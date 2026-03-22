@@ -31,11 +31,20 @@ type CanvasPreset = {
   height: number;
 };
 
+type EditorSnapshot = {
+  blocks: Block[];
+  canvasPresetId: string;
+  backgroundColor: string;
+};
+
 const CANVAS_PRESETS: CanvasPreset[] = [
   { id: "square", label: "Instagram Square (1080×1080)", width: 1080, height: 1080 },
   { id: "story", label: "Story (1080×1920)", width: 1080, height: 1920 },
   { id: "a4", label: "Print A4 (2480×3508)", width: 2480, height: 3508 },
 ];
+
+const undoStackRef = useRef<EditorSnapshot[]>([]);
+const redoStackRef = useRef<EditorSnapshot[]>([]);
 
 const EXPORT_PADDING = 40;
 const STORAGE_KEY = "calligraphy-layout-v1";
@@ -112,9 +121,7 @@ const App: React.FC = () => {
   }, []);
 
 	useEffect(() => {
-	  // Check if we have no blocks AND valid dimensions
 	  if (blocks.length === 0 && canvasWidth > 0) {
-		// Use the current preset dimensions for true centering on the canvas
 		const centerX = currentPreset.width / 2;
 		const centerY = currentPreset.height / 2;
 
@@ -153,6 +160,26 @@ const App: React.FC = () => {
     };
   }, [isResizingSidebar, isMobile, viewportWidth]);
 
+useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    const meta = e.ctrlKey || e.metaKey;
+    if (!meta) return;
+
+    if (e.key === "z" && !e.shiftKey) {
+      e.preventDefault();
+      handleUndo();
+    }
+
+    if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+      e.preventDefault();
+      handleRedo();
+    }
+  };
+
+  window.addEventListener("keydown", handleKeyDown);
+  return () => window.removeEventListener("keydown", handleKeyDown);
+}, []);
+
   useEffect(() => {
     if (blocks.length === 0 && canvasWidth > 0 && canvasHeight > 0) {
       setBlocks([{ ...DEFAULT_BLOCK, x: canvasWidth / 2, y: canvasHeight / 2 }]);
@@ -177,10 +204,12 @@ const App: React.FC = () => {
 
   const updateSelectedBlock = (patch: Partial<Block>) => {
     if (!selectedBlock) return;
+    pushHistory();
     setBlocks((prev) => prev.map((b) => (b.id === selectedBlock.id ? { ...b, ...patch } : b)));
   };
 
   const addBlock = () => {
+    pushHistory();
     const newId = createNextId();
     const newBlock: Block = {
       ...DEFAULT_BLOCK,
@@ -196,6 +225,7 @@ const App: React.FC = () => {
 
   const duplicateSelectedBlock = () => {
     if (!selectedBlock) return;
+    pushHistory();
     const newId = createNextId();
     const copy: Block = {
       ...selectedBlock,
@@ -209,6 +239,7 @@ const App: React.FC = () => {
 
   const deleteSelectedBlock = () => {
     if (!selectedBlock) return;
+    pushHistory();
     setBlocks((prev) => {
       const filtered = prev.filter((b) => b.id !== selectedBlock.id);
       setSelectedId(filtered.length > 0 ? filtered[0].id : null);
@@ -336,6 +367,43 @@ const App: React.FC = () => {
     setIsResizingSidebar(true);
   };
 
+type EditorSnapshot = {
+  blocks: Block[];
+  canvasPresetId: string;
+  backgroundColor: string;
+};
+
+const getSnapshot = (): EditorSnapshot => ({
+  blocks,
+  canvasPresetId,
+  backgroundColor,
+});
+
+const applySnapshot = (snapshot: EditorSnapshot) => {
+  setBlocks(snapshot.blocks);
+  setCanvasPresetId(snapshot.canvasPresetId);
+  setBackgroundColor(snapshot.backgroundColor);
+};
+
+const pushHistory = () => {
+  undoStackRef.current.push(getSnapshot());
+  redoStackRef.current = [];
+};
+
+const handleUndo = () => {
+  const prev = undoStackRef.current.pop();
+  if (!prev) return;
+  redoStackRef.current.push(getSnapshot());
+  applySnapshot(prev);
+};
+
+const handleRedo = () => {
+  const next = redoStackRef.current.pop();
+  if (!next) return;
+  undoStackRef.current.push(getSnapshot());
+  applySnapshot(next);
+};
+
   return (
     <div
       style={{
@@ -357,9 +425,15 @@ const App: React.FC = () => {
         isMobile={isMobile}
         width={effectiveSidebarWidth}
         canvasPresetId={canvasPresetId}
-        onChangeCanvasPreset={setCanvasPresetId}
+        onChangeCanvasPreset={(id) => {
+ 				 pushHistory();
+ 				 setCanvasPresetId(id);
+				}}
+				onChangeBackgroundColor={(color) => {
+				  pushHistory();
+				  setBackgroundColor(color);
+				}}
         backgroundColor={backgroundColor}
-        onChangeBackgroundColor={setBackgroundColor}
         onAddBlock={addBlock}
         onDuplicateBlock={duplicateSelectedBlock}
         onDeleteBlock={deleteSelectedBlock}
