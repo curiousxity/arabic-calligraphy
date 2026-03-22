@@ -183,7 +183,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showStyling, setShowStyling] = useState(false);
   const [showHelpers, setShowHelpers] = useState(false);
   const [showFileActions, setShowFileActions] = useState(false);
-
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const [cursorPosition, setCursorPosition] = useState<number>(0);
   const selectedText = selectedBlock?.text ?? "";
   const selectedOpacity = selectedBlock?.opacity ?? 1;
   const selectedShadowOpacity = selectedBlock?.shadowOpacity ?? 0.35;
@@ -194,21 +195,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const activeBlockLabel = selectedBlock ? `Block ${selectedBlock.id}` : "Block";
 
-  const handleKeyboardKey = (k: string) => {
-    if (!selectedBlock) return;
-    onUpdateSelectedBlock({ text: `${selectedText}${k}` });
-  };
+// Replace the existing handlers (around line 185-197) with these:
 
-  const handleKeyboardSpace = () => {
-    if (!selectedBlock) return;
-    onUpdateSelectedBlock({ text: `${selectedText} ` });
-  };
+const handleKeyboardKey = (k: string) => {
+  if (!selectedBlock) return;
 
-  const handleKeyboardBackspace = () => {
-    if (!selectedBlock) return;
-    onUpdateSelectedBlock({ text: selectedText.slice(0, -1) });
-  };
+  const before = selectedText.substring(0, cursorPosition);
+  const after = selectedText.substring(cursorPosition);
+  const newText = before + k + after;
+  
+  // Calculate new position immediately
+  const newPos = cursorPosition + k.length;
 
+  onUpdateSelectedBlock({ text: newText });
+  setCursorPosition(newPos);
+
+  // Essential: Keep focus so the user can see the cursor position
+  setTimeout(() => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(newPos, newPos);
+    }
+  }, 0);
+};
+
+
+	const handleKeyboardSpace = () => {
+	  handleKeyboardKey(" ");
+	};
+
+	const handleKeyboardBackspace = () => {
+	  if (!selectedBlock || cursorPosition === 0) return;
+
+	  const before = selectedText.substring(0, cursorPosition - 1);
+	  const after = selectedText.substring(cursorPosition);
+	  const newText = before + after;
+	  const newPos = cursorPosition - 1;
+
+	  onUpdateSelectedBlock({ text: newText });
+	  setCursorPosition(newPos);
+
+	  setTimeout(() => {
+		if (textareaRef.current) {
+		  textareaRef.current.focus();
+		  textareaRef.current.setSelectionRange(newPos, newPos);
+		}
+	  }, 0);
+	};
   return (
     <div
       style={{
@@ -233,42 +266,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </h2>
         </div>
 
-        <div className="sidebarPanel">
-          <div className="sidebarSectionTitle">Controls</div>
+		<div className="sidebarPanel">
+		  <div className="sidebarSectionTitle">Block Controls</div>
 
-          <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
-            <button type="button" onClick={onAddBlock} className="sidebarCircleButton">
-              +
-            </button>
-            <button type="button" onClick={onDuplicateBlock} disabled={!selectedBlock} className="sidebarCircleButton">
-              II
-            </button>
-            <button type="button" onClick={onDeleteBlock} disabled={!selectedBlock || blocks.length === 0} className="sidebarCircleButton">
-              -
-            </button>
-          </div>
-
-          <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-            <label className="checkboxRow">
-              <input type="checkbox" checked={showGrid} onChange={(e) => onToggleGrid(e.target.checked)} />
-              Show gridlines
-            </label>
-            <label className="checkboxRow">
-              <input type="checkbox" checked={snapToGrid} onChange={(e) => onToggleSnap(e.target.checked)} />
-              Snap text to gridlines
-            </label>
-          </div>
-        </div>
-
+		  <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+			<button type="button" onClick={onAddBlock} className="sidebarCircleButton">
+			  +
+			</button>
+			<button type="button" onClick={onDuplicateBlock} disabled={!selectedBlock} className="sidebarCircleButton">
+			  II
+			</button>
+			<button type="button" onClick={onDeleteBlock} disabled={!selectedBlock || blocks.length === 0} className="sidebarCircleButton">
+			  -
+			</button>
+		  </div>
+		</div>
         {selectedBlock && (
           <div className="sidebarPanel">
             <div className="sidebarSectionTitle">{activeBlockLabel}</div>
-            <textarea
-              className="sidebarTextarea"
-              value={selectedText}
-              onChange={(e) => updateText(e.target.value)}
-              placeholder="Select a text block to edit..."
-            />
+		<textarea
+		  ref={textareaRef}
+		  className="sidebarTextarea"
+		  value={selectedText}
+		  onChange={(e) => {
+			updateText(e.target.value);
+		  }}
+		  // onSelect handles clicks, drags, and arrow key movements
+		  onSelect={(e) => {
+			setCursorPosition(e.currentTarget.selectionStart);
+		  }}
+		  placeholder="Select a text block to edit..."
+		/>
           </div>
         )}
 
@@ -404,15 +432,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 </div>
 
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
-                  <div className="sidebarSectionTitle">Canvas background</div>
-                  <input
-                    type="color"
-                    value={backgroundColor}
-                    onChange={(e) => onChangeBackgroundColor(e.target.value)}
-                    className="sidebarColorInput"
-                  />
-                </div>
               </div>
             )}
           </div>
@@ -444,7 +463,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {showHelpers && (
             <div className="sectionPanel">
-              <PresetKeyboard title="Diacritics" rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]} onPick={onInsertPreset} />
+              <PresetKeyboard title="Diacritics" rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]} onPick={handleKeyboardKey} />
               <button
                 type="button"
                 onClick={() => selectedBlock && onClearDiacritics(selectedBlock)}
@@ -485,21 +504,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        <div className="sidebarPanel">
-          <div className="sidebarSectionTitle">Canvas size</div>
-          <div className="shell">
-            <select
-              value={canvasPresetId}
-              onChange={(e) => onChangeCanvasPreset(e.target.value)}
-              className="select"
-            >
-              <option value="square">Instagram Square</option>
-              <option value="story">Story</option>
-              <option value="a4">Print A4</option>
-            </select>
-          </div>
-        </div>
+		<div className="sidebarPanel">
+		  <div className="sidebarSectionTitle">Canvas</div>		  
+				<div className="sidebarSectionTitle">Size</div>
+			  <div className="shell">
+				<select
+				  value={canvasPresetId}
+				  onChange={(e) => onChangeCanvasPreset(e.target.value)}
+				  className="select"
+				>
+				  <option value="story">Story</option>
+				  <option value="square">Instagram Square</option>
+				  <option value="a4">Print A4</option>
+				</select>
+			  </div>
+	  
+		                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                <div className="sidebarSectionTitle">Background Color</div>
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    onChange={(e) => onChangeBackgroundColor(e.target.value)}
+                    className="sidebarColorInput"
+                  />
+                </div>
 
+		  {/* Add the moved code here */}
+		  <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+			<label className="checkboxRow">
+			  <input type="checkbox" checked={showGrid} onChange={(e) => onToggleGrid(e.target.checked)} />
+			  Show gridlines
+			</label>
+			<label className="checkboxRow">
+			  <input type="checkbox" checked={snapToGrid} onChange={(e) => onToggleSnap(e.target.checked)} />
+			  Snap text to gridlines
+			</label>
+		  </div>
+		</div>
         <p style={{ fontSize: 12, color: "#6b7280", margin: "0 4px 8px" }}>
           Use the controls and keyboard to build your composition.
         </p>

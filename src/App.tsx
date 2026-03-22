@@ -81,7 +81,7 @@ const App: React.FC = () => {
   const [viewportWidth, setViewportWidth] = useState(isBrowser ? window.innerWidth : 1200);
   const [viewportHeight, setViewportHeight] = useState(isBrowser ? window.innerHeight : 800);
 
-  const stageRef = useRef<Konva.Stage | null>(null);
+  const stageRef = useRef<any>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(320);
@@ -111,7 +111,26 @@ const App: React.FC = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+	useEffect(() => {
+	  // Check if we have no blocks AND valid dimensions
+	  if (blocks.length === 0 && canvasWidth > 0) {
+		// Use the current preset dimensions for true centering on the canvas
+		const centerX = currentPreset.width / 2;
+		const centerY = currentPreset.height / 2;
+
+		setBlocks([
+		  { 
+			...DEFAULT_BLOCK, 
+			x: centerX, 
+			y: centerY 
+		  }
+		]);
+		setSelectedId(1);
+	  }
+	}, [blocks.length, canvasWidth, currentPreset]);
+	
   useEffect(() => {
+	  
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizingSidebar || isMobile) return;
       const delta = e.clientX - resizeStartX.current;
@@ -120,7 +139,7 @@ const App: React.FC = () => {
       const sidebarMax = Math.max(260, viewportWidth - 260);
       setSidebarWidth(Math.min(Math.max(newWidth, sidebarMin), sidebarMax));
     };
-
+	
     const handleMouseUp = () => setIsResizingSidebar(false);
 
     if (!isBrowser) return;
@@ -167,9 +186,8 @@ const App: React.FC = () => {
       ...DEFAULT_BLOCK,
       id: newId,
       text: "جديد",
-      x: canvasWidth / 2,
-      y: height / 2,
-      fontSize: 50,
+	x: currentPreset.width / 2, // Use preset width
+	y: currentPreset.height / 2, // Use preset height      fontSize: 50,
       color: "#990000",
     };
     setBlocks((prev) => [...prev, newBlock]);

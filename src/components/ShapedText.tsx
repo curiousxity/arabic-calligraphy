@@ -104,7 +104,7 @@ export const ShapedText: React.FC<Props> = ({
         width={metrics.width}
         height={metrics.height}
         sceneFunc={(context, shape) => {
-          const canvas = context as CanvasRenderingContext2D;
+          const ctx = context as any;
           canvas.save();
 
           canvas.beginPath();
