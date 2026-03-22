@@ -1,0 +1,375 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700&display=swap");
+
+@font-face {
+  font-family: "TahaNaskhRegular";
+  src: url("/fonts/TahaNaskhRegular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kufi";
+  src: url("/fonts/Kufi.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kufi2";
+  src: url("/fonts/Kufi2.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Thuluth";
+  src: url("/fonts/Thuluth.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Wessam";
+  src: url("/fonts/Wessam.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Yekan";
+  src: url("/fonts/Yekan.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lateef";
+  src: url("/fonts/Lateef.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Amiri";
+  src: url("/fonts/Amiri.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ruqaa";
+  src: url("/fonts/Ruqaa.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Qahiri";
+  src: url("/fonts/Qahiri.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  font-family: system-ui, sans-serif;
+  color: #111;
+  background: #e0e0e0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.sidebar {
+  width: 100%;
+  height: 100vh;
+  padding: 0;
+  background: #fafafa;
+  font-family: system-ui, sans-serif;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sidebarInner {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100%;
+}
+
+.sidebarPanel {
+  background: #f5f8fa;
+  border: none;
+  border-radius: 14px;
+  box-shadow: none;
+  padding: 12px;
+}
+
+.sidebarTitle {
+  margin: 0;
+  font-weight: 400;
+  color: #111827;
+}
+
+.sidebarSectionTitle {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  color: #111827;
+}
+
+.field {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.fieldTitle {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #374151;
+}
+
+.shell {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: #f5f8fa;
+  box-shadow: none;
+  padding: 8px 10px;
+}
+
+.select {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  color: #111827;
+}
+
+.sidebarSectionButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 12px;
+  background: #f5f8fa;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  color: #111827;
+}
+
+.sectionPanel {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.checkboxRow {
+  display: block;
+  font-size: 13px;
+  color: #111827;
+  font-weight: 400;
+}
+
+.checkboxRow input {
+  margin-right: 8px;
+}
+
+.sidebarSmallAction {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 400;
+  background: #f5f8fa;
+  color: #111827;
+}
+
+.keyboardWrap {
+  margin-top: 12px;
+}
+
+.colorInput,
+.sidebarColorInput {
+  width: 100%;
+  height: 40px;
+  padding: 4px;
+  border: none;
+  border-radius: 10px;
+  background: #f5f8fa;
+  cursor: pointer;
+}
+
+.textArea,
+.sidebarTextarea {
+  width: 100%;
+  max-width: 100%;
+  min-height: 120px;
+  padding: 12px;
+  font-size: 18px;
+  line-height: 1.5;
+  direction: rtl;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 10px;
+  resize: vertical;
+  background: #f5f8fa;
+  color: #111827;
+}
+
+.rangeInput {
+  width: 100%;
+}
+
+.smallButton {
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.smallButtonBlue {
+  background: #0066cc;
+  color: white;
+}
+
+.smallButtonGray {
+  background: #555;
+  color: white;
+}
+
+.smallButtonRed {
+  background: #cc0000;
+  color: white;
+}
+
+.smallButtonGreen {
+  background: #00a86b;
+  color: white;
+}
+
+.smallButtonOrange {
+  background: #ff9800;
+  color: white;
+}
+
+.smallButtonDark {
+  background: #444;
+  color: white;
+}
+
+.smallButtonLight {
+  background: #777;
+  color: white;
+}
+
+.sidebarPresetKeyboard {
+  border: none;
+  border-radius: 14px;
+  padding: 10px;
+  background: #f5f8fa;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+.sidebarPresetKeyboardTitle {
+  font-size: 12px;
+  color: #111827;
+  margin-bottom: 10px;
+  font-weight: 400;
+}
+
+.sidebarPresetKeyboardRow {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  flex-wrap: nowrap;
+}
+
+.sidebarPresetKeyboardKey {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 40px;
+  padding: 6px 4px;
+  font-size: 18px;
+  text-align: center;
+  border-radius: 8px;
+  border: none;
+  background: #f5f8fa;
+  color: #111827;
+  cursor: pointer;
+  line-height: 1.1;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+.sidebarPresetKeyboardKeyWide {
+  font-size: 14px;
+}
+
+.sidebarCircleButton {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: none;
+  background: #8dbff0;
+  color: #0066cc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+}
+
+.sidebarCircleButton:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.sidebarActionGrid {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sidebarActionGrid.mobile {
+  grid-template-columns: 1fr 1fr;
+}
+
+.sidebarActionGrid.desktop {
+  grid-template-columns: 1fr;
+}

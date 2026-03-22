@@ -1,0 +1,511 @@
+import React, { useState } from "react";
+import { ArabicKeyboard } from "./ArabicKeyboard";
+import { DIACRITICS, SPECIALS, PERSIAN, URDU, PRESETS, PresetButton } from "./SidebarPresets";
+
+type Block = {
+  id: number;
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  color: string;
+  fontFamily: string;
+  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+  opacity?: number;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+  stroke?: string;
+  strokeWidth?: number;
+  locked?: boolean;
+};
+
+export type SidebarProps = {
+  blocks: Block[];
+  selectedBlock?: Block;
+  showGrid: boolean;
+  snapToGrid: boolean;
+  isMobile: boolean;
+  width: number;
+  canvasPresetId: string;
+  onChangeCanvasPreset: (id: string) => void;
+  backgroundColor: string;
+  onChangeBackgroundColor: (color: string) => void;
+  onAddBlock: () => void;
+  onDuplicateBlock: () => void;
+  onDeleteBlock: () => void;
+  onExportPNG: () => void;
+  onExportSVG: () => void;
+  onSaveLayout: () => void;
+  onLoadLayout: () => void;
+  onToggleGrid: (v: boolean) => void;
+  onToggleSnap: (v: boolean) => void;
+  onSelectBlock: (id: number | null) => void;
+  onUpdateSelectedBlock: (patch: Partial<Block>) => void;
+  showKeyboard: boolean;
+  onToggleKeyboard: () => void;
+  onClearDiacritics: (block: Block) => void;
+  onInsertPreset: (value: string) => void;
+};
+
+const SelectRow = ({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}) => (
+  <label className="field">
+    <span className="fieldTitle">{label}</span>
+    <div className="shell">
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="select">
+        {children}
+      </select>
+    </div>
+  </label>
+);
+
+const ColorRow = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) => (
+  <label className="field">
+    <span className="fieldTitle">{label}</span>
+    <input
+      type="color"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="sidebarColorInput"
+    />
+  </label>
+);
+
+const RangeRow = ({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  suffix,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+  suffix?: string;
+}) => (
+  <label className="field">
+    <span className="fieldTitle">
+      {label} {suffix ? <span style={{ color: "#6b7280", fontWeight: 500 }}>{suffix}</span> : null}
+    </span>
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step ?? 1}
+      value={value}
+      onChange={(e) => onChange(step ? parseFloat(e.target.value) : parseInt(e.target.value, 10))}
+      className="rangeInput"
+    />
+  </label>
+);
+
+const PresetKeyboard = ({
+  title,
+  rows,
+  onPick,
+}: {
+  title: string;
+  rows: string[][];
+  onPick: (value: string) => void;
+}) => (
+  <div className="sidebarPresetKeyboard">
+    <div className="sidebarPresetKeyboardTitle">{title}</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {rows.map((row, rowIndex) => (
+        <div key={rowIndex} className="sidebarPresetKeyboardRow">
+          {row.map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onPick(key)}
+              className={`sidebarPresetKeyboardKey ${key.length > 1 ? "sidebarPresetKeyboardKeyWide" : ""}`}
+            >
+              {key}
+            </button>
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  blocks,
+  selectedBlock,
+  showGrid,
+  snapToGrid,
+  isMobile,
+  width,
+  canvasPresetId,
+  onChangeCanvasPreset,
+  backgroundColor,
+  onChangeBackgroundColor,
+  onAddBlock,
+  onDuplicateBlock,
+  onDeleteBlock,
+  onExportPNG,
+  onExportSVG,
+  onSaveLayout,
+  onLoadLayout,
+  onToggleGrid,
+  onToggleSnap,
+  onUpdateSelectedBlock,
+  showKeyboard,
+  onToggleKeyboard,
+  onClearDiacritics,
+  onInsertPreset,
+}) => {
+  const [showStyling, setShowStyling] = useState(false);
+  const [showHelpers, setShowHelpers] = useState(false);
+  const [showFileActions, setShowFileActions] = useState(false);
+
+  const selectedText = selectedBlock?.text ?? "";
+  const selectedOpacity = selectedBlock?.opacity ?? 1;
+  const selectedShadowOpacity = selectedBlock?.shadowOpacity ?? 0.35;
+
+  const updateText = (text: string) => {
+    if (selectedBlock) onUpdateSelectedBlock({ text });
+  };
+
+  const activeBlockLabel = selectedBlock ? `Block ${selectedBlock.id}` : "Block";
+
+  const handleKeyboardKey = (k: string) => {
+    if (!selectedBlock) return;
+    onUpdateSelectedBlock({ text: `${selectedText}${k}` });
+  };
+
+  const handleKeyboardSpace = () => {
+    if (!selectedBlock) return;
+    onUpdateSelectedBlock({ text: `${selectedText} ` });
+  };
+
+  const handleKeyboardBackspace = () => {
+    if (!selectedBlock) return;
+    onUpdateSelectedBlock({ text: selectedText.slice(0, -1) });
+  };
+
+  return (
+    <div
+      style={{
+        width,
+        height: "100%",
+        padding: 0,
+        boxSizing: "border-box",
+        borderRight: isMobile ? "none" : "1px solid #dbe2ea",
+        borderBottom: isMobile ? "1px solid #dbe2ea" : "none",
+        background: "linear-gradient(180deg, #e8edf2 0%, #dde3ea 100%)",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        position: "relative",
+        flexShrink: 0,
+        overflowY: "auto",
+        overflowX: "hidden",
+      }}
+    >
+      <div className="sidebarInner">
+        <div className="sidebarPanel">
+          <h2 className="sidebarTitle" style={{ fontSize: isMobile ? 18 : 20, textAlign: "center", color: "#111827", letterSpacing: "-0.02em" }}>
+            Mohammed Calligraphy
+          </h2>
+        </div>
+
+        <div className="sidebarPanel">
+          <div className="sidebarSectionTitle">Controls</div>
+
+          <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+            <button type="button" onClick={onAddBlock} className="sidebarCircleButton">
+              +
+            </button>
+            <button type="button" onClick={onDuplicateBlock} disabled={!selectedBlock} className="sidebarCircleButton">
+              II
+            </button>
+            <button type="button" onClick={onDeleteBlock} disabled={!selectedBlock || blocks.length === 0} className="sidebarCircleButton">
+              -
+            </button>
+          </div>
+
+          <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+            <label className="checkboxRow">
+              <input type="checkbox" checked={showGrid} onChange={(e) => onToggleGrid(e.target.checked)} />
+              Show gridlines
+            </label>
+            <label className="checkboxRow">
+              <input type="checkbox" checked={snapToGrid} onChange={(e) => onToggleSnap(e.target.checked)} />
+              Snap text to gridlines
+            </label>
+          </div>
+        </div>
+
+        {selectedBlock && (
+          <div className="sidebarPanel">
+            <div className="sidebarSectionTitle">{activeBlockLabel}</div>
+            <textarea
+              className="sidebarTextarea"
+              value={selectedText}
+              onChange={(e) => updateText(e.target.value)}
+              placeholder="Select a text block to edit..."
+            />
+          </div>
+        )}
+
+        {selectedBlock && (
+          <div className="sidebarPanel">
+            <button
+              type="button"
+              onClick={() => setShowStyling((v) => !v)}
+              className="sidebarSectionButton"
+            >
+              <span>Styling</span>
+              <span>{showStyling ? "−" : "+"}</span>
+            </button>
+
+            {showStyling && (
+              <div className="sectionPanel">
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                  <SelectRow
+                    label="Font family"
+                    value={selectedBlock.fontFamily}
+                    onChange={(value) => onUpdateSelectedBlock({ fontFamily: value })}
+                  >
+                    <option value="TahaNaskhRegular">Taha Naskh Regular</option>
+                    <option value="Kufi">Kufi</option>
+                    <option value="Kufi2">Kufi2</option>
+                    <option value="Thuluth">Thuluth</option>
+                    <option value="Wessam">Wessam</option>
+                    <option value="Yekan">Yekan</option>
+                    <option value="NotoSans">Noto Sans</option>
+                    <option value="Lateef">Lateef</option>
+                    <option value="Amiri">Amiri</option>
+                    <option value="Ruqaa">Ruqaa</option>
+                    <option value="Qahiri">Qahiri</option>
+                  </SelectRow>
+
+                  <SelectRow
+                    label="Font style"
+                    value={selectedBlock.fontStyle ?? "normal"}
+                    onChange={(value) => onUpdateSelectedBlock({ fontStyle: value as Block["fontStyle"] })}
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="bold">Bold</option>
+                    <option value="italic">Italic</option>
+                    <option value="bold italic">Bold italic</option>
+                  </SelectRow>
+                </div>
+
+                <RangeRow
+                  label="Font size"
+                  value={selectedBlock.fontSize}
+                  min={24}
+                  max={160}
+                  onChange={(value) => onUpdateSelectedBlock({ fontSize: value })}
+                />
+
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                  <ColorRow
+                    label="Text color"
+                    value={selectedBlock.color}
+                    onChange={(value) => onUpdateSelectedBlock({ color: value })}
+                  />
+                  <RangeRow
+                    label="Opacity"
+                    value={selectedOpacity}
+                    min={0.1}
+                    max={1}
+                    step={0.05}
+                    onChange={(value) => onUpdateSelectedBlock({ opacity: value })}
+                    suffix={`${Math.round(selectedOpacity * 100)}%`}
+                  />
+                </div>
+
+                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                  <div className="sidebarSectionTitle">Stroke</div>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                    <ColorRow
+                      label="Stroke color"
+                      value={selectedBlock.stroke ?? "#000000"}
+                      onChange={(value) => onUpdateSelectedBlock({ stroke: value })}
+                    />
+                    <RangeRow
+                      label="Stroke width"
+                      value={selectedBlock.strokeWidth ?? 0}
+                      min={0}
+                      max={14}
+                      onChange={(value) => onUpdateSelectedBlock({ strokeWidth: value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                  <div className="sidebarSectionTitle">Shadow</div>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                    <ColorRow
+                      label="Shadow color"
+                      value={selectedBlock.shadowColor ?? "#000000"}
+                      onChange={(value) => onUpdateSelectedBlock({ shadowColor: value })}
+                    />
+                    <RangeRow
+                      label="Shadow blur"
+                      value={selectedBlock.shadowBlur ?? 0}
+                      min={0}
+                      max={40}
+                      onChange={(value) => onUpdateSelectedBlock({ shadowBlur: value })}
+                    />
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginTop: 10 }}>
+                    <RangeRow
+                      label="Shadow X"
+                      value={selectedBlock.shadowOffsetX ?? 0}
+                      min={-40}
+                      max={40}
+                      onChange={(value) => onUpdateSelectedBlock({ shadowOffsetX: value })}
+                    />
+                    <RangeRow
+                      label="Shadow Y"
+                      value={selectedBlock.shadowOffsetY ?? 0}
+                      min={-40}
+                      max={40}
+                      onChange={(value) => onUpdateSelectedBlock({ shadowOffsetY: value })}
+                    />
+                  </div>
+
+                  <RangeRow
+                    label="Shadow opacity"
+                    value={selectedShadowOpacity}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    onChange={(value) => onUpdateSelectedBlock({ shadowOpacity: value })}
+                    suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
+                  />
+                </div>
+
+                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                  <div className="sidebarSectionTitle">Canvas background</div>
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    onChange={(e) => onChangeBackgroundColor(e.target.value)}
+                    className="sidebarColorInput"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="sidebarPanel">
+          <button type="button" onClick={onToggleKeyboard} className="sidebarSectionButton">
+            <span>Arabic Keyboard</span>
+            <span>{showKeyboard ? "−" : "+"}</span>
+          </button>
+
+          {showKeyboard && (
+            <div className="keyboardWrap">
+              <ArabicKeyboard
+                onKey={handleKeyboardKey}
+                onSpace={handleKeyboardSpace}
+                onBackspace={handleKeyboardBackspace}
+                style={{ width: "100%" }}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="sidebarPanel">
+          <button type="button" onClick={() => setShowHelpers((v) => !v)} className="sidebarSectionButton">
+            <span>Arabic Helpers</span>
+            <span>{showHelpers ? "−" : "+"}</span>
+          </button>
+
+          {showHelpers && (
+            <div className="sectionPanel">
+              <PresetKeyboard title="Diacritics" rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]} onPick={onInsertPreset} />
+              <button
+                type="button"
+                onClick={() => selectedBlock && onClearDiacritics(selectedBlock)}
+                className="sidebarSmallAction"
+                style={{ background: "#f9fafb" }}
+              >
+                Clear diacritics
+              </button>
+              <PresetKeyboard title="Presets" rows={[PRESETS.slice(0, 5), PRESETS.slice(5)]} onPick={onInsertPreset} />
+              <PresetKeyboard title="Specials" rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]} onPick={onInsertPreset} />
+              <PresetKeyboard title="Persian" rows={[PERSIAN.slice(0, 6), PERSIAN.slice(6)]} onPick={onInsertPreset} />
+              <PresetKeyboard title="Urdu" rows={[URDU.slice(0, 6), URDU.slice(6)]} onPick={onInsertPreset} />
+            </div>
+          )}
+        </div>
+
+        <div className="sidebarPanel">
+          <button type="button" onClick={() => setShowFileActions((v) => !v)} className="sidebarSectionButton">
+            <span>Save Export</span>
+            <span>{showFileActions ? "−" : "+"}</span>
+          </button>
+
+          {showFileActions && (
+            <div className={`sidebarActionGrid ${isMobile ? "mobile" : "desktop"}`}>
+              <button type="button" onClick={onExportPNG} className="smallButton smallButtonGreen">
+                PNG
+              </button>
+              <button type="button" onClick={onExportSVG} className="smallButton smallButtonOrange">
+                SVG
+              </button>
+              <button type="button" onClick={onSaveLayout} className="smallButton smallButtonDark">
+                Save layout
+              </button>
+              <button type="button" onClick={onLoadLayout} className="smallButton smallButtonLight">
+                Load layout
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="sidebarPanel">
+          <div className="sidebarSectionTitle">Canvas size</div>
+          <div className="shell">
+            <select
+              value={canvasPresetId}
+              onChange={(e) => onChangeCanvasPreset(e.target.value)}
+              className="select"
+            >
+              <option value="square">Instagram Square</option>
+              <option value="story">Story</option>
+              <option value="a4">Print A4</option>
+            </select>
+          </div>
+        </div>
+
+        <p style={{ fontSize: 12, color: "#6b7280", margin: "0 4px 8px" }}>
+          Use the controls and keyboard to build your composition.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default Sidebar;
