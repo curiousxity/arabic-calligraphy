@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ArabicKeyboard } from "./ArabicKeyboard";
-import { DIACRITICS, SPECIALS, PERSIAN, URDU, PRESETS, PresetButton } from "./SidebarPresets";
+import { DIACRITICS, SPECIALS, PERSIAN, URDU, PRESETS } from "./SidebarPresets";
 
 type Block = {
   id: number;
