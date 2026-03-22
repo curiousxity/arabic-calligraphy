@@ -262,7 +262,7 @@ const handleKeyboardKey = (k: string) => {
       <div className="sidebarInner">
         <div className="sidebarPanel">
           <h2 className="sidebarTitle" style={{ fontSize: isMobile ? 18 : 20, textAlign: "center", color: "#111827", letterSpacing: "-0.02em" }}>
-            Mohammed Calligraphy
+            Mohammed's Calligraphy
           </h2>
         </div>
 
@@ -270,14 +270,22 @@ const handleKeyboardKey = (k: string) => {
 		  <div className="sidebarSectionTitle">Block Controls</div>
 
 		  <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
-			<button type="button" onClick={onAddBlock} className="sidebarCircleButton">
-			  +
-			</button>
 			<button type="button" onClick={onDuplicateBlock} disabled={!selectedBlock} className="sidebarCircleButton">
 			  II
 			</button>
 			<button type="button" onClick={onDeleteBlock} disabled={!selectedBlock || blocks.length === 0} className="sidebarCircleButton">
 			  -
+			</button>
+			<button type="button" onClick={onAddBlock} className="sidebarCircleButton">
+			  +
+			</button>
+		  </div>
+			<div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
+			<button type="button" onClick={onUndo} disabled={!canUndo} className="sidebarCircleButton">
+			  <wa-icon name="arrow-left" variant="regular"></wa-icon>
+			</button>
+			<button type="button" onClick={onRedo} disabled={!canRedo} className="sidebarCircleButton">
+			  <wa-icon name="arrow-right" variant="regular"></wa-icon>
 			</button>
 		  </div>
 		</div>
