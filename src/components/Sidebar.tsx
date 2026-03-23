@@ -48,6 +48,10 @@ export type SidebarProps = {
   onToggleKeyboard: () => void;
   onClearDiacritics: (block: Block) => void;
   onInsertPreset: (value: string) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 };
 
 const SelectRow = ({
@@ -179,6 +183,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleKeyboard,
   onClearDiacritics,
   onInsertPreset,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }) => {
   const [showStyling, setShowStyling] = useState(false);
   const [showHelpers, setShowHelpers] = useState(false);
@@ -195,53 +203,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const activeBlockLabel = selectedBlock ? `Block ${selectedBlock.id}` : "Block";
 
-// Replace the existing handlers (around line 185-197) with these:
+  const handleKeyboardKey = (k: string) => {
+    if (!selectedBlock) return;
 
-const handleKeyboardKey = (k: string) => {
-  if (!selectedBlock) return;
+    const before = selectedText.substring(0, cursorPosition);
+    const after = selectedText.substring(cursorPosition);
+    const newText = before + k + after;
+    const newPos = cursorPosition + k.length;
 
-  const before = selectedText.substring(0, cursorPosition);
-  const after = selectedText.substring(cursorPosition);
-  const newText = before + k + after;
-  
-  // Calculate new position immediately
-  const newPos = cursorPosition + k.length;
+    onUpdateSelectedBlock({ text: newText });
+    setCursorPosition(newPos);
 
-  onUpdateSelectedBlock({ text: newText });
-  setCursorPosition(newPos);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(newPos, newPos);
+      }
+    }, 0);
+  };
 
-  // Essential: Keep focus so the user can see the cursor position
-  setTimeout(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(newPos, newPos);
-    }
-  }, 0);
-};
+  const handleKeyboardSpace = () => {
+    handleKeyboardKey(" ");
+  };
 
+  const handleKeyboardBackspace = () => {
+    if (!selectedBlock || cursorPosition === 0) return;
 
-	const handleKeyboardSpace = () => {
-	  handleKeyboardKey(" ");
-	};
+    const before = selectedText.substring(0, cursorPosition - 1);
+    const after = selectedText.substring(cursorPosition);
+    const newText = before + after;
+    const newPos = cursorPosition - 1;
 
-	const handleKeyboardBackspace = () => {
-	  if (!selectedBlock || cursorPosition === 0) return;
+    onUpdateSelectedBlock({ text: newText });
+    setCursorPosition(newPos);
 
-	  const before = selectedText.substring(0, cursorPosition - 1);
-	  const after = selectedText.substring(cursorPosition);
-	  const newText = before + after;
-	  const newPos = cursorPosition - 1;
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(newPos, newPos);
+      }
+    }, 0);
+  };
 
-	  onUpdateSelectedBlock({ text: newText });
-	  setCursorPosition(newPos);
-
-	  setTimeout(() => {
-		if (textareaRef.current) {
-		  textareaRef.current.focus();
-		  textareaRef.current.setSelectionRange(newPos, newPos);
-		}
-	  }, 0);
-	};
   return (
     <div
       style={{
@@ -261,50 +264,59 @@ const handleKeyboardKey = (k: string) => {
     >
       <div className="sidebarInner">
         <div className="sidebarPanel">
-          <h2 className="sidebarTitle" style={{ fontSize: isMobile ? 18 : 20, textAlign: "center", color: "#111827", letterSpacing: "-0.02em" }}>
+          <h2
+            className="sidebarTitle"
+            style={{ fontSize: isMobile ? 18 : 20, textAlign: "center", color: "#111827", letterSpacing: "-0.02em" }}
+          >
             Mohammed's Calligraphy
           </h2>
         </div>
 
-		<div className="sidebarPanel">
-		  <div className="sidebarSectionTitle">Block Controls</div>
+        <div className="sidebarPanel">
+          <div className="sidebarSectionTitle">Block Controls</div>
 
-		  <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
-			<button type="button" onClick={onDuplicateBlock} disabled={!selectedBlock} className="sidebarCircleButton">
-			  II
-			</button>
-			<button type="button" onClick={onDeleteBlock} disabled={!selectedBlock || blocks.length === 0} className="sidebarCircleButton">
-			  -
-			</button>
-			<button type="button" onClick={onAddBlock} className="sidebarCircleButton">
-			  +
-			</button>
-		  </div>
-			<div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
-			<button type="button" onClick={onUndo} disabled={!canUndo} className="sidebarCircleButton">
-			  <wa-icon name="arrow-left" variant="regular"></wa-icon>
-			</button>
-			<button type="button" onClick={onRedo} disabled={!canRedo} className="sidebarCircleButton">
-			  <wa-icon name="arrow-right" variant="regular"></wa-icon>
-			</button>
-		  </div>
-		</div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+            <button type="button" onClick={onDuplicateBlock} disabled={!selectedBlock} className="sidebarCircleButton">
+              II
+            </button>
+            <button
+              type="button"
+              onClick={onDeleteBlock}
+              disabled={!selectedBlock || blocks.length === 0}
+              className="sidebarCircleButton"
+            >
+              -
+            </button>
+            <button type="button" onClick={onAddBlock} className="sidebarCircleButton">
+              +
+            </button>
+          </div>
+
+          <div style={{ height: 10 }} />
+
+          <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+            <button type="button" onClick={onUndo} disabled={!canUndo} className="sidebarCircleButton" aria-label="Undo">
+              <wa-icon name="arrow-left" variant="regular"></wa-icon>
+            </button>
+            <button type="button" onClick={onRedo} disabled={!canRedo} className="sidebarCircleButton" aria-label="Redo">
+              <wa-icon name="arrow-right" variant="regular"></wa-icon>
+            </button>
+          </div>
+        </div>
+
         {selectedBlock && (
           <div className="sidebarPanel">
             <div className="sidebarSectionTitle">{activeBlockLabel}</div>
-		<textarea
-		  ref={textareaRef}
-		  className="sidebarTextarea"
-		  value={selectedText}
-		  onChange={(e) => {
-			updateText(e.target.value);
-		  }}
-		  // onSelect handles clicks, drags, and arrow key movements
-		  onSelect={(e) => {
-			setCursorPosition(e.currentTarget.selectionStart);
-		  }}
-		  placeholder="Select a text block to edit..."
-		/>
+            <textarea
+              ref={textareaRef}
+              className="sidebarTextarea"
+              value={selectedText}
+              onChange={(e) => updateText(e.target.value)}
+              onSelect={(e) => {
+                setCursorPosition(e.currentTarget.selectionStart ?? 0);
+              }}
+              placeholder="Select a text block to edit..."
+            />
           </div>
         )}
 
@@ -439,7 +451,6 @@ const handleKeyboardKey = (k: string) => {
                     suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
                   />
                 </div>
-
               </div>
             )}
           </div>
@@ -511,50 +522,3 @@ const handleKeyboardKey = (k: string) => {
             </div>
           )}
         </div>
-
-		<div className="sidebarPanel">
-		  <div className="sidebarSectionTitle">Canvas</div>		  
-				<div className="sidebarSectionTitle">Size</div>
-			  <div className="shell">
-				<select
-				  value={canvasPresetId}
-				  onChange={(e) => onChangeCanvasPreset(e.target.value)}
-				  className="select"
-				>
-				  <option value="story">Story</option>
-				  <option value="square">Instagram Square</option>
-				  <option value="a4">Print A4</option>
-				</select>
-			  </div>
-	  
-		                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
-                <div className="sidebarSectionTitle">Background Color</div>
-                  <input
-                    type="color"
-                    value={backgroundColor}
-                    onChange={(e) => onChangeBackgroundColor(e.target.value)}
-                    className="sidebarColorInput"
-                  />
-                </div>
-
-		  {/* Add the moved code here */}
-		  <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-			<label className="checkboxRow">
-			  <input type="checkbox" checked={showGrid} onChange={(e) => onToggleGrid(e.target.checked)} />
-			  Show gridlines
-			</label>
-			<label className="checkboxRow">
-			  <input type="checkbox" checked={snapToGrid} onChange={(e) => onToggleSnap(e.target.checked)} />
-			  Snap text to gridlines
-			</label>
-		  </div>
-		</div>
-        <p style={{ fontSize: 12, color: "#6b7280", margin: "0 4px 8px" }}>
-          Use the controls and keyboard to build your composition.
-        </p>
-      </div>
-    </div>
-  );
-};
-
-export default Sidebar;
