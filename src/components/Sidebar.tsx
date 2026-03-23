@@ -1,8 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import type Konva from "konva";
-import { exportStageSVG } from "react-konva-to-svg";
-import { Sidebar } from "./components/Sidebar";
-import { CanvasStage } from "./components/CanvasStage";
+import React, { useState } from "react";
+import { ArabicKeyboard } from "./ArabicKeyboard";
+import { DIACRITICS, SPECIALS, PERSIAN, URDU, PRESETS } from "./SidebarPresets";
 
 type Block = {
   id: number;
@@ -14,474 +12,560 @@ type Block = {
   fontFamily: string;
   fontStyle?: "normal" | "bold" | "italic" | "bold italic";
   opacity?: number;
-  stroke?: string;
-  strokeWidth?: number;
   shadowColor?: string;
   shadowBlur?: number;
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  stroke?: string;
+  strokeWidth?: number;
   locked?: boolean;
 };
 
-type CanvasPreset = {
-  id: string;
-  label: string;
-  width: number;
-  height: number;
-};
-
-type EditorSnapshot = {
+export type SidebarProps = {
   blocks: Block[];
+  selectedBlock?: Block;
+  showGrid: boolean;
+  snapToGrid: boolean;
+  isMobile: boolean;
+  width: number;
   canvasPresetId: string;
+  onChangeCanvasPreset: (id: string) => void;
   backgroundColor: string;
+  onChangeBackgroundColor: (color: string) => void;
+  onAddBlock: () => void;
+  onDuplicateBlock: () => void;
+  onDeleteBlock: () => void;
+  onExportPNG: () => void;
+  onExportSVG: () => void;
+  onSaveLayout: () => void;
+  onLoadLayout: () => void;
+  onToggleGrid: (v: boolean) => void;
+  onToggleSnap: (v: boolean) => void;
+  onSelectBlock: (id: number | null) => void;
+  onUpdateSelectedBlock: (patch: Partial<Block>) => void;
+  showKeyboard: boolean;
+  onToggleKeyboard: () => void;
+  onClearDiacritics: (block: Block) => void;
+  onInsertPreset: (value: string) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 };
 
-const CANVAS_PRESETS: CanvasPreset[] = [
-  { id: "square", label: "Instagram Square (1080×1080)", width: 1080, height: 1080 },
-  { id: "story", label: "Story (1080×1920)", width: 1080, height: 1920 },
-  { id: "a4", label: "Print A4 (2480×3508)", width: 2480, height: 3508 },
-];
+const SelectRow = ({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}) => (
+  <label className="field">
+    <span className="fieldTitle">{label}</span>
+    <div className="shell">
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="select">
+        {children}
+      </select>
+    </div>
+  </label>
+);
 
-const EXPORT_PADDING = 40;
-const STORAGE_KEY = "calligraphy-layout-v1";
-const MIN_SCALE = 0.25;
-const MAX_SCALE = 3;
+const ColorRow = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) => (
+  <label className="field">
+    <span className="fieldTitle">{label}</span>
+    <input
+      type="color"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="sidebarColorInput"
+    />
+  </label>
+);
 
-const DEFAULT_BLOCK: Block = {
-  id: 1,
-  text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
-  x: 0,
-  y: 0,
-  fontSize: 60,
-  color: "#0066cc",
-  fontFamily: "TahaNaskhRegular",
-  fontStyle: "normal",
-  opacity: 1,
-  stroke: "#000000",
-  strokeWidth: 0,
-  shadowColor: "#000000",
-  shadowBlur: 0,
-  shadowOffsetX: 0,
-  shadowOffsetY: 0,
-  shadowOpacity: 0.35,
-  locked: false,
-};
+const RangeRow = ({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  suffix,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+  suffix?: string;
+}) => (
+  <label className="field">
+    <span className="fieldTitle">
+      {label} {suffix ? <span style={{ color: "#6b7280", fontWeight: 500 }}>{suffix}</span> : null}
+    </span>
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step ?? 1}
+      value={value}
+      onChange={(e) => onChange(step ? parseFloat(e.target.value) : parseInt(e.target.value, 10))}
+      className="rangeInput"
+    />
+  </label>
+);
 
-const isBrowser = typeof window !== "undefined";
+const PresetKeyboard = ({
+  title,
+  rows,
+  onPick,
+}: {
+  title: string;
+  rows: string[][];
+  onPick: (value: string) => void;
+}) => (
+  <div className="sidebarPresetKeyboard">
+    <div className="sidebarPresetKeyboardTitle">{title}</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {rows.map((row, rowIndex) => (
+        <div key={rowIndex} className="sidebarPresetKeyboardRow">
+          {row.map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onPick(key)}
+              className={`sidebarPresetKeyboardKey ${key.length > 1 ? "sidebarPresetKeyboardKeyWide" : ""}`}
+            >
+              {key}
+            </button>
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
-const App: React.FC = () => {
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(1);
-  const [showGrid, setShowGrid] = useState(true);
-  const [snapToGrid, setSnapToGrid] = useState(false);
-  const [isMobile, setIsMobile] = useState(isBrowser ? window.innerWidth <= 768 : false);
-  const [canvasPresetId, setCanvasPresetId] = useState<string>("story");
-  const [backgroundColor, setBackgroundColor] = useState<string>("#ffffff");
-  const [sidebarWidth, setSidebarWidth] = useState(320);
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const [stageScale, setStageScale] = useState(1);
-  const [stagePosition, setStagePosition] = useState({ x: 0, y: 0 });
-  const [panMode, setPanMode] = useState(false);
-  const [showKeyboard, setShowKeyboard] = useState(false);
-  const [viewportWidth, setViewportWidth] = useState(isBrowser ? window.innerWidth : 1200);
-  const [viewportHeight, setViewportHeight] = useState(isBrowser ? window.innerHeight : 800);
+export const Sidebar: React.FC<SidebarProps> = ({
+  blocks,
+  selectedBlock,
+  showGrid,
+  snapToGrid,
+  isMobile,
+  width,
+  canvasPresetId,
+  onChangeCanvasPreset,
+  backgroundColor,
+  onChangeBackgroundColor,
+  onAddBlock,
+  onDuplicateBlock,
+  onDeleteBlock,
+  onExportPNG,
+  onExportSVG,
+  onSaveLayout,
+  onLoadLayout,
+  onToggleGrid,
+  onToggleSnap,
+  onUpdateSelectedBlock,
+  showKeyboard,
+  onToggleKeyboard,
+  onClearDiacritics,
+  onInsertPreset,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+}) => {
+  const [showStyling, setShowStyling] = useState(false);
+  const [showHelpers, setShowHelpers] = useState(false);
+  const [showFileActions, setShowFileActions] = useState(false);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const [cursorPosition, setCursorPosition] = useState<number>(0);
+  const selectedText = selectedBlock?.text ?? "";
+  const selectedOpacity = selectedBlock?.opacity ?? 1;
+  const selectedShadowOpacity = selectedBlock?.shadowOpacity ?? 0.35;
 
-  const stageRef = useRef<Konva.Stage | null>(null);
-  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
-  const resizeStartX = useRef(0);
-  const resizeStartWidth = useRef(320);
-  const nextIdRef = useRef(2);
-  const undoStackRef = useRef<EditorSnapshot[]>([]);
-  const redoStackRef = useRef<EditorSnapshot[]>([]);
-
-  const currentPreset =
-    CANVAS_PRESETS.find((p) => p.id === canvasPresetId) ?? CANVAS_PRESETS[0];
-
-  const effectiveSidebarWidth = isMobile
-    ? viewportWidth
-    : Math.min(Math.max(sidebarWidth, 220), Math.max(260, viewportWidth - 260));
-
-  const canvasWidth = Math.max(0, viewportWidth - effectiveSidebarWidth);
-  const canvasHeight = currentPreset.height;
-  const height = viewportHeight;
-
-  const getSnapshot = (): EditorSnapshot => ({
-    blocks,
-    canvasPresetId,
-    backgroundColor,
-  });
-
-  const applySnapshot = (snapshot: EditorSnapshot) => {
-    setBlocks(snapshot.blocks);
-    setCanvasPresetId(snapshot.canvasPresetId);
-    setBackgroundColor(snapshot.backgroundColor);
+  const updateText = (text: string) => {
+    if (selectedBlock) onUpdateSelectedBlock({ text });
   };
 
-  const pushHistory = () => {
-    undoStackRef.current.push(getSnapshot());
-    redoStackRef.current = [];
-  };
+  const activeBlockLabel = selectedBlock ? `Block ${selectedBlock.id}` : "Block";
 
-  const handleUndo = () => {
-    const prev = undoStackRef.current.pop();
-    if (!prev) return;
-    redoStackRef.current.push(getSnapshot());
-    applySnapshot(prev);
-  };
-
-  const handleRedo = () => {
-    const next = redoStackRef.current.pop();
-    if (!next) return;
-    undoStackRef.current.push(getSnapshot());
-    applySnapshot(next);
-  };
-
-  useEffect(() => {
-    if (!isBrowser) return;
-
-    const handleResize = () => {
-      setViewportWidth(window.innerWidth);
-      setViewportHeight(window.innerHeight);
-      setIsMobile(window.innerWidth <= 768);
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  useEffect(() => {
-    if (blocks.length === 0 && canvasWidth > 0 && canvasHeight > 0) {
-      setBlocks([{ ...DEFAULT_BLOCK, x: canvasWidth / 2, y: canvasHeight / 2 }]);
-      setSelectedId(1);
-    }
-  }, [blocks.length, canvasWidth, canvasHeight]);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizingSidebar || isMobile) return;
-      const delta = e.clientX - resizeStartX.current;
-      const newWidth = resizeStartWidth.current + delta;
-      const sidebarMin = 220;
-      const sidebarMax = Math.max(260, viewportWidth - 260);
-      setSidebarWidth(Math.min(Math.max(newWidth, sidebarMin), sidebarMax));
-    };
-
-    const handleMouseUp = () => setIsResizingSidebar(false);
-
-    if (!isBrowser) return;
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isResizingSidebar, isMobile, viewportWidth]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const meta = e.ctrlKey || e.metaKey;
-      if (!meta) return;
-
-      if (e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      }
-
-      if ((e.key === "z" && e.shiftKey) || e.key === "y") {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [blocks, canvasPresetId, backgroundColor]);
-
-  useEffect(() => {
-    nextIdRef.current = Math.max(2, ...blocks.map((b) => b.id + 1));
-  }, [blocks]);
-
-  const selectedBlock = useMemo(
-    () => (selectedId == null ? undefined : blocks.find((b) => b.id === selectedId)),
-    [blocks, selectedId]
-  );
-
-  const createNextId = () => {
-    const id = nextIdRef.current;
-    nextIdRef.current += 1;
-    return id;
-  };
-
-  const updateSelectedBlock = (patch: Partial<Block>) => {
+  const handleKeyboardKey = (k: string) => {
     if (!selectedBlock) return;
-    pushHistory();
-    setBlocks((prev) => prev.map((b) => (b.id === selectedBlock.id ? { ...b, ...patch } : b)));
-  };
 
-  const addBlock = () => {
-    pushHistory();
-    const newId = createNextId();
-    const newBlock: Block = {
-      ...DEFAULT_BLOCK,
-      id: newId,
-      text: "جديد",
-      x: currentPreset.width / 2,
-      y: currentPreset.height / 2,
-      fontSize: 50,
-      color: "#990000",
-    };
-    setBlocks((prev) => [...prev, newBlock]);
-    setSelectedId(newId);
-  };
+    const before = selectedText.substring(0, cursorPosition);
+    const after = selectedText.substring(cursorPosition);
+    const newText = before + k + after;
+    const newPos = cursorPosition + k.length;
 
-  const duplicateSelectedBlock = () => {
-    if (!selectedBlock) return;
-    pushHistory();
-    const newId = createNextId();
-    const copy: Block = {
-      ...selectedBlock,
-      id: newId,
-      x: selectedBlock.x + 20,
-      y: selectedBlock.y + 20,
-    };
-    setBlocks((prev) => [...prev, copy]);
-    setSelectedId(newId);
-  };
+    onUpdateSelectedBlock({ text: newText });
+    setCursorPosition(newPos);
 
-  const deleteSelectedBlock = () => {
-    if (!selectedBlock) return;
-    pushHistory();
-    setBlocks((prev) => {
-      const filtered = prev.filter((b) => b.id !== selectedBlock.id);
-      setSelectedId(filtered.length > 0 ? filtered[0].id : null);
-      return filtered;
-    });
-  };
-
-  const getBlocksBoundingBox = () => {
-    const stage = stageRef.current;
-    if (!stage || blocks.length === 0) return null;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    blocks.forEach((block) => {
-      const node = stage.findOne(`#block-${block.id}`) as Konva.Node | null;
-      if (!node) return;
-      const rect = node.getClientRect({ relativeTo: stage });
-      minX = Math.min(minX, rect.x);
-      minY = Math.min(minY, rect.y);
-      maxX = Math.max(maxX, rect.x + rect.width);
-      maxY = Math.max(maxY, rect.y + rect.height);
-    });
-
-    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return null;
-
-    return {
-      x: minX - EXPORT_PADDING,
-      y: minY - EXPORT_PADDING,
-      width: maxX - minX + 2 * EXPORT_PADDING,
-      height: maxY - minY + 2 * EXPORT_PADDING,
-    };
-  };
-
-  const handleExportPNG = () => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const box = getBlocksBoundingBox();
-    if (!box) return;
-
-    const dataURL = stage.toDataURL({
-      mimeType: "image/png",
-      quality: 1,
-      pixelRatio: 2,
-      x: box.x,
-      y: box.y,
-      width: box.width,
-      height: box.height,
-    });
-
-    const link = document.createElement("a");
-    link.download = "calligraphy.png";
-    link.href = dataURL;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleExportSVG = async () => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const box = getBlocksBoundingBox();
-    if (!box) return;
-
-    const exported = await exportStageSVG(stage, false);
-    const svgText = String(exported).trim();
-    const finalSvg = svgText.startsWith("<svg")
-      ? svgText
-      : `<svg xmlns="http://www.w3.org/2000/svg" width="${box.width}" height="${box.height}" viewBox="${box.x} ${box.y} ${box.width} ${box.height}">${svgText}</svg>`;
-
-    const blob = new Blob([finalSvg], { type: "image/svg+xml" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "calligraphy.svg";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const saveLayout = () => {
-    if (!isBrowser) return;
-    const payload = { blocks, selectedId, canvasPresetId, backgroundColor, stageScale, stagePosition, panMode };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  };
-
-  const loadLayout = () => {
-    if (!isBrowser) return;
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
-      if (typeof parsed.selectedId === "number" || parsed.selectedId === null) setSelectedId(parsed.selectedId);
-      if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
-      if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
-      if (typeof parsed.stageScale === "number") setStageScale(parsed.stageScale);
-      if (
-        parsed.stagePosition &&
-        typeof parsed.stagePosition.x === "number" &&
-        typeof parsed.stagePosition.y === "number"
-      ) {
-        setStagePosition(parsed.stagePosition);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(newPos, newPos);
       }
-      if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
-    } catch {
-      // ignore invalid saved data
-    }
+    }, 0);
   };
 
-  const updateStageZoom = (scale: number, position: { x: number; y: number }) => {
-    setStageScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale)));
-    setStagePosition(position);
+  const handleKeyboardSpace = () => {
+    handleKeyboardKey(" ");
   };
 
-  const startSidebarResize = (e: React.MouseEvent) => {
-    resizeStartX.current = e.clientX;
-    resizeStartWidth.current = sidebarWidth;
-    setIsResizingSidebar(true);
-  };
+  const handleKeyboardBackspace = () => {
+    if (!selectedBlock || cursorPosition === 0) return;
 
-  function onUpdateClearDiacritics(
-    block: { text: string } | undefined,
-    updateSelectedBlockFn: (patch: Partial<Block>) => void
-  ) {
-    if (!block) return;
-    updateSelectedBlockFn({ text: block.text.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "") });
-  }
+    const before = selectedText.substring(0, cursorPosition - 1);
+    const after = selectedText.substring(cursorPosition);
+    const newText = before + after;
+    const newPos = cursorPosition - 1;
+
+    onUpdateSelectedBlock({ text: newText });
+    setCursorPosition(newPos);
+
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(newPos, newPos);
+      }
+    }, 0);
+  };
 
   return (
     <div
       style={{
-        height: "100vh",
-        width: "100vw",
-        display: "flex",
-        flexDirection: isMobile ? "column" : "row",
-        margin: 0,
+        width,
+        height: "100%",
         padding: 0,
-        overflow: "hidden",
-        background: "#e0e0e0",
+        boxSizing: "border-box",
+        borderRight: isMobile ? "none" : "1px solid #dbe2ea",
+        borderBottom: isMobile ? "1px solid #dbe2ea" : "none",
+        background: "linear-gradient(180deg, #e8edf2 0%, #dde3ea 100%)",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        position: "relative",
+        flexShrink: 0,
+        overflowY: "auto",
+        overflowX: "hidden",
       }}
     >
-      <Sidebar
-        blocks={blocks}
-        selectedBlock={selectedBlock}
-        showGrid={showGrid}
-        snapToGrid={snapToGrid}
-        isMobile={isMobile}
-        width={effectiveSidebarWidth}
-        canvasPresetId={canvasPresetId}
-        onChangeCanvasPreset={(id) => {
-          pushHistory();
-          setCanvasPresetId(id);
-        }}
-        backgroundColor={backgroundColor}
-        onChangeBackgroundColor={(color) => {
-          pushHistory();
-          setBackgroundColor(color);
-        }}
-        onAddBlock={addBlock}
-        onDuplicateBlock={duplicateSelectedBlock}
-        onDeleteBlock={deleteSelectedBlock}
-        onExportPNG={handleExportPNG}
-        onExportSVG={handleExportSVG}
-        onSaveLayout={saveLayout}
-        onLoadLayout={loadLayout}
-        onToggleGrid={setShowGrid}
-        onToggleSnap={setSnapToGrid}
-        onSelectBlock={setSelectedId}
-        onUpdateSelectedBlock={updateSelectedBlock}
-        showKeyboard={showKeyboard}
-        onToggleKeyboard={() => setShowKeyboard((v) => !v)}
-        onClearDiacritics={(block) => onUpdateClearDiacritics(block, updateSelectedBlock)}
-        onInsertPreset={(value) => selectedBlock && updateSelectedBlock({ text: selectedBlock.text + value })}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        canUndo={undoStackRef.current.length > 0}
-        canRedo={redoStackRef.current.length > 0}
-      />
+      <div className="sidebarInner">
+        <div className="sidebarPanel">
+          <h2
+            className="sidebarTitle"
+            style={{ fontSize: isMobile ? 18 : 20, textAlign: "center", color: "#111827", letterSpacing: "-0.02em" }}
+          >
+            Mohammed's Calligraphy
+          </h2>
+        </div>
 
-      <div
-        onMouseDown={isMobile ? undefined : startSidebarResize}
-        style={{
-          width: isMobile ? "100%" : 6,
-          cursor: isMobile ? "default" : "col-resize",
-          background: isMobile
-            ? "transparent"
-            : "linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,0.06), rgba(0,0,0,0))",
-          flexShrink: 0,
-        }}
-      />
+        <div className="sidebarPanel">
+          <div className="sidebarSectionTitle">Block Controls</div>
 
-      <div ref={canvasContainerRef} style={{ flex: 1, position: "relative" }}>
-        <CanvasStage
-          blocks={blocks}
-          snapToGrid={snapToGrid}
-          showGrid={showGrid}
-          canvasWidth={canvasWidth}
-          canvasHeight={canvasHeight}
-          backgroundColor={backgroundColor}
-          stageRef={stageRef}
-          stageScale={stageScale}
-          stagePosition={stagePosition}
-          panMode={panMode}
-          onTogglePanMode={setPanMode}
-          onUpdateStage={updateStageZoom}
-          onUpdateBlockPosition={(id, x, y) =>
-            setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, x, y } : b)))
-          }
-          onSelectBlock={setSelectedId}
-          showKeyboard={showKeyboard}
-          onKeyFromKeyboard={(k) =>
-            selectedBlock && updateSelectedBlock({ text: selectedBlock.text + k })
-          }
-          onSpaceFromKeyboard={() =>
-            selectedBlock && updateSelectedBlock({ text: selectedBlock.text + " " })
-          }
-          onBackspaceFromKeyboard={() =>
-            selectedBlock && updateSelectedBlock({ text: selectedBlock.text.slice(0, -1) })
-          }
-        />
+          <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+            <button
+              type="button"
+              onClick={onDeleteBlock}
+              disabled={!selectedBlock || blocks.length === 0}
+              className="sidebarCircleButton"
+            >
+              -
+            </button>
+            <button type="button" onClick={onDuplicateBlock} disabled={!selectedBlock} className="sidebarCircleButton">
+              II
+            </button>
+            <button type="button" onClick={onAddBlock} className="sidebarCircleButton">
+              +
+            </button>
+          </div>
+
+          <div style={{ height: 10 }} />
+
+          <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+            <button type="button" onClick={onUndo} disabled={!canUndo} className="sidebarCircleButton" aria-label="Undo">
+              <wa-icon name="arrow-left" variant="regular"></wa-icon>
+            </button>
+            <button type="button" onClick={onRedo} disabled={!canRedo} className="sidebarCircleButton" aria-label="Redo">
+              <wa-icon name="arrow-right" variant="regular"></wa-icon>
+            </button>
+          </div>
+        </div>
+
+        {selectedBlock && (
+          <div className="sidebarPanel">
+            <div className="sidebarSectionTitle">{activeBlockLabel}</div>
+            <textarea
+              ref={textareaRef}
+              className="sidebarTextarea"
+              value={selectedText}
+              onChange={(e) => updateText(e.target.value)}
+              onSelect={(e) => {
+                setCursorPosition(e.currentTarget.selectionStart ?? 0);
+              }}
+              placeholder="Select a text block to edit..."
+            />
+          </div>
+        )}
+
+        {selectedBlock && (
+          <div className="sidebarPanel">
+            <button
+              type="button"
+              onClick={() => setShowStyling((v) => !v)}
+              className="sidebarSectionButton"
+            >
+              <span>Styling</span>
+              <span>{showStyling ? "−" : "+"}</span>
+            </button>
+
+            {showStyling && (
+              <div className="sectionPanel">
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                  <SelectRow
+                    label="Font family"
+                    value={selectedBlock.fontFamily}
+                    onChange={(value) => onUpdateSelectedBlock({ fontFamily: value })}
+                  >
+                    <option value="TahaNaskhRegular">Taha Naskh Regular</option>
+                    <option value="Kufi">Kufi</option>
+                    <option value="Kufi2">Kufi2</option>
+                    <option value="Thuluth">Thuluth</option>
+                    <option value="Wessam">Wessam</option>
+                    <option value="Yekan">Yekan</option>
+                    <option value="NotoSans">Noto Sans</option>
+                    <option value="Lateef">Lateef</option>
+                    <option value="Amiri">Amiri</option>
+                    <option value="Ruqaa">Ruqaa</option>
+                    <option value="Qahiri">Qahiri</option>
+                  </SelectRow>
+
+                  <SelectRow
+                    label="Font style"
+                    value={selectedBlock.fontStyle ?? "normal"}
+                    onChange={(value) => onUpdateSelectedBlock({ fontStyle: value as Block["fontStyle"] })}
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="bold">Bold</option>
+                    <option value="italic">Italic</option>
+                    <option value="bold italic">Bold italic</option>
+                  </SelectRow>
+                </div>
+
+                <RangeRow
+                  label="Font size"
+                  value={selectedBlock.fontSize}
+                  min={24}
+                  max={160}
+                  onChange={(value) => onUpdateSelectedBlock({ fontSize: value })}
+                />
+
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                  <ColorRow
+                    label="Text color"
+                    value={selectedBlock.color}
+                    onChange={(value) => onUpdateSelectedBlock({ color: value })}
+                  />
+                  <RangeRow
+                    label="Opacity"
+                    value={selectedOpacity}
+                    min={0.1}
+                    max={1}
+                    step={0.05}
+                    onChange={(value) => onUpdateSelectedBlock({ opacity: value })}
+                    suffix={`${Math.round(selectedOpacity * 100)}%`}
+                  />
+                </div>
+
+                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                  <div className="sidebarSectionTitle">Stroke</div>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                    <ColorRow
+                      label="Stroke color"
+                      value={selectedBlock.stroke ?? "#000000"}
+                      onChange={(value) => onUpdateSelectedBlock({ stroke: value })}
+                    />
+                    <RangeRow
+                      label="Stroke width"
+                      value={selectedBlock.strokeWidth ?? 0}
+                      min={0}
+                      max={14}
+                      onChange={(value) => onUpdateSelectedBlock({ strokeWidth: value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                  <div className="sidebarSectionTitle">Shadow</div>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                    <ColorRow
+                      label="Shadow color"
+                      value={selectedBlock.shadowColor ?? "#000000"}
+                      onChange={(value) => onUpdateSelectedBlock({ shadowColor: value })}
+                    />
+                    <RangeRow
+                      label="Shadow blur"
+                      value={selectedBlock.shadowBlur ?? 0}
+                      min={0}
+                      max={40}
+                      onChange={(value) => onUpdateSelectedBlock({ shadowBlur: value })}
+                    />
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginTop: 10 }}>
+                    <RangeRow
+                      label="Shadow X"
+                      value={selectedBlock.shadowOffsetX ?? 0}
+                      min={-40}
+                      max={40}
+                      onChange={(value) => onUpdateSelectedBlock({ shadowOffsetX: value })}
+                    />
+                    <RangeRow
+                      label="Shadow Y"
+                      value={selectedBlock.shadowOffsetY ?? 0}
+                      min={-40}
+                      max={40}
+                      onChange={(value) => onUpdateSelectedBlock({ shadowOffsetY: value })}
+                    />
+                  </div>
+
+                  <RangeRow
+                    label="Shadow opacity"
+                    value={selectedShadowOpacity}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    onChange={(value) => onUpdateSelectedBlock({ shadowOpacity: value })}
+                    suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="sidebarPanel">
+          <button type="button" onClick={onToggleKeyboard} className="sidebarSectionButton">
+            <span>Arabic Keyboard</span>
+            <span>{showKeyboard ? "−" : "+"}</span>
+          </button>
+
+          {showKeyboard && (
+            <div className="keyboardWrap">
+              <ArabicKeyboard
+                onKey={handleKeyboardKey}
+                onSpace={handleKeyboardSpace}
+                onBackspace={handleKeyboardBackspace}
+                style={{ width: "100%" }}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="sidebarPanel">
+          <button type="button" onClick={() => setShowHelpers((v) => !v)} className="sidebarSectionButton">
+            <span>Arabic Helpers</span>
+            <span>{showHelpers ? "−" : "+"}</span>
+          </button>
+
+          {showHelpers && (
+            <div className="sectionPanel">
+              <PresetKeyboard title="Diacritics" rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]} onPick={handleKeyboardKey} />
+              <button
+                type="button"
+                onClick={() => selectedBlock && onClearDiacritics(selectedBlock)}
+                className="sidebarSmallAction"
+                style={{ background: "#f9fafb" }}
+              >
+                Clear diacritics
+              </button>
+              <PresetKeyboard title="Presets" rows={[PRESETS.slice(0, 5), PRESETS.slice(5)]} onPick={onInsertPreset} />
+              <PresetKeyboard title="Specials" rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]} onPick={onInsertPreset} />
+              <PresetKeyboard title="Persian" rows={[PERSIAN.slice(0, 6), PERSIAN.slice(6)]} onPick={onInsertPreset} />
+              <PresetKeyboard title="Urdu" rows={[URDU.slice(0, 6), URDU.slice(6)]} onPick={onInsertPreset} />
+            </div>
+          )}
+        </div>
+
+        <div className="sidebarPanel">
+          <button type="button" onClick={() => setShowFileActions((v) => !v)} className="sidebarSectionButton">
+            <span>Save Export</span>
+            <span>{showFileActions ? "−" : "+"}</span>
+          </button>
+
+          {showFileActions && (
+            <div className={`sidebarActionGrid ${isMobile ? "mobile" : "desktop"}`}>
+              <button type="button" onClick={onExportPNG} className="smallButton smallButtonGreen">
+                PNG
+              </button>
+              <button type="button" onClick={onExportSVG} className="smallButton smallButtonOrange">
+                SVG
+              </button>
+              <button type="button" onClick={onSaveLayout} className="smallButton smallButtonDark">
+                Save layout
+              </button>
+              <button type="button" onClick={onLoadLayout} className="smallButton smallButtonLight">
+                Load layout
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="sidebarPanel">
+          <div className="sidebarSectionTitle">Canvas</div>
+          <div className="sidebarSectionTitle">Size</div>
+          <div className="shell">
+            <select
+              value={canvasPresetId}
+              onChange={(e) => onChangeCanvasPreset(e.target.value)}
+              className="select"
+            >
+              <option value="story">Story</option>
+              <option value="square">Instagram Square</option>
+              <option value="a4">Print A4</option>
+            </select>
+          </div>
+
+          <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+            <div className="sidebarSectionTitle">Background Color</div>
+            <input
+              type="color"
+              value={backgroundColor}
+              onChange={(e) => onChangeBackgroundColor(e.target.value)}
+              className="sidebarColorInput"
+            />
+          </div>
+
+          <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+            <label className="checkboxRow">
+              <input type="checkbox" checked={showGrid} onChange={(e) => onToggleGrid(e.target.checked)} />
+              Show gridlines
+            </label>
+            <label className="checkboxRow">
+              <input type="checkbox" checked={snapToGrid} onChange={(e) => onToggleSnap(e.target.checked)} />
+              Snap text to gridlines
+            </label>
+          </div>
+        </div>
+
+        <p style={{ fontSize: 12, color: "#6b7280", margin: "0 4px 8px" }}>
+          Use the controls and keyboard to build your composition.
+        </p>
       </div>
     </div>
   );
 };
 
-export default App;
+export default Sidebar;
