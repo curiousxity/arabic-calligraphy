@@ -43,9 +43,6 @@ const CANVAS_PRESETS: CanvasPreset[] = [
   { id: "a4", label: "Print A4 (2480×3508)", width: 2480, height: 3508 },
 ];
 
-const undoStackRef = useRef<EditorSnapshot[]>([]);
-const redoStackRef = useRef<EditorSnapshot[]>([]);
-
 const EXPORT_PADDING = 40;
 const STORAGE_KEY = "calligraphy-layout-v1";
 const MIN_SCALE = 0.25;
@@ -90,11 +87,13 @@ const App: React.FC = () => {
   const [viewportWidth, setViewportWidth] = useState(isBrowser ? window.innerWidth : 1200);
   const [viewportHeight, setViewportHeight] = useState(isBrowser ? window.innerHeight : 800);
 
-  const stageRef = useRef<any>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(320);
   const nextIdRef = useRef(2);
+  const undoStackRef = useRef<EditorSnapshot[]>([]);
+  const redoStackRef = useRef<EditorSnapshot[]>([]);
 
   const currentPreset =
     CANVAS_PRESETS.find((p) => p.id === canvasPresetId) ?? CANVAS_PRESETS[0];
@@ -106,6 +105,37 @@ const App: React.FC = () => {
   const canvasWidth = Math.max(0, viewportWidth - effectiveSidebarWidth);
   const canvasHeight = currentPreset.height;
   const height = viewportHeight;
+
+  const getSnapshot = (): EditorSnapshot => ({
+    blocks,
+    canvasPresetId,
+    backgroundColor,
+  });
+
+  const applySnapshot = (snapshot: EditorSnapshot) => {
+    setBlocks(snapshot.blocks);
+    setCanvasPresetId(snapshot.canvasPresetId);
+    setBackgroundColor(snapshot.backgroundColor);
+  };
+
+  const pushHistory = () => {
+    undoStackRef.current.push(getSnapshot());
+    redoStackRef.current = [];
+  };
+
+  const handleUndo = () => {
+    const prev = undoStackRef.current.pop();
+    if (!prev) return;
+    redoStackRef.current.push(getSnapshot());
+    applySnapshot(prev);
+  };
+
+  const handleRedo = () => {
+    const next = redoStackRef.current.pop();
+    if (!next) return;
+    undoStackRef.current.push(getSnapshot());
+    applySnapshot(next);
+  };
 
   useEffect(() => {
     if (!isBrowser) return;
@@ -120,24 +150,14 @@ const App: React.FC = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-	useEffect(() => {
-	  if (blocks.length === 0 && canvasWidth > 0) {
-		const centerX = currentPreset.width / 2;
-		const centerY = currentPreset.height / 2;
-
-		setBlocks([
-		  { 
-			...DEFAULT_BLOCK, 
-			x: centerX, 
-			y: centerY 
-		  }
-		]);
-		setSelectedId(1);
-	  }
-	}, [blocks.length, canvasWidth, currentPreset]);
-	
   useEffect(() => {
-	  
+    if (blocks.length === 0 && canvasWidth > 0 && canvasHeight > 0) {
+      setBlocks([{ ...DEFAULT_BLOCK, x: canvasWidth / 2, y: canvasHeight / 2 }]);
+      setSelectedId(1);
+    }
+  }, [blocks.length, canvasWidth, canvasHeight]);
+
+  useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizingSidebar || isMobile) return;
       const delta = e.clientX - resizeStartX.current;
@@ -146,7 +166,7 @@ const App: React.FC = () => {
       const sidebarMax = Math.max(260, viewportWidth - 260);
       setSidebarWidth(Math.min(Math.max(newWidth, sidebarMin), sidebarMax));
     };
-	
+
     const handleMouseUp = () => setIsResizingSidebar(false);
 
     if (!isBrowser) return;
@@ -160,32 +180,25 @@ const App: React.FC = () => {
     };
   }, [isResizingSidebar, isMobile, viewportWidth]);
 
-useEffect(() => {
-  const handleKeyDown = (e: KeyboardEvent) => {
-    const meta = e.ctrlKey || e.metaKey;
-    if (!meta) return;
-
-    if (e.key === "z" && !e.shiftKey) {
-      e.preventDefault();
-      handleUndo();
-    }
-
-    if ((e.key === "z" && e.shiftKey) || e.key === "y") {
-      e.preventDefault();
-      handleRedo();
-    }
-  };
-
-  window.addEventListener("keydown", handleKeyDown);
-  return () => window.removeEventListener("keydown", handleKeyDown);
-}, []);
-
   useEffect(() => {
-    if (blocks.length === 0 && canvasWidth > 0 && canvasHeight > 0) {
-      setBlocks([{ ...DEFAULT_BLOCK, x: canvasWidth / 2, y: canvasHeight / 2 }]);
-      setSelectedId(1);
-    }
-  }, [blocks.length, canvasWidth, canvasHeight]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const meta = e.ctrlKey || e.metaKey;
+      if (!meta) return;
+
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+
+      if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [blocks, canvasPresetId, backgroundColor]);
 
   useEffect(() => {
     nextIdRef.current = Math.max(2, ...blocks.map((b) => b.id + 1));
@@ -215,8 +228,9 @@ useEffect(() => {
       ...DEFAULT_BLOCK,
       id: newId,
       text: "جديد",
-	x: currentPreset.width / 2, // Use preset width
-	y: currentPreset.height / 2, // Use preset height      fontSize: 50,
+      x: currentPreset.width / 2,
+      y: currentPreset.height / 2,
+      fontSize: 50,
       color: "#990000",
     };
     setBlocks((prev) => [...prev, newBlock]);
@@ -266,9 +280,7 @@ useEffect(() => {
       maxY = Math.max(maxY, rect.y + rect.height);
     });
 
-    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-      return null;
-    }
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return null;
 
     return {
       x: minX - EXPORT_PADDING,
@@ -367,42 +379,13 @@ useEffect(() => {
     setIsResizingSidebar(true);
   };
 
-type EditorSnapshot = {
-  blocks: Block[];
-  canvasPresetId: string;
-  backgroundColor: string;
-};
-
-const getSnapshot = (): EditorSnapshot => ({
-  blocks,
-  canvasPresetId,
-  backgroundColor,
-});
-
-const applySnapshot = (snapshot: EditorSnapshot) => {
-  setBlocks(snapshot.blocks);
-  setCanvasPresetId(snapshot.canvasPresetId);
-  setBackgroundColor(snapshot.backgroundColor);
-};
-
-const pushHistory = () => {
-  undoStackRef.current.push(getSnapshot());
-  redoStackRef.current = [];
-};
-
-const handleUndo = () => {
-  const prev = undoStackRef.current.pop();
-  if (!prev) return;
-  redoStackRef.current.push(getSnapshot());
-  applySnapshot(prev);
-};
-
-const handleRedo = () => {
-  const next = redoStackRef.current.pop();
-  if (!next) return;
-  undoStackRef.current.push(getSnapshot());
-  applySnapshot(next);
-};
+  function onUpdateClearDiacritics(
+    block: { text: string } | undefined,
+    updateSelectedBlockFn: (patch: Partial<Block>) => void
+  ) {
+    if (!block) return;
+    updateSelectedBlockFn({ text: block.text.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "") });
+  }
 
   return (
     <div
@@ -426,14 +409,14 @@ const handleRedo = () => {
         width={effectiveSidebarWidth}
         canvasPresetId={canvasPresetId}
         onChangeCanvasPreset={(id) => {
- 				 pushHistory();
- 				 setCanvasPresetId(id);
-				}}
-				onChangeBackgroundColor={(color) => {
-				  pushHistory();
-				  setBackgroundColor(color);
-				}}
+          pushHistory();
+          setCanvasPresetId(id);
+        }}
         backgroundColor={backgroundColor}
+        onChangeBackgroundColor={(color) => {
+          pushHistory();
+          setBackgroundColor(color);
+        }}
         onAddBlock={addBlock}
         onDuplicateBlock={duplicateSelectedBlock}
         onDeleteBlock={deleteSelectedBlock}
@@ -447,12 +430,12 @@ const handleRedo = () => {
         onUpdateSelectedBlock={updateSelectedBlock}
         showKeyboard={showKeyboard}
         onToggleKeyboard={() => setShowKeyboard((v) => !v)}
-        onClearDiacritics={(block) =>
-          onUpdateClearDiacritics(block, updateSelectedBlock)
-        }
-        onInsertPreset={(value) =>
-          selectedBlock && updateSelectedBlock({ text: selectedBlock.text + value })
-        }
+        onClearDiacritics={(block) => onUpdateClearDiacritics(block, updateSelectedBlock)}
+        onInsertPreset={(value) => selectedBlock && updateSelectedBlock({ text: selectedBlock.text + value })}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={undoStackRef.current.length > 0}
+        canRedo={redoStackRef.current.length > 0}
       />
 
       <div
@@ -500,13 +483,5 @@ const handleRedo = () => {
     </div>
   );
 };
-
-function onUpdateClearDiacritics(
-  block: { text: string } | undefined,
-  updateSelectedBlock: (patch: Partial<Block>) => void
-) {
-  if (!block) return;
-  updateSelectedBlock({ text: block.text.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "") });
-}
 
 export default App;
