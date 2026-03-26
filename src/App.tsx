@@ -3,6 +3,7 @@ import type Konva from "konva";
 import { exportStageSVG } from "react-konva-to-svg";
 import { Sidebar } from "./components/Sidebar";
 import { CanvasStage } from "./components/CanvasStage";
+import jsPDF from "jspdf";
 
 type Block = {
   id: number;
@@ -442,6 +443,49 @@ const addBlock = () => {
     URL.revokeObjectURL(url);
   };
 
+const handleExportPDF = async () => {
+  const stage = stageRef.current;
+  if (!stage) return;
+
+  const box = getBlocksBoundingBox();
+  if (!box) return;
+
+  // Render the selection as a high‑res PNG
+  const dataURL = stage.toDataURL({
+    mimeType: "image/png",
+    quality: 1,
+    pixelRatio: 2,
+    x: box.x,
+    y: box.y,
+    width: box.width,
+    height: box.height,
+  });
+
+  // Convert from pixels (96 dpi) to mm for A4‑style PDF
+  const pxToMm = (px: number) => (px * 25.4) / 96;
+
+  const imgWidthMm = pxToMm(box.width);
+  const imgHeightMm = pxToMm(box.height);
+
+  // Create a PDF page that matches the artwork aspect ratio
+  const pdf = new jsPDF({
+    orientation: imgWidthMm > imgHeightMm ? "landscape" : "portrait",
+    unit: "mm",
+    format: [imgWidthMm, imgHeightMm],
+  });
+
+  pdf.addImage(
+    dataURL,
+    "PNG",
+    0,
+    0,
+    imgWidthMm,
+    imgHeightMm
+  );
+
+  pdf.save("calligraphy.pdf");
+};
+
   const saveLayout = () => {
     if (!isBrowser) return;
     const payload = { blocks, selectedId, canvasPresetId, backgroundColor, stageScale, stagePosition, panMode };
@@ -527,6 +571,7 @@ const addBlock = () => {
         onDeleteBlock={deleteSelectedBlock}
         onExportPNG={handleExportPNG}
         onExportSVG={handleExportSVG}
+		onExportPDF={handleExportPDF}
         onSaveLayout={saveLayout}
         onLoadLayout={loadLayout}
         onToggleGrid={setShowGrid}

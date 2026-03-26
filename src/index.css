@@ -355,6 +355,11 @@ body,
   padding: 0;
 }
 
+.sidebarCircleButton--light {
+  font-weight: 400;
+  font-size: 12px;
+}
+
 .sidebarCircleButton:disabled {
   opacity: 0.35;
   cursor: not-allowed;

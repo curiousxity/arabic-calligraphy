@@ -38,6 +38,7 @@ export type SidebarProps = {
   onDeleteBlock: () => void;
   onExportPNG: () => void;
   onExportSVG: () => void;
+  onExportPDF: () => void;
   onSaveLayout: () => void;
   onLoadLayout: () => void;
   onToggleGrid: (v: boolean) => void;
@@ -174,6 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteBlock,
   onExportPNG,
   onExportSVG,
+  onExportPDF,
   onSaveLayout,
   onLoadLayout,
   onToggleGrid,
@@ -505,22 +507,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>{showFileActions ? "−" : "+"}</span>
           </button>
 
-          {showFileActions && (
-            <div className={`sidebarActionGrid ${isMobile ? "mobile" : "desktop"}`}>
-              <button type="button" onClick={onExportPNG} className="smallButton smallButtonGreen">
-                PNG
-              </button>
-              <button type="button" onClick={onExportSVG} className="smallButton smallButtonOrange">
-                SVG
-              </button>
-              <button type="button" onClick={onSaveLayout} className="smallButton smallButtonDark">
-                Save layout
-              </button>
-              <button type="button" onClick={onLoadLayout} className="smallButton smallButtonLight">
-                Load layout
-              </button>
-            </div>
-          )}
+		{showFileActions && (
+		  <div
+			style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}
+		  >
+			<button
+			  type="button"
+			  onClick={onExportPNG}
+			  className="sidebarCircleButton sidebarCircleButton--light"
+			  aria-label="Export PNG"
+			>
+			  PNG
+			</button>
+			<button
+			  type="button"
+			  onClick={onExportSVG}
+			  className="sidebarCircleButton sidebarCircleButton--light"
+			  aria-label="Export SVG"
+			>
+			  SVG
+			</button>
+			<button
+			  type="button"
+			  onClick={onExportPDF}
+			  className="sidebarCircleButton sidebarCircleButton--light"
+			  aria-label="Export PDF"
+			>
+			  PDF
+			</button>
+			<button
+			  type="button"
+			  onClick={onSaveLayout}
+			  className="sidebarCircleButton"
+			  aria-label="Save layout"
+			>
+			  💾
+			</button>
+			<button
+			  type="button"
+			  onClick={onLoadLayout}
+			  className="sidebarCircleButton"
+			  aria-label="Load layout"
+			>
+			  📂
+			</button>
+		  </div>
+		)}
         </div>
 
         <div className="sidebarPanel">
