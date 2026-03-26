@@ -141,9 +141,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             padding: "6px 8px",
           }}
         >
-          <button onClick={() => onUpdateStage(stageScale * 1.1, stagePosition)}>+</button>
+          <button onClick={() => onUpdateStage(stageScale / 1.1, stagePosition)}>-</button>
           <button onClick={handleReset}>{Math.round(stageScale * 100)}%</button>
-          <button onClick={() => onUpdateStage(stageScale / 1.1, stagePosition)}>−</button>
+          <button onClick={() => onUpdateStage(stageScale * 1.1, stagePosition)}>+</button>
           <button onClick={handleReset}>Reset</button>
           <button onClick={() => onTogglePanMode(!panMode)}>{panMode ? "Pan: On" : "Pan: Off"}</button>
         </div>

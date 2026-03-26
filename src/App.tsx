@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import type Konva from "konva";
 import { exportStageSVG } from "react-konva-to-svg";
 import { Sidebar } from "./components/Sidebar";
@@ -51,9 +51,7 @@ const MAX_SCALE = 3;
 const DEFAULT_BLOCK: Block = {
   id: 1,
   text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
-  x: 0,
-  y: 0,
-  fontSize: 60,
+  fontSize: 53,
   color: "#0066cc",
   fontFamily: "TahaNaskhRegular",
   fontStyle: "normal",
@@ -129,6 +127,19 @@ const App: React.FC = () => {
     redoStackRef.current.push(getSnapshot());
     applySnapshot(prev);
   };
+const moveTimeoutRef = useRef<number | null>(null);
+
+const updateBlockPositionWithHistory = (id: number, x: number, y: number) => {
+  setBlocks(prev => prev.map(b => (b.id === id ? { ...b, x, y } : b)));
+
+  if (moveTimeoutRef.current != null) {
+    window.clearTimeout(moveTimeoutRef.current);
+  }
+
+  moveTimeoutRef.current = window.setTimeout(() => {
+    pushHistory();
+  }, 300);
+};
 
   const handleRedo = () => {
     const next = redoStackRef.current.pop();
@@ -150,12 +161,60 @@ const App: React.FC = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  useEffect(() => {
-    if (blocks.length === 0 && canvasWidth > 0 && canvasHeight > 0) {
-      setBlocks([{ ...DEFAULT_BLOCK, x: canvasWidth / 2, y: canvasHeight / 2 }]);
-      setSelectedId(1);
-    }
-  }, [blocks.length, canvasWidth, canvasHeight]);
+useEffect(() => {
+  if (blocks.length !== 0 || canvasWidth <= 0 || canvasHeight <= 0) return;
+
+  const stage = stageRef.current;
+  const container = canvasContainerRef.current;
+  if (!stage || !container) return;
+
+  const viewRect = container.getBoundingClientRect();
+
+  // Horizontal: true center
+  const centerScreenX = viewRect.left + viewRect.width / 2;
+
+  // Vertical: 10% from top instead of 50%
+  const topFraction = 0.1; // tweak 0.25–0.35 to taste
+  const targetScreenY = viewRect.top + viewRect.height * topFraction;
+
+  const oldPointer = stage.getPointerPosition();
+  stage.setPointersPositions({
+    clientX: centerScreenX,
+    clientY: targetScreenY,
+  });
+
+  const pos = stage.getRelativePointerPosition();
+  const centerStageX = pos?.x ?? 0;
+  const centerStageY = pos?.y ?? 0;
+
+  if (oldPointer) {
+    stage.setPointersPositions({
+      clientX: oldPointer.x,
+      clientY: oldPointer.y,
+    });
+  }
+
+  // Measure DEFAULT_BLOCK to center it on that point
+  const tempText = new (window as any).Konva.Text({
+    text: DEFAULT_BLOCK.text,
+    fontSize: DEFAULT_BLOCK.fontSize,
+    fontFamily: DEFAULT_BLOCK.fontFamily,
+    fontStyle: DEFAULT_BLOCK.fontStyle ?? "normal",
+    lineHeight: 1.2,
+  });
+
+  const blockWidth = tempText.width();
+  const blockHeight = tempText.height();
+
+  setBlocks([
+    {
+      ...DEFAULT_BLOCK,
+      x: centerStageX - blockWidth / 2,
+      y: centerStageY - blockHeight / 2,
+    },
+  ]);
+  setSelectedId(1);
+}, [blocks.length, canvasWidth, canvasHeight, stageScale, stagePosition]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -221,21 +280,67 @@ const App: React.FC = () => {
     setBlocks((prev) => prev.map((b) => (b.id === selectedBlock.id ? { ...b, ...patch } : b)));
   };
 
-  const addBlock = () => {
-    pushHistory();
-    const newId = createNextId();
-    const newBlock: Block = {
-      ...DEFAULT_BLOCK,
-      id: newId,
-      text: "جديد",
-      x: currentPreset.width / 2,
-      y: currentPreset.height / 2,
-      fontSize: 50,
-      color: "#990000",
-    };
-    setBlocks((prev) => [...prev, newBlock]);
-    setSelectedId(newId);
+const addBlock = () => {
+  pushHistory();
+  const newId = createNextId();
+
+  const stage = stageRef.current;
+  const container = canvasContainerRef.current;
+  if (!stage || !container) return;
+
+  const viewRect = container.getBoundingClientRect();
+  const centerScreenX = viewRect.left + viewRect.width / 2;
+  const centerScreenY = viewRect.top + viewRect.height / 2;
+
+  const oldPointer = stage.getPointerPosition();
+  stage.setPointersPositions({
+    clientX: centerScreenX,
+    clientY: centerScreenY,
+  });
+
+  const pos = stage.getRelativePointerPosition();
+  const centerStageX = pos?.x ?? 0;
+  const centerStageY = pos?.y ?? 0;
+
+  if (oldPointer) {
+    stage.setPointersPositions({
+      clientX: oldPointer.x,
+      clientY: oldPointer.y,
+    });
+  }
+
+  // Create block first
+  let newBlock: Block = {
+    ...DEFAULT_BLOCK,
+    id: newId,
+    text: "جديد",
+    fontSize: 50,
+    color: "#0066cc",
+    x: centerStageX,
+    y: centerStageY,
   };
+
+  // Measure its size via Konva
+  const tempText = new (window as any).Konva.Text({
+    text: newBlock.text,
+    fontSize: newBlock.fontSize,
+    fontFamily: newBlock.fontFamily,
+    fontStyle: newBlock.fontStyle ?? "normal",
+    lineHeight: newBlock.lineHeight ?? 1.2,
+  });
+
+  const blockWidth = tempText.width();
+  const blockHeight = tempText.height();
+
+  newBlock = {
+    ...newBlock,
+    x: centerStageX - blockWidth / 2,
+    y: centerStageY - blockHeight / 2,
+  };
+
+  setBlocks((prev) => [...prev, newBlock]);
+  setSelectedId(newId);
+};
 
   const duplicateSelectedBlock = () => {
     if (!selectedBlock) return;
@@ -244,7 +349,7 @@ const App: React.FC = () => {
     const copy: Block = {
       ...selectedBlock,
       id: newId,
-      x: selectedBlock.x + 20,
+      x: selectedBlock.x - 20,
       y: selectedBlock.y + 20,
     };
     setBlocks((prev) => [...prev, copy]);
@@ -451,34 +556,32 @@ const App: React.FC = () => {
       />
 
       <div ref={canvasContainerRef} style={{ flex: 1, position: "relative" }}>
-        <CanvasStage
-          blocks={blocks}
-          snapToGrid={snapToGrid}
-          showGrid={showGrid}
-          canvasWidth={canvasWidth}
-          canvasHeight={canvasHeight}
-          backgroundColor={backgroundColor}
-          stageRef={stageRef}
-          stageScale={stageScale}
-          stagePosition={stagePosition}
-          panMode={panMode}
-          onTogglePanMode={setPanMode}
-          onUpdateStage={updateStageZoom}
-          onUpdateBlockPosition={(id, x, y) =>
-            setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, x, y } : b)))
-          }
-          onSelectBlock={setSelectedId}
-          showKeyboard={showKeyboard}
-          onKeyFromKeyboard={(k) =>
-            selectedBlock && updateSelectedBlock({ text: selectedBlock.text + k })
-          }
-          onSpaceFromKeyboard={() =>
-            selectedBlock && updateSelectedBlock({ text: selectedBlock.text + " " })
-          }
-          onBackspaceFromKeyboard={() =>
-            selectedBlock && updateSelectedBlock({ text: selectedBlock.text.slice(0, -1) })
-          }
-        />
+		<CanvasStage
+		  blocks={blocks}
+		  snapToGrid={snapToGrid}
+		  showGrid={showGrid}
+		  canvasWidth={canvasWidth}
+		  canvasHeight={canvasHeight}
+		  backgroundColor={backgroundColor}
+		  stageRef={stageRef}
+		  stageScale={stageScale}
+		  stagePosition={stagePosition}
+		  panMode={panMode}
+		  onTogglePanMode={setPanMode}
+		  onUpdateStage={updateStageZoom}
+		  onUpdateBlockPosition={updateBlockPositionWithHistory}  // ← use the new function
+		  onSelectBlock={setSelectedId}
+		  showKeyboard={showKeyboard}
+		  onKeyFromKeyboard={(k) =>
+			selectedBlock && updateSelectedBlock({ text: selectedBlock.text + k })
+		  }
+		  onSpaceFromKeyboard={() =>
+			selectedBlock && updateSelectedBlock({ text: selectedBlock.text + " " })
+		  }
+		  onBackspaceFromKeyboard={() =>
+			selectedBlock && updateSelectedBlock({ text: selectedBlock.text.slice(0, -1) })
+		  }
+		/>
       </div>
     </div>
   );

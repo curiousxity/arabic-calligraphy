@@ -296,10 +296,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
             <button type="button" onClick={onUndo} disabled={!canUndo} className="sidebarCircleButton" aria-label="Undo">
-              <wa-icon name="arrow-left" variant="regular"></wa-icon>
+              ↶
             </button>
             <button type="button" onClick={onRedo} disabled={!canRedo} className="sidebarCircleButton" aria-label="Redo">
-              <wa-icon name="arrow-right" variant="regular"></wa-icon>
+              ↷
             </button>
           </div>
         </div>
