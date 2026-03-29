@@ -20,7 +20,9 @@ type Props = {
 };
 
 const FONT_URLS: Record<string, string> = {
+  AlFatemi: "fonts/AlFatemi.otf",
   TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
+  FatemiMaqala: "fonts/FatemiMaqala.ttf",
   Kufi: "/fonts/Kufi.ttf",
   Kufi2: "/fonts/Kufi2.ttf",
   Thuluth: "/fonts/Thuluth.ttf",
@@ -31,6 +33,9 @@ const FONT_URLS: Record<string, string> = {
   Amiri: "/fonts/Amiri.ttf",
   Ruqaa: "/fonts/Ruqaa.ttf",
   Qahiri: "/fonts/Qahiri.ttf",
+  Urdu: "/fonts/Urdu.ttf",
+  AlMarjaan: "/fonts/AlMarjaan.ttf",
+
 };
 
 type Glyph = {

@@ -23,6 +23,7 @@ type Block = {
   shadowOffsetY?: number;
   shadowOpacity?: number;
   locked?: boolean;
+  rotation?: number;
 };
 
 type CanvasPreset = {
@@ -65,6 +66,7 @@ const DEFAULT_BLOCK: Block = {
   shadowOffsetY: 0,
   shadowOpacity: 0.35,
   locked: false,
+  rotation: 0,
 };
 
 const isBrowser = typeof window !== "undefined";

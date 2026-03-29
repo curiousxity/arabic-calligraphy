@@ -25,6 +25,38 @@
 }
 
 @font-face {
+  font-family: "Urdu";
+  src: url("/fonts/Urdu.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "AlKanz";
+  src: url("/fonts/AlKanz.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AlFatemi';
+  src: url('fonts/AlFatemi.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'FatemiMaqala';
+  src: url('fonts/FatemiMaqala.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "Thuluth";
   src: url("/fonts/Thuluth.ttf") format("truetype");
   font-weight: normal;

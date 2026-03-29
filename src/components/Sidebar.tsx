@@ -20,6 +20,7 @@ type Block = {
   stroke?: string;
   strokeWidth?: number;
   locked?: boolean;
+  rotation?: number;
 };
 
 export type SidebarProps = {
@@ -198,6 +199,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const selectedText = selectedBlock?.text ?? "";
   const selectedOpacity = selectedBlock?.opacity ?? 1;
   const selectedShadowOpacity = selectedBlock?.shadowOpacity ?? 0.35;
+  const selectedRotation = selectedBlock?.rotation ?? 0;
 
   const updateText = (text: string) => {
     if (selectedBlock) onUpdateSelectedBlock({ text });
@@ -341,7 +343,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     value={selectedBlock.fontFamily}
                     onChange={(value) => onUpdateSelectedBlock({ fontFamily: value })}
                   >
-                    <option value="TahaNaskhRegular">Taha Naskh Regular</option>
+                    <option value="AlFatemi">Al Fatemi</option>
+                    <option value="FatemiMaqala">Fatemi Maqala</option>
+                    <option value="TahaNaskhRegular">Taha Naskh</option>
                     <option value="Kufi">Kufi</option>
                     <option value="Kufi2">Kufi2</option>
                     <option value="Thuluth">Thuluth</option>
@@ -352,6 +356,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <option value="Amiri">Amiri</option>
                     <option value="Ruqaa">Ruqaa</option>
                     <option value="Qahiri">Qahiri</option>
+                    <option value="Urdu">Urdu</option>
+                    <option value="AlMarjaan">AlMarjaan</option>
                   </SelectRow>
 
                   <SelectRow
@@ -366,50 +372,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </SelectRow>
                 </div>
 
-                <RangeRow
-                  label="Font size"
-                  value={selectedBlock.fontSize}
-                  min={24}
-                  max={160}
-                  onChange={(value) => onUpdateSelectedBlock({ fontSize: value })}
-                />
+				<RangeRow
+				  label="Font size"
+				  value={selectedBlock.fontSize}
+				  min={24}
+				  max={160}
+				  onChange={(value) => onUpdateSelectedBlock({ fontSize: value })}
+				/>
 
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
-                  <ColorRow
-                    label="Text color"
-                    value={selectedBlock.color}
-                    onChange={(value) => onUpdateSelectedBlock({ color: value })}
-                  />
-                  <RangeRow
-                    label="Opacity"
-                    value={selectedOpacity}
-                    min={0.1}
-                    max={1}
-                    step={0.05}
-                    onChange={(value) => onUpdateSelectedBlock({ opacity: value })}
-                    suffix={`${Math.round(selectedOpacity * 100)}%`}
-                  />
-                </div>
+				<div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+				  <ColorRow
+					label="Text color"
+					value={selectedBlock.color}
+					onChange={(value) => onUpdateSelectedBlock({ color: value })}
+				/>
+				  <RangeRow
+					label="Opacity"
+					value={selectedOpacity}
+					min={0.1}
+					max={1}
+					step={0.05}
+					onChange={(value) => onUpdateSelectedBlock({ opacity: value })}
+					suffix={`${Math.round(selectedOpacity * 100)}%`}
+				/>
+				</div>
 
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
-                  <div className="sidebarSectionTitle">Stroke</div>
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
-                    <ColorRow
-                      label="Stroke color"
-                      value={selectedBlock.stroke ?? "#000000"}
-                      onChange={(value) => onUpdateSelectedBlock({ stroke: value })}
-                    />
-                    <RangeRow
-                      label="Stroke width"
-                      value={selectedBlock.strokeWidth ?? 0}
-                      min={0}
-                      max={14}
-                      onChange={(value) => onUpdateSelectedBlock({ strokeWidth: value })}
-                    />
-                  </div>
-                </div>
+				{/* Rotation section */}
+				<div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+				  <div className="sidebarSectionTitle">Rotation</div>
+				  <RangeRow
+					label="Rotation"
+					value={selectedRotation}
+					min={-180}
+					max={180}
+					step={1}
+					onChange={(value) => onUpdateSelectedBlock({ rotation: value })}
+					suffix={`${selectedRotation}°`}
+				/>
+				</div>
 
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+				{/* Stroke section */}
+				<div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+				  <div className="sidebarSectionTitle">Stroke</div>
+				  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+					<ColorRow
+					  label="Stroke color"
+					  value={selectedBlock.stroke ?? "#000000"}
+					  onChange={(value) => onUpdateSelectedBlock({ stroke: value })}
+				/>
+					<RangeRow
+					  label="Stroke width"
+					  value={selectedBlock.strokeWidth ?? 0}
+					  min={0}
+					  max={14}
+					  onChange={(value) => onUpdateSelectedBlock({ strokeWidth: value })}
+				/>
+				  </div>
+				</div>                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Shadow</div>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                     <ColorRow
