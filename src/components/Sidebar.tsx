@@ -35,6 +35,7 @@ export type SidebarProps = {
   backgroundColor: string;
   onChangeBackgroundColor: (color: string) => void;
   onAddBlock: () => void;
+  onAddCircleBlock?: () => void;
   onDuplicateBlock: () => void;
   onDeleteBlock: () => void;
   onExportPNG: () => void;
@@ -116,7 +117,10 @@ const RangeRow = ({
 }) => (
   <label className="field">
     <span className="fieldTitle">
-      {label} {suffix ? <span style={{ color: "#6b7280", fontWeight: 500 }}>{suffix}</span> : null}
+      {label}{" "}
+      {suffix ? (
+        <span style={{ color: "#6b7280", fontWeight: 500 }}>{suffix}</span>
+      ) : null}
     </span>
     <input
       type="range"
@@ -124,7 +128,9 @@ const RangeRow = ({
       max={max}
       step={step ?? 1}
       value={value}
-      onChange={(e) => onChange(step ? parseFloat(e.target.value) : parseInt(e.target.value, 10))}
+      onChange={(e) =>
+        onChange(step ? parseFloat(e.target.value) : parseInt(e.target.value, 10))
+      }
       className="rangeInput"
     />
   </label>
@@ -149,7 +155,9 @@ const PresetKeyboard = ({
               key={key}
               type="button"
               onClick={() => onPick(key)}
-              className={`sidebarPresetKeyboardKey ${key.length > 1 ? "sidebarPresetKeyboardKeyWide" : ""}`}
+              className={`sidebarPresetKeyboardKey ${
+                key.length > 1 ? "sidebarPresetKeyboardKeyWide" : ""
+              }`}
             >
               {key}
             </button>
@@ -159,6 +167,7 @@ const PresetKeyboard = ({
     </div>
   </div>
 );
+// ... ColorRow, RangeRow, PresetKeyboard unchanged ...
 
 export const Sidebar: React.FC<SidebarProps> = ({
   blocks,
@@ -172,6 +181,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   backgroundColor,
   onChangeBackgroundColor,
   onAddBlock,
+  onAddCircleBlock,
   onDuplicateBlock,
   onDeleteBlock,
   onExportPNG,
@@ -181,6 +191,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLoadLayout,
   onToggleGrid,
   onToggleSnap,
+  onSelectBlock,
   onUpdateSelectedBlock,
   showKeyboard,
   onToggleKeyboard,
@@ -209,15 +220,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleKeyboardKey = (k: string) => {
     if (!selectedBlock) return;
-
     const before = selectedText.substring(0, cursorPosition);
     const after = selectedText.substring(cursorPosition);
     const newText = before + k + after;
     const newPos = cursorPosition + k.length;
-
     onUpdateSelectedBlock({ text: newText });
     setCursorPosition(newPos);
-
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
@@ -226,21 +234,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }, 0);
   };
 
-  const handleKeyboardSpace = () => {
-    handleKeyboardKey(" ");
-  };
+  const handleKeyboardSpace = () => handleKeyboardKey(" ");
 
   const handleKeyboardBackspace = () => {
     if (!selectedBlock || cursorPosition === 0) return;
-
     const before = selectedText.substring(0, cursorPosition - 1);
     const after = selectedText.substring(cursorPosition);
     const newText = before + after;
     const newPos = cursorPosition - 1;
-
     onUpdateSelectedBlock({ text: newText });
     setCursorPosition(newPos);
-
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
@@ -259,7 +262,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         borderRight: isMobile ? "none" : "1px solid #dbe2ea",
         borderBottom: isMobile ? "1px solid #dbe2ea" : "none",
         background: "linear-gradient(180deg, #e8edf2 0%, #dde3ea 100%)",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         position: "relative",
         flexShrink: 0,
         overflowY: "auto",
@@ -270,7 +273,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebarPanel">
           <h2
             className="sidebarTitle"
-            style={{ fontSize: isMobile ? 18 : 20, textAlign: "center", color: "#111827", letterSpacing: "-0.02em" }}
+            style={{
+              fontSize: isMobile ? 18 : 20,
+              textAlign: "center",
+              color: "#111827",
+              letterSpacing: "-0.02em",
+            }}
           >
             Mohammed's Calligraphy
           </h2>
@@ -288,24 +296,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               -
             </button>
-            <button type="button" onClick={onDuplicateBlock} disabled={!selectedBlock} className="sidebarCircleButton">
+            <button
+              type="button"
+              onClick={onDuplicateBlock}
+              disabled={!selectedBlock}
+              className="sidebarCircleButton"
+            >
               II
             </button>
-            <button type="button" onClick={onAddBlock} className="sidebarCircleButton">
+            <button
+              type="button"
+              onClick={onAddBlock}
+              className="sidebarCircleButton"
+              title="Add text block"
+            >
               +
             </button>
+            {onAddCircleBlock && (
+              <button
+                type="button"
+                onClick={onAddCircleBlock}
+                className="sidebarCircleButton"
+                title="Add circle text"
+              >
+                ⭕
+              </button>
+            )}
           </div>
 
           <div style={{ height: 10 }} />
 
           <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
-            <button type="button" onClick={onUndo} disabled={!canUndo} className="sidebarCircleButton" aria-label="Undo">
+            <button
+              type="button"
+              onClick={onUndo}
+              disabled={!canUndo}
+              className="sidebarCircleButton"
+              aria-label="Undo"
+            >
               ↶
             </button>
-            <button type="button" onClick={onRedo} disabled={!canRedo} className="sidebarCircleButton" aria-label="Redo">
+            <button
+              type="button"
+              onClick={onRedo}
+              disabled={!canRedo}
+              className="sidebarCircleButton"
+              aria-label="Redo"
+            >
               ↷
             </button>
           </div>
+		  
         </div>
 
         {selectedBlock && (
@@ -349,6 +390,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <option value="Kufi">Kufi</option>
                     <option value="Kufi2">Kufi2</option>
                     <option value="Thuluth">Thuluth</option>
+					<option value="ThuluthDeco">Thuluth Deco</option>
                     <option value="Wessam">Wessam</option>
                     <option value="Yekan">Yekan</option>
                     <option value="NotoSans">Noto Sans</option>
@@ -357,7 +399,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <option value="Ruqaa">Ruqaa</option>
                     <option value="Qahiri">Qahiri</option>
                     <option value="Urdu">Urdu</option>
-                    <option value="AlMarjaan">AlMarjaan</option>
                   </SelectRow>
 
                   <SelectRow
@@ -472,6 +513,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
                   />
                 </div>
+				{selectedBlock?.type === "circlePath" && (
+				  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12, marginTop: 8 }}>
+					<div className="sidebarSectionTitle">Circle Path</div>
+
+					{/* Top/Bottom toggle */}
+					<div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+					  <button
+						type="button"
+						className="sidebarSmallAction"
+						style={{
+						  flex: 1,
+						  background:
+							selectedBlock.arcPosition === "top" ? "#111827" : "#f3f4f6",
+						  color: selectedBlock.arcPosition === "top" ? "#ffffff" : "#111827",
+						}}
+						onClick={() => onUpdateSelectedBlock({ arcPosition: "top" })}
+					  >
+						Top
+					  </button>
+					  <button
+						type="button"
+						className="sidebarSmallAction"
+						style={{
+						  flex: 1,
+						  background:
+							selectedBlock.arcPosition === "bottom" ? "#111827" : "#f3f4f6",
+						  color: selectedBlock.arcPosition === "bottom" ? "#ffffff" : "#111827",
+						}}
+						onClick={() => onUpdateSelectedBlock({ arcPosition: "bottom" })}
+					  >
+						Bottom
+					  </button>
+					</div>
+
+					{/* Radius */}
+					<RangeRow
+					  label="Radius"
+					  value={selectedBlock.radius ?? 250}
+					  min={50}
+					  max={800}
+					  onChange={(value) => onUpdateSelectedBlock({ radius: value })}
+					  suffix={`${selectedBlock.radius ?? 250}px`}
+					/>
+
+					{/* Start/End angles */}
+					<RangeRow
+					  label="Start angle"
+					  value={selectedBlock.startAngle ?? -160}
+					  min={-360}
+					  max={360}
+					  onChange={(value) => onUpdateSelectedBlock({ startAngle: value })}
+					  suffix={`${selectedBlock.startAngle ?? -160}°`}
+					/>
+					<RangeRow
+					  label="End angle"
+					  value={selectedBlock.endAngle ?? -20}
+					  min={-360}
+					  max={360}
+					  onChange={(value) => onUpdateSelectedBlock({ endAngle: value })}
+					  suffix={`${selectedBlock.endAngle ?? -20}°`}
+					/>
+
+					{/* Letter spacing */}
+					<RangeRow
+					  label="Letter spacing"
+					  value={selectedBlock.letterSpacing ?? 1}
+					  min={0.5}
+					  max={2}
+					  step={0.05}
+					  onChange={(value) => onUpdateSelectedBlock({ letterSpacing: value })}
+					  suffix={`${(selectedBlock.letterSpacing ?? 1).toFixed(2)}×`}
+					/>
+				  </div>
+				)}
               </div>
             )}
           </div>

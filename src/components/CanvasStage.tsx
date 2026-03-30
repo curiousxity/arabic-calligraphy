@@ -2,6 +2,7 @@ import React from "react";
 import { Stage, Layer, Text, Rect, Line } from "react-konva";
 import type Konva from "konva";
 import ArabicKeyboard from "./ArabicKeyboard";
+import { CircularShapedText } from "./CircularShapedText";
 
 const GRID_SIZE = 40;
 
@@ -26,6 +27,13 @@ type Block = {
   lineHeight?: number;
   locked?: boolean;
   rotation?: number;
+
+  // circle text fields (to match App Block)
+  type?: "text" | "circlePath";
+  radius?: number;
+  startAngle?: number;
+  endAngle?: number;
+  direction?: "clockwise" | "counterclockwise";
 };
 
 export type CanvasStageProps = {
@@ -75,11 +83,25 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     const lines: React.ReactNode[] = [];
 
     for (let x = 0; x <= canvasWidth; x += GRID_SIZE) {
-      lines.push(<Line key={`v-${x}`} points={[x, 0, x, canvasHeight]} stroke="#ddd" strokeWidth={1} />);
+      lines.push(
+        <Line
+          key={`v-${x}`}
+          points={[x, 0, x, canvasHeight]}
+          stroke="#ddd"
+          strokeWidth={1}
+        />
+      );
     }
 
     for (let y = 0; y <= canvasHeight; y += GRID_SIZE) {
-      lines.push(<Line key={`h-${y}`} points={[0, y, canvasWidth, y]} stroke="#ddd" strokeWidth={1} />);
+      lines.push(
+        <Line
+          key={`h-${y}`}
+          points={[0, y, canvasWidth, y]}
+          stroke="#ddd"
+          strokeWidth={1}
+        />
+      );
     }
 
     return lines;
@@ -142,94 +164,135 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             padding: "6px 8px",
           }}
         >
-          <button onClick={() => onUpdateStage(stageScale / 1.1, stagePosition)}>-</button>
+          <button onClick={() => onUpdateStage(stageScale / 1.1, stagePosition)}>
+            -
+          </button>
           <button onClick={handleReset}>{Math.round(stageScale * 100)}%</button>
-          <button onClick={() => onUpdateStage(stageScale * 1.1, stagePosition)}>+</button>
+          <button onClick={() => onUpdateStage(stageScale * 1.1, stagePosition)}>
+            +
+          </button>
           <button onClick={handleReset}>Reset</button>
-          <button onClick={() => onTogglePanMode(!panMode)}>{panMode ? "Pan: On" : "Pan: Off"}</button>
+          <button onClick={() => onTogglePanMode(!panMode)}>
+            {panMode ? "Pan: On" : "Pan: Off"}
+          </button>
         </div>
 
-<Stage
-  width={canvasWidth}
-  height={canvasHeight}
-  ref={stageRef}
-  scaleX={stageScale}
-  scaleY={stageScale}
-  x={stagePosition.x}
-  y={stagePosition.y}
-  draggable={panMode}
-  dragButtons={[0]}
-  onWheel={handleWheel}
-  onDragMove={(e) => {
-    if (!panMode) return;
-    onUpdateStage(stageScale, { x: e.target.x(), y: e.target.y() });
-  }}
-  onDragEnd={(e) => {
-    if (!panMode) return;
-    onUpdateStage(stageScale, { x: e.target.x(), y: e.target.y() });
-  }}
-  onContextMenu={(e) => e.evt.preventDefault()}
-  style={{ background: "transparent" }}
->
-  <Layer>
-    <Rect x={0} y={0} width={canvasWidth} height={canvasHeight} fill={backgroundColor} />
-    {showGrid && renderGridLines()}
+        <Stage
+          width={canvasWidth}
+          height={canvasHeight}
+          ref={stageRef}
+          scaleX={stageScale}
+          scaleY={stageScale}
+          x={stagePosition.x}
+          y={stagePosition.y}
+          draggable={panMode}
+          dragButtons={[0]}
+          onWheel={handleWheel}
+          onDragMove={(e) => {
+            if (!panMode) return;
+            onUpdateStage(stageScale, { x: e.target.x(), y: e.target.y() });
+          }}
+          onDragEnd={(e) => {
+            if (!panMode) return;
+            onUpdateStage(stageScale, { x: e.target.x(), y: e.target.y() });
+          }}
+          onContextMenu={(e) => e.evt.preventDefault()}
+          style={{ background: "transparent" }}
+        >
+          <Layer>
+            <Rect
+              x={0}
+              y={0}
+              width={canvasWidth}
+              height={canvasHeight}
+              fill={backgroundColor}
+            />
+            {showGrid && renderGridLines()}
 
-    {blocks.map((block) => (
-      <Text
-        key={block.id}
-        id={`block-${block.id}`}
-        text={block.text}
-        x={block.x}
-        y={block.y}
-        fontSize={block.fontSize}
-        fill={block.color}
-        fontFamily={block.fontFamily}
-        fontStyle={block.fontStyle ?? "normal"}
-        align={block.align ?? "center"}
-        lineHeight={block.lineHeight ?? 1.2}
-        draggable={!block.locked && !panMode}
-        opacity={block.opacity ?? 1}
-        stroke={block.stroke}
-        strokeWidth={block.strokeWidth ?? 0}
-        shadowColor={block.shadowColor}
-        shadowBlur={block.shadowBlur ?? 0}
-        shadowOffsetX={block.shadowOffsetX ?? 0}
-        shadowOffsetY={block.shadowOffsetY ?? 0}
-        shadowOpacity={block.shadowOpacity ?? 0.35}
-        rotation={block.rotation ?? 0}
-        ref={(node) => {
-          if (!node) return;
-          const width = node.width();
-          const height = node.height();
-          node.offsetX(width / 2);
-          node.offsetY(height / 2);
-        }}
-        onClick={() => onSelectBlock(block.id)}
-        onTap={() => onSelectBlock(block.id)}
-        onDragEnd={(e) => {
-          if (block.locked || panMode) return;
-          let { x, y } = e.target.position();
+            {blocks.map((block) =>
+              block.type === "circlePath" ? (
+                <CircularShapedText
+                  key={block.id}
+                  text={block.text}
+                  x={block.x}
+                  y={block.y}
+                  radius={block.radius ?? 200}
+                  fontSize={block.fontSize}
+                  color={block.color}
+                  fontFamily={block.fontFamily}
+                  startAngle={block.startAngle ?? 0}
+                  endAngle={block.endAngle ?? 360}
+                  direction={block.direction ?? "clockwise"}
+				  arcPosition={block.arcPosition ?? "top"}
+				  letterSpacing={block.letterSpacing ?? 1}
+                  locked={block.locked}
+                  draggable={!block.locked && !panMode}
+                  onClick={() => onSelectBlock(block.id)}
+                  onTap={() => onSelectBlock(block.id)}
+                  onDragEnd={(e) => {
+                    if (block.locked || panMode) return;
+                    const { x, y } = e.target.position();
+                    onUpdateBlockPosition(block.id, x, y);
+                  }}
+				  
+                />
+              ) : (
+                <Text
+                  key={block.id}
+                  id={`block-${block.id}`}
+                  text={block.text}
+                  x={block.x}
+                  y={block.y}
+                  fontSize={block.fontSize}
+                  fill={block.color}
+                  fontFamily={block.fontFamily}
+                  fontStyle={block.fontStyle ?? "normal"}
+                  align={block.align ?? "center"}
+                  lineHeight={block.lineHeight ?? 1.2}
+                  draggable={!block.locked && !panMode}
+                  opacity={block.opacity ?? 1}
+                  stroke={block.stroke}
+                  strokeWidth={block.strokeWidth ?? 0}
+                  shadowColor={block.shadowColor}
+                  shadowBlur={block.shadowBlur ?? 0}
+                  shadowOffsetX={block.shadowOffsetX ?? 0}
+                  shadowOffsetY={block.shadowOffsetY ?? 0}
+                  shadowOpacity={block.shadowOpacity ?? 0.35}
+                  rotation={block.rotation ?? 0}
+                  ref={(node) => {
+                    if (!node) return;
+                    const width = node.width();
+                    const height = node.height();
+                    node.offsetX(width / 2);
+                    node.offsetY(height / 2);
+                  }}
+                  onClick={() => onSelectBlock(block.id)}
+                  onTap={() => onSelectBlock(block.id)}
+                  onDragEnd={(e) => {
+                    if (block.locked || panMode) return;
+                    let { x, y } = e.target.position();
 
-          if (snapToGrid) {
-            const node = e.target as Konva.Text;
-            const width = node.width();
-            const height = node.height();
-            const anchorX = x + width / 2;
-            const anchorY = y + height / 2;
-            const snappedAnchorX = snapCoord(anchorX);
-            const snappedAnchorY = snapCoord(anchorY);
-            x = snappedAnchorX - width / 2;
-            y = snappedAnchorY - height / 2;
-            node.position({ x, y });
-          }
+                    if (snapToGrid) {
+                      const node = e.target as Konva.Text;
+                      const width = node.width();
+                      const height = node.height();
+                      const anchorX = x + width / 2;
+                      const anchorY = y + height / 2;
+                      const snappedAnchorX = snapCoord(anchorX);
+                      const snappedAnchorY = snapCoord(anchorY);
+                      x = snappedAnchorX - width / 2;
+                      y = snappedAnchorY - height / 2;
+                      node.position({ x, y });
+                    }
 
-          onUpdateBlockPosition(block.id, x, y);
-        }}
-      />
-    ))}
-  </Layer>
-</Stage>      </div>
+                    onUpdateBlockPosition(block.id, x, y);
+                  }}
+                />
+              )
+            )}
+          </Layer>
+        </Stage>
+      </div>
 
       {showKeyboard && (
         <div
