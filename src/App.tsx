@@ -52,7 +52,6 @@ const DEFAULT_BLOCK: Block = {
   locked: false,
   rotation: 0,
   ornamental: false,
-  embossStrength: 0,
   type: "text",
 };
 

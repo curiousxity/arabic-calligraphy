@@ -18,8 +18,7 @@
 import React, { useEffect, useState } from "react";
 import { Group, Shape, Circle } from "react-konva";
 import type Konva from "konva";
-import type opentype from "opentype.js";
-import { shapeText, type HarfBuzzGlyph } from "../lib/harfbuzz";
+import { shapeText, type HarfBuzzGlyph, type ShapedTextResult } from "../lib/harfbuzz";
 
 const FONT_URLS: Record<string, string> = {
   TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
@@ -41,7 +40,7 @@ const FONT_URLS: Record<string, string> = {
 
 type ShapedGlyph = {
   glyph: HarfBuzzGlyph;
-  font: opentype.Font;
+  font: ShapedTextResult["font"];
   unitsPerEm: number;
 };
 
@@ -73,8 +72,6 @@ type Props = {
   onClick?: () => void;
   onTap?: () => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
-  emboss?: boolean;
-  embossStrength?: number;
 };
 
 export const CircularShapedText: React.FC<Props> = ({
@@ -105,8 +102,6 @@ export const CircularShapedText: React.FC<Props> = ({
   onClick,
   onTap,
   onDragEnd,
-  emboss = false,
-  embossStrength = 4,
 }) => {
   const [shapedGlyphs, setShapedGlyphs] = useState<ShapedGlyph[]>([]);
   const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
@@ -235,33 +230,6 @@ export const CircularShapedText: React.FC<Props> = ({
           ctx.fillStyle = color;
           drawAllGlyphs();
           ctx.restore();
-
-          // ── 2. Inner emboss using source-atop compositing ─────────────────
-          if (emboss && (embossStrength ?? 0) > 0) {
-            const s = embossStrength!;
-
-            // Highlight pass (top-left bright edge)
-            ctx.save();
-            ctx.fillStyle = "rgba(255,255,255,0)";
-            ctx.globalCompositeOperation = "source-atop";
-            ctx.shadowColor = "rgba(255,255,255,0.9)";
-            ctx.shadowBlur = s * 1.2;
-            ctx.shadowOffsetX = -s * 0.8;
-            ctx.shadowOffsetY = -s * 0.8;
-            drawAllGlyphs();
-            ctx.restore();
-
-            // Shadow pass (bottom-right dark edge)
-            ctx.save();
-            ctx.fillStyle = "rgba(0,0,0,0)";
-            ctx.globalCompositeOperation = "source-atop";
-            ctx.shadowColor = "rgba(0,0,0,0.65)";
-            ctx.shadowBlur = s * 1.2;
-            ctx.shadowOffsetX = s * 0.8;
-            ctx.shadowOffsetY = s * 0.8;
-            drawAllGlyphs();
-            ctx.restore();
-          }
         }}
       />
     </Group>

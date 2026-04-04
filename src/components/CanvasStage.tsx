@@ -250,7 +250,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     shadowOpacity={block.shadowOpacity ?? 0.35}
                     rotation={block.rotation ?? 0}
                     locked={block.locked}
-                    embossStrength={block.embossStrength ?? 0}
                   />
                 );
               }
@@ -278,7 +277,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   shadowOpacity={block.shadowOpacity ?? 0.35}
                   rotation={block.rotation ?? 0}
                   locked={block.locked}
-                  embossStrength={block.embossStrength ?? 0}
                   debugBounds={false}
                 />
               );

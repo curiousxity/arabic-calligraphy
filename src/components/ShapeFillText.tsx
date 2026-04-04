@@ -17,8 +17,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
-import type opentype from "opentype.js";
-import { shapeText, type HarfBuzzGlyph } from "../lib/harfbuzz";
+import { shapeText, type HarfBuzzGlyph, type ShapedTextResult } from "../lib/harfbuzz";
 
 const FONT_URLS: Record<string, string> = {
   TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
@@ -40,7 +39,7 @@ const FONT_URLS: Record<string, string> = {
 
 type ShapeData = {
   glyphs: HarfBuzzGlyph[];
-  font: opentype.Font;
+  font: ShapedTextResult["font"];
   unitsPerEm: number;
 };
 
@@ -74,7 +73,6 @@ export type ShapeFillTextProps = {
   onClick?: () => void;
   onTap?: () => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
-  embossStrength?: number;
 };
 
 // ─── SVG path parser ──────────────────────────────────────────────────────────
@@ -232,7 +230,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   locked,
   draggable = true,
   onClick, onTap, onDragEnd,
-  embossStrength = 0,
 }) => {
   const [shapeData, setShapeData] = useState<ShapeData | null>(null);
   const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
@@ -276,8 +273,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   const scaledW = shapeWidth * shapeScale;
   const scaledH = shapeHeight * shapeScale;
 
-  const hasEmboss = (embossStrength ?? 0) > 0;
-
   return (
     <Group
       id={id}
@@ -292,11 +287,11 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
       <Shape
         listening={false}
-        shadowColor={!hasEmboss && shadowBlur > 0 ? shadowColor : undefined}
-        shadowBlur={!hasEmboss ? shadowBlur : 0}
-        shadowOffsetX={!hasEmboss ? shadowOffsetX : 0}
-        shadowOffsetY={!hasEmboss ? shadowOffsetY : 0}
-        shadowOpacity={!hasEmboss ? shadowOpacity : 0}
+        shadowColor={shadowBlur > 0 ? shadowColor : undefined}
+        shadowBlur={shadowBlur}
+        shadowOffsetX={shadowOffsetX}
+        shadowOffsetY={shadowOffsetY}
+        shadowOpacity={shadowOpacity}
         sceneFunc={(ctx) => {
           if (!shapeSvgPath || parsedCmds.length === 0) return;
 
@@ -387,45 +382,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
             lineY += lineH;
           }
 
-          // ── Inner emboss ─────────────────────────────────────────────────
-          if (hasEmboss) {
-            const s = embossStrength!;
-            lineY = fontSize * 0.85;
-            while (lineY < shapeHeight) {
-              let lx = -1, rx = -1;
-              for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
-                if (inShape(sx, lineY)) { if (lx < 0) lx = sx; rx = sx; }
-              }
-              if (lx >= 0 && rx > lx + 2) {
-                const lineWidth = rx - lx;
-                const effectiveAdvance = totalAdvance * shapeFillScaleX;
-                const reps = Math.max(1, Math.floor(lineWidth / effectiveAdvance));
-                const fitScaleX = lineWidth / (reps * effectiveAdvance);
-                const scX = shapeFillScaleX * fitScaleX;
-
-                ctx.save();
-                ctx.globalCompositeOperation = "source-atop";
-                ctx.shadowColor = "rgba(255,255,255,0.9)";
-                ctx.shadowBlur = s * 1.2;
-                ctx.shadowOffsetX = -s * 0.8;
-                ctx.shadowOffsetY = -s * 0.8;
-                ctx.fillStyle = "rgba(255,255,255,0)";
-                for (let r = 0; r < reps; r++) drawGlyphRow(lx + r * effectiveAdvance * fitScaleX, lineY, scX, shapeFillScaleY);
-                ctx.restore();
-
-                ctx.save();
-                ctx.globalCompositeOperation = "source-atop";
-                ctx.shadowColor = "rgba(0,0,0,0.65)";
-                ctx.shadowBlur = s * 1.2;
-                ctx.shadowOffsetX = s * 0.8;
-                ctx.shadowOffsetY = s * 0.8;
-                ctx.fillStyle = "rgba(0,0,0,0)";
-                for (let r = 0; r < reps; r++) drawGlyphRow(lx + r * effectiveAdvance * fitScaleX, lineY, scX, shapeFillScaleY);
-                ctx.restore();
-              }
-              lineY += lineH;
-            }
-          }
 
           ctx.restore(); // remove shapeScale transform
         }}

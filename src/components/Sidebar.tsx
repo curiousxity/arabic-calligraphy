@@ -55,7 +55,6 @@ const SLIDER_DEFAULTS: Record<string, number> = {
   shapeFillScaleX: 1,
   shapeFillScaleY: 1,
   shapeFillTextRotation: 0,
-  embossStrength: 0,
   shapeScale: 1,
 };
 
@@ -328,27 +327,138 @@ function scaleSvgPathNumbers(d: string, scaleX: number, scaleY: number): string 
   return out.join(" ");
 }
 
+/**
+ * Parse a simple SVG transform="translate(x,y) scale(s)" attribute into a matrix.
+ * Returns [a, b, c, d, e, f] (SVG matrix). Only handles translate/scale/matrix.
+ */
+function parseTransform(t: string): [number,number,number,number,number,number] {
+  let a=1,b=0,c=0,d=1,e=0,f=0;
+  const mat = t.match(/matrix\(([^)]+)\)/);
+  if (mat) { [a,b,c,d,e,f] = mat[1].split(/[\s,]+/).map(Number); return [a,b,c,d,e,f]; }
+  const trans = t.match(/translate\(([^)]+)\)/);
+  if (trans) { const [tx,ty=0] = trans[1].split(/[\s,]+/).map(Number); e=tx; f=ty; }
+  const scale = t.match(/scale\(([^)]+)\)/);
+  if (scale) { const [sx,sy=sx] = scale[1].split(/[\s,]+/).map(Number); a*=sx; d*=sy; }
+  return [a,b,c,d,e,f];
+}
+
+/** Accumulate ancestor transforms from a DOM element up to the SVG root. */
+function getAccumulatedTransform(el: Element): [number,number,number,number,number,number] {
+  const mats: Array<[number,number,number,number,number,number]> = [];
+  let node: Element | null = el;
+  while (node && node.tagName.toLowerCase() !== "svg") {
+    const t = node.getAttribute("transform");
+    if (t) mats.unshift(parseTransform(t));
+    node = node.parentElement;
+  }
+  // Multiply all matrices left-to-right
+  let r: [number,number,number,number,number,number] = [1,0,0,1,0,0];
+  for (const m of mats) {
+    r = [
+      r[0]*m[0]+r[2]*m[1], r[1]*m[0]+r[3]*m[1],
+      r[0]*m[2]+r[2]*m[3], r[1]*m[2]+r[3]*m[3],
+      r[0]*m[4]+r[2]*m[5]+r[4], r[1]*m[4]+r[3]*m[5]+r[5],
+    ];
+  }
+  return r;
+}
+
+
 function extractSvgPaths(svgText: string): { pathData: string; w: number; h: number } | null {
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgText, "image/svg+xml");
   if (doc.querySelector("parsererror")) return null;
   const svgEl = doc.querySelector("svg");
   const vb = svgEl?.getAttribute("viewBox")?.split(/[\s,]+/).map(Number);
-  // Source dimensions from viewBox or width/height attributes
   const srcW = (vb?.[2] ?? parseFloat(svgEl?.getAttribute("width") ?? "400")) || 400;
   const srcH = (vb?.[3] ?? parseFloat(svgEl?.getAttribute("height") ?? "400")) || 400;
-  // Scale factors to normalize to TARGET_SVG_SIZE
+  // Scale everything to TARGET_SVG_SIZE — handles tiny icon SVGs and huge illustrations
   const sx = TARGET_SVG_SIZE / srcW;
   const sy = TARGET_SVG_SIZE / srcH;
+
+  // querySelectorAll descends into nested <g> elements automatically
   const shapeEls = doc.querySelectorAll("path, rect, circle, ellipse, polygon, polyline");
   const parts: string[] = [];
+
   shapeEls.forEach((el) => {
-    const d = svgElementToPathData(el);
-    if (d) parts.push(scaleSvgPathNumbers(d, sx, sy));
+    // Skip invisible elements
+    const display = el.getAttribute("display") ?? el.closest("[display]")?.getAttribute("display");
+    if (display === "none") return;
+    const visibility = el.getAttribute("visibility") ?? el.closest("[visibility]")?.getAttribute("visibility");
+    if (visibility === "hidden") return;
+
+    let d = svgElementToPathData(el);
+    if (!d) return;
+
+    // Apply accumulated ancestor transforms (handles nested <g transform="...">)
+    const mat = getAccumulatedTransform(el);
+    if (!(mat[0]===1&&mat[1]===0&&mat[2]===0&&mat[3]===1&&mat[4]===0&&mat[5]===0)) {
+      d = applyTransformToPathString(d, mat);
+    }
+
+    parts.push(scaleSvgPathNumbers(d, sx, sy));
   });
+
   if (parts.length === 0) return null;
-  // Always return TARGET_SVG_SIZE square — consistent for all SVGs
   return { pathData: parts.join(" "), w: TARGET_SVG_SIZE, h: TARGET_SVG_SIZE };
+}
+
+/** Apply a matrix transform to all absolute coordinates in a path d string. */
+function applyTransformToPathString(d: string, m: [number,number,number,number,number,number]): string {
+  const [a,b,c,dd,e,f] = m;
+  const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g);
+  if (!tokens) return d;
+  // First normalize to absolute commands, then apply matrix
+  // For simplicity: only apply matrix to x/y pairs (covers M,L,C,Q,Z)
+  // This works correctly for the shapes we extract (which are already absolute from svgElementToPathData)
+  const out: string[] = [];
+  let cmd = "";
+  const nums: number[] = [];
+  const flush = () => {
+    if (!cmd) return;
+    switch (cmd.toUpperCase()) {
+      case "M": case "L": case "T":
+        for (let i=0;i<nums.length;i+=2) {
+          const nx=a*nums[i]+c*nums[i+1]+e, ny=b*nums[i]+dd*nums[i+1]+f;
+          out.push(cmd,String(parseFloat(nx.toFixed(3))),String(parseFloat(ny.toFixed(3))));
+          cmd="L"; // subsequent pairs are lineto
+        }
+        break;
+      case "C":
+        for (let i=0;i<nums.length;i+=6) {
+          const pts = [nums[i],nums[i+1],nums[i+2],nums[i+3],nums[i+4],nums[i+5]];
+          const t: number[] = [];
+          for (let j=0;j<6;j+=2){t.push(a*pts[j]+c*pts[j+1]+e,b*pts[j]+dd*pts[j+1]+f);}
+          out.push("C",...t.map(v=>String(parseFloat(v.toFixed(3)))));
+        }
+        break;
+      case "Q": case "S":
+        for (let i=0;i<nums.length;i+=4) {
+          const t: number[] = [];
+          for (let j=0;j<4;j+=2){t.push(a*nums[j]+c*nums[j+1]+e,b*nums[j]+dd*nums[j+1]+f);}
+          out.push(cmd,...t.map(v=>String(parseFloat(v.toFixed(3)))));
+        }
+        break;
+      case "H":
+        for (const x of nums) out.push("L",String(parseFloat((a*x+e).toFixed(3))),String(parseFloat(f.toFixed(3))));
+        break;
+      case "V":
+        for (const y of nums) out.push("L",String(parseFloat(e.toFixed(3))),String(parseFloat((dd*y+f).toFixed(3))));
+        break;
+      case "Z":
+        out.push("Z");
+        break;
+      default:
+        out.push(cmd,...nums.map(String));
+    }
+    nums.length=0;
+  };
+  for (const tok of tokens) {
+    if (/^[MmLlHhVvCcSsQqTtAaZz]$/.test(tok)) { flush(); cmd=tok.toUpperCase(); }
+    else nums.push(parseFloat(tok));
+  }
+  flush();
+  return out.join(" ");
 }
 
 const blockTypeIcon = (b: Block) => (b.type === "shapeFill" ? "✦" : "T");
@@ -1060,24 +1170,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 </div>
 
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
-                  <div className="sidebarSectionTitle">Emboss (inner bevel)</div>
-                  <RangeRow
-                    id={makeId("emboss-strength", selectedId)}
-                    name={makeId("embossStrength", selectedId)}
-                    label="Emboss strength"
-                    value={selectedBlock.embossStrength ?? 0}
-                    min={0}
-                    max={12}
-                    step={1}
-                    onChange={(v) => onUpdateSelectedBlock({ embossStrength: v })}
-                    suffix={`${selectedBlock.embossStrength ?? 0}${
-                      (selectedBlock.embossStrength ?? 0) === 0 ? " (off)" : ""
-                    }`}
-                    fieldKey="embossStrength"
-                  />
-                </div>
-
                 {selectedBlock.type === "shapeFill" && (
                   <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Shape Fill</div>
@@ -1237,7 +1329,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {showFileActions && (
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
 
-              {/* Row 1: Export image formats */}
+              {/* Row 1: Browser save / load */}
+              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+                <button type="button" onClick={onSaveLayout} className="sidebarCircleButton" title="Quick-save to browser">
+                  💾
+                </button>
+                <button type="button" onClick={onLoadLayout} className="sidebarCircleButton" title="Load from browser">
+                  📂
+                </button>
+              </div>
+
+              {/* Row 2: JSON file download / upload */}
+              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+                <button type="button" onClick={onDownloadLayout} className="sidebarCircleButton sidebarCircleButton--light" title="Download layout as .json">
+                  ⬇
+                </button>
+                <button type="button" onClick={onUploadLayout} className="sidebarCircleButton sidebarCircleButton--light" title="Upload .json layout file">
+                  ⬆
+                </button>
+              </div>
+
+              {/* Row 3: Export image formats — at the bottom */}
               <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
                 <button type="button" onClick={onExportPNG} className="sidebarCircleButton sidebarCircleButton--light" title="Export PNG">
                   PNG
@@ -1247,26 +1359,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
                 <button type="button" onClick={onExportPDF} className="sidebarCircleButton sidebarCircleButton--light" title="Export PDF">
                   PDF
-                </button>
-              </div>
-
-              {/* Row 2: Browser save / load */}
-              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-                <button type="button" onClick={onSaveLayout} className="sidebarCircleButton" title="Quick-save to browser">
-                  💾 Save
-                </button>
-                <button type="button" onClick={onLoadLayout} className="sidebarCircleButton" title="Load from browser">
-                  📂 Load
-                </button>
-              </div>
-
-              {/* Row 3: JSON file download / upload */}
-              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-                <button type="button" onClick={onDownloadLayout} className="sidebarCircleButton sidebarCircleButton--light" title="Download layout as .json">
-                  ⬇ JSON
-                </button>
-                <button type="button" onClick={onUploadLayout} className="sidebarCircleButton sidebarCircleButton--light" title="Upload .json layout file">
-                  ⬆ JSON
                 </button>
               </div>
 

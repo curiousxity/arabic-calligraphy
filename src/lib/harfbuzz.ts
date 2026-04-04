@@ -1,5 +1,7 @@
 import * as hbjsModule from "harfbuzzjs";
-import opentype from "opentype.js";
+// Use our zero-dependency font parser instead of opentype.js
+// This avoids the Rolldown/Vite 8 resolution failure with opentype.js
+import { parse as parseFont, type MiniFont } from "./opentype-mini";
 
 // harfbuzzjs ships as CJS; Vite may wrap it so the callable is at .default
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10,7 +12,7 @@ const hbjs: () => Promise<any> =
 
 let hbPromise: Promise<any> | null = null;
 const fontCache = new Map<string, ArrayBuffer>();
-const parsedFontCache = new Map<string, opentype.Font>();
+const parsedFontCache = new Map<string, MiniFont>();
 
 export type HarfBuzzGlyph = {
   g: number;
@@ -23,7 +25,7 @@ export type HarfBuzzGlyph = {
 
 export type ShapedTextResult = {
   glyphs: HarfBuzzGlyph[];
-  font: opentype.Font;
+  font: MiniFont;
   unitsPerEm: number;
 };
 
@@ -42,10 +44,10 @@ async function loadFontData(fontUrl: string): Promise<ArrayBuffer> {
   return fontCache.get(fontUrl)!;
 }
 
-async function loadParsedFont(fontUrl: string): Promise<opentype.Font> {
+async function loadParsedFont(fontUrl: string): Promise<MiniFont> {
   if (!parsedFontCache.has(fontUrl)) {
     const fontData = await loadFontData(fontUrl);
-    const parsed = opentype.parse(fontData.slice(0));
+    const parsed = parseFont(fontData.slice(0));
     parsedFontCache.set(fontUrl, parsed);
   }
   return parsedFontCache.get(fontUrl)!;

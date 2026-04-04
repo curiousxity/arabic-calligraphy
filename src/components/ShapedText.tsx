@@ -13,7 +13,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
-import type opentype from "opentype.js";
 import { shapeText, type HarfBuzzGlyph, type ShapedTextResult } from "../lib/harfbuzz";
 
 type Props = {
@@ -42,7 +41,6 @@ type Props = {
   onTap?: () => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   debugBounds?: boolean;
-  embossStrength?: number;
 };
 
 const FONT_URLS: Record<string, string> = {
@@ -65,7 +63,7 @@ const FONT_URLS: Record<string, string> = {
 
 type LoadedShape = {
   glyphs: HarfBuzzGlyph[];
-  font: opentype.Font | null;
+  font: ShapedTextResult["font"] | null;
   unitsPerEm: number;
 };
 
@@ -85,7 +83,7 @@ const fallbackWidth = (text: string, fs: number) => Math.max(text.length * fs * 
 function drawGlyphs(
   ctx: any,
   glyphs: HarfBuzzGlyph[],
-  font: opentype.Font,
+  font: ShapedTextResult["font"],
   scale: number,
   fontSize: number
 ) {
@@ -150,7 +148,6 @@ export const ShapedText: React.FC<Props> = ({
   onTap,
   onDragEnd,
   debugBounds = false,
-  embossStrength = 0,
 }) => {
   const [shapeData, setShapeData] = useState<LoadedShape>({
     glyphs: [],
@@ -226,8 +223,6 @@ export const ShapedText: React.FC<Props> = ({
   const bx = align === "left" ? 0 : align === "right" ? -bw : -bw / 2;
   const by = -bh / 2;
 
-  const hasEmboss = (embossStrength ?? 0) > 0;
-
   return (
     <Group
       id={id}
@@ -269,11 +264,11 @@ export const ShapedText: React.FC<Props> = ({
         width={bw}
         height={bh}
         listening={false}
-        shadowColor={!hasEmboss && shadowBlur > 0 ? shadowColor : undefined}
-        shadowBlur={!hasEmboss ? shadowBlur : 0}
-        shadowOffsetX={!hasEmboss ? shadowOffsetX : 0}
-        shadowOffsetY={!hasEmboss ? shadowOffsetY : 0}
-        shadowOpacity={!hasEmboss ? shadowOpacity : 0}
+        shadowColor={shadowBlur > 0 ? shadowColor : undefined}
+        shadowBlur={shadowBlur}
+        shadowOffsetX={shadowOffsetX}
+        shadowOffsetY={shadowOffsetY}
+        shadowOpacity={shadowOpacity}
         sceneFunc={(ctx) => {
           if (!shapeData.font || shapeData.glyphs.length === 0) {
             ctx.save();
@@ -363,35 +358,6 @@ export const ShapedText: React.FC<Props> = ({
               }
               penX += (glyph.ax ?? 0) * glyphBounds.scale;
             }
-          }
-
-          // 2. Inner emboss using source-atop
-          // Must stay inside the ctx.translate(drawX, drawY) block so the
-          // composite operations paint over the same pixels as the base fill.
-          if (hasEmboss && shapeData.font) {
-            const s = embossStrength!;
-
-            // Highlight pass (top-left)
-            ctx.save();
-            ctx.globalCompositeOperation = "source-atop";
-            ctx.shadowColor = "rgba(255,255,255,0.9)";
-            ctx.shadowBlur = s * 1.2;
-            ctx.shadowOffsetX = -s * 0.8;
-            ctx.shadowOffsetY = -s * 0.8;
-            ctx.fillStyle = "rgba(255,255,255,0)";
-            drawGlyphs(ctx, shapeData.glyphs, shapeData.font, glyphBounds.scale, fontSize);
-            ctx.restore();
-
-            // Shadow pass (bottom-right)
-            ctx.save();
-            ctx.globalCompositeOperation = "source-atop";
-            ctx.shadowColor = "rgba(0,0,0,0.65)";
-            ctx.shadowBlur = s * 1.2;
-            ctx.shadowOffsetX = s * 0.8;
-            ctx.shadowOffsetY = s * 0.8;
-            ctx.fillStyle = "rgba(0,0,0,0)";
-            drawGlyphs(ctx, shapeData.glyphs, shapeData.font, glyphBounds.scale, fontSize);
-            ctx.restore();
           }
 
           ctx.restore(); // pop translate(drawX, drawY)
