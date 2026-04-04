@@ -535,16 +535,21 @@ const App: React.FC = () => {
     const newId = createNextId();
     const { x, y } = getCenterStagePos();
 
+    // Auto-size fontSize so roughly 10-15 rows fit inside the shape height.
+    // This gives a dense fill regardless of SVG size.
+    const autoFontSize = Math.max(8, Math.round(shapeHeight / 12));
+
     const newBlock: Block = {
       ...DEFAULT_BLOCK,
       id: newId,
-      text: "نَصٌّ جَدِيدٌ",
+      text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
+      fontSize: autoFontSize,
       type: "shapeFill",
       shapeSvgPath: svgPathData,
       shapeWidth,
       shapeHeight,
       shapeScale: 1,
-      shapeFillSpacing: 1.3,
+      shapeFillSpacing: 1.4,
       shapeFillScaleX: 1,
       shapeFillScaleY: 1,
       shapeFillTextRotation: 0,

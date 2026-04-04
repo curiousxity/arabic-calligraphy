@@ -17,7 +17,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
-import { shapeText, type HarfBuzzGlyph, type ShapedTextResult } from "../lib/harfbuzz";
+import type opentype from "opentype.js";
+import { shapeText, type HarfBuzzGlyph } from "../lib/harfbuzz";
 
 const FONT_URLS: Record<string, string> = {
   TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
@@ -39,7 +40,7 @@ const FONT_URLS: Record<string, string> = {
 
 type ShapeData = {
   glyphs: HarfBuzzGlyph[];
-  font: ShapedTextResult["font"];
+  font: opentype.Font;
   unitsPerEm: number;
 };
 

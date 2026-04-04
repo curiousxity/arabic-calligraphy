@@ -688,7 +688,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 className="sidebarCircleButton"
-                title="Upload SVG shape"
+                title="Upload SVG shape — use a simple flat SVG with path/rect/circle/ellipse elements. Avoid SVGs with nested transforms or complex filters."
                 onClick={handleSvgUpload}
               >
                 ✦
@@ -827,8 +827,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   name={makeId("fontSize", selectedId)}
                   label="Font size"
                   value={selectedBlock.fontSize}
-                  min={12}
-                  max={200}
+                  min={selectedBlock.type === "shapeFill" ? 4 : 12}
+                  max={selectedBlock.type === "shapeFill" ? 400 : 200}
                   onChange={(v) => onUpdateSelectedBlock({ fontSize: v })}
                   fieldKey="fontSize"
                 />
