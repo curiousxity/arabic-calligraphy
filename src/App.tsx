@@ -1,41 +1,10 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import type Konva from "konva";
 import { exportStageSVG } from "react-konva-to-svg";
 import { Sidebar } from "./components/Sidebar";
 import { CanvasStage } from "./components/CanvasStage";
 import jsPDF from "jspdf";
-
-type Block = {
-  id: number;
-  text: string;
-  x: number;
-  y: number;
-  fontSize: number;
-  color: string;
-  fontFamily: string;
-  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
-  opacity?: number;
-  stroke?: string;
-  strokeWidth?: number;
-  shadowColor?: string;
-  shadowBlur?: number;
-  shadowOffsetX?: number;
-  shadowOffsetY?: number;
-  shadowOpacity?: number;
-  locked?: boolean;
-  rotation?: number;
-  arcPosition?: "top" | "bottom";
-  letterSpacing?: number;
-
-  // text-on-circle fields
-  type?: "text" | "circlePath";
-  radius?: number;
-  startAngle?: number;
-  endAngle?: number;
-  direction?: "clockwise" | "counterclockwise";
-
-  ornamental?: boolean;
-};
+import type { Block } from "./types";
 
 type CanvasPreset = {
   id: string;
@@ -64,10 +33,14 @@ const MAX_SCALE = 3;
 const DEFAULT_BLOCK: Block = {
   id: 1,
   text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
+  x: 0,
+  y: 0,
   fontSize: 53,
   color: "#0066cc",
   fontFamily: "TahaNaskhRegular",
   fontStyle: "normal",
+  align: "center",
+  lineHeight: 1.2,
   opacity: 1,
   stroke: "#000000",
   strokeWidth: 0,
@@ -79,6 +52,7 @@ const DEFAULT_BLOCK: Block = {
   locked: false,
   rotation: 0,
   ornamental: false,
+  embossStrength: 0,
   type: "text",
 };
 
@@ -119,13 +93,11 @@ const App: React.FC = () => {
 
   const canvasWidth = Math.max(0, viewportWidth - effectiveSidebarWidth);
   const canvasHeight = currentPreset.height;
-  const height = viewportHeight;
 
-  const getSnapshot = (): EditorSnapshot => ({
-    blocks,
-    canvasPresetId,
-    backgroundColor,
-  });
+  const getSnapshot = useCallback(
+    (): EditorSnapshot => ({ blocks, canvasPresetId, backgroundColor }),
+    [blocks, canvasPresetId, backgroundColor]
+  );
 
   const applySnapshot = (snapshot: EditorSnapshot) => {
     setBlocks(snapshot.blocks);
@@ -133,107 +105,70 @@ const App: React.FC = () => {
     setBackgroundColor(snapshot.backgroundColor);
   };
 
-  const pushHistory = () => {
+  const pushHistory = useCallback(() => {
     undoStackRef.current.push(getSnapshot());
     redoStackRef.current = [];
-  };
+  }, [getSnapshot]);
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     const prev = undoStackRef.current.pop();
     if (!prev) return;
     redoStackRef.current.push(getSnapshot());
     applySnapshot(prev);
-  };
+  }, [getSnapshot]);
+
+  const handleRedo = useCallback(() => {
+    const next = redoStackRef.current.pop();
+    if (!next) return;
+    undoStackRef.current.push(getSnapshot());
+    applySnapshot(next);
+  }, [getSnapshot]);
 
   const updateBlockPositionWithHistory = (id: number, x: number, y: number) => {
     setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, x, y } : b)));
-
-    if (moveTimeoutRef.current != null) {
-      window.clearTimeout(moveTimeoutRef.current);
-    }
-
+    if (moveTimeoutRef.current != null) window.clearTimeout(moveTimeoutRef.current);
     moveTimeoutRef.current = window.setTimeout(() => {
       pushHistory();
     }, 300);
   };
 
-  const handleRedo = () => {
-    const next = redoStackRef.current.pop();
-    if (!next) return;
-    undoStackRef.current.push(getSnapshot());
-    applySnapshot(next);
-  };
-
-  // 1) Viewport resize
   useEffect(() => {
     if (!isBrowser) return;
-
     const handleResize = () => {
       setViewportWidth(window.innerWidth);
       setViewportHeight(window.innerHeight);
       setIsMobile(window.innerWidth <= 768);
     };
-
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // 2) Initial block placement (top-ish, horizontally centered)
   useEffect(() => {
     if (blocks.length !== 0 || canvasWidth <= 0 || canvasHeight <= 0) return;
-
     const stage = stageRef.current;
     const container = canvasContainerRef.current;
     if (!stage || !container) return;
 
     const viewRect = container.getBoundingClientRect();
-
     const centerScreenX = viewRect.left + viewRect.width / 2;
-    const topFraction = 0.15; // adjust to taste
-    const targetScreenY = viewRect.top + viewRect.height * topFraction;
-
+    const targetScreenY = viewRect.top + viewRect.height * 0.2;
     const oldPointer = stage.getPointerPosition();
-    stage.setPointersPositions({
-      clientX: centerScreenX,
-      clientY: targetScreenY,
-    });
 
+    stage.setPointersPositions({ clientX: centerScreenX, clientY: targetScreenY });
     const pos = stage.getRelativePointerPosition();
-    const centerStageX = pos?.x ?? 0;
-    const centerStageY = pos?.y ?? 0;
+    const cx = pos?.x ?? 0;
+    const cy = pos?.y ?? 0;
 
     if (oldPointer) {
-      stage.setPointersPositions({
-        clientX: oldPointer.x,
-        clientY: oldPointer.y,
-      });
+      stage.setPointersPositions({ clientX: oldPointer.x, clientY: oldPointer.y });
     }
 
-    const tempText = new (window as any).Konva.Text({
-      text: DEFAULT_BLOCK.text,
-      fontSize: DEFAULT_BLOCK.fontSize,
-      fontFamily: DEFAULT_BLOCK.fontFamily,
-      fontStyle: DEFAULT_BLOCK.fontStyle ?? "normal",
-      lineHeight: 1.2,
-    });
-
-    const blockWidth = tempText.width();
-    const blockHeight = tempText.height();
-
-    setBlocks([
-      {
-        ...DEFAULT_BLOCK,
-        x: centerStageX - blockWidth / 2,
-        y: centerStageY - blockHeight / 2,
-      },
-    ]);
+    setBlocks([{ ...DEFAULT_BLOCK, x: cx, y: cy }]);
     setSelectedId(1);
   }, [blocks.length, canvasWidth, canvasHeight, stageScale, stagePosition]);
 
-  // 3) Sidebar drag resize
   useEffect(() => {
     if (!isBrowser) return;
-
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizingSidebar || isMobile) return;
       const delta = e.clientX - resizeStartX.current;
@@ -242,12 +177,9 @@ const App: React.FC = () => {
       const sidebarMax = Math.max(260, viewportWidth - 260);
       setSidebarWidth(Math.min(Math.max(newWidth, sidebarMin), sidebarMax));
     };
-
     const handleMouseUp = () => setIsResizingSidebar(false);
-
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
-
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
@@ -255,6 +187,7 @@ const App: React.FC = () => {
   }, [isResizingSidebar, isMobile, viewportWidth]);
 
   useEffect(() => {
+    if (!isBrowser) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const meta = e.ctrlKey || e.metaKey;
       if (!meta) return;
@@ -263,7 +196,6 @@ const App: React.FC = () => {
         e.preventDefault();
         handleUndo();
       }
-
       if ((e.key === "z" && e.shiftKey) || e.key === "y") {
         e.preventDefault();
         handleRedo();
@@ -272,7 +204,7 @@ const App: React.FC = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [blocks, canvasPresetId, backgroundColor]);
+  }, [handleUndo, handleRedo]);
 
   useEffect(() => {
     nextIdRef.current = Math.max(2, ...blocks.map((b) => b.id + 1));
@@ -289,113 +221,86 @@ const App: React.FC = () => {
     return id;
   };
 
-  const updateSelectedBlock = (patch: Partial<Block>) => {
-    if (!selectedBlock) return;
-    pushHistory();
-    setBlocks((prev) => prev.map((b) => (b.id === selectedBlock.id ? { ...b, ...patch } : b)));
-  };
+  const updateSelectedBlock = useCallback(
+    (patch: Partial<Block>) => {
+      if (!selectedBlock) return;
+      pushHistory();
+      setBlocks((prev) => prev.map((b) => (b.id === selectedBlock.id ? { ...b, ...patch } : b)));
+    },
+    [selectedBlock, pushHistory]
+  );
 
-  const addCircleBlock = () => {
-    pushHistory();
-    const newId = createNextId();
+  const updateBlock = useCallback(
+    (id: number, patch: Partial<Block>) => {
+      pushHistory();
+      setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+    },
+    [pushHistory]
+  );
 
+  const reorderBlocks = useCallback(
+    (newBlocks: Block[]) => {
+      pushHistory();
+      setBlocks(newBlocks);
+    },
+    [pushHistory]
+  );
+
+  const mergeBlocks = useCallback(
+    (idA: number, idB: number) => {
+      pushHistory();
+      setBlocks((prev) => {
+        const a = prev.find((b) => b.id === idA);
+        const b = prev.find((b) => b.id === idB);
+        if (!a || !b) return prev;
+
+        const merged: Block = {
+          ...a,
+          text: `${a.text} ${b.text}`.trim(),
+        };
+
+        return prev
+          .map((bl) => (bl.id === idA ? merged : bl))
+          .filter((bl) => bl.id !== idB);
+      });
+      setSelectedId(idA);
+    },
+    [pushHistory]
+  );
+
+  const getCenterStagePos = () => {
     const stage = stageRef.current;
     const container = canvasContainerRef.current;
-    if (!stage || !container) return;
+    if (!stage || !container) return { x: 0, y: 0 };
 
     const viewRect = container.getBoundingClientRect();
     const centerScreenX = viewRect.left + viewRect.width / 2;
     const centerScreenY = viewRect.top + viewRect.height / 2;
-
     const oldPointer = stage.getPointerPosition();
-    stage.setPointersPositions({
-      clientX: centerScreenX,
-      clientY: centerScreenY,
-    });
 
+    stage.setPointersPositions({ clientX: centerScreenX, clientY: centerScreenY });
     const pos = stage.getRelativePointerPosition();
-    const centerStageX = pos?.x ?? 0;
-    const centerStageY = pos?.y ?? 0;
 
     if (oldPointer) {
-      stage.setPointersPositions({
-        clientX: oldPointer.x,
-        clientY: oldPointer.y,
-      });
+      stage.setPointersPositions({ clientX: oldPointer.x, clientY: oldPointer.y });
     }
 
-    const newBlock: Block = {
-      ...DEFAULT_BLOCK,
-      id: newId,
-      text: "دائرة",
-      type: "circlePath",
-      radius: 150,
-      startAngle: -160,
-      endAngle: -20,
-      arcPosition: "top",
-      letterSpacing: 1,
-      x: centerStageX,
-      y: centerStageY,
-    };
-
-    setBlocks((prev) => [...prev, newBlock]);
-    setSelectedId(newId);
+    return { x: pos?.x ?? 0, y: pos?.y ?? 0 };
   };
 
   const addBlock = () => {
     pushHistory();
     const newId = createNextId();
+    const { x, y } = getCenterStagePos();
 
-    const stage = stageRef.current;
-    const container = canvasContainerRef.current;
-    if (!stage || !container) return;
-
-    const viewRect = container.getBoundingClientRect();
-    const centerScreenX = viewRect.left + viewRect.width / 2;
-    const centerScreenY = viewRect.top + viewRect.height / 2;
-
-    const oldPointer = stage.getPointerPosition();
-    stage.setPointersPositions({
-      clientX: centerScreenX,
-      clientY: centerScreenY,
-    });
-
-    const pos = stage.getRelativePointerPosition();
-    const centerStageX = pos?.x ?? 0;
-    const centerStageY = pos?.y ?? 0;
-
-    if (oldPointer) {
-      stage.setPointersPositions({
-        clientX: oldPointer.x,
-        clientY: oldPointer.y,
-      });
-    }
-
-    let newBlock: Block = {
+    const newBlock: Block = {
       ...DEFAULT_BLOCK,
       id: newId,
-      text: "جديد",
+      text: "نَصٌّ جَدِيدٌ",
       fontSize: 50,
       color: "#0066cc",
-      x: centerStageX,
-      y: centerStageY,
-    };
-
-    const tempText = new (window as any).Konva.Text({
-      text: newBlock.text,
-      fontSize: newBlock.fontSize,
-      fontFamily: newBlock.fontFamily,
-      fontStyle: newBlock.fontStyle ?? "normal",
-      lineHeight: 1.2,
-    });
-
-    const blockWidth = tempText.width();
-    const blockHeight = tempText.height();
-
-    newBlock = {
-      ...newBlock,
-      x: centerStageX - blockWidth / 2,
-      y: centerStageY - blockHeight / 2,
+      x,
+      y,
     };
 
     setBlocks((prev) => [...prev, newBlock]);
@@ -405,6 +310,7 @@ const App: React.FC = () => {
   const duplicateSelectedBlock = () => {
     if (!selectedBlock) return;
     pushHistory();
+
     const newId = createNextId();
     const copy: Block = {
       ...selectedBlock,
@@ -412,6 +318,7 @@ const App: React.FC = () => {
       x: selectedBlock.x - 20,
       y: selectedBlock.y + 20,
     };
+
     setBlocks((prev) => [...prev, copy]);
     setSelectedId(newId);
   };
@@ -419,6 +326,7 @@ const App: React.FC = () => {
   const deleteSelectedBlock = () => {
     if (!selectedBlock) return;
     pushHistory();
+
     setBlocks((prev) => {
       const filtered = prev.filter((b) => b.id !== selectedBlock.id);
       setSelectedId(filtered.length > 0 ? filtered[0].id : null);
@@ -487,6 +395,7 @@ const App: React.FC = () => {
 
     const exported = await exportStageSVG(stage, false);
     const svgText = String(exported).trim();
+
     const finalSvg = svgText.startsWith("<svg")
       ? svgText
       : `<svg xmlns="http://www.w3.org/2000/svg" width="${box.width}" height="${box.height}" viewBox="${box.x} ${box.y} ${box.width} ${box.height}">${svgText}</svg>`;
@@ -505,7 +414,6 @@ const App: React.FC = () => {
   const handleExportPDF = async () => {
     const stage = stageRef.current;
     if (!stage) return;
-
     const box = getBlocksBoundingBox();
     if (!box) return;
 
@@ -520,7 +428,6 @@ const App: React.FC = () => {
     });
 
     const pxToMm = (px: number) => (px * 25.4) / 96;
-
     const imgWidthMm = pxToMm(box.width);
     const imgHeightMm = pxToMm(box.height);
 
@@ -534,18 +441,34 @@ const App: React.FC = () => {
     pdf.save("calligraphy.pdf");
   };
 
+  const buildLayoutPayload = () => ({
+    blocks,
+    selectedId,
+    canvasPresetId,
+    backgroundColor,
+    stageScale,
+    stagePosition,
+    panMode,
+    version: 2,
+  });
+
+  const applyLayoutPayload = (parsed: any) => {
+    if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
+    if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
+      setSelectedId(parsed.selectedId);
+    }
+    if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
+    if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
+    if (typeof parsed.stageScale === "number") setStageScale(parsed.stageScale);
+    if (parsed.stagePosition && typeof parsed.stagePosition.x === "number") {
+      setStagePosition(parsed.stagePosition);
+    }
+    if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
+  };
+
   const saveLayout = () => {
     if (!isBrowser) return;
-    const payload = {
-      blocks,
-      selectedId,
-      canvasPresetId,
-      backgroundColor,
-      stageScale,
-      stagePosition,
-      panMode,
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(buildLayoutPayload()));
   };
 
   const loadLayout = () => {
@@ -554,26 +477,43 @@ const App: React.FC = () => {
     if (!raw) return;
 
     try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
-      if (typeof parsed.selectedId === "number" || parsed.selectedId === null)
-        setSelectedId(parsed.selectedId);
-      if (typeof parsed.canvasPresetId === "string")
-        setCanvasPresetId(parsed.canvasPresetId);
-      if (typeof parsed.backgroundColor === "string")
-        setBackgroundColor(parsed.backgroundColor);
-      if (typeof parsed.stageScale === "number") setStageScale(parsed.stageScale);
-      if (
-        parsed.stagePosition &&
-        typeof parsed.stagePosition.x === "number" &&
-        typeof parsed.stagePosition.y === "number"
-      ) {
-        setStagePosition(parsed.stagePosition);
-      }
-      if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
+      applyLayoutPayload(JSON.parse(raw));
     } catch {
-      // ignore invalid saved data
+      // ignore
     }
+  };
+
+  const downloadLayout = () => {
+    const json = JSON.stringify(buildLayoutPayload(), null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "calligraphy-layout.json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const uploadLayout = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          applyLayoutPayload(JSON.parse(e.target?.result as string));
+        } catch {
+          alert("Invalid layout file.");
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
   };
 
   const updateStageZoom = (scale: number, position: { x: number; y: number }) => {
@@ -587,15 +527,38 @@ const App: React.FC = () => {
     setIsResizingSidebar(true);
   };
 
-  function onUpdateClearDiacritics(
-    block: { text: string } | undefined,
-    updateSelectedBlockFn: (patch: Partial<Block>) => void
-  ) {
-    if (!block) return;
-    updateSelectedBlockFn({
-      text: block.text.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, ""),
+  const addShapeFillBlock = (svgPathData: string, shapeWidth: number, shapeHeight: number) => {
+    pushHistory();
+    const newId = createNextId();
+    const { x, y } = getCenterStagePos();
+
+    const newBlock: Block = {
+      ...DEFAULT_BLOCK,
+      id: newId,
+      text: "نَصٌّ جَدِيدٌ",
+      type: "shapeFill",
+      shapeSvgPath: svgPathData,
+      shapeWidth,
+      shapeHeight,
+      shapeScale: 1,
+      shapeFillSpacing: 1.3,
+      shapeFillScaleX: 1,
+      shapeFillScaleY: 1,
+      shapeFillTextRotation: 0,
+      x: x - shapeWidth / 2,
+      y: y - shapeHeight / 2,
+    };
+
+    setBlocks((prev) => [...prev, newBlock]);
+    setSelectedId(newId);
+  };
+
+  const clearDiacritics = useCallback(() => {
+    if (!selectedBlock) return;
+    updateSelectedBlock({
+      text: selectedBlock.text.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, ""),
     });
-  }
+  }, [selectedBlock, updateSelectedBlock]);
 
   return (
     <div
@@ -635,19 +598,21 @@ const App: React.FC = () => {
         onExportPDF={handleExportPDF}
         onSaveLayout={saveLayout}
         onLoadLayout={loadLayout}
+        onDownloadLayout={downloadLayout}
+        onUploadLayout={uploadLayout}
+        onAddShapeFillBlock={addShapeFillBlock}
         onToggleGrid={setShowGrid}
         onToggleSnap={setSnapToGrid}
         onSelectBlock={setSelectedId}
         onUpdateSelectedBlock={updateSelectedBlock}
-        onAddCircleBlock={addCircleBlock}
+        onUpdateBlock={updateBlock}
+        onReorderBlocks={reorderBlocks}
+        onMergeBlocks={mergeBlocks}
         showKeyboard={showKeyboard}
         onToggleKeyboard={() => setShowKeyboard((v) => !v)}
-        onClearDiacritics={(block) =>
-          onUpdateClearDiacritics(block, updateSelectedBlock)
-        }
+        onClearDiacritics={() => selectedBlock && clearDiacritics()}
         onInsertPreset={(value) =>
-          selectedBlock &&
-          updateSelectedBlock({ text: selectedBlock.text + value })
+          selectedBlock && updateSelectedBlock({ text: selectedBlock.text + value })
         }
         onUndo={handleUndo}
         onRedo={handleRedo}
@@ -667,7 +632,10 @@ const App: React.FC = () => {
         }}
       />
 
-      <div ref={canvasContainerRef} style={{ flex: 1, position: "relative" }}>
+      <div
+        ref={canvasContainerRef}
+        style={{ flex: 1, position: "relative", height: viewportHeight, overflow: "hidden" }}
+      >
         <CanvasStage
           blocks={blocks}
           snapToGrid={snapToGrid}
@@ -691,8 +659,7 @@ const App: React.FC = () => {
             selectedBlock && updateSelectedBlock({ text: selectedBlock.text + " " })
           }
           onBackspaceFromKeyboard={() =>
-            selectedBlock &&
-            updateSelectedBlock({ text: selectedBlock.text.slice(0, -1) })
+            selectedBlock && updateSelectedBlock({ text: selectedBlock.text.slice(0, -1) })
           }
         />
       </div>
