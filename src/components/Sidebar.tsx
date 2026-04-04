@@ -272,22 +272,83 @@ function svgElementToPathData(el: Element): string {
   }
 }
 
+/**
+ * Normalize all SVG coordinate numbers in a path string by multiplying by
+ * (targetSize / sourceSize). This handles both tiny icon SVGs (24px) and
+ * large illustration SVGs (2000px) — everything ends up at TARGET_SIZE × TARGET_SIZE.
+ */
+const TARGET_SVG_SIZE = 500;
+
+function scaleSvgPathNumbers(d: string, scaleX: number, scaleY: number): string {
+  // We re-serialize via a simple token pass: scale every numeric token.
+  // Commands that mix x/y coords (C, Q, etc.) alternate x then y implicitly,
+  // so we track the coord parity per-command.
+  const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g);
+  if (!tokens) return d;
+
+  const out: string[] = [];
+  let cmd = "";
+  let argIdx = 0; // argument index within current command
+
+  // How many args per command (absolute)
+  const argCounts: Record<string, number> = {
+    M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, T: 2, A: 7, Z: 0,
+  };
+  // Which arg indices are X coords (0-based within the arg group)
+  const xArgIdx: Record<string, number[]> = {
+    M: [0], L: [0], H: [0], V: [], C: [0, 2, 4], S: [0, 2], Q: [0, 2], T: [0],
+    A: [5], // arc endpoint x
+  };
+  const yArgIdx: Record<string, number[]> = {
+    M: [1], L: [1], H: [], V: [0], C: [1, 3, 5], S: [1, 3], Q: [1, 3], T: [1],
+    A: [6], // arc endpoint y
+  };
+
+  for (const tok of tokens) {
+    if (/^[MmLlHhVvCcSsQqTtAaZz]$/.test(tok)) {
+      cmd = tok.toUpperCase();
+      argIdx = 0;
+      out.push(tok);
+    } else {
+      const n = parseFloat(tok);
+      const count = argCounts[cmd] ?? 2;
+      const posInGroup = count > 0 ? argIdx % count : 0;
+      const isX = (xArgIdx[cmd] ?? []).includes(posInGroup);
+      const isY = (yArgIdx[cmd] ?? []).includes(posInGroup);
+      let scaled = n;
+      if (isX) scaled = n * scaleX;
+      else if (isY) scaled = n * scaleY;
+      // A command: args 0-4 are radii/flags, also scale radii (0=rx, 1=ry)
+      if (cmd === "A" && (posInGroup === 0)) scaled = n * scaleX;
+      if (cmd === "A" && (posInGroup === 1)) scaled = n * scaleY;
+      out.push(String(parseFloat(scaled.toFixed(3))));
+      argIdx++;
+    }
+  }
+  return out.join(" ");
+}
+
 function extractSvgPaths(svgText: string): { pathData: string; w: number; h: number } | null {
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgText, "image/svg+xml");
   if (doc.querySelector("parsererror")) return null;
   const svgEl = doc.querySelector("svg");
   const vb = svgEl?.getAttribute("viewBox")?.split(/[\s,]+/).map(Number);
-  const w = (vb?.[2] ?? parseFloat(svgEl?.getAttribute("width") ?? "400")) || 400;
-  const h = (vb?.[3] ?? parseFloat(svgEl?.getAttribute("height") ?? "400")) || 400;
+  // Source dimensions from viewBox or width/height attributes
+  const srcW = (vb?.[2] ?? parseFloat(svgEl?.getAttribute("width") ?? "400")) || 400;
+  const srcH = (vb?.[3] ?? parseFloat(svgEl?.getAttribute("height") ?? "400")) || 400;
+  // Scale factors to normalize to TARGET_SVG_SIZE
+  const sx = TARGET_SVG_SIZE / srcW;
+  const sy = TARGET_SVG_SIZE / srcH;
   const shapeEls = doc.querySelectorAll("path, rect, circle, ellipse, polygon, polyline");
   const parts: string[] = [];
   shapeEls.forEach((el) => {
     const d = svgElementToPathData(el);
-    if (d) parts.push(d);
+    if (d) parts.push(scaleSvgPathNumbers(d, sx, sy));
   });
   if (parts.length === 0) return null;
-  return { pathData: parts.join(" "), w, h };
+  // Always return TARGET_SVG_SIZE square — consistent for all SVGs
+  return { pathData: parts.join(" "), w: TARGET_SVG_SIZE, h: TARGET_SVG_SIZE };
 }
 
 const blockTypeIcon = (b: Block) => (b.type === "shapeFill" ? "✦" : "T");
@@ -299,6 +360,7 @@ type LayersPanelProps = {
   onToggleLock: (id: number) => void;
   onMoveUp: (id: number) => void;
   onMoveDown: (id: number) => void;
+  onDelete: (id: number) => void;
   onMerge: (idA: number, idB: number) => void;
   onRename: (id: number, name: string) => void;
 };
@@ -310,6 +372,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
   onToggleLock,
   onMoveUp,
   onMoveDown,
+  onDelete,
   onMerge,
   onRename,
 }) => {
@@ -469,6 +532,18 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               style={{ background: isMerge ? "#fcd34d" : "transparent", borderRadius: 4 }}
             >
               ⊕
+            </button>
+            <button
+              type="button"
+              title="Delete layer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(block.id);
+              }}
+              className="layerIconBtn"
+              style={{ color: "#dc2626" }}
+            >
+              ✕
             </button>
           </div>
         );
@@ -739,6 +814,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onToggleLock={handleToggleLock}
                 onMoveUp={(id) => handleMoveLayer(id, "up")}
                 onMoveDown={(id) => handleMoveLayer(id, "down")}
+                onDelete={(id) => {
+                  const idx = blocks.findIndex((b) => b.id === id);
+                  const remaining = blocks.filter((b) => b.id !== id);
+                  const next = remaining[idx] ?? remaining[idx - 1];
+                  onReorderBlocks?.(remaining);
+                  onSelectBlock(next?.id ?? null);
+                }}
                 onMerge={(a, b) => onMergeBlocks?.(a, b)}
                 onRename={handleRename}
               />
@@ -1153,68 +1235,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           {showFileActions && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: 10,
-                flexWrap: "wrap",
-                marginTop: 12,
-              }}
-            >
-              <button
-                type="button"
-                onClick={onExportPNG}
-                className="sidebarCircleButton sidebarCircleButton--light"
-              >
-                PNG
-              </button>
-              <button
-                type="button"
-                onClick={onExportSVG}
-                className="sidebarCircleButton sidebarCircleButton--light"
-              >
-                SVG
-              </button>
-              <button
-                type="button"
-                onClick={onExportPDF}
-                className="sidebarCircleButton sidebarCircleButton--light"
-              >
-                PDF
-              </button>
-              <button
-                type="button"
-                onClick={onSaveLayout}
-                className="sidebarCircleButton"
-                title="Quick-save to browser"
-              >
-                💾
-              </button>
-              <button
-                type="button"
-                onClick={onLoadLayout}
-                className="sidebarCircleButton"
-                title="Load from browser"
-              >
-                📂
-              </button>
-              <button
-                type="button"
-                onClick={onDownloadLayout}
-                className="sidebarCircleButton sidebarCircleButton--light"
-                title="Download .json"
-              >
-                ⬇
-              </button>
-              <button
-                type="button"
-                onClick={onUploadLayout}
-                className="sidebarCircleButton sidebarCircleButton--light"
-                title="Upload .json"
-              >
-                ⬆
-              </button>
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+
+              {/* Row 1: Export image formats */}
+              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+                <button type="button" onClick={onExportPNG} className="sidebarCircleButton sidebarCircleButton--light" title="Export PNG">
+                  PNG
+                </button>
+                <button type="button" onClick={onExportSVG} className="sidebarCircleButton sidebarCircleButton--light" title="Export SVG">
+                  SVG
+                </button>
+                <button type="button" onClick={onExportPDF} className="sidebarCircleButton sidebarCircleButton--light" title="Export PDF">
+                  PDF
+                </button>
+              </div>
+
+              {/* Row 2: Browser save / load */}
+              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+                <button type="button" onClick={onSaveLayout} className="sidebarCircleButton" title="Quick-save to browser">
+                  💾 Save
+                </button>
+                <button type="button" onClick={onLoadLayout} className="sidebarCircleButton" title="Load from browser">
+                  📂 Load
+                </button>
+              </div>
+
+              {/* Row 3: JSON file download / upload */}
+              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+                <button type="button" onClick={onDownloadLayout} className="sidebarCircleButton sidebarCircleButton--light" title="Download layout as .json">
+                  ⬇ JSON
+                </button>
+                <button type="button" onClick={onUploadLayout} className="sidebarCircleButton sidebarCircleButton--light" title="Upload .json layout file">
+                  ⬆ JSON
+                </button>
+              </div>
+
             </div>
           )}
         </div>

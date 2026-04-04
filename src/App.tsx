@@ -535,9 +535,9 @@ const App: React.FC = () => {
     const newId = createNextId();
     const { x, y } = getCenterStagePos();
 
-    // Auto-size fontSize so roughly 10-15 rows fit inside the shape height.
-    // This gives a dense fill regardless of SVG size.
-    const autoFontSize = Math.max(8, Math.round(shapeHeight / 12));
+    // SVGs are normalized to 500×500 on import, so shapeHeight is always 500.
+    // fontSize of ~35 gives ~14 rows of text — a dense, visible fill.
+    const autoFontSize = Math.max(8, Math.round(shapeHeight / 14));
 
     const newBlock: Block = {
       ...DEFAULT_BLOCK,
@@ -660,16 +660,6 @@ const App: React.FC = () => {
           onUpdateStage={updateStageZoom}
           onUpdateBlockPosition={updateBlockPositionWithHistory}
           onSelectBlock={setSelectedId}
-          showKeyboard={showKeyboard}
-          onKeyFromKeyboard={(k) =>
-            selectedBlock && updateSelectedBlock({ text: selectedBlock.text + k })
-          }
-          onSpaceFromKeyboard={() =>
-            selectedBlock && updateSelectedBlock({ text: selectedBlock.text + " " })
-          }
-          onBackspaceFromKeyboard={() =>
-            selectedBlock && updateSelectedBlock({ text: selectedBlock.text.slice(0, -1) })
-          }
         />
       </div>
     </div>

@@ -1,7 +1,7 @@
 import React from "react";
 import { Stage, Layer, Rect, Line } from "react-konva";
 import type Konva from "konva";
-import ArabicKeyboard from "./ArabicKeyboard";
+// ArabicKeyboard removed from canvas — keyboard lives only in the sidebar
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import type { Block } from "../types";
@@ -27,10 +27,6 @@ export type CanvasStageProps = {
   onUpdateStage: (scale: number, position: { x: number; y: number }) => void;
   onUpdateBlockPosition: (id: number, x: number, y: number) => void;
   onSelectBlock: (id: number) => void;
-  showKeyboard: boolean;
-  onKeyFromKeyboard: (k: string) => void;
-  onSpaceFromKeyboard: () => void;
-  onBackspaceFromKeyboard: () => void;
 };
 
 export const CanvasStage: React.FC<CanvasStageProps> = ({
@@ -49,10 +45,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onUpdateStage,
   onUpdateBlockPosition,
   onSelectBlock,
-  showKeyboard,
-  onKeyFromKeyboard,
-  onSpaceFromKeyboard,
-  onBackspaceFromKeyboard,
 }) => {
   const snapCoord = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
@@ -295,24 +287,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         </Stage>
       </div>
 
-      {showKeyboard && (
-        <div
-          style={{
-            position: "absolute",
-            left: 12,
-            right: 12,
-            bottom: 12,
-            zIndex: 50,
-          }}
-        >
-          <ArabicKeyboard
-            onKey={onKeyFromKeyboard}
-            onSpace={onSpaceFromKeyboard}
-            onBackspace={onBackspaceFromKeyboard}
-            style={{ width: "100%" }}
-          />
-        </div>
-      )}
     </div>
   );
 };
