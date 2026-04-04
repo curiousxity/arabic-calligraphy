@@ -13,7 +13,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
-import type opentype from "opentype.js";
 import { shapeText, type HarfBuzzGlyph, type ShapedTextResult } from "../lib/harfbuzz";
 
 type Props = {
@@ -65,7 +64,7 @@ const FONT_URLS: Record<string, string> = {
 
 type LoadedShape = {
   glyphs: HarfBuzzGlyph[];
-  font: opentype.Font | null;
+  font: ShapedTextResult["font"] | null;
   unitsPerEm: number;
 };
 
@@ -85,7 +84,7 @@ const fallbackWidth = (text: string, fs: number) => Math.max(text.length * fs * 
 function drawGlyphs(
   ctx: any,
   glyphs: HarfBuzzGlyph[],
-  font: opentype.Font,
+  font: ShapedTextResult["font"],
   scale: number,
   fontSize: number
 ) {

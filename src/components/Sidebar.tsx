@@ -748,7 +748,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {selectedBlock && (
           <div className="sidebarPanel">
-            <div className="sidebarSectionTitle">{activeBlockLabel}</div>
             <label htmlFor={makeId("block-text", selectedId)} className="sr-only">
               Block text
             </label>

@@ -1,5 +1,7 @@
 import * as hbjsModule from "harfbuzzjs";
-import opentype from "opentype.js";
+// Use namespace import so Rolldown/Vite 8 (rolldown bundler) can resolve the
+// CJS-wrapped opentype.js package without an explicit ESM entry point.
+import * as opentype from "opentype.js";
 
 // harfbuzzjs ships as CJS; Vite may wrap it so the callable is at .default
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10,7 +12,8 @@ const hbjs: () => Promise<any> =
 
 let hbPromise: Promise<any> | null = null;
 const fontCache = new Map<string, ArrayBuffer>();
-const parsedFontCache = new Map<string, opentype.Font>();
+// opentype.Font is accessed as a type from the namespace import
+const parsedFontCache = new Map<string, ReturnType<typeof opentype.parse>>();
 
 export type HarfBuzzGlyph = {
   g: number;
@@ -23,7 +26,7 @@ export type HarfBuzzGlyph = {
 
 export type ShapedTextResult = {
   glyphs: HarfBuzzGlyph[];
-  font: opentype.Font;
+  font: ReturnType<typeof opentype.parse>;
   unitsPerEm: number;
 };
 
@@ -42,7 +45,7 @@ async function loadFontData(fontUrl: string): Promise<ArrayBuffer> {
   return fontCache.get(fontUrl)!;
 }
 
-async function loadParsedFont(fontUrl: string): Promise<opentype.Font> {
+async function loadParsedFont(fontUrl: string): Promise<ReturnType<typeof opentype.parse>> {
   if (!parsedFontCache.has(fontUrl)) {
     const fontData = await loadFontData(fontUrl);
     const parsed = opentype.parse(fontData.slice(0));

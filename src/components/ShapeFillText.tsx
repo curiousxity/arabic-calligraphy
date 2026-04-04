@@ -1,22 +1,23 @@
 /**
- * ShapeFillText v4
+ * ShapeFillText v5
  *
- * Key changes:
- *  - `shapeScale` prop: uniformly scales the entire shape + fill (0.1–5).
- *    The SVG path is drawn at (shapeWidth * shapeScale) × (shapeHeight * shapeScale).
- *    ctx.scale(shapeScale, shapeScale) is applied before clipping so the path
- *    and all glyph placement coordinates scale together.
- *  - Text genuinely FORMS the shape: glyphs are clipped inside the SVG path,
- *    and the shape outline is NOT drawn — the text itself reveals the shape.
- *  - Inner emboss via source-atop compositing (same approach as ShapedText).
- *  - No checkbox for emboss — just strength slider (0 = off).
+ * Key fix: Konva's sceneFunc context wrapper does NOT support Path2D or the
+ * two-argument isPointInPath(path, x, y) form. All path operations must use
+ * the standard beginPath() / moveTo / lineTo / bezierCurveTo / clip() API
+ * that Konva forwards to the underlying canvas context.
+ *
+ * Strategy:
+ *  - Parse the SVG path string into an array of command objects once (memoized).
+ *  - Replay those commands via ctx.beginPath() + individual draw calls for clipping.
+ *  - For scanline hit-testing, use a simple ray-casting polygon approximation
+ *    (sample the path outline into a polygon, then test each scanline point).
+ *  - shapeScale, emboss, stroke all preserved.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
-import type opentype from "opentype.js";
-import { shapeText, type HarfBuzzGlyph } from "../lib/harfbuzz";
+import { shapeText, type HarfBuzzGlyph, type ShapedTextResult } from "../lib/harfbuzz";
 
 const FONT_URLS: Record<string, string> = {
   TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
@@ -38,7 +39,7 @@ const FONT_URLS: Record<string, string> = {
 
 type ShapeData = {
   glyphs: HarfBuzzGlyph[];
-  font: opentype.Font;
+  font: ShapedTextResult["font"];
   unitsPerEm: number;
 };
 
@@ -53,7 +54,6 @@ export type ShapeFillTextProps = {
   shapeSvgPath: string;
   shapeWidth: number;
   shapeHeight: number;
-  /** Uniform scale for the whole shape+fill. 1 = original SVG size. */
   shapeScale?: number;
   shapeFillSpacing?: number;
   shapeFillScaleX?: number;
@@ -75,6 +75,121 @@ export type ShapeFillTextProps = {
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   embossStrength?: number;
 };
+
+// ─── SVG path parser ──────────────────────────────────────────────────────────
+
+type SvgCmd =
+  | { type: "M"; x: number; y: number }
+  | { type: "L"; x: number; y: number }
+  | { type: "C"; x1: number; y1: number; x2: number; y2: number; x: number; y: number }
+  | { type: "Q"; x1: number; y1: number; x: number; y: number }
+  | { type: "Z" };
+
+/** Parse an SVG path `d` string into an array of absolute commands. */
+function parseSvgPath(d: string): SvgCmd[] {
+  const cmds: SvgCmd[] = [];
+  const re = /([MmLlHhVvCcSsQqTtAaZz])|([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/g;
+  const tokens: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(d)) !== null) tokens.push(m[0]);
+
+  let i = 0;
+  let cx = 0, cy = 0, sx = 0, sy = 0; // current pos, subpath start
+  const num = () => parseFloat(tokens[i++]);
+
+  while (i < tokens.length) {
+    const cmd = tokens[i++];
+    switch (cmd) {
+      case "M": { const x = num(), y = num(); cmds.push({ type: "M", x, y }); cx = sx = x; cy = sy = y; break; }
+      case "m": { const x = cx + num(), y = cy + num(); cmds.push({ type: "M", x, y }); cx = sx = x; cy = sy = y; break; }
+      case "L": { const x = num(), y = num(); cmds.push({ type: "L", x, y }); cx = x; cy = y; break; }
+      case "l": { const x = cx + num(), y = cy + num(); cmds.push({ type: "L", x, y }); cx = x; cy = y; break; }
+      case "H": { const x = num(); cmds.push({ type: "L", x, y: cy }); cx = x; break; }
+      case "h": { const x = cx + num(); cmds.push({ type: "L", x, y: cy }); cx = x; break; }
+      case "V": { const y = num(); cmds.push({ type: "L", x: cx, y }); cy = y; break; }
+      case "v": { const y = cy + num(); cmds.push({ type: "L", x: cx, y }); cy = y; break; }
+      case "C": { const x1=num(),y1=num(),x2=num(),y2=num(),x=num(),y=num(); cmds.push({type:"C",x1,y1,x2,y2,x,y}); cx=x; cy=y; break; }
+      case "c": { const x1=cx+num(),y1=cy+num(),x2=cx+num(),y2=cy+num(),x=cx+num(),y=cy+num(); cmds.push({type:"C",x1,y1,x2,y2,x,y}); cx=x; cy=y; break; }
+      case "Q": { const x1=num(),y1=num(),x=num(),y=num(); cmds.push({type:"Q",x1,y1,x,y}); cx=x; cy=y; break; }
+      case "q": { const x1=cx+num(),y1=cy+num(),x=cx+num(),y=cy+num(); cmds.push({type:"Q",x1,y1,x,y}); cx=x; cy=y; break; }
+      case "S": { const x2=num(),y2=num(),x=num(),y=num(); cmds.push({type:"C",x1:cx,y1:cy,x2,y2,x,y}); cx=x; cy=y; break; }
+      case "s": { const x2=cx+num(),y2=cy+num(),x=cx+num(),y=cy+num(); cmds.push({type:"C",x1:cx,y1:cy,x2,y2,x,y}); cx=x; cy=y; break; }
+      case "Z": case "z": { cmds.push({ type: "Z" }); cx = sx; cy = sy; break; }
+      // A (arc) — approximate as a line to endpoint for simplicity
+      case "A": { num();num();num();num();num(); const x=num(),y=num(); cmds.push({type:"L",x,y}); cx=x; cy=y; break; }
+      case "a": { num();num();num();num();num(); const x=cx+num(),y=cy+num(); cmds.push({type:"L",x,y}); cx=x; cy=y; break; }
+      default: break;
+    }
+  }
+  return cmds;
+}
+
+/** Replay parsed SVG commands onto a canvas context (no Path2D needed). */
+function replayPath(ctx: any, cmds: SvgCmd[]) {
+  ctx.beginPath();
+  for (const c of cmds) {
+    switch (c.type) {
+      case "M": ctx.moveTo(c.x, c.y); break;
+      case "L": ctx.lineTo(c.x, c.y); break;
+      case "C": ctx.bezierCurveTo(c.x1, c.y1, c.x2, c.y2, c.x, c.y); break;
+      case "Q": ctx.quadraticCurveTo(c.x1, c.y1, c.x, c.y); break;
+      case "Z": ctx.closePath(); break;
+    }
+  }
+}
+
+/**
+ * Build a flat polygon approximation from path commands (for hit testing).
+ * Curves are subdivided at a fixed step count.
+ */
+function pathToPolygon(cmds: SvgCmd[], steps = 8): Array<[number, number]> {
+  const pts: Array<[number, number]> = [];
+  let cx = 0, cy = 0;
+  for (const c of cmds) {
+    switch (c.type) {
+      case "M": cx = c.x; cy = c.y; pts.push([cx, cy]); break;
+      case "L": cx = c.x; cy = c.y; pts.push([cx, cy]); break;
+      case "Z": break;
+      case "C": {
+        const ox = cx, oy = cy;
+        for (let s = 1; s <= steps; s++) {
+          const t = s / steps;
+          const mt = 1 - t;
+          const x = mt*mt*mt*ox + 3*mt*mt*t*c.x1 + 3*mt*t*t*c.x2 + t*t*t*c.x;
+          const y = mt*mt*mt*oy + 3*mt*mt*t*c.y1 + 3*mt*t*t*c.y2 + t*t*t*c.y;
+          pts.push([x, y]);
+        }
+        cx = c.x; cy = c.y; break;
+      }
+      case "Q": {
+        const ox = cx, oy = cy;
+        for (let s = 1; s <= steps; s++) {
+          const t = s / steps;
+          const mt = 1 - t;
+          const x = mt*mt*ox + 2*mt*t*c.x1 + t*t*c.x;
+          const y = mt*mt*oy + 2*mt*t*c.y1 + t*t*c.y;
+          pts.push([x, y]);
+        }
+        cx = c.x; cy = c.y; break;
+      }
+    }
+  }
+  return pts;
+}
+
+/** Ray-casting point-in-polygon test. */
+function pointInPolygon(px: number, py: number, poly: Array<[number, number]>): boolean {
+  let inside = false;
+  const n = poly.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
 
 function drawCommandsToCtx(ctx: any, commands: any[]) {
   ctx.beginPath();
@@ -131,7 +246,13 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     return () => { alive = false; };
   }, [text, fontUrl]);
 
-  // Pre-compute glyph path commands + advances (synchronous in sceneFunc)
+  // Parse SVG path once
+  const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
+
+  // Build polygon for hit-testing once
+  const polygon = useMemo(() => pathToPolygon(parsedCmds, 12), [parsedCmds]);
+
+  // Pre-compute glyph path commands + advances
   const glyphCache = useMemo(() => {
     if (!shapeData) return [];
     const { glyphs, font, unitsPerEm } = shapeData;
@@ -151,7 +272,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
   const totalAdvance = glyphCache.reduce((s, g) => s + g.advance, 0);
 
-  // Actual rendered dimensions after scale
   const scaledW = shapeWidth * shapeScale;
   const scaledH = shapeHeight * shapeScale;
 
@@ -167,7 +287,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       onClick={onClick} onTap={onTap} onDragEnd={onDragEnd}
       listening
     >
-      {/* Hit area matches scaled dimensions */}
       <Rect x={0} y={0} width={scaledW} height={scaledH} fill="transparent" strokeEnabled={false} listening />
 
       <Shape
@@ -178,9 +297,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
         shadowOffsetY={!hasEmboss ? shadowOffsetY : 0}
         shadowOpacity={!hasEmboss ? shadowOpacity : 0}
         sceneFunc={(ctx) => {
-          if (!shapeSvgPath || !shapeData || glyphCache.length === 0 || totalAdvance <= 0) return;
+          if (!shapeSvgPath || parsedCmds.length === 0) return;
 
-          const { font } = shapeData;
           const lineH = fontSize * shapeFillSpacing;
           const rotRad = (shapeFillTextRotation * Math.PI) / 180;
 
@@ -188,17 +306,21 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           ctx.save();
           ctx.scale(shapeScale, shapeScale);
 
-          const path2d = new Path2D(shapeSvgPath);
+          // Clip to shape using replayed path commands (Konva-safe, no Path2D)
+          replayPath(ctx, parsedCmds);
+          ctx.clip();
 
-          // Clip to SVG shape — text will FORM the shape silhouette
-          ctx.clip(path2d);
+          // If no text data yet, draw a semi-transparent placeholder fill
+          if (!shapeData || glyphCache.length === 0 || totalAdvance <= 0) {
+            ctx.fillStyle = color + "33"; // 20% opacity hint
+            replayPath(ctx, parsedCmds);
+            ctx.fill();
+            ctx.restore();
+            return;
+          }
 
-          // ── Draw text rows to fill the shape ──────────────────────────────
           ctx.fillStyle = color;
 
-          /**
-           * Helper: draw all cached glyphs at a given pen offset.
-           */
           const drawGlyphRow = (startPenX: number, sy: number, scX: number, scY: number) => {
             for (const g of glyphCache) {
               if (!g.obj || g.commands.length === 0) continue;
@@ -220,64 +342,58 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
             }
           };
 
-          // Scanline: find x-extents at each lineY using coarse sampling.
-          // IMPORTANT: ctx.scale(shapeScale) is active, so isPointInPath receives
-          // coordinates already in scaled canvas space. We must test in the
-          // ORIGINAL path coordinate space by dividing by shapeScale.
+          // Scanline fill — use ray-casting polygon test (no Path2D / isPointInPath)
           const sampleStep = Math.max(2, Math.round(fontSize / 8));
           let lineY = fontSize * 0.85;
 
-          // Helper that correctly tests a point accounting for the active scale
-          const inPath = (px: number, py: number) =>
-            ctx.isPointInPath(path2d, px / shapeScale, py / shapeScale);
+          // The polygon is in original (pre-scale) path coordinates, matching lineY
+          const inShape = (px: number, py: number) => pointInPolygon(px, py, polygon);
 
           while (lineY < shapeHeight) {
             let lx = -1, rx = -1;
             for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
-              if (inPath(sx, lineY)) {
+              if (inShape(sx, lineY)) {
                 if (lx < 0) lx = sx;
                 rx = sx;
               }
             }
-            // Refine endpoints
+            // Refine left edge
             if (lx > 0) {
               for (let sx = lx - sampleStep; sx <= lx; sx++) {
-                if (inPath(sx, lineY)) { lx = sx; break; }
+                if (inShape(sx, lineY)) { lx = sx; break; }
               }
             }
+            // Refine right edge
             if (rx > 0) {
               for (let sx = rx; sx <= rx + sampleStep; sx++) {
-                if (inPath(sx, lineY)) { rx = sx; } else { break; }
+                if (inShape(sx, lineY)) { rx = sx; } else { break; }
               }
             }
 
             if (lx >= 0 && rx > lx + 2) {
               const lineWidth = rx - lx;
               const effectiveAdvance = totalAdvance * shapeFillScaleX;
-
-              // Fit as many whole repetitions as possible; scale to fill remainder
               const reps = Math.max(1, Math.floor(lineWidth / effectiveAdvance));
               const fitScaleX = lineWidth / (reps * effectiveAdvance);
               const scX = shapeFillScaleX * fitScaleX;
               const scY = shapeFillScaleY;
 
               for (let r = 0; r < reps; r++) {
-                const penStart = lx + r * effectiveAdvance * fitScaleX;
-                drawGlyphRow(penStart, lineY, scX, scY);
+                drawGlyphRow(lx + r * effectiveAdvance * fitScaleX, lineY, scX, scY);
               }
             }
 
             lineY += lineH;
           }
 
-          // ── Inner emboss (source-atop, strictly inside glyphs) ─────────────
+          // ── Inner emboss ─────────────────────────────────────────────────
           if (hasEmboss) {
             const s = embossStrength!;
             lineY = fontSize * 0.85;
             while (lineY < shapeHeight) {
               let lx = -1, rx = -1;
               for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
-                if (inPath(sx, lineY)) { if (lx < 0) lx = sx; rx = sx; }
+                if (inShape(sx, lineY)) { if (lx < 0) lx = sx; rx = sx; }
               }
               if (lx >= 0 && rx > lx + 2) {
                 const lineWidth = rx - lx;
@@ -286,7 +402,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 const fitScaleX = lineWidth / (reps * effectiveAdvance);
                 const scX = shapeFillScaleX * fitScaleX;
 
-                // Highlight
                 ctx.save();
                 ctx.globalCompositeOperation = "source-atop";
                 ctx.shadowColor = "rgba(255,255,255,0.9)";
@@ -297,7 +412,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 for (let r = 0; r < reps; r++) drawGlyphRow(lx + r * effectiveAdvance * fitScaleX, lineY, scX, shapeFillScaleY);
                 ctx.restore();
 
-                // Dark edge
                 ctx.save();
                 ctx.globalCompositeOperation = "source-atop";
                 ctx.shadowColor = "rgba(0,0,0,0.65)";
