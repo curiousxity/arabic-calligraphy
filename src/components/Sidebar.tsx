@@ -651,7 +651,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               letterSpacing: "-0.02em",
             }}
           >
-            Mohammed&apos;s Calligraphy
+            Mohammed's Calligraphy
           </h2>
         </div>
 

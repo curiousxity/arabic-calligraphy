@@ -123,7 +123,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
   useEffect(() => {
     let alive = true;
-    shapeText(text || "بسم", fontUrl)
+    shapeText(text || "", fontUrl)
       .then((r) => {
         if (alive) setShapeData({ glyphs: r.glyphs, font: r.font, unitsPerEm: r.unitsPerEm || 1000 });
       })
@@ -198,7 +198,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
           /**
            * Helper: draw all cached glyphs at a given pen offset.
-           * Returns total x-advance consumed.
            */
           const drawGlyphRow = (startPenX: number, sy: number, scX: number, scY: number) => {
             for (const g of glyphCache) {
@@ -221,14 +220,21 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
             }
           };
 
-          // Scanline: find x-extents at each lineY using coarse sampling
+          // Scanline: find x-extents at each lineY using coarse sampling.
+          // IMPORTANT: ctx.scale(shapeScale) is active, so isPointInPath receives
+          // coordinates already in scaled canvas space. We must test in the
+          // ORIGINAL path coordinate space by dividing by shapeScale.
           const sampleStep = Math.max(2, Math.round(fontSize / 8));
           let lineY = fontSize * 0.85;
+
+          // Helper that correctly tests a point accounting for the active scale
+          const inPath = (px: number, py: number) =>
+            ctx.isPointInPath(path2d, px / shapeScale, py / shapeScale);
 
           while (lineY < shapeHeight) {
             let lx = -1, rx = -1;
             for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
-              if (ctx.isPointInPath(path2d, sx, lineY)) {
+              if (inPath(sx, lineY)) {
                 if (lx < 0) lx = sx;
                 rx = sx;
               }
@@ -236,12 +242,12 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
             // Refine endpoints
             if (lx > 0) {
               for (let sx = lx - sampleStep; sx <= lx; sx++) {
-                if (ctx.isPointInPath(path2d, sx, lineY)) { lx = sx; break; }
+                if (inPath(sx, lineY)) { lx = sx; break; }
               }
             }
             if (rx > 0) {
               for (let sx = rx; sx <= rx + sampleStep; sx++) {
-                if (ctx.isPointInPath(path2d, sx, lineY)) { rx = sx; } else { break; }
+                if (inPath(sx, lineY)) { rx = sx; } else { break; }
               }
             }
 
@@ -271,7 +277,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
             while (lineY < shapeHeight) {
               let lx = -1, rx = -1;
               for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
-                if (ctx.isPointInPath(path2d, sx, lineY)) { if (lx < 0) lx = sx; rx = sx; }
+                if (inPath(sx, lineY)) { if (lx < 0) lx = sx; rx = sx; }
               }
               if (lx >= 0 && rx > lx + 2) {
                 const lineWidth = rx - lx;

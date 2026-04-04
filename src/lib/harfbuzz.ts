@@ -59,7 +59,8 @@ export async function shapeText(
   const fontData = await loadFontData(fontUrl);
   const parsedFont = await loadParsedFont(fontUrl);
 
-  const blob = hb.createBlob(fontData);
+  // Pass a copy so the WASM binding cannot detach the cached ArrayBuffer.
+  const blob = hb.createBlob(fontData.slice(0));
   const face = hb.createFace(blob, 0);
   const font = hb.createFont(face);
   const buffer = hb.createBuffer();

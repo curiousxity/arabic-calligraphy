@@ -92,7 +92,10 @@ const App: React.FC = () => {
     : Math.min(Math.max(sidebarWidth, 220), Math.max(260, viewportWidth - 260));
 
   const canvasWidth = Math.max(0, viewportWidth - effectiveSidebarWidth);
+  // canvasHeight = artboard logical height (used for stage content / grid).
+  // stageViewportHeight = the actual pixel height of the stage DOM element.
   const canvasHeight = currentPreset.height;
+  const stageViewportHeight = viewportHeight;
 
   const getSnapshot = useCallback(
     (): EditorSnapshot => ({ blocks, canvasPresetId, backgroundColor }),
@@ -610,7 +613,7 @@ const App: React.FC = () => {
         onMergeBlocks={mergeBlocks}
         showKeyboard={showKeyboard}
         onToggleKeyboard={() => setShowKeyboard((v) => !v)}
-        onClearDiacritics={() => selectedBlock && clearDiacritics()}
+        onClearDiacritics={clearDiacritics}
         onInsertPreset={(value) =>
           selectedBlock && updateSelectedBlock({ text: selectedBlock.text + value })
         }
@@ -642,6 +645,7 @@ const App: React.FC = () => {
           showGrid={showGrid}
           canvasWidth={canvasWidth}
           canvasHeight={canvasHeight}
+          stageViewportHeight={stageViewportHeight}
           backgroundColor={backgroundColor}
           stageRef={stageRef}
           stageScale={stageScale}

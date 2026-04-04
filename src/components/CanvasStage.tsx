@@ -16,6 +16,8 @@ export type CanvasStageProps = {
   showGrid: boolean;
   canvasWidth: number;
   canvasHeight: number;
+  /** Pixel height of the Stage DOM element (viewport height, not artboard height). */
+  stageViewportHeight: number;
   backgroundColor: string;
   stageRef: React.RefObject<Konva.Stage | null>;
   stageScale: number;
@@ -37,6 +39,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   showGrid,
   canvasWidth,
   canvasHeight,
+  stageViewportHeight,
   backgroundColor,
   stageRef,
   stageScale,
@@ -149,7 +152,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         cursor: panMode ? "grab" : "default",
       }}
     >
-      <div style={{ width: canvasWidth, height: canvasHeight }}>
+      <div style={{ width: canvasWidth, height: stageViewportHeight }}>
         <div
           style={{
             position: "absolute",
@@ -183,7 +186,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
         <Stage
           width={canvasWidth}
-          height={canvasHeight}
+          height={stageViewportHeight}
           ref={stageRef}
           scaleX={stageScale}
           scaleY={stageScale}

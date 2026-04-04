@@ -366,6 +366,8 @@ export const ShapedText: React.FC<Props> = ({
           }
 
           // 2. Inner emboss using source-atop
+          // Must stay inside the ctx.translate(drawX, drawY) block so the
+          // composite operations paint over the same pixels as the base fill.
           if (hasEmboss && shapeData.font) {
             const s = embossStrength!;
 
@@ -392,7 +394,7 @@ export const ShapedText: React.FC<Props> = ({
             ctx.restore();
           }
 
-          ctx.restore();
+          ctx.restore(); // pop translate(drawX, drawY)
         }}
       />
     </Group>
