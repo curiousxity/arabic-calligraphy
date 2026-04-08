@@ -1,19 +1,11 @@
-/**
- * ShapedText — single line of HarfBuzz-shaped Arabic text on Konva.
- *
- * Emboss v3: true inner-bevel using canvas compositing.
- *  1. Draw the glyphs normally (fill).
- *  2. Set composite "source-atop" so subsequent drawing only touches
- *     pixels that are already filled (inside the glyph).
- *  3. Draw a white gradient shadow offset top-left (highlight).
- *  4. Draw a dark gradient shadow offset bottom-right (shadow edge).
- *  This keeps all emboss pixels strictly inside the letterforms.
- */
-
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
-import { shapeText, type HarfBuzzGlyph, type ShapedTextResult } from "../lib/harfbuzz";
+import {
+  shapeText,
+  type HarfBuzzGlyph,
+  type ShapedTextResult,
+} from "../lib/harfbuzz";
 
 type Props = {
   id?: string;
@@ -35,12 +27,30 @@ type Props = {
   shadowOffsetY?: number;
   shadowOpacity?: number;
   rotation?: number;
+  warpX?: number;
+  warpY?: number;
   locked?: boolean;
   draggable?: boolean;
   onClick?: () => void;
   onTap?: () => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   debugBounds?: boolean;
+};
+
+type LoadedShape = {
+  glyphs: HarfBuzzGlyph[];
+  font: ShapedTextResult["font"] | null;
+  unitsPerEm: number;
+  isLoading: boolean;
+};
+
+type GlyphBounds = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  rawWidth: number;
+  rawHeight: number;
 };
 
 const FONT_URLS: Record<string, string> = {
@@ -61,64 +71,161 @@ const FONT_URLS: Record<string, string> = {
   FatemiMaqala: "/fonts/FatemiMaqala.ttf",
 };
 
-type LoadedShape = {
-  glyphs: HarfBuzzGlyph[];
-  font: ShapedTextResult["font"] | null;
-  unitsPerEm: number;
-};
+const DEBUG_LOG = import.meta.env.DEV;
 
-type GlyphBounds = {
-  scale: number;
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-  rawWidth: number;
-  rawHeight: number;
-};
+const fallbackWidth = (text: string, fs: number) =>
+  Math.max(text.length * fs * 0.55, 20);
 
-const fallbackWidth = (text: string, fs: number) => Math.max(text.length * fs * 0.55, 20);
+function clampUnit(value: number) {
+  return Math.max(-1, Math.min(1, value));
+}
 
-/** Draw all glyphs as a single compound path onto ctx, starting at the current pen */
-function drawGlyphs(
-  ctx: any,
+function warpPoint(
+  x: number,
+  y: number,
+  bounds: GlyphBounds,
+  width: number,
+  height: number,
+  warpX: number,
+  warpY: number
+) {
+  const nx = clampUnit(((x - bounds.minX) / width) * 2 - 1);
+  const ny = clampUnit(((y - bounds.minY) / height) * 2 - 1);
+
+  const wx = warpX / 100;
+  const wy = warpY / 100;
+
+  return {
+    x: x + wx * ny * width * 0.25,
+    y: y - wy * (1 - nx * nx) * height * 0.5,
+  };
+}
+
+function tracePath(ctx: CanvasRenderingContext2D, commands: any[]) {
+  ctx.beginPath();
+  for (const cmd of commands) {
+    switch (cmd.type) {
+      case "M":
+        ctx.moveTo(cmd.x, cmd.y);
+        break;
+      case "L":
+        ctx.lineTo(cmd.x, cmd.y);
+        break;
+      case "C":
+        ctx.bezierCurveTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y);
+        break;
+      case "Q":
+        ctx.quadraticCurveTo(cmd.x1, cmd.y1, cmd.x, cmd.y);
+        break;
+      case "Z":
+        ctx.closePath();
+        break;
+    }
+  }
+}
+
+/**
+ * Draws each glyph in its own local transform, like CircularShapedText,
+ * then warps points in that local frame.
+ */
+function drawWarpedGlyphRun(
+  ctx: CanvasRenderingContext2D,
   glyphs: HarfBuzzGlyph[],
-  font: ShapedTextResult["font"],
-  scale: number,
-  fontSize: number
+  font: NonNullable<ShapedTextResult["font"]>,
+  fontSize: number,
+  unitsPerEm: number,
+  bounds: GlyphBounds,
+  warpX: number,
+  warpY: number,
+  drawStroke: boolean,
+  strokeColor: string,
+  strokeWidth: number
 ) {
   let penX = 0;
-  for (const glyph of glyphs) {
-    const obj = font.glyphs.get(glyph.g);
-    if (!obj) {
-      penX += (glyph.ax ?? 0) * scale;
+  const upm = Math.max(unitsPerEm || 1000, 1);
+  const scale = fontSize / upm;
+  const width = Math.max(bounds.rawWidth, 1);
+  const height = Math.max(bounds.rawHeight, fontSize);
+
+  for (const g of glyphs) {
+    const glyphObj = font.glyphs.get(g.g);
+    const advance = g.ax ?? 0;
+
+    if (!glyphObj) {
+      penX += advance;
       continue;
     }
-    const gx = penX + (glyph.dx ?? 0) * scale;
-    const gy = -(glyph.dy ?? 0) * scale;
-    const path = obj.getPath(gx, gy, fontSize);
-    ctx.beginPath();
-    for (const cmd of (path as any).commands) {
-      switch (cmd.type) {
-        case "M":
-          ctx.moveTo(cmd.x, cmd.y);
-          break;
-        case "L":
-          ctx.lineTo(cmd.x, cmd.y);
-          break;
-        case "C":
-          ctx.bezierCurveTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y);
-          break;
-        case "Q":
-          ctx.quadraticCurveTo(cmd.x1, cmd.y1, cmd.x, cmd.y);
-          break;
-        case "Z":
-          ctx.closePath();
-          break;
+
+    // Local glyph origin in line coordinates
+    const gx = (penX + (g.dx ?? 0)) * scale;
+    const gy = -(g.dy ?? 0) * scale;
+
+    // We translate to the glyph origin like CircularShapedText
+    ctx.save();
+    ctx.translate(gx, gy);
+
+    // Generate the glyph path at local (0, 0)
+    const opPath = glyphObj.getPath(0, 0, fontSize);
+
+    // Compute a warped version of its commands
+    const cmds = (opPath as any).commands.map((cmd: any) => {
+      const out = { ...cmd };
+
+      if (typeof cmd.x === "number" && typeof cmd.y === "number") {
+        const p = warpPoint(
+          cmd.x + gx,
+          cmd.y + gy,
+          bounds,
+          width,
+          height,
+          warpX,
+          warpY
+        );
+        out.x = p.x - gx;
+        out.y = p.y - gy;
       }
-    }
+
+      if (typeof cmd.x1 === "number" && typeof cmd.y1 === "number") {
+        const p1 = warpPoint(
+          cmd.x1 + gx,
+          cmd.y1 + gy,
+          bounds,
+          width,
+          height,
+          warpX,
+          warpY
+        );
+        out.x1 = p1.x - gx;
+        out.y1 = p1.y - gy;
+      }
+
+      if (typeof cmd.x2 === "number" && typeof cmd.y2 === "number") {
+        const p2 = warpPoint(
+          cmd.x2 + gx,
+          cmd.y2 + gy,
+          bounds,
+          width,
+          height,
+          warpX,
+          warpY
+        );
+        out.x2 = p2.x - gx;
+        out.y2 = p2.y - gy;
+      }
+
+      return out;
+    });
+
+    tracePath(ctx, cmds);
     ctx.fill();
-    penX += (glyph.ax ?? 0) * scale;
+    if (drawStroke && strokeWidth > 0) {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+    penX += advance;
   }
 }
 
@@ -142,6 +249,8 @@ export const ShapedText: React.FC<Props> = ({
   shadowOffsetY = 0,
   shadowOpacity = 0.35,
   rotation = 0,
+  warpX = 0,
+  warpY = 0,
   locked,
   draggable = true,
   onClick,
@@ -149,66 +258,135 @@ export const ShapedText: React.FC<Props> = ({
   onDragEnd,
   debugBounds = false,
 }) => {
+  const [hbLoaded, setHbLoaded] = useState(false);
+
   const [shapeData, setShapeData] = useState<LoadedShape>({
     glyphs: [],
     font: null,
     unitsPerEm: 1000,
+    isLoading: true,
   });
+
+  const aliveRef = useRef(true);
   const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
 
   useEffect(() => {
-    let alive = true;
+    aliveRef.current = true;
+
+    setHbLoaded(false);
+    setShapeData((prev) => ({ ...prev, isLoading: true }));
+
     shapeText(text || "", fontUrl)
       .then((r: ShapedTextResult) => {
-        if (!alive) return;
-        setShapeData({ glyphs: r.glyphs, font: r.font, unitsPerEm: r.unitsPerEm || 1000 });
+        if (!aliveRef.current) return;
+
+        const glyphs = r.glyphs ?? [];
+        const font = r.font ?? null;
+        const hasGlyphs = !!font && glyphs.length > 0;
+
+        setShapeData({
+          glyphs,
+          font,
+          unitsPerEm: r.unitsPerEm || 1000,
+          isLoading: false,
+        });
+
+        setHbLoaded(hasGlyphs);
       })
-      .catch(() => {
-        if (alive) setShapeData({ glyphs: [], font: null, unitsPerEm: 1000 });
+      .catch((err) => {
+        if (DEBUG_LOG) {
+          console.error("ShapedText shapeText failed", {
+            text,
+            fontFamily,
+            fontUrl,
+            err,
+          });
+        }
+
+        if (!aliveRef.current) return;
+
+        setShapeData({
+          glyphs: [],
+          font: null,
+          unitsPerEm: 1000,
+          isLoading: false,
+        });
+
+        setHbLoaded(false);
       });
+
     return () => {
-      alive = false;
+      aliveRef.current = false;
     };
-  }, [text, fontUrl]);
+  }, [text, fontUrl, fontFamily]);
 
   const glyphBounds = useMemo<GlyphBounds>(() => {
-    const upm = shapeData.unitsPerEm || 1000;
-    const scale = fontSize / upm;
-    const { font, glyphs } = shapeData;
+    const { font, glyphs, unitsPerEm } = shapeData;
+
     if (!font || glyphs.length === 0) {
       const rw = fallbackWidth(text, fontSize);
       const rh = Math.max(fontSize, 24);
-      return { scale, minX: 0, minY: 0, maxX: rw, maxY: rh, rawWidth: rw, rawHeight: rh };
+      return {
+        minX: 0,
+        minY: 0,
+        maxX: rw,
+        maxY: rh,
+        rawWidth: rw,
+        rawHeight: rh,
+      };
     }
-    let penX = 0,
-      minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
+
+    const upm = Math.max(unitsPerEm || 1000, 1);
+    const scale = fontSize / upm;
+
+    let penX = 0;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
     for (const g of glyphs) {
-      const obj = font.glyphs.get(g.g);
-      const dx = (g.dx ?? 0) * scale;
-      const dy = (g.dy ?? 0) * scale;
-      if (obj) {
-        const box = obj.getPath(penX + dx, -dy, fontSize).getBoundingBox();
-        if (isFinite(box.x1)) {
+      const glyphObj = font.glyphs.get(g.g);
+      const advance = g.ax ?? 0;
+
+      if (glyphObj) {
+        const gx = (penX + (g.dx ?? 0)) * scale;
+        const gy = -(g.dy ?? 0) * scale;
+        const box = glyphObj.getPath(gx, gy, fontSize).getBoundingBox();
+
+        if (isFinite(box.x1) && isFinite(box.x2)) {
           minX = Math.min(minX, box.x1);
           maxX = Math.max(maxX, box.x2);
         }
-        if (isFinite(box.y1)) {
+
+        if (isFinite(box.y1) && isFinite(box.y2)) {
           minY = Math.min(minY, box.y1);
           maxY = Math.max(maxY, box.y2);
         }
       }
-      penX += (g.ax ?? 0) * scale;
+
+      penX += advance;
     }
-    if (!isFinite(minX)) {
+
+    if (
+      !isFinite(minX) ||
+      !isFinite(minY) ||
+      !isFinite(maxX) ||
+      !isFinite(maxY)
+    ) {
       const rw = fallbackWidth(text, fontSize);
       const rh = Math.max(fontSize, 24);
-      return { scale, minX: 0, minY: 0, maxX: rw, maxY: rh, rawWidth: rw, rawHeight: rh };
+      return {
+        minX: 0,
+        minY: 0,
+        maxX: rw,
+        maxY: rh,
+        rawWidth: rw,
+        rawHeight: rh,
+      };
     }
+
     return {
-      scale,
       minX,
       minY,
       maxX,
@@ -245,6 +423,7 @@ export const ShapedText: React.FC<Props> = ({
         strokeEnabled={false}
         listening
       />
+
       {debugBounds && (
         <Rect
           x={bx}
@@ -270,97 +449,53 @@ export const ShapedText: React.FC<Props> = ({
         shadowOffsetY={shadowOffsetY}
         shadowOpacity={shadowOpacity}
         sceneFunc={(ctx) => {
-          if (!shapeData.font || shapeData.glyphs.length === 0) {
-            ctx.save();
-            ctx.fillStyle = color;
+          if (!hbLoaded) return;
 
-            const fw = fallbackWidth(text, fontSize);
-            const fx = align === "left" ? 0 : align === "right" ? fw : fw / 2;
+          const hasGlyphs =
+            shapeData.glyphs.length > 0 && shapeData.font != null;
+          if (!hasGlyphs) return;
 
-            const weight =
-              fontStyle === "bold" || fontStyle === "bold italic"
-                ? "bold"
-                : "normal";
-            const italic =
-              fontStyle === "italic" || fontStyle === "bold italic"
-                ? "italic"
-                : "normal";
-
-            ctx.font = `${italic} ${weight} ${fontSize}px ${fontFamily}`;
-            ctx.direction = "rtl";
-            ctx.textBaseline = "top";
-            ctx.textAlign =
-              align === "left" ? "left" : align === "right" ? "right" : "center";
-
-            ctx.fillText(text, fx, 0);
-
-            if (strokeWidth > 0) {
-              ctx.strokeStyle = stroke;
-              ctx.lineWidth = strokeWidth;
-              ctx.strokeText(text, fx, 0);
-            }
-
-            ctx.restore();
-            return;
-          }
-
-          const drawX = -glyphBounds.minX + (bw - glyphBounds.rawWidth) / 2;
-          const drawY = -glyphBounds.minY + (bh - glyphBounds.rawHeight) / 2;
+          const font = shapeData.font!;
+          const localDrawX =
+            -glyphBounds.minX + (bw - glyphBounds.rawWidth) / 2;
+          const localDrawY =
+            -glyphBounds.minY + (bh - glyphBounds.rawHeight) / 2;
 
           ctx.save();
-          ctx.translate(drawX, drawY);
+          ctx.translate(localDrawX, localDrawY);
 
-          // 1. Base fill
           ctx.fillStyle = color;
-          drawGlyphs(ctx, shapeData.glyphs, shapeData.font, glyphBounds.scale, fontSize);
+          drawWarpedGlyphRun(
+            ctx as CanvasRenderingContext2D,
+            shapeData.glyphs,
+            font,
+            fontSize,
+            shapeData.unitsPerEm,
+            glyphBounds,
+            warpX,
+            warpY,
+            false,
+            stroke,
+            strokeWidth
+          );
 
-          // Optional stroke
           if (strokeWidth > 0) {
-            let penX = 0;
-            for (const glyph of shapeData.glyphs) {
-              const obj = shapeData.font.glyphs.get(glyph.g);
-              if (obj) {
-                const path = obj.getPath(
-                  penX + (glyph.dx ?? 0) * glyphBounds.scale,
-                  -(glyph.dy ?? 0) * glyphBounds.scale,
-                  fontSize
-                );
-                ctx.beginPath();
-                for (const cmd of (path as any).commands) {
-                  switch (cmd.type) {
-                    case "M":
-                      ctx.moveTo(cmd.x, cmd.y);
-                      break;
-                    case "L":
-                      ctx.lineTo(cmd.x, cmd.y);
-                      break;
-                    case "C":
-                      ctx.bezierCurveTo(
-                        cmd.x1,
-                        cmd.y1,
-                        cmd.x2,
-                        cmd.y2,
-                        cmd.x,
-                        cmd.y
-                      );
-                      break;
-                    case "Q":
-                      ctx.quadraticCurveTo(cmd.x1, cmd.y1, cmd.x, cmd.y);
-                      break;
-                    case "Z":
-                      ctx.closePath();
-                      break;
-                  }
-                }
-                ctx.strokeStyle = stroke;
-                ctx.lineWidth = strokeWidth;
-                ctx.stroke();
-              }
-              penX += (glyph.ax ?? 0) * glyphBounds.scale;
-            }
+            drawWarpedGlyphRun(
+              ctx as CanvasRenderingContext2D,
+              shapeData.glyphs,
+              font,
+              fontSize,
+              shapeData.unitsPerEm,
+              glyphBounds,
+              warpX,
+              warpY,
+              true,
+              stroke,
+              strokeWidth
+            );
           }
 
-          ctx.restore(); // pop translate(drawX, drawY)
+          ctx.restore();
         }}
       />
     </Group>

@@ -25,17 +25,20 @@ const CANVAS_PRESETS: CanvasPreset[] = [
   { id: "a4", label: "Print A4 (2480×3508)", width: 2480, height: 3508 },
 ];
 
-const EXPORT_PADDING = 40;
-const STORAGE_KEY = "calligraphy-layout-v1";
-const MIN_SCALE = 0.25;
+const EXPORT_PADDING = 0;
+const STORAGE_KEY = "calligraphy-layout-v2";
+const MIN_SCALE = 0.05;
 const MAX_SCALE = 3;
+const STAGE_PADDING = 0;
+const DEFAULT_TEXT_FONT_SIZE = 53;
+const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
 
 const DEFAULT_BLOCK: Block = {
   id: 1,
   text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
   x: 0,
   y: 0,
-  fontSize: 53,
+  fontSize: DEFAULT_TEXT_FONT_SIZE,
   color: "#0066cc",
   fontFamily: "TahaNaskhRegular",
   fontStyle: "normal",
@@ -52,13 +55,38 @@ const DEFAULT_BLOCK: Block = {
   locked: false,
   rotation: 0,
   ornamental: false,
+  warpX: 0,
+  warpY: 0,
   type: "text",
 };
 
 const isBrowser = typeof window !== "undefined";
 
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const computeFitToViewport = (
+  canvasWidth: number,
+  viewportHeight: number,
+  preset: CanvasPreset
+) => {
+  const availW = Math.max(1, canvasWidth - STAGE_PADDING * 2);
+  const availH = Math.max(1, viewportHeight - STAGE_PADDING * 2);
+  const scaleX = availW / preset.width;
+  const scaleY = availH / preset.height;
+  const scale = clamp(Math.max(scaleX, scaleY), MIN_SCALE, MAX_SCALE);
+  const scaledW = preset.width * scale;
+  const scaledH = preset.height * scale;
+
+  return {
+    scale,
+    position: {
+      x: (canvasWidth - scaledW) / 2,
+      y: Math.max(STAGE_PADDING, (viewportHeight - scaledH) / 2),
+    },
+  };
+};
+
 const App: React.FC = () => {
-  const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [showGrid, setShowGrid] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(false);
@@ -67,21 +95,10 @@ const App: React.FC = () => {
   const [backgroundColor, setBackgroundColor] = useState<string>("#ffffff");
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const [stageScale, setStageScale] = useState(1);
-  const [stagePosition, setStagePosition] = useState({ x: 0, y: 0 });
   const [panMode, setPanMode] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(isBrowser ? window.innerWidth : 1200);
   const [viewportHeight, setViewportHeight] = useState(isBrowser ? window.innerHeight : 800);
-
-  const stageRef = useRef<Konva.Stage | null>(null);
-  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
-  const resizeStartX = useRef(0);
-  const resizeStartWidth = useRef(320);
-  const nextIdRef = useRef(2);
-  const undoStackRef = useRef<EditorSnapshot[]>([]);
-  const redoStackRef = useRef<EditorSnapshot[]>([]);
-  const moveTimeoutRef = useRef<number | null>(null);
 
   const currentPreset =
     CANVAS_PRESETS.find((p) => p.id === canvasPresetId) ?? CANVAS_PRESETS[0];
@@ -91,10 +108,39 @@ const App: React.FC = () => {
     : Math.min(Math.max(sidebarWidth, 220), Math.max(260, viewportWidth - 260));
 
   const canvasWidth = Math.max(0, viewportWidth - effectiveSidebarWidth);
-  // canvasHeight = artboard logical height (used for stage content / grid).
-  // stageViewportHeight = the actual pixel height of the stage DOM element.
-  const canvasHeight = currentPreset.height;
   const stageViewportHeight = viewportHeight;
+
+  const initialFit = computeFitToViewport(
+    Math.max(1, isBrowser ? window.innerWidth - 320 : 880),
+    isBrowser ? window.innerHeight : 800,
+    CANVAS_PRESETS.find((p) => p.id === "story") ?? CANVAS_PRESETS[0]
+  );
+
+  const [stageScale, setStageScale] = useState(initialFit.scale);
+  const [stagePosition, setStagePosition] = useState(initialFit.position);
+
+  const [blocks, setBlocks] = useState<Block[]>(() => {
+    const preset = CANVAS_PRESETS.find((p) => p.id === "story") ?? CANVAS_PRESETS[0];
+    return [
+      {
+        ...DEFAULT_BLOCK,
+        x: preset.width / 2,
+        y: preset.height * 0.25,
+      },
+    ];
+  });
+
+  const stageRef = useRef<Konva.Stage | null>(null);
+  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(320);
+  const nextIdRef = useRef(2);
+  const undoStackRef = useRef<EditorSnapshot[]>([]);
+  const redoStackRef = useRef<EditorSnapshot[]>([]);
+  const moveTimeoutRef = useRef<number | null>(null);
+  const lastAutoFitSignatureRef = useRef<string>("");
+  const didHydrateLayoutRef = useRef(false);
+  const skipNextAutoFitRef = useRef(false);
 
   const getSnapshot = useCallback(
     (): EditorSnapshot => ({ blocks, canvasPresetId, backgroundColor }),
@@ -129,10 +175,32 @@ const App: React.FC = () => {
   const updateBlockPositionWithHistory = (id: number, x: number, y: number) => {
     setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, x, y } : b)));
     if (moveTimeoutRef.current != null) window.clearTimeout(moveTimeoutRef.current);
-    moveTimeoutRef.current = window.setTimeout(() => {
-      pushHistory();
-    }, 300);
+    moveTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
   };
+
+  const fitStageToViewport = useCallback(
+    (options?: { force?: boolean }) => {
+      if (canvasWidth <= 0 || stageViewportHeight <= 0) return;
+
+      const fit = computeFitToViewport(canvasWidth, stageViewportHeight, currentPreset);
+      const signature = [
+        currentPreset.id,
+        canvasWidth,
+        stageViewportHeight,
+        Math.round(fit.scale * 10000),
+        Math.round(fit.position.x),
+        Math.round(fit.position.y),
+      ].join(":");
+
+      if (!options?.force && lastAutoFitSignatureRef.current === signature) return;
+
+      lastAutoFitSignatureRef.current = signature;
+      setStageScale(fit.scale);
+      setStagePosition(fit.position);
+      setPanMode(false);
+    },
+    [canvasWidth, stageViewportHeight, currentPreset]
+  );
 
   useEffect(() => {
     if (!isBrowser) return;
@@ -146,54 +214,92 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (blocks.length !== 0 || canvasWidth <= 0 || canvasHeight <= 0) return;
-    const stage = stageRef.current;
-    const container = canvasContainerRef.current;
-    if (!stage || !container) return;
-
-    const viewRect = container.getBoundingClientRect();
-    const centerScreenX = viewRect.left + viewRect.width / 2;
-    const targetScreenY = viewRect.top + viewRect.height * 0.2;
-    const oldPointer = stage.getPointerPosition();
-
-    stage.setPointersPositions({ clientX: centerScreenX, clientY: targetScreenY });
-    const pos = stage.getRelativePointerPosition();
-    const cx = pos?.x ?? 0;
-    const cy = pos?.y ?? 0;
-
-    if (oldPointer) {
-      stage.setPointersPositions({ clientX: oldPointer.x, clientY: oldPointer.y });
-    }
-
-    setBlocks([{ ...DEFAULT_BLOCK, x: cx, y: cy }]);
-    setSelectedId(1);
-  }, [blocks.length, canvasWidth, canvasHeight, stageScale, stagePosition]);
+    nextIdRef.current = Math.max(2, ...blocks.map((b) => b.id + 1));
+  }, [blocks]);
 
   useEffect(() => {
-    if (!isBrowser) return;
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizingSidebar || isMobile) return;
-      const delta = e.clientX - resizeStartX.current;
-      const newWidth = resizeStartWidth.current + delta;
-      const sidebarMin = 220;
-      const sidebarMax = Math.max(260, viewportWidth - 260);
-      setSidebarWidth(Math.min(Math.max(newWidth, sidebarMin), sidebarMax));
-    };
-    const handleMouseUp = () => setIsResizingSidebar(false);
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isResizingSidebar, isMobile, viewportWidth]);
+    if (!didHydrateLayoutRef.current) {
+      didHydrateLayoutRef.current = true;
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          fitStageToViewport({ force: true });
+          return;
+        }
+
+        const parsed = JSON.parse(raw);
+
+        if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
+        if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
+          setSelectedId(parsed.selectedId);
+        }
+        if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
+        if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
+        if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
+
+        const samePreset =
+          typeof parsed.canvasPresetId === "string"
+            ? parsed.canvasPresetId === currentPreset.id
+            : true;
+
+        const savedViewportWidth = typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
+        const savedViewportHeight =
+          typeof parsed.viewportHeight === "number" ? parsed.viewportHeight : null;
+
+        const viewportCloseEnough =
+          savedViewportWidth != null &&
+          savedViewportHeight != null &&
+          Math.abs(savedViewportWidth - viewportWidth) < 80 &&
+          Math.abs(savedViewportHeight - viewportHeight) < 80;
+
+        if (
+          samePreset &&
+          viewportCloseEnough &&
+          typeof parsed.stageScale === "number" &&
+          parsed.stagePosition &&
+          typeof parsed.stagePosition.x === "number" &&
+          typeof parsed.stagePosition.y === "number"
+        ) {
+          setStageScale(clamp(parsed.stageScale, MIN_SCALE, MAX_SCALE));
+          setStagePosition(parsed.stagePosition);
+          skipNextAutoFitRef.current = true;
+        } else {
+          fitStageToViewport({ force: true });
+        }
+      } catch {
+        fitStageToViewport({ force: true });
+      }
+    }
+  }, [currentPreset.id, fitStageToViewport, viewportWidth, viewportHeight]);
+
+  useEffect(() => {
+    if (canvasWidth <= 0 || stageViewportHeight <= 0) return;
+
+    if (skipNextAutoFitRef.current) {
+      skipNextAutoFitRef.current = false;
+      return;
+    }
+
+    fitStageToViewport({ force: true });
+  }, [canvasWidth, stageViewportHeight, canvasPresetId, fitStageToViewport]);
+
+  useEffect(() => {
+    if (blocks.length > 0) return;
+    setBlocks([
+      {
+        ...DEFAULT_BLOCK,
+        x: currentPreset.width / 2,
+        y: currentPreset.height * 0.25,
+      },
+    ]);
+    setSelectedId(1);
+  }, [blocks.length, currentPreset]);
 
   useEffect(() => {
     if (!isBrowser) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const meta = e.ctrlKey || e.metaKey;
       if (!meta) return;
-
       if (e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
@@ -203,14 +309,9 @@ const App: React.FC = () => {
         handleRedo();
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleUndo, handleRedo]);
-
-  useEffect(() => {
-    nextIdRef.current = Math.max(2, ...blocks.map((b) => b.id + 1));
-  }, [blocks]);
 
   const selectedBlock = useMemo(
     () => (selectedId == null ? undefined : blocks.find((b) => b.id === selectedId)),
@@ -227,7 +328,9 @@ const App: React.FC = () => {
     (patch: Partial<Block>) => {
       if (!selectedBlock) return;
       pushHistory();
-      setBlocks((prev) => prev.map((b) => (b.id === selectedBlock.id ? { ...b, ...patch } : b)));
+      setBlocks((prev) =>
+        prev.map((b) => (b.id === selectedBlock.id ? { ...b, ...patch } : b))
+      );
     },
     [selectedBlock, pushHistory]
   );
@@ -255,31 +358,26 @@ const App: React.FC = () => {
         const a = prev.find((b) => b.id === idA);
         const b = prev.find((b) => b.id === idB);
         if (!a || !b) return prev;
-
-        const merged: Block = {
-          ...a,
-          text: `${a.text} ${b.text}`.trim(),
-        };
-
-        return prev
-          .map((bl) => (bl.id === idA ? merged : bl))
-          .filter((bl) => bl.id !== idB);
+        const merged: Block = { ...a, text: `${a.text} ${b.text}`.trim() };
+        return prev.map((bl) => (bl.id === idA ? merged : bl)).filter((bl) => bl.id !== idB);
       });
       setSelectedId(idA);
     },
     [pushHistory]
   );
 
-  const getCenterStagePos = () => {
+  const getCenterStagePos = useCallback(() => {
     const stage = stageRef.current;
     const container = canvasContainerRef.current;
-    if (!stage || !container) return { x: 0, y: 0 };
+    if (!stage || !container) {
+      return { x: currentPreset.width / 2, y: currentPreset.height / 2 };
+    }
 
     const viewRect = container.getBoundingClientRect();
     const centerScreenX = viewRect.left + viewRect.width / 2;
     const centerScreenY = viewRect.top + viewRect.height / 2;
-    const oldPointer = stage.getPointerPosition();
 
+    const oldPointer = stage.getPointerPosition();
     stage.setPointersPositions({ clientX: centerScreenX, clientY: centerScreenY });
     const pos = stage.getRelativePointerPosition();
 
@@ -287,8 +385,11 @@ const App: React.FC = () => {
       stage.setPointersPositions({ clientX: oldPointer.x, clientY: oldPointer.y });
     }
 
-    return { x: pos?.x ?? 0, y: pos?.y ?? 0 };
-  };
+    return {
+      x: pos?.x ?? currentPreset.width / 2,
+      y: pos?.y ?? currentPreset.height / 2,
+    };
+  }, [currentPreset]);
 
   const addBlock = () => {
     pushHistory();
@@ -299,7 +400,7 @@ const App: React.FC = () => {
       ...DEFAULT_BLOCK,
       id: newId,
       text: "نَصٌّ جَدِيدٌ",
-      fontSize: 50,
+      fontSize: DEFAULT_NEW_BLOCK_FONT_SIZE,
       color: "#0066cc",
       x,
       y,
@@ -328,7 +429,6 @@ const App: React.FC = () => {
   const deleteSelectedBlock = () => {
     if (!selectedBlock) return;
     pushHistory();
-
     setBlocks((prev) => {
       const filtered = prev.filter((b) => b.id !== selectedBlock.id);
       setSelectedId(filtered.length > 0 ? filtered[0].id : null);
@@ -340,10 +440,10 @@ const App: React.FC = () => {
     const stage = stageRef.current;
     if (!stage || blocks.length === 0) return null;
 
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity;
+    let maxX = -Infinity,
+      maxY = -Infinity;
 
     blocks.forEach((block) => {
       const node = stage.findOne(`#block-${block.id}`) as Konva.Node | null;
@@ -355,7 +455,7 @@ const App: React.FC = () => {
       maxY = Math.max(maxY, rect.y + rect.height);
     });
 
-    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return null;
+    if (!isFinite(minX)) return null;
 
     return {
       x: minX - EXPORT_PADDING,
@@ -397,7 +497,6 @@ const App: React.FC = () => {
 
     const exported = await exportStageSVG(stage, false);
     const svgText = String(exported).trim();
-
     const finalSvg = svgText.startsWith("<svg")
       ? svgText
       : `<svg xmlns="http://www.w3.org/2000/svg" width="${box.width}" height="${box.height}" viewBox="${box.x} ${box.y} ${box.width} ${box.height}">${svgText}</svg>`;
@@ -438,7 +537,6 @@ const App: React.FC = () => {
       unit: "mm",
       format: [imgWidthMm, imgHeightMm],
     });
-
     pdf.addImage(dataURL, "PNG", 0, 0, imgWidthMm, imgHeightMm);
     pdf.save("calligraphy.pdf");
   };
@@ -451,37 +549,67 @@ const App: React.FC = () => {
     stageScale,
     stagePosition,
     panMode,
-    version: 2,
+    viewportWidth,
+    viewportHeight,
+    version: 3,
   });
-
-  const applyLayoutPayload = (parsed: any) => {
-    if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
-    if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
-      setSelectedId(parsed.selectedId);
-    }
-    if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
-    if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
-    if (typeof parsed.stageScale === "number") setStageScale(parsed.stageScale);
-    if (parsed.stagePosition && typeof parsed.stagePosition.x === "number") {
-      setStagePosition(parsed.stagePosition);
-    }
-    if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
-  };
 
   const saveLayout = () => {
     if (!isBrowser) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(buildLayoutPayload()));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(buildLayoutPayload()));
+    } catch {}
   };
 
   const loadLayout = () => {
     if (!isBrowser) return;
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-
     try {
-      applyLayoutPayload(JSON.parse(raw));
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw);
+
+      if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
+      if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
+        setSelectedId(parsed.selectedId);
+      }
+      if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
+      if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
+      if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
+
+      const currentFit = computeFitToViewport(
+        canvasWidth || Math.max(1, viewportWidth - effectiveSidebarWidth),
+        stageViewportHeight || viewportHeight,
+        CANVAS_PRESETS.find((p) => p.id === (parsed.canvasPresetId ?? canvasPresetId)) ??
+          currentPreset
+      );
+
+      const savedViewportWidth = typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
+      const savedViewportHeight =
+        typeof parsed.viewportHeight === "number" ? parsed.viewportHeight : null;
+
+      const viewportCloseEnough =
+        savedViewportWidth != null &&
+        savedViewportHeight != null &&
+        Math.abs(savedViewportWidth - viewportWidth) < 80 &&
+        Math.abs(savedViewportHeight - viewportHeight) < 80;
+
+      if (
+        viewportCloseEnough &&
+        typeof parsed.stageScale === "number" &&
+        parsed.stagePosition &&
+        typeof parsed.stagePosition.x === "number" &&
+        typeof parsed.stagePosition.y === "number"
+      ) {
+        setStageScale(clamp(parsed.stageScale, MIN_SCALE, MAX_SCALE));
+        setStagePosition(parsed.stagePosition);
+        skipNextAutoFitRef.current = true;
+      } else {
+        setStageScale(currentFit.scale);
+        setStagePosition(currentFit.position);
+      }
     } catch {
-      // ignore
+      fitStageToViewport({ force: true });
     }
   };
 
@@ -508,7 +636,19 @@ const App: React.FC = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          applyLayoutPayload(JSON.parse(e.target?.result as string));
+          const parsed = JSON.parse(e.target?.result as string);
+
+          if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
+          if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
+            setSelectedId(parsed.selectedId);
+          }
+          if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
+          if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
+          if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
+
+          setTimeout(() => {
+            fitStageToViewport({ force: true });
+          }, 0);
         } catch {
           alert("Invalid layout file.");
         }
@@ -519,24 +659,20 @@ const App: React.FC = () => {
   };
 
   const updateStageZoom = (scale: number, position: { x: number; y: number }) => {
-    setStageScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale)));
+    setStageScale(clamp(scale, MIN_SCALE, MAX_SCALE));
     setStagePosition(position);
   };
 
-  const startSidebarResize = (e: React.MouseEvent) => {
-    resizeStartX.current = e.clientX;
-    resizeStartWidth.current = sidebarWidth;
-    setIsResizingSidebar(true);
-  };
-
-  const addShapeFillBlock = (svgPathData: string, shapeWidth: number, shapeHeight: number) => {
+  const addShapeFillBlock = (
+    svgPathData: string,
+    shapeWidth: number,
+    shapeHeight: number
+  ) => {
     pushHistory();
     const newId = createNextId();
     const { x, y } = getCenterStagePos();
 
-    // SVGs are normalized to 500×500 on import, so shapeHeight is always 500.
-    // fontSize of ~35 gives ~14 rows of text — a dense, visible fill.
-    const autoFontSize = Math.max(8, Math.round(shapeHeight / 14));
+    const autoFontSize = Math.max(8, Math.round(shapeHeight / 18));
 
     const newBlock: Block = {
       ...DEFAULT_BLOCK,
@@ -559,6 +695,62 @@ const App: React.FC = () => {
     setBlocks((prev) => [...prev, newBlock]);
     setSelectedId(newId);
   };
+  
+    const addShapeWarpBlock = (
+    svgPathData: string,
+    shapeWidth: number,
+    shapeHeight: number
+  ) => {
+    pushHistory();
+    const newId = createNextId();
+    const { x, y } = getCenterStagePos();
+
+    const autoFontSize = Math.max(8, Math.round(shapeHeight / 6));
+
+    const newBlock: Block = {
+      ...DEFAULT_BLOCK,
+      id: newId,
+      text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
+      fontSize: autoFontSize,
+      type: "shapeWarp",
+      shapeSvgPath: svgPathData,
+      warpShapeWidth: shapeWidth,
+      warpShapeHeight: shapeHeight,
+      warpShapePadding: 24,
+      warpShapeStrength: 1,
+      warpShapeMode: "envelope",
+      x: x - shapeWidth / 2,
+      y: y - shapeHeight / 2,
+    };
+
+    setBlocks((prev) => [...prev, newBlock]);
+    setSelectedId(newId);
+  };
+  
+
+  const startSidebarResize = (e: React.MouseEvent) => {
+    resizeStartX.current = e.clientX;
+    resizeStartWidth.current = sidebarWidth;
+    setIsResizingSidebar(true);
+  };
+
+  useEffect(() => {
+    if (!isResizingSidebar) return;
+
+    const handleMove = (e: MouseEvent) => {
+      const delta = e.clientX - resizeStartX.current;
+      setSidebarWidth(clamp(resizeStartWidth.current + delta, 220, Math.max(260, viewportWidth - 260)));
+    };
+
+    const handleUp = () => setIsResizingSidebar(false);
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [isResizingSidebar, viewportWidth]);
 
   const clearDiacritics = useCallback(() => {
     if (!selectedBlock) return;
@@ -608,6 +800,7 @@ const App: React.FC = () => {
         onDownloadLayout={downloadLayout}
         onUploadLayout={uploadLayout}
         onAddShapeFillBlock={addShapeFillBlock}
+		onAddShapeWarpBlock={addShapeWarpBlock}
         onToggleGrid={setShowGrid}
         onToggleSnap={setSnapToGrid}
         onSelectBlock={setSelectedId}
@@ -627,17 +820,18 @@ const App: React.FC = () => {
         canRedo={redoStackRef.current.length > 0}
       />
 
-      <div
-        onMouseDown={isMobile ? undefined : startSidebarResize}
-        style={{
-          width: isMobile ? "100%" : 6,
-          cursor: isMobile ? "default" : "col-resize",
-          background: isMobile
-            ? "transparent"
-            : "linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,0.06), rgba(0,0,0,0))",
-          flexShrink: 0,
-        }}
-      />
+      {!isMobile && (
+        <div
+          onMouseDown={startSidebarResize}
+          style={{
+            width: 6,
+            cursor: "col-resize",
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,0.06), rgba(0,0,0,0))",
+            flexShrink: 0,
+          }}
+        />
+      )}
 
       <div
         ref={canvasContainerRef}
@@ -647,8 +841,9 @@ const App: React.FC = () => {
           blocks={blocks}
           snapToGrid={snapToGrid}
           showGrid={showGrid}
-          canvasWidth={canvasWidth}
-          canvasHeight={canvasHeight}
+          viewportWidth={canvasWidth}
+          artboardWidth={currentPreset.width}
+          artboardHeight={currentPreset.height}
           stageViewportHeight={stageViewportHeight}
           backgroundColor={backgroundColor}
           stageRef={stageRef}

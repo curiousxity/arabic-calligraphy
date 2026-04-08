@@ -3,6 +3,8 @@ import ArabicKeyboard from "./ArabicKeyboard";
 import { DIACRITICS, SPECIALS, PERSIAN, URDU, PRESETS } from "./SidebarPresets";
 import type { Block } from "../types";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 export type SidebarProps = {
   blocks: Block[];
   selectedBlock?: Block;
@@ -25,6 +27,7 @@ export type SidebarProps = {
   onDownloadLayout: () => void;
   onUploadLayout: () => void;
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
+  onAddShapeWarpBlock?: (svgPathData: string, w: number, h: number) => void;
   onToggleGrid: (v: boolean) => void;
   onToggleSnap: (v: boolean) => void;
   onSelectBlock: (id: number | null) => void;
@@ -42,6 +45,12 @@ export type SidebarProps = {
   canRedo: boolean;
 };
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/**
+ * Default reset values for all sliders.
+ * These must match DEFAULT_BLOCK in App.tsx.
+ */
 const SLIDER_DEFAULTS: Record<string, number> = {
   fontSize: 53,
   opacity: 1,
@@ -51,15 +60,25 @@ const SLIDER_DEFAULTS: Record<string, number> = {
   shadowOffsetX: 0,
   shadowOffsetY: 0,
   shadowOpacity: 0.35,
+  warpX: 0,
+  warpY: 0,
   shapeFillSpacing: 1.3,
   shapeFillScaleX: 1,
   shapeFillScaleY: 1,
   shapeFillTextRotation: 0,
   shapeScale: 1,
+  warpShapePadding: 24,
+  warpShapeStrength: 1,
 };
+
+const TARGET_SVG_SIZE = 500;
+
+// ─── Tiny helpers ─────────────────────────────────────────────────────────────
 
 const makeId = (base: string, suffix?: string | number) =>
   suffix == null ? base : `${base}-${suffix}`;
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 const SelectRow = ({
   id,
@@ -141,11 +160,8 @@ const RangeRow = ({
   suffix?: string;
   fieldKey?: string;
 }) => {
-  const defaultVal = fieldKey !== undefined ? (SLIDER_DEFAULTS[fieldKey] ?? value) : value;
-
-  const handleDoubleClick = () => {
-    if (fieldKey !== undefined) onChange(defaultVal);
-  };
+  const defaultVal =
+    fieldKey !== undefined ? (SLIDER_DEFAULTS[fieldKey] ?? value) : value;
 
   return (
     <label
@@ -155,7 +171,9 @@ const RangeRow = ({
     >
       <span className="fieldTitle">
         {label}{" "}
-        {suffix ? <span style={{ color: "#6b7280", fontWeight: 500 }}>{suffix}</span> : null}
+        {suffix ? (
+          <span style={{ color: "#6b7280", fontWeight: 500 }}>{suffix}</span>
+        ) : null}
       </span>
       <input
         id={id}
@@ -168,7 +186,9 @@ const RangeRow = ({
         onChange={(e) =>
           onChange(step ? parseFloat(e.target.value) : parseInt(e.target.value, 10))
         }
-        onDoubleClick={handleDoubleClick}
+        onDoubleClick={() => {
+          if (fieldKey !== undefined) onChange(defaultVal);
+        }}
         className="rangeInput"
         style={{ cursor: "pointer" }}
       />
@@ -208,6 +228,8 @@ const PresetKeyboard = ({
   </div>
 );
 
+// ─── SVG extraction helpers ───────────────────────────────────────────────────
+
 function svgElementToPathData(el: Element): string {
   const tag = el.tagName.toLowerCase().replace(/^.*:/, "");
   switch (tag) {
@@ -220,7 +242,8 @@ function svgElementToPathData(el: Element): string {
       const ey = parseFloat(el.getAttribute("y") ?? "0");
       const w = parseFloat(el.getAttribute("width") ?? "0");
       const h = parseFloat(el.getAttribute("height") ?? "0");
-      if (rx === 0 && ry === 0) return `M ${ex} ${ey} H ${ex + w} V ${ey + h} H ${ex} Z`;
+      if (rx === 0 && ry === 0)
+        return `M ${ex} ${ey} H ${ex + w} V ${ey + h} H ${ex} Z`;
       const r = Math.min(rx, w / 2, ry, h / 2);
       return (
         `M ${ex + r} ${ey} H ${ex + w - r} Q ${ex + w} ${ey} ${ex + w} ${ey + r} ` +
@@ -262,7 +285,8 @@ function svgElementToPathData(el: Element): string {
         .filter(Boolean);
       if (pts.length < 2) return "";
       let d = `M ${pts[0]} ${pts[1]}`;
-      for (let i = 2; i < pts.length - 1; i += 2) d += ` L ${pts[i]} ${pts[i + 1]}`;
+      for (let i = 2; i < pts.length - 1; i += 2)
+        d += ` L ${pts[i]} ${pts[i + 1]}`;
       if (tag === "polygon") d += " Z";
       return d;
     }
@@ -271,37 +295,25 @@ function svgElementToPathData(el: Element): string {
   }
 }
 
-/**
- * Normalize all SVG coordinate numbers in a path string by multiplying by
- * (targetSize / sourceSize). This handles both tiny icon SVGs (24px) and
- * large illustration SVGs (2000px) — everything ends up at TARGET_SIZE × TARGET_SIZE.
- */
-const TARGET_SVG_SIZE = 500;
-
 function scaleSvgPathNumbers(d: string, scaleX: number, scaleY: number): string {
-  // We re-serialize via a simple token pass: scale every numeric token.
-  // Commands that mix x/y coords (C, Q, etc.) alternate x then y implicitly,
-  // so we track the coord parity per-command.
-  const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g);
+  const tokens = d.match(
+    /[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g
+  );
   if (!tokens) return d;
 
-  const out: string[] = [];
-  let cmd = "";
-  let argIdx = 0; // argument index within current command
-
-  // How many args per command (absolute)
   const argCounts: Record<string, number> = {
     M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, T: 2, A: 7, Z: 0,
   };
-  // Which arg indices are X coords (0-based within the arg group)
   const xArgIdx: Record<string, number[]> = {
-    M: [0], L: [0], H: [0], V: [], C: [0, 2, 4], S: [0, 2], Q: [0, 2], T: [0],
-    A: [5], // arc endpoint x
+    M: [0], L: [0], H: [0], V: [], C: [0, 2, 4], S: [0, 2], Q: [0, 2], T: [0], A: [5],
   };
   const yArgIdx: Record<string, number[]> = {
-    M: [1], L: [1], H: [], V: [0], C: [1, 3, 5], S: [1, 3], Q: [1, 3], T: [1],
-    A: [6], // arc endpoint y
+    M: [1], L: [1], H: [], V: [0], C: [1, 3, 5], S: [1, 3], Q: [1, 3], T: [1], A: [6],
   };
+
+  const out: string[] = [];
+  let cmd = "";
+  let argIdx = 0;
 
   for (const tok of tokens) {
     if (/^[MmLlHhVvCcSsQqTtAaZz]$/.test(tok)) {
@@ -317,9 +329,8 @@ function scaleSvgPathNumbers(d: string, scaleX: number, scaleY: number): string 
       let scaled = n;
       if (isX) scaled = n * scaleX;
       else if (isY) scaled = n * scaleY;
-      // A command: args 0-4 are radii/flags, also scale radii (0=rx, 1=ry)
-      if (cmd === "A" && (posInGroup === 0)) scaled = n * scaleX;
-      if (cmd === "A" && (posInGroup === 1)) scaled = n * scaleY;
+      if (cmd === "A" && posInGroup === 0) scaled = n * scaleX;
+      if (cmd === "A" && posInGroup === 1) scaled = n * scaleY;
       out.push(String(parseFloat(scaled.toFixed(3))));
       argIdx++;
     }
@@ -327,74 +338,165 @@ function scaleSvgPathNumbers(d: string, scaleX: number, scaleY: number): string 
   return out.join(" ");
 }
 
-/**
- * Parse a simple SVG transform="translate(x,y) scale(s)" attribute into a matrix.
- * Returns [a, b, c, d, e, f] (SVG matrix). Only handles translate/scale/matrix.
- */
-function parseTransform(t: string): [number,number,number,number,number,number] {
-  let a=1,b=0,c=0,d=1,e=0,f=0;
+function parseTransform(
+  t: string
+): [number, number, number, number, number, number] {
+  let a = 1, b = 0, c = 0, d = 1, e = 0, f = 0;
   const mat = t.match(/matrix\(([^)]+)\)/);
-  if (mat) { [a,b,c,d,e,f] = mat[1].split(/[\s,]+/).map(Number); return [a,b,c,d,e,f]; }
+  if (mat) {
+    [a, b, c, d, e, f] = mat[1].split(/[\s,]+/).map(Number);
+    return [a, b, c, d, e, f];
+  }
   const trans = t.match(/translate\(([^)]+)\)/);
-  if (trans) { const [tx,ty=0] = trans[1].split(/[\s,]+/).map(Number); e=tx; f=ty; }
+  if (trans) {
+    const [tx, ty = 0] = trans[1].split(/[\s,]+/).map(Number);
+    e = tx;
+    f = ty;
+  }
   const scale = t.match(/scale\(([^)]+)\)/);
-  if (scale) { const [sx,sy=sx] = scale[1].split(/[\s,]+/).map(Number); a*=sx; d*=sy; }
-  return [a,b,c,d,e,f];
+  if (scale) {
+    const [sx, sy = sx] = scale[1].split(/[\s,]+/).map(Number);
+    a *= sx;
+    d *= sy;
+  }
+  return [a, b, c, d, e, f];
 }
 
-/** Accumulate ancestor transforms from a DOM element up to the SVG root. */
-function getAccumulatedTransform(el: Element): [number,number,number,number,number,number] {
-  const mats: Array<[number,number,number,number,number,number]> = [];
+function getAccumulatedTransform(
+  el: Element
+): [number, number, number, number, number, number] {
+  const mats: Array<[number, number, number, number, number, number]> = [];
   let node: Element | null = el;
   while (node && node.tagName.toLowerCase() !== "svg") {
     const t = node.getAttribute("transform");
     if (t) mats.unshift(parseTransform(t));
     node = node.parentElement;
   }
-  // Multiply all matrices left-to-right
-  let r: [number,number,number,number,number,number] = [1,0,0,1,0,0];
+  let r: [number, number, number, number, number, number] = [1, 0, 0, 1, 0, 0];
   for (const m of mats) {
     r = [
-      r[0]*m[0]+r[2]*m[1], r[1]*m[0]+r[3]*m[1],
-      r[0]*m[2]+r[2]*m[3], r[1]*m[2]+r[3]*m[3],
-      r[0]*m[4]+r[2]*m[5]+r[4], r[1]*m[4]+r[3]*m[5]+r[5],
+      r[0] * m[0] + r[2] * m[1],
+      r[1] * m[0] + r[3] * m[1],
+      r[0] * m[2] + r[2] * m[3],
+      r[1] * m[2] + r[3] * m[3],
+      r[0] * m[4] + r[2] * m[5] + r[4],
+      r[1] * m[4] + r[3] * m[5] + r[5],
     ];
   }
   return r;
 }
 
+function applyTransformToPathString(
+  d: string,
+  m: [number, number, number, number, number, number]
+): string {
+  const [a, b, c, dd, e, f] = m;
+  const tokens = d.match(
+    /[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g
+  );
+  if (!tokens) return d;
 
-function extractSvgPaths(svgText: string): { pathData: string; w: number; h: number } | null {
+  const out: string[] = [];
+  let cmd = "";
+  const nums: number[] = [];
+
+  const flush = () => {
+    if (!cmd) return;
+    switch (cmd.toUpperCase()) {
+      case "M":
+      case "L":
+      case "T":
+        for (let i = 0; i < nums.length; i += 2) {
+          const nx = a * nums[i] + c * nums[i + 1] + e;
+          const ny = b * nums[i] + dd * nums[i + 1] + f;
+          out.push(cmd, String(parseFloat(nx.toFixed(3))), String(parseFloat(ny.toFixed(3))));
+          cmd = "L";
+        }
+        break;
+      case "C":
+        for (let i = 0; i < nums.length; i += 6) {
+          const pts = nums.slice(i, i + 6);
+          const t: number[] = [];
+          for (let j = 0; j < 6; j += 2) {
+            t.push(a * pts[j] + c * pts[j + 1] + e, b * pts[j] + dd * pts[j + 1] + f);
+          }
+          out.push("C", ...t.map((v) => String(parseFloat(v.toFixed(3)))));
+        }
+        break;
+      case "Q":
+      case "S":
+        for (let i = 0; i < nums.length; i += 4) {
+          const t: number[] = [];
+          for (let j = 0; j < 4; j += 2) {
+            t.push(a * nums[j] + c * nums[j + 1] + e, b * nums[j] + dd * nums[j + 1] + f);
+          }
+          out.push(cmd, ...t.map((v) => String(parseFloat(v.toFixed(3)))));
+        }
+        break;
+      case "H":
+        for (const x of nums)
+          out.push("L", String(parseFloat((a * x + e).toFixed(3))), String(parseFloat(f.toFixed(3))));
+        break;
+      case "V":
+        for (const y of nums)
+          out.push("L", String(parseFloat(e.toFixed(3))), String(parseFloat((dd * y + f).toFixed(3))));
+        break;
+      case "Z":
+        out.push("Z");
+        break;
+      default:
+        out.push(cmd, ...nums.map(String));
+    }
+    nums.length = 0;
+  };
+
+  for (const tok of tokens) {
+    if (/^[MmLlHhVvCcSsQqTtAaZz]$/.test(tok)) {
+      flush();
+      cmd = tok.toUpperCase();
+    } else {
+      nums.push(parseFloat(tok));
+    }
+  }
+  flush();
+  return out.join(" ");
+}
+
+function extractSvgPaths(
+  svgText: string
+): { pathData: string; w: number; h: number } | null {
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgText, "image/svg+xml");
   if (doc.querySelector("parsererror")) return null;
+
   const svgEl = doc.querySelector("svg");
   const vb = svgEl?.getAttribute("viewBox")?.split(/[\s,]+/).map(Number);
   const srcW = (vb?.[2] ?? parseFloat(svgEl?.getAttribute("width") ?? "400")) || 400;
   const srcH = (vb?.[3] ?? parseFloat(svgEl?.getAttribute("height") ?? "400")) || 400;
-  // Scale everything to TARGET_SVG_SIZE — handles tiny icon SVGs and huge illustrations
   const sx = TARGET_SVG_SIZE / srcW;
   const sy = TARGET_SVG_SIZE / srcH;
 
-  // querySelectorAll descends into nested <g> elements automatically
   const shapeEls = doc.querySelectorAll("path, rect, circle, ellipse, polygon, polyline");
   const parts: string[] = [];
 
   shapeEls.forEach((el) => {
-    // Skip invisible elements
-    const display = el.getAttribute("display") ?? el.closest("[display]")?.getAttribute("display");
+    const display =
+      el.getAttribute("display") ??
+      el.closest("[display]")?.getAttribute("display");
     if (display === "none") return;
-    const visibility = el.getAttribute("visibility") ?? el.closest("[visibility]")?.getAttribute("visibility");
+    const visibility =
+      el.getAttribute("visibility") ??
+      el.closest("[visibility]")?.getAttribute("visibility");
     if (visibility === "hidden") return;
 
     let d = svgElementToPathData(el);
     if (!d) return;
 
-    // Apply accumulated ancestor transforms (handles nested <g transform="...">)
     const mat = getAccumulatedTransform(el);
-    if (!(mat[0]===1&&mat[1]===0&&mat[2]===0&&mat[3]===1&&mat[4]===0&&mat[5]===0)) {
-      d = applyTransformToPathString(d, mat);
-    }
+    const isIdentity =
+      mat[0] === 1 && mat[1] === 0 && mat[2] === 0 &&
+      mat[3] === 1 && mat[4] === 0 && mat[5] === 0;
+    if (!isIdentity) d = applyTransformToPathString(d, mat);
 
     parts.push(scaleSvgPathNumbers(d, sx, sy));
   });
@@ -403,66 +505,11 @@ function extractSvgPaths(svgText: string): { pathData: string; w: number; h: num
   return { pathData: parts.join(" "), w: TARGET_SVG_SIZE, h: TARGET_SVG_SIZE };
 }
 
-/** Apply a matrix transform to all absolute coordinates in a path d string. */
-function applyTransformToPathString(d: string, m: [number,number,number,number,number,number]): string {
-  const [a,b,c,dd,e,f] = m;
-  const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g);
-  if (!tokens) return d;
-  // First normalize to absolute commands, then apply matrix
-  // For simplicity: only apply matrix to x/y pairs (covers M,L,C,Q,Z)
-  // This works correctly for the shapes we extract (which are already absolute from svgElementToPathData)
-  const out: string[] = [];
-  let cmd = "";
-  const nums: number[] = [];
-  const flush = () => {
-    if (!cmd) return;
-    switch (cmd.toUpperCase()) {
-      case "M": case "L": case "T":
-        for (let i=0;i<nums.length;i+=2) {
-          const nx=a*nums[i]+c*nums[i+1]+e, ny=b*nums[i]+dd*nums[i+1]+f;
-          out.push(cmd,String(parseFloat(nx.toFixed(3))),String(parseFloat(ny.toFixed(3))));
-          cmd="L"; // subsequent pairs are lineto
-        }
-        break;
-      case "C":
-        for (let i=0;i<nums.length;i+=6) {
-          const pts = [nums[i],nums[i+1],nums[i+2],nums[i+3],nums[i+4],nums[i+5]];
-          const t: number[] = [];
-          for (let j=0;j<6;j+=2){t.push(a*pts[j]+c*pts[j+1]+e,b*pts[j]+dd*pts[j+1]+f);}
-          out.push("C",...t.map(v=>String(parseFloat(v.toFixed(3)))));
-        }
-        break;
-      case "Q": case "S":
-        for (let i=0;i<nums.length;i+=4) {
-          const t: number[] = [];
-          for (let j=0;j<4;j+=2){t.push(a*nums[j]+c*nums[j+1]+e,b*nums[j]+dd*nums[j+1]+f);}
-          out.push(cmd,...t.map(v=>String(parseFloat(v.toFixed(3)))));
-        }
-        break;
-      case "H":
-        for (const x of nums) out.push("L",String(parseFloat((a*x+e).toFixed(3))),String(parseFloat(f.toFixed(3))));
-        break;
-      case "V":
-        for (const y of nums) out.push("L",String(parseFloat(e.toFixed(3))),String(parseFloat((dd*y+f).toFixed(3))));
-        break;
-      case "Z":
-        out.push("Z");
-        break;
-      default:
-        out.push(cmd,...nums.map(String));
-    }
-    nums.length=0;
-  };
-  for (const tok of tokens) {
-    if (/^[MmLlHhVvCcSsQqTtAaZz]$/.test(tok)) { flush(); cmd=tok.toUpperCase(); }
-    else nums.push(parseFloat(tok));
-  }
-  flush();
-  return out.join(" ");
-}
+// ─── Layers panel ─────────────────────────────────────────────────────────────
 
-const blockTypeIcon = (b: Block) => (b.type === "shapeFill" ? "✦" : "T");
-
+const blockTypeIcon = (b: Block) =>
+  b.type === "shapeFill" ? "✦" : b.type === "shapeWarp" ? "⬡" : "T";
+  
 type LayersPanelProps = {
   blocks: Block[];
   selectedId?: number;
@@ -550,7 +597,9 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               padding: "5px 7px",
               borderRadius: 10,
               background: isSelected ? "#dbeafe" : isMerge ? "#fef9c3" : "#f0f4fa",
-              border: `1px solid ${isSelected ? "#93c5fd" : isMerge ? "#fcd34d" : "transparent"}`,
+              border: `1px solid ${
+                isSelected ? "#93c5fd" : isMerge ? "#fcd34d" : "transparent"
+              }`,
               cursor: "pointer",
               userSelect: "none",
             }}
@@ -604,33 +653,27 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
             <button
               type="button"
               title={block.locked ? "Unlock" : "Lock"}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleLock(block.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); onToggleLock(block.id); }}
               className="layerIconBtn"
+              aria-label={block.locked ? "Unlock layer" : "Lock layer"}
             >
               {block.locked ? "🔒" : "🔓"}
             </button>
             <button
               type="button"
               title="Move up"
-              onClick={(e) => {
-                e.stopPropagation();
-                onMoveUp(block.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); onMoveUp(block.id); }}
               className="layerIconBtn"
+              aria-label="Move layer up"
             >
               ▲
             </button>
             <button
               type="button"
               title="Move down"
-              onClick={(e) => {
-                e.stopPropagation();
-                onMoveDown(block.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); onMoveDown(block.id); }}
               className="layerIconBtn"
+              aria-label="Move layer down"
             >
               ▼
             </button>
@@ -639,6 +682,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               title={isMerge ? "Cancel merge" : "Merge with another layer"}
               onClick={(e) => handleMergeClick(block.id, e)}
               className="layerIconBtn"
+              aria-label="Merge layer"
               style={{ background: isMerge ? "#fcd34d" : "transparent", borderRadius: 4 }}
             >
               ⊕
@@ -646,11 +690,9 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
             <button
               type="button"
               title="Delete layer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(block.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); onDelete(block.id); }}
               className="layerIconBtn"
+              aria-label="Delete layer"
               style={{ color: "#dc2626" }}
             >
               ✕
@@ -667,6 +709,8 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     </div>
   );
 };
+
+// ─── Main Sidebar ─────────────────────────────────────────────────────────────
 
 export const Sidebar: React.FC<SidebarProps> = ({
   blocks,
@@ -690,6 +734,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDownloadLayout,
   onUploadLayout,
   onAddShapeFillBlock,
+  onAddShapeWarpBlock,
   onToggleGrid,
   onToggleSnap,
   onSelectBlock,
@@ -710,21 +755,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showHelpers, setShowHelpers] = useState(false);
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(true);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
+
+  // ── Derived values ──────────────────────────────────────────────────────────
 
   const selectedText = selectedBlock?.text ?? "";
   const selectedOpacity = selectedBlock?.opacity ?? 1;
   const selectedShadowOpacity = selectedBlock?.shadowOpacity ?? 0.35;
   const selectedRotation = selectedBlock?.rotation ?? 0;
 
+  /**
+   * Stable key for element IDs when a block is selected.
+   * Using "none" as a fallback means all IDs remain stable even when nothing
+   * is selected, avoiding React key warnings.
+   */
+  const selectedId = selectedBlock?.id ?? "none";
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
   const updateText = (text: string) => {
     if (selectedBlock) onUpdateSelectedBlock({ text });
   };
-
-  const activeBlockLabel = selectedBlock
-    ? (selectedBlock.name ?? `Block ${selectedBlock.id}`) + ` (${selectedBlock.type})`
-    : "Block";
 
   const handleKeyboardKey = (k: string) => {
     if (!selectedBlock) return;
@@ -747,7 +800,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleKeyboardBackspace = () => {
     if (!selectedBlock || cursorPosition === 0) return;
     const newText =
-      selectedText.substring(0, cursorPosition - 1) + selectedText.substring(cursorPosition);
+      selectedText.substring(0, cursorPosition - 1) +
+      selectedText.substring(cursorPosition);
     const newPos = cursorPosition - 1;
     onUpdateSelectedBlock({ text: newText });
     setCursorPosition(newPos);
@@ -782,14 +836,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     else if (selectedBlock?.id === id) onUpdateSelectedBlock({ name });
   };
 
-  const handleSvgUpload = () => {
-    if (!onAddShapeFillBlock) return;
+  const handleSvgUpload = (mode: "shapeFill" | "shapeWarp") => {
+    const onAdd = mode === "shapeFill" ? onAddShapeFillBlock : onAddShapeWarpBlock;
+    if (!onAdd) return;
+
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".svg,image/svg+xml";
+
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
+
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = extractSvgPaths(e.target?.result as string);
@@ -799,14 +857,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
           return;
         }
-        onAddShapeFillBlock(result.pathData, result.w, result.h);
+
+        onAdd(result.pathData, result.w, result.h);
       };
+
       reader.readAsText(file);
     };
+
     input.click();
   };
 
-  const selectedId = selectedBlock?.id ?? "none";
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -826,6 +888,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }}
     >
       <div className="sidebarInner">
+
+        {/* ── Header ── */}
         <div className="sidebarPanel">
           <h2
             className="sidebarTitle"
@@ -840,6 +904,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </h2>
         </div>
 
+        {/* ── Block Controls ── */}
         <div className="sidebarPanel">
           <div className="sidebarSectionTitle">Block Controls</div>
           <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
@@ -848,7 +913,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={onDeleteBlock}
               disabled={!selectedBlock || blocks.length === 0}
               className="sidebarCircleButton"
-              title="Delete"
+              title="Delete selected block"
+              aria-label="Delete block"
             >
               −
             </button>
@@ -857,7 +923,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={onDuplicateBlock}
               disabled={!selectedBlock}
               className="sidebarCircleButton"
-              title="Duplicate"
+              title="Duplicate selected block"
+              aria-label="Duplicate block"
             >
               ⧉
             </button>
@@ -866,6 +933,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={onAddBlock}
               className="sidebarCircleButton"
               title="Add text block"
+              aria-label="Add text block"
             >
               +
             </button>
@@ -873,13 +941,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 className="sidebarCircleButton"
-                title="Upload SVG shape — use a simple flat SVG with path/rect/circle/ellipse elements. Avoid SVGs with nested transforms or complex filters."
-                onClick={handleSvgUpload}
+                title="Upload SVG for Shape Fill"
+                onClick={() => handleSvgUpload("shapeFill")}
               >
                 ✦
               </button>
             )}
-          </div>
+
+            {onAddShapeWarpBlock && (
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                title="Upload SVG for Shape Warp"
+                onClick={() => handleSvgUpload("shapeWarp")}
+              >
+                ⬡
+              </button>
+            )}
+			</div>
 
           <div style={{ height: 8 }} />
 
@@ -890,6 +969,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               disabled={!canUndo}
               className="sidebarCircleButton"
               title="Undo"
+              aria-label="Undo"
             >
               ↶
             </button>
@@ -899,17 +979,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               disabled={!canRedo}
               className="sidebarCircleButton"
               title="Redo"
+              aria-label="Redo"
             >
               ↷
             </button>
           </div>
         </div>
 
+        {/* ── Layers ── */}
         <div className="sidebarPanel">
           <button
             type="button"
             onClick={() => setShowLayers((v) => !v)}
             className="sidebarSectionButton"
+            aria-expanded={showLayers}
           >
             <span>Layers</span>
             <span>{showLayers ? "−" : "+"}</span>
@@ -938,6 +1021,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
+        {/* ── Text Editor ── */}
         {selectedBlock && (
           <div className="sidebarPanel">
             <label htmlFor={makeId("block-text", selectedId)} className="sr-only">
@@ -950,18 +1034,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="sidebarTextarea"
               value={selectedText}
               onChange={(e) => updateText(e.target.value)}
-              onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart ?? 0)}
-              placeholder="Select a block to edit..."
+              onSelect={(e) =>
+                setCursorPosition(e.currentTarget.selectionStart ?? 0)
+              }
+              placeholder="Type Arabic text here…"
+              dir="rtl"
+              lang="ar"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
             />
           </div>
         )}
 
+        {/* ── Styling ── */}
         {selectedBlock && (
           <div className="sidebarPanel">
             <button
               type="button"
               onClick={() => setShowStyling((v) => !v)}
               className="sidebarSectionButton"
+              aria-expanded={showStyling}
             >
               <span>Styling</span>
               <span>{showStyling ? "−" : "+"}</span>
@@ -969,6 +1062,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {showStyling && (
               <div className="sectionPanel">
+
+                {/* Font family + style */}
                 <div
                   style={{
                     display: "grid",
@@ -987,7 +1082,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <option value="FatemiMaqala">Fatemi Maqala</option>
                     <option value="TahaNaskhRegular">Taha Naskh</option>
                     <option value="Kufi">Kufi</option>
-                    <option value="Kufi2">Kufi2</option>
+                    <option value="Kufi2">Kufi 2</option>
                     <option value="Thuluth">Thuluth</option>
                     <option value="ThuluthDeco">Thuluth Deco</option>
                     <option value="Wessam">Wessam</option>
@@ -1005,26 +1100,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     name={makeId("fontStyle", selectedId)}
                     label="Font style"
                     value={selectedBlock.fontStyle ?? "normal"}
-                    onChange={(v) => onUpdateSelectedBlock({ fontStyle: v as Block["fontStyle"] })}
+                    onChange={(v) =>
+                      onUpdateSelectedBlock({ fontStyle: v as Block["fontStyle"] })
+                    }
                   >
                     <option value="normal">Normal</option>
                     <option value="bold">Bold</option>
                     <option value="italic">Italic</option>
-                    <option value="bold italic">Bold italic</option>
+                    <option value="bold italic">Bold Italic</option>
                   </SelectRow>
                 </div>
 
+                {/* Font size */}
+				
                 <RangeRow
                   id={makeId("font-size", selectedId)}
                   name={makeId("fontSize", selectedId)}
                   label="Font size"
                   value={selectedBlock.fontSize}
-                  min={selectedBlock.type === "shapeFill" ? 4 : 12}
-                  max={selectedBlock.type === "shapeFill" ? 400 : 200}
+                  min={selectedBlock.type === "shapeFill" || selectedBlock.type === "shapeWarp" ? 4 : 12}
+                  max={selectedBlock.type === "shapeFill" || selectedBlock.type === "shapeWarp" ? 400 : 200}
                   onChange={(v) => onUpdateSelectedBlock({ fontSize: v })}
                   fieldKey="fontSize"
                 />
-
+				
+                {/* Color + opacity */}
                 <div
                   style={{
                     display: "grid",
@@ -1053,6 +1153,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 </div>
 
+                {/* Align (text blocks only) */}
+                {selectedBlock.type === "text" && (
+                  <SelectRow
+                    id={makeId("text-align", selectedId)}
+                    name={makeId("textAlign", selectedId)}
+                    label="Alignment"
+                    value={selectedBlock.align ?? "center"}
+                    onChange={(v) =>
+                      onUpdateSelectedBlock({ align: v as Block["align"] })
+                    }
+                  >
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </SelectRow>
+                )}
+
+                {/* Rotation */}
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Rotation</div>
                   <RangeRow
@@ -1069,6 +1187,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 </div>
 
+                {/* Warp (text blocks only) */}
+                {selectedBlock.type === "text" && (
+                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                    <div className="sidebarSectionTitle">Warp</div>
+
+                    <RangeRow
+                      id={makeId("warp-x", selectedId)}
+                      name={makeId("warpX", selectedId)}
+                      label="Horizontal warp"
+                      value={selectedBlock.warpX ?? 0}
+                      min={-100}
+                      max={100}
+                      step={1}
+                      onChange={(v) => onUpdateSelectedBlock({ warpX: v })}
+                      suffix={`${selectedBlock.warpX ?? 0}`}
+                      fieldKey="warpX"
+                    />
+
+                    <RangeRow
+                      id={makeId("warp-y", selectedId)}
+                      name={makeId("warpY", selectedId)}
+                      label="Vertical warp"
+                      value={selectedBlock.warpY ?? 0}
+                      min={-100}
+                      max={100}
+                      step={1}
+                      onChange={(v) => onUpdateSelectedBlock({ warpY: v })}
+                      suffix={`${selectedBlock.warpY ?? 0}`}
+                      fieldKey="warpY"
+                    />
+                  </div>
+				  )}
+
+                {/* Stroke */}
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Stroke</div>
                   <div
@@ -1091,13 +1243,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       label="Stroke width"
                       value={selectedBlock.strokeWidth ?? 0}
                       min={0}
-                      max={14}
+                      max={20}
                       onChange={(v) => onUpdateSelectedBlock({ strokeWidth: v })}
+                      suffix={`${selectedBlock.strokeWidth ?? 0}`}
                       fieldKey="strokeWidth"
                     />
                   </div>
                 </div>
 
+                {/* Shadow */}
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Shadow</div>
                   <div
@@ -1120,8 +1274,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       label="Shadow blur"
                       value={selectedBlock.shadowBlur ?? 0}
                       min={0}
-                      max={40}
+                      max={60}
                       onChange={(v) => onUpdateSelectedBlock({ shadowBlur: v })}
+                      suffix={`${selectedBlock.shadowBlur ?? 0}`}
                       fieldKey="shadowBlur"
                     />
                   </div>
@@ -1139,9 +1294,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       name={makeId("shadowOffsetX", selectedId)}
                       label="Shadow X"
                       value={selectedBlock.shadowOffsetX ?? 0}
-                      min={-40}
-                      max={40}
+                      min={-60}
+                      max={60}
                       onChange={(v) => onUpdateSelectedBlock({ shadowOffsetX: v })}
+                      suffix={`${selectedBlock.shadowOffsetX ?? 0}`}
                       fieldKey="shadowOffsetX"
                     />
                     <RangeRow
@@ -1149,9 +1305,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       name={makeId("shadowOffsetY", selectedId)}
                       label="Shadow Y"
                       value={selectedBlock.shadowOffsetY ?? 0}
-                      min={-40}
-                      max={40}
+                      min={-60}
+                      max={60}
                       onChange={(v) => onUpdateSelectedBlock({ shadowOffsetY: v })}
+                      suffix={`${selectedBlock.shadowOffsetY ?? 0}`}
                       fieldKey="shadowOffsetY"
                     />
                   </div>
@@ -1169,7 +1326,60 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     fieldKey="shadowOpacity"
                   />
                 </div>
+                {selectedBlock.type === "shapeWarp" && (
+                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                    <div className="sidebarSectionTitle">Shape Warp</div>
 
+                    <SelectRow
+                      id={makeId("warp-shape-mode", selectedId)}
+                      name={makeId("warpShapeMode", selectedId)}
+                      label="Warp mode"
+                      value={selectedBlock.warpShapeMode ?? "envelope"}
+                      onChange={(v) =>
+                        onUpdateSelectedBlock({
+                          warpShapeMode: v as Block["warpShapeMode"],
+                        })
+                      }
+                    >
+                      <option value="envelope">Envelope</option>
+                      <option value="topBottom">Top / Bottom</option>
+                      <option value="stretch">Stretch</option>
+                      <option value="radial">Radial</option>
+                    </SelectRow>
+
+                    <RangeRow
+                      id={makeId("warp-shape-padding", selectedId)}
+                      name={makeId("warpShapePadding", selectedId)}
+                      label="Inner padding"
+                      value={selectedBlock.warpShapePadding ?? 24}
+                      min={0}
+                      max={150}
+                      step={1}
+                      onChange={(v) => onUpdateSelectedBlock({ warpShapePadding: v })}
+                      suffix={`${selectedBlock.warpShapePadding ?? 24}px`}
+                      fieldKey="warpShapePadding"
+                    />
+
+                    <RangeRow
+                      id={makeId("warp-shape-strength", selectedId)}
+                      name={makeId("warpShapeStrength", selectedId)}
+                      label="Warp strength"
+                      value={selectedBlock.warpShapeStrength ?? 1}
+                      min={0}
+                      max={2}
+                      step={0.05}
+                      onChange={(v) => onUpdateSelectedBlock({ warpShapeStrength: v })}
+                      suffix={`${(selectedBlock.warpShapeStrength ?? 1).toFixed(2)}×`}
+                      fieldKey="warpShapeStrength"
+                    />
+
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                      Base shape: {selectedBlock.warpShapeWidth ?? 400} × {selectedBlock.warpShapeHeight ?? 400}px
+                    </div>
+                  </div>
+                )}
+				
+                {/* Shape Fill controls */}
                 {selectedBlock.type === "shapeFill" && (
                   <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Shape Fill</div>
@@ -1186,50 +1396,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       suffix={`${(selectedBlock.shapeScale ?? 1).toFixed(2)}×`}
                       fieldKey="shapeScale"
                     />
-
                     <RangeRow
-                      id={makeId("shape-fill-spacing", selectedId)}
+                      id={makeId("fill-spacing", selectedId)}
                       name={makeId("shapeFillSpacing", selectedId)}
-                      label="Line spacing"
+                      label="Text spacing"
                       value={selectedBlock.shapeFillSpacing ?? 1.3}
-                      min={0.8}
+                      min={0.5}
                       max={4}
                       step={0.05}
                       onChange={(v) => onUpdateSelectedBlock({ shapeFillSpacing: v })}
-                      suffix={`${(selectedBlock.shapeFillSpacing ?? 1.3).toFixed(2)}×`}
+                      suffix={`${(selectedBlock.shapeFillSpacing ?? 1.3).toFixed(2)}`}
                       fieldKey="shapeFillSpacing"
                     />
 
-                    <RangeRow
-                      id={makeId("shape-fill-scale-x", selectedId)}
-                      name={makeId("shapeFillScaleX", selectedId)}
-                      label="Stretch horizontal"
-                      value={selectedBlock.shapeFillScaleX ?? 1}
-                      min={0.2}
-                      max={3}
-                      step={0.05}
-                      onChange={(v) => onUpdateSelectedBlock({ shapeFillScaleX: v })}
-                      suffix={`${(selectedBlock.shapeFillScaleX ?? 1).toFixed(2)}×`}
-                      fieldKey="shapeFillScaleX"
-                    />
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        gap: 10,
+                        marginTop: 8,
+                      }}
+                    >
+                      <RangeRow
+                        id={makeId("fill-scale-x", selectedId)}
+                        name={makeId("shapeFillScaleX", selectedId)}
+                        label="Scale X"
+                        value={selectedBlock.shapeFillScaleX ?? 1}
+                        min={0.1}
+                        max={3}
+                        step={0.05}
+                        onChange={(v) => onUpdateSelectedBlock({ shapeFillScaleX: v })}
+                        suffix={`${(selectedBlock.shapeFillScaleX ?? 1).toFixed(2)}×`}
+                        fieldKey="shapeFillScaleX"
+                      />
+                      <RangeRow
+                        id={makeId("fill-scale-y", selectedId)}
+                        name={makeId("shapeFillScaleY", selectedId)}
+                        label="Scale Y"
+                        value={selectedBlock.shapeFillScaleY ?? 1}
+                        min={0.1}
+                        max={3}
+                        step={0.05}
+                        onChange={(v) => onUpdateSelectedBlock({ shapeFillScaleY: v })}
+                        suffix={`${(selectedBlock.shapeFillScaleY ?? 1).toFixed(2)}×`}
+                        fieldKey="shapeFillScaleY"
+                      />
+                    </div>
 
                     <RangeRow
-                      id={makeId("shape-fill-scale-y", selectedId)}
-                      name={makeId("shapeFillScaleY", selectedId)}
-                      label="Stretch vertical"
-                      value={selectedBlock.shapeFillScaleY ?? 1}
-                      min={0.2}
-                      max={3}
-                      step={0.05}
-                      onChange={(v) => onUpdateSelectedBlock({ shapeFillScaleY: v })}
-                      suffix={`${(selectedBlock.shapeFillScaleY ?? 1).toFixed(2)}×`}
-                      fieldKey="shapeFillScaleY"
-                    />
-
-                    <RangeRow
-                      id={makeId("shape-fill-text-rotation", selectedId)}
+                      id={makeId("fill-text-rotation", selectedId)}
                       name={makeId("shapeFillTextRotation", selectedId)}
-                      label="Glyph rotation"
+                      label="Text rotation"
                       value={selectedBlock.shapeFillTextRotation ?? 0}
                       min={-180}
                       max={180}
@@ -1238,10 +1455,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       suffix={`${selectedBlock.shapeFillTextRotation ?? 0}°`}
                       fieldKey="shapeFillTextRotation"
                     />
-
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                      Base shape: {selectedBlock.shapeWidth ?? 400} × {selectedBlock.shapeHeight ?? 400}px
-                    </div>
                   </div>
                 )}
               </div>
@@ -1249,78 +1462,84 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        <div className="sidebarPanel">
-          <button type="button" onClick={onToggleKeyboard} className="sidebarSectionButton">
-            <span>Arabic Keyboard</span>
-            <span>{showKeyboard ? "−" : "+"}</span>
-          </button>
+        {/* ── Arabic Helpers ── */}
+        {selectedBlock && (
+          <div className="sidebarPanel">
+            <button
+              type="button"
+              onClick={() => setShowHelpers((v) => !v)}
+              className="sidebarSectionButton"
+              aria-expanded={showHelpers}
+            >
+              <span>Arabic Helpers</span>
+              <span>{showHelpers ? "−" : "+"}</span>
+            </button>
 
-          {showKeyboard && (
-            <div className="keyboardWrap">
-              <ArabicKeyboard
-                onKey={handleKeyboardKey}
-                onSpace={handleKeyboardSpace}
-                onBackspace={handleKeyboardBackspace}
-                style={{ width: "100%" }}
-              />
-            </div>
-          )}
-        </div>
+            {showHelpers && (
+              <div className="sectionPanel">
+                <button
+                  type="button"
+                  onClick={onToggleKeyboard}
+                  className="sidebarSmallAction"
+                  style={{ marginBottom: 8 }}
+                >
+                  {showKeyboard ? "Hide keyboard" : "Show virtual keyboard"}
+                </button>
 
-        <div className="sidebarPanel">
-          <button
-            type="button"
-            onClick={() => setShowHelpers((v) => !v)}
-            className="sidebarSectionButton"
-          >
-            <span>Arabic Helpers</span>
-            <span>{showHelpers ? "−" : "+"}</span>
-          </button>
+                {showKeyboard && (
+                  <ArabicKeyboard
+                    onKey={handleKeyboardKey}
+                    onSpace={handleKeyboardSpace}
+                    onBackspace={handleKeyboardBackspace}
+                  />
+                )}
 
-          {showHelpers && (
-            <div className="sectionPanel">
-              <PresetKeyboard
-                title="Diacritics"
-                rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]}
-                onPick={handleKeyboardKey}
-              />
-              <button
-                type="button"
-                onClick={onClearDiacritics}
-                className="sidebarSmallAction"
-                style={{ background: "#f9fafb" }}
-              >
-                Clear diacritics
-              </button>
-              <PresetKeyboard
-                title="Presets"
-                rows={[PRESETS.slice(0, 5), PRESETS.slice(5)]}
-                onPick={onInsertPreset}
-              />
-              <PresetKeyboard
-                title="Specials"
-                rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]}
-                onPick={onInsertPreset}
-              />
-              <PresetKeyboard
-                title="Persian"
-                rows={[PERSIAN.slice(0, 6), PERSIAN.slice(6)]}
-                onPick={onInsertPreset}
-              />
-              <PresetKeyboard
-                title="Urdu"
-                rows={[URDU.slice(0, 6), URDU.slice(6)]}
-                onPick={onInsertPreset}
-              />
-            </div>
-          )}
-        </div>
+                <PresetKeyboard
+                  title="Diacritics"
+                  rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]}
+                  onPick={handleKeyboardKey}
+                />
+                <button
+                  type="button"
+                  onClick={onClearDiacritics}
+                  className="sidebarSmallAction"
+                  style={{ background: "#f9fafb" }}
+                >
+                  Clear diacritics
+                </button>
 
+                <PresetKeyboard
+                  title="Presets"
+                  rows={[PRESETS.slice(0, 5), PRESETS.slice(5)]}
+                  onPick={onInsertPreset}
+                />
+                <PresetKeyboard
+                  title="Specials"
+                  rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]}
+                  onPick={onInsertPreset}
+                />
+                <PresetKeyboard
+                  title="Persian"
+                  rows={[PERSIAN.slice(0, 6), PERSIAN.slice(6)]}
+                  onPick={onInsertPreset}
+                />
+                <PresetKeyboard
+                  title="Urdu"
+                  rows={[URDU.slice(0, 6), URDU.slice(6)]}
+                  onPick={onInsertPreset}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Save / Export ── */}
         <div className="sidebarPanel">
           <button
             type="button"
             onClick={() => setShowFileActions((v) => !v)}
             className="sidebarSectionButton"
+            aria-expanded={showFileActions}
           >
             <span>Save / Export</span>
             <span>{showFileActions ? "−" : "+"}</span>
@@ -1328,44 +1547,85 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {showFileActions && (
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-
-              {/* Row 1: Browser save / load */}
+              {/* Browser save / load */}
               <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-                <button type="button" onClick={onSaveLayout} className="sidebarCircleButton" title="Quick-save to browser">
+                <button
+                  type="button"
+                  onClick={onSaveLayout}
+                  className="sidebarCircleButton"
+                  title="Quick-save to browser memory"
+                  aria-label="Save layout"
+                >
                   💾
                 </button>
-                <button type="button" onClick={onLoadLayout} className="sidebarCircleButton" title="Load from browser">
+                <button
+                  type="button"
+                  onClick={onLoadLayout}
+                  className="sidebarCircleButton"
+                  title="Load from browser memory"
+                  aria-label="Load layout"
+                >
                   📂
                 </button>
               </div>
 
-              {/* Row 2: JSON file download / upload */}
+              {/* JSON file download / upload */}
               <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-                <button type="button" onClick={onDownloadLayout} className="sidebarCircleButton sidebarCircleButton--light" title="Download layout as .json">
+                <button
+                  type="button"
+                  onClick={onDownloadLayout}
+                  className="sidebarCircleButton sidebarCircleButton--light"
+                  title="Download layout as .json"
+                  aria-label="Download layout JSON"
+                >
                   ⬇
                 </button>
-                <button type="button" onClick={onUploadLayout} className="sidebarCircleButton sidebarCircleButton--light" title="Upload .json layout file">
+                <button
+                  type="button"
+                  onClick={onUploadLayout}
+                  className="sidebarCircleButton sidebarCircleButton--light"
+                  title="Upload .json layout file"
+                  aria-label="Upload layout JSON"
+                >
                   ⬆
                 </button>
               </div>
 
-              {/* Row 3: Export image formats — at the bottom */}
+              {/* Export image formats */}
               <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-                <button type="button" onClick={onExportPNG} className="sidebarCircleButton sidebarCircleButton--light" title="Export PNG">
+                <button
+                  type="button"
+                  onClick={onExportPNG}
+                  className="sidebarCircleButton sidebarCircleButton--light"
+                  title="Export PNG"
+                  aria-label="Export PNG"
+                >
                   PNG
                 </button>
-                <button type="button" onClick={onExportSVG} className="sidebarCircleButton sidebarCircleButton--light" title="Export SVG">
+                <button
+                  type="button"
+                  onClick={onExportSVG}
+                  className="sidebarCircleButton sidebarCircleButton--light"
+                  title="Export SVG"
+                  aria-label="Export SVG"
+                >
                   SVG
                 </button>
-                <button type="button" onClick={onExportPDF} className="sidebarCircleButton sidebarCircleButton--light" title="Export PDF">
+                <button
+                  type="button"
+                  onClick={onExportPDF}
+                  className="sidebarCircleButton sidebarCircleButton--light"
+                  title="Export PDF"
+                  aria-label="Export PDF"
+                >
                   PDF
                 </button>
               </div>
-
             </div>
           )}
         </div>
 
+        {/* ── Canvas Settings ── */}
         <div className="sidebarPanel">
           <div className="sidebarSectionTitle">Canvas Size</div>
           <div className="shell">
@@ -1375,10 +1635,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               value={canvasPresetId}
               onChange={(e) => onChangeCanvasPreset(e.target.value)}
               className="select"
+              aria-label="Canvas size preset"
             >
-              <option value="story">Story (1080×1920)</option>
-              <option value="square">Instagram Square (1080×1080)</option>
-              <option value="a4">Print A4 (2480×3508)</option>
+              <option value="story">Story (1080 × 1920)</option>
+              <option value="square">Instagram Square (1080 × 1080)</option>
+              <option value="a4">Print A4 (2480 × 3508)</option>
             </select>
           </div>
 
@@ -1391,6 +1652,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               value={backgroundColor}
               onChange={(e) => onChangeBackgroundColor(e.target.value)}
               className="sidebarColorInput"
+              aria-label="Canvas background color"
             />
           </div>
 
@@ -1418,6 +1680,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
+        {/* ── Footer hint ── */}
         <p
           style={{
             fontSize: 11,
@@ -1428,6 +1691,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           Double-click a layer name to rename · Double-click a slider to reset
         </p>
+
       </div>
     </div>
   );

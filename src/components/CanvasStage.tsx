@@ -1,22 +1,23 @@
 import React from "react";
 import { Stage, Layer, Rect, Line } from "react-konva";
 import type Konva from "konva";
-// ArabicKeyboard removed from canvas — keyboard lives only in the sidebar
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
+import { ShapeWarpText } from "./ShapeWarpText";
 import type { Block } from "../types";
 
 const GRID_SIZE = 40;
-const MIN_SCALE = 0.25;
+const MIN_SCALE = 0.05;
 const MAX_SCALE = 3;
+const STAGE_PADDING = 0;
 
 export type CanvasStageProps = {
   blocks: Block[];
   snapToGrid: boolean;
   showGrid: boolean;
-  canvasWidth: number;
-  canvasHeight: number;
-  /** Pixel height of the Stage DOM element (viewport height, not artboard height). */
+  viewportWidth: number;
+  artboardWidth: number;
+  artboardHeight: number;
   stageViewportHeight: number;
   backgroundColor: string;
   stageRef: React.RefObject<Konva.Stage | null>;
@@ -29,12 +30,40 @@ export type CanvasStageProps = {
   onSelectBlock: (id: number) => void;
 };
 
+const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
+
+const computeFit = (
+  viewportWidth: number,
+  stageViewportHeight: number,
+  artboardWidth: number,
+  artboardHeight: number
+) => {
+  const availW = Math.max(1, viewportWidth)
+  const availH = Math.max(1, stageViewportHeight)
+
+  const scaleX = availW / artboardWidth
+  const scaleY = availH / artboardHeight
+  const scale = clampScale(Math.min(scaleX, scaleY, 1))
+
+  const scaledW = artboardWidth * scale
+  const scaledH = artboardHeight * scale
+
+  return {
+    scale,
+    position: {
+      x: (viewportWidth - scaledW) / 2,
+      y: (stageViewportHeight - scaledH) / 2,
+    },
+  }
+}
+
 export const CanvasStage: React.FC<CanvasStageProps> = ({
   blocks,
   snapToGrid,
   showGrid,
-  canvasWidth,
-  canvasHeight,
+  viewportWidth,
+  artboardWidth,
+  artboardHeight,
   stageViewportHeight,
   backgroundColor,
   stageRef,
@@ -48,16 +77,14 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 }) => {
   const snapCoord = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
-  const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
-
   const renderGridLines = () => {
     const lines: React.ReactNode[] = [];
 
-    for (let x = 0; x <= canvasWidth; x += GRID_SIZE) {
+    for (let x = 0; x <= artboardWidth; x += GRID_SIZE) {
       lines.push(
         <Line
           key={`v-${x}`}
-          points={[x, 0, x, canvasHeight]}
+          points={[x, 0, x, artboardHeight]}
           stroke="#ddd"
           strokeWidth={1}
           listening={false}
@@ -65,11 +92,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       );
     }
 
-    for (let y = 0; y <= canvasHeight; y += GRID_SIZE) {
+    for (let y = 0; y <= artboardHeight; y += GRID_SIZE) {
       lines.push(
         <Line
           key={`h-${y}`}
-          points={[0, y, canvasWidth, y]}
+          points={[0, y, artboardWidth, y]}
           stroke="#ddd"
           strokeWidth={1}
           listening={false}
@@ -82,10 +109,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
-
     const stage = stageRef.current;
     if (!stage) return;
-
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
 
@@ -106,45 +131,45 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     onUpdateStage(newScale, newPos);
   };
 
-  const handleZoomOut = () => {
-    onUpdateStage(clampScale(stageScale / 1.1), stagePosition);
-  };
+  const handleZoomOut = () => onUpdateStage(clampScale(stageScale / 1.1), stagePosition);
+  const handleZoomIn = () => onUpdateStage(clampScale(stageScale * 1.1), stagePosition);
 
-  const handleZoomIn = () => {
-    onUpdateStage(clampScale(stageScale * 1.1), stagePosition);
-  };
+	const handleReset = () => {
+	  // Reset to 100% scale, centered
+	  const scaledW = artboardWidth * 1;
+	  const scaledH = artboardHeight * 1;
+	  const position = {
+		x: (viewportWidth - scaledW) / 2,
+		y: (stageViewportHeight - scaledH) / 2,
+	  };
+	  onUpdateStage(1, position);
+	  onTogglePanMode(false);
+	};
 
-  const handleReset = () => {
-    onUpdateStage(1, { x: 0, y: 0 });
-    onTogglePanMode(false);
-  };
-
-  const makeDragEndHandler = (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
-    if (block.locked || panMode) return;
-
-    let { x, y } = e.target.position();
-
-    if (snapToGrid) {
-      x = snapCoord(x);
-      y = snapCoord(y);
-      e.target.position({ x, y });
-    }
-
-    onUpdateBlockPosition(block.id, x, y);
-  };
+  const makeDragEndHandler =
+    (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
+      if (block.locked || panMode) return;
+      let { x, y } = e.target.position();
+      if (snapToGrid) {
+        x = snapCoord(x);
+        y = snapCoord(y);
+        e.target.position({ x, y });
+      }
+      onUpdateBlockPosition(block.id, x, y);
+    };
 
   return (
     <div
       style={{
         flex: 1,
-        width: canvasWidth,
+        width: viewportWidth,
         position: "relative",
         overflow: "hidden",
         background: "#e0e0e0",
         cursor: panMode ? "grab" : "default",
       }}
     >
-      <div style={{ width: canvasWidth, height: stageViewportHeight }}>
+      <div style={{ width: viewportWidth, height: stageViewportHeight }}>
         <div
           style={{
             position: "absolute",
@@ -159,25 +184,19 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             padding: "6px 8px",
           }}
         >
-          <button type="button" onClick={handleZoomOut}>
-            −
-          </button>
+          <button type="button" onClick={handleZoomOut}>−</button>
           <button type="button" onClick={handleReset}>
             {Math.round(stageScale * 100)}%
           </button>
-          <button type="button" onClick={handleZoomIn}>
-            +
-          </button>
-          <button type="button" onClick={handleReset}>
-            Reset
-          </button>
+          <button type="button" onClick={handleZoomIn}>+</button>
+          <button type="button" onClick={handleReset}>Reset</button>
           <button type="button" onClick={() => onTogglePanMode(!panMode)}>
             {panMode ? "Pan: On" : "Pan: Off"}
           </button>
         </div>
 
         <Stage
-          width={canvasWidth}
+          width={viewportWidth}
           height={stageViewportHeight}
           ref={stageRef}
           scaleX={stageScale}
@@ -202,8 +221,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             <Rect
               x={0}
               y={0}
-              width={canvasWidth}
-              height={canvasHeight}
+              width={artboardWidth}
+              height={artboardHeight}
               fill={backgroundColor}
               listening={false}
             />
@@ -254,6 +273,39 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 );
               }
 
+              if (block.type === "shapeWarp") {
+                return (
+                  <ShapeWarpText
+                    key={block.id}
+                    {...commonProps}
+                    text={block.text}
+                    x={block.x}
+                    y={block.y}
+                    fontSize={block.fontSize}
+                    color={block.color}
+                    fontFamily={block.fontFamily}
+                    fontStyle={block.fontStyle ?? "normal"}
+                    shapeSvgPath={block.shapeSvgPath ?? ""}
+                    warpShapeWidth={block.warpShapeWidth ?? block.shapeWidth ?? 400}
+                    warpShapeHeight={block.warpShapeHeight ?? block.shapeHeight ?? 400}
+                    warpShapeMode={block.warpShapeMode ?? "envelope"}
+                    warpShapePadding={block.warpShapePadding ?? 24}
+                    warpShapeStrength={block.warpShapeStrength ?? 1}
+                    opacity={block.opacity ?? 1}
+                    stroke={block.stroke ?? "#000000"}
+                    strokeWidth={block.strokeWidth ?? 0}
+                    shadowColor={block.shadowColor ?? "#000000"}
+                    shadowBlur={block.shadowBlur ?? 0}
+                    shadowOffsetX={block.shadowOffsetX ?? 0}
+                    shadowOffsetY={block.shadowOffsetY ?? 0}
+                    shadowOpacity={block.shadowOpacity ?? 0.35}
+                    rotation={block.rotation ?? 0}
+                    locked={block.locked}
+                    debugBounds={false}
+                  />
+                );
+              }
+			  
               return (
                 <ShapedText
                   key={block.id}
@@ -276,6 +328,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   shadowOffsetY={block.shadowOffsetY ?? 0}
                   shadowOpacity={block.shadowOpacity ?? 0.35}
                   rotation={block.rotation ?? 0}
+                  warpX={block.warpX ?? 0}
+                  warpY={block.warpY ?? 0}
                   locked={block.locked}
                   debugBounds={false}
                 />
@@ -284,7 +338,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
           </Layer>
         </Stage>
       </div>
-
     </div>
   );
 };
