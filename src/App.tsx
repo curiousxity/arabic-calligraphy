@@ -1,10 +1,16 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import type Konva from "konva";
 import { exportStageSVG } from "react-konva-to-svg";
 import { Sidebar } from "./components/Sidebar";
 import { CanvasStage } from "./components/CanvasStage";
 import jsPDF from "jspdf";
-import type { Block } from "./types";
+import type { Block, GlyphWarp, GlyphHandleMode } from "./types";
 
 type CanvasPreset = {
   id: string;
@@ -17,6 +23,33 @@ type EditorSnapshot = {
   blocks: Block[];
   canvasPresetId: string;
   backgroundColor: string;
+};
+
+type GlyphBox = {
+  glyphIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+const glyphBoxesEqual = (a: GlyphBox[] | undefined, b: GlyphBox[]): boolean => {
+  if (!a) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const aa = a[i];
+    const bb = b[i];
+    if (
+      aa.glyphIndex !== bb.glyphIndex ||
+      aa.x !== bb.x ||
+      aa.y !== bb.y ||
+      aa.width !== bb.width ||
+      aa.height !== bb.height
+    ) {
+      return false;
+    }
+  }
+  return true;
 };
 
 const CANVAS_PRESETS: CanvasPreset[] = [
@@ -58,11 +91,15 @@ const DEFAULT_BLOCK: Block = {
   warpX: 0,
   warpY: 0,
   type: "text",
+  glyphEditMode: false,
+  selectedGlyphIndex: null,
+  glyphWarps: [],
 };
 
 const isBrowser = typeof window !== "undefined";
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
 
 const computeFitToViewport = (
   canvasWidth: number,
@@ -86,6 +123,11 @@ const computeFitToViewport = (
   };
 };
 
+const makeHandleId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `gh-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
 const App: React.FC = () => {
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [showGrid, setShowGrid] = useState(true);
@@ -99,6 +141,8 @@ const App: React.FC = () => {
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(isBrowser ? window.innerWidth : 1200);
   const [viewportHeight, setViewportHeight] = useState(isBrowser ? window.innerHeight : 800);
+
+  const [glyphBoxesByBlock, setGlyphBoxesByBlock] = useState<Record<number, GlyphBox[]>>({});
 
   const currentPreset =
     CANVAS_PRESETS.find((p) => p.id === canvasPresetId) ?? CANVAS_PRESETS[0];
@@ -142,6 +186,11 @@ const App: React.FC = () => {
   const didHydrateLayoutRef = useRef(false);
   const skipNextAutoFitRef = useRef(false);
 
+  const selectedBlock = useMemo(
+    () => (selectedId == null ? undefined : blocks.find((b) => b.id === selectedId)),
+    [blocks, selectedId]
+  );
+
   const getSnapshot = useCallback(
     (): EditorSnapshot => ({ blocks, canvasPresetId, backgroundColor }),
     [blocks, canvasPresetId, backgroundColor]
@@ -157,6 +206,106 @@ const App: React.FC = () => {
     undoStackRef.current.push(getSnapshot());
     redoStackRef.current = [];
   }, [getSnapshot]);
+
+  const upsertGlyphWarp = useCallback(
+    (
+      blockId: number,
+      glyphIndex: number,
+      updater: (prev: GlyphWarp | undefined) => GlyphWarp
+    ) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId) return b;
+          const glyphWarps = b.glyphWarps ?? [];
+          const existing = glyphWarps.find((g) => g.glyphIndex === glyphIndex);
+          const next = updater(existing);
+          return {
+            ...b,
+            glyphWarps: [
+              ...glyphWarps.filter((g) => g.glyphIndex !== glyphIndex),
+              next,
+            ].sort((a, b) => a.glyphIndex - b.glyphIndex),
+          };
+        })
+      );
+    },
+    [pushHistory]
+  );
+
+  const selectGlyphForBlock = useCallback((blockId: number, glyphIndex: number | null) => {
+    setBlocks((prev) =>
+      prev.map((b) =>
+        b.id === blockId ? { ...b, selectedGlyphIndex: glyphIndex } : b
+      )
+    );
+  }, []);
+
+  const updateGlyphBoxes = useCallback((blockId: number, boxes: GlyphBox[]) => {
+    setGlyphBoxesByBlock((prev) => {
+		const prevBoxes = prev[blockId];
+		if (glyphBoxesEqual(prevBoxes, boxes)) {
+			return prev;
+		}
+		return {
+			...prev,
+			[blockId]: boxes,
+		};
+		});
+  }, []);
+
+  const addHandleToSelectedGlyph = useCallback(() => {
+    if (!selectedBlock || selectedBlock.selectedGlyphIndex == null) return;
+
+    const blockId = selectedBlock.id;
+    const glyphIndex = selectedBlock.selectedGlyphIndex;
+    const handleId = makeHandleId();
+
+    const boxes = glyphBoxesByBlock[blockId] ?? [];
+    const box = boxes.find((b) => b.glyphIndex === glyphIndex);
+
+    const centerX = box ? box.x + box.width / 2 : selectedBlock.x;
+    const centerY = box ? box.y + box.height / 2 : selectedBlock.y;
+    const radius = box ? Math.max(30, Math.max(box.width, box.height) * 0.8) : 80;
+
+    upsertGlyphWarp(blockId, glyphIndex, (prev) => ({
+      glyphIndex,
+      handles: [
+        ...(prev?.handles ?? []),
+        {
+          id: handleId,
+          x: centerX,
+          y: centerY,
+          radius,
+          strength: 0.5,
+          mode: "pinch",
+        },
+      ],
+    }));
+  }, [selectedBlock, glyphBoxesByBlock, upsertGlyphWarp]);
+
+  const updateGlyphHandle = useCallback(
+    (
+      blockId: number,
+      glyphIndex: number,
+      handleId: string,
+      patch: {
+        x?: number;
+        y?: number;
+        radius?: number;
+        strength?: number;
+        mode?: GlyphHandleMode;
+      }
+    ) => {
+      upsertGlyphWarp(blockId, glyphIndex, (prev) => ({
+        glyphIndex,
+        handles: (prev?.handles ?? []).map((h) =>
+          h.id === handleId ? { ...h, ...patch } : h
+        ),
+      }));
+    },
+    [upsertGlyphWarp]
+  );
 
   const handleUndo = useCallback(() => {
     const prev = undoStackRef.current.pop();
@@ -242,7 +391,8 @@ const App: React.FC = () => {
             ? parsed.canvasPresetId === currentPreset.id
             : true;
 
-        const savedViewportWidth = typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
+        const savedViewportWidth =
+          typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
         const savedViewportHeight =
           typeof parsed.viewportHeight === "number" ? parsed.viewportHeight : null;
 
@@ -312,11 +462,6 @@ const App: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleUndo, handleRedo]);
-
-  const selectedBlock = useMemo(
-    () => (selectedId == null ? undefined : blocks.find((b) => b.id === selectedId)),
-    [blocks, selectedId]
-  );
 
   const createNextId = () => {
     const id = nextIdRef.current;
@@ -440,10 +585,10 @@ const App: React.FC = () => {
     const stage = stageRef.current;
     if (!stage || blocks.length === 0) return null;
 
-    let minX = Infinity,
-      minY = Infinity;
-    let maxX = -Infinity,
-      maxY = -Infinity;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
 
     blocks.forEach((block) => {
       const node = stage.findOne(`#block-${block.id}`) as Konva.Node | null;
@@ -584,7 +729,8 @@ const App: React.FC = () => {
           currentPreset
       );
 
-      const savedViewportWidth = typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
+      const savedViewportWidth =
+        typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
       const savedViewportHeight =
         typeof parsed.viewportHeight === "number" ? parsed.viewportHeight : null;
 
@@ -695,8 +841,8 @@ const App: React.FC = () => {
     setBlocks((prev) => [...prev, newBlock]);
     setSelectedId(newId);
   };
-  
-    const addShapeWarpBlock = (
+
+  const addShapeWarpBlock = (
     svgPathData: string,
     shapeWidth: number,
     shapeHeight: number
@@ -721,12 +867,14 @@ const App: React.FC = () => {
       warpShapeMode: "envelope",
       x: x - shapeWidth / 2,
       y: y - shapeHeight / 2,
+      glyphEditMode: false,
+      selectedGlyphIndex: null,
+      glyphWarps: [],
     };
 
     setBlocks((prev) => [...prev, newBlock]);
     setSelectedId(newId);
   };
-  
 
   const startSidebarResize = (e: React.MouseEvent) => {
     resizeStartX.current = e.clientX;
@@ -739,7 +887,9 @@ const App: React.FC = () => {
 
     const handleMove = (e: MouseEvent) => {
       const delta = e.clientX - resizeStartX.current;
-      setSidebarWidth(clamp(resizeStartWidth.current + delta, 220, Math.max(260, viewportWidth - 260)));
+      setSidebarWidth(
+        clamp(resizeStartWidth.current + delta, 220, Math.max(260, viewportWidth - 260))
+      );
     };
 
     const handleUp = () => setIsResizingSidebar(false);
@@ -800,7 +950,7 @@ const App: React.FC = () => {
         onDownloadLayout={downloadLayout}
         onUploadLayout={uploadLayout}
         onAddShapeFillBlock={addShapeFillBlock}
-		onAddShapeWarpBlock={addShapeWarpBlock}
+        onAddShapeWarpBlock={addShapeWarpBlock}
         onToggleGrid={setShowGrid}
         onToggleSnap={setSnapToGrid}
         onSelectBlock={setSelectedId}
@@ -818,6 +968,13 @@ const App: React.FC = () => {
         onRedo={handleRedo}
         canUndo={undoStackRef.current.length > 0}
         canRedo={redoStackRef.current.length > 0}
+        onToggleGlyphEditMode={() => {
+          if (!selectedBlock) return;
+          updateSelectedBlock({
+            glyphEditMode: !selectedBlock.glyphEditMode,
+          });
+        }}
+        onAddGlyphHandle={addHandleToSelectedGlyph}
       />
 
       {!isMobile && (
@@ -835,7 +992,12 @@ const App: React.FC = () => {
 
       <div
         ref={canvasContainerRef}
-        style={{ flex: 1, position: "relative", height: viewportHeight, overflow: "hidden" }}
+        style={{
+          flex: 1,
+          position: "relative",
+          height: viewportHeight,
+          overflow: "hidden",
+        }}
       >
         <CanvasStage
           blocks={blocks}
@@ -854,6 +1016,9 @@ const App: React.FC = () => {
           onUpdateStage={updateStageZoom}
           onUpdateBlockPosition={updateBlockPositionWithHistory}
           onSelectBlock={setSelectedId}
+          onSelectGlyph={selectGlyphForBlock}
+          onUpdateGlyphHandle={updateGlyphHandle}
+          onGlyphBoxesChange={updateGlyphBoxes}
         />
       </div>
     </div>

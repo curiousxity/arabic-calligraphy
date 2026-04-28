@@ -4,7 +4,7 @@ import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { ShapeWarpText } from "./ShapeWarpText";
-import type { Block } from "../types";
+import type { Block, GlyphHandleMode } from "../types";
 
 const GRID_SIZE = 40;
 const MIN_SCALE = 0.05;
@@ -28,6 +28,23 @@ export type CanvasStageProps = {
   onUpdateStage: (scale: number, position: { x: number; y: number }) => void;
   onUpdateBlockPosition: (id: number, x: number, y: number) => void;
   onSelectBlock: (id: number) => void;
+  onSelectGlyph: (blockId: number, glyphIndex: number | null) => void;
+  onUpdateGlyphHandle: (
+    blockId: number,
+    glyphIndex: number,
+    handleId: string,
+    patch: {
+      x?: number;
+      y?: number;
+      radius?: number;
+      strength?: number;
+      mode?: GlyphHandleMode;
+    }
+  ) => void;
+  onGlyphBoxesChange: (
+    blockId: number,
+    boxes: { glyphIndex: number; x: number; y: number; width: number; height: number }[]
+  ) => void;
 };
 
 const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
@@ -38,15 +55,15 @@ const computeFit = (
   artboardWidth: number,
   artboardHeight: number
 ) => {
-  const availW = Math.max(1, viewportWidth)
-  const availH = Math.max(1, stageViewportHeight)
+  const availW = Math.max(1, viewportWidth);
+  const availH = Math.max(1, stageViewportHeight);
 
-  const scaleX = availW / artboardWidth
-  const scaleY = availH / artboardHeight
-  const scale = clampScale(Math.min(scaleX, scaleY, 1))
+  const scaleX = availW / artboardWidth;
+  const scaleY = availH / artboardHeight;
+  const scale = clampScale(Math.min(scaleX, scaleY, 1));
 
-  const scaledW = artboardWidth * scale
-  const scaledH = artboardHeight * scale
+  const scaledW = artboardWidth * scale;
+  const scaledH = artboardHeight * scale;
 
   return {
     scale,
@@ -54,8 +71,8 @@ const computeFit = (
       x: (viewportWidth - scaledW) / 2,
       y: (stageViewportHeight - scaledH) / 2,
     },
-  }
-}
+  };
+};
 
 export const CanvasStage: React.FC<CanvasStageProps> = ({
   blocks,
@@ -74,6 +91,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onUpdateStage,
   onUpdateBlockPosition,
   onSelectBlock,
+  onSelectGlyph,
+  onUpdateGlyphHandle,
+  onGlyphBoxesChange,
 }) => {
   const snapCoord = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
@@ -134,17 +154,16 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   const handleZoomOut = () => onUpdateStage(clampScale(stageScale / 1.1), stagePosition);
   const handleZoomIn = () => onUpdateStage(clampScale(stageScale * 1.1), stagePosition);
 
-	const handleReset = () => {
-	  // Reset to 100% scale, centered
-	  const scaledW = artboardWidth * 1;
-	  const scaledH = artboardHeight * 1;
-	  const position = {
-		x: (viewportWidth - scaledW) / 2,
-		y: (stageViewportHeight - scaledH) / 2,
-	  };
-	  onUpdateStage(1, position);
-	  onTogglePanMode(false);
-	};
+  const handleReset = () => {
+    const scaledW = artboardWidth * 1;
+    const scaledH = artboardHeight * 1;
+    const position = {
+      x: (viewportWidth - scaledW) / 2,
+      y: (stageViewportHeight - scaledH) / 2,
+    };
+    onUpdateStage(1, position);
+    onTogglePanMode(false);
+  };
 
   const makeDragEndHandler =
     (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -184,12 +203,18 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             padding: "6px 8px",
           }}
         >
-          <button type="button" onClick={handleZoomOut}>−</button>
+          <button type="button" onClick={handleZoomOut}>
+            −
+          </button>
           <button type="button" onClick={handleReset}>
             {Math.round(stageScale * 100)}%
           </button>
-          <button type="button" onClick={handleZoomIn}>+</button>
-          <button type="button" onClick={handleReset}>Reset</button>
+          <button type="button" onClick={handleZoomIn}>
+            +
+          </button>
+          <button type="button" onClick={handleReset}>
+            Reset
+          </button>
           <button type="button" onClick={() => onTogglePanMode(!panMode)}>
             {panMode ? "Pan: On" : "Pan: Off"}
           </button>
@@ -302,10 +327,20 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     rotation={block.rotation ?? 0}
                     locked={block.locked}
                     debugBounds={false}
+                    glyphEditMode={block.glyphEditMode ?? false}
+                    selectedGlyphIndex={block.selectedGlyphIndex ?? null}
+                    glyphWarps={block.glyphWarps ?? []}
+                    onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
+                    onUpdateGlyphHandle={(glyphIndex, handleId, patch) =>
+                      onUpdateGlyphHandle(block.id, glyphIndex, handleId, patch)
+                    }
+                    onGlyphBoxesChange={(boxes) =>
+                      onGlyphBoxesChange(block.id, boxes)
+                    }
                   />
                 );
               }
-			  
+
               return (
                 <ShapedText
                   key={block.id}

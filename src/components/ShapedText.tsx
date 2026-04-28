@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
 import {
@@ -80,6 +80,7 @@ function clampUnit(value: number) {
   return Math.max(-1, Math.min(1, value));
 }
 
+// Block-level warp used by your sliders (warpX/warpY).
 function warpPoint(
   x: number,
   y: number,
@@ -125,8 +126,9 @@ function tracePath(ctx: CanvasRenderingContext2D, commands: any[]) {
 }
 
 /**
- * Draws each glyph in its own local transform, like CircularShapedText,
- * then warps points in that local frame.
+ * Draws each glyph in its own local transform, then warps points
+ * in that local frame using warpX / warpY. This is the same
+ * block-level warp you’ve been using.
  */
 function drawWarpedGlyphRun(
   ctx: CanvasRenderingContext2D,
@@ -156,18 +158,13 @@ function drawWarpedGlyphRun(
       continue;
     }
 
-    // Local glyph origin in line coordinates
     const gx = (penX + (g.dx ?? 0)) * scale;
     const gy = -(g.dy ?? 0) * scale;
 
-    // We translate to the glyph origin like CircularShapedText
     ctx.save();
     ctx.translate(gx, gy);
 
-    // Generate the glyph path at local (0, 0)
     const opPath = glyphObj.getPath(0, 0, fontSize);
-
-    // Compute a warped version of its commands
     const cmds = (opPath as any).commands.map((cmd: any) => {
       const out = { ...cmd };
 
@@ -267,18 +264,17 @@ export const ShapedText: React.FC<Props> = ({
     isLoading: true,
   });
 
-  const aliveRef = useRef(true);
   const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
 
   useEffect(() => {
-    aliveRef.current = true;
+    let alive = true;
 
     setHbLoaded(false);
     setShapeData((prev) => ({ ...prev, isLoading: true }));
 
     shapeText(text || "", fontUrl)
       .then((r: ShapedTextResult) => {
-        if (!aliveRef.current) return;
+        if (!alive) return;
 
         const glyphs = r.glyphs ?? [];
         const font = r.font ?? null;
@@ -303,7 +299,7 @@ export const ShapedText: React.FC<Props> = ({
           });
         }
 
-        if (!aliveRef.current) return;
+        if (!alive) return;
 
         setShapeData({
           glyphs: [],
@@ -316,7 +312,7 @@ export const ShapedText: React.FC<Props> = ({
       });
 
     return () => {
-      aliveRef.current = false;
+      alive = false;
     };
   }, [text, fontUrl, fontFamily]);
 
@@ -414,6 +410,7 @@ export const ShapedText: React.FC<Props> = ({
       onDragEnd={onDragEnd}
       listening
     >
+      {/* Transparent hit rect for selection/dragging */}
       <Rect
         x={bx}
         y={by}

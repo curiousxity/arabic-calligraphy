@@ -1,13 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Group, Shape, Rect } from "react-konva";
+import { Group, Shape, Rect, Circle } from "react-konva";
 import type Konva from "konva";
 import {
   shapeText,
   type HarfBuzzGlyph,
   type ShapedTextResult,
 } from "../lib/harfbuzz";
+import type { GlyphWarp, GlyphHandle } from "../types";
 
 type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
+
+export type GlyphHitBox = {
+  glyphIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  cx: number;
+  cy: number;
+};
 
 export type ShapeWarpTextProps = {
   id?: string;
@@ -41,6 +52,17 @@ export type ShapeWarpTextProps = {
   onTap?: () => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   debugBounds?: boolean;
+
+  glyphEditMode?: boolean;
+  selectedGlyphIndex?: number | null;
+  glyphWarps?: GlyphWarp[];
+  onGlyphSelect?: (glyphIndex: number | null) => void;
+  onGlyphBoxesChange?: (boxes: GlyphHitBox[]) => void;
+  onUpdateGlyphHandle?: (
+    glyphIndex: number,
+    handleId: string,
+    patch: Partial<GlyphHandle>
+  ) => void;
 };
 
 type LoadedShape = {
@@ -57,6 +79,14 @@ type GlyphBounds = {
   maxY: number;
   rawWidth: number;
   rawHeight: number;
+};
+
+type GlyphLayout = {
+  glyphIndex: number;
+  bounds: GlyphBounds;
+  gx: number;
+  gy: number;
+  advance: number;
 };
 
 type SvgCmd =
@@ -97,48 +127,52 @@ function clampUnit(v: number) {
 
 function parseSvgPath(d: string): SvgCmd[] {
   const cmds: SvgCmd[] = [];
-  const re = /([MmLlHhVvCcSsQqTtAaZz])|([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/g;
+  const re =
+    /([MmLlHhVvCcSsQqTtAaZz])|([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/g;
+
   const tokens: string[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(d)) !== null) tokens.push(m[0]);
 
   let i = 0;
-  let cx = 0,
-    cy = 0,
-    sx = 0,
-    sy = 0;
+  let cx = 0;
+  let cy = 0;
+  let sx = 0;
+  let sy = 0;
+
   const num = () => parseFloat(tokens[i++]);
 
   while (i < tokens.length) {
     const cmd = tokens[i++];
+
     switch (cmd) {
       case "M": {
-        const x = num(),
-          y = num();
+        const x = num();
+        const y = num();
         cmds.push({ type: "M", x, y });
         cx = sx = x;
         cy = sy = y;
         break;
       }
       case "m": {
-        const x = cx + num(),
-          y = cy + num();
+        const x = cx + num();
+        const y = cy + num();
         cmds.push({ type: "M", x, y });
         cx = sx = x;
         cy = sy = y;
         break;
       }
       case "L": {
-        const x = num(),
-          y = num();
+        const x = num();
+        const y = num();
         cmds.push({ type: "L", x, y });
         cx = x;
         cy = y;
         break;
       }
       case "l": {
-        const x = cx + num(),
-          y = cy + num();
+        const x = cx + num();
+        const y = cy + num();
         cmds.push({ type: "L", x, y });
         cx = x;
         cy = y;
@@ -169,80 +203,90 @@ function parseSvgPath(d: string): SvgCmd[] {
         break;
       }
       case "C": {
-        const x1 = num(),
-          y1 = num(),
-          x2 = num(),
-          y2 = num(),
-          x = num(),
-          y = num();
+        const x1 = num();
+        const y1 = num();
+        const x2 = num();
+        const y2 = num();
+        const x = num();
+        const y = num();
         cmds.push({ type: "C", x1, y1, x2, y2, x, y });
         cx = x;
         cy = y;
         break;
       }
       case "c": {
-        const x1 = cx + num(),
-          y1 = cy + num(),
-          x2 = cx + num(),
-          y2 = cy + num(),
-          x = cx + num(),
-          y = cy + num();
+        const x1 = cx + num();
+        const y1 = cy + num();
+        const x2 = cx + num();
+        const y2 = cy + num();
+        const x = cx + num();
+        const y = cy + num();
         cmds.push({ type: "C", x1, y1, x2, y2, x, y });
         cx = x;
         cy = y;
         break;
       }
       case "Q": {
-        const x1 = num(),
-          y1 = num(),
-          x = num(),
-          y = num();
+        const x1 = num();
+        const y1 = num();
+        const x = num();
+        const y = num();
         cmds.push({ type: "Q", x1, y1, x, y });
         cx = x;
         cy = y;
         break;
       }
       case "q": {
-        const x1 = cx + num(),
-          y1 = cy + num(),
-          x = cx + num(),
-          y = cy + num();
+        const x1 = cx + num();
+        const y1 = cy + num();
+        const x = cx + num();
+        const y = cy + num();
         cmds.push({ type: "Q", x1, y1, x, y });
         cx = x;
         cy = y;
         break;
       }
       case "S": {
-        const x2 = num(),
-          y2 = num(),
-          x = num(),
-          y = num();
+        const x2 = num();
+        const y2 = num();
+        const x = num();
+        const y = num();
         cmds.push({ type: "C", x1: cx, y1: cy, x2, y2, x, y });
         cx = x;
         cy = y;
         break;
       }
       case "s": {
-        const x2 = cx + num(),
-          y2 = cy + num(),
-          x = cx + num(),
-          y = cy + num();
+        const x2 = cx + num();
+        const y2 = cy + num();
+        const x = cx + num();
+        const y = cy + num();
         cmds.push({ type: "C", x1: cx, y1: cy, x2, y2, x, y });
         cx = x;
         cy = y;
         break;
       }
       case "A": {
-        num(); num(); num(); num(); num();
-        const x = num(), y = num();
+        num();
+        num();
+        num();
+        num();
+        num();
+        const x = num();
+        const y = num();
         cmds.push({ type: "L", x, y });
         cx = x;
         cy = y;
         break;
       }
       case "a": {
-        num(); num(); num(); num(); num();
-        const x = cx + num(), y = cy + num();
+        num();
+        num();
+        num();
+        num();
+        num();
+        const x = cx + num();
+        const y = cy + num();
         cmds.push({ type: "L", x, y });
         cx = x;
         cy = y;
@@ -263,7 +307,7 @@ function parseSvgPath(d: string): SvgCmd[] {
   return cmds;
 }
 
-function replayPath(ctx: any, cmds: SvgCmd[]) {
+function replayPath(ctx: CanvasRenderingContext2D, cmds: SvgCmd[]) {
   ctx.beginPath();
   for (const c of cmds) {
     switch (c.type) {
@@ -359,6 +403,40 @@ function applyShapeWarpPoint(
   return { x: px, y: py };
 }
 
+function applyGlyphHandles(x: number, y: number, handles?: GlyphHandle[]) {
+  if (!handles || handles.length === 0) return { x, y };
+
+  let px = x;
+  let py = y;
+
+  for (const h of handles) {
+    const dx = px - h.x;
+    const dy = py - h.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const radius = Math.max(h.radius ?? 1, 1);
+    const strength = h.strength ?? 0.5;
+
+    if (dist >= radius) continue;
+
+    const t = 1 - dist / radius;
+    const k = strength * t * t;
+
+    if (h.mode === "pinch") {
+      px = h.x + dx * (1 - k);
+      py = h.y + dy * (1 - k);
+    } else if (h.mode === "scaleX") {
+      px = h.x + dx * (1 - k);
+    } else if (h.mode === "scaleY") {
+      py = h.y + dy * (1 - k);
+    } else if (h.mode === "move") {
+      px = px + dx * 0.15 * k;
+      py = py + dy * 0.15 * k;
+    }
+  }
+
+  return { x: px, y: py };
+}
+
 export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   id,
   text,
@@ -388,6 +466,12 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   onTap,
   onDragEnd,
   debugBounds = false,
+  glyphEditMode = false,
+  selectedGlyphIndex = null,
+  glyphWarps = [],
+  onGlyphSelect,
+  onGlyphBoxesChange,
+  onUpdateGlyphHandle,
 }) => {
   const [hbLoaded, setHbLoaded] = useState(false);
   const [shapeData, setShapeData] = useState<LoadedShape>({
@@ -408,9 +492,9 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
     shapeText(text || "", fontUrl)
       .then((r: ShapedTextResult) => {
         if (!aliveRef.current) return;
+
         const glyphs = r.glyphs ?? [];
         const font = r.font ?? null;
-        const hasGlyphs = !!font && glyphs.length > 0;
 
         setShapeData({
           glyphs,
@@ -419,16 +503,18 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           isLoading: false,
         });
 
-        setHbLoaded(hasGlyphs);
+        setHbLoaded(!!font && glyphs.length > 0);
       })
       .catch(() => {
         if (!aliveRef.current) return;
+
         setShapeData({
           glyphs: [],
           font: null,
           unitsPerEm: 1000,
           isLoading: false,
         });
+
         setHbLoaded(false);
       });
 
@@ -477,6 +563,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           minX = Math.min(minX, box.x1);
           maxX = Math.max(maxX, box.x2);
         }
+
         if (isFinite(box.y1) && isFinite(box.y2)) {
           minY = Math.min(minY, box.y1);
           maxY = Math.max(maxY, box.y2);
@@ -509,10 +596,83 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
     };
   }, [shapeData, text, fontSize]);
 
+  const glyphLayouts = useMemo<GlyphLayout[]>(() => {
+    const { font, glyphs, unitsPerEm } = shapeData;
+    if (!font || glyphs.length === 0) return [];
+
+    const upm = Math.max(unitsPerEm || 1000, 1);
+    const scale = fontSize / upm;
+    let penX = 0;
+    const layouts: GlyphLayout[] = [];
+
+    for (let i = 0; i < glyphs.length; i++) {
+      const g = glyphs[i];
+      const glyphObj = font.glyphs.get(g.g);
+      const advance = g.ax ?? 0;
+      const gx = (penX + (g.dx ?? 0)) * scale;
+      const gy = -(g.dy ?? 0) * scale;
+
+      let bounds: GlyphBounds;
+
+      if (glyphObj) {
+        const box = glyphObj.getPath(gx, gy, fontSize).getBoundingBox();
+        bounds = {
+          minX: isFinite(box.x1) ? box.x1 : gx,
+          minY: isFinite(box.y1) ? box.y1 : gy - fontSize,
+          maxX: isFinite(box.x2) ? box.x2 : gx + fontSize * 0.5,
+          maxY: isFinite(box.y2) ? box.y2 : gy,
+          rawWidth: Math.max((isFinite(box.x2) ? box.x2 : gx + fontSize * 0.5) - (isFinite(box.x1) ? box.x1 : gx), 1),
+          rawHeight: Math.max((isFinite(box.y2) ? box.y2 : gy) - (isFinite(box.y1) ? box.y1 : gy - fontSize), 1),
+        };
+      } else {
+        const w = Math.max(advance * scale, fontSize * 0.4);
+        const h = fontSize;
+        bounds = {
+          minX: gx,
+          minY: gy - h,
+          maxX: gx + w,
+          maxY: gy,
+          rawWidth: w,
+          rawHeight: h,
+        };
+      }
+
+      layouts.push({ glyphIndex: i, bounds, gx, gy, advance });
+      penX += advance;
+    }
+
+    return layouts;
+  }, [shapeData, fontSize]);
+
+  const hitBoxes = useMemo<GlyphHitBox[]>(() => {
+    return glyphLayouts.map(({ glyphIndex, bounds }) => ({
+      glyphIndex,
+      x: bounds.minX,
+      y: bounds.minY,
+      width: bounds.rawWidth,
+      height: bounds.rawHeight,
+      cx: bounds.minX + bounds.rawWidth / 2,
+      cy: bounds.minY + bounds.rawHeight / 2,
+    }));
+  }, [glyphLayouts]);
+
+  useEffect(() => {
+    onGlyphBoxesChange?.(hitBoxes);
+  }, [hitBoxes, onGlyphBoxesChange]);
+
+  const selectedWarp =
+    glyphEditMode && selectedGlyphIndex != null
+      ? glyphWarps.find((w) => w.glyphIndex === selectedGlyphIndex)
+      : undefined;
+
+  const selectedHandles = selectedWarp?.handles ?? [];
   const bw = Math.max(warpShapeWidth, 20);
   const bh = Math.max(warpShapeHeight, 20);
   const bx = -bw / 2;
   const by = -bh / 2;
+
+  const localDrawOffsetX = -glyphBounds.minX + (bw - glyphBounds.rawWidth) / 2;
+  const localDrawOffsetY = -glyphBounds.minY + (bh - glyphBounds.rawHeight) / 2;
 
   return (
     <Group
@@ -521,8 +681,29 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
       y={y}
       rotation={rotation}
       opacity={opacity}
-      draggable={draggable && !locked}
-      onClick={onClick}
+      draggable={draggable && !locked && !glyphEditMode}
+      onClick={(e) => {
+        onClick?.();
+
+        if (!glyphEditMode) return;
+
+        const group = e.currentTarget;
+        const pos = group.getRelativePointerPosition();
+        if (!pos) return;
+
+        const textSpaceX = pos.x - bx - localDrawOffsetX;
+        const textSpaceY = pos.y - by - localDrawOffsetY;
+
+        const hit = hitBoxes.find(
+          (b) =>
+            textSpaceX >= b.x &&
+            textSpaceX <= b.x + b.width &&
+            textSpaceY >= b.y &&
+            textSpaceY <= b.y + b.height
+        );
+
+        onGlyphSelect?.(hit?.glyphIndex ?? null);
+      }}
       onTap={onTap}
       onDragEnd={onDragEnd}
       listening
@@ -565,13 +746,12 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           if (!shapeSvgPath || parsedCmds.length === 0) return;
 
           ctx.save();
-
-          replayPath(ctx, parsedCmds);
+          replayPath(ctx as CanvasRenderingContext2D, parsedCmds);
           ctx.clip();
 
           if (!hbLoaded || !shapeData.font || shapeData.glyphs.length === 0) {
-            ctx.fillStyle = color + "22";
-            replayPath(ctx, parsedCmds);
+            ctx.fillStyle = `${color}22`;
+            replayPath(ctx as CanvasRenderingContext2D, parsedCmds);
             ctx.fill();
             ctx.restore();
             return;
@@ -579,10 +759,11 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
 
           const font = shapeData.font;
           let penX = 0;
-
           ctx.fillStyle = color;
 
-          for (const g of shapeData.glyphs) {
+          const scale = fontSize / Math.max(shapeData.unitsPerEm || 1000, 1);
+
+          for (const [glyphIndex, g] of shapeData.glyphs.entries()) {
             const glyphObj = font.glyphs.get(g.g);
             const advance = g.ax ?? 0;
 
@@ -591,55 +772,47 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
               continue;
             }
 
-            const scale = fontSize / Math.max(shapeData.unitsPerEm || 1000, 1);
+            const glyphWarp = glyphWarps.find((w) => w.glyphIndex === glyphIndex);
+            const handles = glyphWarp?.handles ?? [];
+
             const gx = (penX + (g.dx ?? 0)) * scale;
             const gy = -(g.dy ?? 0) * scale;
+
+            const warpPoint = (cx: number, cy: number) => {
+              const baseX = cx + gx;
+              const baseY = cy + gy;
+              const pGlyph = applyGlyphHandles(baseX, baseY, handles);
+
+              return applyShapeWarpPoint(
+                pGlyph.x,
+                pGlyph.y,
+                glyphBounds,
+                bw,
+                bh,
+                warpShapePadding,
+                warpShapeMode,
+                warpShapeStrength
+              );
+            };
 
             const opPath = glyphObj.getPath(0, 0, fontSize);
             const cmds = (opPath as any).commands.map((cmd: any) => {
               const out = { ...cmd };
 
               if (typeof cmd.x === "number" && typeof cmd.y === "number") {
-                const p = applyShapeWarpPoint(
-                  cmd.x + gx,
-                  cmd.y + gy,
-                  glyphBounds,
-                  bw,
-                  bh,
-                  warpShapePadding,
-                  warpShapeMode,
-                  warpShapeStrength
-                );
+                const p = warpPoint(cmd.x, cmd.y);
                 out.x = p.x;
                 out.y = p.y;
               }
 
               if (typeof cmd.x1 === "number" && typeof cmd.y1 === "number") {
-                const p1 = applyShapeWarpPoint(
-                  cmd.x1 + gx,
-                  cmd.y1 + gy,
-                  glyphBounds,
-                  bw,
-                  bh,
-                  warpShapePadding,
-                  warpShapeMode,
-                  warpShapeStrength
-                );
+                const p1 = warpPoint(cmd.x1, cmd.y1);
                 out.x1 = p1.x;
                 out.y1 = p1.y;
               }
 
               if (typeof cmd.x2 === "number" && typeof cmd.y2 === "number") {
-                const p2 = applyShapeWarpPoint(
-                  cmd.x2 + gx,
-                  cmd.y2 + gy,
-                  glyphBounds,
-                  bw,
-                  bh,
-                  warpShapePadding,
-                  warpShapeMode,
-                  warpShapeStrength
-                );
+                const p2 = warpPoint(cmd.x2, cmd.y2);
                 out.x2 = p2.x;
                 out.y2 = p2.y;
               }
@@ -662,6 +835,41 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           ctx.restore();
         }}
       />
+
+      {glyphEditMode &&
+        selectedGlyphIndex != null &&
+        selectedHandles.map((h) => (
+          <Circle
+            key={h.id}
+            x={bx + localDrawOffsetX + h.x}
+            y={by + localDrawOffsetY + h.y}
+            radius={7}
+            fill="#ff4d4f"
+            stroke="#ffffff"
+            strokeWidth={2}
+            draggable
+            onMouseDown={(e) => e.cancelBubble = true}
+            onTouchStart={(e) => e.cancelBubble = true}
+            onDragMove={(e) => {
+              e.cancelBubble = true;
+
+              const group = e.currentTarget.getParent() as Konva.Group;
+              const pos = group.getRelativePointerPosition();
+              if (!pos || selectedGlyphIndex == null || !onUpdateGlyphHandle) return;
+
+              const nextX = pos.x - bx - localDrawOffsetX;
+              const nextY = pos.y - by - localDrawOffsetY;
+
+              onUpdateGlyphHandle(selectedGlyphIndex, h.id, {
+                x: nextX,
+                y: nextY,
+              });
+            }}
+            onDragEnd={(e) => {
+              e.cancelBubble = true;
+            }}
+          />
+        ))}
     </Group>
   );
 };

@@ -1,9 +1,13 @@
 import React, { useRef, useState } from "react";
 import ArabicKeyboard from "./ArabicKeyboard";
-import { DIACRITICS, SPECIALS, PERSIAN, URDU, PRESETS } from "./SidebarPresets";
+import {
+  DIACRITICS,
+  SPECIALS,
+  PERSIAN,
+  URDU,
+  PRESETS,
+} from "./SidebarPresets";
 import type { Block } from "../types";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SidebarProps = {
   blocks: Block[];
@@ -12,45 +16,52 @@ export type SidebarProps = {
   snapToGrid: boolean;
   isMobile: boolean;
   width: number;
+
   canvasPresetId: string;
   onChangeCanvasPreset: (id: string) => void;
+
   backgroundColor: string;
   onChangeBackgroundColor: (color: string) => void;
+
   onAddBlock: () => void;
   onDuplicateBlock: () => void;
   onDeleteBlock: () => void;
+
   onExportPNG: () => void;
   onExportSVG: () => void;
   onExportPDF: () => void;
+
   onSaveLayout: () => void;
   onLoadLayout: () => void;
   onDownloadLayout: () => void;
   onUploadLayout: () => void;
+
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddShapeWarpBlock?: (svgPathData: string, w: number, h: number) => void;
+
   onToggleGrid: (v: boolean) => void;
   onToggleSnap: (v: boolean) => void;
+
   onSelectBlock: (id: number | null) => void;
   onUpdateSelectedBlock: (patch: Partial<Block>) => void;
   onUpdateBlock?: (id: number, patch: Partial<Block>) => void;
   onReorderBlocks?: (blocks: Block[]) => void;
   onMergeBlocks?: (idA: number, idB: number) => void;
+
   showKeyboard: boolean;
   onToggleKeyboard: () => void;
   onClearDiacritics: () => void;
   onInsertPreset: (value: string) => void;
+
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+
+  onToggleGlyphEditMode?: () => void;
+  onAddGlyphHandle?: () => void;
 };
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-/**
- * Default reset values for all sliders.
- * These must match DEFAULT_BLOCK in App.tsx.
- */
 const SLIDER_DEFAULTS: Record<string, number> = {
   fontSize: 53,
   opacity: 1,
@@ -73,12 +84,8 @@ const SLIDER_DEFAULTS: Record<string, number> = {
 
 const TARGET_SVG_SIZE = 500;
 
-// ─── Tiny helpers ─────────────────────────────────────────────────────────────
-
-const makeId = (base: string, suffix?: string | number) =>
-  suffix == null ? base : `${base}-${suffix}`;
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
+const makeId = (base: string, suffix?: string | number | null) =>
+  suffix != null ? `${base}-${suffix}` : base;
 
 const SelectRow = ({
   id,
@@ -157,11 +164,11 @@ const RangeRow = ({
   max: number;
   step?: number;
   onChange: (v: number) => void;
-  suffix?: string;
+  suffix?: string | number;
   fieldKey?: string;
 }) => {
   const defaultVal =
-    fieldKey !== undefined ? (SLIDER_DEFAULTS[fieldKey] ?? value) : value;
+    fieldKey !== undefined ? SLIDER_DEFAULTS[fieldKey] ?? value : value;
 
   return (
     <label
@@ -170,9 +177,9 @@ const RangeRow = ({
       title={fieldKey ? `Double-click to reset to ${defaultVal}` : undefined}
     >
       <span className="fieldTitle">
-        {label}{" "}
-        {suffix ? (
-          <span style={{ color: "#6b7280", fontWeight: 500 }}>{suffix}</span>
+        {label}
+        {suffix !== undefined ? (
+          <span style={{ color: "#6b7280", fontWeight: 500 }}> {suffix}</span>
         ) : null}
       </span>
       <input
@@ -215,9 +222,11 @@ const PresetKeyboard = ({
               key={key}
               type="button"
               onClick={() => onPick(key)}
-              className={`sidebarPresetKeyboardKey ${
-                key.length > 1 ? "sidebarPresetKeyboardKeyWide" : ""
-              }`}
+              className={
+                key.length > 1
+                  ? "sidebarPresetKeyboardKey sidebarPresetKeyboardKeyWide"
+                  : "sidebarPresetKeyboardKey"
+              }
             >
               {key}
             </button>
@@ -228,13 +237,13 @@ const PresetKeyboard = ({
   </div>
 );
 
-// ─── SVG extraction helpers ───────────────────────────────────────────────────
-
 function svgElementToPathData(el: Element): string {
   const tag = el.tagName.toLowerCase().replace(/^.*:/, "");
+
   switch (tag) {
     case "path":
       return el.getAttribute("d") ?? "";
+
     case "rect": {
       const rx = parseFloat(el.getAttribute("rx") ?? "0");
       const ry = parseFloat(el.getAttribute("ry") ?? rx.toString());
@@ -242,8 +251,11 @@ function svgElementToPathData(el: Element): string {
       const ey = parseFloat(el.getAttribute("y") ?? "0");
       const w = parseFloat(el.getAttribute("width") ?? "0");
       const h = parseFloat(el.getAttribute("height") ?? "0");
-      if (rx === 0 && ry === 0)
+
+      if (rx === 0 && ry === 0) {
         return `M ${ex} ${ey} H ${ex + w} V ${ey + h} H ${ex} Z`;
+      }
+
       const r = Math.min(rx, w / 2, ry, h / 2);
       return (
         `M ${ex + r} ${ey} H ${ex + w - r} Q ${ex + w} ${ey} ${ex + w} ${ey + r} ` +
@@ -252,11 +264,13 @@ function svgElementToPathData(el: Element): string {
         `V ${ey + r} Q ${ex} ${ey} ${ex + r} ${ey} Z`
       );
     }
+
     case "circle": {
       const cx = parseFloat(el.getAttribute("cx") ?? "0");
       const cy = parseFloat(el.getAttribute("cy") ?? "0");
       const r = parseFloat(el.getAttribute("r") ?? "0");
       const k = 0.5522847498;
+
       return (
         `M ${cx} ${cy - r} C ${cx + r * k} ${cy - r} ${cx + r} ${cy - r * k} ${cx + r} ${cy} ` +
         `C ${cx + r} ${cy + r * k} ${cx + r * k} ${cy + r} ${cx} ${cy + r} ` +
@@ -264,32 +278,39 @@ function svgElementToPathData(el: Element): string {
         `C ${cx - r} ${cy - r * k} ${cx - r * k} ${cy - r} ${cx} ${cy - r} Z`
       );
     }
+
     case "ellipse": {
       const cx = parseFloat(el.getAttribute("cx") ?? "0");
       const cy = parseFloat(el.getAttribute("cy") ?? "0");
-      const rx2 = parseFloat(el.getAttribute("rx") ?? "0");
-      const ry2 = parseFloat(el.getAttribute("ry") ?? "0");
+      const rx = parseFloat(el.getAttribute("rx") ?? "0");
+      const ry = parseFloat(el.getAttribute("ry") ?? "0");
       const k = 0.5522847498;
+
       return (
-        `M ${cx} ${cy - ry2} C ${cx + rx2 * k} ${cy - ry2} ${cx + rx2} ${cy - ry2 * k} ${cx + rx2} ${cy} ` +
-        `C ${cx + rx2} ${cy + ry2 * k} ${cx + rx2 * k} ${cy + ry2} ${cx} ${cy + ry2} ` +
-        `C ${cx - rx2 * k} ${cy + ry2} ${cx - rx2} ${cy + ry2 * k} ${cx - rx2} ${cy} ` +
-        `C ${cx - rx2} ${cy - ry2 * k} ${cx - rx2 * k} ${cy - ry2} ${cx} ${cy - ry2} Z`
+        `M ${cx} ${cy - ry} C ${cx + rx * k} ${cy - ry} ${cx + rx} ${cy - ry * k} ${cx + rx} ${cy} ` +
+        `C ${cx + rx} ${cy + ry * k} ${cx + rx * k} ${cy + ry} ${cx} ${cy + ry} ` +
+        `C ${cx - rx * k} ${cy + ry} ${cx - rx} ${cy + ry * k} ${cx - rx} ${cy} ` +
+        `C ${cx - rx} ${cy - ry * k} ${cx - rx * k} ${cy - ry} ${cx} ${cy - ry} Z`
       );
     }
+
     case "polygon":
     case "polyline": {
       const pts = (el.getAttribute("points") ?? "")
         .trim()
         .split(/[\s,]+/)
         .filter(Boolean);
+
       if (pts.length < 2) return "";
+
       let d = `M ${pts[0]} ${pts[1]}`;
-      for (let i = 2; i < pts.length - 1; i += 2)
+      for (let i = 2; i < pts.length - 1; i += 2) {
         d += ` L ${pts[i]} ${pts[i + 1]}`;
+      }
       if (tag === "polygon") d += " Z";
       return d;
     }
+
     default:
       return "";
   }
@@ -302,13 +323,40 @@ function scaleSvgPathNumbers(d: string, scaleX: number, scaleY: number): string 
   if (!tokens) return d;
 
   const argCounts: Record<string, number> = {
-    M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, T: 2, A: 7, Z: 0,
+    M: 2,
+    L: 2,
+    H: 1,
+    V: 1,
+    C: 6,
+    S: 4,
+    Q: 4,
+    T: 2,
+    A: 7,
+    Z: 0,
   };
+
   const xArgIdx: Record<string, number[]> = {
-    M: [0], L: [0], H: [0], V: [], C: [0, 2, 4], S: [0, 2], Q: [0, 2], T: [0], A: [5],
+    M: [0],
+    L: [0],
+    H: [0],
+    V: [],
+    C: [0, 2, 4],
+    S: [0, 2],
+    Q: [0, 2],
+    T: [0],
+    A: [5],
   };
+
   const yArgIdx: Record<string, number[]> = {
-    M: [1], L: [1], H: [], V: [0], C: [1, 3, 5], S: [1, 3], Q: [1, 3], T: [1], A: [6],
+    M: [1],
+    L: [1],
+    H: [],
+    V: [0],
+    C: [1, 3, 5],
+    S: [1, 3],
+    Q: [1, 3],
+    T: [1],
+    A: [6],
   };
 
   const out: string[] = [];
@@ -326,39 +374,52 @@ function scaleSvgPathNumbers(d: string, scaleX: number, scaleY: number): string 
       const posInGroup = count > 0 ? argIdx % count : 0;
       const isX = (xArgIdx[cmd] ?? []).includes(posInGroup);
       const isY = (yArgIdx[cmd] ?? []).includes(posInGroup);
+
       let scaled = n;
       if (isX) scaled = n * scaleX;
       else if (isY) scaled = n * scaleY;
+
       if (cmd === "A" && posInGroup === 0) scaled = n * scaleX;
       if (cmd === "A" && posInGroup === 1) scaled = n * scaleY;
+
       out.push(String(parseFloat(scaled.toFixed(3))));
       argIdx++;
     }
   }
+
   return out.join(" ");
 }
 
 function parseTransform(
   t: string
 ): [number, number, number, number, number, number] {
-  let a = 1, b = 0, c = 0, d = 1, e = 0, f = 0;
+  let a = 1,
+    b = 0,
+    c = 0,
+    d = 1,
+    e = 0,
+    f = 0;
+
   const mat = t.match(/matrix\(([^)]+)\)/);
   if (mat) {
     [a, b, c, d, e, f] = mat[1].split(/[\s,]+/).map(Number);
     return [a, b, c, d, e, f];
   }
+
   const trans = t.match(/translate\(([^)]+)\)/);
   if (trans) {
     const [tx, ty = 0] = trans[1].split(/[\s,]+/).map(Number);
     e = tx;
     f = ty;
   }
+
   const scale = t.match(/scale\(([^)]+)\)/);
   if (scale) {
     const [sx, sy = sx] = scale[1].split(/[\s,]+/).map(Number);
     a *= sx;
     d *= sy;
   }
+
   return [a, b, c, d, e, f];
 }
 
@@ -367,12 +428,15 @@ function getAccumulatedTransform(
 ): [number, number, number, number, number, number] {
   const mats: Array<[number, number, number, number, number, number]> = [];
   let node: Element | null = el;
+
   while (node && node.tagName.toLowerCase() !== "svg") {
     const t = node.getAttribute("transform");
     if (t) mats.unshift(parseTransform(t));
     node = node.parentElement;
   }
+
   let r: [number, number, number, number, number, number] = [1, 0, 0, 1, 0, 0];
+
   for (const m of mats) {
     r = [
       r[0] * m[0] + r[2] * m[1],
@@ -383,6 +447,7 @@ function getAccumulatedTransform(
       r[1] * m[4] + r[3] * m[5] + r[5],
     ];
   }
+
   return r;
 }
 
@@ -398,10 +463,11 @@ function applyTransformToPathString(
 
   const out: string[] = [];
   let cmd = "";
-  const nums: number[] = [];
+  let nums: number[] = [];
 
   const flush = () => {
     if (!cmd) return;
+
     switch (cmd.toUpperCase()) {
       case "M":
       case "L":
@@ -413,41 +479,57 @@ function applyTransformToPathString(
           cmd = "L";
         }
         break;
+
       case "C":
         for (let i = 0; i < nums.length; i += 6) {
           const pts = nums.slice(i, i + 6);
           const t: number[] = [];
           for (let j = 0; j < 6; j += 2) {
-            t.push(a * pts[j] + c * pts[j + 1] + e, b * pts[j] + dd * pts[j + 1] + f);
+            t.push(
+              a * pts[j] + c * pts[j + 1] + e,
+              b * pts[j] + dd * pts[j + 1] + f
+            );
           }
           out.push("C", ...t.map((v) => String(parseFloat(v.toFixed(3)))));
         }
         break;
+
       case "Q":
       case "S":
         for (let i = 0; i < nums.length; i += 4) {
+          const pts = nums.slice(i, i + 4);
           const t: number[] = [];
           for (let j = 0; j < 4; j += 2) {
-            t.push(a * nums[j] + c * nums[j + 1] + e, b * nums[j] + dd * nums[j + 1] + f);
+            t.push(
+              a * pts[j] + c * pts[j + 1] + e,
+              b * pts[j] + dd * pts[j + 1] + f
+            );
           }
           out.push(cmd, ...t.map((v) => String(parseFloat(v.toFixed(3)))));
         }
         break;
+
       case "H":
-        for (const x of nums)
+        for (const x of nums) {
           out.push("L", String(parseFloat((a * x + e).toFixed(3))), String(parseFloat(f.toFixed(3))));
+        }
         break;
+
       case "V":
-        for (const y of nums)
+        for (const y of nums) {
           out.push("L", String(parseFloat(e.toFixed(3))), String(parseFloat((dd * y + f).toFixed(3))));
+        }
         break;
+
       case "Z":
         out.push("Z");
         break;
+
       default:
         out.push(cmd, ...nums.map(String));
     }
-    nums.length = 0;
+
+    nums = [];
   };
 
   for (const tok of tokens) {
@@ -459,34 +541,38 @@ function applyTransformToPathString(
     }
   }
   flush();
+
   return out.join(" ");
 }
 
-function extractSvgPaths(
-  svgText: string
-): { pathData: string; w: number; h: number } | null {
+function extractSvgPaths(svgText: string): { pathData: string; w: number; h: number } | null {
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgText, "image/svg+xml");
   if (doc.querySelector("parsererror")) return null;
 
   const svgEl = doc.querySelector("svg");
-  const vb = svgEl?.getAttribute("viewBox")?.split(/[\s,]+/).map(Number);
-  const srcW = (vb?.[2] ?? parseFloat(svgEl?.getAttribute("width") ?? "400")) || 400;
-  const srcH = (vb?.[3] ?? parseFloat(svgEl?.getAttribute("height") ?? "400")) || 400;
+  const vb = svgEl?.getAttribute("viewBox")?.split(/\s+/).map(Number);
+
+  const parsedW = parseFloat(svgEl?.getAttribute("width") ?? "400");
+  const parsedH = parseFloat(svgEl?.getAttribute("height") ?? "400");
+
+  const srcW = vb?.[2] ?? (Number.isFinite(parsedW) ? parsedW : 400);
+  const srcH = vb?.[3] ?? (Number.isFinite(parsedH) ? parsedH : 400);
+
   const sx = TARGET_SVG_SIZE / srcW;
   const sy = TARGET_SVG_SIZE / srcH;
 
-  const shapeEls = doc.querySelectorAll("path, rect, circle, ellipse, polygon, polyline");
+  const shapeEls = doc.querySelectorAll(
+    "path, rect, circle, ellipse, polygon, polyline"
+  );
+
   const parts: string[] = [];
 
   shapeEls.forEach((el) => {
-    const display =
-      el.getAttribute("display") ??
-      el.closest("[display]")?.getAttribute("display");
+    const display = el.getAttribute("display");
     if (display === "none") return;
-    const visibility =
-      el.getAttribute("visibility") ??
-      el.closest("[visibility]")?.getAttribute("visibility");
+
+    const visibility = el.getAttribute("visibility");
     if (visibility === "hidden") return;
 
     let d = svgElementToPathData(el);
@@ -494,25 +580,33 @@ function extractSvgPaths(
 
     const mat = getAccumulatedTransform(el);
     const isIdentity =
-      mat[0] === 1 && mat[1] === 0 && mat[2] === 0 &&
-      mat[3] === 1 && mat[4] === 0 && mat[5] === 0;
+      mat[0] === 1 &&
+      mat[1] === 0 &&
+      mat[2] === 0 &&
+      mat[3] === 1 &&
+      mat[4] === 0 &&
+      mat[5] === 0;
+
     if (!isIdentity) d = applyTransformToPathString(d, mat);
 
     parts.push(scaleSvgPathNumbers(d, sx, sy));
   });
 
   if (parts.length === 0) return null;
-  return { pathData: parts.join(" "), w: TARGET_SVG_SIZE, h: TARGET_SVG_SIZE };
+
+  return {
+    pathData: parts.join(" "),
+    w: TARGET_SVG_SIZE,
+    h: TARGET_SVG_SIZE,
+  };
 }
 
-// ─── Layers panel ─────────────────────────────────────────────────────────────
-
 const blockTypeIcon = (b: Block) =>
-  b.type === "shapeFill" ? "✦" : b.type === "shapeWarp" ? "⬡" : "T";
-  
+  b.type === "shapeFill" ? "⬒" : b.type === "shapeWarp" ? "◌" : "T";
+
 type LayersPanelProps = {
   blocks: Block[];
-  selectedId?: number;
+  selectedId?: number | null;
   onSelect: (id: number) => void;
   onToggleLock: (id: number) => void;
   onMoveUp: (id: number) => void;
@@ -536,7 +630,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
   const [mergeTarget, setMergeTarget] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
-  const editRef = useRef<HTMLInputElement>(null);
+  const editRef = useRef<HTMLInputElement | null>(null);
 
   const reversed = [...blocks].reverse();
 
@@ -548,15 +642,13 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
   };
 
   const commitEdit = () => {
-    if (editingId !== null) {
-      onRename(editingId, editValue.trim() || `Block ${editingId}`);
-    }
+    if (editingId != null) onRename(editingId, editValue.trim() || `Block ${editingId}`);
     setEditingId(null);
   };
 
   const handleMergeClick = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (mergeTarget === null) setMergeTarget(id);
+    if (mergeTarget == null) setMergeTarget(id);
     else if (mergeTarget === id) setMergeTarget(null);
     else {
       onMerge(mergeTarget, id);
@@ -566,7 +658,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      {mergeTarget !== null && (
+      {mergeTarget != null && (
         <div
           style={{
             fontSize: 11,
@@ -577,7 +669,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
             textAlign: "center",
           }}
         >
-          Click ⊕ on another layer to merge
+          Click on another layer to merge.
         </div>
       )}
 
@@ -604,7 +696,14 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               userSelect: "none",
             }}
           >
-            <span style={{ fontSize: 13, width: 18, textAlign: "center", flexShrink: 0 }}>
+            <span
+              style={{
+                fontSize: 13,
+                width: 18,
+                textAlign: "center",
+                flexShrink: 0,
+              }}
+            >
               {blockTypeIcon(block)}
             </span>
 
@@ -653,44 +752,63 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
             <button
               type="button"
               title={block.locked ? "Unlock" : "Lock"}
-              onClick={(e) => { e.stopPropagation(); onToggleLock(block.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleLock(block.id);
+              }}
               className="layerIconBtn"
               aria-label={block.locked ? "Unlock layer" : "Lock layer"}
             >
               {block.locked ? "🔒" : "🔓"}
             </button>
+
             <button
               type="button"
               title="Move up"
-              onClick={(e) => { e.stopPropagation(); onMoveUp(block.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveUp(block.id);
+              }}
               className="layerIconBtn"
               aria-label="Move layer up"
             >
-              ▲
+              ↑
             </button>
+
             <button
               type="button"
               title="Move down"
-              onClick={(e) => { e.stopPropagation(); onMoveDown(block.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveDown(block.id);
+              }}
               className="layerIconBtn"
               aria-label="Move layer down"
             >
-              ▼
+              ↓
             </button>
+
             <button
               type="button"
               title={isMerge ? "Cancel merge" : "Merge with another layer"}
               onClick={(e) => handleMergeClick(block.id, e)}
               className="layerIconBtn"
               aria-label="Merge layer"
-              style={{ background: isMerge ? "#fcd34d" : "transparent", borderRadius: 4 }}
+              style={{
+                background: isMerge ? "#fcd34d" : "transparent",
+                borderRadius: 4,
+              }}
             >
-              ⊕
+              ⇄
             </button>
+
             <button
               type="button"
               title="Delete layer"
-              onClick={(e) => { e.stopPropagation(); onDelete(block.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(block.id);
+              }}
               className="layerIconBtn"
               aria-label="Delete layer"
               style={{ color: "#dc2626" }}
@@ -702,15 +820,20 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
       })}
 
       {blocks.length === 0 && (
-        <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", padding: 8 }}>
-          No layers yet
+        <div
+          style={{
+            fontSize: 12,
+            color: "#9ca3af",
+            textAlign: "center",
+            padding: 8,
+          }}
+        >
+          No layers yet.
         </div>
       )}
     </div>
   );
 };
-
-// ─── Main Sidebar ─────────────────────────────────────────────────────────────
 
 export const Sidebar: React.FC<SidebarProps> = ({
   blocks,
@@ -750,30 +873,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRedo,
   canUndo,
   canRedo,
+  onToggleGlyphEditMode,
+  onAddGlyphHandle,
 }) => {
   const [showStyling, setShowStyling] = useState(false);
   const [showHelpers, setShowHelpers] = useState(false);
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(true);
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
-
-  // ── Derived values ──────────────────────────────────────────────────────────
 
   const selectedText = selectedBlock?.text ?? "";
   const selectedOpacity = selectedBlock?.opacity ?? 1;
   const selectedShadowOpacity = selectedBlock?.shadowOpacity ?? 0.35;
   const selectedRotation = selectedBlock?.rotation ?? 0;
-
-  /**
-   * Stable key for element IDs when a block is selected.
-   * Using "none" as a fallback means all IDs remain stable even when nothing
-   * is selected, avoiding React key warnings.
-   */
   const selectedId = selectedBlock?.id ?? "none";
-
-  // ── Handlers ────────────────────────────────────────────────────────────────
 
   const updateText = (text: string) => {
     if (selectedBlock) onUpdateSelectedBlock({ text });
@@ -798,7 +913,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleKeyboardSpace = () => handleKeyboardKey(" ");
 
   const handleKeyboardBackspace = () => {
-    if (!selectedBlock || cursorPosition === 0) return;
+    if (!selectedBlock || cursorPosition <= 0) return;
     const newText =
       selectedText.substring(0, cursorPosition - 1) +
       selectedText.substring(cursorPosition);
@@ -857,18 +972,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
           return;
         }
-
         onAdd(result.pathData, result.w, result.h);
       };
-
       reader.readAsText(file);
     };
 
     input.click();
   };
-
-
-  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -880,7 +990,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         borderRight: isMobile ? "none" : "1px solid #dbe2ea",
         borderBottom: isMobile ? "1px solid #dbe2ea" : "none",
         background: "linear-gradient(180deg, #e8edf2 0%, #dde3ea 100%)",
-        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontFamily:
+          "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
         position: "relative",
         flexShrink: 0,
         overflowY: "auto",
@@ -888,8 +999,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }}
     >
       <div className="sidebarInner">
-
-        {/* ── Header ── */}
         <div className="sidebarPanel">
           <h2
             className="sidebarTitle"
@@ -900,14 +1009,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               letterSpacing: "-0.02em",
             }}
           >
-            Mohammed's Calligraphy
+            Mohammed&apos;s Calligraphy
           </h2>
         </div>
 
-        {/* ── Block Controls ── */}
         <div className="sidebarPanel">
           <div className="sidebarSectionTitle">Block Controls</div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
             <button
               type="button"
               onClick={onDeleteBlock}
@@ -916,8 +1031,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title="Delete selected block"
               aria-label="Delete block"
             >
-              −
+              ✕
             </button>
+
             <button
               type="button"
               onClick={onDuplicateBlock}
@@ -928,6 +1044,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               ⧉
             </button>
+
             <button
               type="button"
               onClick={onAddBlock}
@@ -935,8 +1052,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title="Add text block"
               aria-label="Add text block"
             >
-              +
+              ＋
             </button>
+
             {onAddShapeFillBlock && (
               <button
                 type="button"
@@ -944,7 +1062,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 title="Upload SVG for Shape Fill"
                 onClick={() => handleSvgUpload("shapeFill")}
               >
-                ✦
+                ⬒
               </button>
             )}
 
@@ -955,10 +1073,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 title="Upload SVG for Shape Warp"
                 onClick={() => handleSvgUpload("shapeWarp")}
               >
-                ⬡
+                ◌
               </button>
             )}
-			</div>
+          </div>
 
           <div style={{ height: 8 }} />
 
@@ -973,6 +1091,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               ↶
             </button>
+
             <button
               type="button"
               onClick={onRedo}
@@ -986,7 +1105,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* ── Layers ── */}
         <div className="sidebarPanel">
           <button
             type="button"
@@ -1021,7 +1139,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* ── Text Editor ── */}
         {selectedBlock && (
           <div className="sidebarPanel">
             <label htmlFor={makeId("block-text", selectedId)} className="sr-only">
@@ -1034,10 +1151,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="sidebarTextarea"
               value={selectedText}
               onChange={(e) => updateText(e.target.value)}
-              onSelect={(e) =>
-                setCursorPosition(e.currentTarget.selectionStart ?? 0)
-              }
-              placeholder="Type Arabic text here…"
+              onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart ?? 0)}
+              placeholder="Type Arabic text here..."
               dir="rtl"
               lang="ar"
               spellCheck={false}
@@ -1047,7 +1162,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* ── Styling ── */}
         {selectedBlock && (
           <div className="sidebarPanel">
             <button
@@ -1062,8 +1176,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {showStyling && (
               <div className="sectionPanel">
-
-                {/* Font family + style */}
                 <div
                   style={{
                     display: "grid",
@@ -1101,7 +1213,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     label="Font style"
                     value={selectedBlock.fontStyle ?? "normal"}
                     onChange={(v) =>
-                      onUpdateSelectedBlock({ fontStyle: v as Block["fontStyle"] })
+                      onUpdateSelectedBlock({
+                        fontStyle: v as Block["fontStyle"],
+                      })
                     }
                   >
                     <option value="normal">Normal</option>
@@ -1111,20 +1225,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </SelectRow>
                 </div>
 
-                {/* Font size */}
-				
                 <RangeRow
                   id={makeId("font-size", selectedId)}
                   name={makeId("fontSize", selectedId)}
                   label="Font size"
                   value={selectedBlock.fontSize}
-                  min={selectedBlock.type === "shapeFill" || selectedBlock.type === "shapeWarp" ? 4 : 12}
-                  max={selectedBlock.type === "shapeFill" || selectedBlock.type === "shapeWarp" ? 400 : 200}
+                  min={
+                    selectedBlock.type === "shapeFill" ||
+                    selectedBlock.type === "shapeWarp"
+                      ? 4
+                      : 12
+                  }
+                  max={
+                    selectedBlock.type === "shapeFill" ||
+                    selectedBlock.type === "shapeWarp"
+                      ? 400
+                      : 200
+                  }
                   onChange={(v) => onUpdateSelectedBlock({ fontSize: v })}
                   fieldKey="fontSize"
                 />
-				
-                {/* Color + opacity */}
+
                 <div
                   style={{
                     display: "grid",
@@ -1139,6 +1260,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     value={selectedBlock.color}
                     onChange={(v) => onUpdateSelectedBlock({ color: v })}
                   />
+
                   <RangeRow
                     id={makeId("opacity", selectedId)}
                     name={makeId("opacity", selectedId)}
@@ -1153,7 +1275,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 </div>
 
-                {/* Align (text blocks only) */}
                 {selectedBlock.type === "text" && (
                   <SelectRow
                     id={makeId("text-align", selectedId)}
@@ -1170,7 +1291,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </SelectRow>
                 )}
 
-                {/* Rotation */}
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Rotation</div>
                   <RangeRow
@@ -1182,12 +1302,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     max={180}
                     step={1}
                     onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
-                    suffix={`${selectedRotation}°`}
+                    suffix={selectedRotation}
                     fieldKey="rotation"
                   />
                 </div>
 
-                {/* Warp (text blocks only) */}
                 {selectedBlock.type === "text" && (
                   <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Warp</div>
@@ -1201,7 +1320,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       max={100}
                       step={1}
                       onChange={(v) => onUpdateSelectedBlock({ warpX: v })}
-                      suffix={`${selectedBlock.warpX ?? 0}`}
+                      suffix={selectedBlock.warpX ?? 0}
                       fieldKey="warpX"
                     />
 
@@ -1214,13 +1333,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       max={100}
                       step={1}
                       onChange={(v) => onUpdateSelectedBlock({ warpY: v })}
-                      suffix={`${selectedBlock.warpY ?? 0}`}
+                      suffix={selectedBlock.warpY ?? 0}
                       fieldKey="warpY"
                     />
                   </div>
-				  )}
+                )}
 
-                {/* Stroke */}
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Stroke</div>
                   <div
@@ -1237,6 +1355,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       value={selectedBlock.stroke ?? "#000000"}
                       onChange={(v) => onUpdateSelectedBlock({ stroke: v })}
                     />
+
                     <RangeRow
                       id={makeId("stroke-width", selectedId)}
                       name={makeId("strokeWidth", selectedId)}
@@ -1245,15 +1364,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       min={0}
                       max={20}
                       onChange={(v) => onUpdateSelectedBlock({ strokeWidth: v })}
-                      suffix={`${selectedBlock.strokeWidth ?? 0}`}
+                      suffix={selectedBlock.strokeWidth ?? 0}
                       fieldKey="strokeWidth"
                     />
                   </div>
                 </div>
 
-                {/* Shadow */}
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Shadow</div>
+
                   <div
                     style={{
                       display: "grid",
@@ -1268,6 +1387,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       value={selectedBlock.shadowColor ?? "#000000"}
                       onChange={(v) => onUpdateSelectedBlock({ shadowColor: v })}
                     />
+
                     <RangeRow
                       id={makeId("shadow-blur", selectedId)}
                       name={makeId("shadowBlur", selectedId)}
@@ -1276,7 +1396,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       min={0}
                       max={60}
                       onChange={(v) => onUpdateSelectedBlock({ shadowBlur: v })}
-                      suffix={`${selectedBlock.shadowBlur ?? 0}`}
+                      suffix={selectedBlock.shadowBlur ?? 0}
                       fieldKey="shadowBlur"
                     />
                   </div>
@@ -1297,9 +1417,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       min={-60}
                       max={60}
                       onChange={(v) => onUpdateSelectedBlock({ shadowOffsetX: v })}
-                      suffix={`${selectedBlock.shadowOffsetX ?? 0}`}
+                      suffix={selectedBlock.shadowOffsetX ?? 0}
                       fieldKey="shadowOffsetX"
                     />
+
                     <RangeRow
                       id={makeId("shadow-offset-y", selectedId)}
                       name={makeId("shadowOffsetY", selectedId)}
@@ -1308,7 +1429,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       min={-60}
                       max={60}
                       onChange={(v) => onUpdateSelectedBlock({ shadowOffsetY: v })}
-                      suffix={`${selectedBlock.shadowOffsetY ?? 0}`}
+                      suffix={selectedBlock.shadowOffsetY ?? 0}
                       fieldKey="shadowOffsetY"
                     />
                   </div>
@@ -1326,9 +1447,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     fieldKey="shadowOpacity"
                   />
                 </div>
+
                 {selectedBlock.type === "shapeWarp" && (
                   <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Shape Warp</div>
+
+                    <label className="checkboxRow">
+                      <input
+                        type="checkbox"
+                        checked={!!selectedBlock.glyphEditMode}
+                        onChange={() => onToggleGlyphEditMode?.()}
+                      />
+                      Glyph edit mode
+                    </label>
+
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 8 }}>
+                      Selected glyph:{" "}
+                      {selectedBlock.selectedGlyphIndex != null
+                        ? selectedBlock.selectedGlyphIndex
+                        : "none"}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={
+                        !selectedBlock.glyphEditMode ||
+                        selectedBlock.selectedGlyphIndex == null
+                      }
+                      onClick={() => onAddGlyphHandle?.()}
+                      className="sidebarSmallAction"
+                      style={{ marginTop: 8 }}
+                    >
+                      Add pinch handle
+                    </button>
 
                     <SelectRow
                       id={makeId("warp-shape-mode", selectedId)}
@@ -1342,7 +1493,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }
                     >
                       <option value="envelope">Envelope</option>
-                      <option value="topBottom">Top / Bottom</option>
+                      <option value="topBottom">Top Bottom</option>
                       <option value="stretch">Stretch</option>
                       <option value="radial">Radial</option>
                     </SelectRow>
@@ -1355,7 +1506,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       min={0}
                       max={150}
                       step={1}
-                      onChange={(v) => onUpdateSelectedBlock({ warpShapePadding: v })}
+                      onChange={(v) =>
+                        onUpdateSelectedBlock({ warpShapePadding: v })
+                      }
                       suffix={`${selectedBlock.warpShapePadding ?? 24}px`}
                       fieldKey="warpShapePadding"
                     />
@@ -1368,18 +1521,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       min={0}
                       max={2}
                       step={0.05}
-                      onChange={(v) => onUpdateSelectedBlock({ warpShapeStrength: v })}
-                      suffix={`${(selectedBlock.warpShapeStrength ?? 1).toFixed(2)}×`}
+                      onChange={(v) =>
+                        onUpdateSelectedBlock({ warpShapeStrength: v })
+                      }
+                      suffix={(selectedBlock.warpShapeStrength ?? 1).toFixed(2)}
                       fieldKey="warpShapeStrength"
                     />
 
                     <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                      Base shape: {selectedBlock.warpShapeWidth ?? 400} × {selectedBlock.warpShapeHeight ?? 400}px
+                      Base shape: {selectedBlock.warpShapeWidth ?? 400} ×{" "}
+                      {selectedBlock.warpShapeHeight ?? 400}px
                     </div>
                   </div>
                 )}
-				
-                {/* Shape Fill controls */}
+
                 {selectedBlock.type === "shapeFill" && (
                   <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Shape Fill</div>
@@ -1393,9 +1548,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       max={3}
                       step={0.05}
                       onChange={(v) => onUpdateSelectedBlock({ shapeScale: v })}
-                      suffix={`${(selectedBlock.shapeScale ?? 1).toFixed(2)}×`}
+                      suffix={(selectedBlock.shapeScale ?? 1).toFixed(2)}
                       fieldKey="shapeScale"
                     />
+
                     <RangeRow
                       id={makeId("fill-spacing", selectedId)}
                       name={makeId("shapeFillSpacing", selectedId)}
@@ -1404,8 +1560,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       min={0.5}
                       max={4}
                       step={0.05}
-                      onChange={(v) => onUpdateSelectedBlock({ shapeFillSpacing: v })}
-                      suffix={`${(selectedBlock.shapeFillSpacing ?? 1.3).toFixed(2)}`}
+                      onChange={(v) =>
+                        onUpdateSelectedBlock({ shapeFillSpacing: v })
+                      }
+                      suffix={(selectedBlock.shapeFillSpacing ?? 1.3).toFixed(2)}
                       fieldKey="shapeFillSpacing"
                     />
 
@@ -1425,10 +1583,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         min={0.1}
                         max={3}
                         step={0.05}
-                        onChange={(v) => onUpdateSelectedBlock({ shapeFillScaleX: v })}
-                        suffix={`${(selectedBlock.shapeFillScaleX ?? 1).toFixed(2)}×`}
+                        onChange={(v) =>
+                          onUpdateSelectedBlock({ shapeFillScaleX: v })
+                        }
+                        suffix={(selectedBlock.shapeFillScaleX ?? 1).toFixed(2)}
                         fieldKey="shapeFillScaleX"
                       />
+
                       <RangeRow
                         id={makeId("fill-scale-y", selectedId)}
                         name={makeId("shapeFillScaleY", selectedId)}
@@ -1437,8 +1598,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         min={0.1}
                         max={3}
                         step={0.05}
-                        onChange={(v) => onUpdateSelectedBlock({ shapeFillScaleY: v })}
-                        suffix={`${(selectedBlock.shapeFillScaleY ?? 1).toFixed(2)}×`}
+                        onChange={(v) =>
+                          onUpdateSelectedBlock({ shapeFillScaleY: v })
+                        }
+                        suffix={(selectedBlock.shapeFillScaleY ?? 1).toFixed(2)}
                         fieldKey="shapeFillScaleY"
                       />
                     </div>
@@ -1451,8 +1614,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       min={-180}
                       max={180}
                       step={1}
-                      onChange={(v) => onUpdateSelectedBlock({ shapeFillTextRotation: v })}
-                      suffix={`${selectedBlock.shapeFillTextRotation ?? 0}°`}
+                      onChange={(v) =>
+                        onUpdateSelectedBlock({ shapeFillTextRotation: v })
+                      }
+                      suffix={selectedBlock.shapeFillTextRotation ?? 0}
                       fieldKey="shapeFillTextRotation"
                     />
                   </div>
@@ -1462,7 +1627,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* ── Arabic Helpers ── */}
         {selectedBlock && (
           <div className="sidebarPanel">
             <button
@@ -1499,6 +1663,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]}
                   onPick={handleKeyboardKey}
                 />
+
                 <button
                   type="button"
                   onClick={onClearDiacritics}
@@ -1513,16 +1678,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   rows={[PRESETS.slice(0, 5), PRESETS.slice(5)]}
                   onPick={onInsertPreset}
                 />
+
                 <PresetKeyboard
                   title="Specials"
                   rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]}
                   onPick={onInsertPreset}
                 />
+
                 <PresetKeyboard
                   title="Persian"
                   rows={[PERSIAN.slice(0, 6), PERSIAN.slice(6)]}
                   onPick={onInsertPreset}
                 />
+
                 <PresetKeyboard
                   title="Urdu"
                   rows={[URDU.slice(0, 6), URDU.slice(6)]}
@@ -1533,7 +1701,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* ── Save / Export ── */}
         <div className="sidebarPanel">
           <button
             type="button"
@@ -1541,13 +1708,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="sidebarSectionButton"
             aria-expanded={showFileActions}
           >
-            <span>Save / Export</span>
+            <span>Save Export</span>
             <span>{showFileActions ? "−" : "+"}</span>
           </button>
 
           {showFileActions && (
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              {/* Browser save / load */}
               <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
                 <button
                   type="button"
@@ -1558,6 +1724,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   💾
                 </button>
+
                 <button
                   type="button"
                   onClick={onLoadLayout}
@@ -1569,7 +1736,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </div>
 
-              {/* JSON file download / upload */}
               <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
                 <button
                   type="button"
@@ -1578,8 +1744,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   title="Download layout as .json"
                   aria-label="Download layout JSON"
                 >
-                  ⬇
+                  JSON↓
                 </button>
+
                 <button
                   type="button"
                   onClick={onUploadLayout}
@@ -1587,11 +1754,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   title="Upload .json layout file"
                   aria-label="Upload layout JSON"
                 >
-                  ⬆
+                  JSON↑
                 </button>
               </div>
 
-              {/* Export image formats */}
               <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
                 <button
                   type="button"
@@ -1602,6 +1768,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   PNG
                 </button>
+
                 <button
                   type="button"
                   onClick={onExportSVG}
@@ -1611,6 +1778,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   SVG
                 </button>
+
                 <button
                   type="button"
                   onClick={onExportPDF}
@@ -1625,7 +1793,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* ── Canvas Settings ── */}
         <div className="sidebarPanel">
           <div className="sidebarSectionTitle">Canvas Size</div>
           <div className="shell">
@@ -1637,9 +1804,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="select"
               aria-label="Canvas size preset"
             >
-              <option value="story">Story (1080 × 1920)</option>
-              <option value="square">Instagram Square (1080 × 1080)</option>
-              <option value="a4">Print A4 (2480 × 3508)</option>
+              <option value="story">Story (1080×1920)</option>
+              <option value="square">Instagram Square (1080×1080)</option>
+              <option value="a4">Print A4 (2480×3508)</option>
             </select>
           </div>
 
@@ -1664,9 +1831,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="checkbox"
                 checked={showGrid}
                 onChange={(e) => onToggleGrid(e.target.checked)}
-              />{" "}
+              />
               Show gridlines
             </label>
+
             <label className="checkboxRow" htmlFor="snap-to-grid">
               <input
                 id="snap-to-grid"
@@ -1674,13 +1842,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="checkbox"
                 checked={snapToGrid}
                 onChange={(e) => onToggleSnap(e.target.checked)}
-              />{" "}
+              />
               Snap to gridlines
             </label>
           </div>
         </div>
 
-        {/* ── Footer hint ── */}
         <p
           style={{
             fontSize: 11,
@@ -1689,9 +1856,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             textAlign: "center",
           }}
         >
-          Double-click a layer name to rename · Double-click a slider to reset
+          Double-click a layer name to rename. Double-click a slider to reset.
         </p>
-
       </div>
     </div>
   );
