@@ -2,12 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Shape, Rect, Circle, Arc } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
-import {
-  shapeText,
-  type HarfBuzzGlyph,
-  type ShapedTextResult,
-} from "../lib/harfbuzz";
 import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
+import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import type { GlyphWarp, GlyphHandle } from "../types";
 
 type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
@@ -69,13 +65,6 @@ export type ShapeWarpTextProps = {
   ) => void;
 };
 
-type LoadedShape = {
-  glyphs: HarfBuzzGlyph[];
-  font: ShapedTextResult["font"] | null;
-  unitsPerEm: number;
-  isLoading: boolean;
-};
-
 type GlyphBounds = {
   minX: number;
   minY: number;
@@ -101,24 +90,6 @@ type MutablePathCmd = {
   y1?: number;
   x2?: number;
   y2?: number;
-};
-
-const FONT_URLS: Record<string, string> = {
-  TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
-  Kufi: "/fonts/Kufi.ttf",
-  Kufi2: "/fonts/Kufi2.ttf",
-  Thuluth: "/fonts/Thuluth.ttf",
-  ThuluthDeco: "/fonts/ThuluthDeco.ttf",
-  Wessam: "/fonts/Wessam.ttf",
-  Yekan: "/fonts/Yekan.ttf",
-  NotoSans: "/fonts/NotoSans.ttf",
-  Lateef: "/fonts/Lateef.ttf",
-  Amiri: "/fonts/Amiri.ttf",
-  Ruqaa: "/fonts/Ruqaa.ttf",
-  Qahiri: "/fonts/Qahiri.ttf",
-  Urdu: "/fonts/Urdu.ttf",
-  AlFatemi: "/fonts/AlFatemi.otf",
-  FatemiMaqala: "/fonts/FatemiMaqala.ttf",
 };
 
 const fallbackWidth = (text: string, fs: number) =>
@@ -300,16 +271,8 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   onGlyphBoxesChange,
   onUpdateGlyphHandle,
 }) => {
-  const [hbLoaded, setHbLoaded] = useState(false);
-  const [shapeData, setShapeData] = useState<LoadedShape>({
-    glyphs: [],
-    font: null,
-    unitsPerEm: 1000,
-    isLoading: true,
-  });
-
-  const aliveRef = useRef(true);
-  const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
+  const shapeData = useShapedGlyphs(text, fontFamily);
+  const { hbLoaded } = shapeData;
 
   const [spinnerAngle, setSpinnerAngle] = useState(0);
   const spinnerFrameRef = useRef<number | null>(null);
@@ -329,47 +292,6 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
       }
     };
   }, [shapeData.isLoading]);
-
-  useEffect(() => {
-    aliveRef.current = true;
-    // Mark loading before kicking off the async shapeText() fetch below.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHbLoaded(false);
-    setShapeData((prev) => ({ ...prev, isLoading: true }));
-
-    shapeText(text || "", fontUrl)
-      .then((r: ShapedTextResult) => {
-        if (!aliveRef.current) return;
-
-        const glyphs = r.glyphs ?? [];
-        const font = r.font ?? null;
-
-        setShapeData({
-          glyphs,
-          font,
-          unitsPerEm: r.unitsPerEm || 1000,
-          isLoading: false,
-        });
-
-        setHbLoaded(!!font && glyphs.length > 0);
-      })
-      .catch(() => {
-        if (!aliveRef.current) return;
-
-        setShapeData({
-          glyphs: [],
-          font: null,
-          unitsPerEm: 1000,
-          isLoading: false,
-        });
-
-        setHbLoaded(false);
-      });
-
-    return () => {
-      aliveRef.current = false;
-    };
-  }, [text, fontUrl]);
 
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
 

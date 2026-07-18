@@ -2,12 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Shape, Rect, Arc } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
-import {
-  shapeText,
-  type HarfBuzzGlyph,
-  type ShapedTextResult,
-} from "../lib/harfbuzz";
+import type { HarfBuzzGlyph, ShapedTextResult } from "../lib/harfbuzz";
 import { warpPoint, type GlyphBounds } from "../lib/warp";
+import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 
 type Props = {
   id?: string;
@@ -40,33 +37,6 @@ type Props = {
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   debugBounds?: boolean;
 };
-
-type LoadedShape = {
-  glyphs: HarfBuzzGlyph[];
-  font: ShapedTextResult["font"] | null;
-  unitsPerEm: number;
-  isLoading: boolean;
-};
-
-const FONT_URLS: Record<string, string> = {
-  TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
-  Kufi: "/fonts/Kufi.ttf",
-  Kufi2: "/fonts/Kufi2.ttf",
-  Thuluth: "/fonts/Thuluth.ttf",
-  ThuluthDeco: "/fonts/ThuluthDeco.ttf",
-  Wessam: "/fonts/Wessam.ttf",
-  Yekan: "/fonts/Yekan.ttf",
-  NotoSans: "/fonts/NotoSans.ttf",
-  Lateef: "/fonts/Lateef.ttf",
-  Amiri: "/fonts/Amiri.ttf",
-  Ruqaa: "/fonts/Ruqaa.ttf",
-  Qahiri: "/fonts/Qahiri.ttf",
-  Urdu: "/fonts/Urdu.ttf",
-  AlFatemi: "/fonts/AlFatemi.otf",
-  FatemiMaqala: "/fonts/FatemiMaqala.ttf",
-};
-
-const DEBUG_LOG = import.meta.env.DEV;
 
 const fallbackWidth = (text: string, fs: number) =>
   Math.max(text.length * fs * 0.55, 20);
@@ -242,14 +212,8 @@ export const ShapedText: React.FC<Props> = ({
   onDragEnd,
   debugBounds = false,
 }) => {
-  const [hbLoaded, setHbLoaded] = useState(false);
-
-  const [shapeData, setShapeData] = useState<LoadedShape>({
-    glyphs: [],
-    font: null,
-    unitsPerEm: 1000,
-    isLoading: true,
-  });
+  const shapeData = useShapedGlyphs(text, fontFamily);
+  const { hbLoaded } = shapeData;
 
   const [spinnerAngle, setSpinnerAngle] = useState(0);
   const spinnerFrameRef = useRef<number | null>(null);
@@ -269,60 +233,6 @@ export const ShapedText: React.FC<Props> = ({
       }
     };
   }, [shapeData.isLoading]);
-
-  const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
-
-  useEffect(() => {
-    let alive = true;
-
-    // Mark loading before kicking off the async shapeText() fetch below.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHbLoaded(false);
-    setShapeData((prev) => ({ ...prev, isLoading: true }));
-
-    shapeText(text || "", fontUrl)
-      .then((r: ShapedTextResult) => {
-        if (!alive) return;
-
-        const glyphs = r.glyphs ?? [];
-        const font = r.font ?? null;
-        const hasGlyphs = !!font && glyphs.length > 0;
-
-        setShapeData({
-          glyphs,
-          font,
-          unitsPerEm: r.unitsPerEm || 1000,
-          isLoading: false,
-        });
-
-        setHbLoaded(hasGlyphs);
-      })
-      .catch((err) => {
-        if (DEBUG_LOG) {
-          console.error("ShapedText shapeText failed", {
-            text,
-            fontFamily,
-            fontUrl,
-            err,
-          });
-        }
-
-        if (!alive) return;
-
-        setShapeData({
-          glyphs: [],
-          font: null,
-          unitsPerEm: 1000,
-          isLoading: false,
-        });
-
-        setHbLoaded(false);
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, [text, fontUrl, fontFamily]);
 
   const glyphBounds = useMemo<GlyphBounds>(() => {
     const { font, glyphs, unitsPerEm } = shapeData;

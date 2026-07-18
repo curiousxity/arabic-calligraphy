@@ -14,40 +14,16 @@
  *  - shapeScale, emboss, stroke all preserved.
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
-import { shapeText, type HarfBuzzGlyph, type ShapedTextResult } from "../lib/harfbuzz";
 import {
   parseSvgPath,
   pathToPolygon,
   pointInPolygon,
   type SvgCmd,
 } from "../lib/svgPath";
-
-const FONT_URLS: Record<string, string> = {
-  TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
-  Kufi: "/fonts/Kufi.ttf",
-  Kufi2: "/fonts/Kufi2.ttf",
-  Thuluth: "/fonts/Thuluth.ttf",
-  ThuluthDeco: "/fonts/ThuluthDeco.ttf",
-  Wessam: "/fonts/Wessam.ttf",
-  Yekan: "/fonts/Yekan.ttf",
-  NotoSans: "/fonts/NotoSans.ttf",
-  Lateef: "/fonts/Lateef.ttf",
-  Amiri: "/fonts/Amiri.ttf",
-  Ruqaa: "/fonts/Ruqaa.ttf",
-  Qahiri: "/fonts/Qahiri.ttf",
-  Urdu: "/fonts/Urdu.ttf",
-  AlFatemi: "/fonts/AlFatemi.otf",
-  FatemiMaqala: "/fonts/FatemiMaqala.ttf",
-};
-
-type ShapeData = {
-  glyphs: HarfBuzzGlyph[];
-  font: ShapedTextResult["font"];
-  unitsPerEm: number;
-};
+import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 
 export type ShapeFillTextProps = {
   id?: string;
@@ -142,18 +118,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   draggable = true,
   onClick, onTap, onDblClick, onDragMove, onDragEnd,
 }) => {
-  const [shapeData, setShapeData] = useState<ShapeData | null>(null);
-  const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
-
-  useEffect(() => {
-    let alive = true;
-    shapeText(text || "", fontUrl)
-      .then((r) => {
-        if (alive) setShapeData({ glyphs: r.glyphs, font: r.font, unitsPerEm: r.unitsPerEm || 1000 });
-      })
-      .catch(() => { if (alive) setShapeData(null); });
-    return () => { alive = false; };
-  }, [text, fontUrl]);
+  const shapeData = useShapedGlyphs(text, fontFamily);
 
   // Parse SVG path once
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
@@ -163,8 +128,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
   // Pre-compute glyph path commands + advances
   const glyphCache = useMemo(() => {
-    if (!shapeData) return [];
     const { glyphs, font, unitsPerEm } = shapeData;
+    if (!font) return [];
     const scale = fontSize / unitsPerEm;
     let penX = 0;
     return glyphs.map((g) => {
@@ -222,7 +187,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           ctx.clip();
 
           // If no text data yet, draw a semi-transparent placeholder fill
-          if (!shapeData || glyphCache.length === 0 || totalAdvance <= 0) {
+          if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) {
             ctx.fillStyle = color + "33"; // 20% opacity hint
             replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
             ctx.fill();

@@ -18,7 +18,7 @@ export type GlyphWarp = {
   handles: GlyphHandle[];
 };
 
-export type Block = {
+type BlockCommon = {
   id: number;
   name?: string;
   text: string;
@@ -28,10 +28,6 @@ export type Block = {
   color: string;
   fontFamily: string;
   fontStyle?: FontStyle;
-  align?: TextAlign;
-  lineHeight?: number;
-
-  type: BlockType;
   opacity?: number;
   stroke?: string;
   strokeWidth?: number;
@@ -44,25 +40,42 @@ export type Block = {
   rotation?: number;
   ornamental?: boolean;
 
-  warpX?: number;
-  warpY?: number;
-
+  // Shared shape-import fields. shapeFill and shapeWarp blocks both carry an
+  // uploaded SVG path, and shapeWarp falls back to shapeWidth/shapeHeight
+  // when warpShapeWidth/warpShapeHeight aren't set, so these stay common
+  // rather than being duplicated per type.
   shapeSvgPath?: string;
   shapeWidth?: number;
   shapeHeight?: number;
+};
+
+export type TextBlock = BlockCommon & {
+  type: "text";
+  align?: TextAlign;
+  lineHeight?: number;
+  warpX?: number;
+  warpY?: number;
+};
+
+export type ShapeFillBlock = BlockCommon & {
+  type: "shapeFill";
   shapeScale?: number;
   shapeFillSpacing?: number;
   shapeFillScaleX?: number;
   shapeFillScaleY?: number;
   shapeFillTextRotation?: number;
+};
 
+export type ShapeWarpBlock = BlockCommon & {
+  type: "shapeWarp";
   warpShapeWidth?: number;
   warpShapeHeight?: number;
   warpShapePadding?: number;
   warpShapeStrength?: number;
   warpShapeMode?: ShapeWarpMode;
-
   glyphEditMode?: boolean;
   selectedGlyphIndex?: number | null;
   glyphWarps?: GlyphWarp[];
 };
+
+export type Block = TextBlock | ShapeFillBlock | ShapeWarpBlock;

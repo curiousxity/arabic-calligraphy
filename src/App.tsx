@@ -8,6 +8,8 @@ import React, {
 import type Konva from "konva";
 import { Sidebar } from "./components/Sidebar";
 import { CanvasStage } from "./components/CanvasStage";
+import { useUndoRedo } from "./hooks/useUndoRedo";
+import { useExport } from "./hooks/useExport";
 import type { Block, GlyphWarp, GlyphHandleMode } from "./types";
 
 type CanvasPreset = {
@@ -56,12 +58,10 @@ const CANVAS_PRESETS: CanvasPreset[] = [
   { id: "a4", label: "Print A4 (2480×3508)", width: 2480, height: 3508 },
 ];
 
-const EXPORT_PADDING = 0;
 const STORAGE_KEY = "calligraphy-layout-v2";
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 3;
 const STAGE_PADDING = 0;
-const MAX_HISTORY = 50;
 const DEFAULT_TEXT_FONT_SIZE = 53;
 const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
 
@@ -90,9 +90,6 @@ const DEFAULT_BLOCK: Block = {
   warpX: 0,
   warpY: 0,
   type: "text",
-  glyphEditMode: false,
-  selectedGlyphIndex: null,
-  glyphWarps: [],
 };
 
 const isBrowser = typeof window !== "undefined";
@@ -184,10 +181,6 @@ const App: React.FC = () => {
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(320);
   const nextIdRef = useRef(2);
-  const undoStackRef = useRef<EditorSnapshot[]>([]);
-  const redoStackRef = useRef<EditorSnapshot[]>([]);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
   const [editRequestSignal, setEditRequestSignal] = useState(0);
   const moveTimeoutRef = useRef<number | null>(null);
   const lastAutoFitSignatureRef = useRef<string>("");
@@ -204,21 +197,16 @@ const App: React.FC = () => {
     [blocks, canvasPresetId, backgroundColor]
   );
 
-  const applySnapshot = (snapshot: EditorSnapshot) => {
+  const applySnapshot = useCallback((snapshot: EditorSnapshot) => {
     setBlocks(snapshot.blocks);
     setCanvasPresetId(snapshot.canvasPresetId);
     setBackgroundColor(snapshot.backgroundColor);
-  };
+  }, []);
 
-  const pushHistory = useCallback(() => {
-    undoStackRef.current.push(getSnapshot());
-    if (undoStackRef.current.length > MAX_HISTORY) {
-      undoStackRef.current.splice(0, undoStackRef.current.length - MAX_HISTORY);
-    }
-    redoStackRef.current = [];
-    setCanUndo(true);
-    setCanRedo(false);
-  }, [getSnapshot]);
+  const { pushHistory, handleUndo, handleRedo, canUndo, canRedo } = useUndoRedo(
+    getSnapshot,
+    applySnapshot
+  );
 
   const upsertGlyphWarp = useCallback(
     (
@@ -229,7 +217,7 @@ const App: React.FC = () => {
       pushHistory();
       setBlocks((prev) =>
         prev.map((b) => {
-          if (b.id !== blockId) return b;
+          if (b.id !== blockId || b.type !== "shapeWarp") return b;
           const glyphWarps = b.glyphWarps ?? [];
           const existing = glyphWarps.find((g) => g.glyphIndex === glyphIndex);
           const next = updater(existing);
@@ -249,7 +237,7 @@ const App: React.FC = () => {
   const selectGlyphForBlock = useCallback((blockId: number, glyphIndex: number | null) => {
     setBlocks((prev) =>
       prev.map((b) =>
-        b.id === blockId ? { ...b, selectedGlyphIndex: glyphIndex } : b
+        b.id === blockId && b.type === "shapeWarp" ? { ...b, selectedGlyphIndex: glyphIndex } : b
       )
     );
   }, []);
@@ -268,7 +256,7 @@ const App: React.FC = () => {
   }, []);
 
   const addHandleToSelectedGlyph = useCallback(() => {
-    if (!selectedBlock || selectedBlock.selectedGlyphIndex == null) return;
+    if (!selectedBlock || selectedBlock.type !== "shapeWarp" || selectedBlock.selectedGlyphIndex == null) return;
 
     const blockId = selectedBlock.id;
     const glyphIndex = selectedBlock.selectedGlyphIndex;
@@ -319,24 +307,6 @@ const App: React.FC = () => {
     },
     [upsertGlyphWarp]
   );
-
-  const handleUndo = useCallback(() => {
-    const prev = undoStackRef.current.pop();
-    if (!prev) return;
-    redoStackRef.current.push(getSnapshot());
-    applySnapshot(prev);
-    setCanUndo(undoStackRef.current.length > 0);
-    setCanRedo(redoStackRef.current.length > 0);
-  }, [getSnapshot]);
-
-  const handleRedo = useCallback(() => {
-    const next = redoStackRef.current.pop();
-    if (!next) return;
-    undoStackRef.current.push(getSnapshot());
-    applySnapshot(next);
-    setCanUndo(undoStackRef.current.length > 0);
-    setCanRedo(redoStackRef.current.length > 0);
-  }, [getSnapshot]);
 
   const updateBlockPositionWithHistory = useCallback(
     (id: number, x: number, y: number) => {
@@ -393,6 +363,7 @@ const App: React.FC = () => {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
           // One-time layout hydration on mount; fits the stage to the current viewport.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           fitStageToViewport({ force: true });
           return;
         }
@@ -452,6 +423,7 @@ const App: React.FC = () => {
     }
 
     // Re-fit the stage transform whenever the canvas/preset dimensions change.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fitStageToViewport({ force: true });
   }, [canvasWidth, stageViewportHeight, canvasPresetId, fitStageToViewport]);
 
@@ -625,112 +597,7 @@ const App: React.FC = () => {
     });
   };
 
-  const getBlocksBoundingBox = () => {
-    const stage = stageRef.current;
-    if (!stage || blocks.length === 0) return null;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    blocks.forEach((block) => {
-      const node = stage.findOne(`#block-${block.id}`) as Konva.Node | null;
-      if (!node) return;
-      const rect = node.getClientRect({ relativeTo: stage });
-      minX = Math.min(minX, rect.x);
-      minY = Math.min(minY, rect.y);
-      maxX = Math.max(maxX, rect.x + rect.width);
-      maxY = Math.max(maxY, rect.y + rect.height);
-    });
-
-    if (!isFinite(minX)) return null;
-
-    return {
-      x: minX - EXPORT_PADDING,
-      y: minY - EXPORT_PADDING,
-      width: maxX - minX + 2 * EXPORT_PADDING,
-      height: maxY - minY + 2 * EXPORT_PADDING,
-    };
-  };
-
-  const handleExportPNG = () => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const box = getBlocksBoundingBox();
-    if (!box) return;
-
-    const dataURL = stage.toDataURL({
-      mimeType: "image/png",
-      quality: 1,
-      pixelRatio: 2,
-      x: box.x,
-      y: box.y,
-      width: box.width,
-      height: box.height,
-    });
-
-    const link = document.createElement("a");
-    link.download = "calligraphy.png";
-    link.href = dataURL;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleExportSVG = async () => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const box = getBlocksBoundingBox();
-    if (!box) return;
-
-    const { exportStageSVG } = await import("react-konva-to-svg");
-    const exported = await exportStageSVG(stage, false);
-    const svgText = String(exported).trim();
-    const finalSvg = svgText.startsWith("<svg")
-      ? svgText
-      : `<svg xmlns="http://www.w3.org/2000/svg" width="${box.width}" height="${box.height}" viewBox="${box.x} ${box.y} ${box.width} ${box.height}">${svgText}</svg>`;
-
-    const blob = new Blob([finalSvg], { type: "image/svg+xml" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "calligraphy.svg";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleExportPDF = async () => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const box = getBlocksBoundingBox();
-    if (!box) return;
-
-    const dataURL = stage.toDataURL({
-      mimeType: "image/png",
-      quality: 1,
-      pixelRatio: 2,
-      x: box.x,
-      y: box.y,
-      width: box.width,
-      height: box.height,
-    });
-
-    const pxToMm = (px: number) => (px * 25.4) / 96;
-    const imgWidthMm = pxToMm(box.width);
-    const imgHeightMm = pxToMm(box.height);
-
-    const { default: jsPDF } = await import("jspdf");
-    const pdf = new jsPDF({
-      orientation: imgWidthMm > imgHeightMm ? "landscape" : "portrait",
-      unit: "mm",
-      format: [imgWidthMm, imgHeightMm],
-    });
-    pdf.addImage(dataURL, "PNG", 0, 0, imgWidthMm, imgHeightMm);
-    pdf.save("calligraphy.pdf");
-  };
+  const { handleExportPNG, handleExportSVG, handleExportPDF } = useExport(stageRef, blocks);
 
   const buildLayoutPayload = () => ({
     blocks,
@@ -1023,7 +890,7 @@ const App: React.FC = () => {
         canUndo={canUndo}
         canRedo={canRedo}
         onToggleGlyphEditMode={() => {
-          if (!selectedBlock) return;
+          if (!selectedBlock || selectedBlock.type !== "shapeWarp") return;
           updateSelectedBlock({
             glyphEditMode: !selectedBlock.glyphEditMode,
           });
