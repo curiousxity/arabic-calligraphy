@@ -151,8 +151,14 @@ const App: React.FC = () => {
     ? viewportWidth
     : Math.min(Math.max(sidebarWidth, 220), Math.max(260, viewportWidth - 260));
 
-  const canvasWidth = Math.max(0, viewportWidth - effectiveSidebarWidth);
-  const stageViewportHeight = viewportHeight;
+  const canvasWidth = isMobile
+    ? viewportWidth
+    : Math.max(0, viewportWidth - effectiveSidebarWidth);
+
+  const mobileSidebarBudget = Math.min(viewportHeight * 0.45, 420);
+  const stageViewportHeight = isMobile
+    ? Math.max(240, viewportHeight - mobileSidebarBudget)
+    : viewportHeight;
 
   const initialFit = computeFitToViewport(
     Math.max(1, isBrowser ? window.innerWidth - 320 : 880),
@@ -183,6 +189,7 @@ const App: React.FC = () => {
   const redoStackRef = useRef<EditorSnapshot[]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [editRequestSignal, setEditRequestSignal] = useState(0);
   const moveTimeoutRef = useRef<number | null>(null);
   const lastAutoFitSignatureRef = useRef<string>("");
   const didHydrateLayoutRef = useRef(false);
@@ -922,6 +929,11 @@ const App: React.FC = () => {
     });
   }, [selectedBlock, updateSelectedBlock]);
 
+  const requestTextEdit = useCallback((id: number) => {
+    setSelectedId(id);
+    setEditRequestSignal((v) => v + 1);
+  }, []);
+
   return (
     <div
       style={{
@@ -932,7 +944,7 @@ const App: React.FC = () => {
         margin: 0,
         padding: 0,
         overflow: "hidden",
-        background: "#e0e0e0",
+        background: "var(--bg-page)",
       }}
     >
       <Sidebar
@@ -967,6 +979,7 @@ const App: React.FC = () => {
         onToggleGrid={setShowGrid}
         onToggleSnap={setSnapToGrid}
         onSelectBlock={setSelectedId}
+        editRequestSignal={editRequestSignal}
         onUpdateSelectedBlock={updateSelectedBlock}
         onUpdateBlock={updateBlock}
         onReorderBlocks={reorderBlocks}
@@ -1008,7 +1021,7 @@ const App: React.FC = () => {
         style={{
           flex: 1,
           position: "relative",
-          height: viewportHeight,
+          height: stageViewportHeight,
           overflow: "hidden",
         }}
       >
@@ -1029,6 +1042,7 @@ const App: React.FC = () => {
           onUpdateStage={updateStageZoom}
           onUpdateBlockPosition={updateBlockPositionWithHistory}
           onSelectBlock={setSelectedId}
+          onEditBlock={requestTextEdit}
           onSelectGlyph={selectGlyphForBlock}
           onUpdateGlyphHandle={updateGlyphHandle}
           onGlyphBoxesChange={updateGlyphBoxes}

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Group, Shape, Rect, Circle } from "react-konva";
+import { Group, Shape, Rect, Circle, Arc } from "react-konva";
 import type Konva from "konva";
 import {
   shapeText,
@@ -50,6 +50,7 @@ export type ShapeWarpTextProps = {
   draggable?: boolean;
   onClick?: () => void;
   onTap?: () => void;
+  onDblClick?: () => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   debugBounds?: boolean;
 
@@ -464,6 +465,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   draggable = true,
   onClick,
   onTap,
+  onDblClick,
   onDragEnd,
   debugBounds = false,
   glyphEditMode = false,
@@ -483,6 +485,25 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
 
   const aliveRef = useRef(true);
   const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
+
+  const [spinnerAngle, setSpinnerAngle] = useState(0);
+  const spinnerFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!shapeData.isLoading) return;
+
+    const tick = () => {
+      setSpinnerAngle((a) => (a + 8) % 360);
+      spinnerFrameRef.current = requestAnimationFrame(tick);
+    };
+    spinnerFrameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (spinnerFrameRef.current != null) {
+        cancelAnimationFrame(spinnerFrameRef.current);
+      }
+    };
+  }, [shapeData.isLoading]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -707,6 +728,8 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
         onGlyphSelect?.(hit?.glyphIndex ?? null);
       }}
       onTap={onTap}
+      onDblClick={onDblClick}
+      onDblTap={onDblClick}
       onDragEnd={onDragEnd}
       listening
     >
@@ -729,6 +752,20 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           stroke="red"
           strokeWidth={1}
           dash={[6, 4]}
+          listening={false}
+        />
+      )}
+
+      {shapeData.isLoading && (
+        <Arc
+          x={bx + bw / 2}
+          y={by + bh / 2}
+          innerRadius={Math.max(Math.min(bw, bh) * 0.12, 6)}
+          outerRadius={Math.max(Math.min(bw, bh) * 0.12, 6) + 3}
+          angle={270}
+          rotation={spinnerAngle}
+          fill="#6b7280"
+          opacity={0.6}
           listening={false}
         />
       )}

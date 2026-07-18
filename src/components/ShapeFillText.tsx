@@ -73,6 +73,7 @@ export type ShapeFillTextProps = {
   draggable?: boolean;
   onClick?: () => void;
   onTap?: () => void;
+  onDblClick?: () => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
 };
 
@@ -231,7 +232,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   rotation = 0,
   locked,
   draggable = true,
-  onClick, onTap, onDragEnd,
+  onClick, onTap, onDblClick, onDragEnd,
 }) => {
   const [shapeData, setShapeData] = useState<ShapeData | null>(null);
   const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
@@ -286,7 +287,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       rotation={rotation}
       opacity={opacity}
       draggable={draggable && !locked}
-      onClick={onClick} onTap={onTap} onDragEnd={onDragEnd}
+      onClick={onClick} onTap={onTap} onDblClick={onDblClick} onDblTap={onDblClick} onDragEnd={onDragEnd}
       listening
     >
       <Rect x={0} y={0} width={scaledW} height={scaledH} fill="transparent" strokeEnabled={false} listening />

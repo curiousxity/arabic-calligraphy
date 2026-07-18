@@ -4,6 +4,7 @@ import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { ShapeWarpText } from "./ShapeWarpText";
+import { ZoomInIcon, ZoomOutIcon, FrameIcon, HandIcon } from "./Icons";
 import type { Block, GlyphHandleMode } from "../types";
 
 const GRID_SIZE = 40;
@@ -27,6 +28,7 @@ export type CanvasStageProps = {
   onUpdateStage: (scale: number, position: { x: number; y: number }) => void;
   onUpdateBlockPosition: (id: number, x: number, y: number) => void;
   onSelectBlock: (id: number) => void;
+  onEditBlock: (id: number) => void;
   onSelectGlyph: (blockId: number, glyphIndex: number | null) => void;
   onUpdateGlyphHandle: (
     blockId: number,
@@ -65,6 +67,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onUpdateStage,
   onUpdateBlockPosition,
   onSelectBlock,
+  onEditBlock,
   onSelectGlyph,
   onUpdateGlyphHandle,
   onGlyphBoxesChange,
@@ -158,39 +161,62 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         width: viewportWidth,
         position: "relative",
         overflow: "hidden",
-        background: "#e0e0e0",
+        background: "var(--bg-canvas-area)",
         cursor: panMode ? "grab" : "default",
       }}
     >
       <div style={{ width: viewportWidth, height: stageViewportHeight }}>
-        <div
-          style={{
-            position: "absolute",
-            top: 12,
-            left: 12,
-            zIndex: 20,
-            display: "flex",
-            gap: 8,
-            background: "rgba(255,255,255,0.9)",
-            border: "1px solid #ccc",
-            borderRadius: 8,
-            padding: "6px 8px",
-          }}
-        >
-          <button type="button" onClick={handleZoomOut}>
-            −
+        <div className="canvasToolbar">
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            className="canvasToolbarBtn"
+            title="Zoom out"
+            aria-label="Zoom out"
+          >
+            <ZoomOutIcon size={15} />
           </button>
-          <button type="button" onClick={handleReset}>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="canvasToolbarBtn canvasToolbarZoomLabel"
+            title="Reset zoom to 100%"
+            aria-label="Reset zoom"
+          >
             {Math.round(stageScale * 100)}%
           </button>
-          <button type="button" onClick={handleZoomIn}>
-            +
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            className="canvasToolbarBtn"
+            title="Zoom in"
+            aria-label="Zoom in"
+          >
+            <ZoomInIcon size={15} />
           </button>
-          <button type="button" onClick={handleReset}>
-            Reset
+
+          <div className="canvasToolbarDivider" />
+
+          <button
+            type="button"
+            onClick={handleReset}
+            className="canvasToolbarBtn"
+            title="Reset view"
+            aria-label="Reset view"
+          >
+            <FrameIcon size={15} />
           </button>
-          <button type="button" onClick={() => onTogglePanMode(!panMode)}>
-            {panMode ? "Pan: On" : "Pan: Off"}
+          <button
+            type="button"
+            onClick={() => onTogglePanMode(!panMode)}
+            className={
+              panMode ? "canvasToolbarBtn canvasToolbarBtn--active" : "canvasToolbarBtn"
+            }
+            title={panMode ? "Pan mode on (drag to pan)" : "Enable pan mode"}
+            aria-label="Toggle pan mode"
+            aria-pressed={panMode}
+          >
+            <HandIcon size={15} />
           </button>
         </div>
 
@@ -235,6 +261,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 draggable: !block.locked && !panMode,
                 onClick: () => onSelectBlock(block.id),
                 onTap: () => onSelectBlock(block.id),
+                onDblClick: () => onEditBlock(block.id),
                 onDragEnd,
               };
 

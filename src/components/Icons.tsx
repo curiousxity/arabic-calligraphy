@@ -1,0 +1,217 @@
+import React from "react";
+
+export type IconProps = {
+  size?: number;
+  strokeWidth?: number;
+  className?: string;
+};
+
+type IconBaseProps = IconProps & { children: React.ReactNode };
+
+const IconBase: React.FC<IconBaseProps> = ({
+  size = 16,
+  strokeWidth = 2,
+  className,
+  children,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+    focusable="false"
+  >
+    {children}
+  </svg>
+);
+
+export const TrashIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M3 6h18" />
+    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+  </IconBase>
+);
+
+export const CopyIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </IconBase>
+);
+
+export const PlusIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+  </IconBase>
+);
+
+export const ShapesIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="3" y="3" width="8" height="8" rx="1.5" />
+    <circle cx="17" cy="7" r="4" />
+    <path d="M4 21l6-10 6 10Z" />
+  </IconBase>
+);
+
+export const CircleDashedIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18" strokeDasharray="3 3.5" />
+  </IconBase>
+);
+
+export const UndoIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </IconBase>
+);
+
+export const RedoIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="m15 14 5-5-5-5" />
+    <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />
+  </IconBase>
+);
+
+export const SaveIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+    <path d="M17 21v-8H7v8" />
+    <path d="M7 3v5h8" />
+  </IconBase>
+);
+
+export const FolderOpenIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v1H5.5a2 2 0 0 0-1.94 1.51L2 19V7Z" />
+    <path d="M2.5 19.4 4.3 12a2 2 0 0 1 2-1.5H21l-2.2 7.9a2 2 0 0 1-1.9 1.6H4a1.7 1.7 0 0 1-1.5-1.1Z" />
+  </IconBase>
+);
+
+export const DownloadIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M12 3v12" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M5 21h14" />
+  </IconBase>
+);
+
+export const UploadIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M12 15V3" />
+    <path d="m7 8 5-5 5 5" />
+    <path d="M5 21h14" />
+  </IconBase>
+);
+
+export const ImageIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <circle cx="9" cy="9" r="2" />
+    <path d="m21 15-5-5L5 21" />
+  </IconBase>
+);
+
+export const VectorIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <circle cx="6" cy="6" r="2.5" />
+    <circle cx="18" cy="18" r="2.5" />
+    <path d="M8 6h5a5 5 0 0 1 5 5v5" />
+  </IconBase>
+);
+
+export const FileTextIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+    <path d="M14 2v6h6" />
+    <path d="M9 13h6" />
+    <path d="M9 17h6" />
+  </IconBase>
+);
+
+export const LockIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="4" y="11" width="16" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+  </IconBase>
+);
+
+export const UnlockIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="4" y="11" width="16" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 7.2-2.4" />
+  </IconBase>
+);
+
+export const ChevronUpIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="m6 15 6-6 6 6" />
+  </IconBase>
+);
+
+export const ChevronDownIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="m6 9 6 6 6-6" />
+  </IconBase>
+);
+
+export const MergeIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M8 3 4 7l4 4" />
+    <path d="M4 7h9a4 4 0 0 1 4 4v0" />
+    <path d="m16 21 4-4-4-4" />
+    <path d="M20 17h-9a4 4 0 0 1-4-4v0" />
+  </IconBase>
+);
+
+export const CloseIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M18 6 6 18" />
+    <path d="M6 6l12 12" />
+  </IconBase>
+);
+
+export const ZoomInIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m21 21-4.3-4.3" />
+    <path d="M11 8v6" />
+    <path d="M8 11h6" />
+  </IconBase>
+);
+
+export const ZoomOutIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m21 21-4.3-4.3" />
+    <path d="M8 11h6" />
+  </IconBase>
+);
+
+export const HandIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M18 11V6a2 2 0 0 0-4 0v5" />
+    <path d="M14 10V4a2 2 0 0 0-4 0v6" />
+    <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+    <path d="M6 14v0a8 8 0 0 0 8 8h0a8 8 0 0 0 8-8v-3a2 2 0 0 0-4 0" />
+  </IconBase>
+);
+
+export const FrameIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M3 3v18" />
+    <path d="M21 3v18" />
+    <path d="M3 3h18" />
+    <path d="M3 21h18" />
+  </IconBase>
+);

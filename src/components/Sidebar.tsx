@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ArabicKeyboard from "./ArabicKeyboard";
 import {
   DIACRITICS,
@@ -8,6 +8,28 @@ import {
   PRESETS,
 } from "../lib/presets";
 import type { Block } from "../types";
+import {
+  TrashIcon,
+  CopyIcon,
+  PlusIcon,
+  ShapesIcon,
+  CircleDashedIcon,
+  UndoIcon,
+  RedoIcon,
+  SaveIcon,
+  FolderOpenIcon,
+  DownloadIcon,
+  UploadIcon,
+  ImageIcon,
+  VectorIcon,
+  FileTextIcon,
+  LockIcon,
+  UnlockIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  MergeIcon,
+  CloseIcon,
+} from "./Icons";
 
 export type SidebarProps = {
   blocks: Block[];
@@ -43,6 +65,7 @@ export type SidebarProps = {
   onToggleSnap: (v: boolean) => void;
 
   onSelectBlock: (id: number | null) => void;
+  editRequestSignal?: number;
   onUpdateSelectedBlock: (patch: Partial<Block>) => void;
   onUpdateBlock?: (id: number, patch: Partial<Block>) => void;
   onReorderBlocks?: (blocks: Block[]) => void;
@@ -61,6 +84,24 @@ export type SidebarProps = {
   onToggleGlyphEditMode?: () => void;
   onAddGlyphHandle?: () => void;
 };
+
+const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
+  { value: "AlFatemi", label: "Al Fatemi", cssFamily: "AlFatemi" },
+  { value: "FatemiMaqala", label: "Fatemi Maqala", cssFamily: "FatemiMaqala" },
+  { value: "TahaNaskhRegular", label: "Taha Naskh", cssFamily: "TahaNaskhRegular" },
+  { value: "Kufi", label: "Kufi", cssFamily: "Kufi" },
+  { value: "Kufi2", label: "Kufi 2", cssFamily: "Kufi2" },
+  { value: "Thuluth", label: "Thuluth", cssFamily: "Thuluth" },
+  { value: "ThuluthDeco", label: "Thuluth Deco", cssFamily: "ThuluthDeco" },
+  { value: "Wessam", label: "Wessam", cssFamily: "Wessam" },
+  { value: "Yekan", label: "Yekan", cssFamily: "Yekan" },
+  { value: "NotoSans", label: "Noto Sans", cssFamily: "'Noto Sans Arabic'" },
+  { value: "Lateef", label: "Lateef", cssFamily: "Lateef" },
+  { value: "Amiri", label: "Amiri", cssFamily: "Amiri" },
+  { value: "Ruqaa", label: "Ruqaa", cssFamily: "Ruqaa" },
+  { value: "Qahiri", label: "Qahiri", cssFamily: "Qahiri" },
+  { value: "Urdu", label: "Urdu", cssFamily: "Urdu" },
+];
 
 const SLIDER_DEFAULTS: Record<string, number> = {
   fontSize: 53,
@@ -118,6 +159,24 @@ const SelectRow = ({
   </label>
 );
 
+const COLOR_PALETTE = [
+  "#000000",
+  "#ffffff",
+  "#c9a227",
+  "#8b1e3f",
+  "#0f5132",
+  "#1e3a5f",
+  "#6b21a8",
+  "#9ca3af",
+];
+
+const isValidHex = (v: string) => /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v);
+
+const normalizeHex = (v: string) =>
+  v.length === 4
+    ? `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}`.toLowerCase()
+    : v.toLowerCase();
+
 const ColorRow = ({
   id,
   name,
@@ -130,19 +189,76 @@ const ColorRow = ({
   label: string;
   value: string;
   onChange: (v: string) => void;
-}) => (
-  <label className="field" htmlFor={id}>
-    <span className="fieldTitle">{label}</span>
-    <input
-      id={id}
-      name={name}
-      type="color"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="sidebarColorInput"
-    />
-  </label>
-);
+}) => {
+  const [hexDraft, setHexDraft] = useState(value);
+
+  useEffect(() => {
+    setHexDraft(value);
+  }, [value]);
+
+  const commitHex = () => {
+    const v = hexDraft.trim().startsWith("#") ? hexDraft.trim() : `#${hexDraft.trim()}`;
+    if (isValidHex(v)) {
+      onChange(normalizeHex(v));
+    } else {
+      setHexDraft(value);
+    }
+  };
+
+  return (
+    <div className="field">
+      <span className="fieldTitle">{label}</span>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <input
+          id={id}
+          name={name}
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="sidebarColorInput"
+          style={{ width: 40, height: 32, flexShrink: 0, padding: 2 }}
+          aria-label={label}
+        />
+        <input
+          type="text"
+          value={hexDraft}
+          onChange={(e) => setHexDraft(e.target.value)}
+          onBlur={commitHex}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitHex();
+            }
+          }}
+          className="hexInput"
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          aria-label={`${label} hex value`}
+        />
+      </div>
+      <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" }}>
+        {COLOR_PALETTE.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange(c)}
+            title={c}
+            aria-label={`Set ${label.toLowerCase()} to ${c}`}
+            className="paletteSwatch"
+            style={{
+              background: c,
+              boxShadow:
+                value.toLowerCase() === c
+                  ? "0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent)"
+                  : undefined,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const RangeRow = ({
   id,
@@ -179,7 +295,7 @@ const RangeRow = ({
       <span className="fieldTitle">
         {label}
         {suffix !== undefined ? (
-          <span style={{ color: "#6b7280", fontWeight: 500 }}> {suffix}</span>
+          <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> {suffix}</span>
         ) : null}
       </span>
       <input
@@ -602,7 +718,13 @@ function extractSvgPaths(svgText: string): { pathData: string; w: number; h: num
 }
 
 const blockTypeIcon = (b: Block) =>
-  b.type === "shapeFill" ? "⬒" : b.type === "shapeWarp" ? "◌" : "T";
+  b.type === "shapeFill" ? (
+    <ShapesIcon size={13} />
+  ) : b.type === "shapeWarp" ? (
+    <CircleDashedIcon size={13} />
+  ) : (
+    "T"
+  );
 
 type LayersPanelProps = {
   blocks: Block[];
@@ -662,8 +784,8 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
         <div
           style={{
             fontSize: 11,
-            color: "#0066cc",
-            background: "#e8f0fe",
+            color: "var(--info-text)",
+            background: "var(--info-bg)",
             borderRadius: 8,
             padding: "4px 8px",
             textAlign: "center",
@@ -688,9 +810,17 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               gap: 5,
               padding: "5px 7px",
               borderRadius: 10,
-              background: isSelected ? "#dbeafe" : isMerge ? "#fef9c3" : "#f0f4fa",
+              background: isSelected
+                ? "var(--selection-bg)"
+                : isMerge
+                  ? "var(--merge-bg)"
+                  : "var(--row-bg)",
               border: `1px solid ${
-                isSelected ? "#93c5fd" : isMerge ? "#fcd34d" : "transparent"
+                isSelected
+                  ? "var(--selection-border)"
+                  : isMerge
+                    ? "var(--merge-border)"
+                    : "transparent"
               }`,
               cursor: "pointer",
               userSelect: "none",
@@ -700,8 +830,11 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               style={{
                 fontSize: 13,
                 width: 18,
-                textAlign: "center",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
                 flexShrink: 0,
+                color: "var(--text-secondary)",
               }}
             >
               {blockTypeIcon(block)}
@@ -723,12 +856,13 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                 style={{
                   flex: 1,
                   fontSize: 12,
-                  border: "1px solid #3b82f6",
+                  border: "1px solid var(--accent-hover)",
                   borderRadius: 5,
                   padding: "1px 5px",
-                  background: "#fff",
+                  background: "var(--input-bg-solid)",
                   outline: "none",
                   direction: "rtl",
+                  color: "var(--text-primary)",
                 }}
               />
             ) : (
@@ -741,7 +875,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  color: "#111827",
+                  color: "var(--text-primary)",
                   direction: "rtl",
                 }}
               >
@@ -759,7 +893,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               className="layerIconBtn"
               aria-label={block.locked ? "Unlock layer" : "Lock layer"}
             >
-              {block.locked ? "🔒" : "🔓"}
+              {block.locked ? <LockIcon size={13} /> : <UnlockIcon size={13} />}
             </button>
 
             <button
@@ -772,7 +906,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               className="layerIconBtn"
               aria-label="Move layer up"
             >
-              ↑
+              <ChevronUpIcon size={13} />
             </button>
 
             <button
@@ -785,7 +919,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               className="layerIconBtn"
               aria-label="Move layer down"
             >
-              ↓
+              <ChevronDownIcon size={13} />
             </button>
 
             <button
@@ -795,11 +929,11 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               className="layerIconBtn"
               aria-label="Merge layer"
               style={{
-                background: isMerge ? "#fcd34d" : "transparent",
+                background: isMerge ? "var(--merge-border)" : "transparent",
                 borderRadius: 4,
               }}
             >
-              ⇄
+              <MergeIcon size={13} />
             </button>
 
             <button
@@ -811,9 +945,9 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               }}
               className="layerIconBtn"
               aria-label="Delete layer"
-              style={{ color: "#dc2626" }}
+              style={{ color: "var(--danger)" }}
             >
-              ✕
+              <CloseIcon size={13} />
             </button>
           </div>
         );
@@ -823,7 +957,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
         <div
           style={{
             fontSize: 12,
-            color: "#9ca3af",
+            color: "var(--text-faint)",
             textAlign: "center",
             padding: 8,
           }}
@@ -861,6 +995,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleGrid,
   onToggleSnap,
   onSelectBlock,
+  editRequestSignal,
   onUpdateSelectedBlock,
   onUpdateBlock,
   onReorderBlocks,
@@ -879,10 +1014,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showStyling, setShowStyling] = useState(false);
   const [showHelpers, setShowHelpers] = useState(false);
   const [showFileActions, setShowFileActions] = useState(false);
-  const [showLayers, setShowLayers] = useState(true);
+  const [showLayers, setShowLayers] = useState(!isMobile);
+  const [showCanvasSettings, setShowCanvasSettings] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
+
+  useEffect(() => {
+    if (!editRequestSignal || !selectedBlock) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.focus();
+    el.select();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editRequestSignal]);
 
   const selectedText = selectedBlock?.text ?? "";
   const selectedOpacity = selectedBlock?.opacity ?? 1;
@@ -984,12 +1130,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div
       style={{
         width,
-        height: "100%",
+        height: isMobile ? "auto" : "100%",
+        maxHeight: isMobile ? "45vh" : "none",
         padding: 0,
         boxSizing: "border-box",
-        borderRight: isMobile ? "none" : "1px solid #dbe2ea",
-        borderBottom: isMobile ? "1px solid #dbe2ea" : "none",
-        background: "linear-gradient(180deg, #e8edf2 0%, #dde3ea 100%)",
+        borderRight: isMobile ? "none" : "1px solid var(--border)",
+        borderBottom: isMobile ? "1px solid var(--border)" : "none",
+        background:
+          "linear-gradient(180deg, var(--bg-sidebar-start) 0%, var(--bg-sidebar-end) 100%)",
         fontFamily:
           "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
         position: "relative",
@@ -1005,7 +1153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             style={{
               fontSize: isMobile ? 18 : 20,
               textAlign: "center",
-              color: "#111827",
+              color: "var(--text-primary)",
               letterSpacing: "-0.02em",
             }}
           >
@@ -1031,7 +1179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title="Delete selected block"
               aria-label="Delete block"
             >
-              ✕
+              <TrashIcon size={14} />
             </button>
 
             <button
@@ -1042,7 +1190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title="Duplicate selected block"
               aria-label="Duplicate block"
             >
-              ⧉
+              <CopyIcon size={14} />
             </button>
 
             <button
@@ -1052,7 +1200,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title="Add text block"
               aria-label="Add text block"
             >
-              ＋
+              <PlusIcon size={14} />
             </button>
 
             {onAddShapeFillBlock && (
@@ -1062,7 +1210,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 title="Upload SVG for Shape Fill"
                 onClick={() => handleSvgUpload("shapeFill")}
               >
-                ⬒
+                <ShapesIcon size={14} />
               </button>
             )}
 
@@ -1073,7 +1221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 title="Upload SVG for Shape Warp"
                 onClick={() => handleSvgUpload("shapeWarp")}
               >
-                ◌
+                <CircleDashedIcon size={14} />
               </button>
             )}
           </div>
@@ -1086,10 +1234,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={onUndo}
               disabled={!canUndo}
               className="sidebarCircleButton"
-              title="Undo"
+              title="Undo (Ctrl+Z)"
               aria-label="Undo"
             >
-              ↶
+              <UndoIcon size={14} />
             </button>
 
             <button
@@ -1097,10 +1245,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={onRedo}
               disabled={!canRedo}
               className="sidebarCircleButton"
-              title="Redo"
+              title="Redo (Ctrl+Y)"
               aria-label="Redo"
             >
-              ↷
+              <RedoIcon size={14} />
             </button>
           </div>
         </div>
@@ -1190,21 +1338,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     value={selectedBlock.fontFamily}
                     onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
                   >
-                    <option value="AlFatemi">Al Fatemi</option>
-                    <option value="FatemiMaqala">Fatemi Maqala</option>
-                    <option value="TahaNaskhRegular">Taha Naskh</option>
-                    <option value="Kufi">Kufi</option>
-                    <option value="Kufi2">Kufi 2</option>
-                    <option value="Thuluth">Thuluth</option>
-                    <option value="ThuluthDeco">Thuluth Deco</option>
-                    <option value="Wessam">Wessam</option>
-                    <option value="Yekan">Yekan</option>
-                    <option value="NotoSans">Noto Sans</option>
-                    <option value="Lateef">Lateef</option>
-                    <option value="Amiri">Amiri</option>
-                    <option value="Ruqaa">Ruqaa</option>
-                    <option value="Qahiri">Qahiri</option>
-                    <option value="Urdu">Urdu</option>
+                    {FONT_OPTIONS.map((f) => (
+                      <option
+                        key={f.value}
+                        value={f.value}
+                        style={{ fontFamily: f.cssFamily }}
+                      >
+                        {f.label} — أبجد
+                      </option>
+                    ))}
                   </SelectRow>
 
                   <SelectRow
@@ -1291,7 +1433,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </SelectRow>
                 )}
 
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Rotation</div>
                   <RangeRow
                     id={makeId("rotation", selectedId)}
@@ -1308,7 +1450,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 {selectedBlock.type === "text" && (
-                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Warp</div>
 
                     <RangeRow
@@ -1339,7 +1481,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
 
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Stroke</div>
                   <div
                     style={{
@@ -1370,7 +1512,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 </div>
 
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Shadow</div>
 
                   <div
@@ -1449,7 +1591,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 {selectedBlock.type === "shapeWarp" && (
-                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Shape Warp</div>
 
                     <label className="checkboxRow">
@@ -1461,7 +1603,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       Glyph edit mode
                     </label>
 
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 8 }}>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
                       Selected glyph:{" "}
                       {selectedBlock.selectedGlyphIndex != null
                         ? selectedBlock.selectedGlyphIndex
@@ -1528,7 +1670,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       fieldKey="warpShapeStrength"
                     />
 
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
                       Base shape: {selectedBlock.warpShapeWidth ?? 400} ×{" "}
                       {selectedBlock.warpShapeHeight ?? 400}px
                     </div>
@@ -1536,7 +1678,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
 
                 {selectedBlock.type === "shapeFill" && (
-                  <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Shape Fill</div>
 
                     <RangeRow
@@ -1668,7 +1810,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   type="button"
                   onClick={onClearDiacritics}
                   className="sidebarSmallAction"
-                  style={{ background: "#f9fafb" }}
+                  style={{ background: "var(--bg-input)" }}
                 >
                   Clear diacritics
                 </button>
@@ -1722,7 +1864,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   title="Quick-save to browser memory"
                   aria-label="Save layout"
                 >
-                  💾
+                  <SaveIcon size={14} />
                 </button>
 
                 <button
@@ -1732,7 +1874,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   title="Load from browser memory"
                   aria-label="Load layout"
                 >
-                  📂
+                  <FolderOpenIcon size={14} />
                 </button>
               </div>
 
@@ -1740,21 +1882,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   type="button"
                   onClick={onDownloadLayout}
-                  className="sidebarCircleButton sidebarCircleButton--light"
+                  className="sidebarPillButton"
                   title="Download layout as .json"
                   aria-label="Download layout JSON"
                 >
-                  JSON↓
+                  <DownloadIcon size={13} /> JSON
                 </button>
 
                 <button
                   type="button"
                   onClick={onUploadLayout}
-                  className="sidebarCircleButton sidebarCircleButton--light"
+                  className="sidebarPillButton"
                   title="Upload .json layout file"
                   aria-label="Upload layout JSON"
                 >
-                  JSON↑
+                  <UploadIcon size={13} /> JSON
                 </button>
               </div>
 
@@ -1762,31 +1904,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   type="button"
                   onClick={onExportPNG}
-                  className="sidebarCircleButton sidebarCircleButton--light"
+                  className="sidebarPillButton"
                   title="Export PNG"
                   aria-label="Export PNG"
                 >
-                  PNG
+                  <ImageIcon size={13} /> PNG
                 </button>
 
                 <button
                   type="button"
                   onClick={onExportSVG}
-                  className="sidebarCircleButton sidebarCircleButton--light"
+                  className="sidebarPillButton"
                   title="Export SVG"
                   aria-label="Export SVG"
                 >
-                  SVG
+                  <VectorIcon size={13} /> SVG
                 </button>
 
                 <button
                   type="button"
                   onClick={onExportPDF}
-                  className="sidebarCircleButton sidebarCircleButton--light"
+                  className="sidebarPillButton"
                   title="Export PDF"
                   aria-label="Export PDF"
                 >
-                  PDF
+                  <FileTextIcon size={13} /> PDF
                 </button>
               </div>
             </div>
@@ -1794,69 +1936,78 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="sidebarPanel">
-          <div className="sidebarSectionTitle">Canvas Size</div>
-          <div className="shell">
-            <select
-              id="canvas-preset"
-              name="canvasPreset"
-              value={canvasPresetId}
-              onChange={(e) => onChangeCanvasPreset(e.target.value)}
-              className="select"
-              aria-label="Canvas size preset"
-            >
-              <option value="story">Story (1080×1920)</option>
-              <option value="square">Instagram Square (1080×1080)</option>
-              <option value="a4">Print A4 (2480×3508)</option>
-            </select>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowCanvasSettings((v) => !v)}
+            className="sidebarSectionButton"
+            aria-expanded={showCanvasSettings}
+          >
+            <span>Canvas Size</span>
+            <span>{showCanvasSettings ? "−" : "+"}</span>
+          </button>
 
-          <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12, marginTop: 10 }}>
-            <div className="sidebarSectionTitle">Background Color</div>
-            <input
-              id="background-color"
-              name="backgroundColor"
-              type="color"
-              value={backgroundColor}
-              onChange={(e) => onChangeBackgroundColor(e.target.value)}
-              className="sidebarColorInput"
-              aria-label="Canvas background color"
-            />
-          </div>
+          {showCanvasSettings && (
+            <div className="sectionPanel">
+              <div className="shell">
+                <select
+                  id="canvas-preset"
+                  name="canvasPreset"
+                  value={canvasPresetId}
+                  onChange={(e) => onChangeCanvasPreset(e.target.value)}
+                  className="select"
+                  aria-label="Canvas size preset"
+                >
+                  <option value="story">Story (1080×1920)</option>
+                  <option value="square">Instagram Square (1080×1080)</option>
+                  <option value="a4">Print A4 (2480×3508)</option>
+                </select>
+              </div>
 
-          <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-            <label className="checkboxRow" htmlFor="show-grid">
-              <input
-                id="show-grid"
-                name="showGrid"
-                type="checkbox"
-                checked={showGrid}
-                onChange={(e) => onToggleGrid(e.target.checked)}
+              <ColorRow
+                id="background-color"
+                name="backgroundColor"
+                label="Background Color"
+                value={backgroundColor}
+                onChange={onChangeBackgroundColor}
               />
-              Show gridlines
-            </label>
 
-            <label className="checkboxRow" htmlFor="snap-to-grid">
-              <input
-                id="snap-to-grid"
-                name="snapToGrid"
-                type="checkbox"
-                checked={snapToGrid}
-                onChange={(e) => onToggleSnap(e.target.checked)}
-              />
-              Snap to gridlines
-            </label>
-          </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                <label className="checkboxRow" htmlFor="show-grid">
+                  <input
+                    id="show-grid"
+                    name="showGrid"
+                    type="checkbox"
+                    checked={showGrid}
+                    onChange={(e) => onToggleGrid(e.target.checked)}
+                  />
+                  Show gridlines
+                </label>
+
+                <label className="checkboxRow" htmlFor="snap-to-grid">
+                  <input
+                    id="snap-to-grid"
+                    name="snapToGrid"
+                    type="checkbox"
+                    checked={snapToGrid}
+                    onChange={(e) => onToggleSnap(e.target.checked)}
+                  />
+                  Snap to gridlines
+                </label>
+              </div>
+            </div>
+          )}
         </div>
 
         <p
           style={{
             fontSize: 11,
-            color: "#9ca3af",
+            color: "var(--text-faint)",
             margin: "0 4px 8px",
             textAlign: "center",
           }}
         >
-          Double-click a layer name to rename. Double-click a slider to reset.
+          Double-click a block on the canvas to jump to its text field. Double-click a
+          layer name to rename. Double-click a slider to reset.
         </p>
       </div>
     </div>

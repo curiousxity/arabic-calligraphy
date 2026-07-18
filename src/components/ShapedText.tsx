@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Group, Shape, Rect } from "react-konva";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Group, Shape, Rect, Arc } from "react-konva";
 import type Konva from "konva";
 import {
   shapeText,
@@ -33,6 +33,7 @@ type Props = {
   draggable?: boolean;
   onClick?: () => void;
   onTap?: () => void;
+  onDblClick?: () => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   debugBounds?: boolean;
 };
@@ -258,6 +259,7 @@ export const ShapedText: React.FC<Props> = ({
   draggable = true,
   onClick,
   onTap,
+  onDblClick,
   onDragEnd,
   debugBounds = false,
 }) => {
@@ -269,6 +271,25 @@ export const ShapedText: React.FC<Props> = ({
     unitsPerEm: 1000,
     isLoading: true,
   });
+
+  const [spinnerAngle, setSpinnerAngle] = useState(0);
+  const spinnerFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!shapeData.isLoading) return;
+
+    const tick = () => {
+      setSpinnerAngle((a) => (a + 8) % 360);
+      spinnerFrameRef.current = requestAnimationFrame(tick);
+    };
+    spinnerFrameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (spinnerFrameRef.current != null) {
+        cancelAnimationFrame(spinnerFrameRef.current);
+      }
+    };
+  }, [shapeData.isLoading]);
 
   const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
 
@@ -419,6 +440,8 @@ export const ShapedText: React.FC<Props> = ({
       draggable={draggable && !locked}
       onClick={onClick}
       onTap={onTap}
+      onDblClick={onDblClick}
+      onDblTap={onDblClick}
       onDragEnd={onDragEnd}
       listening
     >
@@ -442,6 +465,20 @@ export const ShapedText: React.FC<Props> = ({
           stroke="red"
           strokeWidth={1}
           dash={[6, 4]}
+          listening={false}
+        />
+      )}
+
+      {shapeData.isLoading && (
+        <Arc
+          x={bx + bw / 2}
+          y={by + bh / 2}
+          innerRadius={Math.max(Math.min(bw, bh) * 0.12, 6)}
+          outerRadius={Math.max(Math.min(bw, bh) * 0.12, 6) + 3}
+          angle={270}
+          rotation={spinnerAngle}
+          fill="#6b7280"
+          opacity={0.6}
           listening={false}
         />
       )}

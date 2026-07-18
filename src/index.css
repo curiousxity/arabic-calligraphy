@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700&display=swap");
-
 @font-face { font-family: "TahaNaskhRegular"; src: url("/fonts/TahaNaskhRegular.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
 @font-face { font-family: "Kufi"; src: url("/fonts/Kufi.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
 @font-face { font-family: "Kufi2"; src: url("/fonts/Kufi2.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
@@ -15,61 +13,181 @@
 @font-face { font-family: "Ruqaa"; src: url("/fonts/Ruqaa.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
 @font-face { font-family: "Qahiri"; src: url("/fonts/Qahiri.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
 
-:root { font-family: system-ui, sans-serif; color: #111; background: #e0e0e0; }
+:root {
+  --bg-page: #e0e0e0;
+  --bg-sidebar-start: #e8edf2;
+  --bg-sidebar-end: #dde3ea;
+  --bg-panel: #f5f8fa;
+  --bg-input: #f5f8fa;
+  --bg-canvas-area: #e0e0e0;
+
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+  --text-on-accent: #ffffff;
+
+  --border: #dbe2ea;
+  --border-soft: #e5e7eb;
+
+  --accent: #0066cc;
+  --accent-hover: #3b82f6;
+  --accent-soft: #8dbff0;
+  --accent-soft-hover: #60a5fa;
+
+  --danger: #cc0000;
+  --success: #00a86b;
+  --warning: #ff9800;
+  --neutral: #555555;
+  --neutral-dark: #444444;
+  --neutral-light: #777777;
+
+  --key-bg: #e8f0fb;
+  --key-text: #0d1b3e;
+  --key-hover: #c9dbf5;
+  --key-shadow: rgba(0, 60, 120, 0.25);
+  --key-shadow-active: rgba(0, 60, 120, 0.2);
+
+  --overlay-hover: rgba(0, 0, 0, 0.07);
+  --toolbar-bg: rgba(255, 255, 255, 0.9);
+
+  --info-text: #0066cc;
+  --info-bg: #e8f0fe;
+  --row-bg: #f0f4fa;
+  --selection-bg: #dbeafe;
+  --selection-border: #93c5fd;
+  --merge-bg: #fef9c3;
+  --merge-border: #fcd34d;
+  --input-bg-solid: #ffffff;
+
+  font-family: system-ui, sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-page: #16181d;
+    --bg-sidebar-start: #1e2128;
+    --bg-sidebar-end: #191b20;
+    --bg-panel: #262a33;
+    --bg-input: #262a33;
+    --bg-canvas-area: #101114;
+
+    --text-primary: #e8eaed;
+    --text-secondary: #b8bfc9;
+    --text-muted: #9aa2ad;
+    --text-faint: #6b7280;
+    --text-on-accent: #ffffff;
+
+    --border: #343a45;
+    --border-soft: #2c313b;
+
+    --accent: #4f9eff;
+    --accent-hover: #7ab6ff;
+    --accent-soft: #2f4a6b;
+    --accent-soft-hover: #3f6390;
+
+    --danger: #ff5c5c;
+    --success: #2ecc8f;
+    --warning: #ffab40;
+    --neutral: #6b7280;
+    --neutral-dark: #4b5563;
+    --neutral-light: #8b93a1;
+
+    --key-bg: #232a3a;
+    --key-text: #dbe6ff;
+    --key-hover: #2c3650;
+    --key-shadow: rgba(0, 0, 0, 0.4);
+    --key-shadow-active: rgba(0, 0, 0, 0.35);
+
+    --overlay-hover: rgba(255, 255, 255, 0.08);
+    --toolbar-bg: rgba(30, 33, 40, 0.9);
+
+    --info-text: #7ab6ff;
+    --info-bg: #1f3252;
+    --row-bg: #23272f;
+    --selection-bg: #23395c;
+    --selection-border: #4f80c2;
+    --merge-bg: #4a3f18;
+    --merge-border: #c8a327;
+    --input-bg-solid: #1c1f26;
+  }
+}
+
 html, body, #root { height: 100%; margin: 0; }
 * { box-sizing: border-box; }
 
-.sidebar { width: 100%; height: 100vh; padding: 0; background: #fafafa; font-family: system-ui, sans-serif; position: relative; flex-shrink: 0; }
+.sidebar { width: 100%; height: 100vh; padding: 0; background: var(--bg-panel); font-family: system-ui, sans-serif; position: relative; flex-shrink: 0; }
 .sidebarInner { padding: 12px; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
-.sidebarPanel { background: #f5f8fa; border: none; border-radius: 14px; box-shadow: none; padding: 12px; }
-.sidebarTitle { margin: 0; font-weight: 400; color: #111827; }
-.sidebarSectionTitle { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 400; color: #111827; }
+.sidebarPanel { background: var(--bg-panel); border: none; border-radius: 14px; box-shadow: none; padding: 12px; }
+.sidebarTitle { margin: 0; font-weight: 400; color: var(--text-primary); }
+.sidebarSectionTitle { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 400; color: var(--text-primary); }
 
 .field { display: block; margin-bottom: 8px; }
-.fieldTitle { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 400; color: #374151; }
-.shell { width: 100%; border: none; border-radius: 10px; background: #f5f8fa; box-shadow: none; padding: 8px 10px; }
-.select { width: 100%; border: none; outline: none; background: transparent; font-size: 14px; font-weight: 400; cursor: pointer; color: #111827; }
+.fieldTitle { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+.shell { width: 100%; border: none; border-radius: 10px; background: var(--bg-input); box-shadow: none; padding: 8px 10px; }
+.select { width: 100%; border: none; outline: none; background: transparent; font-size: 14px; font-weight: 400; cursor: pointer; color: var(--text-primary); }
 
-.sidebarSectionButton { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; border: none; border-radius: 12px; background: #f5f8fa; cursor: pointer; font-size: 14px; font-weight: 400; color: #111827; }
+.sidebarSectionButton { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; border: none; border-radius: 12px; background: var(--bg-panel); cursor: pointer; font-size: 14px; font-weight: 400; color: var(--text-primary); }
 .sectionPanel { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
-.checkboxRow { display: block; font-size: 13px; color: #111827; font-weight: 400; }
+.checkboxRow { display: block; font-size: 13px; color: var(--text-primary); font-weight: 400; }
 .checkboxRow input { margin-right: 8px; }
-.sidebarSmallAction { width: 100%; border: none; border-radius: 10px; padding: 9px 10px; cursor: pointer; font-size: 13px; font-weight: 400; background: #f5f8fa; color: #111827; }
+.sidebarSmallAction { width: 100%; border: none; border-radius: 10px; padding: 9px 10px; cursor: pointer; font-size: 13px; font-weight: 400; background: var(--bg-panel); color: var(--text-primary); }
 .keyboardWrap { margin-top: 12px; }
 
-.colorInput, .sidebarColorInput { width: 100%; height: 40px; padding: 4px; border: none; border-radius: 10px; background: #f5f8fa; cursor: pointer; }
-.textArea, .sidebarTextarea { width: 100%; max-width: 100%; min-height: 120px; padding: 12px; font-size: 18px; line-height: 1.5; direction: rtl; box-sizing: border-box; border: none; border-radius: 10px; resize: vertical; background: #f5f8fa; color: #111827; }
+.colorInput, .sidebarColorInput { width: 100%; height: 40px; padding: 4px; border: none; border-radius: 10px; background: var(--bg-input); cursor: pointer; }
+
+.hexInput { flex: 1 1 0; min-width: 0; height: 32px; padding: 0 10px; border: none; border-radius: 8px; background: var(--bg-input); color: var(--text-primary); font-size: 13px; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+.hexInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.paletteSwatch { width: 18px; height: 18px; border-radius: 999px; border: 1px solid var(--border); padding: 0; cursor: pointer; }
+.textArea, .sidebarTextarea { width: 100%; max-width: 100%; min-height: 120px; padding: 12px; font-size: 18px; line-height: 1.5; direction: rtl; box-sizing: border-box; border: none; border-radius: 10px; resize: vertical; background: var(--bg-input); color: var(--text-primary); }
 
 /* Sliders — pointer cursor + double-click hint via title attribute */
-.rangeInput { width: 100%; cursor: pointer; accent-color: #0066cc; }
-.rangeInput:hover { accent-color: #3b82f6; }
+.rangeInput { width: 100%; cursor: pointer; accent-color: var(--accent); }
+.rangeInput:hover { accent-color: var(--accent-hover); }
 
-.sidebarCircleButton { width: 30px; height: 30px; border-radius: 999px; border: none; background: #8dbff0; color: #0066cc; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; transition: background 0.12s; }
-.sidebarCircleButton:hover:not(:disabled) { background: #60a5fa; color: #fff; }
+.sidebarCircleButton { width: 30px; height: 30px; border-radius: 999px; border: none; background: var(--accent-soft); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; transition: background 0.12s; }
+.sidebarCircleButton:hover:not(:disabled) { background: var(--accent-soft-hover); color: var(--text-on-accent); }
 .sidebarCircleButton--light { font-weight: 400; font-size: 12px; }
 .sidebarCircleButton:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.sidebarPresetKeyboard { border: none; border-radius: 14px; padding: 10px; background: #f5f8fa; box-sizing: border-box; }
-.sidebarPresetKeyboardTitle { font-size: 12px; color: #111827; margin-bottom: 10px; font-weight: 400; }
+.sidebarPillButton { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; border: none; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.12s; flex: 1 1 0; }
+.sidebarPillButton:hover:not(:disabled) { background: var(--accent-soft-hover); color: var(--text-on-accent); }
+.sidebarPillButton:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.sidebarPresetKeyboard { border: none; border-radius: 14px; padding: 10px; background: var(--bg-panel); box-sizing: border-box; }
+.sidebarPresetKeyboardTitle { font-size: 12px; color: var(--text-primary); margin-bottom: 10px; font-weight: 400; }
 .sidebarPresetKeyboardRow { display: flex; justify-content: center; gap: 5px; flex-wrap: nowrap; }
-.sidebarPresetKeyboardKey { flex: 1 1 0; min-width: 0; height: 40px; padding: 6px 4px; font-size: 18px; text-align: center; border-radius: 8px; border: none; background: #e8f0fb; color: #0d1b3e; cursor: pointer; line-height: 1.1; box-shadow: 0 2px 0 rgba(0,60,120,0.25); transition: background 0.1s, transform 0.06s, box-shadow 0.06s; }
-.sidebarPresetKeyboardKey:hover { background: #c9dbf5; }
-.sidebarPresetKeyboardKey:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,60,120,0.2); }
+.sidebarPresetKeyboardKey { flex: 1 1 0; min-width: 0; height: 40px; padding: 6px 4px; font-size: 18px; text-align: center; border-radius: 8px; border: none; background: var(--key-bg); color: var(--key-text); cursor: pointer; line-height: 1.1; box-shadow: 0 2px 0 var(--key-shadow); transition: background 0.1s, transform 0.06s, box-shadow 0.06s; }
+.sidebarPresetKeyboardKey:hover { background: var(--key-hover); }
+.sidebarPresetKeyboardKey:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--key-shadow-active); }
 .sidebarPresetKeyboardKeyWide { font-size: 14px; }
 
 /* Layers */
-.layerIconBtn { border: none; background: transparent; cursor: pointer; font-size: 12px; padding: 2px 3px; flex-shrink: 0; opacity: 0.65; border-radius: 4px; transition: background 0.1s, opacity 0.1s; }
-.layerIconBtn:hover { opacity: 1; background: rgba(0,0,0,0.07); }
+.layerIconBtn { display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; font-size: 12px; padding: 2px 3px; flex-shrink: 0; opacity: 0.65; border-radius: 4px; transition: background 0.1s, opacity 0.1s; color: var(--text-secondary); }
+.layerIconBtn:hover { opacity: 1; background: var(--overlay-hover); }
 
 .smallButton { width: 100%; padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-.smallButtonBlue  { background: #0066cc; color: white; }
-.smallButtonGray  { background: #555;    color: white; }
-.smallButtonRed   { background: #cc0000; color: white; }
-.smallButtonGreen { background: #00a86b; color: white; }
-.smallButtonOrange{ background: #ff9800; color: white; }
-.smallButtonDark  { background: #444;    color: white; }
-.smallButtonLight { background: #777;    color: white; }
+.smallButtonBlue  { background: var(--accent);      color: var(--text-on-accent); }
+.smallButtonGray  { background: var(--neutral);      color: var(--text-on-accent); }
+.smallButtonRed   { background: var(--danger);       color: var(--text-on-accent); }
+.smallButtonGreen { background: var(--success);      color: var(--text-on-accent); }
+.smallButtonOrange{ background: var(--warning);      color: var(--text-on-accent); }
+.smallButtonDark  { background: var(--neutral-dark); color: var(--text-on-accent); }
+.smallButtonLight { background: var(--neutral-light);color: var(--text-on-accent); }
 
 .sidebarActionGrid { display: grid; gap: 8px; margin-top: 12px; }
 .sidebarActionGrid.mobile  { grid-template-columns: 1fr 1fr; }
 .sidebarActionGrid.desktop { grid-template-columns: 1fr; }
+
+/* Canvas toolbar */
+.canvasToolbar { position: absolute; top: 12px; left: 12px; z-index: 20; display: flex; align-items: center; gap: 2px; background: var(--toolbar-bg); border: 1px solid var(--border); border-radius: 10px; padding: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); backdrop-filter: blur(6px); }
+.canvasToolbarBtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; min-width: 32px; padding: 0 8px; border: none; border-radius: 7px; background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.12s, color 0.12s; }
+.canvasToolbarBtn:hover { background: var(--overlay-hover); color: var(--text-primary); }
+.canvasToolbarBtn--active { background: var(--accent-soft); color: var(--accent); }
+.canvasToolbarBtn--active:hover { background: var(--accent-soft-hover); color: var(--text-on-accent); }
+.canvasToolbarDivider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
+.canvasToolbarZoomLabel { min-width: 44px; }
