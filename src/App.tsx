@@ -6,10 +6,8 @@ import React, {
   useCallback,
 } from "react";
 import type Konva from "konva";
-import { exportStageSVG } from "react-konva-to-svg";
 import { Sidebar } from "./components/Sidebar";
 import { CanvasStage } from "./components/CanvasStage";
-import jsPDF from "jspdf";
 import type { Block, GlyphWarp, GlyphHandleMode } from "./types";
 
 type CanvasPreset = {
@@ -63,6 +61,7 @@ const STORAGE_KEY = "calligraphy-layout-v2";
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 3;
 const STAGE_PADDING = 0;
+const MAX_HISTORY = 50;
 const DEFAULT_TEXT_FONT_SIZE = 53;
 const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
 
@@ -213,6 +212,9 @@ const App: React.FC = () => {
 
   const pushHistory = useCallback(() => {
     undoStackRef.current.push(getSnapshot());
+    if (undoStackRef.current.length > MAX_HISTORY) {
+      undoStackRef.current.splice(0, undoStackRef.current.length - MAX_HISTORY);
+    }
     redoStackRef.current = [];
     setCanUndo(true);
     setCanRedo(false);
@@ -336,11 +338,14 @@ const App: React.FC = () => {
     setCanRedo(redoStackRef.current.length > 0);
   }, [getSnapshot]);
 
-  const updateBlockPositionWithHistory = (id: number, x: number, y: number) => {
-    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, x, y } : b)));
-    if (moveTimeoutRef.current != null) window.clearTimeout(moveTimeoutRef.current);
-    moveTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
-  };
+  const updateBlockPositionWithHistory = useCallback(
+    (id: number, x: number, y: number) => {
+      setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, x, y } : b)));
+      if (moveTimeoutRef.current != null) window.clearTimeout(moveTimeoutRef.current);
+      moveTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
+    },
+    [pushHistory]
+  );
 
   const fitStageToViewport = useCallback(
     (options?: { force?: boolean }) => {
@@ -388,7 +393,6 @@ const App: React.FC = () => {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
           // One-time layout hydration on mount; fits the stage to the current viewport.
-          // eslint-disable-next-line react-hooks/set-state-in-effect
           fitStageToViewport({ force: true });
           return;
         }
@@ -448,7 +452,6 @@ const App: React.FC = () => {
     }
 
     // Re-fit the stage transform whenever the canvas/preset dimensions change.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fitStageToViewport({ force: true });
   }, [canvasWidth, stageViewportHeight, canvasPresetId, fitStageToViewport]);
 
@@ -465,21 +468,44 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!isBrowser) return;
+    const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+
+    const isTypingTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const meta = e.ctrlKey || e.metaKey;
-      if (!meta) return;
-      if (e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
+
+      if (meta) {
+        if (e.key === "z" && !e.shiftKey) {
+          e.preventDefault();
+          handleUndo();
+        }
+        if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+          e.preventDefault();
+          handleRedo();
+        }
+        return;
       }
-      if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+
+      if (NUDGE_KEYS.has(e.key) && !isTypingTarget(e.target)) {
+        if (!selectedBlock || selectedBlock.locked) return;
         e.preventDefault();
-        handleRedo();
+        const step = e.shiftKey ? 10 : 1;
+        let { x, y } = selectedBlock;
+        if (e.key === "ArrowUp") y -= step;
+        if (e.key === "ArrowDown") y += step;
+        if (e.key === "ArrowLeft") x -= step;
+        if (e.key === "ArrowRight") x += step;
+        updateBlockPositionWithHistory(selectedBlock.id, x, y);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo, selectedBlock, updateBlockPositionWithHistory]);
 
   const createNextId = () => {
     const id = nextIdRef.current;
@@ -658,6 +684,7 @@ const App: React.FC = () => {
     const box = getBlocksBoundingBox();
     if (!box) return;
 
+    const { exportStageSVG } = await import("react-konva-to-svg");
     const exported = await exportStageSVG(stage, false);
     const svgText = String(exported).trim();
     const finalSvg = svgText.startsWith("<svg")
@@ -695,6 +722,7 @@ const App: React.FC = () => {
     const imgWidthMm = pxToMm(box.width);
     const imgHeightMm = pxToMm(box.height);
 
+    const { default: jsPDF } = await import("jspdf");
     const pdf = new jsPDF({
       orientation: imgWidthMm > imgHeightMm ? "landscape" : "portrait",
       unit: "mm",

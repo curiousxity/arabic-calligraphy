@@ -1,14 +1,12 @@
 import * as hbjsModule from "harfbuzzjs";
 import * as opentype from "opentype.js";
+import {
+  normalizeGlyphs,
+  type HbRawGlyph,
+  type HarfBuzzGlyph,
+} from "./normalizeGlyphs";
 
-type HbRawGlyph = {
-  g?: number;
-  cl?: number;
-  ax?: number;
-  ay?: number;
-  dx?: number;
-  dy?: number;
-};
+export { normalizeGlyphs, type HbRawGlyph, type HarfBuzzGlyph };
 
 type HbBlob = {
   destroy?: () => void;
@@ -71,15 +69,6 @@ const fontDataCache = new Map<string, ArrayBuffer>();
 const parsedFontCache = new Map<string, opentype.Font>();
 const shapeCache = new Map<string, ShapedTextResult>();
 
-export type HarfBuzzGlyph = {
-  g: number;
-  cl?: number;
-  ax?: number;
-  ay?: number;
-  dx?: number;
-  dy?: number;
-};
-
 export type ShapedTextResult = {
   glyphs: HarfBuzzGlyph[];
   font: opentype.Font;
@@ -129,21 +118,6 @@ async function loadParsedFont(fontUrl: string): Promise<opentype.Font> {
     parsedFontCache.set(fontUrl, font);
   }
   return parsedFontCache.get(fontUrl)!;
-}
-
-function normalizeGlyphs(raw: HbRawGlyph[]): HarfBuzzGlyph[] {
-  if (!Array.isArray(raw)) return [];
-
-  return raw
-    .filter((g) => g && typeof g.g === "number")
-    .map((g) => ({
-      g: typeof g.g === "number" ? g.g : 0,
-      cl: typeof g.cl === "number" ? g.cl : 0,
-      ax: typeof g.ax === "number" ? g.ax : 0,
-      ay: typeof g.ay === "number" ? g.ay : 0,
-      dx: typeof g.dx === "number" ? g.dx : 0,
-      dy: typeof g.dy === "number" ? g.dy : 0,
-    }));
 }
 
 function textToCodepoints(text: string) {

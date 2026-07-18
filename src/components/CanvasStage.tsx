@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Stage, Layer, Rect, Line } from "react-konva";
 import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
@@ -10,6 +10,7 @@ import type { Block, GlyphHandleMode } from "../types";
 const GRID_SIZE = 40;
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 3;
+const SNAP_GUIDE_PX = 6;
 
 export type CanvasStageProps = {
   blocks: Block[];
@@ -73,6 +74,48 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onGlyphBoxesChange,
 }) => {
   const snapCoord = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
+
+  const [snapGuides, setSnapGuides] = useState<{ x: number | null; y: number | null }>({
+    x: null,
+    y: null,
+  });
+
+  const findNearest = (value: number, targets: number[], threshold: number) => {
+    let best: number | null = null;
+    let bestDist = threshold;
+    for (const t of targets) {
+      const dist = Math.abs(value - t);
+      if (dist <= bestDist) {
+        best = t;
+        bestDist = dist;
+      }
+    }
+    return best;
+  };
+
+  const makeDragMoveHandler =
+    (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
+      if (block.locked || panMode) return;
+
+      const threshold = SNAP_GUIDE_PX / stageScale;
+      const xTargets = [artboardWidth / 2];
+      const yTargets = [artboardHeight / 2];
+      for (const other of blocks) {
+        if (other.id === block.id) continue;
+        xTargets.push(other.x);
+        yTargets.push(other.y);
+      }
+
+      const { x, y } = e.target.position();
+      const snappedX = findNearest(x, xTargets, threshold);
+      const snappedY = findNearest(y, yTargets, threshold);
+
+      e.target.position({
+        x: snappedX ?? x,
+        y: snappedY ?? y,
+      });
+      setSnapGuides({ x: snappedX, y: snappedY });
+    };
 
   const renderGridLines = () => {
     const lines: React.ReactNode[] = [];
@@ -144,6 +187,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
   const makeDragEndHandler =
     (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
+      setSnapGuides({ x: null, y: null });
       if (block.locked || panMode) return;
       let { x, y } = e.target.position();
       if (snapToGrid) {
@@ -256,12 +300,14 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
             {blocks.map((block) => {
               const onDragEnd = makeDragEndHandler(block);
+              const onDragMove = makeDragMoveHandler(block);
               const commonProps = {
                 id: `block-${block.id}`,
                 draggable: !block.locked && !panMode,
                 onClick: () => onSelectBlock(block.id),
                 onTap: () => onSelectBlock(block.id),
                 onDblClick: () => onEditBlock(block.id),
+                onDragMove,
                 onDragEnd,
               };
 
@@ -371,6 +417,25 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 />
               );
             })}
+
+            {snapGuides.x != null && (
+              <Line
+                points={[snapGuides.x, -1000, snapGuides.x, artboardHeight + 1000]}
+                stroke="#ff2d78"
+                strokeWidth={1 / stageScale}
+                dash={[4 / stageScale, 3 / stageScale]}
+                listening={false}
+              />
+            )}
+            {snapGuides.y != null && (
+              <Line
+                points={[-1000, snapGuides.y, artboardWidth + 1000, snapGuides.y]}
+                stroke="#ff2d78"
+                strokeWidth={1 / stageScale}
+                dash={[4 / stageScale, 3 / stageScale]}
+                listening={false}
+              />
+            )}
           </Layer>
         </Stage>
       </div>

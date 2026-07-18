@@ -7,6 +7,7 @@ import {
   type HarfBuzzGlyph,
   type ShapedTextResult,
 } from "../lib/harfbuzz";
+import { warpPoint, type GlyphBounds } from "../lib/warp";
 
 type Props = {
   id?: string;
@@ -35,6 +36,7 @@ type Props = {
   onClick?: () => void;
   onTap?: () => void;
   onDblClick?: () => void;
+  onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   debugBounds?: boolean;
 };
@@ -44,15 +46,6 @@ type LoadedShape = {
   font: ShapedTextResult["font"] | null;
   unitsPerEm: number;
   isLoading: boolean;
-};
-
-type GlyphBounds = {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-  rawWidth: number;
-  rawHeight: number;
 };
 
 const FONT_URLS: Record<string, string> = {
@@ -77,32 +70,6 @@ const DEBUG_LOG = import.meta.env.DEV;
 
 const fallbackWidth = (text: string, fs: number) =>
   Math.max(text.length * fs * 0.55, 20);
-
-function clampUnit(value: number) {
-  return Math.max(-1, Math.min(1, value));
-}
-
-// Block-level warp used by your sliders (warpX/warpY).
-function warpPoint(
-  x: number,
-  y: number,
-  bounds: GlyphBounds,
-  width: number,
-  height: number,
-  warpX: number,
-  warpY: number
-) {
-  const nx = clampUnit(((x - bounds.minX) / width) * 2 - 1);
-  const ny = clampUnit(((y - bounds.minY) / height) * 2 - 1);
-
-  const wx = warpX / 100;
-  const wy = warpY / 100;
-
-  return {
-    x: x + wx * ny * width * 0.25,
-    y: y - wy * (1 - nx * nx) * height * 0.5,
-  };
-}
 
 function tracePath(ctx: CanvasRenderingContext2D, commands: PathCommand[]) {
   ctx.beginPath();
@@ -271,6 +238,7 @@ export const ShapedText: React.FC<Props> = ({
   onClick,
   onTap,
   onDblClick,
+  onDragMove,
   onDragEnd,
   debugBounds = false,
 }) => {
@@ -453,6 +421,7 @@ export const ShapedText: React.FC<Props> = ({
       onTap={onTap}
       onDblClick={onDblClick}
       onDblTap={onDblClick}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       listening
     >

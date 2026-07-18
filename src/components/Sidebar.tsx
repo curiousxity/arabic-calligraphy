@@ -2007,7 +2007,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }}
         >
           Double-click a block on the canvas to jump to its text field. Double-click a
-          layer name to rename. Double-click a slider to reset.
+          layer name to rename. Double-click a slider to reset. Use the arrow keys to
+          nudge the selected block (hold Shift for bigger steps).
         </p>
       </div>
     </div>

@@ -7,6 +7,7 @@ import {
   type HarfBuzzGlyph,
   type ShapedTextResult,
 } from "../lib/harfbuzz";
+import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import type { GlyphWarp, GlyphHandle } from "../types";
 
 type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
@@ -52,6 +53,7 @@ export type ShapeWarpTextProps = {
   onClick?: () => void;
   onTap?: () => void;
   onDblClick?: () => void;
+  onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   debugBounds?: boolean;
 
@@ -91,13 +93,6 @@ type GlyphLayout = {
   advance: number;
 };
 
-type SvgCmd =
-  | { type: "M"; x: number; y: number }
-  | { type: "L"; x: number; y: number }
-  | { type: "C"; x1: number; y1: number; x2: number; y2: number; x: number; y: number }
-  | { type: "Q"; x1: number; y1: number; x: number; y: number }
-  | { type: "Z" };
-
 type MutablePathCmd = {
   type: PathCommand["type"];
   x?: number;
@@ -135,188 +130,6 @@ function clamp01(v: number) {
 
 function clampUnit(v: number) {
   return Math.max(-1, Math.min(1, v));
-}
-
-function parseSvgPath(d: string): SvgCmd[] {
-  const cmds: SvgCmd[] = [];
-  const re =
-    /([MmLlHhVvCcSsQqTtAaZz])|([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/g;
-
-  const tokens: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(d)) !== null) tokens.push(m[0]);
-
-  let i = 0;
-  let cx = 0;
-  let cy = 0;
-  let sx = 0;
-  let sy = 0;
-
-  const num = () => parseFloat(tokens[i++]);
-
-  while (i < tokens.length) {
-    const cmd = tokens[i++];
-
-    switch (cmd) {
-      case "M": {
-        const x = num();
-        const y = num();
-        cmds.push({ type: "M", x, y });
-        cx = sx = x;
-        cy = sy = y;
-        break;
-      }
-      case "m": {
-        const x = cx + num();
-        const y = cy + num();
-        cmds.push({ type: "M", x, y });
-        cx = sx = x;
-        cy = sy = y;
-        break;
-      }
-      case "L": {
-        const x = num();
-        const y = num();
-        cmds.push({ type: "L", x, y });
-        cx = x;
-        cy = y;
-        break;
-      }
-      case "l": {
-        const x = cx + num();
-        const y = cy + num();
-        cmds.push({ type: "L", x, y });
-        cx = x;
-        cy = y;
-        break;
-      }
-      case "H": {
-        const x = num();
-        cmds.push({ type: "L", x, y: cy });
-        cx = x;
-        break;
-      }
-      case "h": {
-        const x = cx + num();
-        cmds.push({ type: "L", x, y: cy });
-        cx = x;
-        break;
-      }
-      case "V": {
-        const y = num();
-        cmds.push({ type: "L", x: cx, y });
-        cy = y;
-        break;
-      }
-      case "v": {
-        const y = cy + num();
-        cmds.push({ type: "L", x: cx, y });
-        cy = y;
-        break;
-      }
-      case "C": {
-        const x1 = num();
-        const y1 = num();
-        const x2 = num();
-        const y2 = num();
-        const x = num();
-        const y = num();
-        cmds.push({ type: "C", x1, y1, x2, y2, x, y });
-        cx = x;
-        cy = y;
-        break;
-      }
-      case "c": {
-        const x1 = cx + num();
-        const y1 = cy + num();
-        const x2 = cx + num();
-        const y2 = cy + num();
-        const x = cx + num();
-        const y = cy + num();
-        cmds.push({ type: "C", x1, y1, x2, y2, x, y });
-        cx = x;
-        cy = y;
-        break;
-      }
-      case "Q": {
-        const x1 = num();
-        const y1 = num();
-        const x = num();
-        const y = num();
-        cmds.push({ type: "Q", x1, y1, x, y });
-        cx = x;
-        cy = y;
-        break;
-      }
-      case "q": {
-        const x1 = cx + num();
-        const y1 = cy + num();
-        const x = cx + num();
-        const y = cy + num();
-        cmds.push({ type: "Q", x1, y1, x, y });
-        cx = x;
-        cy = y;
-        break;
-      }
-      case "S": {
-        const x2 = num();
-        const y2 = num();
-        const x = num();
-        const y = num();
-        cmds.push({ type: "C", x1: cx, y1: cy, x2, y2, x, y });
-        cx = x;
-        cy = y;
-        break;
-      }
-      case "s": {
-        const x2 = cx + num();
-        const y2 = cy + num();
-        const x = cx + num();
-        const y = cy + num();
-        cmds.push({ type: "C", x1: cx, y1: cy, x2, y2, x, y });
-        cx = x;
-        cy = y;
-        break;
-      }
-      case "A": {
-        num();
-        num();
-        num();
-        num();
-        num();
-        const x = num();
-        const y = num();
-        cmds.push({ type: "L", x, y });
-        cx = x;
-        cy = y;
-        break;
-      }
-      case "a": {
-        num();
-        num();
-        num();
-        num();
-        num();
-        const x = cx + num();
-        const y = cy + num();
-        cmds.push({ type: "L", x, y });
-        cx = x;
-        cy = y;
-        break;
-      }
-      case "Z":
-      case "z": {
-        cmds.push({ type: "Z" });
-        cx = sx;
-        cy = sy;
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  return cmds;
 }
 
 function replayPath(ctx: CanvasRenderingContext2D, cmds: SvgCmd[]) {
@@ -477,6 +290,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   onClick,
   onTap,
   onDblClick,
+  onDragMove,
   onDragEnd,
   debugBounds = false,
   glyphEditMode = false,
@@ -741,6 +555,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
       onTap={onTap}
       onDblClick={onDblClick}
       onDblTap={onDblClick}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       listening
     >
