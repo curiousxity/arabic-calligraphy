@@ -31,6 +31,7 @@ export type LayersPanelProps = {
   onDelete: (id: number) => void;
   onMerge: (idA: number, idB: number) => void;
   onRename: (id: number, name: string) => void;
+  onZoomTo?: (id: number) => void;
 };
 
 export const LayersPanel: React.FC<LayersPanelProps> = ({
@@ -43,6 +44,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   onDelete,
   onMerge,
   onRename,
+  onZoomTo,
 }) => {
   const [mergeTarget, setMergeTarget] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -99,6 +101,8 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
           <div
             key={block.id}
             onClick={() => onSelect(block.id)}
+            onDoubleClick={() => onZoomTo?.(block.id)}
+            title="Double-click to zoom to this block"
             style={{
               display: "flex",
               alignItems: "center",

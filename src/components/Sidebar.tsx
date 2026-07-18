@@ -68,6 +68,7 @@ export type SidebarProps = {
   onUpdateBlock?: (id: number, patch: Partial<Block>) => void;
   onReorderBlocks?: (blocks: Block[]) => void;
   onMergeBlocks?: (idA: number, idB: number) => void;
+  onZoomToBlock?: (id: number) => void;
 
   showKeyboard: boolean;
   onToggleKeyboard: () => void;
@@ -132,6 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onUpdateBlock,
   onReorderBlocks,
   onMergeBlocks,
+  onZoomToBlock,
   showKeyboard,
   onToggleKeyboard,
   onClearDiacritics,
@@ -414,6 +416,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 onMerge={(a, b) => onMergeBlocks?.(a, b)}
                 onRename={handleRename}
+                onZoomTo={(id) => onZoomToBlock?.(id)}
               />
             </div>
           )}

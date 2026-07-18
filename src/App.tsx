@@ -10,6 +10,7 @@ import { Sidebar } from "./components/Sidebar";
 import { CanvasStage } from "./components/CanvasStage";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useExport } from "./hooks/useExport";
+import { isTypingTarget } from "./lib/dom";
 import type { Block, GlyphWarp, GlyphHandleMode } from "./types";
 
 type CanvasPreset = {
@@ -181,6 +182,7 @@ const App: React.FC = () => {
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(320);
   const nextIdRef = useRef(2);
+  const clipboardRef = useRef<Block | null>(null);
   const [editRequestSignal, setEditRequestSignal] = useState(0);
   const moveTimeoutRef = useRef<number | null>(null);
   const lastAutoFitSignatureRef = useRef<string>("");
@@ -438,18 +440,46 @@ const App: React.FC = () => {
     setSelectedId(1);
   }
 
+  const deleteSelectedBlock = useCallback(() => {
+    if (!selectedBlock) return;
+    pushHistory();
+    setBlocks((prev) => {
+      const filtered = prev.filter((b) => b.id !== selectedBlock.id);
+      setSelectedId(filtered.length > 0 ? filtered[0].id : null);
+      return filtered;
+    });
+  }, [selectedBlock, pushHistory]);
+
   useEffect(() => {
     if (!isBrowser) return;
     const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 
-    const isTypingTarget = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) return false;
-      const tag = target.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
-    };
-
     const handleKeyDown = (e: KeyboardEvent) => {
       const meta = e.ctrlKey || e.metaKey;
+      const typing = isTypingTarget(e.target);
+
+      if (meta && !typing) {
+        if (e.key === "c") {
+          if (selectedBlock) clipboardRef.current = { ...selectedBlock };
+          return;
+        }
+        if (e.key === "v") {
+          if (clipboardRef.current) {
+            e.preventDefault();
+            pushHistory();
+            const newId = nextIdRef.current++;
+            const copy: Block = {
+              ...clipboardRef.current,
+              id: newId,
+              x: clipboardRef.current.x + 20,
+              y: clipboardRef.current.y + 20,
+            };
+            setBlocks((prev) => [...prev, copy]);
+            setSelectedId(newId);
+          }
+          return;
+        }
+      }
 
       if (meta) {
         if (e.key === "z" && !e.shiftKey) {
@@ -463,7 +493,15 @@ const App: React.FC = () => {
         return;
       }
 
-      if (NUDGE_KEYS.has(e.key) && !isTypingTarget(e.target)) {
+      if ((e.key === "Delete" || e.key === "Backspace") && !typing) {
+        if (selectedBlock && !selectedBlock.locked) {
+          e.preventDefault();
+          deleteSelectedBlock();
+        }
+        return;
+      }
+
+      if (NUDGE_KEYS.has(e.key) && !typing) {
         if (!selectedBlock || selectedBlock.locked) return;
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
@@ -477,7 +515,14 @@ const App: React.FC = () => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleUndo, handleRedo, selectedBlock, updateBlockPositionWithHistory]);
+  }, [
+    handleUndo,
+    handleRedo,
+    selectedBlock,
+    updateBlockPositionWithHistory,
+    pushHistory,
+    deleteSelectedBlock,
+  ]);
 
   const createNextId = () => {
     const id = nextIdRef.current;
@@ -552,6 +597,35 @@ const App: React.FC = () => {
     };
   }, [currentPreset]);
 
+  const zoomToBlock = useCallback(
+    (id: number) => {
+      const stage = stageRef.current;
+      if (!stage) return;
+      const node = stage.findOne(`#block-${id}`);
+      if (!node) return;
+
+      const rect = node.getClientRect({ relativeTo: stage });
+      const ZOOM_PADDING = 60;
+      const availW = Math.max(1, canvasWidth - ZOOM_PADDING * 2);
+      const availH = Math.max(1, stageViewportHeight - ZOOM_PADDING * 2);
+      const scale = clamp(
+        Math.min(availW / Math.max(rect.width, 1), availH / Math.max(rect.height, 1)),
+        MIN_SCALE,
+        MAX_SCALE
+      );
+
+      const position = {
+        x: canvasWidth / 2 - (rect.x + rect.width / 2) * scale,
+        y: stageViewportHeight / 2 - (rect.y + rect.height / 2) * scale,
+      };
+
+      setStageScale(scale);
+      setStagePosition(position);
+      setPanMode(false);
+    },
+    [canvasWidth, stageViewportHeight]
+  );
+
   const addBlock = () => {
     pushHistory();
     const newId = createNextId();
@@ -585,16 +659,6 @@ const App: React.FC = () => {
 
     setBlocks((prev) => [...prev, copy]);
     setSelectedId(newId);
-  };
-
-  const deleteSelectedBlock = () => {
-    if (!selectedBlock) return;
-    pushHistory();
-    setBlocks((prev) => {
-      const filtered = prev.filter((b) => b.id !== selectedBlock.id);
-      setSelectedId(filtered.length > 0 ? filtered[0].id : null);
-      return filtered;
-    });
   };
 
   const { handleExportPNG, handleExportSVG, handleExportPDF } = useExport(stageRef, blocks);
@@ -879,6 +943,7 @@ const App: React.FC = () => {
         onUpdateBlock={updateBlock}
         onReorderBlocks={reorderBlocks}
         onMergeBlocks={mergeBlocks}
+        onZoomToBlock={zoomToBlock}
         showKeyboard={showKeyboard}
         onToggleKeyboard={() => setShowKeyboard((v) => !v)}
         onClearDiacritics={clearDiacritics}

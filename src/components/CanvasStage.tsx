@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Stage, Layer, Rect, Line } from "react-konva";
 import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { ShapeWarpText } from "./ShapeWarpText";
 import { ZoomInIcon, ZoomOutIcon, FrameIcon, HandIcon } from "./Icons";
+import { isTypingTarget } from "../lib/dom";
 import type { Block, GlyphHandleMode } from "../types";
 
 const GRID_SIZE = 40;
@@ -80,6 +81,27 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     y: null,
   });
 
+  const [spacePan, setSpacePan] = useState(false);
+  const effectivePanMode = panMode || spacePan;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space" && !isTypingTarget(e.target)) {
+        e.preventDefault();
+        setSpacePan(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") setSpacePan(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
   const findNearest = (value: number, targets: number[], threshold: number) => {
     let best: number | null = null;
     let bestDist = threshold;
@@ -95,7 +117,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
   const makeDragMoveHandler =
     (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
-      if (block.locked || panMode) return;
+      if (block.locked || effectivePanMode) return;
 
       const threshold = SNAP_GUIDE_PX / stageScale;
       const xTargets = [artboardWidth / 2];
@@ -188,7 +210,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   const makeDragEndHandler =
     (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
       setSnapGuides({ x: null, y: null });
-      if (block.locked || panMode) return;
+      if (block.locked || effectivePanMode) return;
       let { x, y } = e.target.position();
       if (snapToGrid) {
         x = snapCoord(x);
@@ -206,7 +228,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         position: "relative",
         overflow: "hidden",
         background: "var(--bg-canvas-area)",
-        cursor: panMode ? "grab" : "default",
+        cursor: effectivePanMode ? "grab" : "default",
       }}
     >
       <div style={{ width: viewportWidth, height: stageViewportHeight }}>
@@ -256,7 +278,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             className={
               panMode ? "canvasToolbarBtn canvasToolbarBtn--active" : "canvasToolbarBtn"
             }
-            title={panMode ? "Pan mode on (drag to pan)" : "Enable pan mode"}
+            title={
+              panMode
+                ? "Pan mode on (drag to pan)"
+                : "Enable pan mode (or hold Space / drag with middle mouse button)"
+            }
             aria-label="Toggle pan mode"
             aria-pressed={panMode}
           >
@@ -272,15 +298,15 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
           scaleY={stageScale}
           x={stagePosition.x}
           y={stagePosition.y}
-          draggable={panMode}
-          dragButtons={[0]}
+          draggable
+          dragButtons={effectivePanMode ? [0, 1] : [1]}
           onWheel={handleWheel}
           onDragMove={(e) => {
-            if (!panMode) return;
+            if (e.target !== e.target.getStage()) return;
             onUpdateStage(stageScale, { x: e.target.x(), y: e.target.y() });
           }}
           onDragEnd={(e) => {
-            if (!panMode) return;
+            if (e.target !== e.target.getStage()) return;
             onUpdateStage(stageScale, { x: e.target.x(), y: e.target.y() });
           }}
           onContextMenu={(e) => e.evt.preventDefault()}
@@ -303,7 +329,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
               const onDragMove = makeDragMoveHandler(block);
               const commonProps = {
                 id: `block-${block.id}`,
-                draggable: !block.locked && !panMode,
+                draggable: !block.locked && !effectivePanMode,
                 onClick: () => onSelectBlock(block.id),
                 onTap: () => onSelectBlock(block.id),
                 onDblClick: () => onEditBlock(block.id),
