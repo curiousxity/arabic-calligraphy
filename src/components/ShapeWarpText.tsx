@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Shape, Rect, Circle, Arc } from "react-konva";
 import type Konva from "konva";
+import type { PathCommand } from "opentype.js";
 import {
   shapeText,
   type HarfBuzzGlyph,
@@ -96,6 +97,16 @@ type SvgCmd =
   | { type: "C"; x1: number; y1: number; x2: number; y2: number; x: number; y: number }
   | { type: "Q"; x1: number; y1: number; x: number; y: number }
   | { type: "Z" };
+
+type MutablePathCmd = {
+  type: PathCommand["type"];
+  x?: number;
+  y?: number;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+};
 
 const FONT_URLS: Record<string, string> = {
   TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
@@ -835,28 +846,29 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
             };
 
             const opPath = glyphObj.getPath(0, 0, fontSize);
-            const cmds = (opPath as any).commands.map((cmd: any) => {
-              const out = { ...cmd };
+            const cmds: PathCommand[] = opPath.commands.map((cmd) => {
+              const c = cmd as MutablePathCmd;
+              const out: MutablePathCmd = { ...c };
 
-              if (typeof cmd.x === "number" && typeof cmd.y === "number") {
-                const p = warpPoint(cmd.x, cmd.y);
+              if (typeof c.x === "number" && typeof c.y === "number") {
+                const p = warpPoint(c.x, c.y);
                 out.x = p.x;
                 out.y = p.y;
               }
 
-              if (typeof cmd.x1 === "number" && typeof cmd.y1 === "number") {
-                const p1 = warpPoint(cmd.x1, cmd.y1);
+              if (typeof c.x1 === "number" && typeof c.y1 === "number") {
+                const p1 = warpPoint(c.x1, c.y1);
                 out.x1 = p1.x;
                 out.y1 = p1.y;
               }
 
-              if (typeof cmd.x2 === "number" && typeof cmd.y2 === "number") {
-                const p2 = warpPoint(cmd.x2, cmd.y2);
+              if (typeof c.x2 === "number" && typeof c.y2 === "number") {
+                const p2 = warpPoint(c.x2, c.y2);
                 out.x2 = p2.x;
                 out.y2 = p2.y;
               }
 
-              return out;
+              return out as PathCommand;
             });
 
             tracePath(ctx as unknown as CanvasRenderingContext2D, cmds);

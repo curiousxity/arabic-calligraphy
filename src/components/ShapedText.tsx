@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Shape, Rect, Arc } from "react-konva";
 import type Konva from "konva";
+import type { PathCommand } from "opentype.js";
 import {
   shapeText,
   type HarfBuzzGlyph,
@@ -103,7 +104,7 @@ function warpPoint(
   };
 }
 
-function tracePath(ctx: CanvasRenderingContext2D, commands: any[]) {
+function tracePath(ctx: CanvasRenderingContext2D, commands: PathCommand[]) {
   ctx.beginPath();
   for (const cmd of commands) {
     switch (cmd.type) {
@@ -167,13 +168,23 @@ function drawWarpedGlyphRun(
     ctx.translate(gx, gy);
 
     const opPath = glyphObj.getPath(0, 0, fontSize);
-    const cmds = (opPath as any).commands.map((cmd: any) => {
-      const out = { ...cmd };
+    const cmds: PathCommand[] = opPath.commands.map((cmd) => {
+      type MutableCmd = {
+        type: PathCommand["type"];
+        x?: number;
+        y?: number;
+        x1?: number;
+        y1?: number;
+        x2?: number;
+        y2?: number;
+      };
+      const c = cmd as MutableCmd;
+      const out: MutableCmd = { ...c };
 
-      if (typeof cmd.x === "number" && typeof cmd.y === "number") {
+      if (typeof c.x === "number" && typeof c.y === "number") {
         const p = warpPoint(
-          cmd.x + gx,
-          cmd.y + gy,
+          c.x + gx,
+          c.y + gy,
           bounds,
           width,
           height,
@@ -184,10 +195,10 @@ function drawWarpedGlyphRun(
         out.y = p.y - gy;
       }
 
-      if (typeof cmd.x1 === "number" && typeof cmd.y1 === "number") {
+      if (typeof c.x1 === "number" && typeof c.y1 === "number") {
         const p1 = warpPoint(
-          cmd.x1 + gx,
-          cmd.y1 + gy,
+          c.x1 + gx,
+          c.y1 + gy,
           bounds,
           width,
           height,
@@ -198,10 +209,10 @@ function drawWarpedGlyphRun(
         out.y1 = p1.y - gy;
       }
 
-      if (typeof cmd.x2 === "number" && typeof cmd.y2 === "number") {
+      if (typeof c.x2 === "number" && typeof c.y2 === "number") {
         const p2 = warpPoint(
-          cmd.x2 + gx,
-          cmd.y2 + gy,
+          c.x2 + gx,
+          c.y2 + gy,
           bounds,
           width,
           height,
@@ -212,7 +223,7 @@ function drawWarpedGlyphRun(
         out.y2 = p2.y - gy;
       }
 
-      return out;
+      return out as PathCommand;
     });
 
     tracePath(ctx, cmds);

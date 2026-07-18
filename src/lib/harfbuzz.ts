@@ -1,26 +1,66 @@
 import * as hbjsModule from "harfbuzzjs";
 import * as opentype from "opentype.js";
 
+type HbRawGlyph = {
+  g?: number;
+  cl?: number;
+  ax?: number;
+  ay?: number;
+  dx?: number;
+  dy?: number;
+};
+
+type HbBlob = {
+  destroy?: () => void;
+};
+
+type HbFace = {
+  destroy?: () => void;
+};
+
+type HbFont = {
+  setScale?: (x: number, y: number) => void;
+  destroy?: () => void;
+};
+
+type HbBuffer = {
+  addText: (text: string) => void;
+  guessSegmentProperties?: () => void;
+  setDirection?: (direction: string) => void;
+  setScript?: (script: string) => void;
+  setLanguage?: (language: string) => void;
+  json?: (font?: HbFont) => HbRawGlyph[];
+  destroy?: () => void;
+};
+
 type HbModule = {
-  createBlob: (data: ArrayBuffer | Uint8Array) => any;
-  createFace: (blob: any, index: number) => any;
-  createFont: (face: any) => any;
-  createBuffer: () => any;
-  shape: (font: any, buffer: any, features?: string) => void;
+  createBlob: (data: ArrayBuffer | Uint8Array) => HbBlob;
+  createFace: (blob: HbBlob, index: number) => HbFace;
+  createFont: (face: HbFace) => HbFont;
+  createBuffer: () => HbBuffer;
+  shape: (font: HbFont, buffer: HbBuffer, features?: string) => void;
 };
 
 const DEBUG_HB = true;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function resolveHbLoader(mod: any): Promise<HbModule> | null {
+const asRecord = (v: unknown): Record<string, unknown> | null =>
+  v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+
+function resolveHbLoader(mod: unknown): Promise<HbModule> | null {
   if (DEBUG_HB) console.log("harfbuzzjs raw module", mod);
 
-  let m = mod;
-  if (m?.default !== undefined) m = m.default;
-  if (m?.default !== undefined) m = m.default;
+  let m: unknown = mod;
+  let rec = asRecord(m);
+  if (rec?.default !== undefined) m = rec.default;
+  rec = asRecord(m);
+  if (rec?.default !== undefined) m = rec.default;
 
-  if (typeof m === "function") return m();
-  if (m && typeof m.then === "function") return m;
+  if (typeof m === "function") {
+    return (m as () => Promise<HbModule> | HbModule)() as Promise<HbModule>;
+  }
+
+  rec = asRecord(m);
+  if (rec && typeof rec.then === "function") return m as Promise<HbModule>;
 
   return null;
 }
@@ -55,7 +95,7 @@ export async function initHarfBuzz(): Promise<HbModule> {
       throw new Error("Unable to initialize harfbuzzjs");
     }
 
-    hbPromise = loader.then((m: any) => {
+    hbPromise = loader.then((m) => {
       if (DEBUG_HB) {
         console.log("hb loaded", {
           keys: Object.keys(m || {}),
@@ -64,7 +104,7 @@ export async function initHarfBuzz(): Promise<HbModule> {
           hasShape: typeof m?.shape === "function",
         });
       }
-      return m as HbModule;
+      return m;
     });
   }
 
@@ -91,8 +131,7 @@ async function loadParsedFont(fontUrl: string): Promise<opentype.Font> {
   return parsedFontCache.get(fontUrl)!;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function normalizeGlyphs(raw: any): HarfBuzzGlyph[] {
+function normalizeGlyphs(raw: HbRawGlyph[]): HarfBuzzGlyph[] {
   if (!Array.isArray(raw)) return [];
 
   return raw
@@ -158,7 +197,7 @@ function logShapingDebug(
   fontUrl: string,
   parsedFont: opentype.Font,
   upm: number,
-  raw: any,
+  raw: HbRawGlyph[] | string,
   glyphs: HarfBuzzGlyph[]
 ) {
   const cps = textToCodepoints(text);
@@ -256,7 +295,7 @@ export async function shapeText(
 
     hb.shape(font, buffer);
 
-    let raw: any = [];
+    let raw: HbRawGlyph[] = [];
     if (typeof buffer.json === "function") {
       try {
         raw = buffer.json(font);

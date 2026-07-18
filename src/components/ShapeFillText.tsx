@@ -264,7 +264,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       const dx = (g.dx ?? 0) * scale;
       const dy = (g.dy ?? 0) * scale;
       const advance = (g.ax ?? 0) * scale;
-      const commands = obj ? (obj.getPath(0, 0, fontSize) as any).commands : [];
+      const commands: SvgCmd[] = obj ? obj.getPath(0, 0, fontSize).commands : [];
       const result = { obj, penX, dx, dy, advance, commands };
       penX += advance;
       return result;

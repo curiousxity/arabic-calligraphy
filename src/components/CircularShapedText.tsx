@@ -203,7 +203,7 @@ export const CircularShapedText: React.FC<Props> = ({
                 const glyphH = isFinite(box.y1) && isFinite(box.y2) ? box.y2 - box.y1 : fontSize;
                 ctx.translate(-glyphW / 2, -glyphH / 2);
                 ctx.beginPath();
-                for (const cmd of (opPath as any).commands) {
+                for (const cmd of opPath.commands) {
                   switch (cmd.type) {
                     case "M": ctx.moveTo(cmd.x, cmd.y); break;
                     case "L": ctx.lineTo(cmd.x, cmd.y); break;
