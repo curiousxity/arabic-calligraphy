@@ -49,7 +49,7 @@ const Key: React.FC<{
       padding: "0 2px",
       margin: "2px",
       borderRadius: 6,
-      border: "1px solid rgba(0,80,160,0.18)",
+      border: "1px solid var(--kb-border)",
       cursor: "pointer",
       fontFamily: "inherit",
       fontSize: 15,
@@ -60,12 +60,10 @@ const Key: React.FC<{
       background: danger
         ? pressed ? "#b91c1c" : "linear-gradient(180deg,#ef4444 0%,#c81e1e 100%)"
         : pressed
-        ? "#c8d9f0"
-        : "linear-gradient(180deg,#ffffff 0%,#deeaf8 100%)",
-      color: danger ? "#fff" : "#0d2a5e",
-      boxShadow: pressed
-        ? "0 1px 0 rgba(0,60,120,0.2)"
-        : "0 2px 0 rgba(0,60,120,0.22), 0 1px 2px rgba(0,0,0,0.08)",
+        ? "var(--kb-key-pressed-bg)"
+        : "linear-gradient(180deg, var(--kb-key-bg-start) 0%, var(--kb-key-bg-end) 100%)",
+      color: danger ? "#fff" : "var(--kb-key-text)",
+      boxShadow: pressed ? "var(--kb-key-shadow-pressed)" : "var(--kb-key-shadow)",
     }}
   >
     {label}
@@ -89,11 +87,11 @@ export const ArabicKeyboard: React.FC<Props> = ({
 }) => (
   <div
     style={{
-      background: "linear-gradient(180deg, #dce8f5 0%, #c8daf0 100%)",
+      background: "linear-gradient(180deg, var(--kb-bg-start) 0%, var(--kb-bg-end) 100%)",
       borderRadius: 12,
       padding: "8px 6px 10px",
-      boxShadow: "0 4px 16px rgba(0,60,120,0.18), 0 1px 4px rgba(0,0,0,0.1)",
-      border: "1px solid rgba(0,80,160,0.18)",
+      boxShadow: "var(--kb-panel-shadow)",
+      border: "1px solid var(--kb-border)",
       direction: "rtl",
       width: "100%",
       boxSizing: "border-box",
@@ -110,7 +108,7 @@ export const ArabicKeyboard: React.FC<Props> = ({
       paddingInline: 2,
     }}>
       <div style={{ width: 44 }} />
-      <span style={{ color: "#4a6fa5", fontSize: 11, fontWeight: 500, letterSpacing: 0.5 }}>
+      <span style={{ color: "var(--kb-label-text)", fontSize: 11, fontWeight: 500, letterSpacing: 0.5 }}>
         Arabic
       </span>
       {onClose ? (
@@ -118,10 +116,10 @@ export const ArabicKeyboard: React.FC<Props> = ({
           type="button"
           onClick={onClose}
           style={{
-            background: "rgba(0,80,160,0.1)",
+            background: "var(--kb-close-bg)",
             border: "none",
             borderRadius: 6,
-            color: "#1e3a6e",
+            color: "var(--kb-close-text)",
             fontSize: 11,
             padding: "3px 8px",
             cursor: "pointer",
@@ -172,13 +170,13 @@ const SpaceBar: React.FC<{ onSpace: () => void }> = ({ onSpace }) => {
         flex: 1,
         height: 34,
         borderRadius: 6,
-        border: "1px solid rgba(0,80,160,0.18)",
-        background: pressed ? "#c8d9f0" : "linear-gradient(180deg,#ffffff 0%,#deeaf8 100%)",
-        boxShadow: pressed
-          ? "0 1px 0 rgba(0,60,120,0.2)"
-          : "0 2px 0 rgba(0,60,120,0.22), 0 1px 2px rgba(0,0,0,0.08)",
+        border: "1px solid var(--kb-border)",
+        background: pressed
+          ? "var(--kb-key-pressed-bg)"
+          : "linear-gradient(180deg, var(--kb-key-bg-start) 0%, var(--kb-key-bg-end) 100%)",
+        boxShadow: pressed ? "var(--kb-key-shadow-pressed)" : "var(--kb-key-shadow)",
         cursor: "pointer",
-        color: "#0d2a5e",
+        color: "var(--kb-key-text)",
         fontSize: 11,
         fontWeight: 500,
         letterSpacing: 1,
