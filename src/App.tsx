@@ -181,6 +181,8 @@ const App: React.FC = () => {
   const nextIdRef = useRef(2);
   const undoStackRef = useRef<EditorSnapshot[]>([]);
   const redoStackRef = useRef<EditorSnapshot[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const moveTimeoutRef = useRef<number | null>(null);
   const lastAutoFitSignatureRef = useRef<string>("");
   const didHydrateLayoutRef = useRef(false);
@@ -205,6 +207,8 @@ const App: React.FC = () => {
   const pushHistory = useCallback(() => {
     undoStackRef.current.push(getSnapshot());
     redoStackRef.current = [];
+    setCanUndo(true);
+    setCanRedo(false);
   }, [getSnapshot]);
 
   const upsertGlyphWarp = useCallback(
@@ -312,6 +316,8 @@ const App: React.FC = () => {
     if (!prev) return;
     redoStackRef.current.push(getSnapshot());
     applySnapshot(prev);
+    setCanUndo(undoStackRef.current.length > 0);
+    setCanRedo(redoStackRef.current.length > 0);
   }, [getSnapshot]);
 
   const handleRedo = useCallback(() => {
@@ -319,6 +325,8 @@ const App: React.FC = () => {
     if (!next) return;
     undoStackRef.current.push(getSnapshot());
     applySnapshot(next);
+    setCanUndo(undoStackRef.current.length > 0);
+    setCanRedo(redoStackRef.current.length > 0);
   }, [getSnapshot]);
 
   const updateBlockPositionWithHistory = (id: number, x: number, y: number) => {
@@ -372,6 +380,8 @@ const App: React.FC = () => {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
+          // One-time layout hydration on mount; fits the stage to the current viewport.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           fitStageToViewport({ force: true });
           return;
         }
@@ -430,11 +440,12 @@ const App: React.FC = () => {
       return;
     }
 
+    // Re-fit the stage transform whenever the canvas/preset dimensions change.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fitStageToViewport({ force: true });
   }, [canvasWidth, stageViewportHeight, canvasPresetId, fitStageToViewport]);
 
-  useEffect(() => {
-    if (blocks.length > 0) return;
+  if (blocks.length === 0) {
     setBlocks([
       {
         ...DEFAULT_BLOCK,
@@ -443,7 +454,7 @@ const App: React.FC = () => {
       },
     ]);
     setSelectedId(1);
-  }, [blocks.length, currentPreset]);
+  }
 
   useEffect(() => {
     if (!isBrowser) return;
@@ -703,7 +714,9 @@ const App: React.FC = () => {
     if (!isBrowser) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(buildLayoutPayload()));
-    } catch {}
+    } catch {
+      // Ignore quota-exceeded / privacy-mode storage errors — saving layout is best-effort.
+    }
   };
 
   const loadLayout = () => {
@@ -966,8 +979,8 @@ const App: React.FC = () => {
         }
         onUndo={handleUndo}
         onRedo={handleRedo}
-        canUndo={undoStackRef.current.length > 0}
-        canRedo={redoStackRef.current.length > 0}
+        canUndo={canUndo}
+        canRedo={canRedo}
         onToggleGlyphEditMode={() => {
           if (!selectedBlock) return;
           updateSelectedBlock({

@@ -184,7 +184,7 @@ function scalePath(
 
 // ─── TTF glyf table parser ────────────────────────────────────────────────────
 
-function parseTtfContours(r: Reader, offset: number, upm: number): PathCommand[] {
+function parseTtfContours(r: Reader, offset: number): PathCommand[] {
   r.seek(offset);
   const numContours = r.i16();
   if (numContours === 0) return [];
@@ -407,7 +407,7 @@ function parseCffCharstring(data: Uint8Array): PathCommand[] {
       let h = true;
       while (stack.length) {
         const v = pop();
-        h ? lineto(v, 0) : lineto(0, v);
+        if (h) lineto(v, 0); else lineto(0, v);
         h = !h;
       }
     } // hlineto
@@ -415,7 +415,7 @@ function parseCffCharstring(data: Uint8Array): PathCommand[] {
       let h = false;
       while (stack.length) {
         const v = pop();
-        h ? lineto(v, 0) : lineto(0, v);
+        if (h) lineto(v, 0); else lineto(0, v);
         h = !h;
       }
     } // vlineto
@@ -564,7 +564,7 @@ export function parse(buf: ArrayBuffer): MiniFont {
         return g;
       }
       const r = new Reader(buf);
-      const rawCmds = parseTtfContours(r, glyf!.offset + off, upm);
+      const rawCmds = parseTtfContours(r, glyf!.offset + off);
       const g: MiniGlyph = {
         getPath(x: number, y: number, fontSize: number) {
           return scalePath(rawCmds, x, y, fontSize, upm);

@@ -9,7 +9,6 @@ import type { Block, GlyphHandleMode } from "../types";
 const GRID_SIZE = 40;
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 3;
-const STAGE_PADDING = 0;
 
 export type CanvasStageProps = {
   blocks: Block[];
@@ -48,31 +47,6 @@ export type CanvasStageProps = {
 };
 
 const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
-
-const computeFit = (
-  viewportWidth: number,
-  stageViewportHeight: number,
-  artboardWidth: number,
-  artboardHeight: number
-) => {
-  const availW = Math.max(1, viewportWidth);
-  const availH = Math.max(1, stageViewportHeight);
-
-  const scaleX = availW / artboardWidth;
-  const scaleY = availH / artboardHeight;
-  const scale = clampScale(Math.min(scaleX, scaleY, 1));
-
-  const scaledW = artboardWidth * scale;
-  const scaledH = artboardHeight * scale;
-
-  return {
-    scale,
-    position: {
-      x: (viewportWidth - scaledW) / 2,
-      y: (stageViewportHeight - scaledH) / 2,
-    },
-  };
-};
 
 export const CanvasStage: React.FC<CanvasStageProps> = ({
   blocks,

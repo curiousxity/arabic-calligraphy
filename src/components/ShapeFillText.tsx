@@ -51,6 +51,7 @@ export type ShapeFillTextProps = {
   fontSize: number;
   color: string;
   fontFamily: string;
+  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
   shapeSvgPath: string;
   shapeWidth: number;
   shapeHeight: number;
@@ -124,7 +125,7 @@ function parseSvgPath(d: string): SvgCmd[] {
 }
 
 /** Replay parsed SVG commands onto a canvas context (no Path2D needed). */
-function replayPath(ctx: any, cmds: SvgCmd[]) {
+function replayPath(ctx: CanvasRenderingContext2D, cmds: SvgCmd[]) {
   ctx.beginPath();
   for (const c of cmds) {
     switch (c.type) {
@@ -190,7 +191,7 @@ function pointInPolygon(px: number, py: number, poly: Array<[number, number]>): 
   return inside;
 }
 
-function drawCommandsToCtx(ctx: any, commands: any[]) {
+function drawCommandsToCtx(ctx: CanvasRenderingContext2D, commands: SvgCmd[]) {
   ctx.beginPath();
   for (const cmd of commands) {
     switch (cmd.type) {
@@ -210,6 +211,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   fontSize,
   color,
   fontFamily,
+  fontStyle = "normal",
   shapeSvgPath,
   shapeWidth,
   shapeHeight,
@@ -270,6 +272,10 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
   const totalAdvance = glyphCache.reduce((s, g) => s + g.advance, 0);
 
+  const isBold = fontStyle === "bold" || fontStyle === "bold italic";
+  const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
+  const fauxBoldWidth = isBold ? Math.max(fontSize * 0.035, 0.6) : 0;
+
   const scaledW = shapeWidth * shapeScale;
   const scaledH = shapeHeight * shapeScale;
 
@@ -303,13 +309,13 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           ctx.scale(shapeScale, shapeScale);
 
           // Clip to shape using replayed path commands (Konva-safe, no Path2D)
-          replayPath(ctx, parsedCmds);
+          replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
           ctx.clip();
 
           // If no text data yet, draw a semi-transparent placeholder fill
           if (!shapeData || glyphCache.length === 0 || totalAdvance <= 0) {
             ctx.fillStyle = color + "33"; // 20% opacity hint
-            replayPath(ctx, parsedCmds);
+            replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
             ctx.fill();
             ctx.restore();
             return;
@@ -327,8 +333,14 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
               ctx.translate(gx, gy);
               if (shapeFillTextRotation !== 0) ctx.rotate(rotRad);
               ctx.scale(scX, scY);
-              drawCommandsToCtx(ctx, g.commands);
+              if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
+              drawCommandsToCtx(ctx as unknown as CanvasRenderingContext2D, g.commands);
               ctx.fill();
+              if (fauxBoldWidth > 0) {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = fauxBoldWidth / scX;
+                ctx.stroke();
+              }
               if (strokeWidth > 0) {
                 ctx.strokeStyle = stroke;
                 ctx.lineWidth = strokeWidth / scX;

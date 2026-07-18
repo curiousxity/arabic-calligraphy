@@ -141,7 +141,8 @@ function drawWarpedGlyphRun(
   warpY: number,
   drawStroke: boolean,
   strokeColor: string,
-  strokeWidth: number
+  strokeWidth: number,
+  fauxBoldWidth = 0
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -215,6 +216,11 @@ function drawWarpedGlyphRun(
 
     tracePath(ctx, cmds);
     ctx.fill();
+    if (fauxBoldWidth > 0 && !drawStroke) {
+      ctx.strokeStyle = ctx.fillStyle as string;
+      ctx.lineWidth = fauxBoldWidth;
+      ctx.stroke();
+    }
     if (drawStroke && strokeWidth > 0) {
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = strokeWidth;
@@ -269,6 +275,8 @@ export const ShapedText: React.FC<Props> = ({
   useEffect(() => {
     let alive = true;
 
+    // Mark loading before kicking off the async shapeText() fetch below.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHbLoaded(false);
     setShapeData((prev) => ({ ...prev, isLoading: true }));
 
@@ -392,6 +400,10 @@ export const ShapedText: React.FC<Props> = ({
     };
   }, [shapeData, text, fontSize]);
 
+  const isBold = fontStyle === "bold" || fontStyle === "bold italic";
+  const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
+  const fauxBoldWidth = isBold ? Math.max(fontSize * 0.035, 0.6) : 0;
+
   const bw = Math.max(glyphBounds.rawWidth, 20);
   const bh = Math.max(fontSize * lineHeight, glyphBounds.rawHeight, 24);
   const bx = align === "left" ? 0 : align === "right" ? -bw : -bw / 2;
@@ -460,10 +472,11 @@ export const ShapedText: React.FC<Props> = ({
 
           ctx.save();
           ctx.translate(localDrawX, localDrawY);
+          if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
 
           ctx.fillStyle = color;
           drawWarpedGlyphRun(
-            ctx as CanvasRenderingContext2D,
+            ctx as unknown as CanvasRenderingContext2D,
             shapeData.glyphs,
             font,
             fontSize,
@@ -473,12 +486,13 @@ export const ShapedText: React.FC<Props> = ({
             warpY,
             false,
             stroke,
-            strokeWidth
+            strokeWidth,
+            fauxBoldWidth
           );
 
           if (strokeWidth > 0) {
             drawWarpedGlyphRun(
-              ctx as CanvasRenderingContext2D,
+              ctx as unknown as CanvasRenderingContext2D,
               shapeData.glyphs,
               font,
               fontSize,

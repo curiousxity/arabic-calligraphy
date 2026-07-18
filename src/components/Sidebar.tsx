@@ -6,7 +6,7 @@ import {
   PERSIAN,
   URDU,
   PRESETS,
-} from "./SidebarPresets";
+} from "../lib/presets";
 import type { Block } from "../types";
 
 export type SidebarProps = {

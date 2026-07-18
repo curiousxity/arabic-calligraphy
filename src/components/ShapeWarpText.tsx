@@ -330,7 +330,7 @@ function replayPath(ctx: CanvasRenderingContext2D, cmds: SvgCmd[]) {
   }
 }
 
-function tracePath(ctx: CanvasRenderingContext2D, commands: any[]) {
+function tracePath(ctx: CanvasRenderingContext2D, commands: SvgCmd[]) {
   ctx.beginPath();
   for (const cmd of commands) {
     switch (cmd.type) {
@@ -486,6 +486,8 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
 
   useEffect(() => {
     aliveRef.current = true;
+    // Mark loading before kicking off the async shapeText() fetch below.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHbLoaded(false);
     setShapeData((prev) => ({ ...prev, isLoading: true }));
 
@@ -746,12 +748,12 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           if (!shapeSvgPath || parsedCmds.length === 0) return;
 
           ctx.save();
-          replayPath(ctx as CanvasRenderingContext2D, parsedCmds);
+          replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
           ctx.clip();
 
           if (!hbLoaded || !shapeData.font || shapeData.glyphs.length === 0) {
             ctx.fillStyle = `${color}22`;
-            replayPath(ctx as CanvasRenderingContext2D, parsedCmds);
+            replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
             ctx.fill();
             ctx.restore();
             return;
@@ -820,7 +822,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
               return out;
             });
 
-            tracePath(ctx as CanvasRenderingContext2D, cmds);
+            tracePath(ctx as unknown as CanvasRenderingContext2D, cmds);
             ctx.fill();
 
             if (strokeWidth > 0) {
