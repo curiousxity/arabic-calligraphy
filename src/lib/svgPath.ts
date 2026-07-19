@@ -83,6 +83,20 @@ export function pathToPolygon(cmds: SvgCmd[], steps = 8): Array<[number, number]
   return pts;
 }
 
+/** Replay parsed SVG commands onto a canvas context (no Path2D needed — Konva's context wrapper doesn't support it). */
+export function replayPath(ctx: CanvasRenderingContext2D, cmds: SvgCmd[]) {
+  ctx.beginPath();
+  for (const c of cmds) {
+    switch (c.type) {
+      case "M": ctx.moveTo(c.x, c.y); break;
+      case "L": ctx.lineTo(c.x, c.y); break;
+      case "C": ctx.bezierCurveTo(c.x1, c.y1, c.x2, c.y2, c.x, c.y); break;
+      case "Q": ctx.quadraticCurveTo(c.x1, c.y1, c.x, c.y); break;
+      case "Z": ctx.closePath(); break;
+    }
+  }
+}
+
 /** Ray-casting point-in-polygon test. */
 export function pointInPolygon(px: number, py: number, poly: Array<[number, number]>): boolean {
   let inside = false;

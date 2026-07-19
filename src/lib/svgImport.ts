@@ -227,17 +227,32 @@ function applyTransformToPathString(
   const out: string[] = [];
   let cmd = "";
   let nums: number[] = [];
+  // H/V only carry one axis, so transforming them correctly requires knowing
+  // the other axis from the current point — track it as we consume commands
+  // (coordinates here are assumed already absolute, matching the rest of
+  // this function's M/L/C/Q handling).
+  let curX = 0;
+  let curY = 0;
+  let startX = 0;
+  let startY = 0;
 
   const flush = () => {
     if (!cmd) return;
+    const upper = cmd.toUpperCase();
 
-    switch (cmd.toUpperCase()) {
+    switch (upper) {
       case "M":
       case "L":
       case "T":
         for (let i = 0; i < nums.length; i += 2) {
-          const nx = a * nums[i] + c * nums[i + 1] + e;
-          const ny = b * nums[i] + dd * nums[i + 1] + f;
+          curX = nums[i];
+          curY = nums[i + 1];
+          if (upper === "M" && i === 0) {
+            startX = curX;
+            startY = curY;
+          }
+          const nx = a * curX + c * curY + e;
+          const ny = b * curX + dd * curY + f;
           out.push(cmd, String(parseFloat(nx.toFixed(3))), String(parseFloat(ny.toFixed(3))));
           cmd = "L";
         }
@@ -254,6 +269,8 @@ function applyTransformToPathString(
             );
           }
           out.push("C", ...t.map((v) => String(parseFloat(v.toFixed(3)))));
+          curX = pts[4];
+          curY = pts[5];
         }
         break;
 
@@ -269,23 +286,33 @@ function applyTransformToPathString(
             );
           }
           out.push(cmd, ...t.map((v) => String(parseFloat(v.toFixed(3)))));
+          curX = pts[2];
+          curY = pts[3];
         }
         break;
 
       case "H":
         for (const x of nums) {
-          out.push("L", String(parseFloat((a * x + e).toFixed(3))), String(parseFloat(f.toFixed(3))));
+          curX = x;
+          const nx = a * curX + c * curY + e;
+          const ny = b * curX + dd * curY + f;
+          out.push("L", String(parseFloat(nx.toFixed(3))), String(parseFloat(ny.toFixed(3))));
         }
         break;
 
       case "V":
         for (const y of nums) {
-          out.push("L", String(parseFloat(e.toFixed(3))), String(parseFloat((dd * y + f).toFixed(3))));
+          curY = y;
+          const nx = a * curX + c * curY + e;
+          const ny = b * curX + dd * curY + f;
+          out.push("L", String(parseFloat(nx.toFixed(3))), String(parseFloat(ny.toFixed(3))));
         }
         break;
 
       case "Z":
         out.push("Z");
+        curX = startX;
+        curY = startY;
         break;
 
       default:

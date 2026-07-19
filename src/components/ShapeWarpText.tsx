@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Shape, Rect, Circle, Arc } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
-import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
+import { parseSvgPath, replayPath } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import {
   applyGlyphEdit,
@@ -124,52 +124,6 @@ function clampUnit(v: number) {
   return Math.max(-1, Math.min(1, v));
 }
 
-function replayPath(ctx: CanvasRenderingContext2D, cmds: SvgCmd[]) {
-  ctx.beginPath();
-  for (const c of cmds) {
-    switch (c.type) {
-      case "M":
-        ctx.moveTo(c.x, c.y);
-        break;
-      case "L":
-        ctx.lineTo(c.x, c.y);
-        break;
-      case "C":
-        ctx.bezierCurveTo(c.x1, c.y1, c.x2, c.y2, c.x, c.y);
-        break;
-      case "Q":
-        ctx.quadraticCurveTo(c.x1, c.y1, c.x, c.y);
-        break;
-      case "Z":
-        ctx.closePath();
-        break;
-    }
-  }
-}
-
-function tracePath(ctx: CanvasRenderingContext2D, commands: SvgCmd[]) {
-  ctx.beginPath();
-  for (const cmd of commands) {
-    switch (cmd.type) {
-      case "M":
-        ctx.moveTo(cmd.x, cmd.y);
-        break;
-      case "L":
-        ctx.lineTo(cmd.x, cmd.y);
-        break;
-      case "C":
-        ctx.bezierCurveTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y);
-        break;
-      case "Q":
-        ctx.quadraticCurveTo(cmd.x1, cmd.y1, cmd.x, cmd.y);
-        break;
-      case "Z":
-        ctx.closePath();
-        break;
-    }
-  }
-}
-
 function applyShapeWarpPoint(
   x: number,
   y: number,
@@ -218,6 +172,51 @@ function applyShapeWarpPoint(
   }
 
   return { x: px, y: py };
+}
+
+/**
+ * Inverse of applyShapeWarpPoint. None of the warp modes have a clean
+ * closed-form inverse (stretch/topBottom/radial/envelope all fold the x-axis
+ * position into the y-axis formula), so this solves numerically via Newton's
+ * method with a finite-difference Jacobian — a few iterations converge well
+ * within a pixel since the forward map is smooth and roughly linear locally.
+ */
+function invertShapeWarpPoint(
+  targetX: number,
+  targetY: number,
+  bounds: GlyphBounds,
+  shapeW: number,
+  shapeH: number,
+  padding: number,
+  mode: ShapeWarpMode,
+  strength: number
+) {
+  let x = targetX;
+  let y = targetY;
+  const eps = 1;
+
+  for (let iter = 0; iter < 12; iter++) {
+    const p = applyShapeWarpPoint(x, y, bounds, shapeW, shapeH, padding, mode, strength);
+    const dx = targetX - p.x;
+    const dy = targetY - p.y;
+    if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) break;
+
+    const px = applyShapeWarpPoint(x + eps, y, bounds, shapeW, shapeH, padding, mode, strength);
+    const py = applyShapeWarpPoint(x, y + eps, bounds, shapeW, shapeH, padding, mode, strength);
+
+    const j11 = (px.x - p.x) / eps;
+    const j21 = (px.y - p.y) / eps;
+    const j12 = (py.x - p.x) / eps;
+    const j22 = (py.y - p.y) / eps;
+
+    const det = j11 * j22 - j12 * j21;
+    if (Math.abs(det) < 1e-6) break;
+
+    x += (dx * j22 - dy * j12) / det;
+    y += (dy * j11 - dx * j21) / det;
+  }
+
+  return { x, y };
 }
 
 export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
@@ -447,8 +446,52 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   const bx = -bw / 2;
   const by = -bh / 2;
 
-  const localDrawOffsetX = -glyphBounds.minX + (bw - glyphBounds.rawWidth) / 2;
-  const localDrawOffsetY = -glyphBounds.minY + (bh - glyphBounds.rawHeight) / 2;
+  // Maps a raw (pre-warp) glyph-space point to the same on-screen position
+  // the sceneFunc's own warpPoint() puts the actual glyph pixels at, so
+  // overlay handles track the rendered glyphs instead of the unwarped run.
+  const warpHandlePoint = (rawX: number, rawY: number) => {
+    const p = applyShapeWarpPoint(
+      rawX,
+      rawY,
+      glyphBounds,
+      bw,
+      bh,
+      warpShapePadding,
+      warpShapeMode,
+      warpShapeStrength
+    );
+    return { x: bx + p.x, y: by + p.y };
+  };
+
+  const invertToRawPoint = (screenX: number, screenY: number) =>
+    invertShapeWarpPoint(
+      screenX - bx,
+      screenY - by,
+      glyphBounds,
+      bw,
+      bh,
+      warpShapePadding,
+      warpShapeMode,
+      warpShapeStrength
+    );
+
+  const moveHandleRect = selectedGlyphBox
+    ? (() => {
+        const rawX = selectedGlyphBox.x + selectedMoveOffset.offsetX;
+        const rawY = selectedGlyphBox.y + selectedMoveOffset.offsetY;
+        const topLeft = warpHandlePoint(rawX, rawY);
+        const bottomRight = warpHandlePoint(
+          rawX + selectedGlyphBox.width,
+          rawY + selectedGlyphBox.height
+        );
+        return {
+          x: topLeft.x,
+          y: topLeft.y,
+          width: bottomRight.x - topLeft.x,
+          height: bottomRight.y - topLeft.y,
+        };
+      })()
+    : null;
 
   return (
     <Group
@@ -468,8 +511,9 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
         const pos = group.getRelativePointerPosition();
         if (!pos) return;
 
-        const textSpaceX = pos.x - bx - localDrawOffsetX;
-        const textSpaceY = pos.y - by - localDrawOffsetY;
+        const raw = invertToRawPoint(pos.x, pos.y);
+        const textSpaceX = raw.x;
+        const textSpaceY = raw.y;
 
         const hit = hitBoxes.find(
           (b) =>
@@ -636,7 +680,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
                 return out as PathCommand;
               });
 
-              tracePath(ctx as unknown as CanvasRenderingContext2D, cmds);
+              replayPath(ctx as unknown as CanvasRenderingContext2D, cmds);
               ctx.fill();
 
               if (includeStroke && strokeWidth > 0) {
@@ -664,8 +708,8 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
         selectedStretches.map((h) => (
           <React.Fragment key={h.id}>
             <Circle
-              x={bx + localDrawOffsetX + h.anchorX}
-              y={by + localDrawOffsetY + h.anchorY}
+              x={warpHandlePoint(h.anchorX, h.anchorY).x}
+              y={warpHandlePoint(h.anchorX, h.anchorY).y}
               radius={7}
               fill={STRETCH_ANCHOR_COLOR}
               stroke="#ffffff"
@@ -680,9 +724,10 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
                 const pos = group.getRelativePointerPosition();
                 if (!pos || !onUpdateStretchHandle) return;
 
+                const raw = invertToRawPoint(pos.x, pos.y);
                 onUpdateStretchHandle(selectedGlyphIndex, h.id, {
-                  anchorX: pos.x - bx - localDrawOffsetX,
-                  anchorY: pos.y - by - localDrawOffsetY,
+                  anchorX: raw.x,
+                  anchorY: raw.y,
                 });
               }}
               onDragEnd={(e) => {
@@ -690,8 +735,8 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
               }}
             />
             <Circle
-              x={bx + localDrawOffsetX + h.dragX}
-              y={by + localDrawOffsetY + h.dragY}
+              x={warpHandlePoint(h.dragX, h.dragY).x}
+              y={warpHandlePoint(h.dragX, h.dragY).y}
               radius={7}
               fill={STRETCH_DRAG_COLOR}
               stroke="#ffffff"
@@ -706,9 +751,10 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
                 const pos = group.getRelativePointerPosition();
                 if (!pos || !onUpdateStretchHandle) return;
 
+                const raw = invertToRawPoint(pos.x, pos.y);
                 onUpdateStretchHandle(selectedGlyphIndex, h.id, {
-                  dragX: pos.x - bx - localDrawOffsetX,
-                  dragY: pos.y - by - localDrawOffsetY,
+                  dragX: raw.x,
+                  dragY: raw.y,
                 });
               }}
               onDragEnd={(e) => {
@@ -720,12 +766,13 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
 
       {glyphEditTool === "move" &&
         selectedGlyphIndex != null &&
-        selectedGlyphBox && (
+        selectedGlyphBox &&
+        moveHandleRect && (
           <Rect
-            x={bx + localDrawOffsetX + selectedGlyphBox.x + selectedMoveOffset.offsetX}
-            y={by + localDrawOffsetY + selectedGlyphBox.y + selectedMoveOffset.offsetY}
-            width={selectedGlyphBox.width}
-            height={selectedGlyphBox.height}
+            x={moveHandleRect.x}
+            y={moveHandleRect.y}
+            width={moveHandleRect.width}
+            height={moveHandleRect.height}
             fill="transparent"
             stroke={MOVE_HANDLE_COLOR}
             strokeWidth={2}
@@ -740,9 +787,10 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
               const pos = group.getRelativePointerPosition();
               if (!pos) return;
 
+              const raw = invertToRawPoint(pos.x, pos.y);
               moveDragOriginRef.current = {
-                x: pos.x,
-                y: pos.y,
+                x: raw.x,
+                y: raw.y,
                 offsetX: selectedMoveOffset.offsetX,
                 offsetY: selectedMoveOffset.offsetY,
               };
@@ -755,10 +803,11 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
               const pos = group.getRelativePointerPosition();
               if (!origin || !pos || !onSetGlyphMoveOffset) return;
 
+              const raw = invertToRawPoint(pos.x, pos.y);
               onSetGlyphMoveOffset(
                 selectedGlyphIndex,
-                origin.offsetX + (pos.x - origin.x),
-                origin.offsetY + (pos.y - origin.y)
+                origin.offsetX + (raw.x - origin.x),
+                origin.offsetY + (raw.y - origin.y)
               );
             }}
             onDragEnd={(e) => {

@@ -21,6 +21,7 @@ import {
   parseSvgPath,
   pathToPolygon,
   pointInPolygon,
+  replayPath,
   type SvgCmd,
 } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
@@ -109,20 +110,6 @@ type GlyphInstance = {
 
 // ─── SVG path parser ──────────────────────────────────────────────────────────
 
-/** Replay parsed SVG commands onto a canvas context (no Path2D needed). */
-function replayPath(ctx: CanvasRenderingContext2D, cmds: SvgCmd[]) {
-  ctx.beginPath();
-  for (const c of cmds) {
-    switch (c.type) {
-      case "M": ctx.moveTo(c.x, c.y); break;
-      case "L": ctx.lineTo(c.x, c.y); break;
-      case "C": ctx.bezierCurveTo(c.x1, c.y1, c.x2, c.y2, c.x, c.y); break;
-      case "Q": ctx.quadraticCurveTo(c.x1, c.y1, c.x, c.y); break;
-      case "Z": ctx.closePath(); break;
-    }
-  }
-}
-
 /**
  * Applies a point-transform to a glyph's raw outline commands (in the
  * glyph's own local coordinate space, same frame the tile-loop's own
@@ -155,19 +142,6 @@ function warpSvgCommands(
         return c;
     }
   });
-}
-
-function drawCommandsToCtx(ctx: CanvasRenderingContext2D, commands: SvgCmd[]) {
-  ctx.beginPath();
-  for (const cmd of commands) {
-    switch (cmd.type) {
-      case "M": ctx.moveTo(cmd.x, cmd.y); break;
-      case "L": ctx.lineTo(cmd.x, cmd.y); break;
-      case "C": ctx.bezierCurveTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y); break;
-      case "Q": ctx.quadraticCurveTo(cmd.x1, cmd.y1, cmd.x, cmd.y); break;
-      case "Z": ctx.closePath(); break;
-    }
-  }
 }
 
 export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
@@ -493,7 +467,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 if (shapeFillTextRotation !== 0) ctx.rotate(rotRad);
                 ctx.scale(scX, scY);
                 if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
-                drawCommandsToCtx(ctx as unknown as CanvasRenderingContext2D, commands);
+                replayPath(ctx as unknown as CanvasRenderingContext2D, commands);
                 ctx.fill();
                 if (includeExtras && fauxBoldWidth > 0) {
                   ctx.strokeStyle = fillColor;
