@@ -4,7 +4,6 @@ export type StarterTemplate = {
   id: string;
   label: string;
   description: string;
-  canvasPresetId: "square" | "story" | "a4";
   backgroundColor: string;
   blocks: Omit<TextBlock, "id">[];
 };
@@ -31,7 +30,6 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     id: "bismillah-card",
     label: "Bismillah Card",
     description: "Centered Bismillah in gold on a navy square.",
-    canvasPresetId: "square",
     backgroundColor: "#0d1526",
     blocks: [
       {
@@ -49,7 +47,6 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     id: "eid-greeting",
     label: "Eid Greeting",
     description: "Large greeting with a subtitle line, sized for a story post.",
-    canvasPresetId: "story",
     backgroundColor: "#f2ead9",
     blocks: [
       {
@@ -76,7 +73,6 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     id: "name-monogram",
     label: "Name Monogram",
     description: "A single bold word, centered — good for names or short titles.",
-    canvasPresetId: "square",
     backgroundColor: "#ffffff",
     blocks: [
       {
@@ -94,7 +90,6 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     id: "quote-card",
     label: "Quote Card",
     description: "A body line with a smaller attribution, sized for print (A4).",
-    canvasPresetId: "a4",
     backgroundColor: "#faf5e8",
     blocks: [
       {

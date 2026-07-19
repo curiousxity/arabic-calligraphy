@@ -192,13 +192,19 @@ html, body, #root { height: 100%; margin: 0; }
 .sidebarPillButton:hover:not(:disabled) { background: var(--accent-soft-hover); color: var(--text-on-accent); }
 .sidebarPillButton:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.sidebarPresetKeyboard { border: none; border-radius: 14px; padding: 10px; background: var(--bg-panel); box-sizing: border-box; }
-.sidebarPresetKeyboardTitle { font-size: 12px; color: var(--text-primary); margin-bottom: 10px; font-weight: 400; }
+.sidebarPresetKeyboard { border: 1px solid var(--border-soft); border-radius: 14px; padding: 12px 10px 10px; background: var(--bg-input); box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.15); box-sizing: border-box; }
+.sidebarPresetKeyboardTitle { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; letter-spacing: 0.02em; color: var(--accent); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-soft); font-weight: 400; }
 .sidebarPresetKeyboardRow { display: flex; justify-content: center; gap: 5px; flex-wrap: nowrap; }
-.sidebarPresetKeyboardKey { flex: 1 1 0; min-width: 0; height: 40px; padding: 6px 4px; font-size: 18px; text-align: center; border-radius: 8px; border: none; background: var(--key-bg); color: var(--key-text); cursor: pointer; line-height: 1.1; box-shadow: 0 2px 0 var(--key-shadow); transition: background 0.1s, transform 0.06s, box-shadow 0.06s; }
-.sidebarPresetKeyboardKey:hover { background: var(--key-hover); }
+.sidebarPresetKeyboardRow + .sidebarPresetKeyboardRow { margin-top: 5px; }
+.sidebarPresetKeyboardKey { position: relative; flex: 1 1 0; min-width: 0; height: 42px; padding: 6px 4px; font-size: 18px; text-align: center; border-radius: 8px; border: 1px solid var(--border-soft); background: var(--key-bg); color: var(--key-text); cursor: pointer; line-height: 1.1; box-shadow: 0 2px 0 var(--key-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05); transition: background 0.1s, transform 0.06s, box-shadow 0.06s, border-color 0.12s; }
+.sidebarPresetKeyboardKey:hover { background: var(--key-hover); border-color: var(--accent); transform: translateY(-1px); box-shadow: 0 3px 0 var(--key-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
 .sidebarPresetKeyboardKey:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--key-shadow-active); }
 .sidebarPresetKeyboardKeyWide { font-size: 14px; }
+.sidebarPresetKeyboardKeyLarge { font-size: 34px; }
+.sidebarPresetKeyboardKeyAction { flex: 1.4 1 0; font-size: 15px; color: var(--text-secondary); }
+.sidebarPresetKeyboardKeyActive { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset, 0 2px 0 var(--key-shadow); }
+.sidebarPresetKeyboardKeySpace { flex: 1 1 auto; font-size: 12px; letter-spacing: 0.04em; color: var(--text-muted); }
+.sidebarPresetKeyboardKeyHint { position: absolute; top: 3px; right: 5px; font-size: 9px; line-height: 1; color: var(--text-faint); pointer-events: none; }
 
 /* Layers */
 .layerIconBtn { display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; font-size: 12px; padding: 2px 3px; flex-shrink: 0; opacity: 0.65; border-radius: 4px; transition: background 0.1s, opacity 0.1s; color: var(--text-secondary); }

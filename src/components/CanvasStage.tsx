@@ -7,11 +7,17 @@ import { ShapeWarpText } from "./ShapeWarpText";
 import { ImageBlockView } from "./ImageBlockView";
 import { ZoomInIcon, ZoomOutIcon, FrameIcon, HandIcon } from "./Icons";
 import { isTypingTarget } from "../lib/dom";
+import {
+  MIN_SCALE,
+  MAX_SCALE,
+  getBlocksBoundingBox,
+  padBox,
+  unionRect,
+  DEFAULT_EMPTY_BOUNDS,
+} from "../lib/canvasBounds";
 import type { Block, GlyphHandleMode } from "../types";
 
 const GRID_SIZE = 40;
-const MIN_SCALE = 0.05;
-const MAX_SCALE = 3;
 const SNAP_GUIDE_PX = 6;
 const RULER_SIZE = 20;
 const RULER_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
@@ -30,8 +36,6 @@ export type CanvasStageProps = {
   snapToGrid: boolean;
   showGrid: boolean;
   viewportWidth: number;
-  artboardWidth: number;
-  artboardHeight: number;
   stageViewportHeight: number;
   backgroundColor: string;
   stageRef: React.RefObject<Konva.Stage | null>;
@@ -40,6 +44,8 @@ export type CanvasStageProps = {
   panMode: boolean;
   onTogglePanMode: (value: boolean) => void;
   onUpdateStage: (scale: number, position: { x: number; y: number }) => void;
+  onResetView: () => void;
+  onZoomToActualSize: () => void;
   onUpdateBlockPosition: (id: number, x: number, y: number) => void;
   onSelectBlock: (id: number, additive?: boolean) => void;
   onEditBlock: (id: number) => void;
@@ -78,8 +84,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   snapToGrid,
   showGrid,
   viewportWidth,
-  artboardWidth,
-  artboardHeight,
   stageViewportHeight,
   backgroundColor,
   stageRef,
@@ -88,6 +92,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   panMode,
   onTogglePanMode,
   onUpdateStage,
+  onResetView,
+  onZoomToActualSize,
   onUpdateBlockPosition,
   onSelectBlock,
   onEditBlock,
@@ -112,6 +118,30 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   const [spacePan, setSpacePan] = useState(false);
   const effectivePanMode = panMode || spacePan;
   const additiveSelectRef = useRef(false);
+
+  const [contentBox, setContentBox] = useState(padBox(DEFAULT_EMPTY_BOUNDS));
+
+  const recomputeContentBox = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const paddedContent = padBox(getBlocksBoundingBox(stage, blocks) ?? DEFAULT_EMPTY_BOUNDS);
+    // Never show canvas-container chrome inside the visible viewport — the
+    // background/grid always cover at least what's currently in view, and
+    // extend further to hug padded content wherever that is.
+    const viewRect = {
+      x: -stagePosition.x / stageScale,
+      y: -stagePosition.y / stageScale,
+      width: viewportWidth / stageScale,
+      height: stageViewportHeight / stageScale,
+    };
+    setContentBox(unionRect(paddedContent, viewRect));
+  };
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(recomputeContentBox);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks, stagePosition, stageScale, viewportWidth, stageViewportHeight]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -158,8 +188,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       if (block.locked || effectivePanMode) return;
 
       const threshold = SNAP_GUIDE_PX / stageScale;
-      const xTargets = [artboardWidth / 2, ...guides.vertical];
-      const yTargets = [artboardHeight / 2, ...guides.horizontal];
+      const xTargets = [contentBox.x + contentBox.width / 2, ...guides.vertical];
+      const yTargets = [contentBox.y + contentBox.height / 2, ...guides.horizontal];
       for (const other of blocks) {
         if (other.id === block.id) continue;
         xTargets.push(other.x);
@@ -187,16 +217,23 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
           }
         }
       }
+
+      recomputeContentBox();
     };
 
   const renderGridLines = () => {
     const lines: React.ReactNode[] = [];
 
-    for (let x = 0; x <= artboardWidth; x += GRID_SIZE) {
+    const startX = Math.floor(contentBox.x / GRID_SIZE) * GRID_SIZE;
+    const endX = Math.ceil((contentBox.x + contentBox.width) / GRID_SIZE) * GRID_SIZE;
+    const startY = Math.floor(contentBox.y / GRID_SIZE) * GRID_SIZE;
+    const endY = Math.ceil((contentBox.y + contentBox.height) / GRID_SIZE) * GRID_SIZE;
+
+    for (let x = startX; x <= endX; x += GRID_SIZE) {
       lines.push(
         <Line
           key={`v-${x}`}
-          points={[x, 0, x, artboardHeight]}
+          points={[x, startY, x, endY]}
           stroke="#ddd"
           strokeWidth={1}
           listening={false}
@@ -204,11 +241,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       );
     }
 
-    for (let y = 0; y <= artboardHeight; y += GRID_SIZE) {
+    for (let y = startY; y <= endY; y += GRID_SIZE) {
       lines.push(
         <Line
           key={`h-${y}`}
-          points={[0, y, artboardWidth, y]}
+          points={[startX, y, endX, y]}
           stroke="#ddd"
           strokeWidth={1}
           listening={false}
@@ -306,17 +343,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   const handleZoomOut = () => onUpdateStage(clampScale(stageScale / 1.1), stagePosition);
   const handleZoomIn = () => onUpdateStage(clampScale(stageScale * 1.1), stagePosition);
 
-  const handleReset = () => {
-    const scaledW = artboardWidth * 1;
-    const scaledH = artboardHeight * 1;
-    const position = {
-      x: (viewportWidth - scaledW) / 2,
-      y: (stageViewportHeight - scaledH) / 2,
-    };
-    onUpdateStage(1, position);
-    onTogglePanMode(false);
-  };
-
   const makeDragEndHandler =
     (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
       setSnapGuides({ x: null, y: null });
@@ -367,10 +393,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
           </button>
           <button
             type="button"
-            onClick={handleReset}
+            onClick={onZoomToActualSize}
             className="canvasToolbarBtn canvasToolbarZoomLabel"
-            title="Reset zoom to 100%"
-            aria-label="Reset zoom"
+            title="Zoom to 100%"
+            aria-label="Zoom to 100%"
           >
             {Math.round(stageScale * 100)}%
           </button>
@@ -388,9 +414,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
           <button
             type="button"
-            onClick={handleReset}
+            onClick={onResetView}
             className="canvasToolbarBtn"
-            title="Reset view"
+            title="Reset view (fit content)"
             aria-label="Reset view"
           >
             <FrameIcon size={15} />
@@ -488,10 +514,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
           <Layer>
             <Rect
               id="artboard-background"
-              x={0}
-              y={0}
-              width={artboardWidth}
-              height={artboardHeight}
+              x={contentBox.x}
+              y={contentBox.y}
+              width={contentBox.width}
+              height={contentBox.height}
               fill={backgroundColor}
               listening={false}
             />
@@ -556,9 +582,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     shapeFillScaleY={block.shapeFillScaleY ?? 1}
                     shapeFillTextRotation={block.shapeFillTextRotation ?? 0}
                     opacity={block.opacity ?? 1}
-                    stroke={block.stroke ?? "#000000"}
+                    stroke={block.stroke}
                     strokeWidth={block.strokeWidth ?? 0}
-                    shadowColor={block.shadowColor ?? "#000000"}
+                    shadowColor={block.shadowColor}
                     shadowBlur={block.shadowBlur ?? 0}
                     shadowOffsetX={block.shadowOffsetX ?? 0}
                     shadowOffsetY={block.shadowOffsetY ?? 0}
@@ -590,9 +616,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     warpShapePadding={block.warpShapePadding ?? 24}
                     warpShapeStrength={block.warpShapeStrength ?? 1}
                     opacity={block.opacity ?? 1}
-                    stroke={block.stroke ?? "#000000"}
+                    stroke={block.stroke}
                     strokeWidth={block.strokeWidth ?? 0}
-                    shadowColor={block.shadowColor ?? "#000000"}
+                    shadowColor={block.shadowColor}
                     shadowBlur={block.shadowBlur ?? 0}
                     shadowOffsetX={block.shadowOffsetX ?? 0}
                     shadowOffsetY={block.shadowOffsetY ?? 0}
@@ -628,9 +654,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   align={block.align ?? "center"}
                   lineHeight={block.lineHeight ?? 1.2}
                   opacity={block.opacity ?? 1}
-                  stroke={block.stroke ?? "#000000"}
+                  stroke={block.stroke}
                   strokeWidth={block.strokeWidth ?? 0}
-                  shadowColor={block.shadowColor ?? "#000000"}
+                  shadowColor={block.shadowColor}
                   shadowBlur={block.shadowBlur ?? 0}
                   shadowOffsetX={block.shadowOffsetX ?? 0}
                   shadowOffsetY={block.shadowOffsetY ?? 0}
@@ -683,7 +709,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
             {snapGuides.x != null && (
               <Line
-                points={[snapGuides.x, -1000, snapGuides.x, artboardHeight + 1000]}
+                points={[snapGuides.x, -100000, snapGuides.x, 100000]}
                 stroke="#ff2d78"
                 strokeWidth={1 / stageScale}
                 dash={[4 / stageScale, 3 / stageScale]}
@@ -692,7 +718,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             )}
             {snapGuides.y != null && (
               <Line
-                points={[-1000, snapGuides.y, artboardWidth + 1000, snapGuides.y]}
+                points={[-100000, snapGuides.y, 100000, snapGuides.y]}
                 stroke="#ff2d78"
                 strokeWidth={1 / stageScale}
                 dash={[4 / stageScale, 3 / stageScale]}

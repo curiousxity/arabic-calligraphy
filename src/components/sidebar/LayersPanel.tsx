@@ -12,6 +12,8 @@ import {
   MergeIcon,
   UngroupIcon,
   CloseIcon,
+  PlusIcon,
+  TrashIcon,
 } from "../Icons";
 
 const GROUP_HUE_STEP = 47;
@@ -41,6 +43,7 @@ export type LayersPanelProps = {
   onUngroup: (id: number) => void;
   onRename: (id: number, name: string) => void;
   onZoomTo?: (id: number) => void;
+  onAddBlock: () => void;
 };
 
 export const LayersPanel: React.FC<LayersPanelProps> = ({
@@ -56,6 +59,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   onUngroup,
   onRename,
   onZoomTo,
+  onAddBlock,
 }) => {
   const [mergeTarget, setMergeTarget] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -88,6 +92,31 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginBottom: 2 }}>
+        <button
+          type="button"
+          onClick={() => selectedId != null && onDelete(selectedId)}
+          disabled={selectedId == null}
+          className="sidebarCircleButton sidebarCircleButton--light"
+          style={{ width: 22, height: 22 }}
+          title="Delete selected layer"
+          aria-label="Delete selected layer"
+        >
+          <TrashIcon size={11} />
+        </button>
+
+        <button
+          type="button"
+          onClick={onAddBlock}
+          className="sidebarCircleButton sidebarCircleButton--light"
+          style={{ width: 22, height: 22 }}
+          title="Add text layer"
+          aria-label="Add text layer"
+        >
+          <PlusIcon size={11} />
+        </button>
+      </div>
+
       {mergeTarget != null && (
         <div
           style={{

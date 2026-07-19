@@ -12,6 +12,14 @@ import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
 import { STARTER_TEMPLATES } from "./lib/templates";
+import {
+  MIN_SCALE,
+  MAX_SCALE,
+  getBlocksBoundingBox,
+  padBox,
+  computeFitToBox,
+  DEFAULT_EMPTY_BOUNDS,
+} from "./lib/canvasBounds";
 import type { Block, GlyphWarp, GlyphHandleMode } from "./types";
 
 const dissolveSingletonGroups = (list: Block[]): Block[] => {
@@ -24,17 +32,8 @@ const dissolveSingletonGroups = (list: Block[]): Block[] => {
   );
 };
 
-type CanvasPreset = {
-  id: string;
-  label: string;
-  width: number;
-  height: number;
-};
-
 type EditorSnapshot = {
   blocks: Block[];
-  canvasPresetId: string;
-  customCanvasSize: { width: number; height: number };
   backgroundColor: string;
 };
 
@@ -68,17 +67,8 @@ const glyphBoxesEqual = (a: GlyphBox[] | undefined, b: GlyphBox[]): boolean => {
   return true;
 };
 
-const CANVAS_PRESETS: CanvasPreset[] = [
-  { id: "square", label: "Instagram Square (1080×1080)", width: 1080, height: 1080 },
-  { id: "story", label: "Story (1080×1920)", width: 1080, height: 1920 },
-  { id: "a4", label: "Print A4 (2480×3508)", width: 2480, height: 3508 },
-];
-
 const STORAGE_KEY = "calligraphy-layout-v2";
 const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
-const MIN_SCALE = 0.05;
-const MAX_SCALE = 3;
-const STAGE_PADDING = 0;
 const SIDEBAR_COLLAPSED_WIDTH = 28;
 const DEFAULT_TEXT_FONT_SIZE = 53;
 const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
@@ -115,43 +105,6 @@ const isBrowser = typeof window !== "undefined";
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
-const parseCustomCanvasSize = (
-  value: unknown
-): { width: number; height: number } | null => {
-  if (
-    value &&
-    typeof value === "object" &&
-    typeof (value as { width?: unknown }).width === "number" &&
-    typeof (value as { height?: unknown }).height === "number"
-  ) {
-    const { width, height } = value as { width: number; height: number };
-    return { width: clamp(Math.round(width), 50, 8000), height: clamp(Math.round(height), 50, 8000) };
-  }
-  return null;
-};
-
-const computeFitToViewport = (
-  canvasWidth: number,
-  viewportHeight: number,
-  preset: CanvasPreset
-) => {
-  const availW = Math.max(1, canvasWidth - STAGE_PADDING * 2);
-  const availH = Math.max(1, viewportHeight - STAGE_PADDING * 2);
-  const scaleX = availW / preset.width;
-  const scaleY = availH / preset.height;
-  const scale = clamp(Math.max(scaleX, scaleY), MIN_SCALE, MAX_SCALE);
-  const scaledW = preset.width * scale;
-  const scaledH = preset.height * scale;
-
-  return {
-    scale,
-    position: {
-      x: (canvasWidth - scaledW) / 2,
-      y: Math.max(STAGE_PADDING, (viewportHeight - scaledH) / 2),
-    },
-  };
-};
-
 const makeHandleId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -182,13 +135,8 @@ const App: React.FC = () => {
     }
   });
   const [isMobile, setIsMobile] = useState(isBrowser ? window.innerWidth <= 768 : false);
-  const [canvasPresetId, setCanvasPresetId] = useState<string>("story");
-  const [customCanvasSize, setCustomCanvasSize] = useState<{ width: number; height: number }>({
-    width: 1080,
-    height: 1080,
-  });
   const [backgroundColor, setBackgroundColor] = useState<string>("#ffffff");
-  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [sidebarWidth, setSidebarWidth] = useState(360);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [panMode, setPanMode] = useState(false);
@@ -196,19 +144,6 @@ const App: React.FC = () => {
   const [viewportHeight, setViewportHeight] = useState(isBrowser ? window.innerHeight : 800);
 
   const [glyphBoxesByBlock, setGlyphBoxesByBlock] = useState<Record<number, GlyphBox[]>>({});
-
-  const currentPreset: CanvasPreset = useMemo(
-    () =>
-      canvasPresetId === "custom"
-        ? {
-            id: "custom",
-            label: "Custom",
-            width: customCanvasSize.width,
-            height: customCanvasSize.height,
-          }
-        : CANVAS_PRESETS.find((p) => p.id === canvasPresetId) ?? CANVAS_PRESETS[0],
-    [canvasPresetId, customCanvasSize]
-  );
 
   const effectiveSidebarWidth = isMobile
     ? viewportWidth
@@ -225,25 +160,23 @@ const App: React.FC = () => {
     ? Math.max(240, viewportHeight - mobileSidebarBudget)
     : viewportHeight;
 
-  const initialFit = computeFitToViewport(
+  const initialFit = computeFitToBox(
     Math.max(1, isBrowser ? window.innerWidth - 320 : 880),
     isBrowser ? window.innerHeight : 800,
-    CANVAS_PRESETS.find((p) => p.id === "story") ?? CANVAS_PRESETS[0]
+    DEFAULT_EMPTY_BOUNDS,
+    0
   );
 
   const [stageScale, setStageScale] = useState(initialFit.scale);
   const [stagePosition, setStagePosition] = useState(initialFit.position);
 
-  const [blocks, setBlocks] = useState<Block[]>(() => {
-    const preset = CANVAS_PRESETS.find((p) => p.id === "story") ?? CANVAS_PRESETS[0];
-    return [
-      {
-        ...DEFAULT_BLOCK,
-        x: preset.width / 2,
-        y: preset.height * 0.05,
-      },
-    ];
-  });
+  const [blocks, setBlocks] = useState<Block[]>(() => [
+    {
+      ...DEFAULT_BLOCK,
+      x: 0,
+      y: 40,
+    },
+  ]);
 
   const stageRef = useRef<Konva.Stage | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
@@ -254,10 +187,8 @@ const App: React.FC = () => {
   const clipboardRef = useRef<Block | null>(null);
   const [editRequestSignal, setEditRequestSignal] = useState(0);
   const moveTimeoutRef = useRef<number | null>(null);
-  const customSizeTimeoutRef = useRef<number | null>(null);
-  const lastAutoFitSignatureRef = useRef<string>("");
   const didHydrateLayoutRef = useRef(false);
-  const skipNextAutoFitRef = useRef(false);
+  const prevViewportRef = useRef({ w: 0, h: 0 });
 
   const selectedBlock = useMemo(
     () => (selectedId == null ? undefined : blocks.find((b) => b.id === selectedId)),
@@ -286,14 +217,12 @@ const App: React.FC = () => {
   );
 
   const getSnapshot = useCallback(
-    (): EditorSnapshot => ({ blocks, canvasPresetId, customCanvasSize, backgroundColor }),
-    [blocks, canvasPresetId, customCanvasSize, backgroundColor]
+    (): EditorSnapshot => ({ blocks, backgroundColor }),
+    [blocks, backgroundColor]
   );
 
   const applySnapshot = useCallback((snapshot: EditorSnapshot) => {
     setBlocks(snapshot.blocks);
-    setCanvasPresetId(snapshot.canvasPresetId);
-    setCustomCanvasSize(snapshot.customCanvasSize);
     setBackgroundColor(snapshot.backgroundColor);
   }, []);
 
@@ -477,42 +406,35 @@ const App: React.FC = () => {
     [pushHistory]
   );
 
-  const changeCustomCanvasSize = useCallback(
-    (width: number, height: number) => {
-      setCanvasPresetId("custom");
-      setCustomCanvasSize({
-        width: clamp(Math.round(width), 50, 8000),
-        height: clamp(Math.round(height), 50, 8000),
-      });
-      if (customSizeTimeoutRef.current != null) window.clearTimeout(customSizeTimeoutRef.current);
-      customSizeTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
-    },
-    [pushHistory]
-  );
-
-  const fitStageToViewport = useCallback(
-    (options?: { force?: boolean }) => {
+  const zoomToRect = useCallback(
+    (rect: { x: number; y: number; width: number; height: number }, marginPx = 60) => {
       if (canvasWidth <= 0 || stageViewportHeight <= 0) return;
-
-      const fit = computeFitToViewport(canvasWidth, stageViewportHeight, currentPreset);
-      const signature = [
-        currentPreset.id,
-        canvasWidth,
-        stageViewportHeight,
-        Math.round(fit.scale * 10000),
-        Math.round(fit.position.x),
-        Math.round(fit.position.y),
-      ].join(":");
-
-      if (!options?.force && lastAutoFitSignatureRef.current === signature) return;
-
-      lastAutoFitSignatureRef.current = signature;
+      const fit = computeFitToBox(canvasWidth, stageViewportHeight, rect, marginPx);
       setStageScale(fit.scale);
       setStagePosition(fit.position);
       setPanMode(false);
     },
-    [canvasWidth, stageViewportHeight, currentPreset]
+    [canvasWidth, stageViewportHeight]
   );
+
+  const resetView = useCallback(() => {
+    const stage = stageRef.current;
+    const box = stage ? getBlocksBoundingBox(stage, blocks) : null;
+    zoomToRect(padBox(box ?? DEFAULT_EMPTY_BOUNDS), 0);
+  }, [blocks, zoomToRect]);
+
+  const zoomToActualSize = useCallback(() => {
+    if (canvasWidth <= 0 || stageViewportHeight <= 0) return;
+    const stage = stageRef.current;
+    const box = stage ? getBlocksBoundingBox(stage, blocks) : null;
+    const b = padBox(box ?? DEFAULT_EMPTY_BOUNDS);
+    setStageScale(1);
+    setStagePosition({
+      x: canvasWidth / 2 - (b.x + b.width / 2),
+      y: stageViewportHeight / 2 - (b.y + b.height / 2),
+    });
+    setPanMode(false);
+  }, [blocks, canvasWidth, stageViewportHeight]);
 
   useEffect(() => {
     if (!isBrowser) return;
@@ -535,9 +457,8 @@ const App: React.FC = () => {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
-          // One-time layout hydration on mount; fits the stage to the current viewport.
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          fitStageToViewport({ force: true });
+          // One-time layout hydration on mount; fits the stage to the current content.
+          resetView();
           return;
         }
 
@@ -548,16 +469,8 @@ const App: React.FC = () => {
           setSelectedIds([]);
           setSelectedId(parsed.selectedId);
         }
-        if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
-        const parsedCustomSize = parseCustomCanvasSize(parsed.customCanvasSize);
-        if (parsedCustomSize) setCustomCanvasSize(parsedCustomSize);
         if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
         if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
-
-        const samePreset =
-          typeof parsed.canvasPresetId === "string"
-            ? parsed.canvasPresetId === currentPreset.id
-            : true;
 
         const savedViewportWidth =
           typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
@@ -571,7 +484,6 @@ const App: React.FC = () => {
           Math.abs(savedViewportHeight - viewportHeight) < 80;
 
         if (
-          samePreset &&
           viewportCloseEnough &&
           typeof parsed.stageScale === "number" &&
           parsed.stagePosition &&
@@ -580,35 +492,39 @@ const App: React.FC = () => {
         ) {
           setStageScale(clamp(parsed.stageScale, MIN_SCALE, MAX_SCALE));
           setStagePosition(parsed.stagePosition);
-          skipNextAutoFitRef.current = true;
         } else {
-          fitStageToViewport({ force: true });
+          setTimeout(() => resetView(), 0);
         }
       } catch {
-        fitStageToViewport({ force: true });
+        resetView();
       }
     }
-  }, [currentPreset.id, fitStageToViewport, viewportWidth, viewportHeight]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewportWidth, viewportHeight]);
 
   useEffect(() => {
-    if (canvasWidth <= 0 || stageViewportHeight <= 0) return;
-
-    if (skipNextAutoFitRef.current) {
-      skipNextAutoFitRef.current = false;
-      return;
+    const prev = prevViewportRef.current;
+    if (prev.w > 0 && prev.h > 0 && (prev.w !== canvasWidth || prev.h !== stageViewportHeight)) {
+      // Keep whatever world-space point was centered before the resize still
+      // centered after it, instead of rescaling — standard infinite-canvas
+      // behavior (there's no declared page size to re-fit to anymore).
+      const worldCenterX = (prev.w / 2 - stagePosition.x) / stageScale;
+      const worldCenterY = (prev.h / 2 - stagePosition.y) / stageScale;
+      setStagePosition({
+        x: canvasWidth / 2 - worldCenterX * stageScale,
+        y: stageViewportHeight / 2 - worldCenterY * stageScale,
+      });
     }
-
-    // Re-fit the stage transform whenever the canvas/preset dimensions change.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fitStageToViewport({ force: true });
-  }, [canvasWidth, stageViewportHeight, canvasPresetId, fitStageToViewport]);
+    prevViewportRef.current = { w: canvasWidth, h: stageViewportHeight };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasWidth, stageViewportHeight]);
 
   if (blocks.length === 0) {
     setBlocks([
       {
         ...DEFAULT_BLOCK,
-        x: currentPreset.width / 2,
-        y: currentPreset.height * 0.05,
+        x: 0,
+        y: 40,
       },
     ]);
     setSelectedId(1);
@@ -727,10 +643,10 @@ const App: React.FC = () => {
     pushHistory();
     const newBlocks: Block[] = template.blocks.map((b) => ({ ...b, id: createNextId() }));
     setBlocks(newBlocks);
-    setCanvasPresetId(template.canvasPresetId);
     setBackgroundColor(template.backgroundColor);
     setSelectedIds([]);
     setSelectedId(newBlocks[0]?.id ?? null);
+    setTimeout(() => resetView(), 0);
   };
 
   const updateSelectedBlock = useCallback(
@@ -837,10 +753,13 @@ const App: React.FC = () => {
 
       let refX0: number, refX1: number, refY0: number, refY1: number;
       if (items.length === 1) {
-        refX0 = 0;
-        refX1 = currentPreset.width;
-        refY0 = 0;
-        refY1 = currentPreset.height;
+        const stage = stageRef.current;
+        const box = stage ? getBlocksBoundingBox(stage, blocks) : null;
+        const ref = box ?? items[0].rect;
+        refX0 = ref.x;
+        refX1 = ref.x + ref.width;
+        refY0 = ref.y;
+        refY1 = ref.y + ref.height;
       } else {
         refX0 = Math.min(...items.map((it) => it.rect.x));
         refX1 = Math.max(...items.map((it) => it.rect.x + it.rect.width));
@@ -883,7 +802,7 @@ const App: React.FC = () => {
         })
       );
     },
-    [getSelectedNodeRects, currentPreset, pushHistory]
+    [getSelectedNodeRects, blocks, pushHistory]
   );
 
   const distributeSelectedBlocks = useCallback(
@@ -942,7 +861,7 @@ const App: React.FC = () => {
     const stage = stageRef.current;
     const container = canvasContainerRef.current;
     if (!stage || !container) {
-      return { x: currentPreset.width / 2, y: currentPreset.height / 2 };
+      return { x: 0, y: 0 };
     }
 
     const viewRect = container.getBoundingClientRect();
@@ -958,10 +877,10 @@ const App: React.FC = () => {
     }
 
     return {
-      x: pos?.x ?? currentPreset.width / 2,
-      y: pos?.y ?? currentPreset.height / 2,
+      x: pos?.x ?? 0,
+      y: pos?.y ?? 0,
     };
-  }, [currentPreset]);
+  }, []);
 
   const zoomToBlock = useCallback(
     (id: number) => {
@@ -969,27 +888,9 @@ const App: React.FC = () => {
       if (!stage) return;
       const node = stage.findOne(`#block-${id}`);
       if (!node) return;
-
-      const rect = node.getClientRect({ relativeTo: stage });
-      const ZOOM_PADDING = 60;
-      const availW = Math.max(1, canvasWidth - ZOOM_PADDING * 2);
-      const availH = Math.max(1, stageViewportHeight - ZOOM_PADDING * 2);
-      const scale = clamp(
-        Math.min(availW / Math.max(rect.width, 1), availH / Math.max(rect.height, 1)),
-        MIN_SCALE,
-        MAX_SCALE
-      );
-
-      const position = {
-        x: canvasWidth / 2 - (rect.x + rect.width / 2) * scale,
-        y: stageViewportHeight / 2 - (rect.y + rect.height / 2) * scale,
-      };
-
-      setStageScale(scale);
-      setStagePosition(position);
-      setPanMode(false);
+      zoomToRect(node.getClientRect({ relativeTo: stage }));
     },
-    [canvasWidth, stageViewportHeight]
+    [zoomToRect]
   );
 
   const addBlock = () => {
@@ -1038,8 +939,6 @@ const App: React.FC = () => {
   const buildLayoutPayload = () => ({
     blocks,
     selectedId,
-    canvasPresetId,
-    customCanvasSize,
     backgroundColor,
     stageScale,
     stagePosition,
@@ -1067,28 +966,8 @@ const App: React.FC = () => {
         setSelectedIds([]);
         setSelectedId(parsed.selectedId);
       }
-      if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
-      const parsedCustomSize = parseCustomCanvasSize(parsed.customCanvasSize);
-      if (parsedCustomSize) setCustomCanvasSize(parsedCustomSize);
       if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
       if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
-
-      const loadedPresetId = parsed.canvasPresetId ?? canvasPresetId;
-      const loadedPresetDims: CanvasPreset =
-        loadedPresetId === "custom"
-          ? {
-              id: "custom",
-              label: "Custom",
-              width: (parsedCustomSize ?? customCanvasSize).width,
-              height: (parsedCustomSize ?? customCanvasSize).height,
-            }
-          : CANVAS_PRESETS.find((p) => p.id === loadedPresetId) ?? currentPreset;
-
-      const currentFit = computeFitToViewport(
-        canvasWidth || Math.max(1, viewportWidth - effectiveSidebarWidth),
-        stageViewportHeight || viewportHeight,
-        loadedPresetDims
-      );
 
       const savedViewportWidth =
         typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
@@ -1110,13 +989,11 @@ const App: React.FC = () => {
       ) {
         setStageScale(clamp(parsed.stageScale, MIN_SCALE, MAX_SCALE));
         setStagePosition(parsed.stagePosition);
-        skipNextAutoFitRef.current = true;
       } else {
-        setStageScale(currentFit.scale);
-        setStagePosition(currentFit.position);
+        setTimeout(() => resetView(), 0);
       }
     } catch {
-      fitStageToViewport({ force: true });
+      resetView();
     }
   };
 
@@ -1206,15 +1083,10 @@ const App: React.FC = () => {
             setSelectedIds([]);
             setSelectedId(parsed.selectedId);
           }
-          if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
-          const parsedCustomSize = parseCustomCanvasSize(parsed.customCanvasSize);
-          if (parsedCustomSize) setCustomCanvasSize(parsedCustomSize);
           if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
           if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
 
-          setTimeout(() => {
-            fitStageToViewport({ force: true });
-          }, 0);
+          setTimeout(() => resetView(), 0);
         } catch {
           alert("Invalid layout file.");
         }
@@ -1325,7 +1197,7 @@ const App: React.FC = () => {
     const newId = createNextId();
     const { x, y } = getCenterStagePos();
 
-    const maxDim = Math.max(currentPreset.width, currentPreset.height) * 0.6;
+    const maxDim = (Math.max(canvasWidth, stageViewportHeight) / stageScale) * 0.6;
     const fitScale = Math.min(1, maxDim / Math.max(naturalWidth, naturalHeight, 1));
     const displayWidth = naturalWidth * fitScale;
     const displayHeight = naturalHeight * fitScale;
@@ -1433,13 +1305,6 @@ const App: React.FC = () => {
         width={effectiveSidebarWidth}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
-        canvasPresetId={canvasPresetId}
-        onChangeCanvasPreset={(id) => {
-          pushHistory();
-          setCanvasPresetId(id);
-        }}
-        customCanvasSize={customCanvasSize}
-        onChangeCustomSize={changeCustomCanvasSize}
         backgroundColor={backgroundColor}
         onChangeBackgroundColor={(color) => {
           pushHistory();
@@ -1538,8 +1403,6 @@ const App: React.FC = () => {
           onMoveGuide={moveGuide}
           onRemoveGuide={removeGuide}
           viewportWidth={canvasWidth}
-          artboardWidth={currentPreset.width}
-          artboardHeight={currentPreset.height}
           stageViewportHeight={stageViewportHeight}
           backgroundColor={backgroundColor}
           stageRef={stageRef}
@@ -1548,6 +1411,8 @@ const App: React.FC = () => {
           panMode={panMode}
           onTogglePanMode={setPanMode}
           onUpdateStage={updateStageZoom}
+          onResetView={resetView}
+          onZoomToActualSize={zoomToActualSize}
           onUpdateBlockPosition={updateBlockPositionWithHistory}
           onSelectBlock={selectBlock}
           onEditBlock={requestTextEdit}

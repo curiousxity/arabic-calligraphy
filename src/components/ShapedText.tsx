@@ -5,6 +5,13 @@ import type { PathCommand } from "opentype.js";
 import type { HarfBuzzGlyph, ShapedTextResult } from "../lib/harfbuzz";
 import { warpPoint, type GlyphBounds } from "../lib/warp";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
+import { useOverrideGlyph } from "../hooks/useOverrideGlyph";
+import {
+  isOverrideGlyphChar,
+  OVERRIDE_SCALE,
+  OVERRIDE_RAISE,
+  type OverrideGlyph,
+} from "../lib/glyphOverrides";
 
 type Props = {
   id?: string;
@@ -81,7 +88,8 @@ function drawWarpedGlyphRun(
   drawStroke: boolean,
   strokeColor: string,
   strokeWidth: number,
-  fauxBoldWidth = 0
+  fauxBoldWidth = 0,
+  overrideGlyph: OverrideGlyph | null = null
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -104,66 +112,80 @@ function drawWarpedGlyphRun(
     ctx.save();
     ctx.translate(gx, gy);
 
-    const opPath = glyphObj.getPath(0, 0, fontSize);
-    const cmds: PathCommand[] = opPath.commands.map((cmd) => {
-      type MutableCmd = {
-        type: PathCommand["type"];
-        x?: number;
-        y?: number;
-        x1?: number;
-        y1?: number;
-        x2?: number;
-        y2?: number;
-      };
-      const c = cmd as MutableCmd;
-      const out: MutableCmd = { ...c };
+    if (
+      overrideGlyph &&
+      (isOverrideGlyphChar(glyphObj.unicode) ||
+        glyphObj.unicodes.some(isOverrideGlyphChar))
+    ) {
+      const glyphScale =
+        (fontSize * OVERRIDE_SCALE) /
+        Math.max(overrideGlyph.width, overrideGlyph.height, 1);
+      ctx.translate(0, -fontSize * OVERRIDE_RAISE);
+      ctx.scale(glyphScale, glyphScale);
+      tracePath(ctx, overrideGlyph.commands as unknown as PathCommand[]);
+    } else {
+      const opPath = glyphObj.getPath(0, 0, fontSize);
+      const cmds: PathCommand[] = opPath.commands.map((cmd) => {
+        type MutableCmd = {
+          type: PathCommand["type"];
+          x?: number;
+          y?: number;
+          x1?: number;
+          y1?: number;
+          x2?: number;
+          y2?: number;
+        };
+        const c = cmd as MutableCmd;
+        const out: MutableCmd = { ...c };
 
-      if (typeof c.x === "number" && typeof c.y === "number") {
-        const p = warpPoint(
-          c.x + gx,
-          c.y + gy,
-          bounds,
-          width,
-          height,
-          warpX,
-          warpY
-        );
-        out.x = p.x - gx;
-        out.y = p.y - gy;
-      }
+        if (typeof c.x === "number" && typeof c.y === "number") {
+          const p = warpPoint(
+            c.x + gx,
+            c.y + gy,
+            bounds,
+            width,
+            height,
+            warpX,
+            warpY
+          );
+          out.x = p.x - gx;
+          out.y = p.y - gy;
+        }
 
-      if (typeof c.x1 === "number" && typeof c.y1 === "number") {
-        const p1 = warpPoint(
-          c.x1 + gx,
-          c.y1 + gy,
-          bounds,
-          width,
-          height,
-          warpX,
-          warpY
-        );
-        out.x1 = p1.x - gx;
-        out.y1 = p1.y - gy;
-      }
+        if (typeof c.x1 === "number" && typeof c.y1 === "number") {
+          const p1 = warpPoint(
+            c.x1 + gx,
+            c.y1 + gy,
+            bounds,
+            width,
+            height,
+            warpX,
+            warpY
+          );
+          out.x1 = p1.x - gx;
+          out.y1 = p1.y - gy;
+        }
 
-      if (typeof c.x2 === "number" && typeof c.y2 === "number") {
-        const p2 = warpPoint(
-          c.x2 + gx,
-          c.y2 + gy,
-          bounds,
-          width,
-          height,
-          warpX,
-          warpY
-        );
-        out.x2 = p2.x - gx;
-        out.y2 = p2.y - gy;
-      }
+        if (typeof c.x2 === "number" && typeof c.y2 === "number") {
+          const p2 = warpPoint(
+            c.x2 + gx,
+            c.y2 + gy,
+            bounds,
+            width,
+            height,
+            warpX,
+            warpY
+          );
+          out.x2 = p2.x - gx;
+          out.y2 = p2.y - gy;
+        }
 
-      return out as PathCommand;
-    });
+        return out as PathCommand;
+      });
 
-    tracePath(ctx, cmds);
+      tracePath(ctx, cmds);
+    }
+
     ctx.fill();
     if (fauxBoldWidth > 0 && !drawStroke) {
       ctx.strokeStyle = ctx.fillStyle as string;
@@ -214,6 +236,7 @@ export const ShapedText: React.FC<Props> = ({
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
   const { hbLoaded } = shapeData;
+  const overrideGlyph = useOverrideGlyph();
 
   const [spinnerAngle, setSpinnerAngle] = useState(0);
   const spinnerFrameRef = useRef<number | null>(null);
@@ -414,7 +437,8 @@ export const ShapedText: React.FC<Props> = ({
             false,
             stroke,
             strokeWidth,
-            fauxBoldWidth
+            fauxBoldWidth,
+            overrideGlyph
           );
 
           if (strokeWidth > 0) {
@@ -429,7 +453,9 @@ export const ShapedText: React.FC<Props> = ({
               warpY,
               true,
               stroke,
-              strokeWidth
+              strokeWidth,
+              0,
+              overrideGlyph
             );
           }
 

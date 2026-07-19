@@ -29,9 +29,9 @@ type BlockCommon = {
   fontFamily: string;
   fontStyle?: FontStyle;
   opacity?: number;
-  stroke?: string;
+  stroke: string;
   strokeWidth?: number;
-  shadowColor?: string;
+  shadowColor: string;
   shadowBlur?: number;
   shadowOffsetX?: number;
   shadowOffsetY?: number;

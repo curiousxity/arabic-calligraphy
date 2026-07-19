@@ -13,6 +13,7 @@ import { STARTER_TEMPLATES } from "../lib/templates";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { makeId } from "./sidebar/utils";
 import { SelectRow, ColorRow, RangeRow, PresetKeyboard } from "./sidebar/FormControls";
+import { ArabicKeyboard } from "./sidebar/ArabicKeyboard";
 import {
   TrashIcon,
   CopyIcon,
@@ -50,11 +51,6 @@ export type SidebarProps = {
   width: number;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
-
-  canvasPresetId: string;
-  onChangeCanvasPreset: (id: string) => void;
-  customCanvasSize: { width: number; height: number };
-  onChangeCustomSize: (width: number, height: number) => void;
 
   backgroundColor: string;
   onChangeBackgroundColor: (color: string) => void;
@@ -160,10 +156,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   width,
   isCollapsed = false,
   onToggleCollapse,
-  canvasPresetId,
-  onChangeCanvasPreset,
-  customCanvasSize,
-  onChangeCustomSize,
   backgroundColor,
   onChangeBackgroundColor,
   onAddBlock,
@@ -225,10 +217,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showTemplates, setShowTemplates] = useState(false);
   const [namedProjectInput, setNamedProjectInput] = useState("");
   const selectionCount = selectedIds.length > 1 ? selectedIds.length : 1;
-  const [showCanvasSettings, setShowCanvasSettings] = useState(false);
+  const [showBackgroundSettings, setShowBackgroundSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showStroke, setShowStroke] = useState(false);
   const [showShadow, setShowShadow] = useState(false);
+  const [showKeyboard, setShowKeyboard] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -260,6 +253,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const newText = before + k + after;
     const newPos = cursorPosition + k.length;
     onUpdateSelectedBlock({ text: newText });
+    setCursorPosition(newPos);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(newPos, newPos);
+      }
+    }, 0);
+  };
+
+  const handleKeyboardBackspace = () => {
+    if (!selectedBlock || cursorPosition <= 0) return;
+    const before = selectedText.substring(0, cursorPosition - 1);
+    const after = selectedText.substring(cursorPosition);
+    const newPos = cursorPosition - 1;
+    onUpdateSelectedBlock({ text: before + after });
     setCursorPosition(newPos);
     setTimeout(() => {
       if (textareaRef.current) {
@@ -598,6 +606,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onUngroup={(id) => onUngroupBlock?.(id)}
                 onRename={handleRename}
                 onZoomTo={(id) => onZoomToBlock?.(id)}
+                onAddBlock={onAddBlock}
               />
             </div>
           )}
@@ -970,7 +979,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         id={makeId("stroke-color", selectedId)}
                         name={makeId("strokeColor", selectedId)}
                         label="Outline color"
-                        value={selectedBlock.stroke ?? "#000000"}
+                        value={selectedBlock.stroke}
                         onChange={(v) => onUpdateSelectedBlock({ stroke: v })}
                       />
 
@@ -1013,7 +1022,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           id={makeId("shadow-color", selectedId)}
                           name={makeId("shadowColor", selectedId)}
                           label="Shadow color"
-                          value={selectedBlock.shadowColor ?? "#000000"}
+                          value={selectedBlock.shadowColor}
                           onChange={(v) => onUpdateSelectedBlock({ shadowColor: v })}
                         />
 
@@ -1366,6 +1375,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="sidebarPanel">
             <button
               type="button"
+              onClick={() => setShowKeyboard((v) => !v)}
+              className="sidebarSectionButton"
+              aria-expanded={showKeyboard}
+            >
+              <span>Arabic Keyboard</span>
+              <span>{showKeyboard ? "−" : "+"}</span>
+            </button>
+
+            {showKeyboard && (
+              <div className="sectionPanel">
+                <ArabicKeyboard
+                  onInsert={handleKeyboardKey}
+                  onBackspace={handleKeyboardBackspace}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedBlock && (
+          <div className="sidebarPanel">
+            <button
+              type="button"
               onClick={() => setShowHelpers((v) => !v)}
               className="sidebarSectionButton"
               aria-expanded={showHelpers}
@@ -1377,9 +1409,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {showHelpers && (
               <div className="sectionPanel">
                 <PresetKeyboard
-                  title="Diacritics"
+                  title="إِعْرَاب"
                   rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]}
                   onPick={handleKeyboardKey}
+                  large
                 />
 
                 <button
@@ -1660,90 +1693,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebarPanel">
           <button
             type="button"
-            onClick={() => setShowCanvasSettings((v) => !v)}
+            onClick={() => setShowBackgroundSettings((v) => !v)}
             className="sidebarSectionButton"
-            aria-expanded={showCanvasSettings}
+            aria-expanded={showBackgroundSettings}
           >
-            <span>Canvas Size</span>
-            <span>{showCanvasSettings ? "−" : "+"}</span>
+            <span>Background &amp; Grid</span>
+            <span>{showBackgroundSettings ? "−" : "+"}</span>
           </button>
 
-          {showCanvasSettings && (
+          {showBackgroundSettings && (
             <div className="sectionPanel">
-              <div className="shell">
-                <select
-                  id="canvas-preset"
-                  name="canvasPreset"
-                  value={canvasPresetId}
-                  onChange={(e) => onChangeCanvasPreset(e.target.value)}
-                  className="select"
-                  aria-label="Canvas size preset"
-                >
-                  <option value="story">Story (1080×1920)</option>
-                  <option value="square">Instagram Square (1080×1080)</option>
-                  <option value="a4">Print A4 (2480×3508)</option>
-                  <option value="custom">Custom</option>
-                </select>
-              </div>
-
-              {canvasPresetId === "custom" && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                    gap: 10,
-                  }}
-                >
-                  <label className="field" htmlFor="custom-canvas-width">
-                    <span className="fieldTitle">Width (px)</span>
-                    <div className="shell">
-                      <input
-                        id="custom-canvas-width"
-                        name="customCanvasWidth"
-                        type="number"
-                        min={50}
-                        max={8000}
-                        value={customCanvasSize.width}
-                        onChange={(e) =>
-                          onChangeCustomSize(
-                            Number(e.target.value) || customCanvasSize.width,
-                            customCanvasSize.height
-                          )
-                        }
-                        className="select"
-                        style={{ cursor: "text" }}
-                      />
-                    </div>
-                  </label>
-
-                  <label className="field" htmlFor="custom-canvas-height">
-                    <span className="fieldTitle">Height (px)</span>
-                    <div className="shell">
-                      <input
-                        id="custom-canvas-height"
-                        name="customCanvasHeight"
-                        type="number"
-                        min={50}
-                        max={8000}
-                        value={customCanvasSize.height}
-                        onChange={(e) =>
-                          onChangeCustomSize(
-                            customCanvasSize.width,
-                            Number(e.target.value) || customCanvasSize.height
-                          )
-                        }
-                        className="select"
-                        style={{ cursor: "text" }}
-                      />
-                    </div>
-                  </label>
-                </div>
-              )}
-
               <ColorRow
                 id="background-color"
                 name="backgroundColor"
-                label="Background Color"
+                label="Background color"
                 value={backgroundColor}
                 onChange={onChangeBackgroundColor}
               />

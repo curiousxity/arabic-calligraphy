@@ -1,38 +1,12 @@
 import type { RefObject } from "react";
 import type Konva from "konva";
 import type { Block } from "../types";
-
-const EXPORT_PADDING = 0;
+import { getBlocksBoundingBox as getBlocksBoundingBoxShared } from "../lib/canvasBounds";
 
 /** PNG/SVG/PDF export handlers for the current stage contents. */
 export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block[]) {
-  const getBlocksBoundingBox = (stage: Konva.Stage) => {
-    if (blocks.length === 0) return null;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    blocks.forEach((block) => {
-      const node = stage.findOne(`#block-${block.id}`) as Konva.Node | null;
-      if (!node) return;
-      const rect = node.getClientRect({ relativeTo: stage });
-      minX = Math.min(minX, rect.x);
-      minY = Math.min(minY, rect.y);
-      maxX = Math.max(maxX, rect.x + rect.width);
-      maxY = Math.max(maxY, rect.y + rect.height);
-    });
-
-    if (!isFinite(minX)) return null;
-
-    return {
-      x: minX - EXPORT_PADDING,
-      y: minY - EXPORT_PADDING,
-      width: maxX - minX + 2 * EXPORT_PADDING,
-      height: maxY - minY + 2 * EXPORT_PADDING,
-    };
-  };
+  const getBlocksBoundingBox = (stage: Konva.Stage) =>
+    getBlocksBoundingBoxShared(stage, blocks);
 
   /**
    * Hides the on-screen alignment grid (and, optionally, the artboard

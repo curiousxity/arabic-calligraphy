@@ -63,6 +63,21 @@ export const ShapesIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
+export const KeyboardIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <path d="M6 9h.01" />
+    <path d="M10 9h.01" />
+    <path d="M14 9h.01" />
+    <path d="M18 9h.01" />
+    <path d="M6 13h.01" />
+    <path d="M10 13h.01" />
+    <path d="M14 13h.01" />
+    <path d="M18 13h.01" />
+    <path d="M8 17h8" />
+  </IconBase>
+);
+
 export const CircleDashedIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>
     <path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18" strokeDasharray="3 3.5" />

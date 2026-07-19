@@ -308,10 +308,17 @@ function applyTransformToPathString(
   return out.join(" ");
 }
 
-/** Parse an uploaded SVG's shapes into a single flattened path scaled to a target size. */
+/**
+ * Parse an uploaded SVG's shapes into a single flattened path scaled to a target size.
+ * By default (matching prior behavior) the source is stretched to fill a `targetSize`
+ * square, independently on each axis. Pass `preserveAspect` to instead scale uniformly
+ * and return the source's actual (scaled) width/height — needed for single-icon assets
+ * where non-uniform stretching would visibly distort the shape.
+ */
 export function extractSvgPaths(
   svgText: string,
-  targetSize = TARGET_SVG_SIZE
+  targetSize = TARGET_SVG_SIZE,
+  preserveAspect = false
 ): { pathData: string; w: number; h: number } | null {
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgText, "image/svg+xml");
@@ -325,9 +332,13 @@ export function extractSvgPaths(
 
   const srcW = vb?.[2] ?? (Number.isFinite(parsedW) ? parsedW : 400);
   const srcH = vb?.[3] ?? (Number.isFinite(parsedH) ? parsedH : 400);
+  const vbMinX = vb?.[0] ?? 0;
+  const vbMinY = vb?.[1] ?? 0;
 
-  const sx = targetSize / srcW;
-  const sy = targetSize / srcH;
+  const sx = preserveAspect
+    ? Math.min(targetSize / srcW, targetSize / srcH)
+    : targetSize / srcW;
+  const sy = preserveAspect ? sx : targetSize / srcH;
 
   const shapeEls = doc.querySelectorAll(
     "path, rect, circle, ellipse, polygon, polyline"
@@ -341,6 +352,10 @@ export function extractSvgPaths(
 
     const visibility = el.getAttribute("visibility");
     if (visibility === "hidden") return;
+
+    // Design-tool exports (e.g. Figma) often include an invisible artboard
+    // rect marked fill="transparent" — never part of the visible artwork.
+    if (el.getAttribute("fill") === "transparent") return;
 
     let d = svgElementToPathData(el);
     if (!d) return;
@@ -356,6 +371,13 @@ export function extractSvgPaths(
 
     if (!isIdentity) d = applyTransformToPathString(d, mat);
 
+    // Coordinates are relative to the document, not the viewBox window —
+    // shift by the viewBox origin before scaling so a non-zero-origin
+    // viewBox (again, common in design-tool exports) doesn't offset the shape.
+    if (vbMinX !== 0 || vbMinY !== 0) {
+      d = applyTransformToPathString(d, [1, 0, 0, 1, -vbMinX, -vbMinY]);
+    }
+
     parts.push(scaleSvgPathNumbers(d, sx, sy));
   });
 
@@ -363,7 +385,7 @@ export function extractSvgPaths(
 
   return {
     pathData: parts.join(" "),
-    w: targetSize,
-    h: targetSize,
+    w: preserveAspect ? srcW * sx : targetSize,
+    h: preserveAspect ? srcH * sy : targetSize,
   };
 }
