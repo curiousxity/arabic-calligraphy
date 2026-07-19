@@ -15,6 +15,7 @@ const SNAP_GUIDE_PX = 6;
 
 export type CanvasStageProps = {
   blocks: Block[];
+  selectedId: number | null;
   snapToGrid: boolean;
   showGrid: boolean;
   viewportWidth: number;
@@ -48,12 +49,14 @@ export type CanvasStageProps = {
     blockId: number,
     boxes: { glyphIndex: number; x: number; y: number; width: number; height: number }[]
   ) => void;
+  onResizeShapeFillBlock: (id: number, scale: number) => void;
 };
 
 const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
 
 export const CanvasStage: React.FC<CanvasStageProps> = ({
   blocks,
+  selectedId,
   snapToGrid,
   showGrid,
   viewportWidth,
@@ -73,6 +76,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSelectGlyph,
   onUpdateGlyphHandle,
   onGlyphBoxesChange,
+  onResizeShapeFillBlock,
 }) => {
   const snapCoord = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
@@ -397,6 +401,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     shadowOpacity={block.shadowOpacity ?? 0.35}
                     rotation={block.rotation ?? 0}
                     locked={block.locked}
+                    isSelected={block.id === selectedId}
+                    onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
                   />
                 );
               }

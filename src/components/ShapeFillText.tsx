@@ -15,7 +15,7 @@
  */
 
 import React, { useMemo } from "react";
-import { Group, Shape, Rect } from "react-konva";
+import { Group, Shape, Rect, Circle } from "react-konva";
 import type Konva from "konva";
 import {
   parseSvgPath,
@@ -58,6 +58,8 @@ export type ShapeFillTextProps = {
   onDblClick?: () => void;
   onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  isSelected?: boolean;
+  onResizeScale?: (newScale: number) => void;
 };
 
 // ─── SVG path parser ──────────────────────────────────────────────────────────
@@ -117,6 +119,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   locked,
   draggable = true,
   onClick, onTap, onDblClick, onDragMove, onDragEnd,
+  isSelected = false,
+  onResizeScale,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
 
@@ -272,6 +276,31 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           ctx.restore(); // remove shapeScale transform
         }}
       />
+
+      {isSelected && !locked && (
+        <Circle
+          x={scaledW}
+          y={scaledH}
+          radius={8}
+          fill="#d4af37"
+          stroke="#ffffff"
+          strokeWidth={2}
+          draggable
+          onMouseDown={(e) => { e.cancelBubble = true; }}
+          onTouchStart={(e) => { e.cancelBubble = true; }}
+          onDragMove={(e) => {
+            e.cancelBubble = true;
+            const group = e.currentTarget.getParent() as Konva.Group;
+            const pos = group.getRelativePointerPosition();
+            if (!pos) return;
+            const dist = Math.hypot(pos.x, pos.y);
+            const baseDist = Math.hypot(shapeWidth, shapeHeight);
+            const newScale = Math.max(0.2, Math.min(3, dist / Math.max(baseDist, 1)));
+            onResizeScale?.(newScale);
+          }}
+          onDragEnd={(e) => { e.cancelBubble = true; }}
+        />
+      )}
     </Group>
   );
 };

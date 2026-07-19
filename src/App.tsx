@@ -168,7 +168,6 @@ const App: React.FC = () => {
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [panMode, setPanMode] = useState(false);
-  const [showKeyboard, setShowKeyboard] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(isBrowser ? window.innerWidth : 1200);
   const [viewportHeight, setViewportHeight] = useState(isBrowser ? window.innerHeight : 800);
 
@@ -356,6 +355,72 @@ const App: React.FC = () => {
       }));
     },
     [upsertGlyphWarp]
+  );
+
+  const deleteGlyphHandle = useCallback(
+    (blockId: number, glyphIndex: number, handleId: string) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || b.type !== "shapeWarp") return b;
+          const glyphWarps = b.glyphWarps ?? [];
+          const existing = glyphWarps.find((g) => g.glyphIndex === glyphIndex);
+          if (!existing) return b;
+          const nextHandles = existing.handles.filter((h) => h.id !== handleId);
+          return {
+            ...b,
+            glyphWarps:
+              nextHandles.length > 0
+                ? glyphWarps.map((g) =>
+                    g.glyphIndex === glyphIndex ? { ...g, handles: nextHandles } : g
+                  )
+                : glyphWarps.filter((g) => g.glyphIndex !== glyphIndex),
+          };
+        })
+      );
+    },
+    [pushHistory]
+  );
+
+  const resetShapeWarp = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && b.type === "shapeWarp"
+            ? {
+                ...b,
+                warpShapePadding: 24,
+                warpShapeStrength: 1,
+                warpShapeMode: "envelope",
+                glyphWarps: [],
+                selectedGlyphIndex: null,
+              }
+            : b
+        )
+      );
+    },
+    [pushHistory]
+  );
+
+  const fitShapeFillSpacing = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || b.type !== "shapeFill") return b;
+          const shapeHeight = b.shapeHeight ?? 400;
+          const fontSize = b.fontSize;
+          const firstLineY = fontSize * 0.85;
+          const available = Math.max(shapeHeight - firstLineY, fontSize);
+          const currentLineH = fontSize * (b.shapeFillSpacing ?? 1.3);
+          const numRows = Math.max(1, Math.round(available / currentLineH));
+          const newSpacing = clamp(available / numRows / fontSize, 0.5, 4);
+          return { ...b, shapeFillSpacing: newSpacing };
+        })
+      );
+    },
+    [pushHistory]
   );
 
   const updateBlockPositionWithHistory = useCallback(
@@ -620,6 +685,13 @@ const App: React.FC = () => {
       setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
     },
     [pushHistory]
+  );
+
+  const resizeShapeFillBlock = useCallback(
+    (id: number, scale: number) => {
+      updateBlock(id, { shapeScale: clamp(scale, 0.2, 3) });
+    },
+    [updateBlock]
   );
 
   const reorderBlocks = useCallback(
@@ -1069,8 +1141,6 @@ const App: React.FC = () => {
         onMergeBlocks={groupBlocks}
         onUngroupBlock={ungroupBlock}
         onZoomToBlock={zoomToBlock}
-        showKeyboard={showKeyboard}
-        onToggleKeyboard={() => setShowKeyboard((v) => !v)}
         onClearDiacritics={clearDiacritics}
         onInsertPreset={(value) =>
           selectedBlock && updateSelectedBlock({ text: selectedBlock.text + value })
@@ -1086,6 +1156,10 @@ const App: React.FC = () => {
           });
         }}
         onAddGlyphHandle={addHandleToSelectedGlyph}
+        onDeleteGlyphHandle={deleteGlyphHandle}
+        onUpdateGlyphHandle={updateGlyphHandle}
+        onResetShapeWarp={resetShapeWarp}
+        onFitShapeFillSpacing={fitShapeFillSpacing}
       />
 
       {!isMobile && !sidebarCollapsed && (
@@ -1112,6 +1186,7 @@ const App: React.FC = () => {
       >
         <CanvasStage
           blocks={blocks}
+          selectedId={selectedId}
           snapToGrid={snapToGrid}
           showGrid={showGrid}
           viewportWidth={canvasWidth}
@@ -1131,6 +1206,7 @@ const App: React.FC = () => {
           onSelectGlyph={selectGlyphForBlock}
           onUpdateGlyphHandle={updateGlyphHandle}
           onGlyphBoxesChange={updateGlyphBoxes}
+          onResizeShapeFillBlock={resizeShapeFillBlock}
         />
       </div>
     </div>

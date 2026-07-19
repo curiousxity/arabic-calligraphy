@@ -114,7 +114,7 @@ export const ColorRow = ({
   return (
     <div className="field">
       <span className="fieldTitle">{label}</span>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div className="colorRowShell">
         <input
           id={id}
           name={name}
@@ -122,7 +122,7 @@ export const ColorRow = ({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="sidebarColorInput"
-          style={{ width: 40, height: 32, flexShrink: 0, padding: 2 }}
+          style={{ width: 44, height: 36, flexShrink: 0, padding: 3 }}
           aria-label={label}
         />
         <input
@@ -147,15 +147,23 @@ export const ColorRow = ({
             type="button"
             onClick={pickWithEyeDropper}
             className="sidebarCircleButton"
-            style={{ width: 32, height: 32, flexShrink: 0 }}
+            style={{ width: 36, height: 36, flexShrink: 0 }}
             title="Pick a color from the screen"
             aria-label={`Pick ${label.toLowerCase()} from screen`}
           >
-            <PipetteIcon size={14} />
+            <PipetteIcon size={15} />
           </button>
         )}
       </div>
-      <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          justifyItems: "center",
+          rowGap: 10,
+          marginTop: 8,
+        }}
+      >
         {COLOR_PALETTE.map((c) => (
           <button
             key={c}
@@ -169,7 +177,7 @@ export const ColorRow = ({
               boxShadow:
                 value.toLowerCase() === c
                   ? "0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent)"
-                  : undefined,
+                  : "0 1px 2px rgba(0, 0, 0, 0.2)",
             }}
           />
         ))}

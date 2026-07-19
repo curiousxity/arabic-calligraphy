@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import ArabicKeyboard from "./ArabicKeyboard";
 import {
   DIACRITICS,
   SPECIALS,
@@ -7,7 +6,7 @@ import {
   URDU,
   PRESETS,
 } from "../lib/presets";
-import type { Block, TextAlign, ShapeWarpMode } from "../types";
+import type { Block, TextAlign, ShapeWarpMode, GlyphHandle, GlyphHandleMode } from "../types";
 import { extractSvgPaths } from "../lib/svgImport";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { makeId } from "./sidebar/utils";
@@ -29,6 +28,7 @@ import {
   FileTextIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CloseIcon,
 } from "./Icons";
 
 export type SidebarProps = {
@@ -80,8 +80,6 @@ export type SidebarProps = {
   onUngroupBlock?: (id: number) => void;
   onZoomToBlock?: (id: number) => void;
 
-  showKeyboard: boolean;
-  onToggleKeyboard: () => void;
   onClearDiacritics: () => void;
   onInsertPreset: (value: string) => void;
 
@@ -92,11 +90,27 @@ export type SidebarProps = {
 
   onToggleGlyphEditMode?: () => void;
   onAddGlyphHandle?: () => void;
+  onDeleteGlyphHandle?: (blockId: number, glyphIndex: number, handleId: string) => void;
+  onUpdateGlyphHandle?: (
+    blockId: number,
+    glyphIndex: number,
+    handleId: string,
+    patch: Partial<GlyphHandle>
+  ) => void;
+  onResetShapeWarp?: (blockId: number) => void;
+  onFitShapeFillSpacing?: (blockId: number) => void;
+};
+
+const HANDLE_MODE_COLORS: Record<GlyphHandleMode, string> = {
+  pinch: "#ff4d4f",
+  move: "#4d94ff",
+  scaleX: "#22c55e",
+  scaleY: "#eab308",
 };
 
 const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
-  { value: "AlFatemi", label: "Al Fatemi", cssFamily: "AlFatemi" },
   { value: "FatemiMaqala", label: "Fatemi Maqala", cssFamily: "FatemiMaqala" },
+  { value: "AlFatemi", label: "Al Fatemi", cssFamily: "AlFatemi" },
   { value: "TahaNaskhRegular", label: "Taha Naskh", cssFamily: "TahaNaskhRegular" },
   { value: "Kufi", label: "Kufi", cssFamily: "Kufi" },
   { value: "Kufi2", label: "Kufi 2", cssFamily: "Kufi2" },
@@ -152,8 +166,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onMergeBlocks,
   onUngroupBlock,
   onZoomToBlock,
-  showKeyboard,
-  onToggleKeyboard,
   onClearDiacritics,
   onInsertPreset,
   onUndo,
@@ -162,6 +174,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   canRedo,
   onToggleGlyphEditMode,
   onAddGlyphHandle,
+  onDeleteGlyphHandle,
+  onUpdateGlyphHandle,
+  onResetShapeWarp,
+  onFitShapeFillSpacing,
 }) => {
   const [showStyling, setShowStyling] = useState(false);
   const [showHelpers, setShowHelpers] = useState(false);
@@ -201,24 +217,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const after = selectedText.substring(cursorPosition);
     const newText = before + k + after;
     const newPos = cursorPosition + k.length;
-    onUpdateSelectedBlock({ text: newText });
-    setCursorPosition(newPos);
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(newPos, newPos);
-      }
-    }, 0);
-  };
-
-  const handleKeyboardSpace = () => handleKeyboardKey(" ");
-
-  const handleKeyboardBackspace = () => {
-    if (!selectedBlock || cursorPosition <= 0) return;
-    const newText =
-      selectedText.substring(0, cursorPosition - 1) +
-      selectedText.substring(cursorPosition);
-    const newPos = cursorPosition - 1;
     onUpdateSelectedBlock({ text: newText });
     setCursorPosition(newPos);
     setTimeout(() => {
@@ -545,48 +543,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {showStyling && (
               <div className="sectionPanel">
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                    gap: 10,
-                  }}
+                <SelectRow
+                  id={makeId("font-family", selectedId)}
+                  name={makeId("fontFamily", selectedId)}
+                  label="Font family"
+                  value={selectedBlock.fontFamily}
+                  onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
                 >
-                  <SelectRow
-                    id={makeId("font-family", selectedId)}
-                    name={makeId("fontFamily", selectedId)}
-                    label="Font family"
-                    value={selectedBlock.fontFamily}
-                    onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
-                  >
-                    {FONT_OPTIONS.map((f) => (
-                      <option
-                        key={f.value}
-                        value={f.value}
-                        style={{ fontFamily: f.cssFamily }}
-                      >
-                        {f.label} — أبجد
-                      </option>
-                    ))}
-                  </SelectRow>
-
-                  <SelectRow
-                    id={makeId("font-style", selectedId)}
-                    name={makeId("fontStyle", selectedId)}
-                    label="Font style"
-                    value={selectedBlock.fontStyle ?? "normal"}
-                    onChange={(v) =>
-                      onUpdateSelectedBlock({
-                        fontStyle: v as Block["fontStyle"],
-                      })
-                    }
-                  >
-                    <option value="normal">Normal</option>
-                    <option value="bold">Bold</option>
-                    <option value="italic">Italic</option>
-                    <option value="bold italic">Bold Italic</option>
-                  </SelectRow>
-                </div>
+                  {FONT_OPTIONS.map((f) => (
+                    <option
+                      key={f.value}
+                      value={f.value}
+                      style={{ fontFamily: f.cssFamily }}
+                    >
+                      {f.label} — أبجد
+                    </option>
+                  ))}
+                </SelectRow>
 
                 <RangeRow
                   id={makeId("font-size", selectedId)}
@@ -609,34 +582,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   fieldKey="fontSize"
                 />
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                    gap: 10,
-                  }}
-                >
-                  <ColorRow
-                    id={makeId("text-color", selectedId)}
-                    name={makeId("textColor", selectedId)}
-                    label="Text color"
-                    value={selectedBlock.color}
-                    onChange={(v) => onUpdateSelectedBlock({ color: v })}
-                  />
+                <ColorRow
+                  id={makeId("text-color", selectedId)}
+                  name={makeId("textColor", selectedId)}
+                  label="Text color"
+                  value={selectedBlock.color}
+                  onChange={(v) => onUpdateSelectedBlock({ color: v })}
+                />
 
-                  <RangeRow
-                    id={makeId("opacity", selectedId)}
-                    name={makeId("opacity", selectedId)}
-                    label="Opacity"
-                    value={selectedOpacity}
-                    min={0.1}
-                    max={1}
-                    step={0.05}
-                    onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
-                    suffix={`${Math.round(selectedOpacity * 100)}%`}
-                    fieldKey="opacity"
-                  />
-                </div>
+                <RangeRow
+                  id={makeId("opacity", selectedId)}
+                  name={makeId("opacity", selectedId)}
+                  label="Opacity"
+                  value={selectedOpacity}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
+                  suffix={`${Math.round(selectedOpacity * 100)}%`}
+                  fieldKey="opacity"
+                />
 
                 {selectedBlock.type === "text" && (
                   <SelectRow
@@ -852,9 +817,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 {selectedBlock.type === "shapeWarp" && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Shape Warp</div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
+                        Shape Warp
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onResetShapeWarp?.(selectedBlock.id)}
+                        className="layerIconBtn"
+                        title="Reset shape warp to defaults"
+                      >
+                        Reset
+                      </button>
+                    </div>
 
-                    <label className="checkboxRow">
+                    <label className="checkboxRow" style={{ marginTop: 10 }}>
                       <input
                         type="checkbox"
                         checked={!!selectedBlock.glyphEditMode}
@@ -880,8 +863,79 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       className="sidebarSmallAction"
                       style={{ marginTop: 8 }}
                     >
-                      Add pinch handle
+                      Add handle
                     </button>
+
+                    {selectedBlock.selectedGlyphIndex != null &&
+                      (() => {
+                        const glyphIndex = selectedBlock.selectedGlyphIndex;
+                        const handles =
+                          selectedBlock.glyphWarps?.find((w) => w.glyphIndex === glyphIndex)
+                            ?.handles ?? [];
+                        if (handles.length === 0) return null;
+
+                        return (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 6,
+                              marginTop: 8,
+                            }}
+                          >
+                            {handles.map((h) => (
+                              <div
+                                key={h.id}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  background: "var(--row-bg)",
+                                  borderRadius: 8,
+                                  padding: "4px 6px",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: 999,
+                                    flexShrink: 0,
+                                    background: HANDLE_MODE_COLORS[h.mode],
+                                  }}
+                                />
+                                <select
+                                  value={h.mode}
+                                  onChange={(e) =>
+                                    onUpdateGlyphHandle?.(selectedBlock.id, glyphIndex, h.id, {
+                                      mode: e.target.value as GlyphHandleMode,
+                                    })
+                                  }
+                                  className="select"
+                                  style={{ flex: 1, fontSize: 12 }}
+                                >
+                                  <option value="pinch">Pinch</option>
+                                  <option value="move">Move</option>
+                                  <option value="scaleX">Scale X</option>
+                                  <option value="scaleY">Scale Y</option>
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onDeleteGlyphHandle?.(selectedBlock.id, glyphIndex, h.id)
+                                  }
+                                  className="layerIconBtn"
+                                  title="Delete handle"
+                                  aria-label="Delete handle"
+                                  style={{ color: "var(--danger)" }}
+                                >
+                                  <CloseIcon size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
 
                     <SelectRow
                       id={makeId("warp-shape-mode", selectedId)}
@@ -939,7 +993,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 {selectedBlock.type === "shapeFill" && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Shape Fill</div>
+                    <div className="sidebarSectionTitle" style={{ marginBottom: 4 }}>
+                      Shape Fill
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
+                      Tip: drag the gold handle on the shape's corner (canvas) to resize.
+                    </div>
 
                     <RangeRow
                       id={makeId("shape-scale", selectedId)}
@@ -968,6 +1027,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       suffix={(selectedBlock.shapeFillSpacing ?? 1.3).toFixed(2)}
                       fieldKey="shapeFillSpacing"
                     />
+
+                    <button
+                      type="button"
+                      onClick={() => onFitShapeFillSpacing?.(selectedBlock.id)}
+                      className="sidebarSmallAction"
+                      style={{ marginTop: 4 }}
+                      title="Adjust row spacing so rows evenly fill the shape's height"
+                    >
+                      Fit exactly
+                    </button>
 
                     <div
                       style={{
@@ -1043,23 +1112,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {showHelpers && (
               <div className="sectionPanel">
-                <button
-                  type="button"
-                  onClick={onToggleKeyboard}
-                  className="sidebarSmallAction"
-                  style={{ marginBottom: 8 }}
-                >
-                  {showKeyboard ? "Hide keyboard" : "Show virtual keyboard"}
-                </button>
-
-                {showKeyboard && (
-                  <ArabicKeyboard
-                    onKey={handleKeyboardKey}
-                    onSpace={handleKeyboardSpace}
-                    onBackspace={handleKeyboardBackspace}
-                  />
-                )}
-
                 <PresetKeyboard
                   title="Diacritics"
                   rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]}
@@ -1111,68 +1163,90 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="sidebarSectionButton"
             aria-expanded={showFileActions}
           >
-            <span>Save Export</span>
+            <span>Project &amp; Export</span>
             <span>{showFileActions ? "−" : "+"}</span>
           </button>
 
           {showFileActions && (
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+              <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
+                Your project
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: -4 }}>
+                Keeps every layer editable. Quick save/load uses this browser only —
+                download a file to keep a backup or move it to another device.
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 <button
                   type="button"
                   onClick={onSaveLayout}
-                  className="sidebarCircleButton"
-                  title="Quick-save to browser memory"
-                  aria-label="Save layout"
+                  className="sidebarPillButton"
+                  title="Quick-save to this browser (overwrites the last quick save)"
+                  aria-label="Quick save"
                 >
-                  <SaveIcon size={14} />
+                  <SaveIcon size={13} /> Quick save
                 </button>
 
                 <button
                   type="button"
                   onClick={onLoadLayout}
-                  className="sidebarCircleButton"
-                  title="Load from browser memory"
-                  aria-label="Load layout"
+                  className="sidebarPillButton"
+                  title="Load the last quick save from this browser"
+                  aria-label="Quick load"
                 >
-                  <FolderOpenIcon size={14} />
+                  <FolderOpenIcon size={13} /> Quick load
                 </button>
-              </div>
 
-              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
                 <button
                   type="button"
                   onClick={onDownloadLayout}
                   className="sidebarPillButton"
-                  title="Download layout as .json"
-                  aria-label="Download layout JSON"
+                  title="Download your project as a file you can reopen later"
+                  aria-label="Download project file"
                 >
-                  <DownloadIcon size={13} /> JSON
+                  <DownloadIcon size={13} /> Download file
                 </button>
 
                 <button
                   type="button"
                   onClick={onUploadLayout}
                   className="sidebarPillButton"
-                  title="Upload .json layout file"
-                  aria-label="Upload layout JSON"
+                  title="Open a previously downloaded project file"
+                  aria-label="Open project file"
                 >
-                  <UploadIcon size={13} /> JSON
+                  <UploadIcon size={13} /> Open file
                 </button>
               </div>
 
-              <label className="checkboxRow" htmlFor="transparent-export">
-                <input
-                  id="transparent-export"
-                  name="transparentExport"
-                  type="checkbox"
-                  checked={transparentExport}
-                  onChange={(e) => onToggleTransparentExport(e.target.checked)}
-                />
-                Transparent background (PNG/SVG)
-              </label>
+              <div
+                style={{
+                  borderTop: "1px solid var(--border-soft)",
+                  paddingTop: 10,
+                  marginTop: 4,
+                }}
+              >
+                <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
+                  Export image
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, marginBottom: 8 }}>
+                  Saves a flattened picture or document for sharing — layers can't be
+                  edited afterward.
+                </div>
 
-              <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+                <label className="checkboxRow" htmlFor="transparent-export">
+                  <input
+                    id="transparent-export"
+                    name="transparentExport"
+                    type="checkbox"
+                    checked={transparentExport}
+                    onChange={(e) => onToggleTransparentExport(e.target.checked)}
+                  />
+                  Transparent background (PNG/SVG)
+                </label>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 <button
                   type="button"
                   onClick={onExportPNG}

@@ -4,7 +4,14 @@ import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
-import type { GlyphWarp, GlyphHandle } from "../types";
+import type { GlyphWarp, GlyphHandle, GlyphHandleMode } from "../types";
+
+const HANDLE_MODE_COLORS: Record<GlyphHandleMode, string> = {
+  pinch: "#ff4d4f",
+  move: "#4d94ff",
+  scaleX: "#22c55e",
+  scaleY: "#eab308",
+};
 
 type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
 
@@ -632,7 +639,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
             x={bx + localDrawOffsetX + h.x}
             y={by + localDrawOffsetY + h.y}
             radius={7}
-            fill="#ff4d4f"
+            fill={HANDLE_MODE_COLORS[h.mode]}
             stroke="#ffffff"
             strokeWidth={2}
             draggable
