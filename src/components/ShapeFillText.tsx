@@ -14,7 +14,7 @@
  *  - shapeScale, emboss, stroke all preserved.
  */
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Group, Shape, Rect, Circle } from "react-konva";
 import type Konva from "konva";
 import {
@@ -24,6 +24,13 @@ import {
   type SvgCmd,
 } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
+import {
+  applyGlyphEdit,
+  MOVE_HANDLE_COLOR,
+  STRETCH_ANCHOR_COLOR,
+  STRETCH_DRAG_COLOR,
+} from "../lib/glyphEdits";
+import type { GlyphEdit, GlyphStretchHandle } from "../types";
 
 export type ShapeFillTextProps = {
   id?: string;
@@ -54,6 +61,23 @@ export type ShapeFillTextProps = {
   embossHighlightColor?: string;
   embossShadowColor?: string;
   rotation?: number;
+  glyphEditTool?: "move" | "stretch" | null;
+  selectedGlyphIndex?: number | null;
+  glyphEdits?: GlyphEdit[];
+  onGlyphSelect?: (glyphIndex: number | null) => void;
+  onGlyphBoxesChange?: (
+    boxes: { glyphIndex: number; x: number; y: number; width: number; height: number }[]
+  ) => void;
+  onUpdateStretchHandle?: (
+    glyphIndex: number,
+    handleId: string,
+    patch: Partial<GlyphStretchHandle>
+  ) => void;
+  onSetGlyphMoveOffset?: (
+    glyphIndex: number,
+    offsetX: number,
+    offsetY: number
+  ) => void;
   locked?: boolean;
   draggable?: boolean;
   onClick?: () => void;
@@ -63,6 +87,14 @@ export type ShapeFillTextProps = {
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   isSelected?: boolean;
   onResizeScale?: (newScale: number) => void;
+};
+
+type GlyphInstance = {
+  glyphIndex: number;
+  gx: number;
+  gy: number;
+  scX: number;
+  scY: number;
 };
 
 // ─── SVG path parser ──────────────────────────────────────────────────────────
@@ -79,6 +111,37 @@ function replayPath(ctx: CanvasRenderingContext2D, cmds: SvgCmd[]) {
       case "Z": ctx.closePath(); break;
     }
   }
+}
+
+/**
+ * Applies a glyph's edits to its raw outline commands (in the glyph's own
+ * local coordinate space, same frame the tile-loop's own translate/rotate/
+ * scale positions afterward) — this is what lets a single edit affect every
+ * tiled repetition of that letter identically.
+ */
+function warpSvgCommands(commands: SvgCmd[], edit: GlyphEdit | undefined): SvgCmd[] {
+  return commands.map((c): SvgCmd => {
+    switch (c.type) {
+      case "M":
+      case "L": {
+        const p = applyGlyphEdit(c.x, c.y, edit);
+        return { type: c.type, x: p.x, y: p.y };
+      }
+      case "C": {
+        const p1 = applyGlyphEdit(c.x1, c.y1, edit);
+        const p2 = applyGlyphEdit(c.x2, c.y2, edit);
+        const p = applyGlyphEdit(c.x, c.y, edit);
+        return { type: "C", x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, x: p.x, y: p.y };
+      }
+      case "Q": {
+        const p1 = applyGlyphEdit(c.x1, c.y1, edit);
+        const p = applyGlyphEdit(c.x, c.y, edit);
+        return { type: "Q", x1: p1.x, y1: p1.y, x: p.x, y: p.y };
+      }
+      case "Z":
+        return c;
+    }
+  });
 }
 
 function drawCommandsToCtx(ctx: CanvasRenderingContext2D, commands: SvgCmd[]) {
@@ -122,6 +185,13 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   embossHighlightColor = "#ffffff",
   embossShadowColor = "#000000",
   rotation = 0,
+  glyphEditTool = null,
+  selectedGlyphIndex = null,
+  glyphEdits = [],
+  onGlyphSelect,
+  onGlyphBoxesChange,
+  onUpdateStretchHandle,
+  onSetGlyphMoveOffset,
   locked,
   draggable = true,
   onClick, onTap, onDblClick, onDragMove, onDragEnd,
@@ -129,6 +199,12 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   onResizeScale,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
+  const moveDragOriginRef = useRef<{
+    x: number;
+    y: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
 
   // Parse SVG path once
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
@@ -163,14 +239,160 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   const scaledW = shapeWidth * shapeScale;
   const scaledH = shapeHeight * shapeScale;
 
+  // Per-glyph outline bounds (glyph-local space) — reported so "Add handle"
+  // can size/center a new handle on whichever glyph is selected.
+  const glyphLocalBoxes = useMemo(() => {
+    const boxes: { glyphIndex: number; x: number; y: number; width: number; height: number }[] = [];
+    for (let i = 0; i < glyphCache.length; i++) {
+      const g = glyphCache[i];
+      if (!g.obj) continue;
+      const box = g.obj.getPath(0, 0, fontSize).getBoundingBox();
+      if (isFinite(box.x1) && isFinite(box.x2) && isFinite(box.y1) && isFinite(box.y2)) {
+        boxes.push({
+          glyphIndex: i,
+          x: box.x1,
+          y: box.y1,
+          width: Math.max(box.x2 - box.x1, 1),
+          height: Math.max(box.y2 - box.y1, 1),
+        });
+      }
+    }
+    return boxes;
+  }, [glyphCache, fontSize]);
+
+  useEffect(() => {
+    onGlyphBoxesChange?.(glyphLocalBoxes);
+  }, [glyphLocalBoxes, onGlyphBoxesChange]);
+
+  // Mirrors the sceneFunc's own scanline-tiling loop in plain JS (no canvas
+  // needed — `pointInPolygon` is pure) so glyph-edit click hit-testing and
+  // handle placement can know where every tiled repetition actually lands.
+  // Only computed while glyph edit mode is on (it's a real amount of work).
+  const glyphInstances = useMemo<GlyphInstance[]>(() => {
+    if (!glyphEditTool) return [];
+    if (!shapeSvgPath || parsedCmds.length === 0) return [];
+    if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) return [];
+
+    const lineH = fontSize * shapeFillSpacing;
+    const sampleStep = Math.max(2, Math.round(fontSize / 8));
+    let lineY = fontSize * 0.85;
+    const inShape = (px: number, py: number) => pointInPolygon(px, py, polygon);
+    const instances: GlyphInstance[] = [];
+
+    while (lineY < shapeHeight) {
+      let lx = -1, rx = -1;
+      for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
+        if (inShape(sx, lineY)) {
+          if (lx < 0) lx = sx;
+          rx = sx;
+        }
+      }
+      if (lx > 0) {
+        for (let sx = lx - sampleStep; sx <= lx; sx++) {
+          if (inShape(sx, lineY)) { lx = sx; break; }
+        }
+      }
+      if (rx > 0) {
+        for (let sx = rx; sx <= rx + sampleStep; sx++) {
+          if (inShape(sx, lineY)) { rx = sx; } else { break; }
+        }
+      }
+
+      if (lx >= 0 && rx > lx + 2) {
+        const lineWidth = rx - lx;
+        const effectiveAdvance = totalAdvance * shapeFillScaleX;
+        const reps = Math.max(1, Math.floor(lineWidth / effectiveAdvance));
+        const fitScaleX = lineWidth / (reps * effectiveAdvance);
+        const scX = shapeFillScaleX * fitScaleX;
+        const scY = shapeFillScaleY;
+
+        for (let r = 0; r < reps; r++) {
+          const startPenX = lx + r * effectiveAdvance * fitScaleX;
+          for (let gi = 0; gi < glyphCache.length; gi++) {
+            const g = glyphCache[gi];
+            if (!g.obj || g.commands.length === 0) continue;
+            instances.push({
+              glyphIndex: gi,
+              gx: startPenX + g.penX * scX + g.dx * scX,
+              gy: lineY + g.dy * scY,
+              scX,
+              scY,
+            });
+          }
+        }
+      }
+
+      lineY += lineH;
+    }
+
+    return instances;
+  }, [
+    glyphEditTool,
+    shapeSvgPath,
+    parsedCmds,
+    shapeData.font,
+    glyphCache,
+    totalAdvance,
+    fontSize,
+    shapeFillSpacing,
+    shapeWidth,
+    shapeHeight,
+    shapeFillScaleX,
+    shapeFillScaleY,
+    polygon,
+  ]);
+
+  const selectedInstance = useMemo(
+    () =>
+      selectedGlyphIndex != null
+        ? glyphInstances.find((inst) => inst.glyphIndex === selectedGlyphIndex) ?? null
+        : null,
+    [glyphInstances, selectedGlyphIndex]
+  );
+
+  const selectedEdit =
+    glyphEditTool != null && selectedGlyphIndex != null
+      ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
+      : undefined;
+  const selectedStretches = selectedEdit?.stretches ?? [];
+  const selectedMoveOffset = selectedEdit?.move ?? { offsetX: 0, offsetY: 0 };
+  const selectedGlyphBox =
+    selectedGlyphIndex != null
+      ? glyphLocalBoxes.find((b) => b.glyphIndex === selectedGlyphIndex)
+      : undefined;
+
   return (
     <Group
       id={id}
       x={x} y={y}
       rotation={rotation}
       opacity={opacity}
-      draggable={draggable && !locked}
-      onClick={onClick} onTap={onTap} onDblClick={onDblClick} onDblTap={onDblClick} onDragMove={onDragMove} onDragEnd={onDragEnd}
+      draggable={draggable && !locked && glyphEditTool == null}
+      onClick={(e) => {
+        onClick?.();
+
+        if (glyphEditTool == null) return;
+
+        const group = e.currentTarget;
+        const pos = group.getRelativePointerPosition();
+        if (!pos) return;
+
+        const localX = pos.x / Math.max(shapeScale, 0.0001);
+        const localY = pos.y / Math.max(shapeScale, 0.0001);
+
+        let best: GlyphInstance | null = null;
+        let bestDist = fontSize * 0.7;
+        for (const inst of glyphInstances) {
+          const d = Math.hypot(inst.gx - localX, inst.gy - localY);
+          if (d < bestDist) {
+            bestDist = d;
+            best = inst;
+          }
+        }
+
+        onGlyphSelect?.(best?.glyphIndex ?? null);
+      }}
+      onTap={onTap} onDblClick={onDblClick} onDblTap={onDblClick} onDragMove={onDragMove} onDragEnd={onDragEnd}
       listening
     >
       <Rect x={0} y={0} width={scaledW} height={scaledH} fill="transparent" strokeEnabled={false} listening />
@@ -220,17 +442,20 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
             ctx.fillStyle = fillColor;
 
             const drawGlyphRow = (startPenX: number, sy: number, scX: number, scY: number) => {
-              for (const g of glyphCache) {
+              for (let gi = 0; gi < glyphCache.length; gi++) {
+                const g = glyphCache[gi];
                 if (!g.obj || g.commands.length === 0) continue;
                 const gx = startPenX + g.penX * scX + g.dx * scX;
                 const gy = sy + g.dy * scY;
+                const edit = glyphEdits.find((w) => w.glyphIndex === gi);
+                const commands = edit ? warpSvgCommands(g.commands, edit) : g.commands;
 
                 ctx.save();
                 ctx.translate(gx, gy);
                 if (shapeFillTextRotation !== 0) ctx.rotate(rotRad);
                 ctx.scale(scX, scY);
                 if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
-                drawCommandsToCtx(ctx as unknown as CanvasRenderingContext2D, g.commands);
+                drawCommandsToCtx(ctx as unknown as CanvasRenderingContext2D, commands);
                 ctx.fill();
                 if (includeExtras && fauxBoldWidth > 0) {
                   ctx.strokeStyle = fillColor;
@@ -324,6 +549,135 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           }}
           onDragEnd={(e) => { e.cancelBubble = true; }}
         />
+      )}
+
+      {glyphEditTool != null && selectedGlyphIndex != null && selectedInstance && (
+        <Group
+          x={shapeScale * selectedInstance.gx}
+          y={shapeScale * selectedInstance.gy}
+          scaleX={shapeScale * selectedInstance.scX}
+          scaleY={shapeScale * selectedInstance.scY}
+          listening
+        >
+          {glyphEditTool === "stretch" &&
+            selectedStretches.map((h) => {
+              const effScale = Math.max(shapeScale * selectedInstance.scX, 0.05);
+              const r = Math.max(4, Math.min(20, 7 / effScale));
+              return (
+                <React.Fragment key={h.id}>
+                  <Circle
+                    x={h.anchorX}
+                    y={h.anchorY}
+                    radius={r}
+                    fill={STRETCH_ANCHOR_COLOR}
+                    stroke="#ffffff"
+                    strokeWidth={2 / effScale}
+                    draggable
+                    onMouseDown={(e) => {
+                      e.cancelBubble = true;
+                    }}
+                    onTouchStart={(e) => {
+                      e.cancelBubble = true;
+                    }}
+                    onDragMove={(e) => {
+                      e.cancelBubble = true;
+                      const grp = e.currentTarget.getParent() as Konva.Group;
+                      const pos = grp.getRelativePointerPosition();
+                      if (!pos || !onUpdateStretchHandle) return;
+                      onUpdateStretchHandle(selectedGlyphIndex, h.id, {
+                        anchorX: pos.x,
+                        anchorY: pos.y,
+                      });
+                    }}
+                    onDragEnd={(e) => {
+                      e.cancelBubble = true;
+                    }}
+                  />
+                  <Circle
+                    x={h.dragX}
+                    y={h.dragY}
+                    radius={r}
+                    fill={STRETCH_DRAG_COLOR}
+                    stroke="#ffffff"
+                    strokeWidth={2 / effScale}
+                    draggable
+                    onMouseDown={(e) => {
+                      e.cancelBubble = true;
+                    }}
+                    onTouchStart={(e) => {
+                      e.cancelBubble = true;
+                    }}
+                    onDragMove={(e) => {
+                      e.cancelBubble = true;
+                      const grp = e.currentTarget.getParent() as Konva.Group;
+                      const pos = grp.getRelativePointerPosition();
+                      if (!pos || !onUpdateStretchHandle) return;
+                      onUpdateStretchHandle(selectedGlyphIndex, h.id, {
+                        dragX: pos.x,
+                        dragY: pos.y,
+                      });
+                    }}
+                    onDragEnd={(e) => {
+                      e.cancelBubble = true;
+                    }}
+                  />
+                </React.Fragment>
+              );
+            })}
+
+          {glyphEditTool === "move" &&
+            selectedGlyphBox &&
+            (() => {
+              const effScale = Math.max(shapeScale * selectedInstance.scX, 0.05);
+              return (
+                <Rect
+                  x={selectedGlyphBox.x + selectedMoveOffset.offsetX}
+                  y={selectedGlyphBox.y + selectedMoveOffset.offsetY}
+                  width={selectedGlyphBox.width}
+                  height={selectedGlyphBox.height}
+                  fill="transparent"
+                  stroke={MOVE_HANDLE_COLOR}
+                  strokeWidth={2 / effScale}
+                  dash={[6 / effScale, 4 / effScale]}
+                  draggable
+                  onMouseDown={(e) => {
+                    e.cancelBubble = true;
+                  }}
+                  onTouchStart={(e) => {
+                    e.cancelBubble = true;
+                  }}
+                  onDragStart={(e) => {
+                    e.cancelBubble = true;
+                    const grp = e.currentTarget.getParent() as Konva.Group;
+                    const pos = grp.getRelativePointerPosition();
+                    if (!pos) return;
+                    moveDragOriginRef.current = {
+                      x: pos.x,
+                      y: pos.y,
+                      offsetX: selectedMoveOffset.offsetX,
+                      offsetY: selectedMoveOffset.offsetY,
+                    };
+                  }}
+                  onDragMove={(e) => {
+                    e.cancelBubble = true;
+                    const origin = moveDragOriginRef.current;
+                    const grp = e.currentTarget.getParent() as Konva.Group;
+                    const pos = grp.getRelativePointerPosition();
+                    if (!origin || !pos || !onSetGlyphMoveOffset) return;
+                    onSetGlyphMoveOffset(
+                      selectedGlyphIndex,
+                      origin.offsetX + (pos.x - origin.x),
+                      origin.offsetY + (pos.y - origin.y)
+                    );
+                  }}
+                  onDragEnd={(e) => {
+                    e.cancelBubble = true;
+                    moveDragOriginRef.current = null;
+                  }}
+                />
+              );
+            })()}
+        </Group>
       )}
     </Group>
   );

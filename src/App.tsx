@@ -20,7 +20,7 @@ import {
   computeFitToBox,
   DEFAULT_EMPTY_BOUNDS,
 } from "./lib/canvasBounds";
-import type { Block, GlyphWarp, GlyphHandleMode } from "./types";
+import type { Block, GlyphEdit, GlyphStretchHandle } from "./types";
 
 const dissolveSingletonGroups = (list: Block[]): Block[] => {
   const counts = new Map<number, number>();
@@ -196,6 +196,8 @@ const App: React.FC = () => {
   const clipboardRef = useRef<Block | null>(null);
   const [editRequestSignal, setEditRequestSignal] = useState(0);
   const moveTimeoutRef = useRef<number | null>(null);
+  const kashidaTimeoutRef = useRef<number | null>(null);
+  const glyphEditTimeoutRef = useRef<number | null>(null);
   const didHydrateLayoutRef = useRef(false);
   const prevViewportRef = useRef({ w: 0, h: 0 });
 
@@ -240,36 +242,62 @@ const App: React.FC = () => {
     applySnapshot
   );
 
-  const upsertGlyphWarp = useCallback(
+  const upsertGlyphEditRaw = useCallback(
     (
       blockId: number,
       glyphIndex: number,
-      updater: (prev: GlyphWarp | undefined) => GlyphWarp
+      updater: (prev: GlyphEdit | undefined) => GlyphEdit
     ) => {
-      pushHistory();
       setBlocks((prev) =>
         prev.map((b) => {
-          if (b.id !== blockId || b.type !== "shapeWarp") return b;
-          const glyphWarps = b.glyphWarps ?? [];
-          const existing = glyphWarps.find((g) => g.glyphIndex === glyphIndex);
+          if (b.id !== blockId || b.type === "image") return b;
+          const glyphEdits = b.glyphEdits ?? [];
+          const existing = glyphEdits.find((g) => g.glyphIndex === glyphIndex);
           const next = updater(existing);
           return {
             ...b,
-            glyphWarps: [
-              ...glyphWarps.filter((g) => g.glyphIndex !== glyphIndex),
+            glyphEdits: [
+              ...glyphEdits.filter((g) => g.glyphIndex !== glyphIndex),
               next,
             ].sort((a, b) => a.glyphIndex - b.glyphIndex),
           };
         })
       );
     },
-    [pushHistory]
+    []
+  );
+
+  const upsertGlyphEdit = useCallback(
+    (
+      blockId: number,
+      glyphIndex: number,
+      updater: (prev: GlyphEdit | undefined) => GlyphEdit
+    ) => {
+      pushHistory();
+      upsertGlyphEditRaw(blockId, glyphIndex, updater);
+    },
+    [pushHistory, upsertGlyphEditRaw]
+  );
+
+  // Live-drag version: updates immediately but only pushes one history entry
+  // 300ms after the gesture settles, same debounce pattern as block dragging.
+  const upsertGlyphEditDebounced = useCallback(
+    (
+      blockId: number,
+      glyphIndex: number,
+      updater: (prev: GlyphEdit | undefined) => GlyphEdit
+    ) => {
+      upsertGlyphEditRaw(blockId, glyphIndex, updater);
+      if (glyphEditTimeoutRef.current != null) window.clearTimeout(glyphEditTimeoutRef.current);
+      glyphEditTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
+    },
+    [pushHistory, upsertGlyphEditRaw]
   );
 
   const selectGlyphForBlock = useCallback((blockId: number, glyphIndex: number | null) => {
     setBlocks((prev) =>
       prev.map((b) =>
-        b.id === blockId && b.type === "shapeWarp" ? { ...b, selectedGlyphIndex: glyphIndex } : b
+        b.id === blockId && b.type !== "image" ? { ...b, selectedGlyphIndex: glyphIndex } : b
       )
     );
   }, []);
@@ -287,8 +315,8 @@ const App: React.FC = () => {
 		});
   }, []);
 
-  const addHandleToSelectedGlyph = useCallback(() => {
-    if (!selectedBlock || selectedBlock.type !== "shapeWarp" || selectedBlock.selectedGlyphIndex == null) return;
+  const addStretchHandle = useCallback(() => {
+    if (!selectedBlock || selectedBlock.type === "image" || selectedBlock.selectedGlyphIndex == null) return;
 
     const blockId = selectedBlock.id;
     const glyphIndex = selectedBlock.selectedGlyphIndex;
@@ -297,72 +325,83 @@ const App: React.FC = () => {
     const boxes = glyphBoxesByBlock[blockId] ?? [];
     const box = boxes.find((b) => b.glyphIndex === glyphIndex);
 
-    const centerX = box ? box.x + box.width / 2 : selectedBlock.x;
-    const centerY = box ? box.y + box.height / 2 : selectedBlock.y;
-    const radius = box ? Math.max(30, Math.max(box.width, box.height) * 0.8) : 80;
+    const anchorX = box ? box.x : selectedBlock.x;
+    const anchorY = box ? box.y + box.height / 2 : selectedBlock.y;
+    const dragX = box ? box.x + box.width : selectedBlock.x + 80;
+    const dragY = anchorY;
+    const bandWidth = box ? Math.max(20, Math.min(box.width, box.height) * 0.5) : 40;
 
-    upsertGlyphWarp(blockId, glyphIndex, (prev) => ({
+    upsertGlyphEdit(blockId, glyphIndex, (prev) => ({
       glyphIndex,
-      handles: [
-        ...(prev?.handles ?? []),
+      move: prev?.move,
+      stretches: [
+        ...(prev?.stretches ?? []),
         {
           id: handleId,
-          x: centerX,
-          y: centerY,
-          radius,
-          strength: 0.5,
-          mode: "pinch",
+          anchorX,
+          anchorY,
+          dragOriginX: dragX,
+          dragOriginY: dragY,
+          dragX,
+          dragY,
+          bandWidth,
         },
       ],
     }));
-  }, [selectedBlock, glyphBoxesByBlock, upsertGlyphWarp]);
+  }, [selectedBlock, glyphBoxesByBlock, upsertGlyphEdit]);
 
-  const updateGlyphHandle = useCallback(
+  const updateStretchHandle = useCallback(
     (
       blockId: number,
       glyphIndex: number,
       handleId: string,
-      patch: {
-        x?: number;
-        y?: number;
-        radius?: number;
-        strength?: number;
-        mode?: GlyphHandleMode;
-      }
+      patch: Partial<GlyphStretchHandle>
     ) => {
-      upsertGlyphWarp(blockId, glyphIndex, (prev) => ({
+      upsertGlyphEditDebounced(blockId, glyphIndex, (prev) => ({
         glyphIndex,
-        handles: (prev?.handles ?? []).map((h) =>
+        move: prev?.move,
+        stretches: (prev?.stretches ?? []).map((h) =>
           h.id === handleId ? { ...h, ...patch } : h
         ),
       }));
     },
-    [upsertGlyphWarp]
+    [upsertGlyphEditDebounced]
   );
 
-  const deleteGlyphHandle = useCallback(
+  const deleteStretchHandle = useCallback(
     (blockId: number, glyphIndex: number, handleId: string) => {
       pushHistory();
       setBlocks((prev) =>
         prev.map((b) => {
-          if (b.id !== blockId || b.type !== "shapeWarp") return b;
-          const glyphWarps = b.glyphWarps ?? [];
-          const existing = glyphWarps.find((g) => g.glyphIndex === glyphIndex);
+          if (b.id !== blockId || b.type === "image") return b;
+          const glyphEdits = b.glyphEdits ?? [];
+          const existing = glyphEdits.find((g) => g.glyphIndex === glyphIndex);
           if (!existing) return b;
-          const nextHandles = existing.handles.filter((h) => h.id !== handleId);
+          const nextStretches = existing.stretches.filter((h) => h.id !== handleId);
           return {
             ...b,
-            glyphWarps:
-              nextHandles.length > 0
-                ? glyphWarps.map((g) =>
-                    g.glyphIndex === glyphIndex ? { ...g, handles: nextHandles } : g
+            glyphEdits:
+              nextStretches.length > 0 || existing.move
+                ? glyphEdits.map((g) =>
+                    g.glyphIndex === glyphIndex ? { ...g, stretches: nextStretches } : g
                   )
-                : glyphWarps.filter((g) => g.glyphIndex !== glyphIndex),
+                : glyphEdits.filter((g) => g.glyphIndex !== glyphIndex),
           };
         })
       );
     },
     [pushHistory]
+  );
+
+  const setGlyphMoveOffset = useCallback(
+    (blockId: number, glyphIndex: number, offsetX: number, offsetY: number) => {
+      upsertGlyphEditDebounced(blockId, glyphIndex, (prev) => ({
+        glyphIndex,
+        move: { offsetX, offsetY },
+        stretches: prev?.stretches ?? [],
+      }));
+    },
+    [upsertGlyphEditDebounced]
   );
 
   const resetShapeWarp = useCallback(
@@ -376,7 +415,7 @@ const App: React.FC = () => {
                 warpShapePadding: 24,
                 warpShapeStrength: 1,
                 warpShapeMode: "envelope",
-                glyphWarps: [],
+                glyphEdits: [],
                 selectedGlyphIndex: null,
               }
             : b
@@ -411,6 +450,15 @@ const App: React.FC = () => {
       setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, x, y } : b)));
       if (moveTimeoutRef.current != null) window.clearTimeout(moveTimeoutRef.current);
       moveTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
+    },
+    [pushHistory]
+  );
+
+  const updateKashidaText = useCallback(
+    (id: number, text: string) => {
+      setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, text } : b)));
+      if (kashidaTimeoutRef.current != null) window.clearTimeout(kashidaTimeoutRef.current);
+      kashidaTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
     },
     [pushHistory]
   );
@@ -1223,9 +1271,9 @@ const App: React.FC = () => {
       warpShapeMode: "envelope",
       x: x - shapeWidth / 2,
       y: y - shapeHeight / 2,
-      glyphEditMode: false,
+      glyphEditTool: null,
       selectedGlyphIndex: null,
-      glyphWarps: [],
+      glyphEdits: [],
     };
 
     setBlocks((prev) => [...prev, newBlock]);
@@ -1387,22 +1435,24 @@ const App: React.FC = () => {
         onUngroupBlock={ungroupBlock}
         onZoomToBlock={zoomToBlock}
         onClearDiacritics={clearDiacritics}
-        onInsertPreset={(value) =>
-          selectedBlock && updateSelectedBlock({ text: selectedBlock.text + value })
-        }
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={canUndo}
         canRedo={canRedo}
-        onToggleGlyphEditMode={() => {
-          if (!selectedBlock || selectedBlock.type !== "shapeWarp") return;
+        onSetGlyphEditTool={(tool) => {
+          if (!selectedBlock || selectedBlock.type === "image") return;
+          updateSelectedBlock({ glyphEditTool: tool });
+        }}
+        onToggleKashidaEditMode={() => {
+          if (!selectedBlock || selectedBlock.type !== "text") return;
           updateSelectedBlock({
-            glyphEditMode: !selectedBlock.glyphEditMode,
+            kashidaEditMode: !selectedBlock.kashidaEditMode,
           });
         }}
-        onAddGlyphHandle={addHandleToSelectedGlyph}
-        onDeleteGlyphHandle={deleteGlyphHandle}
-        onUpdateGlyphHandle={updateGlyphHandle}
+        onAddStretchHandle={addStretchHandle}
+        onDeleteStretchHandle={deleteStretchHandle}
+        onUpdateStretchHandle={updateStretchHandle}
+        onSetGlyphMoveOffset={setGlyphMoveOffset}
         onResetShapeWarp={resetShapeWarp}
         onFitShapeFillSpacing={fitShapeFillSpacing}
         onAlignSelected={alignSelectedBlocks}
@@ -1458,8 +1508,10 @@ const App: React.FC = () => {
           onSelectBlock={selectBlock}
           onEditBlock={requestTextEdit}
           onSelectGlyph={selectGlyphForBlock}
-          onUpdateGlyphHandle={updateGlyphHandle}
+          onUpdateStretchHandle={updateStretchHandle}
+          onSetGlyphMoveOffset={setGlyphMoveOffset}
           onGlyphBoxesChange={updateGlyphBoxes}
+          onKashidaTextChange={updateKashidaText}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           onResizeImageBlock={resizeImageBlock}
         />

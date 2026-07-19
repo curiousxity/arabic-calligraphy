@@ -15,7 +15,7 @@ import {
   unionRect,
   DEFAULT_EMPTY_BOUNDS,
 } from "../lib/canvasBounds";
-import type { Block, GlyphHandleMode } from "../types";
+import type { Block, GlyphStretchHandle } from "../types";
 
 const GRID_SIZE = 40;
 const SNAP_GUIDE_PX = 6;
@@ -50,22 +50,23 @@ export type CanvasStageProps = {
   onSelectBlock: (id: number, additive?: boolean) => void;
   onEditBlock: (id: number) => void;
   onSelectGlyph: (blockId: number, glyphIndex: number | null) => void;
-  onUpdateGlyphHandle: (
+  onUpdateStretchHandle: (
     blockId: number,
     glyphIndex: number,
     handleId: string,
-    patch: {
-      x?: number;
-      y?: number;
-      radius?: number;
-      strength?: number;
-      mode?: GlyphHandleMode;
-    }
+    patch: Partial<GlyphStretchHandle>
+  ) => void;
+  onSetGlyphMoveOffset: (
+    blockId: number,
+    glyphIndex: number,
+    offsetX: number,
+    offsetY: number
   ) => void;
   onGlyphBoxesChange: (
     blockId: number,
     boxes: { glyphIndex: number; x: number; y: number; width: number; height: number }[]
   ) => void;
+  onKashidaTextChange: (blockId: number, text: string) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   onResizeImageBlock: (id: number, scale: number) => void;
   showRulers: boolean;
@@ -98,8 +99,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSelectBlock,
   onEditBlock,
   onSelectGlyph,
-  onUpdateGlyphHandle,
+  onUpdateStretchHandle,
+  onSetGlyphMoveOffset,
   onGlyphBoxesChange,
+  onKashidaTextChange,
   onResizeShapeFillBlock,
   onResizeImageBlock,
   showRulers,
@@ -596,6 +599,19 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     locked={block.locked}
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
+                    glyphEditTool={block.glyphEditTool ?? null}
+                    selectedGlyphIndex={block.selectedGlyphIndex ?? null}
+                    glyphEdits={block.glyphEdits ?? []}
+                    onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
+                    onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
+                      onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
+                    }
+                    onSetGlyphMoveOffset={(glyphIndex, offsetX, offsetY) =>
+                      onSetGlyphMoveOffset(block.id, glyphIndex, offsetX, offsetY)
+                    }
+                    onGlyphBoxesChange={(boxes) =>
+                      onGlyphBoxesChange(block.id, boxes)
+                    }
                   />
                 );
               }
@@ -632,12 +648,15 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     rotation={block.rotation ?? 0}
                     locked={block.locked}
                     debugBounds={false}
-                    glyphEditMode={block.glyphEditMode ?? false}
+                    glyphEditTool={block.glyphEditTool ?? null}
                     selectedGlyphIndex={block.selectedGlyphIndex ?? null}
-                    glyphWarps={block.glyphWarps ?? []}
+                    glyphEdits={block.glyphEdits ?? []}
                     onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
-                    onUpdateGlyphHandle={(glyphIndex, handleId, patch) =>
-                      onUpdateGlyphHandle(block.id, glyphIndex, handleId, patch)
+                    onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
+                      onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
+                    }
+                    onSetGlyphMoveOffset={(glyphIndex, offsetX, offsetY) =>
+                      onSetGlyphMoveOffset(block.id, glyphIndex, offsetX, offsetY)
                     }
                     onGlyphBoxesChange={(boxes) =>
                       onGlyphBoxesChange(block.id, boxes)
@@ -673,6 +692,19 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   rotation={block.rotation ?? 0}
                   warpX={block.warpX ?? 0}
                   warpY={block.warpY ?? 0}
+                  kashidaEditMode={block.kashidaEditMode ?? false}
+                  onKashidaTextChange={(text) => onKashidaTextChange(block.id, text)}
+                  glyphEditTool={block.glyphEditTool ?? null}
+                  selectedGlyphIndex={block.selectedGlyphIndex ?? null}
+                  glyphEdits={block.glyphEdits ?? []}
+                  onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
+                  onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
+                    onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
+                  }
+                  onSetGlyphMoveOffset={(glyphIndex, offsetX, offsetY) =>
+                    onSetGlyphMoveOffset(block.id, glyphIndex, offsetX, offsetY)
+                  }
+                  onGlyphBoxesChange={(boxes) => onGlyphBoxesChange(block.id, boxes)}
                   locked={block.locked}
                   debugBounds={false}
                 />

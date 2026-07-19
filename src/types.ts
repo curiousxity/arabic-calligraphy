@@ -2,20 +2,25 @@ export type BlockType = "text" | "shapeFill" | "shapeWarp" | "image";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 export type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
-export type GlyphHandleMode = "pinch" | "move" | "scaleX" | "scaleY";
+export type GlyphMoveEdit = { offsetX: number; offsetY: number };
 
-export type GlyphHandle = {
+export type GlyphStretchHandle = {
   id: string;
-  x: number;
-  y: number;
-  radius: number;
-  strength: number;
-  mode: GlyphHandleMode;
+  anchorX: number;
+  anchorY: number;
+  /** Captured once at creation — the reference axis length/direction the drag delta is measured against. */
+  dragOriginX: number;
+  dragOriginY: number;
+  /** Live, draggable position. */
+  dragX: number;
+  dragY: number;
+  bandWidth: number;
 };
 
-export type GlyphWarp = {
+export type GlyphEdit = {
   glyphIndex: number;
-  handles: GlyphHandle[];
+  move?: GlyphMoveEdit;
+  stretches: GlyphStretchHandle[];
 };
 
 type BlockCommon = {
@@ -44,6 +49,12 @@ type BlockCommon = {
   ornamental?: boolean;
   groupId?: number;
 
+  // Per-glyph editing (Move Glyph / Stretch Line tools) — shared across text,
+  // shapeFill, and shapeWarp blocks; not meaningful on image blocks.
+  glyphEditTool?: "move" | "stretch" | null;
+  selectedGlyphIndex?: number | null;
+  glyphEdits?: GlyphEdit[];
+
   // Shared shape-import fields. shapeFill and shapeWarp blocks both carry an
   // uploaded SVG path, and shapeWarp falls back to shapeWidth/shapeHeight
   // when warpShapeWidth/warpShapeHeight aren't set, so these stay common
@@ -59,6 +70,7 @@ export type TextBlock = BlockCommon & {
   lineHeight?: number;
   warpX?: number;
   warpY?: number;
+  kashidaEditMode?: boolean;
 };
 
 export type ShapeFillBlock = BlockCommon & {
@@ -77,9 +89,6 @@ export type ShapeWarpBlock = BlockCommon & {
   warpShapePadding?: number;
   warpShapeStrength?: number;
   warpShapeMode?: ShapeWarpMode;
-  glyphEditMode?: boolean;
-  selectedGlyphIndex?: number | null;
-  glyphWarps?: GlyphWarp[];
 };
 
 export type ImageBlock = BlockCommon & {

@@ -6,7 +6,7 @@ import {
   URDU,
   PRESETS,
 } from "../lib/presets";
-import type { Block, TextAlign, ShapeWarpMode, GlyphHandle, GlyphHandleMode } from "../types";
+import type { Block, TextAlign, ShapeWarpMode, GlyphStretchHandle } from "../types";
 import type { NamedProjectMeta } from "../App";
 import { extractSvgPaths } from "../lib/svgImport";
 import { STARTER_TEMPLATES } from "../lib/templates";
@@ -98,34 +98,33 @@ export type SidebarProps = {
   onZoomToBlock?: (id: number) => void;
 
   onClearDiacritics: () => void;
-  onInsertPreset: (value: string) => void;
 
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
 
-  onToggleGlyphEditMode?: () => void;
-  onAddGlyphHandle?: () => void;
-  onDeleteGlyphHandle?: (blockId: number, glyphIndex: number, handleId: string) => void;
-  onUpdateGlyphHandle?: (
+  onSetGlyphEditTool?: (tool: "move" | "stretch" | null) => void;
+  onToggleKashidaEditMode?: () => void;
+  onAddStretchHandle?: () => void;
+  onDeleteStretchHandle?: (blockId: number, glyphIndex: number, handleId: string) => void;
+  onUpdateStretchHandle?: (
     blockId: number,
     glyphIndex: number,
     handleId: string,
-    patch: Partial<GlyphHandle>
+    patch: Partial<GlyphStretchHandle>
+  ) => void;
+  onSetGlyphMoveOffset?: (
+    blockId: number,
+    glyphIndex: number,
+    offsetX: number,
+    offsetY: number
   ) => void;
   onResetShapeWarp?: (blockId: number) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
   onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
   onDistributeSelected?: (axis: "x" | "y") => void;
   onGroupSelected?: () => void;
-};
-
-const HANDLE_MODE_COLORS: Record<GlyphHandleMode, string> = {
-  pinch: "#ff4d4f",
-  move: "#4d94ff",
-  scaleX: "#22c55e",
-  scaleY: "#eab308",
 };
 
 const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
@@ -194,15 +193,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onUngroupBlock,
   onZoomToBlock,
   onClearDiacritics,
-  onInsertPreset,
   onUndo,
   onRedo,
   canUndo,
   canRedo,
-  onToggleGlyphEditMode,
-  onAddGlyphHandle,
-  onDeleteGlyphHandle,
-  onUpdateGlyphHandle,
+  onSetGlyphEditTool,
+  onToggleKashidaEditMode,
+  onAddStretchHandle,
+  onDeleteStretchHandle,
+  onUpdateStretchHandle,
+  onSetGlyphMoveOffset,
   onResetShapeWarp,
   onFitShapeFillSpacing,
   onAlignSelected,
@@ -956,6 +956,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
 
+                {selectedBlock.type === "text" && (
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
+                    <div className="sidebarSectionTitle">Kashida</div>
+
+                    <label className="checkboxRow">
+                      <input
+                        type="checkbox"
+                        checked={!!selectedBlock.kashidaEditMode}
+                        onChange={() => onToggleKashidaEditMode?.()}
+                      />
+                      Kashida tool
+                    </label>
+
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                      Drag a gold handle between two connected letters on the canvas to
+                      elongate the connector (tatweel).
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                   <button
                     type="button"
@@ -1132,6 +1152,187 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                 </div>
 
+                <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
+                  <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
+                    Glyph Edit
+                  </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                      Click a letter, then Move to nudge it as a whole, or Stretch to
+                      elongate a stroke between an anchor and a drag point.
+                    </div>
+
+                    <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                      {(
+                        [
+                          { value: null, label: "Off" },
+                          { value: "move", label: "Move" },
+                          { value: "stretch", label: "Stretch" },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.label}
+                          type="button"
+                          onClick={() => onSetGlyphEditTool?.(opt.value)}
+                          className="sidebarPillButton"
+                          style={
+                            (selectedBlock.glyphEditTool ?? null) === opt.value
+                              ? { background: "var(--accent)", color: "var(--text-on-accent)" }
+                              : undefined
+                          }
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {selectedBlock.glyphEditTool != null && (
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+                        Selected glyph:{" "}
+                        {selectedBlock.selectedGlyphIndex != null
+                          ? selectedBlock.selectedGlyphIndex
+                          : "none"}
+                      </div>
+                    )}
+
+                    {selectedBlock.glyphEditTool === "move" &&
+                      selectedBlock.selectedGlyphIndex != null &&
+                      (() => {
+                        const glyphIndex = selectedBlock.selectedGlyphIndex;
+                        const move = selectedBlock.glyphEdits?.find(
+                          (g) => g.glyphIndex === glyphIndex
+                        )?.move;
+                        const offsetX = move?.offsetX ?? 0;
+                        const offsetY = move?.offsetY ?? 0;
+
+                        return (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 6,
+                              marginTop: 8,
+                            }}
+                          >
+                            <RangeRow
+                              id={makeId("glyph-move-x", selectedId)}
+                              name={makeId("glyphMoveX", selectedId)}
+                              label="Offset X"
+                              value={offsetX}
+                              min={-200}
+                              max={200}
+                              onChange={(v) =>
+                                onSetGlyphMoveOffset?.(selectedBlock.id, glyphIndex, v, offsetY)
+                              }
+                              suffix={`${Math.round(offsetX)}px`}
+                            />
+                            <RangeRow
+                              id={makeId("glyph-move-y", selectedId)}
+                              name={makeId("glyphMoveY", selectedId)}
+                              label="Offset Y"
+                              value={offsetY}
+                              min={-200}
+                              max={200}
+                              onChange={(v) =>
+                                onSetGlyphMoveOffset?.(selectedBlock.id, glyphIndex, offsetX, v)
+                              }
+                              suffix={`${Math.round(offsetY)}px`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onSetGlyphMoveOffset?.(selectedBlock.id, glyphIndex, 0, 0)
+                              }
+                              className="sidebarSmallAction"
+                            >
+                              Reset position
+                            </button>
+                          </div>
+                        );
+                      })()}
+
+                    {selectedBlock.glyphEditTool === "stretch" && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={selectedBlock.selectedGlyphIndex == null}
+                          onClick={() => onAddStretchHandle?.()}
+                          className="sidebarSmallAction"
+                          style={{ marginTop: 8 }}
+                        >
+                          Add stretch line
+                        </button>
+
+                        {selectedBlock.selectedGlyphIndex != null &&
+                          (() => {
+                            const glyphIndex = selectedBlock.selectedGlyphIndex;
+                            const stretches =
+                              selectedBlock.glyphEdits?.find((g) => g.glyphIndex === glyphIndex)
+                                ?.stretches ?? [];
+                            if (stretches.length === 0) return null;
+
+                            return (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 6,
+                                  marginTop: 8,
+                                }}
+                              >
+                                {stretches.map((h) => (
+                                  <div
+                                    key={h.id}
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: 6,
+                                      background: "var(--row-bg)",
+                                      borderRadius: 8,
+                                      padding: "6px",
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <span style={{ fontSize: 12, color: "var(--text-muted)", flex: 1 }}>
+                                        Stretch line
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          onDeleteStretchHandle?.(selectedBlock.id, glyphIndex, h.id)
+                                        }
+                                        className="layerIconBtn"
+                                        title="Delete stretch line"
+                                        aria-label="Delete stretch line"
+                                        style={{ color: "var(--danger)" }}
+                                      >
+                                        <CloseIcon size={12} />
+                                      </button>
+                                    </div>
+
+                                    <RangeRow
+                                      id={makeId(`handle-band-${h.id}`, selectedId)}
+                                      name={makeId(`handleBand-${h.id}`, selectedId)}
+                                      label="Band width"
+                                      value={h.bandWidth}
+                                      min={5}
+                                      max={300}
+                                      step={5}
+                                      onChange={(v) =>
+                                        onUpdateStretchHandle?.(selectedBlock.id, glyphIndex, h.id, {
+                                          bandWidth: v,
+                                        })
+                                      }
+                                      suffix={`${Math.round(h.bandWidth)}px`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                      </>
+                    )}
+                </div>
+
                 {selectedBlock.type === "shapeWarp" && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                     <div
@@ -1153,106 +1354,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         Reset
                       </button>
                     </div>
-
-                    <label className="checkboxRow" style={{ marginTop: 10 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!selectedBlock.glyphEditMode}
-                        onChange={() => onToggleGlyphEditMode?.()}
-                      />
-                      Glyph edit mode
-                    </label>
-
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
-                      Selected glyph:{" "}
-                      {selectedBlock.selectedGlyphIndex != null
-                        ? selectedBlock.selectedGlyphIndex
-                        : "none"}
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={
-                        !selectedBlock.glyphEditMode ||
-                        selectedBlock.selectedGlyphIndex == null
-                      }
-                      onClick={() => onAddGlyphHandle?.()}
-                      className="sidebarSmallAction"
-                      style={{ marginTop: 8 }}
-                    >
-                      Add handle
-                    </button>
-
-                    {selectedBlock.selectedGlyphIndex != null &&
-                      (() => {
-                        const glyphIndex = selectedBlock.selectedGlyphIndex;
-                        const handles =
-                          selectedBlock.glyphWarps?.find((w) => w.glyphIndex === glyphIndex)
-                            ?.handles ?? [];
-                        if (handles.length === 0) return null;
-
-                        return (
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 6,
-                              marginTop: 8,
-                            }}
-                          >
-                            {handles.map((h) => (
-                              <div
-                                key={h.id}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  background: "var(--row-bg)",
-                                  borderRadius: 8,
-                                  padding: "4px 6px",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    width: 8,
-                                    height: 8,
-                                    borderRadius: 999,
-                                    flexShrink: 0,
-                                    background: HANDLE_MODE_COLORS[h.mode],
-                                  }}
-                                />
-                                <select
-                                  value={h.mode}
-                                  onChange={(e) =>
-                                    onUpdateGlyphHandle?.(selectedBlock.id, glyphIndex, h.id, {
-                                      mode: e.target.value as GlyphHandleMode,
-                                    })
-                                  }
-                                  className="select"
-                                  style={{ flex: 1, fontSize: 12 }}
-                                >
-                                  <option value="pinch">Pinch</option>
-                                  <option value="move">Move</option>
-                                  <option value="scaleX">Scale X</option>
-                                  <option value="scaleY">Scale Y</option>
-                                </select>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    onDeleteGlyphHandle?.(selectedBlock.id, glyphIndex, h.id)
-                                  }
-                                  className="layerIconBtn"
-                                  title="Delete handle"
-                                  aria-label="Delete handle"
-                                  style={{ color: "var(--danger)" }}
-                                >
-                                  <CloseIcon size={12} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
 
                     <SelectRow
                       id={makeId("warp-shape-mode", selectedId)}
@@ -1471,20 +1572,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <PresetKeyboard
                   title="Presets"
                   rows={[PRESETS]}
-                  onPick={onInsertPreset}
+                  onPick={handleKeyboardKey}
                   fontFamily={selectedBlock?.fontFamily ?? "FatemiMaqala"}
                 />
 
                 <PresetKeyboard
                   title="Specials"
                   rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]}
-                  onPick={onInsertPreset}
+                  onPick={handleKeyboardKey}
                 />
 
                 <PresetKeyboard
                   title="Urdu-Farsi Characters"
                   rows={[PERSIAN, URDU]}
-                  onPick={onInsertPreset}
+                  onPick={handleKeyboardKey}
                 />
               </div>
             )}

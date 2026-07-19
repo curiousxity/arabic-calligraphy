@@ -4,14 +4,13 @@ import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
-import type { GlyphWarp, GlyphHandle, GlyphHandleMode } from "../types";
-
-const HANDLE_MODE_COLORS: Record<GlyphHandleMode, string> = {
-  pinch: "#ff4d4f",
-  move: "#4d94ff",
-  scaleX: "#22c55e",
-  scaleY: "#eab308",
-};
+import {
+  applyGlyphEdit,
+  MOVE_HANDLE_COLOR,
+  STRETCH_ANCHOR_COLOR,
+  STRETCH_DRAG_COLOR,
+} from "../lib/glyphEdits";
+import type { GlyphEdit, GlyphStretchHandle } from "../types";
 
 type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
 
@@ -63,15 +62,20 @@ export type ShapeWarpTextProps = {
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   debugBounds?: boolean;
 
-  glyphEditMode?: boolean;
+  glyphEditTool?: "move" | "stretch" | null;
   selectedGlyphIndex?: number | null;
-  glyphWarps?: GlyphWarp[];
+  glyphEdits?: GlyphEdit[];
   onGlyphSelect?: (glyphIndex: number | null) => void;
   onGlyphBoxesChange?: (boxes: GlyphHitBox[]) => void;
-  onUpdateGlyphHandle?: (
+  onUpdateStretchHandle?: (
     glyphIndex: number,
     handleId: string,
-    patch: Partial<GlyphHandle>
+    patch: Partial<GlyphStretchHandle>
+  ) => void;
+  onSetGlyphMoveOffset?: (
+    glyphIndex: number,
+    offsetX: number,
+    offsetY: number
   ) => void;
 };
 
@@ -209,40 +213,6 @@ function applyShapeWarpPoint(
   return { x: px, y: py };
 }
 
-function applyGlyphHandles(x: number, y: number, handles?: GlyphHandle[]) {
-  if (!handles || handles.length === 0) return { x, y };
-
-  let px = x;
-  let py = y;
-
-  for (const h of handles) {
-    const dx = px - h.x;
-    const dy = py - h.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const radius = Math.max(h.radius ?? 1, 1);
-    const strength = h.strength ?? 0.5;
-
-    if (dist >= radius) continue;
-
-    const t = 1 - dist / radius;
-    const k = strength * t * t;
-
-    if (h.mode === "pinch") {
-      px = h.x + dx * (1 - k);
-      py = h.y + dy * (1 - k);
-    } else if (h.mode === "scaleX") {
-      px = h.x + dx * (1 - k);
-    } else if (h.mode === "scaleY") {
-      py = h.y + dy * (1 - k);
-    } else if (h.mode === "move") {
-      px = px + dx * 0.15 * k;
-      py = py + dy * 0.15 * k;
-    }
-  }
-
-  return { x: px, y: py };
-}
-
 export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   id,
   text,
@@ -277,15 +247,22 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   onDragMove,
   onDragEnd,
   debugBounds = false,
-  glyphEditMode = false,
+  glyphEditTool = null,
   selectedGlyphIndex = null,
-  glyphWarps = [],
+  glyphEdits = [],
   onGlyphSelect,
   onGlyphBoxesChange,
-  onUpdateGlyphHandle,
+  onUpdateStretchHandle,
+  onSetGlyphMoveOffset,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
   const { hbLoaded } = shapeData;
+  const moveDragOriginRef = useRef<{
+    x: number;
+    y: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
 
   const [spinnerAngle, setSpinnerAngle] = useState(0);
   const spinnerFrameRef = useRef<number | null>(null);
@@ -443,12 +420,16 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
     onGlyphBoxesChange?.(hitBoxes);
   }, [hitBoxes, onGlyphBoxesChange]);
 
-  const selectedWarp =
-    glyphEditMode && selectedGlyphIndex != null
-      ? glyphWarps.find((w) => w.glyphIndex === selectedGlyphIndex)
+  const selectedEdit =
+    glyphEditTool != null && selectedGlyphIndex != null
+      ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
       : undefined;
-
-  const selectedHandles = selectedWarp?.handles ?? [];
+  const selectedStretches = selectedEdit?.stretches ?? [];
+  const selectedMoveOffset = selectedEdit?.move ?? { offsetX: 0, offsetY: 0 };
+  const selectedGlyphBox =
+    selectedGlyphIndex != null
+      ? hitBoxes.find((b) => b.glyphIndex === selectedGlyphIndex)
+      : undefined;
   const bw = Math.max(warpShapeWidth, 20);
   const bh = Math.max(warpShapeHeight, 20);
   const bx = -bw / 2;
@@ -464,11 +445,11 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
       y={y}
       rotation={rotation}
       opacity={opacity}
-      draggable={draggable && !locked && !glyphEditMode}
+      draggable={draggable && !locked && glyphEditTool == null}
       onClick={(e) => {
         onClick?.();
 
-        if (!glyphEditMode) return;
+        if (glyphEditTool == null) return;
 
         const group = e.currentTarget;
         const pos = group.getRelativePointerPosition();
@@ -585,8 +566,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
                 continue;
               }
 
-              const glyphWarp = glyphWarps.find((w) => w.glyphIndex === glyphIndex);
-              const handles = glyphWarp?.handles ?? [];
+              const edit = glyphEdits.find((w) => w.glyphIndex === glyphIndex);
 
               const gx = (penX + (g.dx ?? 0)) * scale;
               const gy = -(g.dy ?? 0) * scale;
@@ -594,7 +574,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
               const warpPoint = (cx: number, cy: number) => {
                 const baseX = cx + gx;
                 const baseY = cy + gy;
-                const pGlyph = applyGlyphHandles(baseX, baseY, handles);
+                const pGlyph = applyGlyphEdit(baseX, baseY, edit);
 
                 return applyShapeWarpPoint(
                   pGlyph.x,
@@ -657,40 +637,114 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
         }}
       />
 
-      {glyphEditMode &&
+      {glyphEditTool === "stretch" &&
         selectedGlyphIndex != null &&
-        selectedHandles.map((h) => (
-          <Circle
-            key={h.id}
-            x={bx + localDrawOffsetX + h.x}
-            y={by + localDrawOffsetY + h.y}
-            radius={7}
-            fill={HANDLE_MODE_COLORS[h.mode]}
-            stroke="#ffffff"
+        selectedStretches.map((h) => (
+          <React.Fragment key={h.id}>
+            <Circle
+              x={bx + localDrawOffsetX + h.anchorX}
+              y={by + localDrawOffsetY + h.anchorY}
+              radius={7}
+              fill={STRETCH_ANCHOR_COLOR}
+              stroke="#ffffff"
+              strokeWidth={2}
+              draggable
+              onMouseDown={(e) => (e.cancelBubble = true)}
+              onTouchStart={(e) => (e.cancelBubble = true)}
+              onDragMove={(e) => {
+                e.cancelBubble = true;
+
+                const group = e.currentTarget.getParent() as Konva.Group;
+                const pos = group.getRelativePointerPosition();
+                if (!pos || !onUpdateStretchHandle) return;
+
+                onUpdateStretchHandle(selectedGlyphIndex, h.id, {
+                  anchorX: pos.x - bx - localDrawOffsetX,
+                  anchorY: pos.y - by - localDrawOffsetY,
+                });
+              }}
+              onDragEnd={(e) => {
+                e.cancelBubble = true;
+              }}
+            />
+            <Circle
+              x={bx + localDrawOffsetX + h.dragX}
+              y={by + localDrawOffsetY + h.dragY}
+              radius={7}
+              fill={STRETCH_DRAG_COLOR}
+              stroke="#ffffff"
+              strokeWidth={2}
+              draggable
+              onMouseDown={(e) => (e.cancelBubble = true)}
+              onTouchStart={(e) => (e.cancelBubble = true)}
+              onDragMove={(e) => {
+                e.cancelBubble = true;
+
+                const group = e.currentTarget.getParent() as Konva.Group;
+                const pos = group.getRelativePointerPosition();
+                if (!pos || !onUpdateStretchHandle) return;
+
+                onUpdateStretchHandle(selectedGlyphIndex, h.id, {
+                  dragX: pos.x - bx - localDrawOffsetX,
+                  dragY: pos.y - by - localDrawOffsetY,
+                });
+              }}
+              onDragEnd={(e) => {
+                e.cancelBubble = true;
+              }}
+            />
+          </React.Fragment>
+        ))}
+
+      {glyphEditTool === "move" &&
+        selectedGlyphIndex != null &&
+        selectedGlyphBox && (
+          <Rect
+            x={bx + localDrawOffsetX + selectedGlyphBox.x + selectedMoveOffset.offsetX}
+            y={by + localDrawOffsetY + selectedGlyphBox.y + selectedMoveOffset.offsetY}
+            width={selectedGlyphBox.width}
+            height={selectedGlyphBox.height}
+            fill="transparent"
+            stroke={MOVE_HANDLE_COLOR}
             strokeWidth={2}
+            dash={[6, 4]}
             draggable
-            onMouseDown={(e) => e.cancelBubble = true}
-            onTouchStart={(e) => e.cancelBubble = true}
-            onDragMove={(e) => {
+            onMouseDown={(e) => (e.cancelBubble = true)}
+            onTouchStart={(e) => (e.cancelBubble = true)}
+            onDragStart={(e) => {
               e.cancelBubble = true;
 
               const group = e.currentTarget.getParent() as Konva.Group;
               const pos = group.getRelativePointerPosition();
-              if (!pos || selectedGlyphIndex == null || !onUpdateGlyphHandle) return;
+              if (!pos) return;
 
-              const nextX = pos.x - bx - localDrawOffsetX;
-              const nextY = pos.y - by - localDrawOffsetY;
+              moveDragOriginRef.current = {
+                x: pos.x,
+                y: pos.y,
+                offsetX: selectedMoveOffset.offsetX,
+                offsetY: selectedMoveOffset.offsetY,
+              };
+            }}
+            onDragMove={(e) => {
+              e.cancelBubble = true;
 
-              onUpdateGlyphHandle(selectedGlyphIndex, h.id, {
-                x: nextX,
-                y: nextY,
-              });
+              const origin = moveDragOriginRef.current;
+              const group = e.currentTarget.getParent() as Konva.Group;
+              const pos = group.getRelativePointerPosition();
+              if (!origin || !pos || !onSetGlyphMoveOffset) return;
+
+              onSetGlyphMoveOffset(
+                selectedGlyphIndex,
+                origin.offsetX + (pos.x - origin.x),
+                origin.offsetY + (pos.y - origin.y)
+              );
             }}
             onDragEnd={(e) => {
               e.cancelBubble = true;
+              moveDragOriginRef.current = null;
             }}
           />
-        ))}
+        )}
     </Group>
   );
 };
