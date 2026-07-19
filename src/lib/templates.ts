@@ -25,6 +25,9 @@ const baseText: Omit<TextBlock, "id" | "text" | "x" | "y" | "fontSize" | "fontFa
   rotation: 0,
 };
 
+// Block coordinates are centered on the world origin (0,0) — the canvas has
+// no declared page size, so "reset view" fits/centers on whatever the
+// template's blocks' combined bounding box turns out to be.
 export const STARTER_TEMPLATES: StarterTemplate[] = [
   {
     id: "bismillah-card",
@@ -38,8 +41,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
         fontFamily: "FatemiMaqala",
         color: "#d4af37",
         fontSize: 110,
-        x: 540,
-        y: 460,
+        x: 0,
+        y: 0,
       },
     ],
   },
@@ -55,8 +58,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
         fontFamily: "TahaNaskhRegular",
         color: "#a8791a",
         fontSize: 140,
-        x: 540,
-        y: 760,
+        x: 0,
+        y: -110,
       },
       {
         ...baseText,
@@ -64,8 +67,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
         fontFamily: "Amiri",
         color: "#1a2340",
         fontSize: 60,
-        x: 540,
-        y: 980,
+        x: 0,
+        y: 110,
       },
     ],
   },
@@ -81,8 +84,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
         fontFamily: "Thuluth",
         color: "#1e3a5f",
         fontSize: 260,
-        x: 540,
-        y: 540,
+        x: 0,
+        y: 0,
       },
     ],
   },
@@ -98,8 +101,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
         fontFamily: "TahaNaskhRegular",
         color: "#1a2340",
         fontSize: 130,
-        x: 1240,
-        y: 1500,
+        x: 0,
+        y: -125,
       },
       {
         ...baseText,
@@ -107,8 +110,59 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
         fontFamily: "Amiri",
         color: "#8a92a8",
         fontSize: 55,
-        x: 1240,
-        y: 1750,
+        x: 0,
+        y: 125,
+      },
+    ],
+  },
+  {
+    id: "salawat-card",
+    label: "Salawat Card",
+    description: "An elegant Salawat phrase in gold on deep navy.",
+    backgroundColor: "#15213a",
+    blocks: [
+      {
+        ...baseText,
+        text: "اللَّهُمَّ صَلِّ عَلَى مُحَمَّد",
+        fontFamily: "AlFatemi",
+        color: "#d4af37",
+        fontSize: 90,
+        x: 0,
+        y: 0,
+      },
+    ],
+  },
+  {
+    id: "ramadan-greeting",
+    label: "Ramadan Greeting",
+    description: "Festive Ramadan greeting in gold on deep purple.",
+    backgroundColor: "#2a1a3d",
+    blocks: [
+      {
+        ...baseText,
+        text: "رَمَضَان مُبَارَك",
+        fontFamily: "ThuluthDeco",
+        color: "#e8c766",
+        fontSize: 170,
+        x: 0,
+        y: 0,
+      },
+    ],
+  },
+  {
+    id: "mashaallah-tag",
+    label: "MashaAllah Tag",
+    description: "A small punchy phrase — good for stickers or badges.",
+    backgroundColor: "#f5eeda",
+    blocks: [
+      {
+        ...baseText,
+        text: "مَا شَاءَ اللّٰه",
+        fontFamily: "Wessam",
+        color: "#8b1e3f",
+        fontSize: 130,
+        x: 0,
+        y: 0,
       },
     ],
   },

@@ -120,7 +120,7 @@ const App: React.FC = () => {
     horizontal: [],
     vertical: [],
   });
-  const [transparentExport, setTransparentExport] = useState(false);
+  const [transparentExport, setTransparentExport] = useState(true);
   const [namedProjects, setNamedProjects] = useState<NamedProjectMeta[]>(() => {
     if (!isBrowser) return [];
     try {
@@ -174,7 +174,14 @@ const App: React.FC = () => {
     {
       ...DEFAULT_BLOCK,
       x: 0,
-      y: 40,
+      y: 0,
+    },
+    {
+      ...DEFAULT_BLOCK,
+      id: 2,
+      text: "حرف",
+      x: 0,
+      y: 100,
     },
   ]);
 
@@ -417,11 +424,38 @@ const App: React.FC = () => {
     [canvasWidth, stageViewportHeight]
   );
 
-  const resetView = useCallback(() => {
-    const stage = stageRef.current;
-    const box = stage ? getBlocksBoundingBox(stage, blocks) : null;
-    zoomToRect(padBox(box ?? DEFAULT_EMPTY_BOUNDS), 0);
-  }, [blocks, zoomToRect]);
+  const resetView = useCallback(
+    (targetBlocks: Block[] = blocks) => {
+      const stage = stageRef.current;
+      const box = stage ? getBlocksBoundingBox(stage, targetBlocks) : null;
+      zoomToRect(padBox(box ?? DEFAULT_EMPTY_BOUNDS), 0);
+    },
+    [blocks, zoomToRect]
+  );
+
+  /**
+   * Like `resetView`, but anchors the content's top edge near the top of the
+   * viewport (7% down) instead of vertically centering it — used only for
+   * the very first paint of the default starter content, not general
+   * "fit all content" (that's what the toolbar's Reset View button and
+   * `resetView` are for).
+   */
+  const fitInitialView = useCallback(
+    (targetBlocks: Block[]) => {
+      if (canvasWidth <= 0 || stageViewportHeight <= 0) return;
+      const stage = stageRef.current;
+      const box = stage ? getBlocksBoundingBox(stage, targetBlocks) : null;
+      const b = padBox(box ?? DEFAULT_EMPTY_BOUNDS);
+      const fit = computeFitToBox(canvasWidth, stageViewportHeight, b, 0);
+      setStageScale(fit.scale);
+      setStagePosition({
+        x: canvasWidth / 2 - (b.x + b.width / 2) * fit.scale,
+        y: stageViewportHeight * 0.07 - b.y * fit.scale,
+      });
+      setPanMode(false);
+    },
+    [canvasWidth, stageViewportHeight]
+  );
 
   const zoomToActualSize = useCallback(() => {
     if (canvasWidth <= 0 || stageViewportHeight <= 0) return;
@@ -457,13 +491,15 @@ const App: React.FC = () => {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
-          // One-time layout hydration on mount; fits the stage to the current content.
-          resetView();
+          // One-time layout hydration on mount; anchors the default starter
+          // content near the top of the viewport instead of centering it.
+          fitInitialView(blocks);
           return;
         }
 
         const parsed = JSON.parse(raw);
 
+        const hydratedBlocks: Block[] = Array.isArray(parsed.blocks) ? parsed.blocks : blocks;
         if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
         if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
           setSelectedIds([]);
@@ -493,7 +529,7 @@ const App: React.FC = () => {
           setStageScale(clamp(parsed.stageScale, MIN_SCALE, MAX_SCALE));
           setStagePosition(parsed.stagePosition);
         } else {
-          setTimeout(() => resetView(), 0);
+          setTimeout(() => resetView(hydratedBlocks), 0);
         }
       } catch {
         resetView();
@@ -644,9 +680,10 @@ const App: React.FC = () => {
     const newBlocks: Block[] = template.blocks.map((b) => ({ ...b, id: createNextId() }));
     setBlocks(newBlocks);
     setBackgroundColor(template.backgroundColor);
+    setShowGrid(false);
     setSelectedIds([]);
     setSelectedId(newBlocks[0]?.id ?? null);
-    setTimeout(() => resetView(), 0);
+    setTimeout(() => resetView(newBlocks), 0);
   };
 
   const updateSelectedBlock = useCallback(
@@ -961,6 +998,7 @@ const App: React.FC = () => {
     try {
       const parsed = JSON.parse(raw);
 
+      const loadedBlocks: Block[] = Array.isArray(parsed.blocks) ? parsed.blocks : blocks;
       if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
       if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
         setSelectedIds([]);
@@ -990,7 +1028,7 @@ const App: React.FC = () => {
         setStageScale(clamp(parsed.stageScale, MIN_SCALE, MAX_SCALE));
         setStagePosition(parsed.stagePosition);
       } else {
-        setTimeout(() => resetView(), 0);
+        setTimeout(() => resetView(loadedBlocks), 0);
       }
     } catch {
       resetView();
@@ -1078,6 +1116,7 @@ const App: React.FC = () => {
         try {
           const parsed = JSON.parse(e.target?.result as string);
 
+          const uploadedBlocks: Block[] = Array.isArray(parsed.blocks) ? parsed.blocks : blocks;
           if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
           if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
             setSelectedIds([]);
@@ -1086,7 +1125,7 @@ const App: React.FC = () => {
           if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
           if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
 
-          setTimeout(() => resetView(), 0);
+          setTimeout(() => resetView(uploadedBlocks), 0);
         } catch {
           alert("Invalid layout file.");
         }

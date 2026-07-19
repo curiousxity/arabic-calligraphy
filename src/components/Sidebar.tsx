@@ -969,8 +969,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {showStroke && (
                     <div
                       style={{
-                        display: "grid",
-                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        display: "flex",
+                        flexDirection: "column",
                         gap: 10,
                         marginTop: 10,
                       }}
@@ -1010,34 +1010,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
 
                   {showShadow && (
-                    <div style={{ marginTop: 10 }}>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                          gap: 10,
-                        }}
-                      >
-                        <ColorRow
-                          id={makeId("shadow-color", selectedId)}
-                          name={makeId("shadowColor", selectedId)}
-                          label="Shadow color"
-                          value={selectedBlock.shadowColor}
-                          onChange={(v) => onUpdateSelectedBlock({ shadowColor: v })}
-                        />
+                    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <ColorRow
+                        id={makeId("shadow-color", selectedId)}
+                        name={makeId("shadowColor", selectedId)}
+                        label="Shadow color"
+                        value={selectedBlock.shadowColor}
+                        onChange={(v) => onUpdateSelectedBlock({ shadowColor: v })}
+                      />
 
-                        <RangeRow
-                          id={makeId("shadow-blur", selectedId)}
-                          name={makeId("shadowBlur", selectedId)}
-                          label="Shadow blur"
-                          value={selectedBlock.shadowBlur ?? 0}
-                          min={0}
-                          max={60}
-                          onChange={(v) => onUpdateSelectedBlock({ shadowBlur: v })}
-                          suffix={selectedBlock.shadowBlur ?? 0}
-                          fieldKey="shadowBlur"
-                        />
-                      </div>
+                      <RangeRow
+                        id={makeId("shadow-blur", selectedId)}
+                        name={makeId("shadowBlur", selectedId)}
+                        label="Shadow blur"
+                        value={selectedBlock.shadowBlur ?? 0}
+                        min={0}
+                        max={60}
+                        onChange={(v) => onUpdateSelectedBlock({ shadowBlur: v })}
+                        suffix={selectedBlock.shadowBlur ?? 0}
+                        fieldKey="shadowBlur"
+                      />
 
                       <div
                         style={{
@@ -1438,14 +1430,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
 
                 <PresetKeyboard
-                  title="Persian"
-                  rows={[PERSIAN.slice(0, 6), PERSIAN.slice(6)]}
-                  onPick={onInsertPreset}
-                />
-
-                <PresetKeyboard
-                  title="Urdu"
-                  rows={[URDU.slice(0, 6), URDU.slice(6)]}
+                  title="Urdu-Farsi Characters"
+                  rows={[PERSIAN, URDU]}
                   onPick={onInsertPreset}
                 />
               </div>
