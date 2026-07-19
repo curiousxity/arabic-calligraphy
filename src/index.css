@@ -130,6 +130,15 @@ html, body, #root { height: 100%; margin: 0; }
 .shell { width: 100%; border: none; border-radius: 10px; background: var(--bg-input); box-shadow: none; padding: 8px 10px; }
 .select { width: 100%; border: none; outline: none; background: transparent; font-size: 14px; font-weight: 400; cursor: pointer; color: var(--text-primary); }
 
+.fontSelectShell { position: relative; padding: 0; }
+.fontSelectTrigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; text-align: left; }
+.fontSelectTriggerLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fontSelectCaret { flex-shrink: 0; color: var(--text-muted); font-size: 11px; }
+.fontSelectList { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; margin: 0; padding: 6px; list-style: none; max-height: 260px; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
+.fontSelectOption { display: block; width: 100%; text-align: left; padding: 8px 10px; border: none; border-radius: 8px; background: transparent; color: var(--text-primary); font-size: 14px; cursor: pointer; }
+.fontSelectOption:hover { background: var(--overlay-hover); }
+.fontSelectOption--active { background: var(--accent-soft); color: var(--accent); }
+
 .sidebarSectionButton { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; border: none; border-radius: 12px; background: var(--bg-panel); cursor: pointer; font-size: 14px; font-weight: 400; color: var(--text-primary); }
 .sectionPanel { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
 .checkboxRow { display: block; font-size: 13px; color: var(--text-primary); font-weight: 400; }

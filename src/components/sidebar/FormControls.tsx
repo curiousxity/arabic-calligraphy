@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { PipetteIcon } from "../Icons";
 
 const supportsEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
@@ -55,6 +55,96 @@ export const SelectRow = ({
     </div>
   </label>
 );
+
+export const FontSelectRow = ({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  previewSuffix,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: { value: string; label: string; cssFamily: string }[];
+  onChange: (v: string) => void;
+  previewSuffix?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const current = options.find((o) => o.value === value) ?? options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="field" ref={rootRef}>
+      <span className="fieldTitle" id={`${id}-label`}>
+        {label}
+      </span>
+      <div className="shell fontSelectShell">
+        <button
+          id={id}
+          type="button"
+          className="select fontSelectTrigger"
+          style={{ fontFamily: current?.cssFamily }}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-labelledby={`${id}-label`}
+          onClick={() => setOpen((o) => !o)}
+        >
+          <span className="fontSelectTriggerLabel">
+            {current?.label}
+            {previewSuffix ? ` ${previewSuffix}` : ""}
+          </span>
+          <span className="fontSelectCaret" aria-hidden="true">
+            ▾
+          </span>
+        </button>
+        {open && (
+          <ul className="fontSelectList" role="listbox" aria-labelledby={`${id}-label`}>
+            {options.map((o) => (
+              <li key={o.value} role="option" aria-selected={o.value === value}>
+                <button
+                  type="button"
+                  className={
+                    o.value === value
+                      ? "fontSelectOption fontSelectOption--active"
+                      : "fontSelectOption"
+                  }
+                  style={{ fontFamily: o.cssFamily }}
+                  onClick={() => {
+                    onChange(o.value);
+                    setOpen(false);
+                  }}
+                >
+                  {o.label}
+                  {previewSuffix ? ` ${previewSuffix}` : ""}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const COLOR_PALETTE = [
   "#000000",

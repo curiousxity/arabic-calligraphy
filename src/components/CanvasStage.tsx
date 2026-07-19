@@ -15,7 +15,7 @@ import {
   unionRect,
   DEFAULT_EMPTY_BOUNDS,
 } from "../lib/canvasBounds";
-import type { Block, GlyphStretchHandle } from "../types";
+import type { Block, GlyphStretchHandle, GlyphRig } from "../types";
 
 const GRID_SIZE = 40;
 const SNAP_GUIDE_PX = 6;
@@ -62,9 +62,19 @@ export type CanvasStageProps = {
     offsetX: number,
     offsetY: number
   ) => void;
+  glyphRigs: GlyphRig[];
   onGlyphBoxesChange: (
     blockId: number,
-    boxes: { glyphIndex: number; x: number; y: number; width: number; height: number }[]
+    boxes: {
+      glyphIndex: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      glyphId?: number;
+      gx?: number;
+      gy?: number;
+    }[]
   ) => void;
   onKashidaTextChange: (blockId: number, text: string) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
@@ -101,6 +111,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSelectGlyph,
   onUpdateStretchHandle,
   onSetGlyphMoveOffset,
+  glyphRigs,
   onGlyphBoxesChange,
   onKashidaTextChange,
   onResizeShapeFillBlock,
@@ -417,7 +428,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
           <button
             type="button"
-            onClick={onResetView}
+            onClick={() => onResetView()}
             className="canvasToolbarBtn"
             title="Reset view (fit content)"
             aria-label="Reset view"
@@ -602,6 +613,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     glyphEditTool={block.glyphEditTool ?? null}
                     selectedGlyphIndex={block.selectedGlyphIndex ?? null}
                     glyphEdits={block.glyphEdits ?? []}
+                    glyphRigs={glyphRigs}
+                    glyphRigValues={block.glyphRigValues ?? []}
                     onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
                     onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
                       onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
@@ -651,6 +664,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     glyphEditTool={block.glyphEditTool ?? null}
                     selectedGlyphIndex={block.selectedGlyphIndex ?? null}
                     glyphEdits={block.glyphEdits ?? []}
+                    glyphRigs={glyphRigs}
+                    glyphRigValues={block.glyphRigValues ?? []}
                     onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
                     onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
                       onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
@@ -697,6 +712,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   glyphEditTool={block.glyphEditTool ?? null}
                   selectedGlyphIndex={block.selectedGlyphIndex ?? null}
                   glyphEdits={block.glyphEdits ?? []}
+                  glyphRigs={glyphRigs}
+                  glyphRigValues={block.glyphRigValues ?? []}
                   onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
                   onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
                     onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)

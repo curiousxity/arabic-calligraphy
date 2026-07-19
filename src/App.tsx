@@ -20,7 +20,7 @@ import {
   computeFitToBox,
   DEFAULT_EMPTY_BOUNDS,
 } from "./lib/canvasBounds";
-import type { Block, GlyphEdit, GlyphStretchHandle } from "./types";
+import type { Block, GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigAxis } from "./types";
 
 const dissolveSingletonGroups = (list: Block[]): Block[] => {
   const counts = new Map<number, number>();
@@ -46,6 +46,11 @@ type GlyphBox = {
   y: number;
   width: number;
   height: number;
+  /** HarfBuzz glyph id within this block's font — stable per font binary, used to key reusable glyph rigs. */
+  glyphId?: number;
+  /** Pen offset baked into x/y; 0/omitted where the box is already in glyph-local space (ShapeFillText). */
+  gx?: number;
+  gy?: number;
 };
 
 const glyphBoxesEqual = (a: GlyphBox[] | undefined, b: GlyphBox[]): boolean => {
@@ -59,7 +64,10 @@ const glyphBoxesEqual = (a: GlyphBox[] | undefined, b: GlyphBox[]): boolean => {
       aa.x !== bb.x ||
       aa.y !== bb.y ||
       aa.width !== bb.width ||
-      aa.height !== bb.height
+      aa.height !== bb.height ||
+      aa.glyphId !== bb.glyphId ||
+      aa.gx !== bb.gx ||
+      aa.gy !== bb.gy
     ) {
       return false;
     }
@@ -69,6 +77,7 @@ const glyphBoxesEqual = (a: GlyphBox[] | undefined, b: GlyphBox[]): boolean => {
 
 const STORAGE_KEY = "calligraphy-layout-v2";
 const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
+const GLYPH_RIGS_KEY = "harfcanvas-glyph-rigs-v1";
 const SIDEBAR_COLLAPSED_WIDTH = 28;
 const DEFAULT_TEXT_FONT_SIZE = 53;
 const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
@@ -112,6 +121,21 @@ const makeHandleId = () =>
     ? crypto.randomUUID()
     : `gh-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+const removeStretchHandle = (
+  glyphEdits: GlyphEdit[],
+  glyphIndex: number,
+  handleId: string
+): GlyphEdit[] => {
+  const existing = glyphEdits.find((g) => g.glyphIndex === glyphIndex);
+  if (!existing) return glyphEdits;
+  const nextStretches = existing.stretches.filter((h) => h.id !== handleId);
+  return nextStretches.length > 0 || existing.move
+    ? glyphEdits.map((g) =>
+        g.glyphIndex === glyphIndex ? { ...g, stretches: nextStretches } : g
+      )
+    : glyphEdits.filter((g) => g.glyphIndex !== glyphIndex);
+};
+
 const App: React.FC = () => {
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -136,6 +160,25 @@ const App: React.FC = () => {
       return [];
     }
   });
+  const [glyphRigs, setGlyphRigs] = useState<GlyphRig[]>(() => {
+    if (!isBrowser) return [];
+    try {
+      const raw = localStorage.getItem(GLYPH_RIGS_KEY);
+      return raw ? (JSON.parse(raw) as GlyphRig[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (!isBrowser) return;
+    try {
+      localStorage.setItem(GLYPH_RIGS_KEY, JSON.stringify(glyphRigs));
+    } catch {
+      // Ignore quota-exceeded / privacy-mode storage errors — best-effort, same as other localStorage writes here.
+    }
+  }, [glyphRigs]);
+
   const [isMobile, setIsMobile] = useState(isBrowser ? window.innerWidth <= 768 : false);
   const [backgroundColor, setBackgroundColor] = useState<string>("#ffffff");
   const [sidebarWidth, setSidebarWidth] = useState(360);
@@ -374,21 +417,107 @@ const App: React.FC = () => {
       setBlocks((prev) =>
         prev.map((b) => {
           if (b.id !== blockId || b.type === "image") return b;
-          const glyphEdits = b.glyphEdits ?? [];
-          const existing = glyphEdits.find((g) => g.glyphIndex === glyphIndex);
-          if (!existing) return b;
-          const nextStretches = existing.stretches.filter((h) => h.id !== handleId);
+          return { ...b, glyphEdits: removeStretchHandle(b.glyphEdits ?? [], glyphIndex, handleId) };
+        })
+      );
+    },
+    [pushHistory]
+  );
+
+  const saveStretchHandleAsRig = useCallback(
+    (blockId: number, glyphIndex: number, handleId: string, name: string) => {
+      const trimmed = name.trim();
+      const block = blocks.find((b) => b.id === blockId);
+      if (!block || block.type === "image" || !trimmed) return;
+
+      const handle = block.glyphEdits
+        ?.find((g) => g.glyphIndex === glyphIndex)
+        ?.stretches.find((h) => h.id === handleId);
+      const box = (glyphBoxesByBlock[blockId] ?? []).find((b) => b.glyphIndex === glyphIndex);
+      if (!handle || !box || box.glyphId == null) return;
+
+      const fontSize = block.fontSize;
+      const gx = box.gx ?? 0;
+      const gy = box.gy ?? 0;
+      const glyphId = box.glyphId;
+      const fontFamily = block.fontFamily;
+      const newAxis: GlyphRigAxis = {
+        id: makeHandleId(),
+        name: trimmed,
+        anchorX: (handle.anchorX - gx) / fontSize,
+        anchorY: (handle.anchorY - gy) / fontSize,
+        dragOriginX: (handle.dragOriginX - gx) / fontSize,
+        dragOriginY: (handle.dragOriginY - gy) / fontSize,
+        dragX: (handle.dragX - gx) / fontSize,
+        dragY: (handle.dragY - gy) / fontSize,
+        bandWidth: handle.bandWidth / fontSize,
+      };
+
+      // Library mutation — deliberately not wrapped in pushHistory(); see
+      // the "Undo/redo" design decision in the glyph-rigs plan.
+      setGlyphRigs((prev) => {
+        const idx = prev.findIndex((r) => r.fontFamily === fontFamily && r.glyphId === glyphId);
+        if (idx === -1) {
+          return [...prev, { fontFamily, glyphId, axes: [newAxis] }];
+        }
+        const next = [...prev];
+        next[idx] = { ...next[idx], axes: [...next[idx].axes, newAxis] };
+        return next;
+      });
+
+      // Block mutation — one undo step, removes the raw handle and seeds the
+      // rig value to 1 so the deformation doesn't visually jump.
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || b.type === "image") return b;
+          const nextGlyphEdits = removeStretchHandle(b.glyphEdits ?? [], glyphIndex, handleId);
+          const values = (b.glyphRigValues ?? []).filter((v) => v.axisId !== newAxis.id);
           return {
             ...b,
-            glyphEdits:
-              nextStretches.length > 0 || existing.move
-                ? glyphEdits.map((g) =>
-                    g.glyphIndex === glyphIndex ? { ...g, stretches: nextStretches } : g
-                  )
-                : glyphEdits.filter((g) => g.glyphIndex !== glyphIndex),
+            glyphEdits: nextGlyphEdits,
+            glyphRigValues: [...values, { axisId: newAxis.id, value: 1 }],
           };
         })
       );
+    },
+    [blocks, glyphBoxesByBlock, pushHistory]
+  );
+
+  const deleteGlyphRigAxis = useCallback(
+    (fontFamily: string, glyphId: number, axisId: string) => {
+      setGlyphRigs((prev) =>
+        prev
+          .map((r) =>
+            r.fontFamily === fontFamily && r.glyphId === glyphId
+              ? { ...r, axes: r.axes.filter((a) => a.id !== axisId) }
+              : r
+          )
+          .filter((r) => r.axes.length > 0)
+      );
+    },
+    []
+  );
+
+  const glyphRigValueTimeoutRef = useRef<number | null>(null);
+  const setGlyphRigValue = useCallback(
+    (blockId: number, axisId: string, value: number) => {
+      const clamped = Math.max(-1, Math.min(1, value));
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || b.type === "image") return b;
+          const values = b.glyphRigValues ?? [];
+          const existing = values.find((v) => v.axisId === axisId);
+          return {
+            ...b,
+            glyphRigValues: existing
+              ? values.map((v) => (v.axisId === axisId ? { ...v, value: clamped } : v))
+              : [...values, { axisId, value: clamped }],
+          };
+        })
+      );
+      if (glyphRigValueTimeoutRef.current != null) window.clearTimeout(glyphRigValueTimeoutRef.current);
+      glyphRigValueTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
     },
     [pushHistory]
   );
@@ -1023,17 +1152,55 @@ const App: React.FC = () => {
     blocks
   );
 
-  const buildLayoutPayload = () => ({
-    blocks,
-    selectedId,
-    backgroundColor,
-    stageScale,
-    stagePosition,
-    panMode,
-    viewportWidth,
-    viewportHeight,
-    version: 3,
-  });
+  const buildLayoutPayload = () => {
+    const referencedAxisIds = new Set(
+      blocks.flatMap((b) =>
+        b.type === "image" ? [] : (b.glyphRigValues ?? []).map((v) => v.axisId)
+      )
+    );
+    const embeddedGlyphRigs = glyphRigs.filter((r) =>
+      r.axes.some((a) => referencedAxisIds.has(a.id))
+    );
+
+    return {
+      blocks,
+      selectedId,
+      backgroundColor,
+      stageScale,
+      stagePosition,
+      panMode,
+      viewportWidth,
+      viewportHeight,
+      glyphRigs: embeddedGlyphRigs,
+      version: 4,
+    };
+  };
+
+  // Merges rigs embedded in a loaded/imported project into the local rig
+  // library — local axes win on id conflict (importing someone else's
+  // project can't clobber a locally-retuned axis), any axis id not already
+  // present locally gets added.
+  const mergeGlyphRigs = (embedded: GlyphRig[] | undefined) => {
+    if (!embedded?.length) return;
+    setGlyphRigs((prev) => {
+      let next = prev;
+      for (const incoming of embedded) {
+        const idx = next.findIndex(
+          (r) => r.fontFamily === incoming.fontFamily && r.glyphId === incoming.glyphId
+        );
+        if (idx === -1) {
+          next = [...next, incoming];
+          continue;
+        }
+        const localIds = new Set(next[idx].axes.map((a) => a.id));
+        const missing = incoming.axes.filter((a) => !localIds.has(a.id));
+        if (missing.length) {
+          next = next.map((r, i) => (i === idx ? { ...r, axes: [...r.axes, ...missing] } : r));
+        }
+      }
+      return next;
+    });
+  };
 
   const saveLayout = () => {
     if (!isBrowser) return;
@@ -1056,6 +1223,7 @@ const App: React.FC = () => {
       }
       if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
       if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
+      if (Array.isArray(parsed.glyphRigs)) mergeGlyphRigs(parsed.glyphRigs);
 
       const savedViewportWidth =
         typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
@@ -1174,6 +1342,7 @@ const App: React.FC = () => {
           }
           if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
           if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
+          if (Array.isArray(parsed.glyphRigs)) mergeGlyphRigs(parsed.glyphRigs);
 
           setTimeout(() => resetView(uploadedBlocks), 0);
         } catch {
@@ -1453,6 +1622,11 @@ const App: React.FC = () => {
         onDeleteStretchHandle={deleteStretchHandle}
         onUpdateStretchHandle={updateStretchHandle}
         onSetGlyphMoveOffset={setGlyphMoveOffset}
+        glyphRigs={glyphRigs}
+        selectedGlyphBoxes={glyphBoxesByBlock[selectedBlock?.id ?? -1] ?? []}
+        onSaveStretchHandleAsRig={saveStretchHandleAsRig}
+        onSetGlyphRigValue={setGlyphRigValue}
+        onDeleteGlyphRigAxis={deleteGlyphRigAxis}
         onResetShapeWarp={resetShapeWarp}
         onFitShapeFillSpacing={fitShapeFillSpacing}
         onAlignSelected={alignSelectedBlocks}
@@ -1510,6 +1684,7 @@ const App: React.FC = () => {
           onSelectGlyph={selectGlyphForBlock}
           onUpdateStretchHandle={updateStretchHandle}
           onSetGlyphMoveOffset={setGlyphMoveOffset}
+          glyphRigs={glyphRigs}
           onGlyphBoxesChange={updateGlyphBoxes}
           onKashidaTextChange={updateKashidaText}
           onResizeShapeFillBlock={resizeShapeFillBlock}

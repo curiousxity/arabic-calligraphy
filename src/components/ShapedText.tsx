@@ -8,11 +8,12 @@ import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { useOverrideGlyph } from "../hooks/useOverrideGlyph";
 import {
   applyGlyphEdit,
+  applyGlyphRig,
   MOVE_HANDLE_COLOR,
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
 } from "../lib/glyphEdits";
-import type { GlyphEdit, GlyphStretchHandle } from "../types";
+import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
 import {
   isOverrideGlyphChar,
   OVERRIDE_SCALE,
@@ -50,6 +51,8 @@ type Props = {
   glyphEditTool?: "move" | "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
+  glyphRigs?: GlyphRig[];
+  glyphRigValues?: GlyphRigValue[];
   onGlyphSelect?: (glyphIndex: number | null) => void;
   onGlyphBoxesChange?: (boxes: GlyphHitBox[]) => void;
   onUpdateStretchHandle?: (
@@ -81,6 +84,9 @@ type GlyphHitBox = {
   y: number;
   width: number;
   height: number;
+  glyphId: number;
+  gx: number;
+  gy: number;
 };
 
 /** A draggable kashīda handle sitting between two shaped glyphs. */
@@ -136,7 +142,10 @@ function drawWarpedGlyphRun(
   strokeWidth: number,
   fauxBoldWidth = 0,
   overrideGlyph: OverrideGlyph | null = null,
-  glyphEdits: GlyphEdit[] = []
+  glyphEdits: GlyphEdit[] = [],
+  fontFamily = "",
+  glyphRigs: GlyphRig[] = [],
+  glyphRigValues: GlyphRigValue[] = []
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -189,9 +198,18 @@ function drawWarpedGlyphRun(
 
         if (typeof c.x === "number" && typeof c.y === "number") {
           const handled = applyGlyphEdit(c.x + gx, c.y + gy, edit);
-          const p = warpPoint(
+          const rigged = applyGlyphRig(
             handled.x,
             handled.y,
+            fontFamily,
+            g.g,
+            fontSize,
+            glyphRigs,
+            glyphRigValues
+          );
+          const p = warpPoint(
+            rigged.x,
+            rigged.y,
             bounds,
             width,
             height,
@@ -204,9 +222,18 @@ function drawWarpedGlyphRun(
 
         if (typeof c.x1 === "number" && typeof c.y1 === "number") {
           const handled1 = applyGlyphEdit(c.x1 + gx, c.y1 + gy, edit);
-          const p1 = warpPoint(
+          const rigged1 = applyGlyphRig(
             handled1.x,
             handled1.y,
+            fontFamily,
+            g.g,
+            fontSize,
+            glyphRigs,
+            glyphRigValues
+          );
+          const p1 = warpPoint(
+            rigged1.x,
+            rigged1.y,
             bounds,
             width,
             height,
@@ -219,9 +246,18 @@ function drawWarpedGlyphRun(
 
         if (typeof c.x2 === "number" && typeof c.y2 === "number") {
           const handled2 = applyGlyphEdit(c.x2 + gx, c.y2 + gy, edit);
-          const p2 = warpPoint(
+          const rigged2 = applyGlyphRig(
             handled2.x,
             handled2.y,
+            fontFamily,
+            g.g,
+            fontSize,
+            glyphRigs,
+            glyphRigValues
+          );
+          const p2 = warpPoint(
+            rigged2.x,
+            rigged2.y,
             bounds,
             width,
             height,
@@ -285,6 +321,8 @@ export const ShapedText: React.FC<Props> = ({
   glyphEditTool = null,
   selectedGlyphIndex = null,
   glyphEdits = [],
+  glyphRigs = [],
+  glyphRigValues = [],
   onGlyphSelect,
   onGlyphBoxesChange,
   onUpdateStretchHandle,
@@ -433,6 +471,9 @@ export const ShapedText: React.FC<Props> = ({
             y: box.y1,
             width: Math.max(box.x2 - box.x1, 1),
             height: Math.max(box.y2 - box.y1, 1),
+            glyphId: g.g,
+            gx,
+            gy,
           });
         }
       }
@@ -540,7 +581,8 @@ export const ShapedText: React.FC<Props> = ({
       y={y}
       rotation={rotation}
       opacity={opacity}
-      draggable={draggable && !locked && glyphEditTool == null}
+      draggable={draggable && !locked}
+      dragBoundFunc={glyphEditTool != null ? () => ({ x, y }) : undefined}
       onClick={(e) => {
         onClick?.();
 
@@ -566,8 +608,8 @@ export const ShapedText: React.FC<Props> = ({
       onTap={onTap}
       onDblClick={onDblClick}
       onDblTap={onDblClick}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
+      onDragMove={glyphEditTool == null ? onDragMove : undefined}
+      onDragEnd={glyphEditTool == null ? onDragEnd : undefined}
       listening
     >
       {/* Transparent hit rect for selection/dragging */}
@@ -654,7 +696,10 @@ export const ShapedText: React.FC<Props> = ({
               strokeWidth,
               0,
               overrideGlyph,
-              glyphEdits
+              glyphEdits,
+              fontFamily,
+              glyphRigs,
+              glyphRigValues
             );
             ctx.restore();
 
@@ -675,7 +720,10 @@ export const ShapedText: React.FC<Props> = ({
               strokeWidth,
               0,
               overrideGlyph,
-              glyphEdits
+              glyphEdits,
+              fontFamily,
+              glyphRigs,
+              glyphRigValues
             );
             ctx.restore();
           }
@@ -695,7 +743,10 @@ export const ShapedText: React.FC<Props> = ({
             strokeWidth,
             fauxBoldWidth,
             overrideGlyph,
-            glyphEdits
+            glyphEdits,
+            fontFamily,
+            glyphRigs,
+            glyphRigValues
           );
 
           if (strokeWidth > 0) {
@@ -713,7 +764,10 @@ export const ShapedText: React.FC<Props> = ({
               strokeWidth,
               0,
               overrideGlyph,
-              glyphEdits
+              glyphEdits,
+              fontFamily,
+              glyphRigs,
+              glyphRigValues
             );
           }
 

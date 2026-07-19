@@ -6,11 +6,12 @@ import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import {
   applyGlyphEdit,
+  applyGlyphRig,
   MOVE_HANDLE_COLOR,
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
 } from "../lib/glyphEdits";
-import type { GlyphEdit, GlyphStretchHandle } from "../types";
+import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
 
 type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
 
@@ -22,6 +23,9 @@ export type GlyphHitBox = {
   height: number;
   cx: number;
   cy: number;
+  glyphId: number;
+  gx: number;
+  gy: number;
 };
 
 export type ShapeWarpTextProps = {
@@ -65,6 +69,8 @@ export type ShapeWarpTextProps = {
   glyphEditTool?: "move" | "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
+  glyphRigs?: GlyphRig[];
+  glyphRigValues?: GlyphRigValue[];
   onGlyphSelect?: (glyphIndex: number | null) => void;
   onGlyphBoxesChange?: (boxes: GlyphHitBox[]) => void;
   onUpdateStretchHandle?: (
@@ -94,6 +100,7 @@ type GlyphLayout = {
   gx: number;
   gy: number;
   advance: number;
+  glyphId: number;
 };
 
 type MutablePathCmd = {
@@ -250,6 +257,8 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   glyphEditTool = null,
   selectedGlyphIndex = null,
   glyphEdits = [],
+  glyphRigs = [],
+  glyphRigValues = [],
   onGlyphSelect,
   onGlyphBoxesChange,
   onUpdateStretchHandle,
@@ -397,7 +406,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
         };
       }
 
-      layouts.push({ glyphIndex: i, bounds, gx, gy, advance });
+      layouts.push({ glyphIndex: i, bounds, gx, gy, advance, glyphId: g.g });
       penX += advance;
     }
 
@@ -405,7 +414,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   }, [shapeData, fontSize]);
 
   const hitBoxes = useMemo<GlyphHitBox[]>(() => {
-    return glyphLayouts.map(({ glyphIndex, bounds }) => ({
+    return glyphLayouts.map(({ glyphIndex, bounds, gx, gy, glyphId }) => ({
       glyphIndex,
       x: bounds.minX,
       y: bounds.minY,
@@ -413,6 +422,9 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
       height: bounds.rawHeight,
       cx: bounds.minX + bounds.rawWidth / 2,
       cy: bounds.minY + bounds.rawHeight / 2,
+      glyphId,
+      gx,
+      gy,
     }));
   }, [glyphLayouts]);
 
@@ -445,7 +457,8 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
       y={y}
       rotation={rotation}
       opacity={opacity}
-      draggable={draggable && !locked && glyphEditTool == null}
+      draggable={draggable && !locked}
+      dragBoundFunc={glyphEditTool != null ? () => ({ x, y }) : undefined}
       onClick={(e) => {
         onClick?.();
 
@@ -471,8 +484,8 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
       onTap={onTap}
       onDblClick={onDblClick}
       onDblTap={onDblClick}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
+      onDragMove={glyphEditTool == null ? onDragMove : undefined}
+      onDragEnd={glyphEditTool == null ? onDragEnd : undefined}
       listening
     >
       <Rect
@@ -575,10 +588,19 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
                 const baseX = cx + gx;
                 const baseY = cy + gy;
                 const pGlyph = applyGlyphEdit(baseX, baseY, edit);
-
-                return applyShapeWarpPoint(
+                const pRigged = applyGlyphRig(
                   pGlyph.x,
                   pGlyph.y,
+                  fontFamily,
+                  g.g,
+                  fontSize,
+                  glyphRigs,
+                  glyphRigValues
+                );
+
+                return applyShapeWarpPoint(
+                  pRigged.x,
+                  pRigged.y,
                   glyphBounds,
                   bw,
                   bh,

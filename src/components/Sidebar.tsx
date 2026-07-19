@@ -6,13 +6,19 @@ import {
   URDU,
   PRESETS,
 } from "../lib/presets";
-import type { Block, TextAlign, ShapeWarpMode, GlyphStretchHandle } from "../types";
+import type { Block, TextAlign, ShapeWarpMode, GlyphStretchHandle, GlyphRig } from "../types";
 import type { NamedProjectMeta } from "../App";
 import { extractSvgPaths } from "../lib/svgImport";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { makeId } from "./sidebar/utils";
-import { SelectRow, ColorRow, RangeRow, PresetKeyboard } from "./sidebar/FormControls";
+import {
+  SelectRow,
+  ColorRow,
+  RangeRow,
+  PresetKeyboard,
+  FontSelectRow,
+} from "./sidebar/FormControls";
 import { ArabicKeyboard } from "./sidebar/ArabicKeyboard";
 import {
   TrashIcon,
@@ -120,6 +126,25 @@ export type SidebarProps = {
     offsetX: number,
     offsetY: number
   ) => void;
+  glyphRigs?: GlyphRig[];
+  selectedGlyphBoxes?: {
+    glyphIndex: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    glyphId?: number;
+    gx?: number;
+    gy?: number;
+  }[];
+  onSaveStretchHandleAsRig?: (
+    blockId: number,
+    glyphIndex: number,
+    handleId: string,
+    name: string
+  ) => void;
+  onSetGlyphRigValue?: (blockId: number, axisId: string, value: number) => void;
+  onDeleteGlyphRigAxis?: (fontFamily: string, glyphId: number, axisId: string) => void;
   onResetShapeWarp?: (blockId: number) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
   onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
@@ -203,6 +228,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteStretchHandle,
   onUpdateStretchHandle,
   onSetGlyphMoveOffset,
+  glyphRigs,
+  selectedGlyphBoxes,
+  onSaveStretchHandleAsRig,
+  onSetGlyphRigValue,
+  onDeleteGlyphRigAxis,
   onResetShapeWarp,
   onFitShapeFillSpacing,
   onAlignSelected,
@@ -216,6 +246,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showAlign, setShowAlign] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [namedProjectInput, setNamedProjectInput] = useState("");
+  const [rigNameDrafts, setRigNameDrafts] = useState<Record<string, string>>({});
   const selectionCount = selectedIds.length > 1 ? selectedIds.length : 1;
   const [showBackgroundSettings, setShowBackgroundSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -817,23 +848,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {showStyling && selectedBlock.type !== "image" && (
               <div className="sectionPanel">
-                <SelectRow
+                <FontSelectRow
                   id={makeId("font-family", selectedId)}
-                  name={makeId("fontFamily", selectedId)}
                   label="Font family"
                   value={selectedBlock.fontFamily}
+                  options={FONT_OPTIONS}
                   onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
-                >
-                  {FONT_OPTIONS.map((f) => (
-                    <option
-                      key={f.value}
-                      value={f.value}
-                      style={{ fontFamily: f.cssFamily }}
-                    >
-                      {f.label} — أبجد
-                    </option>
-                  ))}
-                </SelectRow>
+                  previewSuffix="— أبجد"
+                />
 
                 <RangeRow
                   id={makeId("font-size", selectedId)}
@@ -1324,6 +1346,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                       }
                                       suffix={`${Math.round(h.bandWidth)}px`}
                                     />
+
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                      <input
+                                        type="text"
+                                        value={rigNameDrafts[h.id] ?? ""}
+                                        onChange={(e) =>
+                                          setRigNameDrafts((prev) => ({
+                                            ...prev,
+                                            [h.id]: e.target.value,
+                                          }))
+                                        }
+                                        placeholder="e.g. Tip Length"
+                                        className="hexInput"
+                                        style={{ flex: 1 }}
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={!rigNameDrafts[h.id]?.trim()}
+                                        onClick={() => {
+                                          const name = rigNameDrafts[h.id]?.trim();
+                                          if (!name) return;
+                                          onSaveStretchHandleAsRig?.(
+                                            selectedBlock.id,
+                                            glyphIndex,
+                                            h.id,
+                                            name
+                                          );
+                                          setRigNameDrafts((prev) => {
+                                            const next = { ...prev };
+                                            delete next[h.id];
+                                            return next;
+                                          });
+                                        }}
+                                        className="sidebarSmallAction"
+                                      >
+                                        Save as Rig…
+                                      </button>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -1332,6 +1392,78 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </>
                     )}
                 </div>
+
+                {(() => {
+                    const glyphIds = new Set(
+                      (selectedGlyphBoxes ?? [])
+                        .map((b) => b.glyphId)
+                        .filter((id): id is number => id != null)
+                    );
+                    const rows = (glyphRigs ?? [])
+                      .filter(
+                        (r) =>
+                          r.fontFamily === selectedBlock.fontFamily && glyphIds.has(r.glyphId)
+                      )
+                      .flatMap((r) => r.axes.map((a) => ({ rig: r, axis: a })));
+
+                    if (rows.length === 0) return null;
+
+                    return (
+                      <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
+                        <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
+                          Rigged Parameters
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                          Named axes authored for a letterform in this font — affect every
+                          occurrence of that letter in this block.
+                        </div>
+
+                        <div
+                          style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}
+                        >
+                          {rows.map(({ rig, axis }) => {
+                            const val =
+                              selectedBlock.glyphRigValues?.find((v) => v.axisId === axis.id)
+                                ?.value ?? 0;
+                            return (
+                              <div
+                                key={axis.id}
+                                style={{ display: "flex", alignItems: "center", gap: 6 }}
+                              >
+                                <div style={{ flex: 1 }}>
+                                  <RangeRow
+                                    id={makeId(`rig-${axis.id}`, selectedId)}
+                                    name={makeId(`rigValue-${axis.id}`, selectedId)}
+                                    label={axis.name}
+                                    value={val}
+                                    min={-1}
+                                    max={1}
+                                    step={0.01}
+                                    onChange={(v) =>
+                                      onSetGlyphRigValue?.(selectedBlock.id, axis.id, v)
+                                    }
+                                    suffix={val.toFixed(2)}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onDeleteGlyphRigAxis?.(rig.fontFamily, rig.glyphId, axis.id)
+                                  }
+                                  className="layerIconBtn"
+                                  title="Delete rigged parameter"
+                                  aria-label="Delete rigged parameter"
+                                  style={{ color: "var(--danger)" }}
+                                >
+                                  <CloseIcon size={12} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                 {selectedBlock.type === "shapeWarp" && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>

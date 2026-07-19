@@ -23,6 +23,39 @@ export type GlyphEdit = {
   stretches: GlyphStretchHandle[];
 };
 
+/**
+ * A named, reusable deformation axis for one specific letterform in one
+ * specific font (keyed by fontFamily + HarfBuzz glyph id elsewhere) — the
+ * "rig" a user authors once and reuses across every occurrence of that
+ * letterform, in any block, forever. Geometry is em-relative (raw pixel
+ * value divided by the authoring block's fontSize) so the same axis
+ * reapplies at the correct visual proportion on a block using a different
+ * fontSize.
+ */
+export type GlyphRigAxis = {
+  id: string;
+  name: string;
+  anchorX: number;
+  anchorY: number;
+  dragOriginX: number;
+  dragOriginY: number;
+  dragX: number;
+  dragY: number;
+  bandWidth: number;
+};
+
+export type GlyphRig = {
+  fontFamily: string;
+  glyphId: number;
+  axes: GlyphRigAxis[];
+};
+
+/** Per-block live control value for one rig axis, in [-1, 1]. */
+export type GlyphRigValue = {
+  axisId: string;
+  value: number;
+};
+
 type BlockCommon = {
   id: number;
   name?: string;
@@ -54,6 +87,7 @@ type BlockCommon = {
   glyphEditTool?: "move" | "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
+  glyphRigValues?: GlyphRigValue[];
 
   // Shared shape-import fields. shapeFill and shapeWarp blocks both carry an
   // uploaded SVG path, and shapeWarp falls back to shapeWidth/shapeHeight

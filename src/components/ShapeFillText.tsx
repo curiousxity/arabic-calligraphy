@@ -26,11 +26,12 @@ import {
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import {
   applyGlyphEdit,
+  applyGlyphRig,
   MOVE_HANDLE_COLOR,
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
 } from "../lib/glyphEdits";
-import type { GlyphEdit, GlyphStretchHandle } from "../types";
+import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
 
 export type ShapeFillTextProps = {
   id?: string;
@@ -64,9 +65,18 @@ export type ShapeFillTextProps = {
   glyphEditTool?: "move" | "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
+  glyphRigs?: GlyphRig[];
+  glyphRigValues?: GlyphRigValue[];
   onGlyphSelect?: (glyphIndex: number | null) => void;
   onGlyphBoxesChange?: (
-    boxes: { glyphIndex: number; x: number; y: number; width: number; height: number }[]
+    boxes: {
+      glyphIndex: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      glyphId: number;
+    }[]
   ) => void;
   onUpdateStretchHandle?: (
     glyphIndex: number,
@@ -114,28 +124,31 @@ function replayPath(ctx: CanvasRenderingContext2D, cmds: SvgCmd[]) {
 }
 
 /**
- * Applies a glyph's edits to its raw outline commands (in the glyph's own
- * local coordinate space, same frame the tile-loop's own translate/rotate/
- * scale positions afterward) — this is what lets a single edit affect every
- * tiled repetition of that letter identically.
+ * Applies a point-transform to a glyph's raw outline commands (in the
+ * glyph's own local coordinate space, same frame the tile-loop's own
+ * translate/rotate/scale positions afterward) — this is what lets a single
+ * edit or rig axis affect every tiled repetition of that letter identically.
  */
-function warpSvgCommands(commands: SvgCmd[], edit: GlyphEdit | undefined): SvgCmd[] {
+function warpSvgCommands(
+  commands: SvgCmd[],
+  transform: (x: number, y: number) => { x: number; y: number }
+): SvgCmd[] {
   return commands.map((c): SvgCmd => {
     switch (c.type) {
       case "M":
       case "L": {
-        const p = applyGlyphEdit(c.x, c.y, edit);
+        const p = transform(c.x, c.y);
         return { type: c.type, x: p.x, y: p.y };
       }
       case "C": {
-        const p1 = applyGlyphEdit(c.x1, c.y1, edit);
-        const p2 = applyGlyphEdit(c.x2, c.y2, edit);
-        const p = applyGlyphEdit(c.x, c.y, edit);
+        const p1 = transform(c.x1, c.y1);
+        const p2 = transform(c.x2, c.y2);
+        const p = transform(c.x, c.y);
         return { type: "C", x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, x: p.x, y: p.y };
       }
       case "Q": {
-        const p1 = applyGlyphEdit(c.x1, c.y1, edit);
-        const p = applyGlyphEdit(c.x, c.y, edit);
+        const p1 = transform(c.x1, c.y1);
+        const p = transform(c.x, c.y);
         return { type: "Q", x1: p1.x, y1: p1.y, x: p.x, y: p.y };
       }
       case "Z":
@@ -188,6 +201,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   glyphEditTool = null,
   selectedGlyphIndex = null,
   glyphEdits = [],
+  glyphRigs = [],
+  glyphRigValues = [],
   onGlyphSelect,
   onGlyphBoxesChange,
   onUpdateStretchHandle,
@@ -224,7 +239,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       const dy = (g.dy ?? 0) * scale;
       const advance = (g.ax ?? 0) * scale;
       const commands: SvgCmd[] = obj ? obj.getPath(0, 0, fontSize).commands : [];
-      const result = { obj, penX, dx, dy, advance, commands };
+      const result = { obj, penX, dx, dy, advance, commands, glyphId: g.g };
       penX += advance;
       return result;
     });
@@ -242,7 +257,14 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   // Per-glyph outline bounds (glyph-local space) — reported so "Add handle"
   // can size/center a new handle on whichever glyph is selected.
   const glyphLocalBoxes = useMemo(() => {
-    const boxes: { glyphIndex: number; x: number; y: number; width: number; height: number }[] = [];
+    const boxes: {
+      glyphIndex: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      glyphId: number;
+    }[] = [];
     for (let i = 0; i < glyphCache.length; i++) {
       const g = glyphCache[i];
       if (!g.obj) continue;
@@ -254,6 +276,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           y: box.y1,
           width: Math.max(box.x2 - box.x1, 1),
           height: Math.max(box.y2 - box.y1, 1),
+          glyphId: g.glyphId,
         });
       }
     }
@@ -367,7 +390,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       x={x} y={y}
       rotation={rotation}
       opacity={opacity}
-      draggable={draggable && !locked && glyphEditTool == null}
+      draggable={draggable && !locked}
+      dragBoundFunc={glyphEditTool != null ? () => ({ x, y }) : undefined}
       onClick={(e) => {
         onClick?.();
 
@@ -392,7 +416,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
         onGlyphSelect?.(best?.glyphIndex ?? null);
       }}
-      onTap={onTap} onDblClick={onDblClick} onDblTap={onDblClick} onDragMove={onDragMove} onDragEnd={onDragEnd}
+      onTap={onTap} onDblClick={onDblClick} onDblTap={onDblClick} onDragMove={glyphEditTool == null ? onDragMove : undefined} onDragEnd={glyphEditTool == null ? onDragEnd : undefined}
       listening
     >
       <Rect x={0} y={0} width={scaledW} height={scaledH} fill="transparent" strokeEnabled={false} listening />
@@ -448,7 +472,21 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 const gx = startPenX + g.penX * scX + g.dx * scX;
                 const gy = sy + g.dy * scY;
                 const edit = glyphEdits.find((w) => w.glyphIndex === gi);
-                const commands = edit ? warpSvgCommands(g.commands, edit) : g.commands;
+                const commands =
+                  edit || glyphRigValues.length > 0
+                    ? warpSvgCommands(g.commands, (px, py) => {
+                        const edited = applyGlyphEdit(px, py, edit);
+                        return applyGlyphRig(
+                          edited.x,
+                          edited.y,
+                          fontFamily,
+                          g.glyphId,
+                          fontSize,
+                          glyphRigs,
+                          glyphRigValues
+                        );
+                      })
+                    : g.commands;
 
                 ctx.save();
                 ctx.translate(gx, gy);
