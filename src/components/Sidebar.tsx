@@ -136,6 +136,7 @@ const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
   { value: "Ruqaa", label: "Ruqaa", cssFamily: "Ruqaa" },
   { value: "Qahiri", label: "Qahiri", cssFamily: "Qahiri" },
   { value: "Scheherazade", label: "Scheherazade", cssFamily: "Scheherazade" },
+  { value: "Diwani", label: "Diwani", cssFamily: "Diwani" },
   { value: "Urdu", label: "Urdu", cssFamily: "Urdu" },
 ];
 

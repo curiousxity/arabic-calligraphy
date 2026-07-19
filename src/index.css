@@ -13,6 +13,7 @@
 @font-face { font-family: "Ruqaa"; src: url("/fonts/Ruqaa.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
 @font-face { font-family: "Qahiri"; src: url("/fonts/Qahiri.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
 @font-face { font-family: "Scheherazade"; src: url("/fonts/Scheherazade.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
+@font-face { font-family: "Diwani"; src: url("/fonts/Diwani.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
 
 :root {
   --bg-page: #0d1526;
