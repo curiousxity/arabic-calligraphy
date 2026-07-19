@@ -241,10 +241,12 @@ export const PresetKeyboard = ({
   title,
   rows,
   onPick,
+  fontFamily,
 }: {
   title: string;
   rows: string[][];
   onPick: (v: string) => void;
+  fontFamily?: string;
 }) => (
   <div className="sidebarPresetKeyboard">
     <div className="sidebarPresetKeyboardTitle">{title}</div>
@@ -261,6 +263,7 @@ export const PresetKeyboard = ({
                   ? "sidebarPresetKeyboardKey sidebarPresetKeyboardKeyWide"
                   : "sidebarPresetKeyboardKey"
               }
+              style={fontFamily ? { fontFamily } : undefined}
             >
               {key}
             </button>

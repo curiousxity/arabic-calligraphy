@@ -724,7 +724,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className="sidebarSectionButton"
                     aria-expanded={showStroke}
                   >
-                    <span>Stroke</span>
+                    <span>Outline</span>
                     <span>{showStroke ? "−" : "+"}</span>
                   </button>
 
@@ -740,7 +740,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <ColorRow
                         id={makeId("stroke-color", selectedId)}
                         name={makeId("strokeColor", selectedId)}
-                        label="Stroke color"
+                        label="Outline color"
                         value={selectedBlock.stroke ?? "#000000"}
                         onChange={(v) => onUpdateSelectedBlock({ stroke: v })}
                       />
@@ -748,7 +748,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <RangeRow
                         id={makeId("stroke-width", selectedId)}
                         name={makeId("strokeWidth", selectedId)}
-                        label="Stroke width"
+                        label="Outline width"
                         value={selectedBlock.strokeWidth ?? 0}
                         min={0}
                         max={20}
@@ -1079,6 +1079,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   title="Presets"
                   rows={[PRESETS]}
                   onPick={onInsertPreset}
+                  fontFamily={selectedBlock?.fontFamily ?? "FatemiMaqala"}
                 />
 
                 <PresetKeyboard
