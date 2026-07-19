@@ -23,6 +23,7 @@ type CanvasPreset = {
 type EditorSnapshot = {
   blocks: Block[];
   canvasPresetId: string;
+  customCanvasSize: { width: number; height: number };
   backgroundColor: string;
 };
 
@@ -63,6 +64,7 @@ const STORAGE_KEY = "calligraphy-layout-v2";
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 3;
 const STAGE_PADDING = 0;
+const SIDEBAR_COLLAPSED_WIDTH = 28;
 const DEFAULT_TEXT_FONT_SIZE = 53;
 const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
 
@@ -98,6 +100,21 @@ const isBrowser = typeof window !== "undefined";
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
+const parseCustomCanvasSize = (
+  value: unknown
+): { width: number; height: number } | null => {
+  if (
+    value &&
+    typeof value === "object" &&
+    typeof (value as { width?: unknown }).width === "number" &&
+    typeof (value as { height?: unknown }).height === "number"
+  ) {
+    const { width, height } = value as { width: number; height: number };
+    return { width: clamp(Math.round(width), 50, 8000), height: clamp(Math.round(height), 50, 8000) };
+  }
+  return null;
+};
+
 const computeFitToViewport = (
   canvasWidth: number,
   viewportHeight: number,
@@ -131,9 +148,14 @@ const App: React.FC = () => {
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [isMobile, setIsMobile] = useState(isBrowser ? window.innerWidth <= 768 : false);
   const [canvasPresetId, setCanvasPresetId] = useState<string>("story");
+  const [customCanvasSize, setCustomCanvasSize] = useState<{ width: number; height: number }>({
+    width: 1080,
+    height: 1080,
+  });
   const [backgroundColor, setBackgroundColor] = useState<string>("#ffffff");
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [panMode, setPanMode] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(isBrowser ? window.innerWidth : 1200);
@@ -141,12 +163,24 @@ const App: React.FC = () => {
 
   const [glyphBoxesByBlock, setGlyphBoxesByBlock] = useState<Record<number, GlyphBox[]>>({});
 
-  const currentPreset =
-    CANVAS_PRESETS.find((p) => p.id === canvasPresetId) ?? CANVAS_PRESETS[0];
+  const currentPreset: CanvasPreset = useMemo(
+    () =>
+      canvasPresetId === "custom"
+        ? {
+            id: "custom",
+            label: "Custom",
+            width: customCanvasSize.width,
+            height: customCanvasSize.height,
+          }
+        : CANVAS_PRESETS.find((p) => p.id === canvasPresetId) ?? CANVAS_PRESETS[0],
+    [canvasPresetId, customCanvasSize]
+  );
 
   const effectiveSidebarWidth = isMobile
     ? viewportWidth
-    : Math.min(Math.max(sidebarWidth, 220), Math.max(260, viewportWidth - 260));
+    : sidebarCollapsed
+      ? SIDEBAR_COLLAPSED_WIDTH
+      : Math.min(Math.max(sidebarWidth, 220), Math.max(260, viewportWidth - 260));
 
   const canvasWidth = isMobile
     ? viewportWidth
@@ -185,6 +219,7 @@ const App: React.FC = () => {
   const clipboardRef = useRef<Block | null>(null);
   const [editRequestSignal, setEditRequestSignal] = useState(0);
   const moveTimeoutRef = useRef<number | null>(null);
+  const customSizeTimeoutRef = useRef<number | null>(null);
   const lastAutoFitSignatureRef = useRef<string>("");
   const didHydrateLayoutRef = useRef(false);
   const skipNextAutoFitRef = useRef(false);
@@ -195,13 +230,14 @@ const App: React.FC = () => {
   );
 
   const getSnapshot = useCallback(
-    (): EditorSnapshot => ({ blocks, canvasPresetId, backgroundColor }),
-    [blocks, canvasPresetId, backgroundColor]
+    (): EditorSnapshot => ({ blocks, canvasPresetId, customCanvasSize, backgroundColor }),
+    [blocks, canvasPresetId, customCanvasSize, backgroundColor]
   );
 
   const applySnapshot = useCallback((snapshot: EditorSnapshot) => {
     setBlocks(snapshot.blocks);
     setCanvasPresetId(snapshot.canvasPresetId);
+    setCustomCanvasSize(snapshot.customCanvasSize);
     setBackgroundColor(snapshot.backgroundColor);
   }, []);
 
@@ -319,6 +355,19 @@ const App: React.FC = () => {
     [pushHistory]
   );
 
+  const changeCustomCanvasSize = useCallback(
+    (width: number, height: number) => {
+      setCanvasPresetId("custom");
+      setCustomCanvasSize({
+        width: clamp(Math.round(width), 50, 8000),
+        height: clamp(Math.round(height), 50, 8000),
+      });
+      if (customSizeTimeoutRef.current != null) window.clearTimeout(customSizeTimeoutRef.current);
+      customSizeTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
+    },
+    [pushHistory]
+  );
+
   const fitStageToViewport = useCallback(
     (options?: { force?: boolean }) => {
       if (canvasWidth <= 0 || stageViewportHeight <= 0) return;
@@ -377,6 +426,8 @@ const App: React.FC = () => {
           setSelectedId(parsed.selectedId);
         }
         if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
+        const parsedCustomSize = parseCustomCanvasSize(parsed.customCanvasSize);
+        if (parsedCustomSize) setCustomCanvasSize(parsedCustomSize);
         if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
         if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
 
@@ -667,6 +718,7 @@ const App: React.FC = () => {
     blocks,
     selectedId,
     canvasPresetId,
+    customCanvasSize,
     backgroundColor,
     stageScale,
     stagePosition,
@@ -698,14 +750,26 @@ const App: React.FC = () => {
         setSelectedId(parsed.selectedId);
       }
       if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
+      const parsedCustomSize = parseCustomCanvasSize(parsed.customCanvasSize);
+      if (parsedCustomSize) setCustomCanvasSize(parsedCustomSize);
       if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
       if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
+
+      const loadedPresetId = parsed.canvasPresetId ?? canvasPresetId;
+      const loadedPresetDims: CanvasPreset =
+        loadedPresetId === "custom"
+          ? {
+              id: "custom",
+              label: "Custom",
+              width: (parsedCustomSize ?? customCanvasSize).width,
+              height: (parsedCustomSize ?? customCanvasSize).height,
+            }
+          : CANVAS_PRESETS.find((p) => p.id === loadedPresetId) ?? currentPreset;
 
       const currentFit = computeFitToViewport(
         canvasWidth || Math.max(1, viewportWidth - effectiveSidebarWidth),
         stageViewportHeight || viewportHeight,
-        CANVAS_PRESETS.find((p) => p.id === (parsed.canvasPresetId ?? canvasPresetId)) ??
-          currentPreset
+        loadedPresetDims
       );
 
       const savedViewportWidth =
@@ -768,6 +832,8 @@ const App: React.FC = () => {
             setSelectedId(parsed.selectedId);
           }
           if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
+          const parsedCustomSize = parseCustomCanvasSize(parsed.customCanvasSize);
+          if (parsedCustomSize) setCustomCanvasSize(parsedCustomSize);
           if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
           if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
 
@@ -913,11 +979,15 @@ const App: React.FC = () => {
         snapToGrid={snapToGrid}
         isMobile={isMobile}
         width={effectiveSidebarWidth}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
         canvasPresetId={canvasPresetId}
         onChangeCanvasPreset={(id) => {
           pushHistory();
           setCanvasPresetId(id);
         }}
+        customCanvasSize={customCanvasSize}
+        onChangeCustomSize={changeCustomCanvasSize}
         backgroundColor={backgroundColor}
         onChangeBackgroundColor={(color) => {
           pushHistory();
@@ -963,7 +1033,7 @@ const App: React.FC = () => {
         onAddGlyphHandle={addHandleToSelectedGlyph}
       />
 
-      {!isMobile && (
+      {!isMobile && !sidebarCollapsed && (
         <div
           onMouseDown={startSidebarResize}
           style={{

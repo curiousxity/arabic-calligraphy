@@ -165,6 +165,18 @@ export const ChevronDownIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
+export const ChevronLeftIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="m15 18-6-6 6-6" />
+  </IconBase>
+);
+
+export const ChevronRightIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="m9 18 6-6-6-6" />
+  </IconBase>
+);
+
 export const MergeIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>
     <path d="M8 3 4 7l4 4" />
@@ -213,5 +225,13 @@ export const FrameIcon: React.FC<IconProps> = (props) => (
     <path d="M21 3v18" />
     <path d="M3 3h18" />
     <path d="M3 21h18" />
+  </IconBase>
+);
+
+export const PipetteIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="m2 22 1-4 12.5-12.5a2.121 2.121 0 0 1 3 3L6 21l-4 1Z" />
+    <path d="m14.5 6.5 3 3" />
+    <path d="M17 3.5a2.5 2.5 0 0 1 3.5 3.5" />
   </IconBase>
 );

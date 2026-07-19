@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from "react";
+import { PipetteIcon } from "../Icons";
+
+const supportsEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
 
 const SLIDER_DEFAULTS: Record<string, number> = {
   fontSize: 53,
   opacity: 1,
   rotation: 0,
+  lineHeight: 1.2,
   strokeWidth: 0,
   shadowBlur: 0,
   shadowOffsetX: 0,
@@ -97,6 +101,16 @@ export const ColorRow = ({
     }
   };
 
+  const pickWithEyeDropper = async () => {
+    if (!window.EyeDropper) return;
+    try {
+      const result = await new window.EyeDropper().open();
+      onChange(result.sRGBHex);
+    } catch {
+      // User cancelled the pick (Escape) — nothing to do.
+    }
+  };
+
   return (
     <div className="field">
       <span className="fieldTitle">{label}</span>
@@ -128,6 +142,18 @@ export const ColorRow = ({
           autoCapitalize="off"
           aria-label={`${label} hex value`}
         />
+        {supportsEyeDropper && (
+          <button
+            type="button"
+            onClick={pickWithEyeDropper}
+            className="sidebarCircleButton"
+            style={{ width: 32, height: 32, flexShrink: 0 }}
+            title="Pick a color from the screen"
+            aria-label={`Pick ${label.toLowerCase()} from screen`}
+          >
+            <PipetteIcon size={14} />
+          </button>
+        )}
       </div>
       <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" }}>
         {COLOR_PALETTE.map((c) => (

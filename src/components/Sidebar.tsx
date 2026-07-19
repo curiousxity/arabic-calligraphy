@@ -27,6 +27,8 @@ import {
   ImageIcon,
   VectorIcon,
   FileTextIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "./Icons";
 
 export type SidebarProps = {
@@ -36,9 +38,13 @@ export type SidebarProps = {
   snapToGrid: boolean;
   isMobile: boolean;
   width: number;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 
   canvasPresetId: string;
   onChangeCanvasPreset: (id: string) => void;
+  customCanvasSize: { width: number; height: number };
+  onChangeCustomSize: (width: number, height: number) => void;
 
   backgroundColor: string;
   onChangeBackgroundColor: (color: string) => void;
@@ -109,8 +115,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   snapToGrid,
   isMobile,
   width,
+  isCollapsed = false,
+  onToggleCollapse,
   canvasPresetId,
   onChangeCanvasPreset,
+  customCanvasSize,
+  onChangeCustomSize,
   backgroundColor,
   onChangeBackgroundColor,
   onAddBlock,
@@ -150,6 +160,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(!isMobile);
   const [showCanvasSettings, setShowCanvasSettings] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showStroke, setShowStroke] = useState(false);
+  const [showShadow, setShowShadow] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -260,6 +273,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
     input.click();
   };
 
+  if (!isMobile && isCollapsed) {
+    return (
+      <div
+        style={{
+          width,
+          height: "100%",
+          flexShrink: 0,
+          borderRight: "1px solid var(--border)",
+          background:
+            "linear-gradient(180deg, var(--bg-sidebar-start) 0%, var(--bg-sidebar-end) 100%)",
+          display: "flex",
+          justifyContent: "center",
+          paddingTop: 12,
+        }}
+      >
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="sidebarCircleButton"
+          title="Show sidebar"
+          aria-label="Show sidebar"
+        >
+          <ChevronRightIcon size={14} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -281,18 +322,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }}
     >
       <div className="sidebarInner">
-        <div className="sidebarPanel">
-          <h2
-            className="sidebarTitle"
+        <div className="sidebarPanel" style={{ position: "relative" }}>
+          {!isMobile && onToggleCollapse && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="layerIconBtn"
+              style={{ position: "absolute", top: 8, insetInlineEnd: 8 }}
+              title="Hide sidebar"
+              aria-label="Hide sidebar"
+            >
+              <ChevronLeftIcon size={14} />
+            </button>
+          )}
+          <div
             style={{
-              fontSize: isMobile ? 18 : 20,
-              textAlign: "center",
-              color: "var(--text-primary)",
-              letterSpacing: "-0.02em",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
             }}
           >
-            Mohammed&apos;s Calligraphy
-          </h2>
+            <img
+              src="/logo-icon.png"
+              alt=""
+              style={{ width: 26, height: 26, borderRadius: 6, flexShrink: 0 }}
+            />
+            <h2
+              className="sidebarTitle"
+              style={{
+                fontSize: isMobile ? 18 : 20,
+                textAlign: "center",
+                color: "var(--text-primary)",
+                letterSpacing: "-0.02em",
+                margin: 0,
+              }}
+            >
+              HarfCanvas
+            </h2>
+          </div>
         </div>
 
         <div className="sidebarPanel">
@@ -568,6 +636,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </SelectRow>
                 )}
 
+                {selectedBlock.type === "text" && (
+                  <RangeRow
+                    id={makeId("line-height", selectedId)}
+                    name={makeId("lineHeight", selectedId)}
+                    label="Line height"
+                    value={selectedBlock.lineHeight ?? 1.2}
+                    min={0.8}
+                    max={3}
+                    step={0.05}
+                    onChange={(v) => onUpdateSelectedBlock({ lineHeight: v })}
+                    suffix={(selectedBlock.lineHeight ?? 1.2).toFixed(2)}
+                    fieldKey="lineHeight"
+                  />
+                )}
+
                 <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                   <div className="sidebarSectionTitle">Rotation</div>
                   <RangeRow
@@ -617,112 +700,136 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
 
                 <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                  <div className="sidebarSectionTitle">Stroke</div>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                      gap: 10,
-                    }}
+                  <button
+                    type="button"
+                    onClick={() => setShowStroke((v) => !v)}
+                    className="sidebarSectionButton"
+                    aria-expanded={showStroke}
                   >
-                    <ColorRow
-                      id={makeId("stroke-color", selectedId)}
-                      name={makeId("strokeColor", selectedId)}
-                      label="Stroke color"
-                      value={selectedBlock.stroke ?? "#000000"}
-                      onChange={(v) => onUpdateSelectedBlock({ stroke: v })}
-                    />
+                    <span>Stroke</span>
+                    <span>{showStroke ? "−" : "+"}</span>
+                  </button>
 
-                    <RangeRow
-                      id={makeId("stroke-width", selectedId)}
-                      name={makeId("strokeWidth", selectedId)}
-                      label="Stroke width"
-                      value={selectedBlock.strokeWidth ?? 0}
-                      min={0}
-                      max={20}
-                      onChange={(v) => onUpdateSelectedBlock({ strokeWidth: v })}
-                      suffix={selectedBlock.strokeWidth ?? 0}
-                      fieldKey="strokeWidth"
-                    />
-                  </div>
+                  {showStroke && (
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        gap: 10,
+                        marginTop: 10,
+                      }}
+                    >
+                      <ColorRow
+                        id={makeId("stroke-color", selectedId)}
+                        name={makeId("strokeColor", selectedId)}
+                        label="Stroke color"
+                        value={selectedBlock.stroke ?? "#000000"}
+                        onChange={(v) => onUpdateSelectedBlock({ stroke: v })}
+                      />
+
+                      <RangeRow
+                        id={makeId("stroke-width", selectedId)}
+                        name={makeId("strokeWidth", selectedId)}
+                        label="Stroke width"
+                        value={selectedBlock.strokeWidth ?? 0}
+                        min={0}
+                        max={20}
+                        onChange={(v) => onUpdateSelectedBlock({ strokeWidth: v })}
+                        suffix={selectedBlock.strokeWidth ?? 0}
+                        fieldKey="strokeWidth"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                  <div className="sidebarSectionTitle">Shadow</div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                      gap: 10,
-                    }}
+                  <button
+                    type="button"
+                    onClick={() => setShowShadow((v) => !v)}
+                    className="sidebarSectionButton"
+                    aria-expanded={showShadow}
                   >
-                    <ColorRow
-                      id={makeId("shadow-color", selectedId)}
-                      name={makeId("shadowColor", selectedId)}
-                      label="Shadow color"
-                      value={selectedBlock.shadowColor ?? "#000000"}
-                      onChange={(v) => onUpdateSelectedBlock({ shadowColor: v })}
-                    />
+                    <span>Shadow</span>
+                    <span>{showShadow ? "−" : "+"}</span>
+                  </button>
 
-                    <RangeRow
-                      id={makeId("shadow-blur", selectedId)}
-                      name={makeId("shadowBlur", selectedId)}
-                      label="Shadow blur"
-                      value={selectedBlock.shadowBlur ?? 0}
-                      min={0}
-                      max={60}
-                      onChange={(v) => onUpdateSelectedBlock({ shadowBlur: v })}
-                      suffix={selectedBlock.shadowBlur ?? 0}
-                      fieldKey="shadowBlur"
-                    />
-                  </div>
+                  {showShadow && (
+                    <div style={{ marginTop: 10 }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                          gap: 10,
+                        }}
+                      >
+                        <ColorRow
+                          id={makeId("shadow-color", selectedId)}
+                          name={makeId("shadowColor", selectedId)}
+                          label="Shadow color"
+                          value={selectedBlock.shadowColor ?? "#000000"}
+                          onChange={(v) => onUpdateSelectedBlock({ shadowColor: v })}
+                        />
 
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                      gap: 10,
-                      marginTop: 8,
-                    }}
-                  >
-                    <RangeRow
-                      id={makeId("shadow-offset-x", selectedId)}
-                      name={makeId("shadowOffsetX", selectedId)}
-                      label="Shadow X"
-                      value={selectedBlock.shadowOffsetX ?? 0}
-                      min={-60}
-                      max={60}
-                      onChange={(v) => onUpdateSelectedBlock({ shadowOffsetX: v })}
-                      suffix={selectedBlock.shadowOffsetX ?? 0}
-                      fieldKey="shadowOffsetX"
-                    />
+                        <RangeRow
+                          id={makeId("shadow-blur", selectedId)}
+                          name={makeId("shadowBlur", selectedId)}
+                          label="Shadow blur"
+                          value={selectedBlock.shadowBlur ?? 0}
+                          min={0}
+                          max={60}
+                          onChange={(v) => onUpdateSelectedBlock({ shadowBlur: v })}
+                          suffix={selectedBlock.shadowBlur ?? 0}
+                          fieldKey="shadowBlur"
+                        />
+                      </div>
 
-                    <RangeRow
-                      id={makeId("shadow-offset-y", selectedId)}
-                      name={makeId("shadowOffsetY", selectedId)}
-                      label="Shadow Y"
-                      value={selectedBlock.shadowOffsetY ?? 0}
-                      min={-60}
-                      max={60}
-                      onChange={(v) => onUpdateSelectedBlock({ shadowOffsetY: v })}
-                      suffix={selectedBlock.shadowOffsetY ?? 0}
-                      fieldKey="shadowOffsetY"
-                    />
-                  </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                          gap: 10,
+                          marginTop: 8,
+                        }}
+                      >
+                        <RangeRow
+                          id={makeId("shadow-offset-x", selectedId)}
+                          name={makeId("shadowOffsetX", selectedId)}
+                          label="Shadow X"
+                          value={selectedBlock.shadowOffsetX ?? 0}
+                          min={-60}
+                          max={60}
+                          onChange={(v) => onUpdateSelectedBlock({ shadowOffsetX: v })}
+                          suffix={selectedBlock.shadowOffsetX ?? 0}
+                          fieldKey="shadowOffsetX"
+                        />
 
-                  <RangeRow
-                    id={makeId("shadow-opacity", selectedId)}
-                    name={makeId("shadowOpacity", selectedId)}
-                    label="Shadow opacity"
-                    value={selectedShadowOpacity}
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    onChange={(v) => onUpdateSelectedBlock({ shadowOpacity: v })}
-                    suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
-                    fieldKey="shadowOpacity"
-                  />
+                        <RangeRow
+                          id={makeId("shadow-offset-y", selectedId)}
+                          name={makeId("shadowOffsetY", selectedId)}
+                          label="Shadow Y"
+                          value={selectedBlock.shadowOffsetY ?? 0}
+                          min={-60}
+                          max={60}
+                          onChange={(v) => onUpdateSelectedBlock({ shadowOffsetY: v })}
+                          suffix={selectedBlock.shadowOffsetY ?? 0}
+                          fieldKey="shadowOffsetY"
+                        />
+                      </div>
+
+                      <RangeRow
+                        id={makeId("shadow-opacity", selectedId)}
+                        name={makeId("shadowOpacity", selectedId)}
+                        label="Shadow opacity"
+                        value={selectedShadowOpacity}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        onChange={(v) => onUpdateSelectedBlock({ shadowOpacity: v })}
+                        suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
+                        fieldKey="shadowOpacity"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {selectedBlock.type === "shapeWarp" && (
@@ -1095,8 +1202,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <option value="story">Story (1080×1920)</option>
                   <option value="square">Instagram Square (1080×1080)</option>
                   <option value="a4">Print A4 (2480×3508)</option>
+                  <option value="custom">Custom</option>
                 </select>
               </div>
+
+              {canvasPresetId === "custom" && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                    gap: 10,
+                  }}
+                >
+                  <label className="field" htmlFor="custom-canvas-width">
+                    <span className="fieldTitle">Width (px)</span>
+                    <div className="shell">
+                      <input
+                        id="custom-canvas-width"
+                        name="customCanvasWidth"
+                        type="number"
+                        min={50}
+                        max={8000}
+                        value={customCanvasSize.width}
+                        onChange={(e) =>
+                          onChangeCustomSize(
+                            Number(e.target.value) || customCanvasSize.width,
+                            customCanvasSize.height
+                          )
+                        }
+                        className="select"
+                        style={{ cursor: "text" }}
+                      />
+                    </div>
+                  </label>
+
+                  <label className="field" htmlFor="custom-canvas-height">
+                    <span className="fieldTitle">Height (px)</span>
+                    <div className="shell">
+                      <input
+                        id="custom-canvas-height"
+                        name="customCanvasHeight"
+                        type="number"
+                        min={50}
+                        max={8000}
+                        value={customCanvasSize.height}
+                        onChange={(e) =>
+                          onChangeCustomSize(
+                            customCanvasSize.width,
+                            Number(e.target.value) || customCanvasSize.height
+                          )
+                        }
+                        className="select"
+                        style={{ cursor: "text" }}
+                      />
+                    </div>
+                  </label>
+                </div>
+              )}
 
               <ColorRow
                 id="background-color"
@@ -1133,18 +1295,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        <p
-          style={{
-            fontSize: 11,
-            color: "var(--text-faint)",
-            margin: "0 4px 8px",
-            textAlign: "center",
-          }}
-        >
-          Double-click a block on the canvas to jump to its text field. Double-click a
-          layer name to rename. Double-click a slider to reset. Use the arrow keys to
-          nudge the selected block (hold Shift for bigger steps).
-        </p>
+        <div className="sidebarPanel">
+          <button
+            type="button"
+            onClick={() => setShowShortcuts((v) => !v)}
+            className="sidebarSectionButton"
+            aria-expanded={showShortcuts}
+          >
+            <span>Shortcuts</span>
+            <span>{showShortcuts ? "−" : "+"}</span>
+          </button>
+
+          {showShortcuts && (
+            <div
+              className="sectionPanel"
+              style={{ fontSize: 12, color: "var(--text-secondary)" }}
+            >
+              {[
+                ["Double-click a block", "Jump to its text field"],
+                ["Double-click a layer name", "Rename it"],
+                ["Double-click a layer row", "Zoom to that block"],
+                ["Double-click a slider", "Reset it to default"],
+                ["Arrow keys", "Nudge selected block (Shift = bigger steps)"],
+                ["Delete / Backspace", "Delete selected block"],
+                ["Ctrl+Z / Ctrl+Y", "Undo / redo"],
+                ["Ctrl+C / Ctrl+V", "Copy / paste selected block"],
+                ["Hold Space, or middle-click drag", "Pan the canvas"],
+              ].map(([key, desc]) => (
+                <div
+                  key={key}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    padding: "3px 0",
+                  }}
+                >
+                  <span style={{ color: "var(--text-primary)" }}>{key}</span>
+                  <span style={{ color: "var(--text-muted)", textAlign: "right" }}>
+                    {desc}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
