@@ -1,4 +1,4 @@
-export type BlockType = "text" | "shapeFill" | "shapeWarp";
+export type BlockType = "text" | "shapeFill" | "shapeWarp" | "image";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 export type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
@@ -79,4 +79,10 @@ export type ShapeWarpBlock = BlockCommon & {
   glyphWarps?: GlyphWarp[];
 };
 
-export type Block = TextBlock | ShapeFillBlock | ShapeWarpBlock;
+export type ImageBlock = BlockCommon & {
+  type: "image";
+  imageDataUrl: string;
+  imageScale?: number;
+};
+
+export type Block = TextBlock | ShapeFillBlock | ShapeWarpBlock | ImageBlock;

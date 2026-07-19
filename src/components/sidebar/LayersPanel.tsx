@@ -4,6 +4,7 @@ import { makeId } from "./utils";
 import {
   ShapesIcon,
   CircleDashedIcon,
+  ImageIcon,
   LockIcon,
   UnlockIcon,
   ChevronUpIcon,
@@ -21,6 +22,8 @@ const blockTypeIcon = (b: Block) =>
     <ShapesIcon size={13} />
   ) : b.type === "shapeWarp" ? (
     <CircleDashedIcon size={13} />
+  ) : b.type === "image" ? (
+    <ImageIcon size={13} />
   ) : (
     "T"
   );
@@ -28,7 +31,8 @@ const blockTypeIcon = (b: Block) =>
 export type LayersPanelProps = {
   blocks: Block[];
   selectedId?: number | null;
-  onSelect: (id: number) => void;
+  selectedIds?: number[];
+  onSelect: (id: number, additive?: boolean) => void;
   onToggleLock: (id: number) => void;
   onMoveUp: (id: number) => void;
   onMoveDown: (id: number) => void;
@@ -42,6 +46,7 @@ export type LayersPanelProps = {
 export const LayersPanel: React.FC<LayersPanelProps> = ({
   blocks,
   selectedId,
+  selectedIds = [],
   onSelect,
   onToggleLock,
   onMoveUp,
@@ -99,14 +104,15 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
       )}
 
       {reversed.map((block) => {
-        const isSelected = block.id === selectedId;
+        const isMultiSelected = selectedIds.length > 1 && selectedIds.includes(block.id);
+        const isSelected = block.id === selectedId || isMultiSelected;
         const isMerge = block.id === mergeTarget;
         const label = block.name ?? `Block ${block.id}`;
 
         return (
           <div
             key={block.id}
-            onClick={() => onSelect(block.id)}
+            onClick={(e) => onSelect(block.id, e.shiftKey || e.ctrlKey || e.metaKey)}
             onDoubleClick={() => onZoomTo?.(block.id)}
             title="Double-click to zoom to this block"
             style={{

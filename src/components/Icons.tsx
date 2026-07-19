@@ -245,3 +245,67 @@ export const PipetteIcon: React.FC<IconProps> = (props) => (
     <path d="M17 3.5a2.5 2.5 0 0 1 3.5 3.5" />
   </IconBase>
 );
+
+export const AlignLeftIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <line x1="4" y1="2" x2="4" y2="22" />
+    <rect x="4" y="6" width="10" height="4" rx="1" />
+    <rect x="4" y="14" width="16" height="4" rx="1" />
+  </IconBase>
+);
+
+export const AlignCenterHIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <line x1="12" y1="2" x2="12" y2="22" />
+    <rect x="7" y="6" width="10" height="4" rx="1" />
+    <rect x="4" y="14" width="16" height="4" rx="1" />
+  </IconBase>
+);
+
+export const AlignRightIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <line x1="20" y1="2" x2="20" y2="22" />
+    <rect x="10" y="6" width="10" height="4" rx="1" />
+    <rect x="4" y="14" width="16" height="4" rx="1" />
+  </IconBase>
+);
+
+export const AlignTopIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <line x1="2" y1="4" x2="22" y2="4" />
+    <rect x="6" y="4" width="4" height="10" rx="1" />
+    <rect x="14" y="4" width="4" height="16" rx="1" />
+  </IconBase>
+);
+
+export const AlignMiddleIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <rect x="6" y="7" width="4" height="10" rx="1" />
+    <rect x="14" y="4" width="4" height="16" rx="1" />
+  </IconBase>
+);
+
+export const AlignBottomIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <line x1="2" y1="20" x2="22" y2="20" />
+    <rect x="6" y="10" width="4" height="10" rx="1" />
+    <rect x="14" y="4" width="4" height="16" rx="1" />
+  </IconBase>
+);
+
+export const DistributeHorizontalIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="2" y="8" width="4" height="8" rx="1" />
+    <rect x="10" y="8" width="4" height="8" rx="1" />
+    <rect x="18" y="8" width="4" height="8" rx="1" />
+  </IconBase>
+);
+
+export const DistributeVerticalIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="8" y="2" width="8" height="4" rx="1" />
+    <rect x="8" y="10" width="8" height="4" rx="1" />
+    <rect x="8" y="18" width="8" height="4" rx="1" />
+  </IconBase>
+);

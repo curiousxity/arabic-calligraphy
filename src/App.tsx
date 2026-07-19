@@ -11,6 +11,7 @@ import { CanvasStage } from "./components/CanvasStage";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
+import { STARTER_TEMPLATES } from "./lib/templates";
 import type { Block, GlyphWarp, GlyphHandleMode } from "./types";
 
 const dissolveSingletonGroups = (list: Block[]): Block[] => {
@@ -36,6 +37,9 @@ type EditorSnapshot = {
   customCanvasSize: { width: number; height: number };
   backgroundColor: string;
 };
+
+export type NamedProjectMeta = { name: string; savedAt: number };
+type NamedProjectsStore = Record<string, { savedAt: number; payload: unknown }>;
 
 type GlyphBox = {
   glyphIndex: number;
@@ -71,6 +75,7 @@ const CANVAS_PRESETS: CanvasPreset[] = [
 ];
 
 const STORAGE_KEY = "calligraphy-layout-v2";
+const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 3;
 const STAGE_PADDING = 0;
@@ -154,9 +159,28 @@ const makeHandleId = () =>
 
 const App: React.FC = () => {
   const [selectedId, setSelectedId] = useState<number | null>(1);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showGrid, setShowGrid] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(false);
+  const [showRulers, setShowRulers] = useState(false);
+  const [guides, setGuides] = useState<{ horizontal: number[]; vertical: number[] }>({
+    horizontal: [],
+    vertical: [],
+  });
   const [transparentExport, setTransparentExport] = useState(false);
+  const [namedProjects, setNamedProjects] = useState<NamedProjectMeta[]>(() => {
+    if (!isBrowser) return [];
+    try {
+      const raw = localStorage.getItem(NAMED_PROJECTS_KEY);
+      if (!raw) return [];
+      const store = JSON.parse(raw) as NamedProjectsStore;
+      return Object.entries(store)
+        .map(([name, entry]) => ({ name, savedAt: entry.savedAt }))
+        .sort((a, b) => b.savedAt - a.savedAt);
+    } catch {
+      return [];
+    }
+  });
   const [isMobile, setIsMobile] = useState(isBrowser ? window.innerWidth <= 768 : false);
   const [canvasPresetId, setCanvasPresetId] = useState<string>("story");
   const [customCanvasSize, setCustomCanvasSize] = useState<{ width: number; height: number }>({
@@ -238,6 +262,27 @@ const App: React.FC = () => {
   const selectedBlock = useMemo(
     () => (selectedId == null ? undefined : blocks.find((b) => b.id === selectedId)),
     [blocks, selectedId]
+  );
+
+  const effectiveSelectedIds = useMemo(
+    () => (selectedIds.length > 0 ? selectedIds : selectedId != null ? [selectedId] : []),
+    [selectedIds, selectedId]
+  );
+
+  const selectBlock = useCallback(
+    (id: number | null, additive = false) => {
+      if (id == null || !additive) {
+        setSelectedIds([]);
+        setSelectedId(id);
+        return;
+      }
+      setSelectedIds((prev) => {
+        const base = prev.length > 0 ? prev : selectedId != null ? [selectedId] : [];
+        return base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
+      });
+      setSelectedId(id);
+    },
+    [selectedId]
   );
 
   const getSnapshot = useCallback(
@@ -500,6 +545,7 @@ const App: React.FC = () => {
 
         if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
         if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
+          setSelectedIds([]);
           setSelectedId(parsed.selectedId);
         }
         if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
@@ -569,14 +615,19 @@ const App: React.FC = () => {
   }
 
   const deleteSelectedBlock = useCallback(() => {
-    if (!selectedBlock) return;
+    if (effectiveSelectedIds.length === 0) return;
+    const idsToDelete = new Set(
+      blocks.filter((b) => effectiveSelectedIds.includes(b.id) && !b.locked).map((b) => b.id)
+    );
+    if (idsToDelete.size === 0) return;
     pushHistory();
     setBlocks((prev) => {
-      const filtered = dissolveSingletonGroups(prev.filter((b) => b.id !== selectedBlock.id));
+      const filtered = dissolveSingletonGroups(prev.filter((b) => !idsToDelete.has(b.id)));
       setSelectedId(filtered.length > 0 ? filtered[0].id : null);
       return filtered;
     });
-  }, [selectedBlock, pushHistory]);
+    setSelectedIds([]);
+  }, [effectiveSelectedIds, blocks, pushHistory]);
 
   useEffect(() => {
     if (!isBrowser) return;
@@ -604,6 +655,7 @@ const App: React.FC = () => {
               groupId: undefined,
             };
             setBlocks((prev) => [...prev, copy]);
+            setSelectedIds([]);
             setSelectedId(newId);
           }
           return;
@@ -623,7 +675,7 @@ const App: React.FC = () => {
       }
 
       if ((e.key === "Delete" || e.key === "Backspace") && !typing) {
-        if (selectedBlock && !selectedBlock.locked) {
+        if (effectiveSelectedIds.length > 0) {
           e.preventDefault();
           deleteSelectedBlock();
         }
@@ -656,6 +708,7 @@ const App: React.FC = () => {
     handleUndo,
     handleRedo,
     selectedBlock,
+    effectiveSelectedIds,
     blocks,
     updateBlockPositionWithHistory,
     pushHistory,
@@ -668,12 +721,24 @@ const App: React.FC = () => {
     return id;
   };
 
+  const applyStarterTemplate = (templateId: string) => {
+    const template = STARTER_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+    pushHistory();
+    const newBlocks: Block[] = template.blocks.map((b) => ({ ...b, id: createNextId() }));
+    setBlocks(newBlocks);
+    setCanvasPresetId(template.canvasPresetId);
+    setBackgroundColor(template.backgroundColor);
+    setSelectedIds([]);
+    setSelectedId(newBlocks[0]?.id ?? null);
+  };
+
   const updateSelectedBlock = useCallback(
     (patch: Partial<Block>) => {
       if (!selectedBlock) return;
       pushHistory();
       setBlocks((prev) =>
-        prev.map((b) => (b.id === selectedBlock.id ? { ...b, ...patch } : b))
+        prev.map((b) => (b.id === selectedBlock.id ? ({ ...b, ...patch } as Block) : b))
       );
     },
     [selectedBlock, pushHistory]
@@ -682,7 +747,7 @@ const App: React.FC = () => {
   const updateBlock = useCallback(
     (id: number, patch: Partial<Block>) => {
       pushHistory();
-      setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+      setBlocks((prev) => prev.map((b) => (b.id === id ? ({ ...b, ...patch } as Block) : b)));
     },
     [pushHistory]
   );
@@ -690,6 +755,13 @@ const App: React.FC = () => {
   const resizeShapeFillBlock = useCallback(
     (id: number, scale: number) => {
       updateBlock(id, { shapeScale: clamp(scale, 0.2, 3) });
+    },
+    [updateBlock]
+  );
+
+  const resizeImageBlock = useCallback(
+    (id: number, scale: number) => {
+      updateBlock(id, { imageScale: clamp(scale, 0.05, 10) });
     },
     [updateBlock]
   );
@@ -725,9 +797,133 @@ const App: React.FC = () => {
 
         return prev.map((bl) => (memberIds.has(bl.id) ? { ...bl, groupId } : bl));
       });
+      setSelectedIds([]);
       setSelectedId(idA);
     },
     [pushHistory]
+  );
+
+  const groupSelectedBlocks = useCallback(() => {
+    if (effectiveSelectedIds.length < 2) return;
+    pushHistory();
+    const groupId = nextGroupIdRef.current++;
+    const idSet = new Set(effectiveSelectedIds);
+    setBlocks((prev) => prev.map((b) => (idSet.has(b.id) ? { ...b, groupId } : b)));
+  }, [effectiveSelectedIds, pushHistory]);
+
+  const getSelectedNodeRects = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return [];
+    return effectiveSelectedIds
+      .map((id) => {
+        const node = stage.findOne(`#block-${id}`);
+        const block = blocks.find((b) => b.id === id);
+        if (!node || !block) return null;
+        const rect = node.getClientRect({ relativeTo: stage });
+        return { id, block, rect };
+      })
+      .filter(
+        (
+          x
+        ): x is { id: number; block: Block; rect: { x: number; y: number; width: number; height: number } } =>
+          x !== null
+      );
+  }, [effectiveSelectedIds, blocks]);
+
+  const alignSelectedBlocks = useCallback(
+    (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => {
+      const items = getSelectedNodeRects();
+      if (items.length === 0) return;
+
+      let refX0: number, refX1: number, refY0: number, refY1: number;
+      if (items.length === 1) {
+        refX0 = 0;
+        refX1 = currentPreset.width;
+        refY0 = 0;
+        refY1 = currentPreset.height;
+      } else {
+        refX0 = Math.min(...items.map((it) => it.rect.x));
+        refX1 = Math.max(...items.map((it) => it.rect.x + it.rect.width));
+        refY0 = Math.min(...items.map((it) => it.rect.y));
+        refY1 = Math.max(...items.map((it) => it.rect.y + it.rect.height));
+      }
+
+      const deltas = new Map<number, { dx: number; dy: number }>();
+      for (const { id, rect } of items) {
+        let dx = 0;
+        let dy = 0;
+        switch (edge) {
+          case "left":
+            dx = refX0 - rect.x;
+            break;
+          case "centerX":
+            dx = (refX0 + refX1) / 2 - (rect.x + rect.width / 2);
+            break;
+          case "right":
+            dx = refX1 - (rect.x + rect.width);
+            break;
+          case "top":
+            dy = refY0 - rect.y;
+            break;
+          case "centerY":
+            dy = (refY0 + refY1) / 2 - (rect.y + rect.height / 2);
+            break;
+          case "bottom":
+            dy = refY1 - (rect.y + rect.height);
+            break;
+        }
+        deltas.set(id, { dx, dy });
+      }
+
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => {
+          const delta = deltas.get(b.id);
+          return delta ? { ...b, x: b.x + delta.dx, y: b.y + delta.dy } : b;
+        })
+      );
+    },
+    [getSelectedNodeRects, currentPreset, pushHistory]
+  );
+
+  const distributeSelectedBlocks = useCallback(
+    (axis: "x" | "y") => {
+      const items = getSelectedNodeRects();
+      if (items.length < 3) return;
+
+      const sorted = [...items].sort((a, b) =>
+        axis === "x" ? a.rect.x - b.rect.x : a.rect.y - b.rect.y
+      );
+      const first = sorted[0];
+      const last = sorted[sorted.length - 1];
+      const firstEdge = axis === "x" ? first.rect.x : first.rect.y;
+      const lastEdge =
+        axis === "x" ? last.rect.x + last.rect.width : last.rect.y + last.rect.height;
+      const totalSize = sorted.reduce(
+        (sum, it) => sum + (axis === "x" ? it.rect.width : it.rect.height),
+        0
+      );
+      const gap = (lastEdge - firstEdge - totalSize) / (sorted.length - 1);
+
+      const deltas = new Map<number, number>();
+      let cursor = firstEdge;
+      for (const it of sorted) {
+        const size = axis === "x" ? it.rect.width : it.rect.height;
+        const currentPos = axis === "x" ? it.rect.x : it.rect.y;
+        deltas.set(it.id, cursor - currentPos);
+        cursor += size + gap;
+      }
+
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => {
+          const delta = deltas.get(b.id);
+          if (delta == null) return b;
+          return axis === "x" ? { ...b, x: b.x + delta } : { ...b, y: b.y + delta };
+        })
+      );
+    },
+    [getSelectedNodeRects, pushHistory]
   );
 
   const ungroupBlock = useCallback(
@@ -812,6 +1008,7 @@ const App: React.FC = () => {
     };
 
     setBlocks((prev) => [...prev, newBlock]);
+    setSelectedIds([]);
     setSelectedId(newId);
   };
 
@@ -829,6 +1026,7 @@ const App: React.FC = () => {
     };
 
     setBlocks((prev) => [...prev, copy]);
+    setSelectedIds([]);
     setSelectedId(newId);
   };
 
@@ -860,16 +1058,13 @@ const App: React.FC = () => {
     }
   };
 
-  const loadLayout = () => {
-    if (!isBrowser) return;
+  const applyStoredPayload = (raw: string) => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-
       const parsed = JSON.parse(raw);
 
       if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
       if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
+        setSelectedIds([]);
         setSelectedId(parsed.selectedId);
       }
       if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
@@ -925,6 +1120,62 @@ const App: React.FC = () => {
     }
   };
 
+  const loadLayout = () => {
+    if (!isBrowser) return;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    applyStoredPayload(raw);
+  };
+
+  const readNamedProjectsStore = (): NamedProjectsStore => {
+    if (!isBrowser) return {};
+    try {
+      const raw = localStorage.getItem(NAMED_PROJECTS_KEY);
+      return raw ? (JSON.parse(raw) as NamedProjectsStore) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const refreshNamedProjectsList = (store: NamedProjectsStore) => {
+    setNamedProjects(
+      Object.entries(store)
+        .map(([name, entry]) => ({ name, savedAt: entry.savedAt }))
+        .sort((a, b) => b.savedAt - a.savedAt)
+    );
+  };
+
+  const saveNamedProject = (name: string) => {
+    const trimmed = name.trim();
+    if (!isBrowser || !trimmed) return;
+    try {
+      const store = readNamedProjectsStore();
+      store[trimmed] = { savedAt: Date.now(), payload: buildLayoutPayload() };
+      localStorage.setItem(NAMED_PROJECTS_KEY, JSON.stringify(store));
+      refreshNamedProjectsList(store);
+    } catch {
+      // Ignore quota-exceeded / privacy-mode storage errors — best-effort.
+    }
+  };
+
+  const loadNamedProject = (name: string) => {
+    const store = readNamedProjectsStore();
+    const entry = store[name];
+    if (!entry) return;
+    applyStoredPayload(JSON.stringify(entry.payload));
+  };
+
+  const deleteNamedProject = (name: string) => {
+    const store = readNamedProjectsStore();
+    delete store[name];
+    try {
+      localStorage.setItem(NAMED_PROJECTS_KEY, JSON.stringify(store));
+    } catch {
+      // best-effort
+    }
+    refreshNamedProjectsList(store);
+  };
+
   const downloadLayout = () => {
     const json = JSON.stringify(buildLayoutPayload(), null, 2);
     const blob = new Blob([json], { type: "application/json" });
@@ -952,6 +1203,7 @@ const App: React.FC = () => {
 
           if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
           if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
+            setSelectedIds([]);
             setSelectedId(parsed.selectedId);
           }
           if (typeof parsed.canvasPresetId === "string") setCanvasPresetId(parsed.canvasPresetId);
@@ -976,6 +1228,28 @@ const App: React.FC = () => {
     setStageScale(clamp(scale, MIN_SCALE, MAX_SCALE));
     setStagePosition(position);
   };
+
+  const addGuide = useCallback((axis: "horizontal" | "vertical", position: number) => {
+    setGuides((prev) => ({ ...prev, [axis]: [...prev[axis], position] }));
+  }, []);
+
+  const moveGuide = useCallback(
+    (axis: "horizontal" | "vertical", index: number, position: number) => {
+      setGuides((prev) => ({
+        ...prev,
+        [axis]: prev[axis].map((v, i) => (i === index ? position : v)),
+      }));
+    },
+    []
+  );
+
+  const removeGuide = useCallback((axis: "horizontal" | "vertical", index: number) => {
+    setGuides((prev) => ({ ...prev, [axis]: prev[axis].filter((_, i) => i !== index) }));
+  }, []);
+
+  const clearGuides = useCallback(() => {
+    setGuides({ horizontal: [], vertical: [] });
+  }, []);
 
   const addShapeFillBlock = (
     svgPathData: string,
@@ -1007,6 +1281,7 @@ const App: React.FC = () => {
     };
 
     setBlocks((prev) => [...prev, newBlock]);
+    setSelectedIds([]);
     setSelectedId(newId);
   };
 
@@ -1041,7 +1316,59 @@ const App: React.FC = () => {
     };
 
     setBlocks((prev) => [...prev, newBlock]);
+    setSelectedIds([]);
     setSelectedId(newId);
+  };
+
+  const addImageBlock = (dataUrl: string, naturalWidth: number, naturalHeight: number) => {
+    pushHistory();
+    const newId = createNextId();
+    const { x, y } = getCenterStagePos();
+
+    const maxDim = Math.max(currentPreset.width, currentPreset.height) * 0.6;
+    const fitScale = Math.min(1, maxDim / Math.max(naturalWidth, naturalHeight, 1));
+    const displayWidth = naturalWidth * fitScale;
+    const displayHeight = naturalHeight * fitScale;
+
+    const newBlock: Block = {
+      ...DEFAULT_BLOCK,
+      id: newId,
+      text: "",
+      type: "image",
+      imageDataUrl: dataUrl,
+      imageScale: 1,
+      shapeWidth: displayWidth,
+      shapeHeight: displayHeight,
+      x: x - displayWidth / 2,
+      y: y - displayHeight / 2,
+    };
+
+    setBlocks((prev) => [...prev, newBlock]);
+    setSelectedIds([]);
+    setSelectedId(newId);
+  };
+
+  const uploadImageBlock = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        const img = new window.Image();
+        img.onload = () => {
+          addImageBlock(dataUrl, img.naturalWidth || 300, img.naturalHeight || 300);
+        };
+        img.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    input.click();
   };
 
   const startSidebarResize = (e: React.MouseEvent) => {
@@ -1078,6 +1405,7 @@ const App: React.FC = () => {
   }, [selectedBlock, updateSelectedBlock]);
 
   const requestTextEdit = useCallback((id: number) => {
+    setSelectedIds([]);
     setSelectedId(id);
     setEditRequestSignal((v) => v + 1);
   }, []);
@@ -1098,6 +1426,7 @@ const App: React.FC = () => {
       <Sidebar
         blocks={blocks}
         selectedBlock={selectedBlock}
+        selectedIds={selectedIds}
         showGrid={showGrid}
         snapToGrid={snapToGrid}
         isMobile={isMobile}
@@ -1129,11 +1458,21 @@ const App: React.FC = () => {
         onLoadLayout={loadLayout}
         onDownloadLayout={downloadLayout}
         onUploadLayout={uploadLayout}
+        namedProjects={namedProjects}
+        onSaveNamedProject={saveNamedProject}
+        onLoadNamedProject={loadNamedProject}
+        onDeleteNamedProject={deleteNamedProject}
         onAddShapeFillBlock={addShapeFillBlock}
         onAddShapeWarpBlock={addShapeWarpBlock}
+        onAddImageBlock={uploadImageBlock}
+        onApplyTemplate={applyStarterTemplate}
         onToggleGrid={setShowGrid}
         onToggleSnap={setSnapToGrid}
-        onSelectBlock={setSelectedId}
+        showRulers={showRulers}
+        onToggleRulers={setShowRulers}
+        guideCount={guides.horizontal.length + guides.vertical.length}
+        onClearGuides={clearGuides}
+        onSelectBlock={selectBlock}
         editRequestSignal={editRequestSignal}
         onUpdateSelectedBlock={updateSelectedBlock}
         onUpdateBlock={updateBlock}
@@ -1160,6 +1499,9 @@ const App: React.FC = () => {
         onUpdateGlyphHandle={updateGlyphHandle}
         onResetShapeWarp={resetShapeWarp}
         onFitShapeFillSpacing={fitShapeFillSpacing}
+        onAlignSelected={alignSelectedBlocks}
+        onDistributeSelected={distributeSelectedBlocks}
+        onGroupSelected={groupSelectedBlocks}
       />
 
       {!isMobile && !sidebarCollapsed && (
@@ -1187,8 +1529,14 @@ const App: React.FC = () => {
         <CanvasStage
           blocks={blocks}
           selectedId={selectedId}
+          selectedIds={selectedIds}
           snapToGrid={snapToGrid}
           showGrid={showGrid}
+          showRulers={showRulers}
+          guides={guides}
+          onAddGuide={addGuide}
+          onMoveGuide={moveGuide}
+          onRemoveGuide={removeGuide}
           viewportWidth={canvasWidth}
           artboardWidth={currentPreset.width}
           artboardHeight={currentPreset.height}
@@ -1201,12 +1549,13 @@ const App: React.FC = () => {
           onTogglePanMode={setPanMode}
           onUpdateStage={updateStageZoom}
           onUpdateBlockPosition={updateBlockPositionWithHistory}
-          onSelectBlock={setSelectedId}
+          onSelectBlock={selectBlock}
           onEditBlock={requestTextEdit}
           onSelectGlyph={selectGlyphForBlock}
           onUpdateGlyphHandle={updateGlyphHandle}
           onGlyphBoxesChange={updateGlyphBoxes}
           onResizeShapeFillBlock={resizeShapeFillBlock}
+          onResizeImageBlock={resizeImageBlock}
         />
       </div>
     </div>

@@ -7,7 +7,9 @@ import {
   PRESETS,
 } from "../lib/presets";
 import type { Block, TextAlign, ShapeWarpMode, GlyphHandle, GlyphHandleMode } from "../types";
+import type { NamedProjectMeta } from "../App";
 import { extractSvgPaths } from "../lib/svgImport";
+import { STARTER_TEMPLATES } from "../lib/templates";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { makeId } from "./sidebar/utils";
 import { SelectRow, ColorRow, RangeRow, PresetKeyboard } from "./sidebar/FormControls";
@@ -29,6 +31,14 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CloseIcon,
+  AlignLeftIcon,
+  AlignCenterHIcon,
+  AlignRightIcon,
+  AlignTopIcon,
+  AlignMiddleIcon,
+  AlignBottomIcon,
+  DistributeHorizontalIcon,
+  DistributeVerticalIcon,
 } from "./Icons";
 
 export type SidebarProps = {
@@ -64,14 +74,25 @@ export type SidebarProps = {
   onLoadLayout: () => void;
   onDownloadLayout: () => void;
   onUploadLayout: () => void;
+  namedProjects?: NamedProjectMeta[];
+  onSaveNamedProject?: (name: string) => void;
+  onLoadNamedProject?: (name: string) => void;
+  onDeleteNamedProject?: (name: string) => void;
 
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddShapeWarpBlock?: (svgPathData: string, w: number, h: number) => void;
+  onAddImageBlock?: () => void;
+  onApplyTemplate?: (templateId: string) => void;
 
   onToggleGrid: (v: boolean) => void;
   onToggleSnap: (v: boolean) => void;
+  showRulers?: boolean;
+  onToggleRulers?: (v: boolean) => void;
+  guideCount?: number;
+  onClearGuides?: () => void;
 
-  onSelectBlock: (id: number | null) => void;
+  onSelectBlock: (id: number | null, additive?: boolean) => void;
+  selectedIds?: number[];
   editRequestSignal?: number;
   onUpdateSelectedBlock: (patch: Partial<Block>) => void;
   onUpdateBlock?: (id: number, patch: Partial<Block>) => void;
@@ -99,6 +120,9 @@ export type SidebarProps = {
   ) => void;
   onResetShapeWarp?: (blockId: number) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
+  onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
+  onDistributeSelected?: (axis: "x" | "y") => void;
+  onGroupSelected?: () => void;
 };
 
 const HANDLE_MODE_COLORS: Record<GlyphHandleMode, string> = {
@@ -129,6 +153,7 @@ const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
 export const Sidebar: React.FC<SidebarProps> = ({
   blocks,
   selectedBlock,
+  selectedIds = [],
   showGrid,
   snapToGrid,
   isMobile,
@@ -154,10 +179,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLoadLayout,
   onDownloadLayout,
   onUploadLayout,
+  namedProjects = [],
+  onSaveNamedProject,
+  onLoadNamedProject,
+  onDeleteNamedProject,
   onAddShapeFillBlock,
   onAddShapeWarpBlock,
+  onAddImageBlock,
+  onApplyTemplate,
   onToggleGrid,
   onToggleSnap,
+  showRulers = false,
+  onToggleRulers,
+  guideCount = 0,
+  onClearGuides,
   onSelectBlock,
   editRequestSignal,
   onUpdateSelectedBlock,
@@ -178,11 +213,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onUpdateGlyphHandle,
   onResetShapeWarp,
   onFitShapeFillSpacing,
+  onAlignSelected,
+  onDistributeSelected,
+  onGroupSelected,
 }) => {
   const [showStyling, setShowStyling] = useState(false);
   const [showHelpers, setShowHelpers] = useState(false);
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(!isMobile);
+  const [showAlign, setShowAlign] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [namedProjectInput, setNamedProjectInput] = useState("");
+  const selectionCount = selectedIds.length > 1 ? selectedIds.length : 1;
   const [showCanvasSettings, setShowCanvasSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showStroke, setShowStroke] = useState(false);
@@ -378,6 +420,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
+        {onApplyTemplate && (
+          <div className="sidebarPanel">
+            <button
+              type="button"
+              onClick={() => setShowTemplates((v) => !v)}
+              className="sidebarSectionButton"
+              aria-expanded={showTemplates}
+            >
+              <span>Start from a Template</span>
+              <span>{showTemplates ? "−" : "+"}</span>
+            </button>
+
+            {showTemplates && (
+              <div className="sectionPanel">
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  Replaces the current canvas (undo with Ctrl+Z if you change your mind).
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                  }}
+                >
+                  {STARTER_TEMPLATES.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => onApplyTemplate(t.id)}
+                      className="sidebarSmallAction"
+                      title={t.description}
+                      style={{ textAlign: "center", height: "auto", padding: "10px 8px" }}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="sidebarPanel">
           <div className="sidebarSectionTitle">Block Controls</div>
           <div
@@ -441,6 +526,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <CircleDashedIcon size={14} />
               </button>
             )}
+
+            {onAddImageBlock && (
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                title="Upload image (PNG/JPG)"
+                onClick={onAddImageBlock}
+              >
+                <ImageIcon size={14} />
+              </button>
+            )}
           </div>
 
           <div style={{ height: 8 }} />
@@ -486,7 +582,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <LayersPanel
                 blocks={blocks}
                 selectedId={selectedBlock?.id}
-                onSelect={(id) => onSelectBlock(id)}
+                selectedIds={selectedIds}
+                onSelect={(id, additive) => onSelectBlock(id, additive)}
                 onToggleLock={handleToggleLock}
                 onMoveUp={(id) => handleMoveLayer(id, "up")}
                 onMoveDown={(id) => handleMoveLayer(id, "down")}
@@ -507,6 +604,127 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {selectedBlock && (
+          <div className="sidebarPanel">
+            <button
+              type="button"
+              onClick={() => setShowAlign((v) => !v)}
+              className="sidebarSectionButton"
+              aria-expanded={showAlign}
+            >
+              <span>Align &amp; Arrange</span>
+              <span>{showAlign ? "−" : "+"}</span>
+            </button>
+
+            {showAlign && (
+              <div className="sectionPanel">
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  {selectionCount > 1
+                    ? `Aligning ${selectionCount} selected layers to each other.`
+                    : "Aligning to the canvas. Shift/Ctrl-click other layers to align them to each other instead."}
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(6, 1fr)",
+                    gap: 6,
+                    justifyItems: "center",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("left")}
+                    className="sidebarCircleButton"
+                    title="Align left"
+                    aria-label="Align left"
+                  >
+                    <AlignLeftIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("centerX")}
+                    className="sidebarCircleButton"
+                    title="Align center (horizontal)"
+                    aria-label="Align center horizontal"
+                  >
+                    <AlignCenterHIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("right")}
+                    className="sidebarCircleButton"
+                    title="Align right"
+                    aria-label="Align right"
+                  >
+                    <AlignRightIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("top")}
+                    className="sidebarCircleButton"
+                    title="Align top"
+                    aria-label="Align top"
+                  >
+                    <AlignTopIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("centerY")}
+                    className="sidebarCircleButton"
+                    title="Align middle (vertical)"
+                    aria-label="Align middle vertical"
+                  >
+                    <AlignMiddleIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("bottom")}
+                    className="sidebarCircleButton"
+                    title="Align bottom"
+                    aria-label="Align bottom"
+                  >
+                    <AlignBottomIcon size={14} />
+                  </button>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={selectionCount < 3}
+                    onClick={() => onDistributeSelected?.("x")}
+                    className="sidebarPillButton"
+                    title="Distribute horizontally (needs 3+ selected)"
+                    aria-label="Distribute horizontally"
+                  >
+                    <DistributeHorizontalIcon size={13} /> Distribute H
+                  </button>
+                  <button
+                    type="button"
+                    disabled={selectionCount < 3}
+                    onClick={() => onDistributeSelected?.("y")}
+                    className="sidebarPillButton"
+                    title="Distribute vertically (needs 3+ selected)"
+                    aria-label="Distribute vertically"
+                  >
+                    <DistributeVerticalIcon size={13} /> Distribute V
+                  </button>
+                </div>
+
+                {selectionCount > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => onGroupSelected?.()}
+                    className="sidebarSmallAction"
+                  >
+                    Group {selectionCount} selected layers
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedBlock && selectedBlock.type !== "image" && (
           <div className="sidebarPanel">
             <label htmlFor={makeId("block-text", selectedId)} className="sr-only">
               Block text
@@ -541,7 +759,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>{showStyling ? "−" : "+"}</span>
             </button>
 
-            {showStyling && (
+            {showStyling && selectedBlock.type === "image" && (
+              <div className="sectionPanel">
+                <RangeRow
+                  id={makeId("image-scale", selectedId)}
+                  name={makeId("imageScale", selectedId)}
+                  label="Scale"
+                  value={selectedBlock.imageScale ?? 1}
+                  min={0.05}
+                  max={10}
+                  step={0.05}
+                  onChange={(v) => onUpdateSelectedBlock({ imageScale: v })}
+                  suffix={(selectedBlock.imageScale ?? 1).toFixed(2)}
+                  fieldKey="imageScale"
+                />
+
+                <RangeRow
+                  id={makeId("opacity", selectedId)}
+                  name={makeId("opacity", selectedId)}
+                  label="Opacity"
+                  value={selectedOpacity}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
+                  suffix={`${Math.round(selectedOpacity * 100)}%`}
+                  fieldKey="opacity"
+                />
+
+                <RangeRow
+                  id={makeId("rotation", selectedId)}
+                  name={makeId("rotation", selectedId)}
+                  label="Rotation"
+                  value={selectedRotation}
+                  min={-180}
+                  max={180}
+                  onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
+                  suffix={`${selectedRotation}°`}
+                  fieldKey="rotation"
+                />
+
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  Tip: drag the gold handle on the image's corner (canvas) to resize.
+                </div>
+              </div>
+            )}
+
+            {showStyling && selectedBlock.type !== "image" && (
               <div className="sectionPanel">
                 <SelectRow
                   id={makeId("font-family", selectedId)}
@@ -1219,6 +1483,108 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </div>
 
+              {(onSaveNamedProject || namedProjects.length > 0) && (
+                <div
+                  style={{
+                    borderTop: "1px solid var(--border-soft)",
+                    paddingTop: 10,
+                    marginTop: 4,
+                  }}
+                >
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
+                    Named saves — keep several in-progress designs in this browser at once.
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      value={namedProjectInput}
+                      onChange={(e) => setNamedProjectInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && namedProjectInput.trim()) {
+                          onSaveNamedProject?.(namedProjectInput.trim());
+                          setNamedProjectInput("");
+                        }
+                      }}
+                      placeholder="Project name…"
+                      className="hexInput"
+                      style={{ fontFamily: "inherit", letterSpacing: 0 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!namedProjectInput.trim()) return;
+                        onSaveNamedProject?.(namedProjectInput.trim());
+                        setNamedProjectInput("");
+                      }}
+                      disabled={!namedProjectInput.trim()}
+                      className="sidebarPillButton"
+                      style={{ flex: "0 0 auto" }}
+                    >
+                      Save As
+                    </button>
+                  </div>
+
+                  {namedProjects.length > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                        marginTop: 8,
+                      }}
+                    >
+                      {namedProjects.map((p) => (
+                        <div
+                          key={p.name}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            background: "var(--row-bg)",
+                            borderRadius: 8,
+                            padding: "5px 7px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              flex: 1,
+                              fontSize: 12,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              color: "var(--text-primary)",
+                            }}
+                            title={new Date(p.savedAt).toLocaleString()}
+                          >
+                            {p.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onLoadNamedProject?.(p.name)}
+                            className="layerIconBtn"
+                            title="Load this project"
+                            aria-label={`Load ${p.name}`}
+                          >
+                            <FolderOpenIcon size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteNamedProject?.(p.name)}
+                            className="layerIconBtn"
+                            title="Delete this saved project"
+                            aria-label={`Delete ${p.name}`}
+                            style={{ color: "var(--danger)" }}
+                          >
+                            <CloseIcon size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div
                 style={{
                   borderTop: "1px solid var(--border-soft)",
@@ -1404,6 +1770,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                   Snap to gridlines
                 </label>
+
+                <label className="checkboxRow" htmlFor="show-rulers">
+                  <input
+                    id="show-rulers"
+                    name="showRulers"
+                    type="checkbox"
+                    checked={showRulers}
+                    onChange={(e) => onToggleRulers?.(e.target.checked)}
+                  />
+                  Show rulers (click a ruler to drop a snap guide)
+                </label>
+
+                {guideCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={onClearGuides}
+                    className="sidebarSmallAction"
+                  >
+                    Clear {guideCount} guide{guideCount === 1 ? "" : "s"}
+                  </button>
+                )}
               </div>
             </div>
           )}
