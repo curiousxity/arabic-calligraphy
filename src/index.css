@@ -134,6 +134,9 @@ html, body, #root { height: 100%; margin: 0; }
 .floatingKeyboard { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 1000; width: min(560px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); padding: 10px; box-sizing: border-box; }
 .floatingKeyboardHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; font-size: 13px; font-weight: 500; color: var(--text-primary); }
 
+.morphEditorFloating { position: fixed; right: 12px; bottom: 12px; z-index: 1000; width: min(340px, calc(100vw - 24px)); max-height: 70vh; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); padding: 10px; box-sizing: border-box; }
+.morphEditorFloatingHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; font-size: 13px; font-weight: 500; color: var(--text-primary); }
+
 .fontSelectShell { position: relative; padding: 0; }
 .fontSelectTrigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; text-align: left; }
 .fontSelectTriggerLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

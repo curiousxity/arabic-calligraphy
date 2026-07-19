@@ -8,6 +8,7 @@ import React, {
 import type Konva from "konva";
 import { Sidebar } from "./components/Sidebar";
 import { CanvasStage } from "./components/CanvasStage";
+import { MorphGlyphEditor } from "./components/MorphGlyphEditor";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
@@ -79,12 +80,14 @@ const STORAGE_KEY = "calligraphy-layout-v2";
 const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
 const GLYPH_RIGS_KEY = "harfcanvas-glyph-rigs-v1";
 const SIDEBAR_COLLAPSED_WIDTH = 28;
+const RIGHT_PANEL_WIDTH = 280;
+const RIGHT_PANEL_COLLAPSED_WIDTH = 28;
 const DEFAULT_TEXT_FONT_SIZE = 53;
 const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
 
 const DEFAULT_BLOCK: Block = {
   id: 1,
-  text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
+  text: "حرف",
   x: 0,
   y: 0,
   fontSize: DEFAULT_TEXT_FONT_SIZE,
@@ -184,6 +187,8 @@ const App: React.FC = () => {
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [showMorphEditorMobile, setShowMorphEditorMobile] = useState(false);
   const [panMode, setPanMode] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(isBrowser ? window.innerWidth : 1200);
   const [viewportHeight, setViewportHeight] = useState(isBrowser ? window.innerHeight : 800);
@@ -195,10 +200,6 @@ const App: React.FC = () => {
     : sidebarCollapsed
       ? SIDEBAR_COLLAPSED_WIDTH
       : Math.min(Math.max(sidebarWidth, 220), Math.max(260, viewportWidth - 260));
-
-  const canvasWidth = isMobile
-    ? viewportWidth
-    : Math.max(0, viewportWidth - effectiveSidebarWidth);
 
   const mobileSidebarBudget = Math.min(viewportHeight * 0.45, 420);
   const stageViewportHeight = isMobile
@@ -221,13 +222,6 @@ const App: React.FC = () => {
       x: 0,
       y: 0,
     },
-    {
-      ...DEFAULT_BLOCK,
-      id: 2,
-      text: "حرف",
-      x: 0,
-      y: 100,
-    },
   ]);
 
   const stageRef = useRef<Konva.Stage | null>(null);
@@ -248,6 +242,17 @@ const App: React.FC = () => {
     () => (selectedId == null ? undefined : blocks.find((b) => b.id === selectedId)),
     [blocks, selectedId]
   );
+
+  const rightPanelVisible = !isMobile && !!selectedBlock && selectedBlock.type !== "image";
+  const effectiveRightPanelWidth = !rightPanelVisible
+    ? 0
+    : rightPanelCollapsed
+      ? RIGHT_PANEL_COLLAPSED_WIDTH
+      : RIGHT_PANEL_WIDTH;
+
+  const canvasWidth = isMobile
+    ? viewportWidth
+    : Math.max(0, viewportWidth - effectiveSidebarWidth - effectiveRightPanelWidth);
 
   const effectiveSelectedIds = useMemo(
     () => (selectedIds.length > 0 ? selectedIds : selectedId != null ? [selectedId] : []),
@@ -1608,25 +1613,14 @@ const App: React.FC = () => {
         onRedo={handleRedo}
         canUndo={canUndo}
         canRedo={canRedo}
-        onSetGlyphEditTool={(tool) => {
-          if (!selectedBlock || selectedBlock.type === "image") return;
-          updateSelectedBlock({ glyphEditTool: tool });
-        }}
         onToggleKashidaEditMode={() => {
           if (!selectedBlock || selectedBlock.type !== "text") return;
           updateSelectedBlock({
             kashidaEditMode: !selectedBlock.kashidaEditMode,
           });
         }}
-        onAddStretchHandle={addStretchHandle}
-        onDeleteStretchHandle={deleteStretchHandle}
-        onUpdateStretchHandle={updateStretchHandle}
-        onSetGlyphMoveOffset={setGlyphMoveOffset}
-        glyphRigs={glyphRigs}
-        selectedGlyphBoxes={glyphBoxesByBlock[selectedBlock?.id ?? -1] ?? []}
-        onSaveStretchHandleAsRig={saveStretchHandleAsRig}
-        onSetGlyphRigValue={setGlyphRigValue}
-        onDeleteGlyphRigAxis={deleteGlyphRigAxis}
+        showMorphEditorMobile={showMorphEditorMobile}
+        onToggleMorphEditorMobile={() => setShowMorphEditorMobile((v) => !v)}
         onResetShapeWarp={resetShapeWarp}
         onFitShapeFillSpacing={fitShapeFillSpacing}
         onAlignSelected={alignSelectedBlocks}
@@ -1691,6 +1685,29 @@ const App: React.FC = () => {
           onResizeImageBlock={resizeImageBlock}
         />
       </div>
+
+      <MorphGlyphEditor
+        selectedBlock={selectedBlock}
+        selectedGlyphBoxes={glyphBoxesByBlock[selectedBlock?.id ?? -1] ?? []}
+        glyphRigs={glyphRigs}
+        onSetGlyphEditTool={(tool) => {
+          if (!selectedBlock || selectedBlock.type === "image") return;
+          updateSelectedBlock({ glyphEditTool: tool });
+        }}
+        onSetGlyphMoveOffset={setGlyphMoveOffset}
+        onAddStretchHandle={addStretchHandle}
+        onUpdateStretchHandle={updateStretchHandle}
+        onDeleteStretchHandle={deleteStretchHandle}
+        onSaveStretchHandleAsRig={saveStretchHandleAsRig}
+        onSetGlyphRigValue={setGlyphRigValue}
+        onDeleteGlyphRigAxis={deleteGlyphRigAxis}
+        isMobile={isMobile}
+        width={RIGHT_PANEL_WIDTH}
+        isCollapsed={rightPanelCollapsed}
+        onToggleCollapse={() => setRightPanelCollapsed((v) => !v)}
+        mobileOpen={showMorphEditorMobile}
+        onCloseMobile={() => setShowMorphEditorMobile(false)}
+      />
     </div>
   );
 };

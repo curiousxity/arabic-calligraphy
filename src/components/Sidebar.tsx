@@ -6,7 +6,7 @@ import {
   URDU,
   PRESETS,
 } from "../lib/presets";
-import type { Block, TextAlign, ShapeWarpMode, GlyphStretchHandle, GlyphRig } from "../types";
+import type { Block, TextAlign, ShapeWarpMode } from "../types";
 import type { NamedProjectMeta } from "../App";
 import { extractSvgPaths } from "../lib/svgImport";
 import { STARTER_TEMPLATES } from "../lib/templates";
@@ -110,41 +110,9 @@ export type SidebarProps = {
   canUndo: boolean;
   canRedo: boolean;
 
-  onSetGlyphEditTool?: (tool: "move" | "stretch" | null) => void;
   onToggleKashidaEditMode?: () => void;
-  onAddStretchHandle?: () => void;
-  onDeleteStretchHandle?: (blockId: number, glyphIndex: number, handleId: string) => void;
-  onUpdateStretchHandle?: (
-    blockId: number,
-    glyphIndex: number,
-    handleId: string,
-    patch: Partial<GlyphStretchHandle>
-  ) => void;
-  onSetGlyphMoveOffset?: (
-    blockId: number,
-    glyphIndex: number,
-    offsetX: number,
-    offsetY: number
-  ) => void;
-  glyphRigs?: GlyphRig[];
-  selectedGlyphBoxes?: {
-    glyphIndex: number;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    glyphId?: number;
-    gx?: number;
-    gy?: number;
-  }[];
-  onSaveStretchHandleAsRig?: (
-    blockId: number,
-    glyphIndex: number,
-    handleId: string,
-    name: string
-  ) => void;
-  onSetGlyphRigValue?: (blockId: number, axisId: string, value: number) => void;
-  onDeleteGlyphRigAxis?: (fontFamily: string, glyphId: number, axisId: string) => void;
+  showMorphEditorMobile?: boolean;
+  onToggleMorphEditorMobile?: () => void;
   onResetShapeWarp?: (blockId: number) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
   onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
@@ -223,17 +191,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRedo,
   canUndo,
   canRedo,
-  onSetGlyphEditTool,
   onToggleKashidaEditMode,
-  onAddStretchHandle,
-  onDeleteStretchHandle,
-  onUpdateStretchHandle,
-  onSetGlyphMoveOffset,
-  glyphRigs,
-  selectedGlyphBoxes,
-  onSaveStretchHandleAsRig,
-  onSetGlyphRigValue,
-  onDeleteGlyphRigAxis,
+  showMorphEditorMobile,
+  onToggleMorphEditorMobile,
   onResetShapeWarp,
   onFitShapeFillSpacing,
   onAlignSelected,
@@ -247,7 +207,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showAlign, setShowAlign] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [namedProjectInput, setNamedProjectInput] = useState("");
-  const [rigNameDrafts, setRigNameDrafts] = useState<Record<string, string>>({});
   const selectionCount = selectedIds.length > 1 ? selectedIds.length : 1;
   const [showBackgroundSettings, setShowBackgroundSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -1175,297 +1134,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                 </div>
 
-                <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                  <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
-                    Glyph Edit
-                  </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-                      Click a letter, then Move to nudge it as a whole, or Stretch to
-                      elongate a stroke between an anchor and a drag point.
-                    </div>
-
-                    <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                      {(
-                        [
-                          { value: null, label: "Off" },
-                          { value: "move", label: "Move" },
-                          { value: "stretch", label: "Stretch" },
-                        ] as const
-                      ).map((opt) => (
-                        <button
-                          key={opt.label}
-                          type="button"
-                          onClick={() => onSetGlyphEditTool?.(opt.value)}
-                          className="sidebarPillButton"
-                          style={
-                            (selectedBlock.glyphEditTool ?? null) === opt.value
-                              ? { background: "var(--accent)", color: "var(--text-on-accent)" }
-                              : undefined
-                          }
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {selectedBlock.glyphEditTool != null && (
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
-                        Selected glyph:{" "}
-                        {selectedBlock.selectedGlyphIndex != null
-                          ? selectedBlock.selectedGlyphIndex
-                          : "none"}
-                      </div>
-                    )}
-
-                    {selectedBlock.glyphEditTool === "move" &&
-                      selectedBlock.selectedGlyphIndex != null &&
-                      (() => {
-                        const glyphIndex = selectedBlock.selectedGlyphIndex;
-                        const move = selectedBlock.glyphEdits?.find(
-                          (g) => g.glyphIndex === glyphIndex
-                        )?.move;
-                        const offsetX = move?.offsetX ?? 0;
-                        const offsetY = move?.offsetY ?? 0;
-
-                        return (
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 6,
-                              marginTop: 8,
-                            }}
-                          >
-                            <RangeRow
-                              id={makeId("glyph-move-x", selectedId)}
-                              name={makeId("glyphMoveX", selectedId)}
-                              label="Offset X"
-                              value={offsetX}
-                              min={-200}
-                              max={200}
-                              onChange={(v) =>
-                                onSetGlyphMoveOffset?.(selectedBlock.id, glyphIndex, v, offsetY)
-                              }
-                              suffix={`${Math.round(offsetX)}px`}
-                            />
-                            <RangeRow
-                              id={makeId("glyph-move-y", selectedId)}
-                              name={makeId("glyphMoveY", selectedId)}
-                              label="Offset Y"
-                              value={offsetY}
-                              min={-200}
-                              max={200}
-                              onChange={(v) =>
-                                onSetGlyphMoveOffset?.(selectedBlock.id, glyphIndex, offsetX, v)
-                              }
-                              suffix={`${Math.round(offsetY)}px`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onSetGlyphMoveOffset?.(selectedBlock.id, glyphIndex, 0, 0)
-                              }
-                              className="sidebarSmallAction"
-                            >
-                              Reset position
-                            </button>
-                          </div>
-                        );
-                      })()}
-
-                    {selectedBlock.glyphEditTool === "stretch" && (
-                      <>
-                        <button
-                          type="button"
-                          disabled={selectedBlock.selectedGlyphIndex == null}
-                          onClick={() => onAddStretchHandle?.()}
-                          className="sidebarSmallAction"
-                          style={{ marginTop: 8 }}
-                        >
-                          Add stretch line
-                        </button>
-
-                        {selectedBlock.selectedGlyphIndex != null &&
-                          (() => {
-                            const glyphIndex = selectedBlock.selectedGlyphIndex;
-                            const stretches =
-                              selectedBlock.glyphEdits?.find((g) => g.glyphIndex === glyphIndex)
-                                ?.stretches ?? [];
-                            if (stretches.length === 0) return null;
-
-                            return (
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: 6,
-                                  marginTop: 8,
-                                }}
-                              >
-                                {stretches.map((h) => (
-                                  <div
-                                    key={h.id}
-                                    style={{
-                                      display: "flex",
-                                      flexDirection: "column",
-                                      gap: 6,
-                                      background: "var(--row-bg)",
-                                      borderRadius: 8,
-                                      padding: "6px",
-                                    }}
-                                  >
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                      <span style={{ fontSize: 12, color: "var(--text-muted)", flex: 1 }}>
-                                        Stretch line
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          onDeleteStretchHandle?.(selectedBlock.id, glyphIndex, h.id)
-                                        }
-                                        className="layerIconBtn"
-                                        title="Delete stretch line"
-                                        aria-label="Delete stretch line"
-                                        style={{ color: "var(--danger)" }}
-                                      >
-                                        <CloseIcon size={12} />
-                                      </button>
-                                    </div>
-
-                                    <RangeRow
-                                      id={makeId(`handle-band-${h.id}`, selectedId)}
-                                      name={makeId(`handleBand-${h.id}`, selectedId)}
-                                      label="Band width"
-                                      value={h.bandWidth}
-                                      min={5}
-                                      max={300}
-                                      step={5}
-                                      onChange={(v) =>
-                                        onUpdateStretchHandle?.(selectedBlock.id, glyphIndex, h.id, {
-                                          bandWidth: v,
-                                        })
-                                      }
-                                      suffix={`${Math.round(h.bandWidth)}px`}
-                                    />
-
-                                    <div style={{ display: "flex", gap: 6 }}>
-                                      <input
-                                        type="text"
-                                        value={rigNameDrafts[h.id] ?? ""}
-                                        onChange={(e) =>
-                                          setRigNameDrafts((prev) => ({
-                                            ...prev,
-                                            [h.id]: e.target.value,
-                                          }))
-                                        }
-                                        placeholder="e.g. Tip Length"
-                                        className="hexInput"
-                                        style={{ flex: 1 }}
-                                      />
-                                      <button
-                                        type="button"
-                                        disabled={!rigNameDrafts[h.id]?.trim()}
-                                        onClick={() => {
-                                          const name = rigNameDrafts[h.id]?.trim();
-                                          if (!name) return;
-                                          onSaveStretchHandleAsRig?.(
-                                            selectedBlock.id,
-                                            glyphIndex,
-                                            h.id,
-                                            name
-                                          );
-                                          setRigNameDrafts((prev) => {
-                                            const next = { ...prev };
-                                            delete next[h.id];
-                                            return next;
-                                          });
-                                        }}
-                                        className="sidebarSmallAction"
-                                      >
-                                        Save as Rig…
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })()}
-                      </>
-                    )}
-                </div>
-
-                {(() => {
-                    const glyphIds = new Set(
-                      (selectedGlyphBoxes ?? [])
-                        .map((b) => b.glyphId)
-                        .filter((id): id is number => id != null)
-                    );
-                    const rows = (glyphRigs ?? [])
-                      .filter(
-                        (r) =>
-                          r.fontFamily === selectedBlock.fontFamily && glyphIds.has(r.glyphId)
-                      )
-                      .flatMap((r) => r.axes.map((a) => ({ rig: r, axis: a })));
-
-                    if (rows.length === 0) return null;
-
-                    return (
-                      <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                        <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
-                          Rigged Parameters
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-                          Named axes authored for a letterform in this font — affect every
-                          occurrence of that letter in this block.
-                        </div>
-
-                        <div
-                          style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}
-                        >
-                          {rows.map(({ rig, axis }) => {
-                            const val =
-                              selectedBlock.glyphRigValues?.find((v) => v.axisId === axis.id)
-                                ?.value ?? 0;
-                            return (
-                              <div
-                                key={axis.id}
-                                style={{ display: "flex", alignItems: "center", gap: 6 }}
-                              >
-                                <div style={{ flex: 1 }}>
-                                  <RangeRow
-                                    id={makeId(`rig-${axis.id}`, selectedId)}
-                                    name={makeId(`rigValue-${axis.id}`, selectedId)}
-                                    label={axis.name}
-                                    value={val}
-                                    min={-1}
-                                    max={1}
-                                    step={0.01}
-                                    onChange={(v) =>
-                                      onSetGlyphRigValue?.(selectedBlock.id, axis.id, v)
-                                    }
-                                    suffix={val.toFixed(2)}
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    onDeleteGlyphRigAxis?.(rig.fontFamily, rig.glyphId, axis.id)
-                                  }
-                                  className="layerIconBtn"
-                                  title="Delete rigged parameter"
-                                  aria-label="Delete rigged parameter"
-                                  style={{ color: "var(--danger)" }}
-                                >
-                                  <CloseIcon size={12} />
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
                 {selectedBlock.type === "shapeWarp" && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                     <div
@@ -1670,6 +1338,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onInsert={handleKeyboardKey}
           onBackspace={handleKeyboardBackspace}
         />
+
+        {isMobile && selectedBlock && selectedBlock.type !== "image" && (
+          <div className="sidebarPanel">
+            <button
+              type="button"
+              onClick={onToggleMorphEditorMobile}
+              className="sidebarSectionButton"
+              aria-expanded={showMorphEditorMobile}
+              aria-pressed={showMorphEditorMobile}
+            >
+              <span>Morph Glyph Editor</span>
+              <span>{showMorphEditorMobile ? "Hide" : "Show"}</span>
+            </button>
+          </div>
+        )}
 
         {selectedBlock && (
           <div className="sidebarPanel">
