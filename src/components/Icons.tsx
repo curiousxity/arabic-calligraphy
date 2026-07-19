@@ -186,6 +186,16 @@ export const MergeIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
+export const UngroupIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="8" y="8" width="8" height="8" rx="2" />
+    <path d="M9 9 4 4" />
+    <path d="M9 15 4 20" />
+    <path d="M15 9l5-5" />
+    <path d="M15 15l5 5" />
+  </IconBase>
+);
+
 export const CloseIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>
     <path d="M18 6 6 18" />

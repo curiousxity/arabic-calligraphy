@@ -54,8 +54,11 @@ export type SidebarProps = {
   onDeleteBlock: () => void;
 
   onExportPNG: () => void;
+  onExportJPEG: () => void;
   onExportSVG: () => void;
   onExportPDF: () => void;
+  transparentExport: boolean;
+  onToggleTransparentExport: (value: boolean) => void;
 
   onSaveLayout: () => void;
   onLoadLayout: () => void;
@@ -74,6 +77,7 @@ export type SidebarProps = {
   onUpdateBlock?: (id: number, patch: Partial<Block>) => void;
   onReorderBlocks?: (blocks: Block[]) => void;
   onMergeBlocks?: (idA: number, idB: number) => void;
+  onUngroupBlock?: (id: number) => void;
   onZoomToBlock?: (id: number) => void;
 
   showKeyboard: boolean;
@@ -127,8 +131,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDuplicateBlock,
   onDeleteBlock,
   onExportPNG,
+  onExportJPEG,
   onExportSVG,
   onExportPDF,
+  transparentExport,
+  onToggleTransparentExport,
   onSaveLayout,
   onLoadLayout,
   onDownloadLayout,
@@ -143,6 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onUpdateBlock,
   onReorderBlocks,
   onMergeBlocks,
+  onUngroupBlock,
   onZoomToBlock,
   showKeyboard,
   onToggleKeyboard,
@@ -492,6 +500,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onSelectBlock(next?.id ?? null);
                 }}
                 onMerge={(a, b) => onMergeBlocks?.(a, b)}
+                onUngroup={(id) => onUngroupBlock?.(id)}
                 onRename={handleRename}
                 onZoomTo={(id) => onZoomToBlock?.(id)}
               />
@@ -1151,6 +1160,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </div>
 
+              <label className="checkboxRow" htmlFor="transparent-export">
+                <input
+                  id="transparent-export"
+                  name="transparentExport"
+                  type="checkbox"
+                  checked={transparentExport}
+                  onChange={(e) => onToggleTransparentExport(e.target.checked)}
+                />
+                Transparent background (PNG/SVG)
+              </label>
+
               <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
                 <button
                   type="button"
@@ -1160,6 +1180,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   aria-label="Export PNG"
                 >
                   <ImageIcon size={13} /> PNG
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onExportJPEG}
+                  className="sidebarPillButton"
+                  title="Export JPEG"
+                  aria-label="Export JPEG"
+                >
+                  <ImageIcon size={13} /> JPEG
                 </button>
 
                 <button

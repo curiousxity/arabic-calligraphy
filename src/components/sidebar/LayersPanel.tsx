@@ -9,8 +9,12 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
   MergeIcon,
+  UngroupIcon,
   CloseIcon,
 } from "../Icons";
+
+const GROUP_HUE_STEP = 47;
+const groupColor = (groupId: number) => `hsl(${(groupId * GROUP_HUE_STEP) % 360}, 65%, 55%)`;
 
 const blockTypeIcon = (b: Block) =>
   b.type === "shapeFill" ? (
@@ -30,6 +34,7 @@ export type LayersPanelProps = {
   onMoveDown: (id: number) => void;
   onDelete: (id: number) => void;
   onMerge: (idA: number, idB: number) => void;
+  onUngroup: (id: number) => void;
   onRename: (id: number, name: string) => void;
   onZoomTo?: (id: number) => void;
 };
@@ -43,6 +48,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   onMoveDown,
   onDelete,
   onMerge,
+  onUngroup,
   onRename,
   onZoomTo,
 }) => {
@@ -88,7 +94,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
             textAlign: "center",
           }}
         >
-          Click on another layer to merge.
+          Click on another layer to group. Grouped layers move together.
         </div>
       )}
 
@@ -138,6 +144,19 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
             >
               {blockTypeIcon(block)}
             </span>
+
+            {block.groupId != null && (
+              <span
+                title="Grouped — moves together with linked layers"
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 999,
+                  flexShrink: 0,
+                  background: groupColor(block.groupId),
+                }}
+              />
+            )}
 
             {editingId === block.id ? (
               <input
@@ -223,10 +242,10 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
 
             <button
               type="button"
-              title={isMerge ? "Cancel merge" : "Merge with another layer"}
+              title={isMerge ? "Cancel grouping" : "Group with another layer"}
               onClick={(e) => handleMergeClick(block.id, e)}
               className="layerIconBtn"
-              aria-label="Merge layer"
+              aria-label="Group layer"
               style={{
                 background: isMerge ? "var(--merge-border)" : "transparent",
                 borderRadius: 4,
@@ -234,6 +253,21 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
             >
               <MergeIcon size={13} />
             </button>
+
+            {block.groupId != null && (
+              <button
+                type="button"
+                title="Ungroup this layer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUngroup(block.id);
+                }}
+                className="layerIconBtn"
+                aria-label="Ungroup layer"
+              >
+                <UngroupIcon size={13} />
+              </button>
+            )}
 
             <button
               type="button"

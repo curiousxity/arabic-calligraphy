@@ -39,6 +39,7 @@ type BlockCommon = {
   locked?: boolean;
   rotation?: number;
   ornamental?: boolean;
+  groupId?: number;
 
   // Shared shape-import fields. shapeFill and shapeWarp blocks both carry an
   // uploaded SVG path, and shapeWarp falls back to shapeWidth/shapeHeight

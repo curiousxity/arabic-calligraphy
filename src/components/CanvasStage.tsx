@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Stage, Layer, Rect, Line } from "react-konva";
+import { Stage, Layer, Group, Rect, Line } from "react-konva";
 import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
@@ -132,11 +132,23 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       const snappedX = findNearest(x, xTargets, threshold);
       const snappedY = findNearest(y, yTargets, threshold);
 
-      e.target.position({
-        x: snappedX ?? x,
-        y: snappedY ?? y,
-      });
+      const finalX = snappedX ?? x;
+      const finalY = snappedY ?? y;
+      e.target.position({ x: finalX, y: finalY });
       setSnapGuides({ x: snappedX, y: snappedY });
+
+      if (block.groupId != null) {
+        const deltaX = finalX - block.x;
+        const deltaY = finalY - block.y;
+        const stage = e.target.getStage();
+        if (stage) {
+          for (const other of blocks) {
+            if (other.id === block.id || other.groupId !== block.groupId) continue;
+            const node = stage.findOne(`#block-${other.id}`);
+            node?.position({ x: other.x + deltaX, y: other.y + deltaY });
+          }
+        }
+      }
     };
 
   const renderGridLines = () => {
@@ -218,6 +230,19 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         e.target.position({ x, y });
       }
       onUpdateBlockPosition(block.id, x, y);
+
+      if (block.groupId != null) {
+        const deltaX = x - block.x;
+        const deltaY = y - block.y;
+        const stage = e.target.getStage();
+        for (const other of blocks) {
+          if (other.id === block.id || other.groupId !== block.groupId) continue;
+          const newX = other.x + deltaX;
+          const newY = other.y + deltaY;
+          stage?.findOne(`#block-${other.id}`)?.position({ x: newX, y: newY });
+          onUpdateBlockPosition(other.id, newX, newY);
+        }
+      }
     };
 
   return (
@@ -314,6 +339,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         >
           <Layer>
             <Rect
+              id="artboard-background"
               x={0}
               y={0}
               width={artboardWidth}
@@ -322,7 +348,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
               listening={false}
             />
 
-            {showGrid && renderGridLines()}
+            {showGrid && (
+              <Group id="grid-lines" listening={false}>
+                {renderGridLines()}
+              </Group>
+            )}
 
             {blocks.map((block) => {
               const onDragEnd = makeDragEndHandler(block);

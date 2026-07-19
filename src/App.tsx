@@ -13,6 +13,16 @@ import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
 import type { Block, GlyphWarp, GlyphHandleMode } from "./types";
 
+const dissolveSingletonGroups = (list: Block[]): Block[] => {
+  const counts = new Map<number, number>();
+  for (const b of list) {
+    if (b.groupId != null) counts.set(b.groupId, (counts.get(b.groupId) ?? 0) + 1);
+  }
+  return list.map((b) =>
+    b.groupId != null && counts.get(b.groupId) === 1 ? { ...b, groupId: undefined } : b
+  );
+};
+
 type CanvasPreset = {
   id: string;
   label: string;
@@ -146,6 +156,7 @@ const App: React.FC = () => {
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [showGrid, setShowGrid] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(false);
+  const [transparentExport, setTransparentExport] = useState(false);
   const [isMobile, setIsMobile] = useState(isBrowser ? window.innerWidth <= 768 : false);
   const [canvasPresetId, setCanvasPresetId] = useState<string>("story");
   const [customCanvasSize, setCustomCanvasSize] = useState<{ width: number; height: number }>({
@@ -216,6 +227,7 @@ const App: React.FC = () => {
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(320);
   const nextIdRef = useRef(2);
+  const nextGroupIdRef = useRef(1);
   const clipboardRef = useRef<Block | null>(null);
   const [editRequestSignal, setEditRequestSignal] = useState(0);
   const moveTimeoutRef = useRef<number | null>(null);
@@ -495,7 +507,7 @@ const App: React.FC = () => {
     if (!selectedBlock) return;
     pushHistory();
     setBlocks((prev) => {
-      const filtered = prev.filter((b) => b.id !== selectedBlock.id);
+      const filtered = dissolveSingletonGroups(prev.filter((b) => b.id !== selectedBlock.id));
       setSelectedId(filtered.length > 0 ? filtered[0].id : null);
       return filtered;
     });
@@ -524,6 +536,7 @@ const App: React.FC = () => {
               id: newId,
               x: clipboardRef.current.x + 20,
               y: clipboardRef.current.y + 20,
+              groupId: undefined,
             };
             setBlocks((prev) => [...prev, copy]);
             setSelectedId(newId);
@@ -562,6 +575,14 @@ const App: React.FC = () => {
         if (e.key === "ArrowLeft") x -= step;
         if (e.key === "ArrowRight") x += step;
         updateBlockPositionWithHistory(selectedBlock.id, x, y);
+        if (selectedBlock.groupId != null) {
+          const deltaX = x - selectedBlock.x;
+          const deltaY = y - selectedBlock.y;
+          for (const other of blocks) {
+            if (other.id === selectedBlock.id || other.groupId !== selectedBlock.groupId) continue;
+            updateBlockPositionWithHistory(other.id, other.x + deltaX, other.y + deltaY);
+          }
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -570,6 +591,7 @@ const App: React.FC = () => {
     handleUndo,
     handleRedo,
     selectedBlock,
+    blocks,
     updateBlockPositionWithHistory,
     pushHistory,
     deleteSelectedBlock,
@@ -603,22 +625,47 @@ const App: React.FC = () => {
   const reorderBlocks = useCallback(
     (newBlocks: Block[]) => {
       pushHistory();
-      setBlocks(newBlocks);
+      setBlocks(dissolveSingletonGroups(newBlocks));
     },
     [pushHistory]
   );
 
-  const mergeBlocks = useCallback(
+  const groupBlocks = useCallback(
     (idA: number, idB: number) => {
       pushHistory();
       setBlocks((prev) => {
         const a = prev.find((b) => b.id === idA);
         const b = prev.find((b) => b.id === idB);
         if (!a || !b) return prev;
-        const merged: Block = { ...a, text: `${a.text} ${b.text}`.trim() };
-        return prev.map((bl) => (bl.id === idA ? merged : bl)).filter((bl) => bl.id !== idB);
+
+        const groupId = a.groupId ?? b.groupId ?? nextGroupIdRef.current++;
+        const memberIds = new Set(
+          prev
+            .filter(
+              (bl) =>
+                bl.id === idA ||
+                bl.id === idB ||
+                (a.groupId != null && bl.groupId === a.groupId) ||
+                (b.groupId != null && bl.groupId === b.groupId)
+            )
+            .map((bl) => bl.id)
+        );
+
+        return prev.map((bl) => (memberIds.has(bl.id) ? { ...bl, groupId } : bl));
       });
       setSelectedId(idA);
+    },
+    [pushHistory]
+  );
+
+  const ungroupBlock = useCallback(
+    (id: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        dissolveSingletonGroups(
+          prev.map((bl) => (bl.id === id ? { ...bl, groupId: undefined } : bl))
+        )
+      );
     },
     [pushHistory]
   );
@@ -706,13 +753,17 @@ const App: React.FC = () => {
       id: newId,
       x: selectedBlock.x - 20,
       y: selectedBlock.y + 20,
+      groupId: undefined,
     };
 
     setBlocks((prev) => [...prev, copy]);
     setSelectedId(newId);
   };
 
-  const { handleExportPNG, handleExportSVG, handleExportPDF } = useExport(stageRef, blocks);
+  const { handleExportPNG, handleExportJPEG, handleExportSVG, handleExportPDF } = useExport(
+    stageRef,
+    blocks
+  );
 
   const buildLayoutPayload = () => ({
     blocks,
@@ -996,9 +1047,12 @@ const App: React.FC = () => {
         onAddBlock={addBlock}
         onDuplicateBlock={duplicateSelectedBlock}
         onDeleteBlock={deleteSelectedBlock}
-        onExportPNG={handleExportPNG}
-        onExportSVG={handleExportSVG}
+        onExportPNG={() => handleExportPNG(transparentExport)}
+        onExportJPEG={handleExportJPEG}
+        onExportSVG={() => handleExportSVG(transparentExport)}
         onExportPDF={handleExportPDF}
+        transparentExport={transparentExport}
+        onToggleTransparentExport={setTransparentExport}
         onSaveLayout={saveLayout}
         onLoadLayout={loadLayout}
         onDownloadLayout={downloadLayout}
@@ -1012,7 +1066,8 @@ const App: React.FC = () => {
         onUpdateSelectedBlock={updateSelectedBlock}
         onUpdateBlock={updateBlock}
         onReorderBlocks={reorderBlocks}
-        onMergeBlocks={mergeBlocks}
+        onMergeBlocks={groupBlocks}
+        onUngroupBlock={ungroupBlock}
         onZoomToBlock={zoomToBlock}
         showKeyboard={showKeyboard}
         onToggleKeyboard={() => setShowKeyboard((v) => !v)}
