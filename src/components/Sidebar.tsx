@@ -19,7 +19,7 @@ import {
   PresetKeyboard,
   FontSelectRow,
 } from "./sidebar/FormControls";
-import { ArabicKeyboard } from "./sidebar/ArabicKeyboard";
+import { FloatingArabicKeyboard } from "./sidebar/FloatingKeyboard";
 import {
   TrashIcon,
   CopyIcon,
@@ -167,6 +167,7 @@ const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
   { value: "Amiri", label: "Amiri", cssFamily: "Amiri" },
   { value: "Ruqaa", label: "Ruqaa", cssFamily: "Ruqaa" },
   { value: "Qahiri", label: "Qahiri", cssFamily: "Qahiri" },
+  { value: "Scheherazade", label: "Scheherazade", cssFamily: "Scheherazade" },
   { value: "Urdu", label: "Urdu", cssFamily: "Urdu" },
 ];
 
@@ -288,7 +289,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setCursorPosition(newPos);
     setTimeout(() => {
       if (textareaRef.current) {
-        textareaRef.current.focus();
+        textareaRef.current.focus({ preventScroll: true });
         textareaRef.current.setSelectionRange(newPos, newPos);
       }
     }, 0);
@@ -303,7 +304,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setCursorPosition(newPos);
     setTimeout(() => {
       if (textareaRef.current) {
-        textareaRef.current.focus();
+        textareaRef.current.focus({ preventScroll: true });
         textareaRef.current.setSelectionRange(newPos, newPos);
       }
     }, 0);
@@ -1655,21 +1656,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => setShowKeyboard((v) => !v)}
               className="sidebarSectionButton"
               aria-expanded={showKeyboard}
+              aria-pressed={showKeyboard}
             >
               <span>Arabic Keyboard</span>
-              <span>{showKeyboard ? "−" : "+"}</span>
+              <span>{showKeyboard ? "Hide" : "Show"}</span>
             </button>
-
-            {showKeyboard && (
-              <div className="sectionPanel">
-                <ArabicKeyboard
-                  onInsert={handleKeyboardKey}
-                  onBackspace={handleKeyboardBackspace}
-                />
-              </div>
-            )}
           </div>
         )}
+
+        <FloatingArabicKeyboard
+          open={showKeyboard && !!selectedBlock}
+          onClose={() => setShowKeyboard(false)}
+          onInsert={handleKeyboardKey}
+          onBackspace={handleKeyboardBackspace}
+        />
 
         {selectedBlock && (
           <div className="sidebarPanel">

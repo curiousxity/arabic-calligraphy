@@ -18,6 +18,7 @@ export const FONT_URLS: Record<string, string> = {
   Amiri: "/fonts/Amiri.ttf",
   Ruqaa: "/fonts/Ruqaa.ttf",
   Qahiri: "/fonts/Qahiri.ttf",
+  Scheherazade: "/fonts/Scheherazade.ttf",
   Urdu: "/fonts/Urdu.ttf",
   AlFatemi: "/fonts/AlFatemi.otf",
   FatemiMaqala: "/fonts/FatemiMaqala.ttf",

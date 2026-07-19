@@ -12,6 +12,7 @@
 @font-face { font-family: "Amiri"; src: url("/fonts/Amiri.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
 @font-face { font-family: "Ruqaa"; src: url("/fonts/Ruqaa.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
 @font-face { font-family: "Qahiri"; src: url("/fonts/Qahiri.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
+@font-face { font-family: "Scheherazade"; src: url("/fonts/Scheherazade.ttf") format("truetype"); font-weight: normal; font-style: normal; font-display: swap; }
 
 :root {
   --bg-page: #0d1526;
@@ -129,6 +130,9 @@ html, body, #root { height: 100%; margin: 0; }
 .fieldTitle { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .shell { width: 100%; border: none; border-radius: 10px; background: var(--bg-input); box-shadow: none; padding: 8px 10px; }
 .select { width: 100%; border: none; outline: none; background: transparent; font-size: 14px; font-weight: 400; cursor: pointer; color: var(--text-primary); }
+
+.floatingKeyboard { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 1000; width: min(560px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); padding: 10px; box-sizing: border-box; }
+.floatingKeyboardHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; font-size: 13px; font-weight: 500; color: var(--text-primary); }
 
 .fontSelectShell { position: relative; padding: 0; }
 .fontSelectTrigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; text-align: left; }
