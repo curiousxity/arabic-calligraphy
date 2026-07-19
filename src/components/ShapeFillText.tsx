@@ -50,6 +50,9 @@ export type ShapeFillTextProps = {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  embossStrength?: number;
+  embossHighlightColor?: string;
+  embossShadowColor?: string;
   rotation?: number;
   locked?: boolean;
   draggable?: boolean;
@@ -115,6 +118,9 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   shadowOffsetX = 0,
   shadowOffsetY = 0,
   shadowOpacity = 0.35,
+  embossStrength = 0,
+  embossHighlightColor = "#ffffff",
+  embossShadowColor = "#000000",
   rotation = 0,
   locked,
   draggable = true,
@@ -182,98 +188,116 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           const lineH = fontSize * shapeFillSpacing;
           const rotRad = (shapeFillTextRotation * Math.PI) / 180;
 
-          // ── Apply uniform shape scale ──────────────────────────────────────
-          ctx.save();
-          ctx.scale(shapeScale, shapeScale);
-
-          // Clip to shape using replayed path commands (Konva-safe, no Path2D)
-          replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
-          ctx.clip();
-
-          // If no text data yet, draw a semi-transparent placeholder fill
+          // If no text data yet, draw a semi-transparent placeholder fill (once,
+          // regardless of emboss — there's nothing shaped yet to emboss).
           if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) {
-            ctx.fillStyle = color + "33"; // 20% opacity hint
+            ctx.save();
+            ctx.scale(shapeScale, shapeScale);
             replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
+            ctx.fillStyle = color + "33"; // 20% opacity hint
             ctx.fill();
             ctx.restore();
             return;
           }
 
-          ctx.fillStyle = color;
+          // Draws the whole shape-filled glyph run once, in `fillColor`, offset
+          // by (offsetX, offsetY) — called once normally, and twice more (offset
+          // opposite directions, no stroke/fauxBold) when emboss is active.
+          const drawPass = (
+            fillColor: string,
+            offsetX: number,
+            offsetY: number,
+            includeExtras: boolean
+          ) => {
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+            ctx.scale(shapeScale, shapeScale);
 
-          const drawGlyphRow = (startPenX: number, sy: number, scX: number, scY: number) => {
-            for (const g of glyphCache) {
-              if (!g.obj || g.commands.length === 0) continue;
-              const gx = startPenX + g.penX * scX + g.dx * scX;
-              const gy = sy + g.dy * scY;
+            // Clip to shape using replayed path commands (Konva-safe, no Path2D)
+            replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
+            ctx.clip();
 
-              ctx.save();
-              ctx.translate(gx, gy);
-              if (shapeFillTextRotation !== 0) ctx.rotate(rotRad);
-              ctx.scale(scX, scY);
-              if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
-              drawCommandsToCtx(ctx as unknown as CanvasRenderingContext2D, g.commands);
-              ctx.fill();
-              if (fauxBoldWidth > 0) {
-                ctx.strokeStyle = color;
-                ctx.lineWidth = fauxBoldWidth / scX;
-                ctx.stroke();
+            ctx.fillStyle = fillColor;
+
+            const drawGlyphRow = (startPenX: number, sy: number, scX: number, scY: number) => {
+              for (const g of glyphCache) {
+                if (!g.obj || g.commands.length === 0) continue;
+                const gx = startPenX + g.penX * scX + g.dx * scX;
+                const gy = sy + g.dy * scY;
+
+                ctx.save();
+                ctx.translate(gx, gy);
+                if (shapeFillTextRotation !== 0) ctx.rotate(rotRad);
+                ctx.scale(scX, scY);
+                if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
+                drawCommandsToCtx(ctx as unknown as CanvasRenderingContext2D, g.commands);
+                ctx.fill();
+                if (includeExtras && fauxBoldWidth > 0) {
+                  ctx.strokeStyle = fillColor;
+                  ctx.lineWidth = fauxBoldWidth / scX;
+                  ctx.stroke();
+                }
+                if (includeExtras && strokeWidth > 0) {
+                  ctx.strokeStyle = stroke;
+                  ctx.lineWidth = strokeWidth / scX;
+                  ctx.stroke();
+                }
+                ctx.restore();
               }
-              if (strokeWidth > 0) {
-                ctx.strokeStyle = stroke;
-                ctx.lineWidth = strokeWidth / scX;
-                ctx.stroke();
+            };
+
+            // Scanline fill — use ray-casting polygon test (no Path2D / isPointInPath)
+            const sampleStep = Math.max(2, Math.round(fontSize / 8));
+            let lineY = fontSize * 0.85;
+
+            // The polygon is in original (pre-scale) path coordinates, matching lineY
+            const inShape = (px: number, py: number) => pointInPolygon(px, py, polygon);
+
+            while (lineY < shapeHeight) {
+              let lx = -1, rx = -1;
+              for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
+                if (inShape(sx, lineY)) {
+                  if (lx < 0) lx = sx;
+                  rx = sx;
+                }
               }
-              ctx.restore();
+              // Refine left edge
+              if (lx > 0) {
+                for (let sx = lx - sampleStep; sx <= lx; sx++) {
+                  if (inShape(sx, lineY)) { lx = sx; break; }
+                }
+              }
+              // Refine right edge
+              if (rx > 0) {
+                for (let sx = rx; sx <= rx + sampleStep; sx++) {
+                  if (inShape(sx, lineY)) { rx = sx; } else { break; }
+                }
+              }
+
+              if (lx >= 0 && rx > lx + 2) {
+                const lineWidth = rx - lx;
+                const effectiveAdvance = totalAdvance * shapeFillScaleX;
+                const reps = Math.max(1, Math.floor(lineWidth / effectiveAdvance));
+                const fitScaleX = lineWidth / (reps * effectiveAdvance);
+                const scX = shapeFillScaleX * fitScaleX;
+                const scY = shapeFillScaleY;
+
+                for (let r = 0; r < reps; r++) {
+                  drawGlyphRow(lx + r * effectiveAdvance * fitScaleX, lineY, scX, scY);
+                }
+              }
+
+              lineY += lineH;
             }
+
+            ctx.restore();
           };
 
-          // Scanline fill — use ray-casting polygon test (no Path2D / isPointInPath)
-          const sampleStep = Math.max(2, Math.round(fontSize / 8));
-          let lineY = fontSize * 0.85;
-
-          // The polygon is in original (pre-scale) path coordinates, matching lineY
-          const inShape = (px: number, py: number) => pointInPolygon(px, py, polygon);
-
-          while (lineY < shapeHeight) {
-            let lx = -1, rx = -1;
-            for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
-              if (inShape(sx, lineY)) {
-                if (lx < 0) lx = sx;
-                rx = sx;
-              }
-            }
-            // Refine left edge
-            if (lx > 0) {
-              for (let sx = lx - sampleStep; sx <= lx; sx++) {
-                if (inShape(sx, lineY)) { lx = sx; break; }
-              }
-            }
-            // Refine right edge
-            if (rx > 0) {
-              for (let sx = rx; sx <= rx + sampleStep; sx++) {
-                if (inShape(sx, lineY)) { rx = sx; } else { break; }
-              }
-            }
-
-            if (lx >= 0 && rx > lx + 2) {
-              const lineWidth = rx - lx;
-              const effectiveAdvance = totalAdvance * shapeFillScaleX;
-              const reps = Math.max(1, Math.floor(lineWidth / effectiveAdvance));
-              const fitScaleX = lineWidth / (reps * effectiveAdvance);
-              const scX = shapeFillScaleX * fitScaleX;
-              const scY = shapeFillScaleY;
-
-              for (let r = 0; r < reps; r++) {
-                drawGlyphRow(lx + r * effectiveAdvance * fitScaleX, lineY, scX, scY);
-              }
-            }
-
-            lineY += lineH;
+          if (embossStrength > 0) {
+            drawPass(embossShadowColor, embossStrength, embossStrength, false);
+            drawPass(embossHighlightColor, -embossStrength, -embossStrength, false);
           }
-
-
-          ctx.restore(); // remove shapeScale transform
+          drawPass(color, 0, 0, true);
         }}
       />
 

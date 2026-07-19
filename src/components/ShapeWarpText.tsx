@@ -42,6 +42,9 @@ export type ShapeWarpTextProps = {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  embossStrength?: number;
+  embossHighlightColor?: string;
+  embossShadowColor?: string;
   rotation?: number;
 
   shapeSvgPath: string;
@@ -256,6 +259,9 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   shadowOffsetX = 0,
   shadowOffsetY = 0,
   shadowOpacity = 0.35,
+  embossStrength = 0,
+  embossHighlightColor = "#ffffff",
+  embossShadowColor = "#000000",
   rotation = 0,
   shapeSvgPath,
   warpShapeWidth,
@@ -539,11 +545,10 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
         sceneFunc={(ctx) => {
           if (!shapeSvgPath || parsedCmds.length === 0) return;
 
-          ctx.save();
-          replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
-          ctx.clip();
-
           if (!hbLoaded || !shapeData.font || shapeData.glyphs.length === 0) {
+            ctx.save();
+            replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
+            ctx.clip();
             ctx.fillStyle = `${color}22`;
             replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
             ctx.fill();
@@ -552,82 +557,103 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           }
 
           const font = shapeData.font;
-          let penX = 0;
-          ctx.fillStyle = color;
-
           const scale = fontSize / Math.max(shapeData.unitsPerEm || 1000, 1);
 
-          for (const [glyphIndex, g] of shapeData.glyphs.entries()) {
-            const glyphObj = font.glyphs.get(g.g);
-            const advance = g.ax ?? 0;
+          // Draws the whole warped glyph run once, in `fillColor`, offset by
+          // (offsetX, offsetY) — called once normally, and twice more (offset
+          // opposite directions, no stroke) when emboss is active.
+          const drawPass = (
+            fillColor: string,
+            offsetX: number,
+            offsetY: number,
+            includeStroke: boolean
+          ) => {
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+            replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
+            ctx.clip();
 
-            if (!glyphObj) {
+            let penX = 0;
+            ctx.fillStyle = fillColor;
+
+            for (const [glyphIndex, g] of shapeData.glyphs.entries()) {
+              const glyphObj = font.glyphs.get(g.g);
+              const advance = g.ax ?? 0;
+
+              if (!glyphObj) {
+                penX += advance;
+                continue;
+              }
+
+              const glyphWarp = glyphWarps.find((w) => w.glyphIndex === glyphIndex);
+              const handles = glyphWarp?.handles ?? [];
+
+              const gx = (penX + (g.dx ?? 0)) * scale;
+              const gy = -(g.dy ?? 0) * scale;
+
+              const warpPoint = (cx: number, cy: number) => {
+                const baseX = cx + gx;
+                const baseY = cy + gy;
+                const pGlyph = applyGlyphHandles(baseX, baseY, handles);
+
+                return applyShapeWarpPoint(
+                  pGlyph.x,
+                  pGlyph.y,
+                  glyphBounds,
+                  bw,
+                  bh,
+                  warpShapePadding,
+                  warpShapeMode,
+                  warpShapeStrength
+                );
+              };
+
+              const opPath = glyphObj.getPath(0, 0, fontSize);
+              const cmds: PathCommand[] = opPath.commands.map((cmd) => {
+                const c = cmd as MutablePathCmd;
+                const out: MutablePathCmd = { ...c };
+
+                if (typeof c.x === "number" && typeof c.y === "number") {
+                  const p = warpPoint(c.x, c.y);
+                  out.x = p.x;
+                  out.y = p.y;
+                }
+
+                if (typeof c.x1 === "number" && typeof c.y1 === "number") {
+                  const p1 = warpPoint(c.x1, c.y1);
+                  out.x1 = p1.x;
+                  out.y1 = p1.y;
+                }
+
+                if (typeof c.x2 === "number" && typeof c.y2 === "number") {
+                  const p2 = warpPoint(c.x2, c.y2);
+                  out.x2 = p2.x;
+                  out.y2 = p2.y;
+                }
+
+                return out as PathCommand;
+              });
+
+              tracePath(ctx as unknown as CanvasRenderingContext2D, cmds);
+              ctx.fill();
+
+              if (includeStroke && strokeWidth > 0) {
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = strokeWidth;
+                ctx.stroke();
+              }
+
               penX += advance;
-              continue;
             }
 
-            const glyphWarp = glyphWarps.find((w) => w.glyphIndex === glyphIndex);
-            const handles = glyphWarp?.handles ?? [];
+            ctx.restore();
+          };
 
-            const gx = (penX + (g.dx ?? 0)) * scale;
-            const gy = -(g.dy ?? 0) * scale;
-
-            const warpPoint = (cx: number, cy: number) => {
-              const baseX = cx + gx;
-              const baseY = cy + gy;
-              const pGlyph = applyGlyphHandles(baseX, baseY, handles);
-
-              return applyShapeWarpPoint(
-                pGlyph.x,
-                pGlyph.y,
-                glyphBounds,
-                bw,
-                bh,
-                warpShapePadding,
-                warpShapeMode,
-                warpShapeStrength
-              );
-            };
-
-            const opPath = glyphObj.getPath(0, 0, fontSize);
-            const cmds: PathCommand[] = opPath.commands.map((cmd) => {
-              const c = cmd as MutablePathCmd;
-              const out: MutablePathCmd = { ...c };
-
-              if (typeof c.x === "number" && typeof c.y === "number") {
-                const p = warpPoint(c.x, c.y);
-                out.x = p.x;
-                out.y = p.y;
-              }
-
-              if (typeof c.x1 === "number" && typeof c.y1 === "number") {
-                const p1 = warpPoint(c.x1, c.y1);
-                out.x1 = p1.x;
-                out.y1 = p1.y;
-              }
-
-              if (typeof c.x2 === "number" && typeof c.y2 === "number") {
-                const p2 = warpPoint(c.x2, c.y2);
-                out.x2 = p2.x;
-                out.y2 = p2.y;
-              }
-
-              return out as PathCommand;
-            });
-
-            tracePath(ctx as unknown as CanvasRenderingContext2D, cmds);
-            ctx.fill();
-
-            if (strokeWidth > 0) {
-              ctx.strokeStyle = stroke;
-              ctx.lineWidth = strokeWidth;
-              ctx.stroke();
-            }
-
-            penX += advance;
+          if (embossStrength > 0) {
+            drawPass(embossShadowColor, embossStrength, embossStrength, false);
+            drawPass(embossHighlightColor, -embossStrength, -embossStrength, false);
           }
-
-          ctx.restore();
+          drawPass(color, 0, 0, true);
         }}
       />
 

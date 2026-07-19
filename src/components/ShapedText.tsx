@@ -32,6 +32,9 @@ type Props = {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  embossStrength?: number;
+  embossHighlightColor?: string;
+  embossShadowColor?: string;
   rotation?: number;
   warpX?: number;
   warpY?: number;
@@ -222,6 +225,9 @@ export const ShapedText: React.FC<Props> = ({
   shadowOffsetX = 0,
   shadowOffsetY = 0,
   shadowOpacity = 0.35,
+  embossStrength = 0,
+  embossHighlightColor = "#ffffff",
+  embossShadowColor = "#000000",
   rotation = 0,
   warpX = 0,
   warpY = 0,
@@ -423,6 +429,48 @@ export const ShapedText: React.FC<Props> = ({
           ctx.save();
           ctx.translate(localDrawX, localDrawY);
           if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
+
+          if (embossStrength > 0) {
+            ctx.save();
+            ctx.translate(embossStrength, embossStrength);
+            ctx.fillStyle = embossShadowColor;
+            drawWarpedGlyphRun(
+              ctx as unknown as CanvasRenderingContext2D,
+              shapeData.glyphs,
+              font,
+              fontSize,
+              shapeData.unitsPerEm,
+              glyphBounds,
+              warpX,
+              warpY,
+              false,
+              stroke,
+              strokeWidth,
+              0,
+              overrideGlyph
+            );
+            ctx.restore();
+
+            ctx.save();
+            ctx.translate(-embossStrength, -embossStrength);
+            ctx.fillStyle = embossHighlightColor;
+            drawWarpedGlyphRun(
+              ctx as unknown as CanvasRenderingContext2D,
+              shapeData.glyphs,
+              font,
+              fontSize,
+              shapeData.unitsPerEm,
+              glyphBounds,
+              warpX,
+              warpY,
+              false,
+              stroke,
+              strokeWidth,
+              0,
+              overrideGlyph
+            );
+            ctx.restore();
+          }
 
           ctx.fillStyle = color;
           drawWarpedGlyphRun(

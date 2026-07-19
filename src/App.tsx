@@ -92,6 +92,8 @@ const DEFAULT_BLOCK: Block = {
   shadowOffsetX: 0,
   shadowOffsetY: 0,
   shadowOpacity: 0.35,
+  embossHighlightColor: "#ffffff",
+  embossShadowColor: "#000000",
   locked: false,
   rotation: 0,
   ornamental: false,
