@@ -395,29 +395,15 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
 
   if (isCollapsed) {
     return (
-      <div
-        style={{
-          width,
-          height: "100%",
-          flexShrink: 0,
-          borderLeft: "1px solid var(--border)",
-          background:
-            "linear-gradient(180deg, var(--bg-sidebar-start) 0%, var(--bg-sidebar-end) 100%)",
-          display: "flex",
-          justifyContent: "center",
-          paddingTop: 12,
-        }}
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        className="morphEditorReopenTab"
+        title="Show Morph Glyph Editor"
+        aria-label="Show Morph Glyph Editor"
       >
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          className="sidebarCircleButton"
-          title="Show Morph Glyph Editor"
-          aria-label="Show Morph Glyph Editor"
-        >
-          <ChevronLeftIcon size={14} />
-        </button>
-      </div>
+        <ChevronLeftIcon size={14} />
+      </button>
     );
   }
 

@@ -138,6 +138,9 @@ html, body, #root { height: 100%; margin: 0; }
 .morphEditorFloating { position: fixed; right: 12px; bottom: 12px; z-index: 1000; width: min(340px, calc(100vw - 24px)); max-height: 70vh; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); padding: 10px; box-sizing: border-box; }
 .morphEditorFloatingHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; font-size: 13px; font-weight: 500; color: var(--text-primary); }
 
+.morphEditorReopenTab { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 500; width: 28px; height: 44px; border: 1px solid var(--border); border-right: none; border-radius: 10px 0 0 10px; background: var(--bg-panel); color: var(--accent); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: -2px 0 8px rgba(0, 0, 0, 0.18); padding: 0; }
+.morphEditorReopenTab:hover { background: var(--overlay-hover); }
+
 .fontSelectShell { position: relative; padding: 0; }
 .fontSelectTrigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; text-align: left; }
 .fontSelectTriggerLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

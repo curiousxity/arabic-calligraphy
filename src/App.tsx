@@ -81,7 +81,6 @@ const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
 const GLYPH_RIGS_KEY = "harfcanvas-glyph-rigs-v1";
 const SIDEBAR_COLLAPSED_WIDTH = 28;
 const RIGHT_PANEL_WIDTH = 280;
-const RIGHT_PANEL_COLLAPSED_WIDTH = 28;
 const DEFAULT_TEXT_FONT_SIZE = 53;
 const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
 
@@ -244,11 +243,8 @@ const App: React.FC = () => {
   );
 
   const rightPanelVisible = !isMobile && !!selectedBlock && selectedBlock.type !== "image";
-  const effectiveRightPanelWidth = !rightPanelVisible
-    ? 0
-    : rightPanelCollapsed
-      ? RIGHT_PANEL_COLLAPSED_WIDTH
-      : RIGHT_PANEL_WIDTH;
+  const effectiveRightPanelWidth =
+    !rightPanelVisible || rightPanelCollapsed ? 0 : RIGHT_PANEL_WIDTH;
 
   const canvasWidth = isMobile
     ? viewportWidth
