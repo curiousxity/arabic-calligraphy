@@ -338,23 +338,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div
             style={{
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
+              gap: 10,
+              padding: isMobile ? "4px 0 2px" : "8px 0 4px",
             }}
           >
             <img
               src="/logo-icon.png"
-              alt=""
-              style={{ width: 26, height: 26, borderRadius: 6, flexShrink: 0 }}
+              alt="HarfCanvas"
+              style={{
+                width: isMobile ? 76 : 104,
+                height: isMobile ? 76 : 104,
+                borderRadius: 18,
+                flexShrink: 0,
+                boxShadow: "0 0 0 1px var(--border), 0 6px 24px rgba(212, 175, 55, 0.3)",
+              }}
             />
             <h2
               className="sidebarTitle"
               style={{
-                fontSize: isMobile ? 18 : 20,
+                fontSize: isMobile ? 22 : 26,
                 textAlign: "center",
                 color: "var(--text-primary)",
-                letterSpacing: "-0.02em",
+                letterSpacing: "0.01em",
+                fontWeight: 600,
                 margin: 0,
               }}
             >
@@ -1059,7 +1068,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 <PresetKeyboard
                   title="Presets"
-                  rows={[PRESETS.slice(0, 5), PRESETS.slice(5)]}
+                  rows={[PRESETS]}
                   onPick={onInsertPreset}
                 />
 

@@ -153,7 +153,7 @@ html, body, #root { height: 100%; margin: 0; }
 .sidebarTitle { margin: 0; font-weight: 400; color: var(--text-primary); }
 .sidebarSectionTitle { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 400; color: var(--text-primary); }
 
-.field { display: block; margin-bottom: 8px; }
+.field { display: block; margin-bottom: 8px; min-width: 0; }
 .fieldTitle { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .shell { width: 100%; border: none; border-radius: 10px; background: var(--bg-input); box-shadow: none; padding: 8px 10px; }
 .select { width: 100%; border: none; outline: none; background: transparent; font-size: 14px; font-weight: 400; cursor: pointer; color: var(--text-primary); }

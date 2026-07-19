@@ -3,13 +3,6 @@ export const SPECIALS = ["ـ", "لا", "لآ", "لأ", "لإ", "ﷲ", "ﷺ", "�
 export const PERSIAN = ["پ", "چ", "گ", "ک", "ی", "ە"];
 export const URDU = ["ٹ", "ڈ", "ڑ", "ں", "ھ", "ے", "ۓ"];
 export const PRESETS = [
-  // Phrase presets
-  "بِسْمِ",
-  "اللّٰه",
-  "الرَّحْمٰن",
-  "الرَّحِيم",
-  "مَحَمَّد",
-
   // Private Use Area honorifics (Fatemi PUA glyphs)
 
   "\uE833",  // 

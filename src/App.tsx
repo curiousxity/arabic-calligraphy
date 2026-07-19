@@ -74,8 +74,8 @@ const DEFAULT_BLOCK: Block = {
   x: 0,
   y: 0,
   fontSize: DEFAULT_TEXT_FONT_SIZE,
-  color: "#0066cc",
-  fontFamily: "TahaNaskhRegular",
+  color: "#1e3a5f",
+  fontFamily: "FatemiMaqala",
   fontStyle: "normal",
   align: "center",
   lineHeight: 1.2,
@@ -206,7 +206,7 @@ const App: React.FC = () => {
       {
         ...DEFAULT_BLOCK,
         x: preset.width / 2,
-        y: preset.height * 0.25,
+        y: preset.height * 0.05,
       },
     ];
   });
@@ -485,7 +485,7 @@ const App: React.FC = () => {
       {
         ...DEFAULT_BLOCK,
         x: currentPreset.width / 2,
-        y: currentPreset.height * 0.25,
+        y: currentPreset.height * 0.05,
       },
     ]);
     setSelectedId(1);
@@ -687,7 +687,7 @@ const App: React.FC = () => {
       id: newId,
       text: "نَصٌّ جَدِيدٌ",
       fontSize: DEFAULT_NEW_BLOCK_FONT_SIZE,
-      color: "#0066cc",
+      color: "#1e3a5f",
       x,
       y,
     };
