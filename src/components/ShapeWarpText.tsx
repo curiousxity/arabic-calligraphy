@@ -3,6 +3,7 @@ import { Group, Shape, Rect, Circle, Arc } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import { parseSvgPath, replayPath } from "../lib/svgPath";
+import { drawInsetBevel } from "../lib/emboss";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import {
   applyGlyphEdit,
@@ -598,21 +599,23 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           const scale = fontSize / Math.max(shapeData.unitsPerEm || 1000, 1);
 
           // Draws the whole warped glyph run once, in `fillColor`, offset by
-          // (offsetX, offsetY) — called once normally, and twice more (offset
-          // opposite directions, no stroke) when emboss is active.
+          // (offsetX, offsetY) — called once normally against the real
+          // context for the main fill, and against a scratch context by
+          // drawInsetBevel when emboss is active.
           const drawPass = (
+            targetCtx: CanvasRenderingContext2D,
             fillColor: string,
             offsetX: number,
             offsetY: number,
             includeStroke: boolean
           ) => {
-            ctx.save();
-            ctx.translate(offsetX, offsetY);
-            replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
-            ctx.clip();
+            targetCtx.save();
+            targetCtx.translate(offsetX, offsetY);
+            replayPath(targetCtx, parsedCmds);
+            targetCtx.clip();
 
             let penX = 0;
-            ctx.fillStyle = fillColor;
+            targetCtx.fillStyle = fillColor;
 
             for (const [glyphIndex, g] of shapeData.glyphs.entries()) {
               const glyphObj = font.glyphs.get(g.g);
@@ -683,26 +686,35 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
                 return out as PathCommand;
               });
 
-              replayPath(ctx as unknown as CanvasRenderingContext2D, cmds);
-              ctx.fill();
+              replayPath(targetCtx, cmds);
+              targetCtx.fill();
 
               if (includeStroke && strokeWidth > 0) {
-                ctx.strokeStyle = stroke;
-                ctx.lineWidth = strokeWidth;
-                ctx.stroke();
+                targetCtx.strokeStyle = stroke;
+                targetCtx.lineWidth = strokeWidth;
+                targetCtx.stroke();
               }
 
               penX += advance;
             }
 
-            ctx.restore();
+            targetCtx.restore();
           };
 
+          drawPass(ctx as unknown as CanvasRenderingContext2D, color, 0, 0, true);
+
           if (embossStrength > 0) {
-            drawPass(embossShadowColor, embossStrength, embossStrength, false);
-            drawPass(embossHighlightColor, -embossStrength, -embossStrength, false);
+            drawInsetBevel(
+              ctx as unknown as CanvasRenderingContext2D,
+              bw,
+              bh,
+              embossStrength,
+              embossHighlightColor,
+              embossShadowColor,
+              (scratchCtx, offsetX, offsetY, fillColor) =>
+                drawPass(scratchCtx, fillColor, offsetX, offsetY, false)
+            );
           }
-          drawPass(color, 0, 0, true);
         }}
       />
 

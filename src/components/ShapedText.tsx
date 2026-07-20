@@ -4,6 +4,7 @@ import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import type { HarfBuzzGlyph, ShapedTextResult } from "../lib/harfbuzz";
 import { warpPoint, type GlyphBounds } from "../lib/warp";
+import { drawInsetBevel } from "../lib/emboss";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { useOverrideGlyph } from "../hooks/useOverrideGlyph";
 import {
@@ -800,56 +801,6 @@ export const ShapedText: React.FC<Props> = ({
           ctx.translate(localDrawX, localDrawY);
           if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
 
-          if (embossStrength > 0) {
-            ctx.save();
-            ctx.translate(embossStrength, embossStrength);
-            ctx.fillStyle = embossShadowColor;
-            drawWarpedGlyphRun(
-              ctx as unknown as CanvasRenderingContext2D,
-              shapeData.glyphs,
-              font,
-              fontSize,
-              shapeData.unitsPerEm,
-              glyphBounds,
-              warpX,
-              warpY,
-              false,
-              stroke,
-              strokeWidth,
-              0,
-              overrideGlyph,
-              glyphEdits,
-              fontFamily,
-              glyphRigs,
-              glyphRigValues
-            );
-            ctx.restore();
-
-            ctx.save();
-            ctx.translate(-embossStrength, -embossStrength);
-            ctx.fillStyle = embossHighlightColor;
-            drawWarpedGlyphRun(
-              ctx as unknown as CanvasRenderingContext2D,
-              shapeData.glyphs,
-              font,
-              fontSize,
-              shapeData.unitsPerEm,
-              glyphBounds,
-              warpX,
-              warpY,
-              false,
-              stroke,
-              strokeWidth,
-              0,
-              overrideGlyph,
-              glyphEdits,
-              fontFamily,
-              glyphRigs,
-              glyphRigValues
-            );
-            ctx.restore();
-          }
-
           ctx.fillStyle = color;
           drawWarpedGlyphRun(
             ctx as unknown as CanvasRenderingContext2D,
@@ -870,8 +821,49 @@ export const ShapedText: React.FC<Props> = ({
             glyphRigs,
             glyphRigValues
           );
+          ctx.restore();
+
+          if (embossStrength > 0) {
+            drawInsetBevel(
+              ctx as unknown as CanvasRenderingContext2D,
+              bw,
+              bh,
+              embossStrength,
+              embossHighlightColor,
+              embossShadowColor,
+              (scratchCtx, offsetX, offsetY, fillColor) => {
+                scratchCtx.save();
+                scratchCtx.translate(localDrawX + offsetX, localDrawY + offsetY);
+                if (isItalic) scratchCtx.transform(1, 0, -0.25, 1, 0, 0);
+                scratchCtx.fillStyle = fillColor;
+                drawWarpedGlyphRun(
+                  scratchCtx,
+                  shapeData.glyphs,
+                  font,
+                  fontSize,
+                  shapeData.unitsPerEm,
+                  glyphBounds,
+                  warpX,
+                  warpY,
+                  false,
+                  stroke,
+                  strokeWidth,
+                  0,
+                  overrideGlyph,
+                  glyphEdits,
+                  fontFamily,
+                  glyphRigs,
+                  glyphRigValues
+                );
+                scratchCtx.restore();
+              }
+            );
+          }
 
           if (strokeWidth > 0) {
+            ctx.save();
+            ctx.translate(localDrawX, localDrawY);
+            if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
             drawWarpedGlyphRun(
               ctx as unknown as CanvasRenderingContext2D,
               shapeData.glyphs,
@@ -891,9 +883,8 @@ export const ShapedText: React.FC<Props> = ({
               glyphRigs,
               glyphRigValues
             );
+            ctx.restore();
           }
-
-          ctx.restore();
         }}
       />
 

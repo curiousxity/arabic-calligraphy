@@ -25,6 +25,7 @@ import {
   type SvgCmd,
 } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
+import { drawInsetBevel } from "../lib/emboss";
 import {
   applyGlyphEdit,
   applyGlyphRig,
@@ -421,23 +422,25 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           }
 
           // Draws the whole shape-filled glyph run once, in `fillColor`, offset
-          // by (offsetX, offsetY) — called once normally, and twice more (offset
-          // opposite directions, no stroke/fauxBold) when emboss is active.
+          // by (offsetX, offsetY) — called once normally against the real
+          // context for the main fill, and against a scratch context by
+          // drawInsetBevel when emboss is active.
           const drawPass = (
+            targetCtx: CanvasRenderingContext2D,
             fillColor: string,
             offsetX: number,
             offsetY: number,
             includeExtras: boolean
           ) => {
-            ctx.save();
-            ctx.translate(offsetX, offsetY);
-            ctx.scale(shapeScale, shapeScale);
+            targetCtx.save();
+            targetCtx.translate(offsetX, offsetY);
+            targetCtx.scale(shapeScale, shapeScale);
 
             // Clip to shape using replayed path commands (Konva-safe, no Path2D)
-            replayPath(ctx as unknown as CanvasRenderingContext2D, parsedCmds);
-            ctx.clip();
+            replayPath(targetCtx, parsedCmds);
+            targetCtx.clip();
 
-            ctx.fillStyle = fillColor;
+            targetCtx.fillStyle = fillColor;
 
             const drawGlyphRow = (startPenX: number, sy: number, scX: number, scY: number) => {
               for (let gi = 0; gi < glyphCache.length; gi++) {
@@ -462,24 +465,24 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                       })
                     : g.commands;
 
-                ctx.save();
-                ctx.translate(gx, gy);
-                if (shapeFillTextRotation !== 0) ctx.rotate(rotRad);
-                ctx.scale(scX, scY);
-                if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
-                replayPath(ctx as unknown as CanvasRenderingContext2D, commands);
-                ctx.fill();
+                targetCtx.save();
+                targetCtx.translate(gx, gy);
+                if (shapeFillTextRotation !== 0) targetCtx.rotate(rotRad);
+                targetCtx.scale(scX, scY);
+                if (isItalic) targetCtx.transform(1, 0, -0.25, 1, 0, 0);
+                replayPath(targetCtx, commands);
+                targetCtx.fill();
                 if (includeExtras && fauxBoldWidth > 0) {
-                  ctx.strokeStyle = fillColor;
-                  ctx.lineWidth = fauxBoldWidth / scX;
-                  ctx.stroke();
+                  targetCtx.strokeStyle = fillColor;
+                  targetCtx.lineWidth = fauxBoldWidth / scX;
+                  targetCtx.stroke();
                 }
                 if (includeExtras && strokeWidth > 0) {
-                  ctx.strokeStyle = stroke;
-                  ctx.lineWidth = strokeWidth / scX;
-                  ctx.stroke();
+                  targetCtx.strokeStyle = stroke;
+                  targetCtx.lineWidth = strokeWidth / scX;
+                  targetCtx.stroke();
                 }
-                ctx.restore();
+                targetCtx.restore();
               }
             };
 
@@ -527,14 +530,23 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
               lineY += lineH;
             }
 
-            ctx.restore();
+            targetCtx.restore();
           };
 
+          drawPass(ctx as unknown as CanvasRenderingContext2D, color, 0, 0, true);
+
           if (embossStrength > 0) {
-            drawPass(embossShadowColor, embossStrength, embossStrength, false);
-            drawPass(embossHighlightColor, -embossStrength, -embossStrength, false);
+            drawInsetBevel(
+              ctx as unknown as CanvasRenderingContext2D,
+              scaledW,
+              scaledH,
+              embossStrength,
+              embossHighlightColor,
+              embossShadowColor,
+              (scratchCtx, offsetX, offsetY, fillColor) =>
+                drawPass(scratchCtx, fillColor, offsetX, offsetY, false)
+            );
           }
-          drawPass(color, 0, 0, true);
         }}
       />
 
