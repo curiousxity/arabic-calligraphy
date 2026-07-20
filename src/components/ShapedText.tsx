@@ -11,7 +11,6 @@ import {
   applyGlyphEdit,
   prepareGlyphRig,
   applyPreparedGlyphRig,
-  MOVE_HANDLE_COLOR,
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
   MASK_CONTOUR_ON_COLOR,
@@ -59,7 +58,7 @@ type Props = {
   warpY?: number;
   kashidaEditMode?: boolean;
   onKashidaTextChange?: (text: string) => void;
-  glyphEditTool?: "move" | "stretch" | null;
+  glyphEditTool?: "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
   glyphMaskEdit?: { handleId: string; mode: "contours" | "lasso" } | null;
@@ -71,11 +70,6 @@ type Props = {
     glyphIndex: number,
     handleId: string,
     patch: Partial<GlyphStretchHandle>
-  ) => void;
-  onSetGlyphMoveOffset?: (
-    glyphIndex: number,
-    offsetX: number,
-    offsetY: number
   ) => void;
   locked?: boolean;
   draggable?: boolean;
@@ -362,7 +356,6 @@ export const ShapedText: React.FC<Props> = ({
   onGlyphSelect,
   onGlyphBoxesChange,
   onUpdateStretchHandle,
-  onSetGlyphMoveOffset,
   locked,
   draggable = true,
   onClick,
@@ -530,11 +523,6 @@ export const ShapedText: React.FC<Props> = ({
       ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
       : undefined;
   const selectedStretches = selectedEdit?.stretches ?? [];
-  const selectedMoveOffset = selectedEdit?.move ?? { offsetX: 0, offsetY: 0 };
-  const selectedGlyphBox =
-    selectedGlyphIndex != null
-      ? glyphHitBoxes.find((b) => b.glyphIndex === selectedGlyphIndex)
-      : undefined;
 
   const activeMaskHandle =
     glyphMaskEdit != null
@@ -596,13 +584,6 @@ export const ShapedText: React.FC<Props> = ({
   const dragStateRef = useRef<{ originX: number; insertIndex: number; baseText: string } | null>(
     null
   );
-  const moveDragOriginRef = useRef<{
-    x: number;
-    y: number;
-    offsetX: number;
-    offsetY: number;
-  } | null>(null);
-
   const lassoActiveRef = useRef(false);
   const [lassoDrawPoints, setLassoDrawPoints] = useState<{ x: number; y: number }[]>([]);
 
@@ -1074,59 +1055,6 @@ export const ShapedText: React.FC<Props> = ({
         </>
       )}
 
-      {glyphEditTool === "move" &&
-        selectedGlyphIndex != null &&
-        selectedGlyphBox && (
-          <Rect
-            x={bx + localDrawX + selectedGlyphBox.x + selectedMoveOffset.offsetX}
-            y={by + localDrawY + selectedGlyphBox.y + selectedMoveOffset.offsetY}
-            width={selectedGlyphBox.width}
-            height={selectedGlyphBox.height}
-            fill="transparent"
-            stroke={MOVE_HANDLE_COLOR}
-            strokeWidth={2}
-            dash={[6, 4]}
-            draggable
-            onMouseDown={(e) => {
-              e.cancelBubble = true;
-            }}
-            onTouchStart={(e) => {
-              e.cancelBubble = true;
-            }}
-            onDragStart={(e) => {
-              e.cancelBubble = true;
-
-              const group = e.currentTarget.getParent() as Konva.Group;
-              const pos = group.getRelativePointerPosition();
-              if (!pos) return;
-
-              moveDragOriginRef.current = {
-                x: pos.x,
-                y: pos.y,
-                offsetX: selectedMoveOffset.offsetX,
-                offsetY: selectedMoveOffset.offsetY,
-              };
-            }}
-            onDragMove={(e) => {
-              e.cancelBubble = true;
-
-              const origin = moveDragOriginRef.current;
-              const group = e.currentTarget.getParent() as Konva.Group;
-              const pos = group.getRelativePointerPosition();
-              if (!origin || !pos || !onSetGlyphMoveOffset) return;
-
-              onSetGlyphMoveOffset(
-                selectedGlyphIndex,
-                origin.offsetX + (pos.x - origin.x),
-                origin.offsetY + (pos.y - origin.y)
-              );
-            }}
-            onDragEnd={(e) => {
-              e.cancelBubble = true;
-              moveDragOriginRef.current = null;
-            }}
-          />
-        )}
     </Group>
   );
 };

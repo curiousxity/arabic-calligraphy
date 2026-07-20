@@ -53,17 +53,6 @@ describe("applyGlyphEdit", () => {
     expect(p.y).toBeCloseTo(50);
   });
 
-  it("applies move after stretches, as a rigid shift", () => {
-    const edit: GlyphEdit = {
-      glyphIndex: 0,
-      move: { offsetX: 5, offsetY: -5 },
-      stretches: [],
-    };
-    const p = applyGlyphEdit(10, 10, edit);
-    expect(p.x).toBeCloseTo(15);
-    expect(p.y).toBeCloseTo(5);
-  });
-
   it("with a contour mask, only displaces points in a listed contour", () => {
     const edit: GlyphEdit = {
       glyphIndex: 0,

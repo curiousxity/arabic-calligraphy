@@ -1,6 +1,5 @@
 import type { GlyphEdit, GlyphRig, GlyphRigValue, GlyphStretchMask } from "../types";
 
-export const MOVE_HANDLE_COLOR = "#4d94ff";
 export const STRETCH_ANCHOR_COLOR = "#ff4d4f";
 export const STRETCH_DRAG_COLOR = "#22c55e";
 export const MASK_CONTOUR_ON_COLOR = "#22c55e";
@@ -87,15 +86,11 @@ function applyAxisDisplacement(
 }
 
 /**
- * Applies a glyph's edits to a single outline point:
- *  - Each stretch handle pulls points near its anchor→drag axis along that
- *    axis, proportional to distance from the anchor (0 at the anchor, 1 at
- *    the drag handle's original position, unbounded beyond it) and tapered
- *    by perpendicular distance from the axis (a smoothstep band falloff).
- *  - The move offset (if any) then rigidly shifts the whole already-stretched
- *    point — this is what lets a letter be repositioned as one piece while
- *    still supporting a separate stretch on a neighboring glyph's connector
- *    to visually follow it.
+ * Applies a glyph's edits to a single outline point: each stretch handle
+ * pulls points near its anchor→drag axis along that axis, proportional to
+ * distance from the anchor (0 at the anchor, 1 at the drag handle's original
+ * position, unbounded beyond it) and tapered by perpendicular distance from
+ * the axis (a smoothstep band falloff).
  */
 export function applyGlyphEdit(
   x: number,
@@ -115,11 +110,6 @@ export function applyGlyphEdit(
     const p = applyAxisDisplacement(px, py, h, 1);
     px = p.x;
     py = p.y;
-  }
-
-  if (edit.move) {
-    px += edit.move.offsetX;
-    py += edit.move.offsetY;
   }
 
   return { x: px, y: py };

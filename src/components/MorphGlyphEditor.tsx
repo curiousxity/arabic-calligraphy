@@ -58,16 +58,9 @@ const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
           <h4>1. Pick a glyph</h4>
           <p>
-            Turn on <strong>Move</strong> or <strong>Stretch</strong> above, then
-            click a letter on the canvas to select it. Both tools need a
-            selected glyph before they do anything.
-          </p>
-
-          <h4>Move tool</h4>
-          <p>
-            Nudges the whole glyph as a rigid unit. Drag the dashed blue box
-            around the selected glyph, or use the Offset X / Offset Y sliders.
-            "Reset position" zeroes the offset.
+            Turn on <strong>Stretch</strong> above, then click a letter on the
+            canvas to select it. Stretch needs a selected glyph before it does
+            anything.
           </p>
 
           <h4>Stretch tool</h4>
@@ -134,13 +127,7 @@ export type MorphGlyphEditorProps = {
   selectedBlock?: Block;
   selectedGlyphBoxes?: GlyphBox[];
   glyphRigs?: GlyphRig[];
-  onSetGlyphEditTool?: (tool: "move" | "stretch" | null) => void;
-  onSetGlyphMoveOffset?: (
-    blockId: number,
-    glyphIndex: number,
-    offsetX: number,
-    offsetY: number
-  ) => void;
+  onSetGlyphEditTool?: (tool: "stretch" | null) => void;
   onAddStretchHandle?: () => void;
   onUpdateStretchHandle?: (
     blockId: number,
@@ -171,7 +158,7 @@ export type MorphGlyphEditorProps = {
 };
 
 /**
- * The per-glyph deformation feature (Move/Stretch handle authoring + the
+ * The per-glyph deformation feature (Stretch handle authoring + the
  * named-axis "Rigged Parameters" sliders) lives here instead of buried in
  * the left Sidebar's Styling accordion — on desktop as a real third flex
  * column mirroring the left Sidebar's conventions, on mobile as a floating
@@ -184,7 +171,6 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
   selectedGlyphBoxes,
   glyphRigs,
   onSetGlyphEditTool,
-  onSetGlyphMoveOffset,
   onAddStretchHandle,
   onUpdateStretchHandle,
   onDeleteStretchHandle,
@@ -228,15 +214,14 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
           Glyph Edit
         </div>
         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-          Click a letter, then Move to nudge it as a whole, or Stretch to
-          elongate a stroke between an anchor and a drag point.
+          Click a letter, then Stretch to elongate a stroke between an anchor
+          and a drag point.
         </div>
 
         <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
           {(
             [
               { value: null, label: "Off" },
-              { value: "move", label: "Move" },
               { value: "stretch", label: "Stretch" },
             ] as const
           ).map((opt) => (
@@ -264,62 +249,6 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
               : "none"}
           </div>
         )}
-
-        {selectedBlock.glyphEditTool === "move" &&
-          selectedBlock.selectedGlyphIndex != null &&
-          (() => {
-            const glyphIndex = selectedBlock.selectedGlyphIndex as number;
-            const move = selectedBlock.glyphEdits?.find(
-              (g) => g.glyphIndex === glyphIndex
-            )?.move;
-            const offsetX = move?.offsetX ?? 0;
-            const offsetY = move?.offsetY ?? 0;
-
-            return (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
-                  marginTop: 8,
-                }}
-              >
-                <RangeRow
-                  id={makeId("glyph-move-x", selectedId)}
-                  name={makeId("glyphMoveX", selectedId)}
-                  label="Offset X"
-                  value={offsetX}
-                  min={-200}
-                  max={200}
-                  onChange={(v) =>
-                    onSetGlyphMoveOffset?.(selectedBlock.id, glyphIndex, v, offsetY)
-                  }
-                  suffix={`${Math.round(offsetX)}px`}
-                />
-                <RangeRow
-                  id={makeId("glyph-move-y", selectedId)}
-                  name={makeId("glyphMoveY", selectedId)}
-                  label="Offset Y"
-                  value={offsetY}
-                  min={-200}
-                  max={200}
-                  onChange={(v) =>
-                    onSetGlyphMoveOffset?.(selectedBlock.id, glyphIndex, offsetX, v)
-                  }
-                  suffix={`${Math.round(offsetY)}px`}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    onSetGlyphMoveOffset?.(selectedBlock.id, glyphIndex, 0, 0)
-                  }
-                  className="sidebarSmallAction"
-                >
-                  Reset position
-                </button>
-              </div>
-            );
-          })()}
 
         {selectedBlock.glyphEditTool === "stretch" && (
           <>

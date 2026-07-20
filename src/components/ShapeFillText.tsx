@@ -14,7 +14,7 @@
  *  - shapeScale, emboss, stroke all preserved.
  */
 
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Group, Shape, Rect, Circle } from "react-konva";
 import type Konva from "konva";
 import {
@@ -30,7 +30,6 @@ import {
   applyGlyphEdit,
   prepareGlyphRig,
   applyPreparedGlyphRig,
-  MOVE_HANDLE_COLOR,
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
 } from "../lib/glyphEdits";
@@ -65,7 +64,7 @@ export type ShapeFillTextProps = {
   embossHighlightColor?: string;
   embossShadowColor?: string;
   rotation?: number;
-  glyphEditTool?: "move" | "stretch" | null;
+  glyphEditTool?: "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
   glyphRigs?: GlyphRig[];
@@ -85,11 +84,6 @@ export type ShapeFillTextProps = {
     glyphIndex: number,
     handleId: string,
     patch: Partial<GlyphStretchHandle>
-  ) => void;
-  onSetGlyphMoveOffset?: (
-    glyphIndex: number,
-    offsetX: number,
-    offsetY: number
   ) => void;
   locked?: boolean;
   draggable?: boolean;
@@ -267,7 +261,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   onGlyphSelect,
   onGlyphBoxesChange,
   onUpdateStretchHandle,
-  onSetGlyphMoveOffset,
   locked,
   draggable = true,
   onClick, onTap, onDblClick, onDragMove, onDragEnd,
@@ -275,12 +268,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   onResizeScale,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
-  const moveDragOriginRef = useRef<{
-    x: number;
-    y: number;
-    offsetX: number;
-    offsetY: number;
-  } | null>(null);
 
   // Parse SVG path once
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
@@ -416,11 +403,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
       : undefined;
   const selectedStretches = selectedEdit?.stretches ?? [];
-  const selectedMoveOffset = selectedEdit?.move ?? { offsetX: 0, offsetY: 0 };
-  const selectedGlyphBox =
-    selectedGlyphIndex != null
-      ? glyphLocalBoxes.find((b) => b.glyphIndex === selectedGlyphIndex)
-      : undefined;
 
   return (
     <Group
@@ -685,58 +667,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
               );
             })}
 
-          {glyphEditTool === "move" &&
-            selectedGlyphBox &&
-            (() => {
-              const effScale = Math.max(shapeScale * selectedInstance.scX, 0.05);
-              return (
-                <Rect
-                  x={selectedGlyphBox.x + selectedMoveOffset.offsetX}
-                  y={selectedGlyphBox.y + selectedMoveOffset.offsetY}
-                  width={selectedGlyphBox.width}
-                  height={selectedGlyphBox.height}
-                  fill="transparent"
-                  stroke={MOVE_HANDLE_COLOR}
-                  strokeWidth={2 / effScale}
-                  dash={[6 / effScale, 4 / effScale]}
-                  draggable
-                  onMouseDown={(e) => {
-                    e.cancelBubble = true;
-                  }}
-                  onTouchStart={(e) => {
-                    e.cancelBubble = true;
-                  }}
-                  onDragStart={(e) => {
-                    e.cancelBubble = true;
-                    const grp = e.currentTarget.getParent() as Konva.Group;
-                    const pos = grp.getRelativePointerPosition();
-                    if (!pos) return;
-                    moveDragOriginRef.current = {
-                      x: pos.x,
-                      y: pos.y,
-                      offsetX: selectedMoveOffset.offsetX,
-                      offsetY: selectedMoveOffset.offsetY,
-                    };
-                  }}
-                  onDragMove={(e) => {
-                    e.cancelBubble = true;
-                    const origin = moveDragOriginRef.current;
-                    const grp = e.currentTarget.getParent() as Konva.Group;
-                    const pos = grp.getRelativePointerPosition();
-                    if (!origin || !pos || !onSetGlyphMoveOffset) return;
-                    onSetGlyphMoveOffset(
-                      selectedGlyphIndex,
-                      origin.offsetX + (pos.x - origin.x),
-                      origin.offsetY + (pos.y - origin.y)
-                    );
-                  }}
-                  onDragEnd={(e) => {
-                    e.cancelBubble = true;
-                    moveDragOriginRef.current = null;
-                  }}
-                />
-              );
-            })()}
         </Group>
       )}
     </Group>

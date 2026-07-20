@@ -9,7 +9,6 @@ import {
   applyGlyphEdit,
   prepareGlyphRig,
   applyPreparedGlyphRig,
-  MOVE_HANDLE_COLOR,
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
 } from "../lib/glyphEdits";
@@ -68,7 +67,7 @@ export type ShapeWarpTextProps = {
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   debugBounds?: boolean;
 
-  glyphEditTool?: "move" | "stretch" | null;
+  glyphEditTool?: "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
   glyphRigs?: GlyphRig[];
@@ -79,11 +78,6 @@ export type ShapeWarpTextProps = {
     glyphIndex: number,
     handleId: string,
     patch: Partial<GlyphStretchHandle>
-  ) => void;
-  onSetGlyphMoveOffset?: (
-    glyphIndex: number,
-    offsetX: number,
-    offsetY: number
   ) => void;
 };
 
@@ -263,16 +257,9 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   onGlyphSelect,
   onGlyphBoxesChange,
   onUpdateStretchHandle,
-  onSetGlyphMoveOffset,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
   const { hbLoaded } = shapeData;
-  const moveDragOriginRef = useRef<{
-    x: number;
-    y: number;
-    offsetX: number;
-    offsetY: number;
-  } | null>(null);
 
   const [spinnerAngle, setSpinnerAngle] = useState(0);
   const spinnerFrameRef = useRef<number | null>(null);
@@ -422,11 +409,6 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
       ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
       : undefined;
   const selectedStretches = selectedEdit?.stretches ?? [];
-  const selectedMoveOffset = selectedEdit?.move ?? { offsetX: 0, offsetY: 0 };
-  const selectedGlyphBox =
-    selectedGlyphIndex != null
-      ? hitBoxes.find((b) => b.glyphIndex === selectedGlyphIndex)
-      : undefined;
   const bw = Math.max(warpShapeWidth, 20);
   const bh = Math.max(warpShapeHeight, 20);
   const bx = -bw / 2;
@@ -460,24 +442,6 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
       warpShapeMode,
       warpShapeStrength
     );
-
-  const moveHandleRect = selectedGlyphBox
-    ? (() => {
-        const rawX = selectedGlyphBox.x + selectedMoveOffset.offsetX;
-        const rawY = selectedGlyphBox.y + selectedMoveOffset.offsetY;
-        const topLeft = warpHandlePoint(rawX, rawY);
-        const bottomRight = warpHandlePoint(
-          rawX + selectedGlyphBox.width,
-          rawY + selectedGlyphBox.height
-        );
-        return {
-          x: topLeft.x,
-          y: topLeft.y,
-          width: bottomRight.x - topLeft.x,
-          height: bottomRight.y - topLeft.y,
-        };
-      })()
-    : null;
 
   return (
     <Group
@@ -759,58 +723,6 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           </React.Fragment>
         ))}
 
-      {glyphEditTool === "move" &&
-        selectedGlyphIndex != null &&
-        selectedGlyphBox &&
-        moveHandleRect && (
-          <Rect
-            x={moveHandleRect.x}
-            y={moveHandleRect.y}
-            width={moveHandleRect.width}
-            height={moveHandleRect.height}
-            fill="transparent"
-            stroke={MOVE_HANDLE_COLOR}
-            strokeWidth={2}
-            dash={[6, 4]}
-            draggable
-            onMouseDown={(e) => (e.cancelBubble = true)}
-            onTouchStart={(e) => (e.cancelBubble = true)}
-            onDragStart={(e) => {
-              e.cancelBubble = true;
-
-              const group = e.currentTarget.getParent() as Konva.Group;
-              const pos = group.getRelativePointerPosition();
-              if (!pos) return;
-
-              const raw = invertToRawPoint(pos.x, pos.y);
-              moveDragOriginRef.current = {
-                x: raw.x,
-                y: raw.y,
-                offsetX: selectedMoveOffset.offsetX,
-                offsetY: selectedMoveOffset.offsetY,
-              };
-            }}
-            onDragMove={(e) => {
-              e.cancelBubble = true;
-
-              const origin = moveDragOriginRef.current;
-              const group = e.currentTarget.getParent() as Konva.Group;
-              const pos = group.getRelativePointerPosition();
-              if (!origin || !pos || !onSetGlyphMoveOffset) return;
-
-              const raw = invertToRawPoint(pos.x, pos.y);
-              onSetGlyphMoveOffset(
-                selectedGlyphIndex,
-                origin.offsetX + (raw.x - origin.x),
-                origin.offsetY + (raw.y - origin.y)
-              );
-            }}
-            onDragEnd={(e) => {
-              e.cancelBubble = true;
-              moveDragOriginRef.current = null;
-            }}
-          />
-        )}
     </Group>
   );
 };

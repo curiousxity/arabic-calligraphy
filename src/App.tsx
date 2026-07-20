@@ -166,7 +166,7 @@ const removeStretchHandle = (
   const existing = glyphEdits.find((g) => g.glyphIndex === glyphIndex);
   if (!existing) return glyphEdits;
   const nextStretches = existing.stretches.filter((h) => h.id !== handleId);
-  return nextStretches.length > 0 || existing.move
+  return nextStretches.length > 0
     ? glyphEdits.map((g) =>
         g.glyphIndex === glyphIndex ? { ...g, stretches: nextStretches } : g
       )
@@ -430,7 +430,6 @@ const App: React.FC = () => {
 
     upsertGlyphEdit(blockId, glyphIndex, (prev) => ({
       glyphIndex,
-      move: prev?.move,
       stretches: [
         ...(prev?.stretches ?? []),
         {
@@ -456,7 +455,6 @@ const App: React.FC = () => {
     ) => {
       upsertGlyphEditDebounced(blockId, glyphIndex, (prev) => ({
         glyphIndex,
-        move: prev?.move,
         stretches: (prev?.stretches ?? []).map((h) =>
           h.id === handleId ? { ...h, ...patch } : h
         ),
@@ -588,17 +586,6 @@ const App: React.FC = () => {
       scheduleGlyphRigHistoryPush();
     },
     [scheduleGlyphRigHistoryPush]
-  );
-
-  const setGlyphMoveOffset = useCallback(
-    (blockId: number, glyphIndex: number, offsetX: number, offsetY: number) => {
-      upsertGlyphEditDebounced(blockId, glyphIndex, (prev) => ({
-        glyphIndex,
-        move: { offsetX, offsetY },
-        stretches: prev?.stretches ?? [],
-      }));
-    },
-    [upsertGlyphEditDebounced]
   );
 
   const resetShapeWarp = useCallback(
@@ -1842,7 +1829,6 @@ const App: React.FC = () => {
           onEditBlock={requestTextEdit}
           onSelectGlyph={selectGlyphForBlock}
           onUpdateStretchHandle={updateStretchHandle}
-          onSetGlyphMoveOffset={setGlyphMoveOffset}
           glyphRigs={glyphRigs}
           onGlyphBoxesChange={updateGlyphBoxes}
           onKashidaTextChange={updateKashidaText}
@@ -1870,7 +1856,6 @@ const App: React.FC = () => {
           if (!selectedBlock || selectedBlock.type === "image") return;
           updateSelectedBlock({ glyphEditTool: tool, glyphMaskEdit: null });
         }}
-        onSetGlyphMoveOffset={setGlyphMoveOffset}
         onAddStretchHandle={addStretchHandle}
         onUpdateStretchHandle={updateStretchHandle}
         onDeleteStretchHandle={deleteStretchHandle}

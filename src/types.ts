@@ -2,7 +2,6 @@ export type BlockType = "text" | "shapeFill" | "shapeWarp" | "image";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 export type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
-export type GlyphMoveEdit = { offsetX: number; offsetY: number };
 
 /**
  * Restricts a stretch handle to a subset of a glyph's outline points, for
@@ -34,7 +33,6 @@ export type GlyphStretchHandle = {
 
 export type GlyphEdit = {
   glyphIndex: number;
-  move?: GlyphMoveEdit;
   stretches: GlyphStretchHandle[];
 };
 
@@ -99,9 +97,9 @@ type BlockCommon = {
   ornamental?: boolean;
   groupId?: number;
 
-  // Per-glyph editing (Move Glyph / Stretch Line tools) — shared across text,
-  // shapeFill, and shapeWarp blocks; not meaningful on image blocks.
-  glyphEditTool?: "move" | "stretch" | null;
+  // Per-glyph editing (Stretch Line tool) — shared across text, shapeFill,
+  // and shapeWarp blocks; not meaningful on image blocks.
+  glyphEditTool?: "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
   glyphRigValues?: GlyphRigValue[];

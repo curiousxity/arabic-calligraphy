@@ -56,12 +56,6 @@ export type CanvasStageProps = {
     handleId: string,
     patch: Partial<GlyphStretchHandle>
   ) => void;
-  onSetGlyphMoveOffset: (
-    blockId: number,
-    glyphIndex: number,
-    offsetX: number,
-    offsetY: number
-  ) => void;
   glyphRigs: GlyphRig[];
   onGlyphBoxesChange: (
     blockId: number,
@@ -112,7 +106,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onEditBlock,
   onSelectGlyph,
   onUpdateStretchHandle,
-  onSetGlyphMoveOffset,
   glyphRigs,
   onGlyphBoxesChange,
   onKashidaTextChange,
@@ -622,9 +615,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
                       onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
                     }
-                    onSetGlyphMoveOffset={(glyphIndex, offsetX, offsetY) =>
-                      onSetGlyphMoveOffset(block.id, glyphIndex, offsetX, offsetY)
-                    }
                     onGlyphBoxesChange={(boxes) =>
                       onGlyphBoxesChange(block.id, boxes)
                     }
@@ -673,9 +663,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
                       onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
                     }
-                    onSetGlyphMoveOffset={(glyphIndex, offsetX, offsetY) =>
-                      onSetGlyphMoveOffset(block.id, glyphIndex, offsetX, offsetY)
-                    }
                     onGlyphBoxesChange={(boxes) =>
                       onGlyphBoxesChange(block.id, boxes)
                     }
@@ -721,9 +708,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
                   onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
                     onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
-                  }
-                  onSetGlyphMoveOffset={(glyphIndex, offsetX, offsetY) =>
-                    onSetGlyphMoveOffset(block.id, glyphIndex, offsetX, offsetY)
                   }
                   onGlyphBoxesChange={(boxes) => onGlyphBoxesChange(block.id, boxes)}
                   locked={block.locked}
