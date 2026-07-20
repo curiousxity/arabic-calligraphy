@@ -3,7 +3,7 @@ import { Group, Shape, Rect, Circle, Arc } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import { parseSvgPath, replayPath } from "../lib/svgPath";
-import { drawInsetBevel } from "../lib/emboss";
+import { drawInsetBevel, EMBOSS_STRENGTH_SCALE } from "../lib/emboss";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import {
   applyGlyphEdit,
@@ -581,7 +581,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
         shadowOffsetX={shadowOffsetX}
         shadowOffsetY={shadowOffsetY}
         shadowOpacity={shadowOpacity}
-        sceneFunc={(ctx) => {
+        sceneFunc={(ctx, shape) => {
           if (!shapeSvgPath || parsedCmds.length === 0) return;
 
           if (!hbLoaded || !shapeData.font || shapeData.glyphs.length === 0) {
@@ -704,15 +704,20 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           drawPass(ctx as unknown as CanvasRenderingContext2D, color, 0, 0, true);
 
           if (embossStrength > 0) {
+            const absScale = shape.getAbsoluteScale();
+            const resolutionScale =
+              ctx.getCanvas().getPixelRatio() *
+              Math.max(Math.abs(absScale.x), Math.abs(absScale.y));
             drawInsetBevel(
               ctx as unknown as CanvasRenderingContext2D,
               bw,
               bh,
-              embossStrength,
+              embossStrength * EMBOSS_STRENGTH_SCALE,
               embossHighlightColor,
               embossShadowColor,
               (scratchCtx, offsetX, offsetY, fillColor) =>
-                drawPass(scratchCtx, fillColor, offsetX, offsetY, false)
+                drawPass(scratchCtx, fillColor, offsetX, offsetY, false),
+              resolutionScale
             );
           }
         }}

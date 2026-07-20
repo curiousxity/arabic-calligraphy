@@ -25,7 +25,7 @@ import {
   type SvgCmd,
 } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
-import { drawInsetBevel } from "../lib/emboss";
+import { drawInsetBevel, EMBOSS_STRENGTH_SCALE } from "../lib/emboss";
 import {
   applyGlyphEdit,
   applyGlyphRig,
@@ -403,7 +403,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
         shadowOffsetX={shadowOffsetX}
         shadowOffsetY={shadowOffsetY}
         shadowOpacity={shadowOpacity}
-        sceneFunc={(ctx) => {
+        sceneFunc={(ctx, shape) => {
           if (!shapeSvgPath || parsedCmds.length === 0) return;
 
           const lineH = fontSize * shapeFillSpacing;
@@ -536,15 +536,20 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           drawPass(ctx as unknown as CanvasRenderingContext2D, color, 0, 0, true);
 
           if (embossStrength > 0) {
+            const absScale = shape.getAbsoluteScale();
+            const resolutionScale =
+              ctx.getCanvas().getPixelRatio() *
+              Math.max(Math.abs(absScale.x), Math.abs(absScale.y));
             drawInsetBevel(
               ctx as unknown as CanvasRenderingContext2D,
               scaledW,
               scaledH,
-              embossStrength,
+              embossStrength * EMBOSS_STRENGTH_SCALE,
               embossHighlightColor,
               embossShadowColor,
               (scratchCtx, offsetX, offsetY, fillColor) =>
-                drawPass(scratchCtx, fillColor, offsetX, offsetY, false)
+                drawPass(scratchCtx, fillColor, offsetX, offsetY, false),
+              resolutionScale
             );
           }
         }}

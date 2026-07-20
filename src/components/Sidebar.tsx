@@ -1321,7 +1321,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       label="Strength"
                       value={selectedBlock.embossStrength ?? 0}
                       min={0}
-                      max={15}
+                      max={5}
                       onChange={(v) => onUpdateSelectedBlock({ embossStrength: v })}
                       suffix={selectedBlock.embossStrength ?? 0}
                       fieldKey="embossStrength"

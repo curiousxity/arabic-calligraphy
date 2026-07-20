@@ -4,7 +4,7 @@ import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import type { HarfBuzzGlyph, ShapedTextResult } from "../lib/harfbuzz";
 import { warpPoint, type GlyphBounds } from "../lib/warp";
-import { drawInsetBevel } from "../lib/emboss";
+import { drawInsetBevel, EMBOSS_STRENGTH_SCALE } from "../lib/emboss";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { useOverrideGlyph } from "../hooks/useOverrideGlyph";
 import {
@@ -784,7 +784,7 @@ export const ShapedText: React.FC<Props> = ({
         shadowOffsetX={shadowOffsetX}
         shadowOffsetY={shadowOffsetY}
         shadowOpacity={shadowOpacity}
-        sceneFunc={(ctx) => {
+        sceneFunc={(ctx, shape) => {
           if (!hbLoaded) return;
 
           const hasGlyphs =
@@ -824,11 +824,15 @@ export const ShapedText: React.FC<Props> = ({
           ctx.restore();
 
           if (embossStrength > 0) {
+            const absScale = shape.getAbsoluteScale();
+            const resolutionScale =
+              ctx.getCanvas().getPixelRatio() *
+              Math.max(Math.abs(absScale.x), Math.abs(absScale.y));
             drawInsetBevel(
               ctx as unknown as CanvasRenderingContext2D,
               bw,
               bh,
-              embossStrength,
+              embossStrength * EMBOSS_STRENGTH_SCALE,
               embossHighlightColor,
               embossShadowColor,
               (scratchCtx, offsetX, offsetY, fillColor) => {
@@ -856,7 +860,8 @@ export const ShapedText: React.FC<Props> = ({
                   glyphRigValues
                 );
                 scratchCtx.restore();
-              }
+              },
+              resolutionScale
             );
           }
 
