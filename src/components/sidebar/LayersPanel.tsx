@@ -97,7 +97,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
           type="button"
           onClick={() => selectedId != null && onDelete(selectedId)}
           disabled={selectedId == null}
-          className="sidebarCircleButton sidebarCircleButton--light"
+          className="sidebarCircleButton sidebarCircleButton--light sidebarCircleButton--danger"
           style={{ width: 22, height: 22 }}
           title="Delete selected layer"
           aria-label="Delete selected layer"

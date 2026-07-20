@@ -302,6 +302,7 @@ export const RangeRow = ({
 }) => {
   const defaultVal =
     fieldKey !== undefined ? SLIDER_DEFAULTS[fieldKey] ?? value : value;
+  const canReset = fieldKey !== undefined && value !== defaultVal;
 
   return (
     <label
@@ -309,11 +310,27 @@ export const RangeRow = ({
       htmlFor={id}
       title={fieldKey ? `Double-click to reset to ${defaultVal}` : undefined}
     >
-      <span className="fieldTitle">
-        {label}
-        {suffix !== undefined ? (
-          <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> {suffix}</span>
-        ) : null}
+      <span className="fieldTitle" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          {label}
+          {suffix !== undefined ? (
+            <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> {suffix}</span>
+          ) : null}
+        </span>
+        {canReset && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              onChange(defaultVal);
+            }}
+            className="rangeResetBtn"
+            title={`Reset to ${defaultVal}`}
+            aria-label={`Reset ${label.toLowerCase()} to ${defaultVal}`}
+          >
+            ↺
+          </button>
+        )}
       </span>
       <input
         id={id}

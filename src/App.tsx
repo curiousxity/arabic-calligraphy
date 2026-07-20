@@ -9,6 +9,7 @@ import type Konva from "konva";
 import { Sidebar } from "./components/Sidebar";
 import { CanvasStage } from "./components/CanvasStage";
 import { MorphGlyphEditor } from "./components/MorphGlyphEditor";
+import { ConfirmDialog, type ConfirmDialogRequest } from "./components/ConfirmDialog";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
@@ -36,6 +37,24 @@ const dissolveSingletonGroups = (list: Block[]): Block[] => {
 type EditorSnapshot = {
   blocks: Block[];
   backgroundColor: string;
+};
+
+/**
+ * A freshly-built block that hasn't been dropped onto the canvas yet — it
+ * follows the cursor as a ghost (rendered by CanvasStage, never part of
+ * `blocks`) until a click inside the canvas area commits it at that
+ * position. `block.x`/`block.y` here track the raw cursor position; the
+ * per-type placement convention (text is center-anchored, shape/image
+ * blocks are top-left-anchored) is reconciled via commitOffsetX/Y only at
+ * commit time.
+ */
+type PendingPlacement = {
+  block: Block;
+  width: number;
+  height: number;
+  commitOffsetX: number;
+  commitOffsetY: number;
+  label: string;
 };
 
 export type NamedProjectMeta = { name: string; savedAt: number };
@@ -139,6 +158,8 @@ const removeStretchHandle = (
 };
 
 const App: React.FC = () => {
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmDialogRequest | null>(null);
+  const [pendingPlacement, setPendingPlacement] = useState<PendingPlacement | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showGrid, setShowGrid] = useState(true);
@@ -897,6 +918,21 @@ const App: React.FC = () => {
     setTimeout(() => resetView(newBlocks), 0);
   };
 
+  const requestApplyStarterTemplate = (templateId: string) => {
+    const template = STARTER_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+    setConfirmRequest({
+      title: `Replace canvas with "${template.label}"?`,
+      message:
+        "This clears every block currently on the canvas. Ctrl+Z will bring your design back if you change your mind.",
+      confirmLabel: "Replace canvas",
+      onConfirm: () => {
+        setConfirmRequest(null);
+        applyStarterTemplate(templateId);
+      },
+    });
+  };
+
   const updateSelectedBlock = useCallback(
     (patch: Partial<Block>) => {
       if (!selectedBlock) return;
@@ -1130,6 +1166,14 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const stagePosFromClient = useCallback((clientX: number, clientY: number) => {
+    const stage = stageRef.current;
+    if (!stage) return { x: 0, y: 0 };
+    stage.setPointersPositions({ clientX, clientY });
+    const pos = stage.getRelativePointerPosition();
+    return { x: pos?.x ?? 0, y: pos?.y ?? 0 };
+  }, []);
+
   const zoomToBlock = useCallback(
     (id: number) => {
       const stage = stageRef.current;
@@ -1141,24 +1185,105 @@ const App: React.FC = () => {
     [zoomToRect]
   );
 
-  const addBlock = () => {
-    pushHistory();
-    const newId = createNextId();
-    const { x, y } = getCenterStagePos();
+  const beginPlacement = useCallback(
+    (block: Block, width: number, height: number, commitOffsetX: number, commitOffsetY: number, label: string) => {
+      const { x, y } = getCenterStagePos();
+      setPendingPlacement({
+        block: { ...block, x, y },
+        width,
+        height,
+        commitOffsetX,
+        commitOffsetY,
+        label,
+      });
+    },
+    [getCenterStagePos]
+  );
 
-    const newBlock: Block = {
-      ...DEFAULT_BLOCK,
-      id: newId,
-      text: "نَصٌّ جَدِيدٌ",
-      fontSize: DEFAULT_NEW_BLOCK_FONT_SIZE,
-      color: "#1e3a5f",
-      x,
-      y,
+  // Mirrors pendingPlacement so the click handler below can read the latest
+  // value synchronously without going through a setState updater — updater
+  // functions are called twice under StrictMode (it double-invokes them to
+  // catch impure ones), so the commit's side effects (pushHistory, setBlocks,
+  // ...) must not live inside one, or they'd double-fire.
+  const pendingPlacementRef = useRef<PendingPlacement | null>(null);
+  useEffect(() => {
+    pendingPlacementRef.current = pendingPlacement;
+  }, [pendingPlacement]);
+
+  // Drives the "new block follows the cursor until you click to drop it"
+  // flow: while a placement is pending, track the mouse over the canvas
+  // area only (never the sidebars) and commit/cancel on click/Escape.
+  useEffect(() => {
+    if (!pendingPlacement) return;
+    const container = canvasContainerRef.current;
+    if (!container) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const { x, y } = stagePosFromClient(e.clientX, e.clientY);
+      setPendingPlacement((prev) => (prev ? { ...prev, block: { ...prev.block, x, y } } : prev));
     };
 
-    setBlocks((prev) => [...prev, newBlock]);
-    setSelectedIds([]);
-    setSelectedId(newId);
+    const handleClick = (e: MouseEvent) => {
+      const prev = pendingPlacementRef.current;
+      if (!prev) return;
+      const { x, y } = stagePosFromClient(e.clientX, e.clientY);
+      pushHistory();
+      const finalBlock: Block = {
+        ...prev.block,
+        x: x + prev.commitOffsetX,
+        y: y + prev.commitOffsetY,
+      };
+      setBlocks((bs) => [...bs, finalBlock]);
+      setSelectedIds([]);
+      setSelectedId(finalBlock.id);
+      setPendingPlacement(null);
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      setPendingPlacement(null);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPendingPlacement(null);
+    };
+
+    const prevCursor = container.style.cursor;
+    container.style.cursor = "crosshair";
+    container.addEventListener("mousemove", handleMouseMove);
+    container.addEventListener("click", handleClick);
+    container.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      container.style.cursor = prevCursor;
+      container.removeEventListener("mousemove", handleMouseMove);
+      container.removeEventListener("click", handleClick);
+      container.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+    // Re-runs only when placement starts/ends (not on every cursor-follow
+    // update) — handlers close over the latest state via functional setState.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPlacement != null, pushHistory, stagePosFromClient]);
+
+  const addBlock = () => {
+    const newId = createNextId();
+    beginPlacement(
+      {
+        ...DEFAULT_BLOCK,
+        id: newId,
+        text: "نَصٌّ جَدِيدٌ",
+        fontSize: DEFAULT_NEW_BLOCK_FONT_SIZE,
+        color: "#1e3a5f",
+        x: 0,
+        y: 0,
+      },
+      160,
+      60,
+      0,
+      0,
+      "New Text"
+    );
   };
 
   const duplicateSelectedBlock = () => {
@@ -1341,6 +1466,19 @@ const App: React.FC = () => {
     refreshNamedProjectsList(store);
   };
 
+  const requestDeleteNamedProject = (name: string) => {
+    setConfirmRequest({
+      title: `Delete "${name}"?`,
+      message:
+        "This removes the saved project from this browser for good — unlike canvas edits, it isn't covered by Ctrl+Z.",
+      confirmLabel: "Delete project",
+      onConfirm: () => {
+        setConfirmRequest(null);
+        deleteNamedProject(name);
+      },
+    });
+  };
+
   const downloadLayout = () => {
     const json = JSON.stringify(buildLayoutPayload(), null, 2);
     const blob = new Blob([json], { type: "application/json" });
@@ -1418,33 +1556,33 @@ const App: React.FC = () => {
     shapeWidth: number,
     shapeHeight: number
   ) => {
-    pushHistory();
     const newId = createNextId();
-    const { x, y } = getCenterStagePos();
-
     const autoFontSize = Math.max(8, Math.round(shapeHeight / 18));
 
-    const newBlock: Block = {
-      ...DEFAULT_BLOCK,
-      id: newId,
-      text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
-      fontSize: autoFontSize,
-      type: "shapeFill",
-      shapeSvgPath: svgPathData,
+    beginPlacement(
+      {
+        ...DEFAULT_BLOCK,
+        id: newId,
+        text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
+        fontSize: autoFontSize,
+        type: "shapeFill",
+        shapeSvgPath: svgPathData,
+        shapeWidth,
+        shapeHeight,
+        shapeScale: 1,
+        shapeFillSpacing: 1.4,
+        shapeFillScaleX: 1,
+        shapeFillScaleY: 1,
+        shapeFillTextRotation: 0,
+        x: 0,
+        y: 0,
+      },
       shapeWidth,
       shapeHeight,
-      shapeScale: 1,
-      shapeFillSpacing: 1.4,
-      shapeFillScaleX: 1,
-      shapeFillScaleY: 1,
-      shapeFillTextRotation: 0,
-      x: x - shapeWidth / 2,
-      y: y - shapeHeight / 2,
-    };
-
-    setBlocks((prev) => [...prev, newBlock]);
-    setSelectedIds([]);
-    setSelectedId(newId);
+      -shapeWidth / 2,
+      -shapeHeight / 2,
+      "New Shape Fill"
+    );
   };
 
   const addShapeWarpBlock = (
@@ -1452,62 +1590,62 @@ const App: React.FC = () => {
     shapeWidth: number,
     shapeHeight: number
   ) => {
-    pushHistory();
     const newId = createNextId();
-    const { x, y } = getCenterStagePos();
-
     const autoFontSize = Math.max(8, Math.round(shapeHeight / 6));
 
-    const newBlock: Block = {
-      ...DEFAULT_BLOCK,
-      id: newId,
-      text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
-      fontSize: autoFontSize,
-      type: "shapeWarp",
-      shapeSvgPath: svgPathData,
-      warpShapeWidth: shapeWidth,
-      warpShapeHeight: shapeHeight,
-      warpShapePadding: 24,
-      warpShapeStrength: 1,
-      warpShapeMode: "envelope",
-      x: x - shapeWidth / 2,
-      y: y - shapeHeight / 2,
-      glyphEditTool: null,
-      selectedGlyphIndex: null,
-      glyphEdits: [],
-    };
-
-    setBlocks((prev) => [...prev, newBlock]);
-    setSelectedIds([]);
-    setSelectedId(newId);
+    beginPlacement(
+      {
+        ...DEFAULT_BLOCK,
+        id: newId,
+        text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
+        fontSize: autoFontSize,
+        type: "shapeWarp",
+        shapeSvgPath: svgPathData,
+        warpShapeWidth: shapeWidth,
+        warpShapeHeight: shapeHeight,
+        warpShapePadding: 24,
+        warpShapeStrength: 1,
+        warpShapeMode: "envelope",
+        x: 0,
+        y: 0,
+        glyphEditTool: null,
+        selectedGlyphIndex: null,
+        glyphEdits: [],
+      },
+      shapeWidth,
+      shapeHeight,
+      -shapeWidth / 2,
+      -shapeHeight / 2,
+      "New Shape Warp"
+    );
   };
 
   const addImageBlock = (dataUrl: string, naturalWidth: number, naturalHeight: number) => {
-    pushHistory();
     const newId = createNextId();
-    const { x, y } = getCenterStagePos();
-
     const maxDim = (Math.max(canvasWidth, stageViewportHeight) / stageScale) * 0.6;
     const fitScale = Math.min(1, maxDim / Math.max(naturalWidth, naturalHeight, 1));
     const displayWidth = naturalWidth * fitScale;
     const displayHeight = naturalHeight * fitScale;
 
-    const newBlock: Block = {
-      ...DEFAULT_BLOCK,
-      id: newId,
-      text: "",
-      type: "image",
-      imageDataUrl: dataUrl,
-      imageScale: 1,
-      shapeWidth: displayWidth,
-      shapeHeight: displayHeight,
-      x: x - displayWidth / 2,
-      y: y - displayHeight / 2,
-    };
-
-    setBlocks((prev) => [...prev, newBlock]);
-    setSelectedIds([]);
-    setSelectedId(newId);
+    beginPlacement(
+      {
+        ...DEFAULT_BLOCK,
+        id: newId,
+        text: "",
+        type: "image",
+        imageDataUrl: dataUrl,
+        imageScale: 1,
+        shapeWidth: displayWidth,
+        shapeHeight: displayHeight,
+        x: 0,
+        y: 0,
+      },
+      displayWidth,
+      displayHeight,
+      -displayWidth / 2,
+      -displayHeight / 2,
+      "New Image"
+    );
   };
 
   const uploadImageBlock = () => {
@@ -1616,11 +1754,11 @@ const App: React.FC = () => {
         namedProjects={namedProjects}
         onSaveNamedProject={saveNamedProject}
         onLoadNamedProject={loadNamedProject}
-        onDeleteNamedProject={deleteNamedProject}
+        onDeleteNamedProject={requestDeleteNamedProject}
         onAddShapeFillBlock={addShapeFillBlock}
         onAddShapeWarpBlock={addShapeWarpBlock}
         onAddImageBlock={uploadImageBlock}
-        onApplyTemplate={applyStarterTemplate}
+        onApplyTemplate={requestApplyStarterTemplate}
         onToggleGrid={setShowGrid}
         onToggleSnap={setSnapToGrid}
         showRulers={showRulers}
@@ -1710,6 +1848,17 @@ const App: React.FC = () => {
           onKashidaTextChange={updateKashidaText}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           onResizeImageBlock={resizeImageBlock}
+          ghostBlock={
+            pendingPlacement
+              ? {
+                  x: pendingPlacement.block.x,
+                  y: pendingPlacement.block.y,
+                  width: pendingPlacement.width,
+                  height: pendingPlacement.height,
+                  label: pendingPlacement.label,
+                }
+              : null
+          }
         />
       </div>
 
@@ -1736,6 +1885,8 @@ const App: React.FC = () => {
         mobileOpen={showMorphEditorMobile}
         onCloseMobile={() => setShowMorphEditorMobile(false)}
       />
+
+      <ConfirmDialog request={confirmRequest} onCancel={() => setConfirmRequest(null)} />
     </div>
   );
 };

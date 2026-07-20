@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Stage, Layer, Group, Rect, Line } from "react-konva";
+import { Stage, Layer, Group, Rect, Line, Text } from "react-konva";
 import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
@@ -84,6 +84,8 @@ export type CanvasStageProps = {
   onAddGuide: (axis: "horizontal" | "vertical", position: number) => void;
   onMoveGuide: (axis: "horizontal" | "vertical", index: number, position: number) => void;
   onRemoveGuide: (axis: "horizontal" | "vertical", index: number) => void;
+  /** A new block awaiting placement — follows the cursor until the user clicks to drop it (see App.tsx's pendingPlacement). */
+  ghostBlock?: { x: number; y: number; width: number; height: number; label: string } | null;
 };
 
 const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
@@ -121,6 +123,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onAddGuide,
   onMoveGuide,
   onRemoveGuide,
+  ghostBlock,
 }) => {
   const snapCoord = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
@@ -783,6 +786,35 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 dash={[4 / stageScale, 3 / stageScale]}
                 listening={false}
               />
+            )}
+
+            {ghostBlock && (
+              <Group
+                x={ghostBlock.x - ghostBlock.width / 2}
+                y={ghostBlock.y - ghostBlock.height / 2}
+                listening={false}
+                opacity={0.85}
+              >
+                <Rect
+                  width={ghostBlock.width}
+                  height={ghostBlock.height}
+                  cornerRadius={8}
+                  fill="rgba(212, 175, 55, 0.15)"
+                  stroke="#d4af37"
+                  strokeWidth={1.5 / stageScale}
+                  dash={[8 / stageScale, 5 / stageScale]}
+                />
+                <Text
+                  text={ghostBlock.label}
+                  width={ghostBlock.width}
+                  height={ghostBlock.height}
+                  align="center"
+                  verticalAlign="middle"
+                  fontSize={13 / stageScale}
+                  fill="#d4af37"
+                  listening={false}
+                />
+              </Group>
             )}
           </Layer>
         </Stage>
