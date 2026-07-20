@@ -113,6 +113,8 @@ const STORAGE_KEY = "calligraphy-layout-v2";
 const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
 const GLYPH_RIGS_KEY = "harfcanvas-glyph-rigs-v1";
 const SIDEBAR_COLLAPSED_WIDTH = 28;
+/** Zoom level for the very first paint of the default starter content (a fresh session, no saved layout). */
+const INITIAL_VIEW_SCALE = 2.75;
 const RIGHT_PANEL_WIDTH = 280;
 const DEFAULT_TEXT_FONT_SIZE = 53;
 const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
@@ -678,10 +680,11 @@ const App: React.FC = () => {
 
   /**
    * Like `resetView`, but anchors the content's top edge near the top of the
-   * viewport (7% down) instead of vertically centering it — used only for
-   * the very first paint of the default starter content, not general
-   * "fit all content" (that's what the toolbar's Reset View button and
-   * `resetView` are for).
+   * viewport (7% down) instead of vertically centering it, and always zooms
+   * to `INITIAL_VIEW_SCALE` rather than fitting content to the viewport —
+   * used only for the very first paint of the default starter content, not
+   * general "fit all content" (that's what the toolbar's Reset View button
+   * and `resetView` are for).
    */
   const fitInitialView = useCallback(
     (targetBlocks: Block[]) => {
@@ -689,11 +692,10 @@ const App: React.FC = () => {
       const stage = stageRef.current;
       const box = stage ? getBlocksBoundingBox(stage, targetBlocks) : null;
       const b = padBox(box ?? DEFAULT_EMPTY_BOUNDS);
-      const fit = computeFitToBox(canvasWidth, stageViewportHeight, b, 0);
-      setStageScale(fit.scale);
+      setStageScale(INITIAL_VIEW_SCALE);
       setStagePosition({
-        x: canvasWidth / 2 - (b.x + b.width / 2) * fit.scale,
-        y: stageViewportHeight * 0.07 - b.y * fit.scale,
+        x: canvasWidth / 2 - (b.x + b.width / 2) * INITIAL_VIEW_SCALE,
+        y: stageViewportHeight * 0.07 - b.y * INITIAL_VIEW_SCALE,
       });
       setPanMode(false);
     },
