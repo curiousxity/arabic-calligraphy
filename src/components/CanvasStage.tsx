@@ -712,6 +712,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   glyphEditTool={block.glyphEditTool ?? null}
                   selectedGlyphIndex={block.selectedGlyphIndex ?? null}
                   glyphEdits={block.glyphEdits ?? []}
+                  glyphMaskEdit={block.glyphMaskEdit ?? null}
                   glyphRigs={glyphRigs}
                   glyphRigValues={block.glyphRigValues ?? []}
                   onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}

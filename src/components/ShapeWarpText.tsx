@@ -639,7 +639,10 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
                   g.g,
                   fontSize,
                   glyphRigs,
-                  glyphRigValues
+                  glyphRigValues,
+                  -1,
+                  gx,
+                  gy
                 );
 
                 return applyShapeWarpPoint(

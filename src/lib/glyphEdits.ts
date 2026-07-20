@@ -1,8 +1,37 @@
-import type { GlyphEdit, GlyphRig, GlyphRigValue } from "../types";
+import type { GlyphEdit, GlyphRig, GlyphRigValue, GlyphStretchMask } from "../types";
 
 export const MOVE_HANDLE_COLOR = "#4d94ff";
 export const STRETCH_ANCHOR_COLOR = "#ff4d4f";
 export const STRETCH_DRAG_COLOR = "#22c55e";
+export const MASK_CONTOUR_ON_COLOR = "#22c55e";
+export const MASK_CONTOUR_OFF_COLOR = "#9ca3af";
+export const MASK_LASSO_COLOR = "#22c55e";
+
+/** Standard ray-casting point-in-polygon test (even-odd rule). */
+function pointInPolygon(x: number, y: number, poly: { x: number; y: number }[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x;
+    const yi = poly[i].y;
+    const xj = poly[j].x;
+    const yj = poly[j].y;
+    const intersects =
+      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Whether a point (in the same "original, undisplaced" coordinate space the
+ * mask was authored in) is eligible for a handle/axis's displacement. No
+ * mask = every point is eligible, matching the pre-mask behavior.
+ */
+function passesMask(mask: GlyphStretchMask | undefined, x: number, y: number, contourIndex: number): boolean {
+  if (!mask) return true;
+  if (mask.mode === "contours") return mask.contourIndices.includes(contourIndex);
+  return pointInPolygon(x, y, mask.points);
+}
 
 type AxisGeometry = {
   anchorX: number;
@@ -71,7 +100,8 @@ function applyAxisDisplacement(
 export function applyGlyphEdit(
   x: number,
   y: number,
-  edit: GlyphEdit | undefined
+  edit: GlyphEdit | undefined,
+  contourIndex = -1
 ): { x: number; y: number } {
   if (!edit) return { x, y };
 
@@ -79,6 +109,9 @@ export function applyGlyphEdit(
   let py = y;
 
   for (const h of edit.stretches) {
+    // Masked against the original (pre-stretch) position so a point can't be
+    // carried out of, or into, its own mask by an earlier handle in the chain.
+    if (!passesMask(h.mask, x, y, contourIndex)) continue;
     const p = applyAxisDisplacement(px, py, h, 1);
     px = p.x;
     py = p.y;
@@ -110,7 +143,15 @@ export function applyGlyphRig(
   glyphId: number,
   fontSize: number,
   glyphRigs: GlyphRig[],
-  values: GlyphRigValue[] | undefined
+  values: GlyphRigValue[] | undefined,
+  contourIndex = -1,
+  // This glyph occurrence's own pen offset — axis geometry is authored
+  // relative to the glyph's own origin (see saveStretchHandleAsRig), so it
+  // has to be re-added here to land at the right spot for THIS occurrence,
+  // which generally sits at a different pen position than the one the axis
+  // was authored on.
+  gx = 0,
+  gy = 0
 ): { x: number; y: number } {
   if (!values?.length) return { x, y };
 
@@ -126,13 +167,30 @@ export function applyGlyphRig(
     const axis = rig.axes.find((a) => a.id === v.axisId);
     if (!axis) continue;
 
+    // Em-relative mask geometry, rescaled by the consuming block's fontSize
+    // and re-offset by this occurrence's gx/gy, just like the rest of this
+    // axis (see the module comment above).
+    const mask: GlyphStretchMask | undefined =
+      axis.mask == null
+        ? undefined
+        : axis.mask.mode === "contours"
+          ? axis.mask
+          : {
+              mode: "lasso",
+              points: axis.mask.points.map((p) => ({
+                x: p.x * fontSize + gx,
+                y: p.y * fontSize + gy,
+              })),
+            };
+    if (!passesMask(mask, x, y, contourIndex)) continue;
+
     const scaled: AxisGeometry = {
-      anchorX: axis.anchorX * fontSize,
-      anchorY: axis.anchorY * fontSize,
-      dragOriginX: axis.dragOriginX * fontSize,
-      dragOriginY: axis.dragOriginY * fontSize,
-      dragX: axis.dragX * fontSize,
-      dragY: axis.dragY * fontSize,
+      anchorX: axis.anchorX * fontSize + gx,
+      anchorY: axis.anchorY * fontSize + gy,
+      dragOriginX: axis.dragOriginX * fontSize + gx,
+      dragOriginY: axis.dragOriginY * fontSize + gy,
+      dragX: axis.dragX * fontSize + gx,
+      dragY: axis.dragY * fontSize + gy,
       bandWidth: axis.bandWidth * fontSize,
     };
 

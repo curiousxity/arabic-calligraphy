@@ -341,10 +341,25 @@ const App: React.FC = () => {
   const selectGlyphForBlock = useCallback((blockId: number, glyphIndex: number | null) => {
     setBlocks((prev) =>
       prev.map((b) =>
-        b.id === blockId && b.type !== "image" ? { ...b, selectedGlyphIndex: glyphIndex } : b
+        b.id === blockId && b.type !== "image"
+          ? { ...b, selectedGlyphIndex: glyphIndex, glyphMaskEdit: null }
+          : b
       )
     );
   }, []);
+
+  const setGlyphMaskEditMode = useCallback(
+    (blockId: number, handleId: string, mode: "contours" | "lasso" | null) => {
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && b.type !== "image"
+            ? { ...b, glyphMaskEdit: mode ? { handleId, mode } : null }
+            : b
+        )
+      );
+    },
+    []
+  );
 
   const updateGlyphBoxes = useCallback((blockId: number, boxes: GlyphBox[]) => {
     setGlyphBoxesByBlock((prev) => {
@@ -418,7 +433,11 @@ const App: React.FC = () => {
       setBlocks((prev) =>
         prev.map((b) => {
           if (b.id !== blockId || b.type === "image") return b;
-          return { ...b, glyphEdits: removeStretchHandle(b.glyphEdits ?? [], glyphIndex, handleId) };
+          return {
+            ...b,
+            glyphEdits: removeStretchHandle(b.glyphEdits ?? [], glyphIndex, handleId),
+            glyphMaskEdit: b.glyphMaskEdit?.handleId === handleId ? null : b.glyphMaskEdit,
+          };
         })
       );
     },
@@ -452,6 +471,18 @@ const App: React.FC = () => {
         dragX: (handle.dragX - gx) / fontSize,
         dragY: (handle.dragY - gy) / fontSize,
         bandWidth: handle.bandWidth / fontSize,
+        mask:
+          handle.mask == null
+            ? undefined
+            : handle.mask.mode === "contours"
+              ? handle.mask
+              : {
+                  mode: "lasso",
+                  points: handle.mask.points.map((p) => ({
+                    x: (p.x - gx) / fontSize,
+                    y: (p.y - gy) / fontSize,
+                  })),
+                },
       };
 
       // Library mutation — deliberately not wrapped in pushHistory(); see
@@ -1688,12 +1719,13 @@ const App: React.FC = () => {
         glyphRigs={glyphRigs}
         onSetGlyphEditTool={(tool) => {
           if (!selectedBlock || selectedBlock.type === "image") return;
-          updateSelectedBlock({ glyphEditTool: tool });
+          updateSelectedBlock({ glyphEditTool: tool, glyphMaskEdit: null });
         }}
         onSetGlyphMoveOffset={setGlyphMoveOffset}
         onAddStretchHandle={addStretchHandle}
         onUpdateStretchHandle={updateStretchHandle}
         onDeleteStretchHandle={deleteStretchHandle}
+        onSetGlyphMaskEditMode={setGlyphMaskEditMode}
         onSaveStretchHandleAsRig={saveStretchHandleAsRig}
         onSetGlyphRigValue={setGlyphRigValue}
         onDeleteGlyphRigAxis={deleteGlyphRigAxis}

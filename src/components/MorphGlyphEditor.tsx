@@ -35,6 +35,11 @@ export type MorphGlyphEditorProps = {
     patch: Partial<GlyphStretchHandle>
   ) => void;
   onDeleteStretchHandle?: (blockId: number, glyphIndex: number, handleId: string) => void;
+  onSetGlyphMaskEditMode?: (
+    blockId: number,
+    handleId: string,
+    mode: "contours" | "lasso" | null
+  ) => void;
   onSaveStretchHandleAsRig?: (
     blockId: number,
     glyphIndex: number,
@@ -69,6 +74,7 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
   onAddStretchHandle,
   onUpdateStretchHandle,
   onDeleteStretchHandle,
+  onSetGlyphMaskEditMode,
   onSaveStretchHandleAsRig,
   onSetGlyphRigValue,
   onDeleteGlyphRigAxis,
@@ -274,6 +280,100 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                           }
                           suffix={`${Math.round(h.bandWidth)}px`}
                         />
+
+                        {(() => {
+                          const armedMode =
+                            selectedBlock.glyphMaskEdit?.handleId === h.id
+                              ? selectedBlock.glyphMaskEdit.mode
+                              : null;
+                          const activeStyle = {
+                            background: "var(--accent)",
+                            color: "var(--text-on-accent)",
+                          };
+                          const statusLabel =
+                            h.mask == null
+                              ? "Affects the whole glyph"
+                              : h.mask.mode === "contours"
+                                ? `Affects ${h.mask.contourIndices.length} selected stroke${h.mask.contourIndices.length === 1 ? "" : "s"}`
+                                : "Affects a lassoed region";
+
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <button
+                                  type="button"
+                                  className="sidebarPillButton"
+                                  style={h.mask == null ? activeStyle : undefined}
+                                  onClick={() => {
+                                    onUpdateStretchHandle?.(selectedBlock.id, glyphIndex, h.id, {
+                                      mask: undefined,
+                                    });
+                                    onSetGlyphMaskEditMode?.(selectedBlock.id, h.id, null);
+                                  }}
+                                >
+                                  Whole glyph
+                                </button>
+                                <button
+                                  type="button"
+                                  className="sidebarPillButton"
+                                  style={
+                                    armedMode === "contours" || h.mask?.mode === "contours"
+                                      ? activeStyle
+                                      : undefined
+                                  }
+                                  onClick={() =>
+                                    onSetGlyphMaskEditMode?.(selectedBlock.id, h.id, "contours")
+                                  }
+                                >
+                                  By stroke
+                                </button>
+                                <button
+                                  type="button"
+                                  className="sidebarPillButton"
+                                  style={
+                                    armedMode === "lasso" || h.mask?.mode === "lasso"
+                                      ? activeStyle
+                                      : undefined
+                                  }
+                                  onClick={() =>
+                                    onSetGlyphMaskEditMode?.(selectedBlock.id, h.id, "lasso")
+                                  }
+                                >
+                                  Lasso
+                                </button>
+                              </div>
+                              {armedMode != null ? (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    gap: 6,
+                                  }}
+                                >
+                                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                                    {armedMode === "contours"
+                                      ? "Click strokes on the canvas to include them."
+                                      : "Drag a loop on the canvas around the stroke."}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      onSetGlyphMaskEditMode?.(selectedBlock.id, h.id, null)
+                                    }
+                                    className="sidebarSmallAction"
+                                  >
+                                    Done
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                                  {statusLabel}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         <div style={{ display: "flex", gap: 6 }}>
                           <input

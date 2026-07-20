@@ -63,6 +63,64 @@ describe("applyGlyphEdit", () => {
     expect(p.x).toBeCloseTo(15);
     expect(p.y).toBeCloseTo(5);
   });
+
+  it("with a contour mask, only displaces points in a listed contour", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 20,
+          mask: { mode: "contours", contourIndices: [1] },
+        },
+      ],
+    };
+    const inContour = applyGlyphEdit(100, 0, edit, 1);
+    expect(inContour.x).toBeCloseTo(150);
+
+    const outsideContour = applyGlyphEdit(100, 0, edit, 0);
+    expect(outsideContour.x).toBeCloseTo(100);
+  });
+
+  it("with a lasso mask, only displaces points inside the polygon", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 20,
+          mask: {
+            mode: "lasso",
+            points: [
+              { x: 80, y: -10 },
+              { x: 120, y: -10 },
+              { x: 120, y: 10 },
+              { x: 80, y: 10 },
+            ],
+          },
+        },
+      ],
+    };
+    const inside = applyGlyphEdit(100, 0, edit);
+    expect(inside.x).toBeCloseTo(150);
+
+    // On the axis (perpDist 0, well within the band) but outside the lasso's x range.
+    const outside = applyGlyphEdit(200, 0, edit);
+    expect(outside.x).toBeCloseTo(200);
+    expect(outside.y).toBeCloseTo(0);
+  });
 });
 
 describe("applyGlyphRig", () => {
@@ -132,5 +190,15 @@ describe("applyGlyphRig", () => {
 
     const negative = applyGlyphRig(100, 0, "Thuluth", 42, 100, [rig], [{ axisId: "axis1", value: -1 }]);
     expect(negative.x).toBeCloseTo(50);
+  });
+
+  it("re-offsets axis geometry by this occurrence's own gx/gy, not the authoring occurrence's", () => {
+    // Axis geometry is glyph-local (authored with the authoring occurrence's
+    // gx already subtracted out — see saveStretchHandleAsRig). A DIFFERENT
+    // occurrence of the same letter, sitting at gx=500 in its own line, must
+    // get the same relative displacement applied around ITS OWN pen position
+    // (dragOrigin at 500+100=600), not around x=0.
+    const p = applyGlyphRig(600, 0, "Thuluth", 42, 100, [rig], [{ axisId: "axis1", value: 1 }], -1, 500, 0);
+    expect(p.x).toBeCloseTo(650);
   });
 });

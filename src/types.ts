@@ -4,6 +4,20 @@ export type TextAlign = "left" | "center" | "right";
 export type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
 export type GlyphMoveEdit = { offsetX: number; offsetY: number };
 
+/**
+ * Restricts a stretch handle to a subset of a glyph's outline points, for
+ * letter pairs a font's ligature table has fused into one glyph/contour
+ * (band-falloff alone can't tell "the haa's tail" from "the ra" apart in
+ * that case). Absent = today's whole-glyph band falloff, unchanged.
+ *  - "contours": only points in these closed sub-paths of the glyph outline
+ *    (0-indexed in path-command order) are eligible for displacement.
+ *  - "lasso": only points inside this freehand polygon (same coordinate
+ *    space as anchorX/dragX above) are eligible.
+ */
+export type GlyphStretchMask =
+  | { mode: "contours"; contourIndices: number[] }
+  | { mode: "lasso"; points: { x: number; y: number }[] };
+
 export type GlyphStretchHandle = {
   id: string;
   anchorX: number;
@@ -15,6 +29,7 @@ export type GlyphStretchHandle = {
   dragX: number;
   dragY: number;
   bandWidth: number;
+  mask?: GlyphStretchMask;
 };
 
 export type GlyphEdit = {
@@ -42,6 +57,8 @@ export type GlyphRigAxis = {
   dragX: number;
   dragY: number;
   bandWidth: number;
+  /** Same meaning as GlyphStretchHandle.mask; "lasso" points are em-relative like the rest of this axis's geometry. */
+  mask?: GlyphStretchMask;
 };
 
 export type GlyphRig = {
@@ -88,6 +105,8 @@ type BlockCommon = {
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
   glyphRigValues?: GlyphRigValue[];
+  /** Which stretch handle (if any) is currently having its point mask authored, and how — text blocks only for now. */
+  glyphMaskEdit?: { handleId: string; mode: "contours" | "lasso" } | null;
 
   // Shared shape-import fields. shapeFill and shapeWarp blocks both carry an
   // uploaded SVG path, and shapeWarp falls back to shapeWidth/shapeHeight

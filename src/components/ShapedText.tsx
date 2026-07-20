@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Group, Shape, Rect, Arc, Circle } from "react-konva";
+import { Group, Shape, Rect, Arc, Circle, Path, Line } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import type { HarfBuzzGlyph, ShapedTextResult } from "../lib/harfbuzz";
@@ -12,8 +12,17 @@ import {
   MOVE_HANDLE_COLOR,
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
+  MASK_CONTOUR_ON_COLOR,
+  MASK_CONTOUR_OFF_COLOR,
+  MASK_LASSO_COLOR,
 } from "../lib/glyphEdits";
-import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
+import type {
+  GlyphEdit,
+  GlyphStretchHandle,
+  GlyphRig,
+  GlyphRigValue,
+  GlyphStretchMask,
+} from "../types";
 import {
   isOverrideGlyphChar,
   OVERRIDE_SCALE,
@@ -51,6 +60,7 @@ type Props = {
   glyphEditTool?: "move" | "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
+  glyphMaskEdit?: { handleId: string; mode: "contours" | "lasso" } | null;
   glyphRigs?: GlyphRig[];
   glyphRigValues?: GlyphRigValue[];
   onGlyphSelect?: (glyphIndex: number | null) => void;
@@ -99,6 +109,49 @@ type KashidaGap = {
   baseText: string;
   existingCount: number;
 };
+
+/** Splits a glyph's path commands into its closed sub-paths (contours), one array per "M...Z" run. */
+function splitContours(commands: PathCommand[]): PathCommand[][] {
+  const contours: PathCommand[][] = [];
+  let current: PathCommand[] = [];
+  for (const cmd of commands) {
+    if (cmd.type === "M") {
+      if (current.length) contours.push(current);
+      current = [cmd];
+    } else {
+      current.push(cmd);
+    }
+  }
+  if (current.length) contours.push(current);
+  return contours;
+}
+
+/** Renders path commands (offset by dx/dy) as an SVG path `d` string, for Konva's <Path>. */
+function commandsToSvgPath(commands: PathCommand[], dx: number, dy: number): string {
+  const parts: string[] = [];
+  for (const cmd of commands) {
+    switch (cmd.type) {
+      case "M":
+        parts.push(`M${cmd.x + dx},${cmd.y + dy}`);
+        break;
+      case "L":
+        parts.push(`L${cmd.x + dx},${cmd.y + dy}`);
+        break;
+      case "C":
+        parts.push(
+          `C${cmd.x1 + dx},${cmd.y1 + dy} ${cmd.x2 + dx},${cmd.y2 + dy} ${cmd.x + dx},${cmd.y + dy}`
+        );
+        break;
+      case "Q":
+        parts.push(`Q${cmd.x1 + dx},${cmd.y1 + dy} ${cmd.x + dx},${cmd.y + dy}`);
+        break;
+      case "Z":
+        parts.push("Z");
+        break;
+    }
+  }
+  return parts.join(" ");
+}
 
 function tracePath(ctx: CanvasRenderingContext2D, commands: PathCommand[]) {
   ctx.beginPath();
@@ -183,6 +236,7 @@ function drawWarpedGlyphRun(
       tracePath(ctx, overrideGlyph.commands as unknown as PathCommand[]);
     } else {
       const opPath = glyphObj.getPath(0, 0, fontSize);
+      let contourIndex = -1;
       const cmds: PathCommand[] = opPath.commands.map((cmd) => {
         type MutableCmd = {
           type: PathCommand["type"];
@@ -196,8 +250,10 @@ function drawWarpedGlyphRun(
         const c = cmd as MutableCmd;
         const out: MutableCmd = { ...c };
 
+        if (c.type === "M") contourIndex++;
+
         if (typeof c.x === "number" && typeof c.y === "number") {
-          const handled = applyGlyphEdit(c.x + gx, c.y + gy, edit);
+          const handled = applyGlyphEdit(c.x + gx, c.y + gy, edit, contourIndex);
           const rigged = applyGlyphRig(
             handled.x,
             handled.y,
@@ -205,7 +261,10 @@ function drawWarpedGlyphRun(
             g.g,
             fontSize,
             glyphRigs,
-            glyphRigValues
+            glyphRigValues,
+            contourIndex,
+            gx,
+            gy
           );
           const p = warpPoint(
             rigged.x,
@@ -221,7 +280,7 @@ function drawWarpedGlyphRun(
         }
 
         if (typeof c.x1 === "number" && typeof c.y1 === "number") {
-          const handled1 = applyGlyphEdit(c.x1 + gx, c.y1 + gy, edit);
+          const handled1 = applyGlyphEdit(c.x1 + gx, c.y1 + gy, edit, contourIndex);
           const rigged1 = applyGlyphRig(
             handled1.x,
             handled1.y,
@@ -229,7 +288,10 @@ function drawWarpedGlyphRun(
             g.g,
             fontSize,
             glyphRigs,
-            glyphRigValues
+            glyphRigValues,
+            contourIndex,
+            gx,
+            gy
           );
           const p1 = warpPoint(
             rigged1.x,
@@ -245,7 +307,7 @@ function drawWarpedGlyphRun(
         }
 
         if (typeof c.x2 === "number" && typeof c.y2 === "number") {
-          const handled2 = applyGlyphEdit(c.x2 + gx, c.y2 + gy, edit);
+          const handled2 = applyGlyphEdit(c.x2 + gx, c.y2 + gy, edit, contourIndex);
           const rigged2 = applyGlyphRig(
             handled2.x,
             handled2.y,
@@ -253,7 +315,10 @@ function drawWarpedGlyphRun(
             g.g,
             fontSize,
             glyphRigs,
-            glyphRigValues
+            glyphRigValues,
+            contourIndex,
+            gx,
+            gy
           );
           const p2 = warpPoint(
             rigged2.x,
@@ -321,6 +386,7 @@ export const ShapedText: React.FC<Props> = ({
   glyphEditTool = null,
   selectedGlyphIndex = null,
   glyphEdits = [],
+  glyphMaskEdit = null,
   glyphRigs = [],
   glyphRigValues = [],
   onGlyphSelect,
@@ -488,6 +554,25 @@ export const ShapedText: React.FC<Props> = ({
     onGlyphBoxesChange?.(glyphHitBoxes);
   }, [glyphHitBoxes, onGlyphBoxesChange]);
 
+  /** The selected glyph's outline split into contours, in the same text-space coords as stretch anchor/drag points — used by the "by stroke" mask-editing overlay. */
+  const selectedGlyphContours = useMemo(() => {
+    if (selectedGlyphIndex == null) return [];
+    const { font, glyphs } = shapeData;
+    const g = font ? glyphs[selectedGlyphIndex] : undefined;
+    const glyphObj = g ? font!.glyphs.get(g.g) : undefined;
+    if (!glyphObj) return [];
+
+    const box = glyphHitBoxes.find((b) => b.glyphIndex === selectedGlyphIndex);
+    const gx = box?.gx ?? 0;
+    const gy = box?.gy ?? 0;
+    const commands = glyphObj.getPath(0, 0, fontSize).commands as PathCommand[];
+
+    return splitContours(commands).map((cmds, contourIndex) => ({
+      contourIndex,
+      data: commandsToSvgPath(cmds, gx, gy),
+    }));
+  }, [shapeData, selectedGlyphIndex, glyphHitBoxes, fontSize]);
+
   const selectedEdit =
     glyphEditTool != null && selectedGlyphIndex != null
       ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
@@ -497,6 +582,11 @@ export const ShapedText: React.FC<Props> = ({
   const selectedGlyphBox =
     selectedGlyphIndex != null
       ? glyphHitBoxes.find((b) => b.glyphIndex === selectedGlyphIndex)
+      : undefined;
+
+  const activeMaskHandle =
+    glyphMaskEdit != null
+      ? selectedStretches.find((h) => h.id === glyphMaskEdit.handleId)
       : undefined;
 
   const kashidaGaps = useMemo<KashidaGap[]>(() => {
@@ -561,6 +651,9 @@ export const ShapedText: React.FC<Props> = ({
     offsetY: number;
   } | null>(null);
 
+  const lassoActiveRef = useRef(false);
+  const [lassoDrawPoints, setLassoDrawPoints] = useState<{ x: number; y: number }[]>([]);
+
   const displayedGaps = frozenGaps ?? kashidaGaps;
 
   const commitKashida = (
@@ -572,6 +665,35 @@ export const ShapedText: React.FC<Props> = ({
     const newText =
       baseText.slice(0, insertIndex) + "ـ".repeat(count) + baseText.slice(insertIndex);
     onKashidaTextChange?.(newText);
+  };
+
+  const toggleMaskContour = (contourIndex: number) => {
+    if (!onUpdateStretchHandle || !activeMaskHandle || selectedGlyphIndex == null) return;
+    const current: number[] =
+      activeMaskHandle.mask?.mode === "contours" ? activeMaskHandle.mask.contourIndices : [];
+    const next = current.includes(contourIndex)
+      ? current.filter((i) => i !== contourIndex)
+      : [...current, contourIndex];
+    const mask: GlyphStretchMask = { mode: "contours", contourIndices: next };
+    onUpdateStretchHandle(selectedGlyphIndex, activeMaskHandle.id, { mask });
+  };
+
+  const commitLasso = () => {
+    if (
+      !onUpdateStretchHandle ||
+      !activeMaskHandle ||
+      selectedGlyphIndex == null ||
+      lassoDrawPoints.length < 3
+    ) {
+      setLassoDrawPoints([]);
+      return;
+    }
+    const mask: GlyphStretchMask = {
+      mode: "lasso",
+      points: lassoDrawPoints.map((p) => ({ x: p.x - bx - localDrawX, y: p.y - by - localDrawY })),
+    };
+    onUpdateStretchHandle(selectedGlyphIndex, activeMaskHandle.id, { mask });
+    setLassoDrawPoints([]);
   };
 
   return (
@@ -888,6 +1010,122 @@ export const ShapedText: React.FC<Props> = ({
             />
           </React.Fragment>
         ))}
+
+      {glyphEditTool === "stretch" &&
+        glyphMaskEdit?.mode === "contours" &&
+        activeMaskHandle &&
+        selectedGlyphContours.map((c) => {
+          const included =
+            activeMaskHandle.mask?.mode === "contours" &&
+            activeMaskHandle.mask.contourIndices.includes(c.contourIndex);
+          return (
+            <Path
+              key={c.contourIndex}
+              x={bx + localDrawX}
+              y={by + localDrawY}
+              data={c.data}
+              fill={included ? MASK_CONTOUR_ON_COLOR : MASK_CONTOUR_OFF_COLOR}
+              opacity={included ? 0.45 : 0.25}
+              stroke={included ? MASK_CONTOUR_ON_COLOR : MASK_CONTOUR_OFF_COLOR}
+              strokeWidth={1}
+              onClick={(e) => {
+                e.cancelBubble = true;
+                toggleMaskContour(c.contourIndex);
+              }}
+              onTap={(e) => {
+                e.cancelBubble = true;
+                toggleMaskContour(c.contourIndex);
+              }}
+              onMouseDown={(e) => {
+                e.cancelBubble = true;
+              }}
+            />
+          );
+        })}
+
+      {glyphEditTool === "stretch" && glyphMaskEdit?.mode === "lasso" && activeMaskHandle && (
+        <>
+          <Rect
+            x={bx}
+            y={by}
+            width={bw}
+            height={bh}
+            fill="transparent"
+            listening
+            onMouseDown={(e) => {
+              e.cancelBubble = true;
+              const group = e.currentTarget.getParent() as Konva.Group;
+              const pos = group.getRelativePointerPosition();
+              if (!pos) return;
+              lassoActiveRef.current = true;
+              setLassoDrawPoints([pos]);
+            }}
+            onMouseMove={(e) => {
+              if (!lassoActiveRef.current) return;
+              e.cancelBubble = true;
+              const group = e.currentTarget.getParent() as Konva.Group;
+              const pos = group.getRelativePointerPosition();
+              if (!pos) return;
+              setLassoDrawPoints((prev) => [...prev, pos]);
+            }}
+            onMouseUp={(e) => {
+              if (!lassoActiveRef.current) return;
+              e.cancelBubble = true;
+              lassoActiveRef.current = false;
+              commitLasso();
+            }}
+            onTouchStart={(e) => {
+              e.cancelBubble = true;
+              const group = e.currentTarget.getParent() as Konva.Group;
+              const pos = group.getRelativePointerPosition();
+              if (!pos) return;
+              lassoActiveRef.current = true;
+              setLassoDrawPoints([pos]);
+            }}
+            onTouchMove={(e) => {
+              if (!lassoActiveRef.current) return;
+              e.cancelBubble = true;
+              const group = e.currentTarget.getParent() as Konva.Group;
+              const pos = group.getRelativePointerPosition();
+              if (!pos) return;
+              setLassoDrawPoints((prev) => [...prev, pos]);
+            }}
+            onTouchEnd={(e) => {
+              if (!lassoActiveRef.current) return;
+              e.cancelBubble = true;
+              lassoActiveRef.current = false;
+              commitLasso();
+            }}
+            onClick={(e) => {
+              e.cancelBubble = true;
+            }}
+          />
+          {activeMaskHandle.mask?.mode === "lasso" && (
+            <Line
+              points={activeMaskHandle.mask.points.flatMap((p) => [
+                bx + localDrawX + p.x,
+                by + localDrawY + p.y,
+              ])}
+              closed
+              fill="rgba(34, 197, 94, 0.2)"
+              stroke={MASK_LASSO_COLOR}
+              strokeWidth={2}
+              listening={false}
+            />
+          )}
+          {lassoDrawPoints.length > 1 && (
+            <Line
+              points={lassoDrawPoints.flatMap((p) => [p.x, p.y])}
+              closed
+              fill="rgba(34, 197, 94, 0.15)"
+              stroke={MASK_LASSO_COLOR}
+              strokeWidth={2}
+              dash={[6, 4]}
+              listening={false}
+            />
+          )}
+        </>
+      )}
 
       {glyphEditTool === "move" &&
         selectedGlyphIndex != null &&
