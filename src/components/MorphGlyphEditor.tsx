@@ -85,9 +85,9 @@ const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             </li>
             <li>
               <strong>Masking</strong> limits which part of the glyph is
-              affected: Whole glyph (default), By stroke (click outline
-              contours to include/exclude them, then Done), or Lasso (drag a
-              freeform loop around the region).
+              affected: By stroke (click outline contours to include/exclude
+              them, then Done), or Lasso (drag a freeform loop around the
+              region). A handle with no mask set yet affects the whole glyph.
             </li>
           </ol>
           <p>You can add multiple stretch lines per glyph.</p>
@@ -344,19 +344,6 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                           return (
                             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                               <div style={{ display: "flex", gap: 4 }}>
-                                <button
-                                  type="button"
-                                  className="sidebarPillButton"
-                                  style={h.mask == null ? activeStyle : undefined}
-                                  onClick={() => {
-                                    onUpdateStretchHandle?.(selectedBlock.id, glyphIndex, h.id, {
-                                      mask: undefined,
-                                    });
-                                    onSetGlyphMaskEditMode?.(selectedBlock.id, h.id, null);
-                                  }}
-                                >
-                                  Whole glyph
-                                </button>
                                 <button
                                   type="button"
                                   className="sidebarPillButton"

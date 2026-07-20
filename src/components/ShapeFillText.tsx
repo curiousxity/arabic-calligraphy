@@ -604,7 +604,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           {glyphEditTool === "stretch" &&
             selectedStretches.map((h) => {
               const effScale = Math.max(shapeScale * selectedInstance.scX, 0.05);
-              const r = Math.max(4, Math.min(20, 7 / effScale));
+              const r = Math.max(3, Math.min(14, 5 / effScale));
               return (
                 <React.Fragment key={h.id}>
                   <Circle
@@ -612,6 +612,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                     y={h.anchorY}
                     radius={r}
                     fill={STRETCH_ANCHOR_COLOR}
+                    opacity={0.55}
                     stroke="#ffffff"
                     strokeWidth={2 / effScale}
                     draggable
@@ -640,6 +641,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                     y={h.dragY}
                     radius={r}
                     fill={STRETCH_DRAG_COLOR}
+                    opacity={0.55}
                     stroke="#ffffff"
                     strokeWidth={2 / effScale}
                     draggable

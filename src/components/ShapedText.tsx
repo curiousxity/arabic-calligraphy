@@ -879,8 +879,9 @@ export const ShapedText: React.FC<Props> = ({
             <Circle
               x={bx + localDrawX + h.anchorX}
               y={by + localDrawY + h.anchorY}
-              radius={7}
+              radius={5}
               fill={STRETCH_ANCHOR_COLOR}
+              opacity={0.55}
               stroke="#ffffff"
               strokeWidth={2}
               draggable
@@ -909,8 +910,9 @@ export const ShapedText: React.FC<Props> = ({
             <Circle
               x={bx + localDrawX + h.dragX}
               y={by + localDrawY + h.dragY}
-              radius={7}
+              radius={5}
               fill={STRETCH_DRAG_COLOR}
+              opacity={0.55}
               stroke="#ffffff"
               strokeWidth={2}
               draggable

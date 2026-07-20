@@ -669,8 +669,9 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
             <Circle
               x={warpHandlePoint(h.anchorX, h.anchorY).x}
               y={warpHandlePoint(h.anchorX, h.anchorY).y}
-              radius={7}
+              radius={5}
               fill={STRETCH_ANCHOR_COLOR}
+              opacity={0.55}
               stroke="#ffffff"
               strokeWidth={2}
               draggable
@@ -696,8 +697,9 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
             <Circle
               x={warpHandlePoint(h.dragX, h.dragY).x}
               y={warpHandlePoint(h.dragX, h.dragY).y}
-              radius={7}
+              radius={5}
               fill={STRETCH_DRAG_COLOR}
+              opacity={0.55}
               stroke="#ffffff"
               strokeWidth={2}
               draggable
