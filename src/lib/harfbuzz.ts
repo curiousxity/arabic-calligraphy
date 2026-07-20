@@ -39,7 +39,7 @@ type HbModule = {
   shape: (font: HbFont, buffer: HbBuffer, features?: string) => void;
 };
 
-const DEBUG_HB = true;
+const DEBUG_HB = import.meta.env.DEV;
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
   v && typeof v === "object" ? (v as Record<string, unknown>) : null;

@@ -125,9 +125,19 @@ export function applyGlyphEdit(
   return { x: px, y: py };
 }
 
+type PreparedRigAxis = {
+  value: number;
+  mask: GlyphStretchMask | undefined;
+  scaled: AxisGeometry;
+};
+
+/** Result of {@link prepareGlyphRig} — the resolved, fontSize/gx/gy-scaled axis list for one glyph occurrence. */
+export type PreparedGlyphRig = PreparedRigAxis[];
+
 /**
- * Applies every rig axis this block has dialed a nonzero value for, for the
- * glyph identified by (fontFamily, glyphId). Axis geometry is stored
+ * Resolves every rig axis this block has dialed a nonzero value for, for the
+ * glyph identified by (fontFamily, glyphId), into fontSize/gx/gy-scaled
+ * geometry ready for {@link applyPreparedGlyphRig}. Axis geometry is stored
  * em-relative (authored value / authoring block's fontSize) so it's
  * rescaled here by the *consuming* block's own fontSize — this is what lets
  * one rig axis look visually correct on any block using that font,
@@ -135,16 +145,19 @@ export function applyGlyphEdit(
  * library axis was deleted, or this project was opened somewhere that
  * doesn't have it) are silently skipped, matching this app's existing
  * precedent for ignoring unknown persisted fields.
+ *
+ * This lookup/rescale work is constant for an entire glyph occurrence, so
+ * callers that apply the rig to multiple points of the same glyph (every
+ * renderer does — once per path-command coordinate) should call this once
+ * per glyph and reuse the result via `applyPreparedGlyphRig`, rather than
+ * calling `applyGlyphRig` per point.
  */
-export function applyGlyphRig(
-  x: number,
-  y: number,
+export function prepareGlyphRig(
   fontFamily: string,
   glyphId: number,
   fontSize: number,
   glyphRigs: GlyphRig[],
   values: GlyphRigValue[] | undefined,
-  contourIndex = -1,
   // This glyph occurrence's own pen offset — axis geometry is authored
   // relative to the glyph's own origin (see saveStretchHandleAsRig), so it
   // has to be re-added here to land at the right spot for THIS occurrence,
@@ -152,14 +165,13 @@ export function applyGlyphRig(
   // was authored on.
   gx = 0,
   gy = 0
-): { x: number; y: number } {
-  if (!values?.length) return { x, y };
+): PreparedGlyphRig {
+  if (!values?.length) return [];
 
   const rig = glyphRigs.find((r) => r.fontFamily === fontFamily && r.glyphId === glyphId);
-  if (!rig) return { x, y };
+  if (!rig) return [];
 
-  let px = x;
-  let py = y;
+  const prepared: PreparedGlyphRig = [];
 
   for (const v of values) {
     if (!v.value) continue;
@@ -169,7 +181,7 @@ export function applyGlyphRig(
 
     // Em-relative mask geometry, rescaled by the consuming block's fontSize
     // and re-offset by this occurrence's gx/gy, just like the rest of this
-    // axis (see the module comment above).
+    // axis (see the function comment above).
     const mask: GlyphStretchMask | undefined =
       axis.mask == null
         ? undefined
@@ -182,7 +194,6 @@ export function applyGlyphRig(
                 y: p.y * fontSize + gy,
               })),
             };
-    if (!passesMask(mask, x, y, contourIndex)) continue;
 
     const scaled: AxisGeometry = {
       anchorX: axis.anchorX * fontSize + gx,
@@ -194,10 +205,51 @@ export function applyGlyphRig(
       bandWidth: axis.bandWidth * fontSize,
     };
 
-    const p = applyAxisDisplacement(px, py, scaled, v.value);
+    prepared.push({ value: v.value, mask, scaled });
+  }
+
+  return prepared;
+}
+
+/** Applies an already-resolved {@link PreparedGlyphRig} (see `prepareGlyphRig`) to a single outline point. */
+export function applyPreparedGlyphRig(
+  x: number,
+  y: number,
+  prepared: PreparedGlyphRig,
+  contourIndex = -1
+): { x: number; y: number } {
+  let px = x;
+  let py = y;
+
+  for (const { value, mask, scaled } of prepared) {
+    if (!passesMask(mask, x, y, contourIndex)) continue;
+    const p = applyAxisDisplacement(px, py, scaled, value);
     px = p.x;
     py = p.y;
   }
 
   return { x: px, y: py };
+}
+
+/**
+ * Convenience one-shot wrapper around `prepareGlyphRig` + `applyPreparedGlyphRig`
+ * for a single point. Callers that transform multiple points of the same
+ * glyph occurrence (i.e. every renderer) should call `prepareGlyphRig` once
+ * per glyph instead, to avoid redoing the rig/axis lookup per point.
+ */
+export function applyGlyphRig(
+  x: number,
+  y: number,
+  fontFamily: string,
+  glyphId: number,
+  fontSize: number,
+  glyphRigs: GlyphRig[],
+  values: GlyphRigValue[] | undefined,
+  contourIndex = -1,
+  gx = 0,
+  gy = 0
+): { x: number; y: number } {
+  const prepared = prepareGlyphRig(fontFamily, glyphId, fontSize, glyphRigs, values, gx, gy);
+  if (prepared.length === 0) return { x, y };
+  return applyPreparedGlyphRig(x, y, prepared, contourIndex);
 }

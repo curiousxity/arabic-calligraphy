@@ -11,8 +11,10 @@ import { CanvasStage } from "./components/CanvasStage";
 import { MorphGlyphEditor } from "./components/MorphGlyphEditor";
 import { ConfirmDialog, type ConfirmDialogRequest } from "./components/ConfirmDialog";
 import { useUndoRedo } from "./hooks/useUndoRedo";
+import { useDebouncedHistoryPush } from "./hooks/useDebouncedHistoryPush";
 import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
+import { triggerDownload } from "./lib/download";
 import { STARTER_TEMPLATES } from "./lib/templates";
 import { FONT_URLS } from "./hooks/useShapedGlyphs";
 import {
@@ -264,9 +266,6 @@ const App: React.FC = () => {
   const nextGroupIdRef = useRef(1);
   const clipboardRef = useRef<Block | null>(null);
   const [editRequestSignal, setEditRequestSignal] = useState(0);
-  const moveTimeoutRef = useRef<number | null>(null);
-  const kashidaTimeoutRef = useRef<number | null>(null);
-  const glyphEditTimeoutRef = useRef<number | null>(null);
   const didHydrateLayoutRef = useRef(false);
   const prevViewportRef = useRef({ w: 0, h: 0 });
 
@@ -319,6 +318,11 @@ const App: React.FC = () => {
     applySnapshot
   );
 
+  const scheduleMoveHistoryPush = useDebouncedHistoryPush(pushHistory);
+  const scheduleKashidaHistoryPush = useDebouncedHistoryPush(pushHistory);
+  const scheduleGlyphEditHistoryPush = useDebouncedHistoryPush(pushHistory);
+  const scheduleGlyphRigHistoryPush = useDebouncedHistoryPush(pushHistory);
+
   const upsertGlyphEditRaw = useCallback(
     (
       blockId: number,
@@ -365,10 +369,9 @@ const App: React.FC = () => {
       updater: (prev: GlyphEdit | undefined) => GlyphEdit
     ) => {
       upsertGlyphEditRaw(blockId, glyphIndex, updater);
-      if (glyphEditTimeoutRef.current != null) window.clearTimeout(glyphEditTimeoutRef.current);
-      glyphEditTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
+      scheduleGlyphEditHistoryPush();
     },
-    [pushHistory, upsertGlyphEditRaw]
+    [scheduleGlyphEditHistoryPush, upsertGlyphEditRaw]
   );
 
   const selectGlyphForBlock = useCallback((blockId: number, glyphIndex: number | null) => {
@@ -564,7 +567,6 @@ const App: React.FC = () => {
     []
   );
 
-  const glyphRigValueTimeoutRef = useRef<number | null>(null);
   const setGlyphRigValue = useCallback(
     (blockId: number, axisId: string, value: number) => {
       const clamped = Math.max(-1, Math.min(1, value));
@@ -581,10 +583,9 @@ const App: React.FC = () => {
           };
         })
       );
-      if (glyphRigValueTimeoutRef.current != null) window.clearTimeout(glyphRigValueTimeoutRef.current);
-      glyphRigValueTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
+      scheduleGlyphRigHistoryPush();
     },
-    [pushHistory]
+    [scheduleGlyphRigHistoryPush]
   );
 
   const setGlyphMoveOffset = useCallback(
@@ -642,19 +643,17 @@ const App: React.FC = () => {
   const updateBlockPositionWithHistory = useCallback(
     (id: number, x: number, y: number) => {
       setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, x, y } : b)));
-      if (moveTimeoutRef.current != null) window.clearTimeout(moveTimeoutRef.current);
-      moveTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
+      scheduleMoveHistoryPush();
     },
-    [pushHistory]
+    [scheduleMoveHistoryPush]
   );
 
   const updateKashidaText = useCallback(
     (id: number, text: string) => {
       setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, text } : b)));
-      if (kashidaTimeoutRef.current != null) window.clearTimeout(kashidaTimeoutRef.current);
-      kashidaTimeoutRef.current = window.setTimeout(() => pushHistory(), 300);
+      scheduleKashidaHistoryPush();
     },
-    [pushHistory]
+    [scheduleKashidaHistoryPush]
   );
 
   const zoomToRect = useCallback(
@@ -741,40 +740,10 @@ const App: React.FC = () => {
           return;
         }
 
-        const parsed = JSON.parse(raw);
-
-        const hydratedBlocks: Block[] = Array.isArray(parsed.blocks) ? parsed.blocks : blocks;
-        if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
-        if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
-          setSelectedIds([]);
-          setSelectedId(parsed.selectedId);
-        }
-        if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
-        if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
-
-        const savedViewportWidth =
-          typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
-        const savedViewportHeight =
-          typeof parsed.viewportHeight === "number" ? parsed.viewportHeight : null;
-
-        const viewportCloseEnough =
-          savedViewportWidth != null &&
-          savedViewportHeight != null &&
-          Math.abs(savedViewportWidth - viewportWidth) < 80 &&
-          Math.abs(savedViewportHeight - viewportHeight) < 80;
-
-        if (
-          viewportCloseEnough &&
-          typeof parsed.stageScale === "number" &&
-          parsed.stagePosition &&
-          typeof parsed.stagePosition.x === "number" &&
-          typeof parsed.stagePosition.y === "number"
-        ) {
-          setStageScale(clamp(parsed.stageScale, MIN_SCALE, MAX_SCALE));
-          setStagePosition(parsed.stagePosition);
-        } else {
-          setTimeout(() => resetView(hydratedBlocks), 0);
-        }
+        // Initial mount hydration intentionally doesn't merge embedded
+        // glyphRigs — they're already loaded independently from their own
+        // localStorage key at state-init time (see glyphRigs useState above).
+        applyParsedLayoutPayload(JSON.parse(raw), { mergeRigs: false });
       } catch {
         resetView();
       }
@@ -1400,43 +1369,57 @@ const App: React.FC = () => {
     }
   };
 
+  // Shared body for applying a parsed saved-layout payload (from localStorage,
+  // a named project, or an uploaded file) to editor state. Callers wrap this
+  // in their own try/catch since they differ in failure behavior (silent
+  // resetView vs. an alert).
+  const applyParsedLayoutPayload = (
+    parsed: Record<string, unknown>,
+    opts: { mergeRigs?: boolean } = {}
+  ) => {
+    const parsedBlocks = Array.isArray(parsed.blocks) ? (parsed.blocks as Block[]) : null;
+    const loadedBlocks: Block[] = parsedBlocks ?? blocks;
+    if (parsedBlocks) setBlocks(parsedBlocks);
+    if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
+      setSelectedIds([]);
+      setSelectedId(parsed.selectedId);
+    }
+    if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
+    if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
+    if (opts.mergeRigs !== false && Array.isArray(parsed.glyphRigs)) {
+      mergeGlyphRigs(parsed.glyphRigs as GlyphRig[]);
+    }
+
+    const savedViewportWidth =
+      typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
+    const savedViewportHeight =
+      typeof parsed.viewportHeight === "number" ? parsed.viewportHeight : null;
+
+    const viewportCloseEnough =
+      savedViewportWidth != null &&
+      savedViewportHeight != null &&
+      Math.abs(savedViewportWidth - viewportWidth) < 80 &&
+      Math.abs(savedViewportHeight - viewportHeight) < 80;
+
+    const stagePosition = parsed.stagePosition as { x?: unknown; y?: unknown } | null | undefined;
+
+    if (
+      viewportCloseEnough &&
+      typeof parsed.stageScale === "number" &&
+      stagePosition &&
+      typeof stagePosition.x === "number" &&
+      typeof stagePosition.y === "number"
+    ) {
+      setStageScale(clamp(parsed.stageScale, MIN_SCALE, MAX_SCALE));
+      setStagePosition({ x: stagePosition.x, y: stagePosition.y });
+    } else {
+      setTimeout(() => resetView(loadedBlocks), 0);
+    }
+  };
+
   const applyStoredPayload = (raw: string) => {
     try {
-      const parsed = JSON.parse(raw);
-
-      const loadedBlocks: Block[] = Array.isArray(parsed.blocks) ? parsed.blocks : blocks;
-      if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
-      if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
-        setSelectedIds([]);
-        setSelectedId(parsed.selectedId);
-      }
-      if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
-      if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
-      if (Array.isArray(parsed.glyphRigs)) mergeGlyphRigs(parsed.glyphRigs);
-
-      const savedViewportWidth =
-        typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
-      const savedViewportHeight =
-        typeof parsed.viewportHeight === "number" ? parsed.viewportHeight : null;
-
-      const viewportCloseEnough =
-        savedViewportWidth != null &&
-        savedViewportHeight != null &&
-        Math.abs(savedViewportWidth - viewportWidth) < 80 &&
-        Math.abs(savedViewportHeight - viewportHeight) < 80;
-
-      if (
-        viewportCloseEnough &&
-        typeof parsed.stageScale === "number" &&
-        parsed.stagePosition &&
-        typeof parsed.stagePosition.x === "number" &&
-        typeof parsed.stagePosition.y === "number"
-      ) {
-        setStageScale(clamp(parsed.stageScale, MIN_SCALE, MAX_SCALE));
-        setStagePosition(parsed.stagePosition);
-      } else {
-        setTimeout(() => resetView(loadedBlocks), 0);
-      }
+      applyParsedLayoutPayload(JSON.parse(raw));
     } catch {
       resetView();
     }
@@ -1515,13 +1498,7 @@ const App: React.FC = () => {
     const json = JSON.stringify(buildLayoutPayload(), null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "calligraphy-layout.json";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    triggerDownload(url, "calligraphy-layout.json", true);
   };
 
   const uploadLayout = () => {
@@ -1534,19 +1511,7 @@ const App: React.FC = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const parsed = JSON.parse(e.target?.result as string);
-
-          const uploadedBlocks: Block[] = Array.isArray(parsed.blocks) ? parsed.blocks : blocks;
-          if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
-          if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
-            setSelectedIds([]);
-            setSelectedId(parsed.selectedId);
-          }
-          if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
-          if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
-          if (Array.isArray(parsed.glyphRigs)) mergeGlyphRigs(parsed.glyphRigs);
-
-          setTimeout(() => resetView(uploadedBlocks), 0);
+          applyParsedLayoutPayload(JSON.parse(e.target?.result as string));
         } catch {
           alert("Invalid layout file.");
         }

@@ -28,7 +28,8 @@ import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { drawInsetBevel, EMBOSS_STRENGTH_SCALE } from "../lib/emboss";
 import {
   applyGlyphEdit,
-  applyGlyphRig,
+  prepareGlyphRig,
+  applyPreparedGlyphRig,
   MOVE_HANDLE_COLOR,
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
@@ -143,6 +144,91 @@ function warpSvgCommands(
         return c;
     }
   });
+}
+
+type ShapeFillLine = {
+  lineY: number;
+  scX: number;
+  scY: number;
+  /** Starting pen-x for each tiled repetition on this line. */
+  repStartXs: number[];
+};
+
+/**
+ * Scanline-tiles the glyph run across the shape's silhouette: for each row,
+ * finds the shape's left/right edges via ray-casting samples, then works out
+ * how many repetitions of the glyph run fit and the x-scale that makes them
+ * span the row exactly. Shared by the actual drawing pass and by glyph-edit
+ * hit-testing, which both need the exact same per-line layout — computing it
+ * twice risked the two silently drifting out of sync.
+ */
+function computeShapeFillLines(params: {
+  fontSize: number;
+  shapeFillSpacing: number;
+  shapeWidth: number;
+  shapeHeight: number;
+  shapeFillScaleX: number;
+  shapeFillScaleY: number;
+  totalAdvance: number;
+  inShape: (x: number, y: number) => boolean;
+}): ShapeFillLine[] {
+  const {
+    fontSize,
+    shapeFillSpacing,
+    shapeWidth,
+    shapeHeight,
+    shapeFillScaleX,
+    shapeFillScaleY,
+    totalAdvance,
+    inShape,
+  } = params;
+
+  const lineH = fontSize * shapeFillSpacing;
+  const sampleStep = Math.max(2, Math.round(fontSize / 8));
+  let lineY = fontSize * 0.85;
+  const lines: ShapeFillLine[] = [];
+
+  while (lineY < shapeHeight) {
+    let lx = -1, rx = -1;
+    for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
+      if (inShape(sx, lineY)) {
+        if (lx < 0) lx = sx;
+        rx = sx;
+      }
+    }
+    // Refine left edge
+    if (lx > 0) {
+      for (let sx = lx - sampleStep; sx <= lx; sx++) {
+        if (inShape(sx, lineY)) { lx = sx; break; }
+      }
+    }
+    // Refine right edge
+    if (rx > 0) {
+      for (let sx = rx; sx <= rx + sampleStep; sx++) {
+        if (inShape(sx, lineY)) { rx = sx; } else { break; }
+      }
+    }
+
+    if (lx >= 0 && rx > lx + 2) {
+      const lineWidth = rx - lx;
+      const effectiveAdvance = totalAdvance * shapeFillScaleX;
+      const reps = Math.max(1, Math.floor(lineWidth / effectiveAdvance));
+      const fitScaleX = lineWidth / (reps * effectiveAdvance);
+      const scX = shapeFillScaleX * fitScaleX;
+      const scY = shapeFillScaleY;
+
+      const repStartXs: number[] = [];
+      for (let r = 0; r < reps; r++) {
+        repStartXs.push(lx + r * effectiveAdvance * fitScaleX);
+      }
+
+      lines.push({ lineY, scX, scY, repStartXs });
+    }
+
+    lineY += lineH;
+  }
+
+  return lines;
 }
 
 export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
@@ -271,56 +357,33 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     if (!shapeSvgPath || parsedCmds.length === 0) return [];
     if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) return [];
 
-    const lineH = fontSize * shapeFillSpacing;
-    const sampleStep = Math.max(2, Math.round(fontSize / 8));
-    let lineY = fontSize * 0.85;
     const inShape = (px: number, py: number) => pointInPolygon(px, py, polygon);
+    const lines = computeShapeFillLines({
+      fontSize,
+      shapeFillSpacing,
+      shapeWidth,
+      shapeHeight,
+      shapeFillScaleX,
+      shapeFillScaleY,
+      totalAdvance,
+      inShape,
+    });
     const instances: GlyphInstance[] = [];
 
-    while (lineY < shapeHeight) {
-      let lx = -1, rx = -1;
-      for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
-        if (inShape(sx, lineY)) {
-          if (lx < 0) lx = sx;
-          rx = sx;
+    for (const line of lines) {
+      for (const startPenX of line.repStartXs) {
+        for (let gi = 0; gi < glyphCache.length; gi++) {
+          const g = glyphCache[gi];
+          if (!g.obj || g.commands.length === 0) continue;
+          instances.push({
+            glyphIndex: gi,
+            gx: startPenX + g.penX * line.scX + g.dx * line.scX,
+            gy: line.lineY + g.dy * line.scY,
+            scX: line.scX,
+            scY: line.scY,
+          });
         }
       }
-      if (lx > 0) {
-        for (let sx = lx - sampleStep; sx <= lx; sx++) {
-          if (inShape(sx, lineY)) { lx = sx; break; }
-        }
-      }
-      if (rx > 0) {
-        for (let sx = rx; sx <= rx + sampleStep; sx++) {
-          if (inShape(sx, lineY)) { rx = sx; } else { break; }
-        }
-      }
-
-      if (lx >= 0 && rx > lx + 2) {
-        const lineWidth = rx - lx;
-        const effectiveAdvance = totalAdvance * shapeFillScaleX;
-        const reps = Math.max(1, Math.floor(lineWidth / effectiveAdvance));
-        const fitScaleX = lineWidth / (reps * effectiveAdvance);
-        const scX = shapeFillScaleX * fitScaleX;
-        const scY = shapeFillScaleY;
-
-        for (let r = 0; r < reps; r++) {
-          const startPenX = lx + r * effectiveAdvance * fitScaleX;
-          for (let gi = 0; gi < glyphCache.length; gi++) {
-            const g = glyphCache[gi];
-            if (!g.obj || g.commands.length === 0) continue;
-            instances.push({
-              glyphIndex: gi,
-              gx: startPenX + g.penX * scX + g.dx * scX,
-              gy: lineY + g.dy * scY,
-              scX,
-              scY,
-            });
-          }
-        }
-      }
-
-      lineY += lineH;
     }
 
     return instances;
@@ -406,7 +469,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
         sceneFunc={(ctx, shape) => {
           if (!shapeSvgPath || parsedCmds.length === 0) return;
 
-          const lineH = fontSize * shapeFillSpacing;
           const rotRad = (shapeFillTextRotation * Math.PI) / 180;
 
           // If no text data yet, draw a semi-transparent placeholder fill (once,
@@ -449,19 +511,12 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 const gx = startPenX + g.penX * scX + g.dx * scX;
                 const gy = sy + g.dy * scY;
                 const edit = glyphEdits.find((w) => w.glyphIndex === gi);
+                const preparedRig = prepareGlyphRig(fontFamily, g.glyphId, fontSize, glyphRigs, glyphRigValues);
                 const commands =
                   edit || glyphRigValues.length > 0
                     ? warpSvgCommands(g.commands, (px, py) => {
                         const edited = applyGlyphEdit(px, py, edit);
-                        return applyGlyphRig(
-                          edited.x,
-                          edited.y,
-                          fontFamily,
-                          g.glyphId,
-                          fontSize,
-                          glyphRigs,
-                          glyphRigValues
-                        );
+                        return applyPreparedGlyphRig(edited.x, edited.y, preparedRig);
                       })
                     : g.commands;
 
@@ -487,47 +542,23 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
             };
 
             // Scanline fill — use ray-casting polygon test (no Path2D / isPointInPath)
-            const sampleStep = Math.max(2, Math.round(fontSize / 8));
-            let lineY = fontSize * 0.85;
-
             // The polygon is in original (pre-scale) path coordinates, matching lineY
             const inShape = (px: number, py: number) => pointInPolygon(px, py, polygon);
+            const lines = computeShapeFillLines({
+              fontSize,
+              shapeFillSpacing,
+              shapeWidth,
+              shapeHeight,
+              shapeFillScaleX,
+              shapeFillScaleY,
+              totalAdvance,
+              inShape,
+            });
 
-            while (lineY < shapeHeight) {
-              let lx = -1, rx = -1;
-              for (let sx = 0; sx <= shapeWidth; sx += sampleStep) {
-                if (inShape(sx, lineY)) {
-                  if (lx < 0) lx = sx;
-                  rx = sx;
-                }
+            for (const line of lines) {
+              for (const startPenX of line.repStartXs) {
+                drawGlyphRow(startPenX, line.lineY, line.scX, line.scY);
               }
-              // Refine left edge
-              if (lx > 0) {
-                for (let sx = lx - sampleStep; sx <= lx; sx++) {
-                  if (inShape(sx, lineY)) { lx = sx; break; }
-                }
-              }
-              // Refine right edge
-              if (rx > 0) {
-                for (let sx = rx; sx <= rx + sampleStep; sx++) {
-                  if (inShape(sx, lineY)) { rx = sx; } else { break; }
-                }
-              }
-
-              if (lx >= 0 && rx > lx + 2) {
-                const lineWidth = rx - lx;
-                const effectiveAdvance = totalAdvance * shapeFillScaleX;
-                const reps = Math.max(1, Math.floor(lineWidth / effectiveAdvance));
-                const fitScaleX = lineWidth / (reps * effectiveAdvance);
-                const scX = shapeFillScaleX * fitScaleX;
-                const scY = shapeFillScaleY;
-
-                for (let r = 0; r < reps; r++) {
-                  drawGlyphRow(lx + r * effectiveAdvance * fitScaleX, lineY, scX, scY);
-                }
-              }
-
-              lineY += lineH;
             }
 
             targetCtx.restore();

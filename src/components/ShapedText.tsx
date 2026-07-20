@@ -9,7 +9,8 @@ import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { useOverrideGlyph } from "../hooks/useOverrideGlyph";
 import {
   applyGlyphEdit,
-  applyGlyphRig,
+  prepareGlyphRig,
+  applyPreparedGlyphRig,
   MOVE_HANDLE_COLOR,
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
@@ -220,6 +221,7 @@ function drawWarpedGlyphRun(
     const gx = (penX + (g.dx ?? 0)) * scale;
     const gy = -(g.dy ?? 0) * scale;
     const edit = glyphEdits.find((w) => w.glyphIndex === glyphIndex);
+    const preparedRig = prepareGlyphRig(fontFamily, g.g, fontSize, glyphRigs, glyphRigValues, gx, gy);
 
     ctx.save();
     ctx.translate(gx, gy);
@@ -255,18 +257,7 @@ function drawWarpedGlyphRun(
 
         if (typeof c.x === "number" && typeof c.y === "number") {
           const handled = applyGlyphEdit(c.x + gx, c.y + gy, edit, contourIndex);
-          const rigged = applyGlyphRig(
-            handled.x,
-            handled.y,
-            fontFamily,
-            g.g,
-            fontSize,
-            glyphRigs,
-            glyphRigValues,
-            contourIndex,
-            gx,
-            gy
-          );
+          const rigged = applyPreparedGlyphRig(handled.x, handled.y, preparedRig, contourIndex);
           const p = warpPoint(
             rigged.x,
             rigged.y,
@@ -282,18 +273,7 @@ function drawWarpedGlyphRun(
 
         if (typeof c.x1 === "number" && typeof c.y1 === "number") {
           const handled1 = applyGlyphEdit(c.x1 + gx, c.y1 + gy, edit, contourIndex);
-          const rigged1 = applyGlyphRig(
-            handled1.x,
-            handled1.y,
-            fontFamily,
-            g.g,
-            fontSize,
-            glyphRigs,
-            glyphRigValues,
-            contourIndex,
-            gx,
-            gy
-          );
+          const rigged1 = applyPreparedGlyphRig(handled1.x, handled1.y, preparedRig, contourIndex);
           const p1 = warpPoint(
             rigged1.x,
             rigged1.y,
@@ -309,18 +289,7 @@ function drawWarpedGlyphRun(
 
         if (typeof c.x2 === "number" && typeof c.y2 === "number") {
           const handled2 = applyGlyphEdit(c.x2 + gx, c.y2 + gy, edit, contourIndex);
-          const rigged2 = applyGlyphRig(
-            handled2.x,
-            handled2.y,
-            fontFamily,
-            g.g,
-            fontSize,
-            glyphRigs,
-            glyphRigValues,
-            contourIndex,
-            gx,
-            gy
-          );
+          const rigged2 = applyPreparedGlyphRig(handled2.x, handled2.y, preparedRig, contourIndex);
           const p2 = warpPoint(
             rigged2.x,
             rigged2.y,
@@ -426,10 +395,12 @@ export const ShapedText: React.FC<Props> = ({
     };
   }, [shapeData.isLoading]);
 
-  const glyphBounds = useMemo<GlyphBounds>(() => {
-    const { font, glyphs, unitsPerEm } = shapeData;
-
-    if (!font || glyphs.length === 0) {
+  // Computes glyph bounding-box extents (glyphBounds) and per-glyph hit boxes
+  // (glyphHitBoxes) in one pass over the glyph run — both need the same
+  // (expensive) glyphObj.getPath(...).getBoundingBox() call per glyph, so
+  // walking the font twice to get each independently would do that work twice.
+  const glyphMetrics = useMemo<{ bounds: GlyphBounds; hitBoxes: GlyphHitBox[] }>(() => {
+    const fallbackBounds = (): GlyphBounds => {
       const rw = fallbackWidth(text, fontSize);
       const rh = Math.max(fontSize, 24);
       return {
@@ -440,6 +411,12 @@ export const ShapedText: React.FC<Props> = ({
         rawWidth: rw,
         rawHeight: rh,
       };
+    };
+
+    const { font, glyphs, unitsPerEm } = shapeData;
+
+    if (!font || glyphs.length === 0) {
+      return { bounds: fallbackBounds(), hitBoxes: [] };
     }
 
     const upm = Math.max(unitsPerEm || 1000, 1);
@@ -450,8 +427,10 @@ export const ShapedText: React.FC<Props> = ({
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
+    const hitBoxes: GlyphHitBox[] = [];
 
-    for (const g of glyphs) {
+    for (let i = 0; i < glyphs.length; i++) {
+      const g = glyphs[i];
       const glyphObj = font.glyphs.get(g.g);
       const advance = g.ax ?? 0;
 
@@ -469,70 +448,9 @@ export const ShapedText: React.FC<Props> = ({
           minY = Math.min(minY, box.y1);
           maxY = Math.max(maxY, box.y2);
         }
-      }
 
-      penX += advance;
-    }
-
-    if (
-      !isFinite(minX) ||
-      !isFinite(minY) ||
-      !isFinite(maxX) ||
-      !isFinite(maxY)
-    ) {
-      const rw = fallbackWidth(text, fontSize);
-      const rh = Math.max(fontSize, 24);
-      return {
-        minX: 0,
-        minY: 0,
-        maxX: rw,
-        maxY: rh,
-        rawWidth: rw,
-        rawHeight: rh,
-      };
-    }
-
-    return {
-      minX,
-      minY,
-      maxX,
-      maxY,
-      rawWidth: Math.max(maxX - minX, 1),
-      rawHeight: Math.max(maxY - minY, 1),
-    };
-  }, [shapeData, text, fontSize]);
-
-  const isBold = fontStyle === "bold" || fontStyle === "bold italic";
-  const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
-  const fauxBoldWidth = isBold ? Math.max(fontSize * 0.035, 0.6) : 0;
-
-  const bw = Math.max(glyphBounds.rawWidth, 20);
-  const bh = Math.max(fontSize * lineHeight, glyphBounds.rawHeight, 24);
-  const bx = align === "left" ? 0 : align === "right" ? -bw : -bw / 2;
-  const by = -bh / 2;
-  const localDrawX = -glyphBounds.minX + (bw - glyphBounds.rawWidth) / 2;
-  const localDrawY = -glyphBounds.minY + (bh - glyphBounds.rawHeight) / 2;
-
-  const glyphHitBoxes = useMemo<GlyphHitBox[]>(() => {
-    const { font, glyphs, unitsPerEm } = shapeData;
-    if (!font || glyphs.length === 0) return [];
-
-    const upm = Math.max(unitsPerEm || 1000, 1);
-    const scale = fontSize / upm;
-    let penX = 0;
-    const boxes: GlyphHitBox[] = [];
-
-    for (let i = 0; i < glyphs.length; i++) {
-      const g = glyphs[i];
-      const glyphObj = font.glyphs.get(g.g);
-      const advance = g.ax ?? 0;
-      const gx = (penX + (g.dx ?? 0)) * scale;
-      const gy = -(g.dy ?? 0) * scale;
-
-      if (glyphObj) {
-        const box = glyphObj.getPath(gx, gy, fontSize).getBoundingBox();
         if (isFinite(box.x1) && isFinite(box.x2) && isFinite(box.y1) && isFinite(box.y2)) {
-          boxes.push({
+          hitBoxes.push({
             glyphIndex: i,
             x: box.x1,
             y: box.y1,
@@ -548,8 +466,41 @@ export const ShapedText: React.FC<Props> = ({
       penX += advance;
     }
 
-    return boxes;
-  }, [shapeData, fontSize]);
+    if (
+      !isFinite(minX) ||
+      !isFinite(minY) ||
+      !isFinite(maxX) ||
+      !isFinite(maxY)
+    ) {
+      return { bounds: fallbackBounds(), hitBoxes };
+    }
+
+    return {
+      bounds: {
+        minX,
+        minY,
+        maxX,
+        maxY,
+        rawWidth: Math.max(maxX - minX, 1),
+        rawHeight: Math.max(maxY - minY, 1),
+      },
+      hitBoxes,
+    };
+  }, [shapeData, text, fontSize]);
+
+  const glyphBounds = glyphMetrics.bounds;
+  const glyphHitBoxes = glyphMetrics.hitBoxes;
+
+  const isBold = fontStyle === "bold" || fontStyle === "bold italic";
+  const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
+  const fauxBoldWidth = isBold ? Math.max(fontSize * 0.035, 0.6) : 0;
+
+  const bw = Math.max(glyphBounds.rawWidth, 20);
+  const bh = Math.max(fontSize * lineHeight, glyphBounds.rawHeight, 24);
+  const bx = align === "left" ? 0 : align === "right" ? -bw : -bw / 2;
+  const by = -bh / 2;
+  const localDrawX = -glyphBounds.minX + (bw - glyphBounds.rawWidth) / 2;
+  const localDrawY = -glyphBounds.minY + (bh - glyphBounds.rawHeight) / 2;
 
   useEffect(() => {
     onGlyphBoxesChange?.(glyphHitBoxes);

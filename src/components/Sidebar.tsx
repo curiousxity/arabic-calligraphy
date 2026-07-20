@@ -18,6 +18,8 @@ import {
   RangeRow,
   PresetKeyboard,
   FontSelectRow,
+  CollapsibleSection,
+  CheckboxRow,
 } from "./sidebar/FormControls";
 import { FloatingArabicKeyboard } from "./sidebar/FloatingKeyboard";
 import {
@@ -424,17 +426,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {onApplyTemplate && (
           <div className="sidebarPanel">
-            <button
-              type="button"
-              onClick={() => setShowTemplates((v) => !v)}
-              className="sidebarSectionButton"
-              aria-expanded={showTemplates}
+            <CollapsibleSection
+              title="Start from a Template"
+              isOpen={showTemplates}
+              onToggle={() => setShowTemplates((v) => !v)}
             >
-              <span>Start from a Template</span>
-              <span>{showTemplates ? "−" : "+"}</span>
-            </button>
-
-            {showTemplates && (
               <div className="sectionPanel">
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                   Replaces the current canvas (undo with Ctrl+Z if you change your mind).
@@ -473,7 +469,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                 )}
               </div>
-            )}
+            </CollapsibleSection>
           </div>
         )}
 
@@ -581,17 +577,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="sidebarPanel">
-          <button
-            type="button"
-            onClick={() => setShowLayers((v) => !v)}
-            className="sidebarSectionButton"
-            aria-expanded={showLayers}
-          >
-            <span>Layers</span>
-            <span>{showLayers ? "−" : "+"}</span>
-          </button>
-
-          {showLayers && (
+          <CollapsibleSection title="Layers" isOpen={showLayers} onToggle={() => setShowLayers((v) => !v)}>
             <div style={{ marginTop: 10 }}>
               <LayersPanel
                 blocks={blocks}
@@ -615,22 +601,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onAddBlock={onAddBlock}
               />
             </div>
-          )}
+          </CollapsibleSection>
         </div>
 
         {selectedBlock && (
           <div className="sidebarPanel">
-            <button
-              type="button"
-              onClick={() => setShowAlign((v) => !v)}
-              className="sidebarSectionButton"
-              aria-expanded={showAlign}
+            <CollapsibleSection
+              title="Align & Arrange"
+              isOpen={showAlign}
+              onToggle={() => setShowAlign((v) => !v)}
             >
-              <span>Align &amp; Arrange</span>
-              <span>{showAlign ? "−" : "+"}</span>
-            </button>
-
-            {showAlign && (
               <div className="sectionPanel">
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                   {selectionCount > 1
@@ -735,7 +715,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                 )}
               </div>
-            )}
+            </CollapsibleSection>
           </div>
         )}
 
@@ -764,17 +744,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {selectedBlock && selectedBlock.type === "image" && (
           <div className="sidebarPanel">
-            <button
-              type="button"
-              onClick={() => setShowText((v) => !v)}
-              className="sidebarSectionButton"
-              aria-expanded={showText}
-            >
-              <span>Image</span>
-              <span>{showText ? "−" : "+"}</span>
-            </button>
-
-            {showText && (
+            <CollapsibleSection title="Image" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
               <div className="sectionPanel">
                 <RangeRow
                   id={makeId("image-scale", selectedId)}
@@ -818,23 +788,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   Tip: drag the gold handle on the image's corner (canvas) to resize.
                 </div>
               </div>
-            )}
+            </CollapsibleSection>
           </div>
         )}
 
         {selectedBlock && selectedBlock.type !== "image" && (
           <div className="sidebarPanel">
-            <button
-              type="button"
-              onClick={() => setShowText((v) => !v)}
-              className="sidebarSectionButton"
-              aria-expanded={showText}
-            >
-              <span>Text</span>
-              <span>{showText ? "−" : "+"}</span>
-            </button>
-
-            {showText && (
+            <CollapsibleSection title="Text" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
               <div className="sectionPanel">
                 <FontSelectRow
                   id={makeId("font-family", selectedId)}
@@ -919,23 +879,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 )}
               </div>
-            )}
+            </CollapsibleSection>
           </div>
         )}
 
         {selectedBlock && selectedBlock.type !== "image" && (
           <div className="sidebarPanel">
-            <button
-              type="button"
-              onClick={() => setShowTransform((v) => !v)}
-              className="sidebarSectionButton"
-              aria-expanded={showTransform}
+            <CollapsibleSection
+              title="Transform"
+              isOpen={showTransform}
+              onToggle={() => setShowTransform((v) => !v)}
             >
-              <span>Transform</span>
-              <span>{showTransform ? "−" : "+"}</span>
-            </button>
-
-            {showTransform && (
               <div className="sectionPanel">
                 <RangeRow
                   id={makeId("rotation", selectedId)}
@@ -1161,23 +1115,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
               </div>
-            )}
+            </CollapsibleSection>
           </div>
         )}
 
         {selectedBlock && selectedBlock.type !== "image" && (
           <div className="sidebarPanel">
-            <button
-              type="button"
-              onClick={() => setShowEffects((v) => !v)}
-              className="sidebarSectionButton"
-              aria-expanded={showEffects}
-            >
-              <span>Effects</span>
-              <span>{showEffects ? "−" : "+"}</span>
-            </button>
-
-            {showEffects && (
+            <CollapsibleSection title="Effects" isOpen={showEffects} onToggle={() => setShowEffects((v) => !v)}>
               <div className="sectionPanel">
                 <div style={{ display: "flex", gap: 6 }}>
                   {(
@@ -1329,7 +1273,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
               </div>
-            )}
+            </CollapsibleSection>
           </div>
         )}
 
@@ -1372,30 +1316,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {selectedBlock && (
           <div className="sidebarPanel">
-            <button
-              type="button"
-              onClick={() => setShowHelpers((v) => !v)}
-              className="sidebarSectionButton"
-              aria-expanded={showHelpers}
+            <CollapsibleSection
+              title="Arabic Helpers"
+              isOpen={showHelpers}
+              onToggle={() => setShowHelpers((v) => !v)}
             >
-              <span>Arabic Helpers</span>
-              <span>{showHelpers ? "−" : "+"}</span>
-            </button>
-
-            {showHelpers && (
               <div className="sectionPanel">
                 {selectedBlock?.type === "text" && (
                   <div style={{ borderBottom: "1px solid var(--border-soft)", paddingBottom: 12 }}>
                     <div className="sidebarSectionTitle">Kashida</div>
 
-                    <label className="checkboxRow">
-                      <input
-                        type="checkbox"
-                        checked={!!selectedBlock.kashidaEditMode}
-                        onChange={() => onToggleKashidaEditMode?.()}
-                      />
-                      Kashida tool
-                    </label>
+                    <CheckboxRow
+                      id={makeId("kashida-edit-mode", selectedId)}
+                      label="Kashida tool"
+                      checked={!!selectedBlock.kashidaEditMode}
+                      onChange={() => onToggleKashidaEditMode?.()}
+                    />
 
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
                       Drag a gold handle between two connected letters on the canvas to
@@ -1439,22 +1375,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onPick={handleKeyboardKey}
                 />
               </div>
-            )}
+            </CollapsibleSection>
           </div>
         )}
 
         <div className="sidebarPanel">
-          <button
-            type="button"
-            onClick={() => setShowFileActions((v) => !v)}
-            className="sidebarSectionButton"
-            aria-expanded={showFileActions}
+          <CollapsibleSection
+            title="Project & Export"
+            isOpen={showFileActions}
+            onToggle={() => setShowFileActions((v) => !v)}
           >
-            <span>Project &amp; Export</span>
-            <span>{showFileActions ? "−" : "+"}</span>
-          </button>
-
-          {showFileActions && (
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
               <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
                 Your project
@@ -1623,16 +1553,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   edited afterward.
                 </div>
 
-                <label className="checkboxRow" htmlFor="transparent-export">
-                  <input
-                    id="transparent-export"
-                    name="transparentExport"
-                    type="checkbox"
-                    checked={transparentExport}
-                    onChange={(e) => onToggleTransparentExport(e.target.checked)}
-                  />
-                  Transparent background (PNG/SVG)
-                </label>
+                <CheckboxRow
+                  id="transparent-export"
+                  label="Transparent background (PNG/SVG)"
+                  checked={transparentExport}
+                  onChange={onToggleTransparentExport}
+                />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1677,21 +1603,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </div>
             </div>
-          )}
+          </CollapsibleSection>
         </div>
 
         <div className="sidebarPanel">
-          <button
-            type="button"
-            onClick={() => setShowBackgroundSettings((v) => !v)}
-            className="sidebarSectionButton"
-            aria-expanded={showBackgroundSettings}
+          <CollapsibleSection
+            title="Background & Grid"
+            isOpen={showBackgroundSettings}
+            onToggle={() => setShowBackgroundSettings((v) => !v)}
           >
-            <span>Background &amp; Grid</span>
-            <span>{showBackgroundSettings ? "−" : "+"}</span>
-          </button>
-
-          {showBackgroundSettings && (
             <div className="sectionPanel">
               <ColorRow
                 id="background-color"
@@ -1702,38 +1622,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
               />
 
               <div style={{ display: "grid", gap: 8 }}>
-                <label className="checkboxRow" htmlFor="show-grid">
-                  <input
-                    id="show-grid"
-                    name="showGrid"
-                    type="checkbox"
-                    checked={showGrid}
-                    onChange={(e) => onToggleGrid(e.target.checked)}
-                  />
-                  Show gridlines
-                </label>
+                <CheckboxRow
+                  id="show-grid"
+                  label="Show gridlines"
+                  checked={showGrid}
+                  onChange={onToggleGrid}
+                />
 
-                <label className="checkboxRow" htmlFor="snap-to-grid">
-                  <input
-                    id="snap-to-grid"
-                    name="snapToGrid"
-                    type="checkbox"
-                    checked={snapToGrid}
-                    onChange={(e) => onToggleSnap(e.target.checked)}
-                  />
-                  Snap to gridlines
-                </label>
+                <CheckboxRow
+                  id="snap-to-grid"
+                  label="Snap to gridlines"
+                  checked={snapToGrid}
+                  onChange={onToggleSnap}
+                />
 
-                <label className="checkboxRow" htmlFor="show-rulers">
-                  <input
-                    id="show-rulers"
-                    name="showRulers"
-                    type="checkbox"
-                    checked={showRulers}
-                    onChange={(e) => onToggleRulers?.(e.target.checked)}
-                  />
-                  Show rulers (click a ruler to drop a snap guide)
-                </label>
+                <CheckboxRow
+                  id="show-rulers"
+                  label="Show rulers (click a ruler to drop a snap guide)"
+                  checked={showRulers}
+                  onChange={(checked) => onToggleRulers?.(checked)}
+                />
 
                 {guideCount > 0 && (
                   <button
@@ -1746,21 +1654,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
               </div>
             </div>
-          )}
+          </CollapsibleSection>
         </div>
 
         <div className="sidebarPanel">
-          <button
-            type="button"
-            onClick={() => setShowShortcuts((v) => !v)}
-            className="sidebarSectionButton"
-            aria-expanded={showShortcuts}
+          <CollapsibleSection
+            title="Shortcuts"
+            isOpen={showShortcuts}
+            onToggle={() => setShowShortcuts((v) => !v)}
           >
-            <span>Shortcuts</span>
-            <span>{showShortcuts ? "−" : "+"}</span>
-          </button>
-
-          {showShortcuts && (
             <div
               className="sectionPanel"
               style={{ fontSize: 12, color: "var(--text-secondary)" }}
@@ -1792,7 +1694,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               ))}
             </div>
-          )}
+          </CollapsibleSection>
         </div>
       </div>
     </div>

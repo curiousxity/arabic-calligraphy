@@ -393,3 +393,52 @@ export const PresetKeyboard = ({
     </div>
   </div>
 );
+
+/** Shared +/− collapsible header used throughout the sidebar; renders `children` only while open. */
+export const CollapsibleSection = ({
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) => (
+  <>
+    <button
+      type="button"
+      onClick={onToggle}
+      className="sidebarSectionButton"
+      aria-expanded={isOpen}
+    >
+      <span>{title}</span>
+      <span>{isOpen ? "−" : "+"}</span>
+    </button>
+
+    {isOpen && children}
+  </>
+);
+
+export const CheckboxRow = ({
+  id,
+  label,
+  checked,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) => (
+  <label className="checkboxRow" htmlFor={id}>
+    <input
+      id={id}
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+    />
+    {label}
+  </label>
+);

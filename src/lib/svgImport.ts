@@ -1,5 +1,13 @@
 const TARGET_SVG_SIZE = 500;
 
+const SVG_PATH_TOKEN_RE =
+  /[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
+const SVG_PATH_COMMAND_RE = /^[MmLlHhVvCcSsQqTtAaZz]$/;
+
+function tokenizePathString(d: string): string[] | null {
+  return d.match(SVG_PATH_TOKEN_RE);
+}
+
 function svgElementToPathData(el: Element): string {
   const tag = el.tagName.toLowerCase().replace(/^.*:/, "");
 
@@ -80,9 +88,7 @@ function svgElementToPathData(el: Element): string {
 }
 
 function scaleSvgPathNumbers(d: string, scaleX: number, scaleY: number): string {
-  const tokens = d.match(
-    /[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g
-  );
+  const tokens = tokenizePathString(d);
   if (!tokens) return d;
 
   const argCounts: Record<string, number> = {
@@ -127,7 +133,7 @@ function scaleSvgPathNumbers(d: string, scaleX: number, scaleY: number): string 
   let argIdx = 0;
 
   for (const tok of tokens) {
-    if (/^[MmLlHhVvCcSsQqTtAaZz]$/.test(tok)) {
+    if (SVG_PATH_COMMAND_RE.test(tok)) {
       cmd = tok.toUpperCase();
       argIdx = 0;
       out.push(tok);
@@ -219,9 +225,7 @@ function applyTransformToPathString(
   m: [number, number, number, number, number, number]
 ): string {
   const [a, b, c, dd, e, f] = m;
-  const tokens = d.match(
-    /[MmLlHhVvCcSsQqTtAaZz]|[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g
-  );
+  const tokens = tokenizePathString(d);
   if (!tokens) return d;
 
   const out: string[] = [];
@@ -323,7 +327,7 @@ function applyTransformToPathString(
   };
 
   for (const tok of tokens) {
-    if (/^[MmLlHhVvCcSsQqTtAaZz]$/.test(tok)) {
+    if (SVG_PATH_COMMAND_RE.test(tok)) {
       flush();
       cmd = tok.toUpperCase();
     } else {

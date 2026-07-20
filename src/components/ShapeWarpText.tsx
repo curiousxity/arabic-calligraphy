@@ -7,7 +7,8 @@ import { drawInsetBevel, EMBOSS_STRENGTH_SCALE } from "../lib/emboss";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import {
   applyGlyphEdit,
-  applyGlyphRig,
+  prepareGlyphRig,
+  applyPreparedGlyphRig,
   MOVE_HANDLE_COLOR,
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
@@ -294,10 +295,17 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
 
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
 
-  const glyphBounds = useMemo<GlyphBounds>(() => {
-    const { font, glyphs, unitsPerEm } = shapeData;
-
-    if (!font || glyphs.length === 0) {
+  // Computes the overall glyph-run bounding box (glyphBounds) and per-glyph
+  // layout boxes (glyphLayouts) in one pass — both need the same (expensive)
+  // glyphObj.getPath(...).getBoundingBox() call per glyph, so walking the
+  // font twice to get each independently would do that work twice. Note the
+  // two outputs deliberately stay asymmetric, matching prior behavior:
+  // glyphLayouts always has one entry per glyph (synthesizing a guessed box
+  // when a glyph is missing/degenerate, so callers always have something to
+  // position against), while glyphBounds's overall min/max only folds in
+  // glyphs that actually produced a finite box.
+  const glyphMetrics = useMemo<{ bounds: GlyphBounds; layouts: GlyphLayout[] }>(() => {
+    const fallbackBounds = (): GlyphBounds => {
       const rw = fallbackWidth(text, fontSize);
       const rh = Math.max(fontSize, 24);
       return {
@@ -308,6 +316,12 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
         rawWidth: rw,
         rawHeight: rh,
       };
+    };
+
+    const { font, glyphs, unitsPerEm } = shapeData;
+
+    if (!font || glyphs.length === 0) {
+      return { bounds: fallbackBounds(), layouts: [] };
     }
 
     const upm = Math.max(unitsPerEm || 1000, 1);
@@ -318,60 +332,6 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
-
-    for (const g of glyphs) {
-      const glyphObj = font.glyphs.get(g.g);
-      const advance = g.ax ?? 0;
-
-      if (glyphObj) {
-        const gx = (penX + (g.dx ?? 0)) * scale;
-        const gy = -(g.dy ?? 0) * scale;
-        const box = glyphObj.getPath(gx, gy, fontSize).getBoundingBox();
-
-        if (isFinite(box.x1) && isFinite(box.x2)) {
-          minX = Math.min(minX, box.x1);
-          maxX = Math.max(maxX, box.x2);
-        }
-
-        if (isFinite(box.y1) && isFinite(box.y2)) {
-          minY = Math.min(minY, box.y1);
-          maxY = Math.max(maxY, box.y2);
-        }
-      }
-
-      penX += advance;
-    }
-
-    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-      const rw = fallbackWidth(text, fontSize);
-      const rh = Math.max(fontSize, 24);
-      return {
-        minX: 0,
-        minY: 0,
-        maxX: rw,
-        maxY: rh,
-        rawWidth: rw,
-        rawHeight: rh,
-      };
-    }
-
-    return {
-      minX,
-      minY,
-      maxX,
-      maxY,
-      rawWidth: Math.max(maxX - minX, 1),
-      rawHeight: Math.max(maxY - minY, 1),
-    };
-  }, [shapeData, text, fontSize]);
-
-  const glyphLayouts = useMemo<GlyphLayout[]>(() => {
-    const { font, glyphs, unitsPerEm } = shapeData;
-    if (!font || glyphs.length === 0) return [];
-
-    const upm = Math.max(unitsPerEm || 1000, 1);
-    const scale = fontSize / upm;
-    let penX = 0;
     const layouts: GlyphLayout[] = [];
 
     for (let i = 0; i < glyphs.length; i++) {
@@ -385,6 +345,17 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
 
       if (glyphObj) {
         const box = glyphObj.getPath(gx, gy, fontSize).getBoundingBox();
+
+        if (isFinite(box.x1) && isFinite(box.x2)) {
+          minX = Math.min(minX, box.x1);
+          maxX = Math.max(maxX, box.x2);
+        }
+
+        if (isFinite(box.y1) && isFinite(box.y2)) {
+          minY = Math.min(minY, box.y1);
+          maxY = Math.max(maxY, box.y2);
+        }
+
         bounds = {
           minX: isFinite(box.x1) ? box.x1 : gx,
           minY: isFinite(box.y1) ? box.y1 : gy - fontSize,
@@ -410,8 +381,22 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
       penX += advance;
     }
 
-    return layouts;
-  }, [shapeData, fontSize]);
+    const overallBounds = !isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)
+      ? fallbackBounds()
+      : {
+          minX,
+          minY,
+          maxX,
+          maxY,
+          rawWidth: Math.max(maxX - minX, 1),
+          rawHeight: Math.max(maxY - minY, 1),
+        };
+
+    return { bounds: overallBounds, layouts };
+  }, [shapeData, text, fontSize]);
+
+  const glyphBounds = glyphMetrics.bounds;
+  const glyphLayouts = glyphMetrics.layouts;
 
   const hitBoxes = useMemo<GlyphHitBox[]>(() => {
     return glyphLayouts.map(({ glyphIndex, bounds, gx, gy, glyphId }) => ({
@@ -630,23 +615,13 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
 
               const gx = (penX + (g.dx ?? 0)) * scale;
               const gy = -(g.dy ?? 0) * scale;
+              const preparedRig = prepareGlyphRig(fontFamily, g.g, fontSize, glyphRigs, glyphRigValues, gx, gy);
 
               const warpPoint = (cx: number, cy: number) => {
                 const baseX = cx + gx;
                 const baseY = cy + gy;
                 const pGlyph = applyGlyphEdit(baseX, baseY, edit);
-                const pRigged = applyGlyphRig(
-                  pGlyph.x,
-                  pGlyph.y,
-                  fontFamily,
-                  g.g,
-                  fontSize,
-                  glyphRigs,
-                  glyphRigValues,
-                  -1,
-                  gx,
-                  gy
-                );
+                const pRigged = applyPreparedGlyphRig(pGlyph.x, pGlyph.y, preparedRig);
 
                 return applyShapeWarpPoint(
                   pRigged.x,

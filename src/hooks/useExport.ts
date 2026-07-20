@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import type Konva from "konva";
 import type { Block } from "../types";
 import { getBlocksBoundingBox as getBlocksBoundingBoxShared } from "../lib/canvasBounds";
+import { triggerDownload } from "../lib/download";
 
 /** PNG/SVG/PDF export handlers for the current stage contents. */
 export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block[]) {
@@ -67,12 +68,7 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
     });
     if (!result) return;
 
-    const link = document.createElement("a");
-    link.download = "calligraphy.png";
-    link.href = result.dataURL;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    triggerDownload(result.dataURL, "calligraphy.png");
   };
 
   const handleExportJPEG = async () => {
@@ -96,12 +92,7 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
     });
     if (!result) return;
 
-    const link = document.createElement("a");
-    link.download = "calligraphy.jpg";
-    link.href = result.dataURL;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    triggerDownload(result.dataURL, "calligraphy.jpg");
   };
 
   const handleExportSVG = async (transparent = false) => {
@@ -130,13 +121,7 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
 
     const blob = new Blob([finalSvg], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "calligraphy.svg";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    triggerDownload(url, "calligraphy.svg", true);
   };
 
   const handleExportPDF = async () => {
