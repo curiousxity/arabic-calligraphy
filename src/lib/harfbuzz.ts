@@ -120,6 +120,27 @@ async function loadParsedFont(fontUrl: string): Promise<opentype.Font> {
   return parsedFontCache.get(fontUrl)!;
 }
 
+// Arabic combining marks: harakat, tanween, sukun, shadda, Quranic annotation
+// signs, etc. (U+0610-061A, U+064B-065F, U+0670, U+06D6-06DC, U+06DF-06E4,
+// U+06E7-06E8, U+06EA-06ED). Fonts (e.g. Qahiri) that ship no glyphs for
+// these render them as .notdef boxes via HarfBuzz's normal missing-glyph
+// fallback, which looks like broken/garbled text. Since these are optional
+// pronunciation marks, silently drop the ones the loaded font can't render
+// instead of shaping them into visible tofu.
+const ARABIC_DIACRITIC_RE =
+  /[ؐ-ًؚ-ٰٟۖ-ۜ۟-۪ۤۧۨ-ۭ]/;
+
+function stripUnsupportedDiacritics(text: string, font: opentype.Font): string {
+  let result = "";
+  for (const ch of text) {
+    if (ARABIC_DIACRITIC_RE.test(ch) && !font.charToGlyphIndex(ch)) {
+      continue;
+    }
+    result += ch;
+  }
+  return result;
+}
+
 function textToCodepoints(text: string) {
   return Array.from(text).map((ch, index) => ({
     index,
@@ -236,6 +257,7 @@ export async function shapeText(
   ]);
 
   const upm = parsedFont.unitsPerEm || 1000;
+  const shapableText = stripUnsupportedDiacritics(text, parsedFont);
 
   const blob = hb.createBlob(new Uint8Array(fontData));
   const face = hb.createFace(blob, 0);
@@ -247,7 +269,7 @@ export async function shapeText(
       font.setScale(upm, upm);
     }
 
-    buffer.addText(text);
+    buffer.addText(shapableText);
 
     if (typeof buffer.guessSegmentProperties === "function") {
       buffer.guessSegmentProperties();
@@ -260,6 +282,7 @@ export async function shapeText(
     if (DEBUG_HB) {
       console.log("[HB] before shape", {
         text,
+        shapableText,
         fontUrl,
         upm,
         usingFeatures: false,
@@ -281,7 +304,7 @@ export async function shapeText(
     const glyphs = normalizeGlyphs(raw);
 
     if (DEBUG_HB) {
-      logShapingDebug(text, fontUrl, parsedFont, upm, raw, glyphs);
+      logShapingDebug(shapableText, fontUrl, parsedFont, upm, raw, glyphs);
     }
 
     const result: ShapedTextResult = {
