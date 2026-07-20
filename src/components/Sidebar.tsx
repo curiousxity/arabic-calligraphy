@@ -85,6 +85,7 @@ export type SidebarProps = {
   onAddShapeWarpBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddImageBlock?: () => void;
   onApplyTemplate?: (templateId: string) => void;
+  onRandomizeLayout?: () => void;
 
   onToggleGrid: (v: boolean) => void;
   onToggleSnap: (v: boolean) => void;
@@ -172,6 +173,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddShapeWarpBlock,
   onAddImageBlock,
   onApplyTemplate,
+  onRandomizeLayout,
   onToggleGrid,
   onToggleSnap,
   showRulers = false,
@@ -458,6 +460,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                   ))}
                 </div>
+
+                {onRandomizeLayout && blocks.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={onRandomizeLayout}
+                    className="sidebarSmallAction"
+                    title="Randomize the font, text color, and background color"
+                    style={{ textAlign: "center" }}
+                  >
+                    🎲 Randomize Look
+                  </button>
+                )}
               </div>
             )}
           </div>

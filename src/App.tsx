@@ -14,6 +14,7 @@ import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
 import { STARTER_TEMPLATES } from "./lib/templates";
+import { FONT_URLS } from "./hooks/useShapedGlyphs";
 import {
   MIN_SCALE,
   MAX_SCALE,
@@ -23,6 +24,17 @@ import {
   DEFAULT_EMPTY_BOUNDS,
 } from "./lib/canvasBounds";
 import type { Block, GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigAxis } from "./types";
+
+const hslToHex = (h: number, s: number, l: number): string => {
+  const sat = s / 100;
+  const light = l / 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = sat * Math.min(light, 1 - light);
+  const f = (n: number) =>
+    light - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = (x: number) => Math.round(255 * x).toString(16).padStart(2, "0");
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+};
 
 const dissolveSingletonGroups = (list: Block[]): Block[] => {
   const counts = new Map<number, number>();
@@ -933,6 +945,26 @@ const App: React.FC = () => {
     });
   };
 
+  const randomizeLayout = () => {
+    if (blocks.length === 0) return;
+    pushHistory();
+
+    const fontFamilies = Object.keys(FONT_URLS);
+    const font = fontFamilies[Math.floor(Math.random() * fontFamilies.length)];
+
+    const bgLight = 15 + Math.random() * 75;
+    const bg = hslToHex(Math.random() * 360, 35 + Math.random() * 40, bgLight);
+    const textLight = bgLight > 55 ? 8 + Math.random() * 18 : 82 + Math.random() * 15;
+    const textColor = hslToHex(Math.random() * 360, 40 + Math.random() * 40, textLight);
+
+    setBackgroundColor(bg);
+    setBlocks((prev) =>
+      prev.map((b) =>
+        b.type === "image" ? b : ({ ...b, fontFamily: font, color: textColor } as Block)
+      )
+    );
+  };
+
   const updateSelectedBlock = useCallback(
     (patch: Partial<Block>) => {
       if (!selectedBlock) return;
@@ -1759,6 +1791,7 @@ const App: React.FC = () => {
         onAddShapeWarpBlock={addShapeWarpBlock}
         onAddImageBlock={uploadImageBlock}
         onApplyTemplate={requestApplyStarterTemplate}
+        onRandomizeLayout={randomizeLayout}
         onToggleGrid={setShowGrid}
         onToggleSnap={setSnapToGrid}
         showRulers={showRulers}
