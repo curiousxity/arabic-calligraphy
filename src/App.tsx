@@ -207,7 +207,7 @@ const App: React.FC = () => {
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(true);
   const [showMorphEditorMobile, setShowMorphEditorMobile] = useState(false);
   const [panMode, setPanMode] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(isBrowser ? window.innerWidth : 1200);

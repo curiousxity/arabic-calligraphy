@@ -218,6 +218,14 @@ export const CloseIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
+export const HelpIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9a2.5 2.5 0 0 1 4.85.83c0 1.67-2.35 2.17-2.35 3.67" />
+    <path d="M12 17.5h.01" />
+  </IconBase>
+);
+
 export const ZoomInIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>
     <circle cx="11" cy="11" r="7" />

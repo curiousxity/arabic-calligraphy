@@ -1,9 +1,123 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Block, GlyphRig, GlyphStretchHandle } from "../types";
 import { RangeRow } from "./sidebar/FormControls";
 import { makeId } from "./sidebar/utils";
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon } from "./Icons";
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, HelpIcon } from "./Icons";
+
+const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="confirmDialogOverlay"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="confirmDialog morphHelpDialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="morphHelpTitle"
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 8,
+          }}
+        >
+          <div id="morphHelpTitle" className="confirmDialogTitle" style={{ marginBottom: 0 }}>
+            Morph Glyph Editor
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="layerIconBtn"
+            aria-label="Close help"
+            title="Close"
+          >
+            <CloseIcon size={14} />
+          </button>
+        </div>
+
+        <div className="morphHelpBody">
+          <p>
+            Distort individual letterforms within a text, Shape Fill, or Shape
+            Warp block. Not available for image blocks.
+          </p>
+
+          <h4>1. Pick a glyph</h4>
+          <p>
+            Turn on <strong>Move</strong> or <strong>Stretch</strong> above, then
+            click a letter on the canvas to select it. Both tools need a
+            selected glyph before they do anything.
+          </p>
+
+          <h4>Move tool</h4>
+          <p>
+            Nudges the whole glyph as a rigid unit. Drag the dashed blue box
+            around the selected glyph, or use the Offset X / Offset Y sliders.
+            "Reset position" zeroes the offset.
+          </p>
+
+          <h4>Stretch tool</h4>
+          <p>
+            Elongates or distorts a stroke between two points.
+          </p>
+          <ol>
+            <li>
+              Click <strong>Add stretch line</strong> to create a handle: a{" "}
+              <strong style={{ color: "#ff4d4f" }}>red anchor</strong> (fixed
+              point) and a <strong style={{ color: "#22c55e" }}>green drag
+              point</strong> (the point you pull).
+            </li>
+            <li>
+              Drag the red anchor to where the deformation should originate,
+              and the green point to where it should pull toward. Everything
+              between them stretches proportionally.
+            </li>
+            <li>
+              <strong>Band width</strong> controls how wide a swath around the
+              line is affected.
+            </li>
+            <li>
+              <strong>Masking</strong> limits which part of the glyph is
+              affected: Whole glyph (default), By stroke (click outline
+              contours to include/exclude them, then Done), or Lasso (drag a
+              freeform loop around the region).
+            </li>
+          </ol>
+          <p>You can add multiple stretch lines per glyph.</p>
+
+          <h4>Saving a stretch as a reusable "Rig"</h4>
+          <p>
+            Name a stretch handle and click <strong>Save as Rig…</strong>. It
+            becomes a −1 to 1 slider under Rigged Parameters that applies to
+            every occurrence of that same letterform (same font + glyph) in
+            the block — not just the one you edited. Delete an axis with the
+            × next to its slider.
+          </p>
+
+          <p style={{ marginBottom: 0 }}>
+            All edits are undoable with the normal undo/redo. Turn the tool
+            back to Off to see a clean view of the result.
+          </p>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
 
 type GlyphBox = {
   glyphIndex: number;
@@ -86,6 +200,7 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
   onCloseMobile,
 }) => {
   const [rigNameDrafts, setRigNameDrafts] = useState<Record<string, string>>({});
+  const [showHelp, setShowHelp] = useState(false);
   const selectedId = selectedBlock?.id ?? "none";
 
   const eligible = !!selectedBlock && selectedBlock.type !== "image";
@@ -471,23 +586,39 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
 
   if (isMobile) {
     if (!mobileOpen) return null;
-    return createPortal(
-      <div className="morphEditorFloating" role="dialog" aria-label="Morph glyph editor">
-        <div className="morphEditorFloatingHeader">
-          <span>Morph Glyph Editor</span>
-          <button
-            type="button"
-            onClick={onCloseMobile}
-            className="layerIconBtn"
-            aria-label="Close morph glyph editor"
-            title="Close"
-          >
-            <CloseIcon size={12} />
-          </button>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>{body}</div>
-      </div>,
-      document.body
+    return (
+      <>
+        {createPortal(
+          <div className="morphEditorFloating" role="dialog" aria-label="Morph glyph editor">
+            <div className="morphEditorFloatingHeader">
+              <span>Morph Glyph Editor</span>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowHelp(true)}
+                  className="layerIconBtn"
+                  aria-label="Help"
+                  title="Help"
+                >
+                  <HelpIcon size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onCloseMobile}
+                  className="layerIconBtn"
+                  aria-label="Close morph glyph editor"
+                  title="Close"
+                >
+                  <CloseIcon size={12} />
+                </button>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>{body}</div>
+          </div>,
+          document.body
+        )}
+        {showHelp && <MorphHelpDialog onClose={() => setShowHelp(false)} />}
+      </>
     );
   }
 
@@ -536,6 +667,16 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
           >
             <ChevronRightIcon size={14} />
           </button>
+          <button
+            type="button"
+            onClick={() => setShowHelp(true)}
+            className="layerIconBtn"
+            style={{ position: "absolute", top: 8, insetInlineEnd: 8 }}
+            title="Help"
+            aria-label="Help"
+          >
+            <HelpIcon size={14} />
+          </button>
           <div className="sidebarSectionTitle" style={{ textAlign: "center", marginBottom: 0 }}>
             Morph Glyph Editor
           </div>
@@ -545,6 +686,8 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
           {body}
         </div>
       </div>
+
+      {showHelp && <MorphHelpDialog onClose={() => setShowHelp(false)} />}
     </div>
   );
 };
