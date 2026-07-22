@@ -12,7 +12,10 @@ import {
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
 } from "../lib/glyphEdits";
-import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
+import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
+import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
+import { deriveContourMask } from "../lib/glyphContours";
+import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue, GlyphStretchMask } from "../types";
 
 type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
 
@@ -74,6 +77,7 @@ export type ShapeWarpTextProps = {
   glyphRigValues?: GlyphRigValue[];
   onGlyphSelect?: (glyphIndex: number | null) => void;
   onGlyphBoxesChange?: (boxes: GlyphHitBox[]) => void;
+  onGlyphSchemaChange?: (catalog: Record<number, StretchDefinition[]>) => void;
   onUpdateStretchHandle?: (
     glyphIndex: number,
     handleId: string,
@@ -256,10 +260,12 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   glyphRigValues = [],
   onGlyphSelect,
   onGlyphBoxesChange,
+  onGlyphSchemaChange,
   onUpdateStretchHandle,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
   const { hbLoaded } = shapeData;
+  const glyphSchemaCatalog = useGlyphSchemaCatalog(shapeData.shapableText, shapeData.glyphs);
 
   const [spinnerAngle, setSpinnerAngle] = useState(0);
   const spinnerFrameRef = useRef<number | null>(null);
@@ -404,11 +410,48 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
     onGlyphBoxesChange?.(hitBoxes);
   }, [hitBoxes, onGlyphBoxesChange]);
 
+  useEffect(() => {
+    onGlyphSchemaChange?.(glyphSchemaCatalog);
+  }, [glyphSchemaCatalog, onGlyphSchemaChange]);
+
   const selectedEdit =
     glyphEditTool != null && selectedGlyphIndex != null
       ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
       : undefined;
   const selectedStretches = selectedEdit?.stretches ?? [];
+
+  /** Raw (glyph-local, no gx/gy offset) outline commands for the selected glyph, plus its pen offset — used to auto-derive a contour mask from wherever a handle's anchor/drag points currently sit (see lib/glyphContours.ts). */
+  const selectedGlyphOutline = useMemo(() => {
+    if (selectedGlyphIndex == null) return null;
+    const { font, glyphs } = shapeData;
+    const g = font ? glyphs[selectedGlyphIndex] : undefined;
+    const glyphObj = g ? font!.glyphs.get(g.g) : undefined;
+    if (!glyphObj) return null;
+
+    const box = hitBoxes.find((b) => b.glyphIndex === selectedGlyphIndex);
+    return {
+      commands: glyphObj.getPath(0, 0, fontSize).commands as PathCommand[],
+      gx: box?.gx ?? 0,
+      gy: box?.gy ?? 0,
+    };
+  }, [shapeData, selectedGlyphIndex, hitBoxes, fontSize]);
+
+  /** Recomputes a handle's auto mask from its (possibly just-updated) anchor/drag points, in text-space coords — no-ops (returns undefined) unless the handle opts into auto-masking and the outline is available. */
+  const autoDeriveMask = (
+    h: GlyphStretchHandle,
+    anchorX: number,
+    anchorY: number,
+    dragX: number,
+    dragY: number
+  ): GlyphStretchMask | undefined => {
+    if (!h.maskAuto || !selectedGlyphOutline) return undefined;
+    const { commands, gx, gy } = selectedGlyphOutline;
+    return deriveContourMask(commands, [
+      { x: anchorX - gx, y: anchorY - gy },
+      { x: dragX - gx, y: dragY - gy },
+    ]);
+  };
+
   const bw = Math.max(warpShapeWidth, 20);
   const bh = Math.max(warpShapeHeight, 20);
   const bx = -bw / 2;
@@ -685,9 +728,12 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
                 if (!pos || !onUpdateStretchHandle) return;
 
                 const raw = invertToRawPoint(pos.x, pos.y);
+                const mask = autoDeriveMask(h, raw.x, raw.y, h.dragX, h.dragY);
+
                 onUpdateStretchHandle(selectedGlyphIndex, h.id, {
                   anchorX: raw.x,
                   anchorY: raw.y,
+                  ...(mask ? { mask } : {}),
                 });
               }}
               onDragEnd={(e) => {
@@ -713,9 +759,12 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
                 if (!pos || !onUpdateStretchHandle) return;
 
                 const raw = invertToRawPoint(pos.x, pos.y);
+                const mask = autoDeriveMask(h, h.anchorX, h.anchorY, raw.x, raw.y);
+
                 onUpdateStretchHandle(selectedGlyphIndex, h.id, {
                   dragX: raw.x,
                   dragY: raw.y,
+                  ...(mask ? { mask } : {}),
                 });
               }}
               onDragEnd={(e) => {

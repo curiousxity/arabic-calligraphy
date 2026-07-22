@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Block, GlyphRig, GlyphStretchHandle } from "../types";
+import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import { RangeRow } from "./sidebar/FormControls";
 import { makeId } from "./sidebar/utils";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, HelpIcon } from "./Icons";
@@ -65,11 +66,16 @@ const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
           <h4>Stretch tool</h4>
           <p>
-            Elongates or distorts a stroke between two points.
+            Elongates or distorts one anatomical stroke of a letter (its body,
+            an eye/loop, a tooth, etc.), bounded to that stroke's authored safe
+            range — only available where a stroke schema has been authored for
+            that letter and joining form. If none is authored yet, this
+            letter/form isn't editable here.
           </p>
           <ol>
             <li>
-              Click <strong>Add stretch line</strong> to create a handle: a{" "}
+              Labeled buttons appear per available stroke (e.g. "+ Body —
+              kashida-eligible") — click one to add a handle: a{" "}
               <strong style={{ color: "#ff4d4f" }}>red anchor</strong> (fixed
               point) and a <strong style={{ color: "#22c55e" }}>green drag
               point</strong> (the point you pull).
@@ -84,13 +90,24 @@ const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               line is affected.
             </li>
             <li>
+              <strong>Kashida amount</strong> is bounded to that stroke's
+              authored min/max — it scales the stretch instead of dragging the
+              green point past its original length.
+            </li>
+            <li>
               <strong>Masking</strong> limits which part of the glyph is
               affected: By stroke (click outline contours to include/exclude
               them, then Done), or Lasso (drag a freeform loop around the
               region). A handle with no mask set yet affects the whole glyph.
             </li>
           </ol>
-          <p>You can add multiple stretch lines per glyph.</p>
+          <p>You can add every available stroke's handle at once, per glyph.</p>
+          <p>
+            When a block has one or more kashida-eligible schema-backed
+            handles, a block-level <strong>Kashida</strong> slider appears —
+            it distributes a single 0–100 dial across all of them, weighted by
+            each stroke's authored priority.
+          </p>
 
           <h4>Saving a stretch as a reusable "Rig"</h4>
           <p>
@@ -126,9 +143,11 @@ type GlyphBox = {
 export type MorphGlyphEditorProps = {
   selectedBlock?: Block;
   selectedGlyphBoxes?: GlyphBox[];
+  /** Stroke-schema stretch definitions available for the currently selected glyph (empty if that letter/form has no authored schema entry). */
+  selectedGlyphCatalog?: StretchDefinition[];
   glyphRigs?: GlyphRig[];
   onSetGlyphEditTool?: (tool: "stretch" | null) => void;
-  onAddStretchHandle?: () => void;
+  onAddStretchHandle?: (definition: StretchDefinition) => void;
   onUpdateStretchHandle?: (
     blockId: number,
     glyphIndex: number,
@@ -149,6 +168,7 @@ export type MorphGlyphEditorProps = {
   ) => void;
   onSetGlyphRigValue?: (blockId: number, axisId: string, value: number) => void;
   onDeleteGlyphRigAxis?: (fontFamily: string, glyphId: number, axisId: string) => void;
+  onSetBlockKashidaAmount?: (blockId: number, amount: number) => void;
   isMobile: boolean;
   width: number;
   isCollapsed: boolean;
@@ -169,6 +189,7 @@ export type MorphGlyphEditorProps = {
 export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
   selectedBlock,
   selectedGlyphBoxes,
+  selectedGlyphCatalog,
   glyphRigs,
   onSetGlyphEditTool,
   onAddStretchHandle,
@@ -178,6 +199,7 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
   onSaveStretchHandleAsRig,
   onSetGlyphRigValue,
   onDeleteGlyphRigAxis,
+  onSetBlockKashidaAmount,
   isMobile,
   width,
   isCollapsed,
@@ -202,6 +224,15 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
       .filter((r) => r.fontFamily === selectedBlock.fontFamily && glyphIds.has(r.glyphId))
       .flatMap((r) => r.axes.map((a) => ({ rig: r, axis: a })));
   })();
+
+  // Every kashida-eligible, schema-backed handle across the whole block (not
+  // just the selected glyph) — drives the block-level Kashida dial below.
+  const kashidaEligibleCount =
+    selectedBlock?.glyphEdits?.reduce(
+      (count, edit) =>
+        count + edit.stretches.filter((h) => h.kashidaEligible && h.maxFactor != null).length,
+      0
+    ) ?? 0;
 
   const body = !eligible || !selectedBlock ? (
     <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
@@ -252,15 +283,50 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
 
         {selectedBlock.glyphEditTool === "stretch" && (
           <>
-            <button
-              type="button"
-              disabled={selectedBlock.selectedGlyphIndex == null}
-              onClick={() => onAddStretchHandle?.()}
-              className="sidebarSmallAction"
-              style={{ marginTop: 8 }}
-            >
-              Add stretch line
-            </button>
+            {selectedBlock.selectedGlyphIndex != null &&
+              (() => {
+                const glyphIndex = selectedBlock.selectedGlyphIndex as number;
+                const addedZoneKeys = new Set(
+                  (
+                    selectedBlock.glyphEdits?.find((g) => g.glyphIndex === glyphIndex)
+                      ?.stretches ?? []
+                  )
+                    .filter((h) => h.schemaStrokeId != null)
+                    .map((h) => `${h.schemaStrokeId}:${h.schemaZoneIndex ?? 0}`)
+                );
+                const available = (selectedGlyphCatalog ?? []).filter(
+                  (def) => !addedZoneKeys.has(`${def.strokeId}:${def.zoneIndex}`)
+                );
+
+                if (available.length > 0) {
+                  return (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                      {available.map((def) => (
+                        <button
+                          key={`${def.strokeId}:${def.zoneIndex}`}
+                          type="button"
+                          onClick={() => onAddStretchHandle?.(def)}
+                          className="sidebarSmallAction"
+                          title={def.label.ar}
+                        >
+                          + {def.label.en ?? def.componentType}
+                          {def.kashidaEligible ? " (kashida)" : ""}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                }
+
+                if ((selectedGlyphCatalog ?? []).length === 0) {
+                  return (
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+                      No stroke schema authored yet for this letter/form.
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
 
             {selectedBlock.selectedGlyphIndex != null &&
               (() => {
@@ -279,7 +345,12 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                       marginTop: 8,
                     }}
                   >
-                    {stretches.map((h) => (
+                    {stretches.map((h) => {
+                      const catalogEntry = (selectedGlyphCatalog ?? []).find(
+                        (d) => d.strokeId === h.schemaStrokeId && d.zoneIndex === (h.schemaZoneIndex ?? 0)
+                      );
+
+                      return (
                       <div
                         key={h.id}
                         style={{
@@ -293,7 +364,8 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ fontSize: 12, color: "var(--text-muted)", flex: 1 }}>
-                            Stretch line
+                            {catalogEntry?.label.en ?? "Stretch line"}
+                            {h.kashidaEligible ? " · kashida" : ""}
                           </span>
                           <button
                             type="button"
@@ -308,6 +380,32 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                             <CloseIcon size={12} />
                           </button>
                         </div>
+
+                        {catalogEntry && catalogEntry.protectedReasons.length > 0 && (
+                          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                            ⚠ Schema notes a protected zone on this stroke (
+                            {catalogEntry.protectedReasons.join(", ")}) — avoid stretching past
+                            its terminal/join.
+                          </span>
+                        )}
+
+                        {h.minFactor != null && h.maxFactor != null && (
+                          <RangeRow
+                            id={makeId(`handle-factor-${h.id}`, selectedId)}
+                            name={makeId(`handleFactor-${h.id}`, selectedId)}
+                            label="Kashida amount"
+                            value={h.factor ?? 1}
+                            min={h.minFactor}
+                            max={h.maxFactor}
+                            step={0.01}
+                            onChange={(v) =>
+                              onUpdateStretchHandle?.(selectedBlock.id, glyphIndex, h.id, {
+                                factor: v,
+                              })
+                            }
+                            suffix={(h.factor ?? 1).toFixed(2)}
+                          />
+                        )}
 
                         <RangeRow
                           id={makeId(`handle-band-${h.id}`, selectedId)}
@@ -444,10 +542,42 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                           </button>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 );
               })()}
+
+            {kashidaEligibleCount > 0 && (
+              <div
+                style={{
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTop: "1px solid var(--border-soft)",
+                }}
+              >
+                <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
+                  Kashida
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                  Distributes one dial across every kashida-eligible handle in
+                  this block, weighted by each stroke's authored priority.
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <RangeRow
+                    id={makeId("kashida-amount", selectedId)}
+                    name={makeId("kashidaAmount", selectedId)}
+                    label="Extend by"
+                    value={selectedBlock.kashidaAmount ?? 0}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onChange={(v) => onSetBlockKashidaAmount?.(selectedBlock.id, v)}
+                    suffix={`${Math.round(selectedBlock.kashidaAmount ?? 0)}%`}
+                  />
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

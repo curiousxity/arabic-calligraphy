@@ -107,7 +107,9 @@ export function applyGlyphEdit(
     // Masked against the original (pre-stretch) position so a point can't be
     // carried out of, or into, its own mask by an earlier handle in the chain.
     if (!passesMask(h.mask, x, y, contourIndex)) continue;
-    const p = applyAxisDisplacement(px, py, h, 1);
+    // `factor` (schema-backed handles only) scales the axis the same way a
+    // rig axis's value does; absent/1 preserves this handle's authored length.
+    const p = applyAxisDisplacement(px, py, h, h.factor ?? 1);
     px = p.x;
     py = p.y;
   }

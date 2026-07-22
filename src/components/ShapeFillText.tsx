@@ -17,6 +17,7 @@
 import React, { useEffect, useMemo } from "react";
 import { Group, Shape, Rect, Circle } from "react-konva";
 import type Konva from "konva";
+import type { PathCommand } from "opentype.js";
 import {
   parseSvgPath,
   pathToPolygon,
@@ -33,7 +34,10 @@ import {
   STRETCH_ANCHOR_COLOR,
   STRETCH_DRAG_COLOR,
 } from "../lib/glyphEdits";
-import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
+import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
+import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
+import { deriveContourMask } from "../lib/glyphContours";
+import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue, GlyphStretchMask } from "../types";
 
 export type ShapeFillTextProps = {
   id?: string;
@@ -80,6 +84,7 @@ export type ShapeFillTextProps = {
       glyphId: number;
     }[]
   ) => void;
+  onGlyphSchemaChange?: (catalog: Record<number, StretchDefinition[]>) => void;
   onUpdateStretchHandle?: (
     glyphIndex: number,
     handleId: string,
@@ -260,6 +265,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   glyphRigValues = [],
   onGlyphSelect,
   onGlyphBoxesChange,
+  onGlyphSchemaChange,
   onUpdateStretchHandle,
   locked,
   draggable = true,
@@ -268,6 +274,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   onResizeScale,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
+  const glyphSchemaCatalog = useGlyphSchemaCatalog(shapeData.shapableText, shapeData.glyphs);
 
   // Parse SVG path once
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
@@ -334,6 +341,10 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   useEffect(() => {
     onGlyphBoxesChange?.(glyphLocalBoxes);
   }, [glyphLocalBoxes, onGlyphBoxesChange]);
+
+  useEffect(() => {
+    onGlyphSchemaChange?.(glyphSchemaCatalog);
+  }, [glyphSchemaCatalog, onGlyphSchemaChange]);
 
   // Mirrors the sceneFunc's own scanline-tiling loop in plain JS (no canvas
   // needed — `pointInPolygon` is pure) so glyph-edit click hit-testing and
@@ -403,6 +414,23 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
       : undefined;
   const selectedStretches = selectedEdit?.stretches ?? [];
+
+  /** Recomputes a handle's auto mask from its (possibly just-updated) anchor/drag points — no-ops (returns undefined) unless the handle opts into auto-masking. Anchor/drag here are already glyph-local (no gx/gy offset — see the per-instance <Group> transform below), matching glyphCache's own commands. */
+  const autoDeriveMask = (
+    h: GlyphStretchHandle,
+    anchorX: number,
+    anchorY: number,
+    dragX: number,
+    dragY: number
+  ): GlyphStretchMask | undefined => {
+    if (!h.maskAuto || selectedGlyphIndex == null) return undefined;
+    const commands = glyphCache[selectedGlyphIndex]?.commands;
+    if (!commands || commands.length === 0) return undefined;
+    return deriveContourMask(commands as unknown as PathCommand[], [
+      { x: anchorX, y: anchorY },
+      { x: dragX, y: dragY },
+    ]);
+  };
 
   return (
     <Group
@@ -627,9 +655,11 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                       const grp = e.currentTarget.getParent() as Konva.Group;
                       const pos = grp.getRelativePointerPosition();
                       if (!pos || !onUpdateStretchHandle) return;
+                      const mask = autoDeriveMask(h, pos.x, pos.y, h.dragX, h.dragY);
                       onUpdateStretchHandle(selectedGlyphIndex, h.id, {
                         anchorX: pos.x,
                         anchorY: pos.y,
+                        ...(mask ? { mask } : {}),
                       });
                     }}
                     onDragEnd={(e) => {
@@ -656,9 +686,11 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                       const grp = e.currentTarget.getParent() as Konva.Group;
                       const pos = grp.getRelativePointerPosition();
                       if (!pos || !onUpdateStretchHandle) return;
+                      const mask = autoDeriveMask(h, h.anchorX, h.anchorY, pos.x, pos.y);
                       onUpdateStretchHandle(selectedGlyphIndex, h.id, {
                         dragX: pos.x,
                         dragY: pos.y,
+                        ...(mask ? { mask } : {}),
                       });
                     }}
                     onDragEnd={(e) => {

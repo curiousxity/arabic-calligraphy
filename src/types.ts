@@ -29,6 +29,23 @@ export type GlyphStretchHandle = {
   dragY: number;
   bandWidth: number;
   mask?: GlyphStretchMask;
+  /** True while `mask` is auto-derived from the anchor/drag points' current position on the real glyph outline (see lib/glyphContours.ts) — recomputed on every drag. Set to false the moment the user manually authors a mask via By-stroke/Lasso, so their choice is never overwritten. Absent (pre-existing handles) = leave alone. */
+  maskAuto?: boolean;
+
+  // Stroke-schema linkage (lib/strokeSchema) — set only when this handle was
+  // created from a schema-driven catalog entry (see MorphGlyphEditor's "add
+  // named stretch" buttons). Absent = a plain freehand handle, behaving
+  // exactly as before this feature existed.
+  /** The schema Stroke.id this handle represents, for display/bookkeeping only. */
+  schemaStrokeId?: string;
+  /** Which of that stroke's stretchZones (see strokeSchema/deriveCatalog.ts's StretchDefinition.zoneIndex) this handle represents — a stroke can have more than one independently named zone (e.g. Height vs Length). Absent = zone 0 (every pre-existing handle, from single-zone strokes). */
+  schemaZoneIndex?: number;
+  /** Multiplier applied on top of the anchor->drag axis (same role as a rig axis's [-1,1] value), driven by the "Kashida amount" slider. Absent/1 = today's un-scaled behavior. */
+  factor?: number;
+  minFactor?: number;
+  maxFactor?: number;
+  kashidaEligible?: boolean;
+  priority?: number;
 };
 
 export type GlyphEdit = {
@@ -105,6 +122,8 @@ type BlockCommon = {
   glyphRigValues?: GlyphRigValue[];
   /** Which stretch handle (if any) is currently having its point mask authored, and how — text blocks only for now. */
   glyphMaskEdit?: { handleId: string; mode: "contours" | "lasso" } | null;
+  /** Block-level "Kashida" slider (0-100) — proportionally scales every kashida-eligible, schema-backed stretch handle's `factor` toward its `maxFactor`, weighted by each handle's `priority`. */
+  kashidaAmount?: number;
 
   // Shared shape-import fields. shapeFill and shapeWarp blocks both carry an
   // uploaded SVG path, and shapeWarp falls back to shapeWidth/shapeHeight

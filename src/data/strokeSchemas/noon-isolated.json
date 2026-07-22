@@ -1,0 +1,287 @@
+{
+  "schemaVersion": "1.0.0",
+  "styleProfile": {
+    "script": "arabic",
+    "calligraphicModel": "naskh",
+    "measurementSystem": {
+      "dotUnit": {
+        "name": "nuqta",
+        "shape": "rhombic",
+        "width": 1.0,
+        "height": 1.0
+      },
+      "angleDegrees": 45
+    },
+    "verticalLevels": [
+      {
+        "id": "earth-1",
+        "name": "earth-1",
+        "y": -3.0
+      },
+      {
+        "id": "baseline",
+        "name": "baseline",
+        "y": 0.0
+      },
+      {
+        "id": "tooth-height",
+        "name": "tooth-height",
+        "y": 1.2
+      },
+      {
+        "id": "loop-height",
+        "name": "loop-height",
+        "y": 2.2
+      },
+      {
+        "id": "eye-height",
+        "name": "eye-height",
+        "y": 2.8
+      },
+      {
+        "id": "sky-1",
+        "name": "sky-1",
+        "y": 4.5
+      }
+    ]
+  },
+  "glyph": {
+    "id": "NOON_ISOLATED",
+    "baseLetter": "ن",
+    "joiningForm": "isolated",
+    "role": "base_letter",
+    "unicode": "0646",
+    "components": [
+      {
+        "id": "HEAD_1",
+        "type": "HEAD",
+        "semanticLabel": {
+          "ar": "رأس",
+          "en": "head"
+        },
+        "strokes": [
+          {
+            "id": "S_HEAD_1",
+            "function": "HEAD",
+            "direction": "horizontal-left",
+            "curvature": "soft-curve",
+            "terminalStart": "hidden",
+            "terminalEnd": "hidden",
+            "thicknessProfile": "contrast-low",
+            "startLevel": "loop-height",
+            "endLevel": "loop-height",
+            "lengthDots": 1.6,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 3.9,
+                  "y": 1.7,
+                  "out": {
+                    "x": 3.1,
+                    "y": 1.9
+                  }
+                },
+                {
+                  "x": 2.2,
+                  "y": 1.7,
+                  "in": {
+                    "x": 3.0,
+                    "y": 1.85
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "reason": "standalone-balance"
+                }
+              ],
+              "priority": 7,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "رأس النون",
+              "en": "noon head"
+            }
+          }
+        ]
+      },
+      {
+        "id": "BODY_1",
+        "type": "BODY",
+        "semanticLabel": {
+          "ar": "جسم",
+          "en": "body"
+        },
+        "strokes": [
+          {
+            "id": "S_BODY_1",
+            "function": "BODY",
+            "direction": "counterclockwise-loop",
+            "curvature": "bowl",
+            "terminalStart": "hidden",
+            "terminalEnd": "hidden",
+            "thicknessProfile": "contrast-high",
+            "startLevel": "loop-height",
+            "endLevel": "baseline",
+            "lengthDots": 4.8,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 2.2,
+                  "y": 1.7,
+                  "out": {
+                    "x": 1.4,
+                    "y": 1.7
+                  }
+                },
+                {
+                  "x": 0.8,
+                  "y": 1.0,
+                  "in": {
+                    "x": 1.5,
+                    "y": 1.7
+                  },
+                  "out": {
+                    "x": 0.7,
+                    "y": 0.2
+                  }
+                },
+                {
+                  "x": 1.7,
+                  "y": -0.2,
+                  "in": {
+                    "x": 0.8,
+                    "y": 0.0
+                  },
+                  "out": {
+                    "x": 2.7,
+                    "y": -0.3
+                  }
+                },
+                {
+                  "x": 3.4,
+                  "y": 0.5,
+                  "in": {
+                    "x": 2.8,
+                    "y": -0.1
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [
+                {
+                  "fromNode": 1,
+                  "toNode": 3,
+                  "axis": "path",
+                  "minFactor": 0.9,
+                  "maxFactor": 1.35,
+                  "preserveCurvature": true,
+                  "preserveThickness": false
+                }
+              ],
+              "protectedZones": [
+                {
+                  "fromNode": 1,
+                  "toNode": 3,
+                  "reason": "bowl-legibility"
+                },
+                {
+                  "fromNode": 0,
+                  "toNode": 3,
+                  "reason": "standalone-balance"
+                }
+              ],
+              "priority": 10,
+              "kashidaEligible": false,
+              "elongationStrategy": "expand-loop"
+            },
+            "labels": {
+              "ar": "بطن النون",
+              "en": "noon bowl"
+            }
+          }
+        ]
+      },
+      {
+        "id": "DOT_1",
+        "type": "DOT",
+        "semanticLabel": {
+          "ar": "نقطة",
+          "en": "dot"
+        },
+        "strokes": [
+          {
+            "id": "S_DOT_1",
+            "function": "DOT",
+            "direction": "down-left",
+            "curvature": "soft-curve",
+            "terminalStart": "teardrop",
+            "terminalEnd": "sharp",
+            "thicknessProfile": "taper-out",
+            "startLevel": "loop-height",
+            "endLevel": "loop-height",
+            "lengthDots": 0.7,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 2.4,
+                  "y": 2.7,
+                  "out": {
+                    "x": 2.25,
+                    "y": 2.5
+                  }
+                },
+                {
+                  "x": 2.1,
+                  "y": 2.3,
+                  "in": {
+                    "x": 2.25,
+                    "y": 2.5
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "reason": "dot-shape"
+                },
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "reason": "standalone-balance"
+                }
+              ],
+              "priority": 9,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "نقطة النون",
+              "en": "noon dot"
+            }
+          }
+        ]
+      }
+    ],
+    "formMetadata": {
+      "connectsRight": false,
+      "connectsLeft": false,
+      "derivedFrom": "NOON",
+      "rulesNote": "Dual-joining letters may take all four contextual forms."
+    }
+  }
+}

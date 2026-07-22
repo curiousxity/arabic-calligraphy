@@ -15,6 +15,7 @@ import {
   unionRect,
   DEFAULT_EMPTY_BOUNDS,
 } from "../lib/canvasBounds";
+import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import type { Block, GlyphStretchHandle, GlyphRig } from "../types";
 
 const GRID_SIZE = 40;
@@ -70,6 +71,7 @@ export type CanvasStageProps = {
       gy?: number;
     }[]
   ) => void;
+  onGlyphSchemaChange: (blockId: number, catalog: Record<number, StretchDefinition[]>) => void;
   onKashidaTextChange: (blockId: number, text: string) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   onResizeImageBlock: (id: number, scale: number) => void;
@@ -108,6 +110,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onUpdateStretchHandle,
   glyphRigs,
   onGlyphBoxesChange,
+  onGlyphSchemaChange,
   onKashidaTextChange,
   onResizeShapeFillBlock,
   onResizeImageBlock,
@@ -618,6 +621,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onGlyphBoxesChange={(boxes) =>
                       onGlyphBoxesChange(block.id, boxes)
                     }
+                    onGlyphSchemaChange={(catalog) =>
+                      onGlyphSchemaChange(block.id, catalog)
+                    }
                   />
                 );
               }
@@ -666,6 +672,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onGlyphBoxesChange={(boxes) =>
                       onGlyphBoxesChange(block.id, boxes)
                     }
+                    onGlyphSchemaChange={(catalog) =>
+                      onGlyphSchemaChange(block.id, catalog)
+                    }
                   />
                 );
               }
@@ -710,6 +719,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
                   }
                   onGlyphBoxesChange={(boxes) => onGlyphBoxesChange(block.id, boxes)}
+                  onGlyphSchemaChange={(catalog) => onGlyphSchemaChange(block.id, catalog)}
                   locked={block.locked}
                   debugBounds={false}
                 />

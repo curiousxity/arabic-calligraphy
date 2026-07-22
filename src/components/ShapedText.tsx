@@ -17,6 +17,9 @@ import {
   MASK_CONTOUR_OFF_COLOR,
   MASK_LASSO_COLOR,
 } from "../lib/glyphEdits";
+import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
+import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
+import { splitContours, deriveContourMask } from "../lib/glyphContours";
 import type {
   GlyphEdit,
   GlyphStretchHandle,
@@ -66,6 +69,7 @@ type Props = {
   glyphRigValues?: GlyphRigValue[];
   onGlyphSelect?: (glyphIndex: number | null) => void;
   onGlyphBoxesChange?: (boxes: GlyphHitBox[]) => void;
+  onGlyphSchemaChange?: (catalog: Record<number, StretchDefinition[]>) => void;
   onUpdateStretchHandle?: (
     glyphIndex: number,
     handleId: string,
@@ -105,22 +109,6 @@ type KashidaGap = {
   baseText: string;
   existingCount: number;
 };
-
-/** Splits a glyph's path commands into its closed sub-paths (contours), one array per "M...Z" run. */
-function splitContours(commands: PathCommand[]): PathCommand[][] {
-  const contours: PathCommand[][] = [];
-  let current: PathCommand[] = [];
-  for (const cmd of commands) {
-    if (cmd.type === "M") {
-      if (current.length) contours.push(current);
-      current = [cmd];
-    } else {
-      current.push(cmd);
-    }
-  }
-  if (current.length) contours.push(current);
-  return contours;
-}
 
 /** Renders path commands (offset by dx/dy) as an SVG path `d` string, for Konva's <Path>. */
 function commandsToSvgPath(commands: PathCommand[], dx: number, dy: number): string {
@@ -355,6 +343,7 @@ export const ShapedText: React.FC<Props> = ({
   glyphRigValues = [],
   onGlyphSelect,
   onGlyphBoxesChange,
+  onGlyphSchemaChange,
   onUpdateStretchHandle,
   locked,
   draggable = true,
@@ -368,6 +357,7 @@ export const ShapedText: React.FC<Props> = ({
   const shapeData = useShapedGlyphs(text, fontFamily);
   const { hbLoaded } = shapeData;
   const overrideGlyph = useOverrideGlyph();
+  const glyphSchemaCatalog = useGlyphSchemaCatalog(shapeData.shapableText, shapeData.glyphs);
 
   const [spinnerAngle, setSpinnerAngle] = useState(0);
   const spinnerFrameRef = useRef<number | null>(null);
@@ -499,6 +489,10 @@ export const ShapedText: React.FC<Props> = ({
     onGlyphBoxesChange?.(glyphHitBoxes);
   }, [glyphHitBoxes, onGlyphBoxesChange]);
 
+  useEffect(() => {
+    onGlyphSchemaChange?.(glyphSchemaCatalog);
+  }, [glyphSchemaCatalog, onGlyphSchemaChange]);
+
   /** The selected glyph's outline split into contours, in the same text-space coords as stretch anchor/drag points — used by the "by stroke" mask-editing overlay. */
   const selectedGlyphContours = useMemo(() => {
     if (selectedGlyphIndex == null) return [];
@@ -517,6 +511,38 @@ export const ShapedText: React.FC<Props> = ({
       data: commandsToSvgPath(cmds, gx, gy),
     }));
   }, [shapeData, selectedGlyphIndex, glyphHitBoxes, fontSize]);
+
+  /** Raw (glyph-local, no gx/gy offset) outline commands for the selected glyph, plus its pen offset — used to auto-derive a contour mask from wherever a handle's anchor/drag points currently sit (see lib/glyphContours.ts). */
+  const selectedGlyphOutline = useMemo(() => {
+    if (selectedGlyphIndex == null) return null;
+    const { font, glyphs } = shapeData;
+    const g = font ? glyphs[selectedGlyphIndex] : undefined;
+    const glyphObj = g ? font!.glyphs.get(g.g) : undefined;
+    if (!glyphObj) return null;
+
+    const box = glyphHitBoxes.find((b) => b.glyphIndex === selectedGlyphIndex);
+    return {
+      commands: glyphObj.getPath(0, 0, fontSize).commands as PathCommand[],
+      gx: box?.gx ?? 0,
+      gy: box?.gy ?? 0,
+    };
+  }, [shapeData, selectedGlyphIndex, glyphHitBoxes, fontSize]);
+
+  /** Recomputes a handle's auto mask from its (possibly just-updated) anchor/drag points, in text-space coords — no-ops (returns undefined) unless the handle opts into auto-masking and the outline is available. */
+  const autoDeriveMask = (
+    h: GlyphStretchHandle,
+    anchorX: number,
+    anchorY: number,
+    dragX: number,
+    dragY: number
+  ): GlyphStretchMask | undefined => {
+    if (!h.maskAuto || !selectedGlyphOutline) return undefined;
+    const { commands, gx, gy } = selectedGlyphOutline;
+    return deriveContourMask(commands, [
+      { x: anchorX - gx, y: anchorY - gy },
+      { x: dragX - gx, y: dragY - gy },
+    ]);
+  };
 
   const selectedEdit =
     glyphEditTool != null && selectedGlyphIndex != null
@@ -608,7 +634,7 @@ export const ShapedText: React.FC<Props> = ({
       ? current.filter((i) => i !== contourIndex)
       : [...current, contourIndex];
     const mask: GlyphStretchMask = { mode: "contours", contourIndices: next };
-    onUpdateStretchHandle(selectedGlyphIndex, activeMaskHandle.id, { mask });
+    onUpdateStretchHandle(selectedGlyphIndex, activeMaskHandle.id, { mask, maskAuto: false });
   };
 
   const commitLasso = () => {
@@ -625,7 +651,7 @@ export const ShapedText: React.FC<Props> = ({
       mode: "lasso",
       points: lassoDrawPoints.map((p) => ({ x: p.x - bx - localDrawX, y: p.y - by - localDrawY })),
     };
-    onUpdateStretchHandle(selectedGlyphIndex, activeMaskHandle.id, { mask });
+    onUpdateStretchHandle(selectedGlyphIndex, activeMaskHandle.id, { mask, maskAuto: false });
     setLassoDrawPoints([]);
   };
 
@@ -898,9 +924,14 @@ export const ShapedText: React.FC<Props> = ({
                 const pos = group.getRelativePointerPosition();
                 if (!pos || !onUpdateStretchHandle) return;
 
+                const anchorX = pos.x - bx - localDrawX;
+                const anchorY = pos.y - by - localDrawY;
+                const mask = autoDeriveMask(h, anchorX, anchorY, h.dragX, h.dragY);
+
                 onUpdateStretchHandle(selectedGlyphIndex, h.id, {
-                  anchorX: pos.x - bx - localDrawX,
-                  anchorY: pos.y - by - localDrawY,
+                  anchorX,
+                  anchorY,
+                  ...(mask ? { mask } : {}),
                 });
               }}
               onDragEnd={(e) => {
@@ -929,9 +960,14 @@ export const ShapedText: React.FC<Props> = ({
                 const pos = group.getRelativePointerPosition();
                 if (!pos || !onUpdateStretchHandle) return;
 
+                const dragPtX = pos.x - bx - localDrawX;
+                const dragPtY = pos.y - by - localDrawY;
+                const mask = autoDeriveMask(h, h.anchorX, h.anchorY, dragPtX, dragPtY);
+
                 onUpdateStretchHandle(selectedGlyphIndex, h.id, {
-                  dragX: pos.x - bx - localDrawX,
-                  dragY: pos.y - by - localDrawY,
+                  dragX: dragPtX,
+                  dragY: dragPtY,
+                  ...(mask ? { mask } : {}),
                 });
               }}
               onDragEnd={(e) => {

@@ -77,6 +77,35 @@ describe("applyGlyphEdit", () => {
     expect(outsideContour.x).toBeCloseTo(100);
   });
 
+  it("scales displacement by the handle's own `factor`, defaulting to 1 when absent", () => {
+    const baseHandle = {
+      id: "h1",
+      anchorX: 0,
+      anchorY: 0,
+      dragOriginX: 100,
+      dragOriginY: 0,
+      dragX: 150,
+      dragY: 0,
+      bandWidth: 20,
+    };
+
+    const noFactor: GlyphEdit = { glyphIndex: 0, stretches: [baseHandle] };
+    expect(applyGlyphEdit(100, 0, noFactor).x).toBeCloseTo(150);
+
+    const half: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [{ ...baseHandle, factor: 0.5 }],
+    };
+    // deltaAlong (50) * factor (0.5) -> 25px displacement from the anchor's 100 origin.
+    expect(applyGlyphEdit(100, 0, half).x).toBeCloseTo(125);
+
+    const zero: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [{ ...baseHandle, factor: 0 }],
+    };
+    expect(applyGlyphEdit(100, 0, zero).x).toBeCloseTo(100);
+  });
+
   it("with a lasso mask, only displaces points inside the polygon", () => {
     const edit: GlyphEdit = {
       glyphIndex: 0,

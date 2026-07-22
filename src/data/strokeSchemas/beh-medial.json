@@ -1,0 +1,210 @@
+{
+  "schemaVersion": "1.0.0",
+  "styleProfile": {
+    "script": "arabic",
+    "calligraphicModel": "naskh",
+    "measurementSystem": {
+      "dotUnit": {
+        "name": "nuqta",
+        "shape": "rhombic",
+        "width": 1.0,
+        "height": 1.0
+      },
+      "angleDegrees": 45
+    },
+    "verticalLevels": [
+      {
+        "id": "earth-1",
+        "name": "earth-1",
+        "y": -3.0
+      },
+      {
+        "id": "baseline",
+        "name": "baseline",
+        "y": 0.0
+      },
+      {
+        "id": "tooth-height",
+        "name": "tooth-height",
+        "y": 1.2
+      },
+      {
+        "id": "loop-height",
+        "name": "loop-height",
+        "y": 2.2
+      },
+      {
+        "id": "eye-height",
+        "name": "eye-height",
+        "y": 2.8
+      },
+      {
+        "id": "sky-1",
+        "name": "sky-1",
+        "y": 4.5
+      }
+    ]
+  },
+  "glyph": {
+    "id": "BEH_MEDIAL",
+    "baseLetter": "ب",
+    "joiningForm": "medial",
+    "role": "base_letter",
+    "unicode": "0628",
+    "components": [
+      {
+        "id": "BODY_1",
+        "type": "BODY",
+        "semanticLabel": {
+          "ar": "جسم",
+          "en": "body"
+        },
+        "strokes": [
+          {
+            "id": "S_BODY_1",
+            "function": "BODY",
+            "direction": "horizontal-left",
+            "curvature": "shallow-bowl",
+            "terminalStart": "join-right",
+            "terminalEnd": "join-left",
+            "thicknessProfile": "contrast-high",
+            "startLevel": "baseline",
+            "endLevel": "baseline",
+            "lengthDots": 4.8,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 4.4,
+                  "y": 0.0,
+                  "out": {
+                    "x": 3.4,
+                    "y": 0.0
+                  }
+                },
+                {
+                  "x": 2.4,
+                  "y": -0.35,
+                  "in": {
+                    "x": 3.5,
+                    "y": 0.0
+                  },
+                  "out": {
+                    "x": 1.2,
+                    "y": -0.35
+                  }
+                },
+                {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "in": {
+                    "x": 1.1,
+                    "y": -0.35
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 2,
+                  "axis": "x",
+                  "minFactor": 0.9,
+                  "maxFactor": 2.0,
+                  "preserveCurvature": true,
+                  "preserveThickness": false
+                }
+              ],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 0,
+                  "reason": "entry-join"
+                },
+                {
+                  "fromNode": 2,
+                  "toNode": 2,
+                  "reason": "exit-join"
+                }
+              ],
+              "priority": 10,
+              "kashidaEligible": true,
+              "elongationStrategy": "linear"
+            },
+            "labels": {
+              "ar": "جسم ب",
+              "en": "beh medial body"
+            }
+          }
+        ]
+      },
+      {
+        "id": "DOTS",
+        "type": "DOT",
+        "semanticLabel": {
+          "ar": "نقاط",
+          "en": "dots"
+        },
+        "strokes": [
+          {
+            "id": "S_DOT_1",
+            "function": "DOT",
+            "direction": "down-left",
+            "curvature": "soft-curve",
+            "terminalStart": "teardrop",
+            "terminalEnd": "sharp",
+            "thicknessProfile": "taper-out",
+            "startLevel": "earth-1",
+            "endLevel": "earth-1",
+            "lengthDots": 0.7,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 1.9,
+                  "y": -1.0,
+                  "out": {
+                    "x": 1.75,
+                    "y": -1.2
+                  }
+                },
+                {
+                  "x": 1.5999999999999999,
+                  "y": -1.4,
+                  "in": {
+                    "x": 1.75,
+                    "y": -1.2
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "reason": "dot-shape"
+                }
+              ],
+              "priority": 9,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "النقطة 1",
+              "en": "dot 1"
+            }
+          }
+        ]
+      }
+    ],
+    "formMetadata": {
+      "connectsRight": true,
+      "connectsLeft": true,
+      "derivedFrom": "BEH",
+      "geometryVariant": true
+    }
+  }
+}
