@@ -17,6 +17,7 @@
 import React, { useEffect, useMemo } from "react";
 import { Group, Shape, Rect, Circle } from "react-konva";
 import type Konva from "konva";
+import type { PathCommand } from "opentype.js";
 import {
   parseSvgPath,
   pathToPolygon,
@@ -26,14 +27,11 @@ import {
 } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { drawInsetBevel, EMBOSS_STRENGTH_SCALE } from "../lib/emboss";
-import {
-  applyGlyphEdit,
-  prepareGlyphRig,
-  applyPreparedGlyphRig,
-  STRETCH_ANCHOR_COLOR,
-  STRETCH_DRAG_COLOR,
-} from "../lib/glyphEdits";
-import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
+import { applyGlyphEdit, prepareGlyphRig, applyPreparedGlyphRig } from "../lib/glyphEdits";
+import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
+import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
+import { deriveContourMask } from "../lib/glyphContours";
+import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue, GlyphStretchMask } from "../types";
 
 export type ShapeFillTextProps = {
   id?: string;
@@ -80,6 +78,7 @@ export type ShapeFillTextProps = {
       glyphId: number;
     }[]
   ) => void;
+  onGlyphSchemaChange?: (catalog: Record<number, StretchDefinition[]>) => void;
   onUpdateStretchHandle?: (
     glyphIndex: number,
     handleId: string,
@@ -260,6 +259,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   glyphRigValues = [],
   onGlyphSelect,
   onGlyphBoxesChange,
+  onGlyphSchemaChange,
   onUpdateStretchHandle,
   locked,
   draggable = true,
@@ -268,6 +268,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   onResizeScale,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
+  const glyphSchemaCatalog = useGlyphSchemaCatalog(shapeData.shapableText, shapeData.glyphs);
 
   // Parse SVG path once
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
@@ -335,6 +336,10 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     onGlyphBoxesChange?.(glyphLocalBoxes);
   }, [glyphLocalBoxes, onGlyphBoxesChange]);
 
+  useEffect(() => {
+    onGlyphSchemaChange?.(glyphSchemaCatalog);
+  }, [glyphSchemaCatalog, onGlyphSchemaChange]);
+
   // Mirrors the sceneFunc's own scanline-tiling loop in plain JS (no canvas
   // needed — `pointInPolygon` is pure) so glyph-edit click hit-testing and
   // handle placement can know where every tiled repetition actually lands.
@@ -390,19 +395,44 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     polygon,
   ]);
 
-  const selectedInstance = useMemo(
-    () =>
-      selectedGlyphIndex != null
-        ? glyphInstances.find((inst) => inst.glyphIndex === selectedGlyphIndex) ?? null
-        : null,
-    [glyphInstances, selectedGlyphIndex]
-  );
-
   const selectedEdit =
     glyphEditTool != null && selectedGlyphIndex != null
       ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
       : undefined;
   const selectedStretches = selectedEdit?.stretches ?? [];
+
+  /** Derives a contour mask from a handle's (fixed, schema-auto-computed) anchor/dragOrigin points — no-ops (returns undefined) unless the handle opts into auto-masking. Anchor/drag here are already glyph-local (no gx/gy offset — see the per-instance <Group> transform below), matching glyphCache's own commands. */
+  const autoDeriveMask = (
+    h: GlyphStretchHandle,
+    anchorX: number,
+    anchorY: number,
+    dragX: number,
+    dragY: number
+  ): GlyphStretchMask | undefined => {
+    if (!h.maskAuto || selectedGlyphIndex == null) return undefined;
+    const commands = glyphCache[selectedGlyphIndex]?.commands;
+    if (!commands || commands.length === 0) return undefined;
+    return deriveContourMask(commands as unknown as PathCommand[], [
+      { x: anchorX, y: anchorY },
+      { x: dragX, y: dragY },
+    ]);
+  };
+
+  // Handles no longer get their axis from dragging — it's auto-computed once
+  // at creation (App.tsx's addStretchHandle). The mask still needs the real
+  // glyph outline, which only this component has, so it's derived here, once,
+  // the first time a new maskAuto handle with no mask yet shows up.
+  useEffect(() => {
+    if (!onUpdateStretchHandle || selectedGlyphIndex == null) return;
+    for (const h of selectedStretches) {
+      if (!h.maskAuto || h.mask != null) continue;
+      const mask = autoDeriveMask(h, h.anchorX, h.anchorY, h.dragOriginX, h.dragOriginY);
+      if (mask) onUpdateStretchHandle(selectedGlyphIndex, h.id, { mask });
+    }
+    // autoDeriveMask is a plain function of the listed deps, not a stable
+    // reference — omitted to avoid re-running every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStretches, selectedGlyphIndex, glyphCache, onUpdateStretchHandle]);
 
   return (
     <Group
@@ -593,84 +623,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
         />
       )}
 
-      {glyphEditTool != null && selectedGlyphIndex != null && selectedInstance && (
-        <Group
-          x={shapeScale * selectedInstance.gx}
-          y={shapeScale * selectedInstance.gy}
-          scaleX={shapeScale * selectedInstance.scX}
-          scaleY={shapeScale * selectedInstance.scY}
-          listening
-        >
-          {glyphEditTool === "stretch" &&
-            selectedStretches.map((h) => {
-              const effScale = Math.max(shapeScale * selectedInstance.scX, 0.05);
-              const r = Math.max(3, Math.min(14, 5 / effScale));
-              return (
-                <React.Fragment key={h.id}>
-                  <Circle
-                    x={h.anchorX}
-                    y={h.anchorY}
-                    radius={r}
-                    fill={STRETCH_ANCHOR_COLOR}
-                    opacity={0.55}
-                    stroke="#ffffff"
-                    strokeWidth={2 / effScale}
-                    draggable
-                    onMouseDown={(e) => {
-                      e.cancelBubble = true;
-                    }}
-                    onTouchStart={(e) => {
-                      e.cancelBubble = true;
-                    }}
-                    onDragMove={(e) => {
-                      e.cancelBubble = true;
-                      const grp = e.currentTarget.getParent() as Konva.Group;
-                      const pos = grp.getRelativePointerPosition();
-                      if (!pos || !onUpdateStretchHandle) return;
-                      onUpdateStretchHandle(selectedGlyphIndex, h.id, {
-                        anchorX: pos.x,
-                        anchorY: pos.y,
-                      });
-                    }}
-                    onDragEnd={(e) => {
-                      e.cancelBubble = true;
-                    }}
-                  />
-                  <Circle
-                    x={h.dragX}
-                    y={h.dragY}
-                    radius={r}
-                    fill={STRETCH_DRAG_COLOR}
-                    opacity={0.55}
-                    stroke="#ffffff"
-                    strokeWidth={2 / effScale}
-                    draggable
-                    onMouseDown={(e) => {
-                      e.cancelBubble = true;
-                    }}
-                    onTouchStart={(e) => {
-                      e.cancelBubble = true;
-                    }}
-                    onDragMove={(e) => {
-                      e.cancelBubble = true;
-                      const grp = e.currentTarget.getParent() as Konva.Group;
-                      const pos = grp.getRelativePointerPosition();
-                      if (!pos || !onUpdateStretchHandle) return;
-                      onUpdateStretchHandle(selectedGlyphIndex, h.id, {
-                        dragX: pos.x,
-                        dragY: pos.y,
-                      });
-                    }}
-                    onDragEnd={(e) => {
-                      e.cancelBubble = true;
-                    }}
-                  />
-                </React.Fragment>
-              );
-            })}
-
-        </Group>
-      )}
     </Group>
   );
 };

@@ -33,6 +33,8 @@ export type ShapedGlyphsState = {
   isLoading: boolean;
   /** True once shaping has finished and produced at least one renderable glyph. */
   hbLoaded: boolean;
+  /** The text actually shaped (after diacritic-stripping) — `glyph.cl` indexes into this, not the raw `text` argument. */
+  shapableText: string;
 };
 
 /**
@@ -50,11 +52,13 @@ export function useShapedGlyphs(text: string, fontFamily: string): ShapedGlyphsS
     font: ShapedTextResult["font"] | null;
     unitsPerEm: number;
     isLoading: boolean;
+    shapableText: string;
   }>({
     glyphs: [],
     font: null,
     unitsPerEm: 1000,
     isLoading: true,
+    shapableText: "",
   });
 
   useEffect(() => {
@@ -78,6 +82,7 @@ export function useShapedGlyphs(text: string, fontFamily: string): ShapedGlyphsS
           font,
           unitsPerEm: r.unitsPerEm || 1000,
           isLoading: false,
+          shapableText: r.shapableText ?? "",
         });
 
         setHbLoaded(hasGlyphs);
@@ -99,6 +104,7 @@ export function useShapedGlyphs(text: string, fontFamily: string): ShapedGlyphsS
           font: null,
           unitsPerEm: 1000,
           isLoading: false,
+          shapableText: "",
         });
 
         setHbLoaded(false);

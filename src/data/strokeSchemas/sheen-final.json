@@ -1,0 +1,479 @@
+{
+  "schemaVersion": "1.0.0",
+  "styleProfile": {
+    "script": "arabic",
+    "calligraphicModel": "naskh",
+    "measurementSystem": {
+      "dotUnit": {
+        "name": "nuqta",
+        "shape": "rhombic",
+        "width": 1.0,
+        "height": 1.0
+      },
+      "angleDegrees": 45
+    },
+    "verticalLevels": [
+      {
+        "id": "earth-1",
+        "name": "earth-1",
+        "y": -3.0
+      },
+      {
+        "id": "baseline",
+        "name": "baseline",
+        "y": 0.0
+      },
+      {
+        "id": "tooth-height",
+        "name": "tooth-height",
+        "y": 1.2
+      },
+      {
+        "id": "loop-height",
+        "name": "loop-height",
+        "y": 2.2
+      },
+      {
+        "id": "eye-height",
+        "name": "eye-height",
+        "y": 2.8
+      },
+      {
+        "id": "sky-1",
+        "name": "sky-1",
+        "y": 4.5
+      }
+    ]
+  },
+  "glyph": {
+    "id": "SHEEN_FINAL",
+    "baseLetter": "ش",
+    "joiningForm": "final",
+    "role": "base_letter",
+    "unicode": "0634",
+    "components": [
+      {
+        "id": "BODY_1",
+        "type": "BODY",
+        "semanticLabel": {
+          "ar": "جسم",
+          "en": "body"
+        },
+        "strokes": [
+          {
+            "id": "S_TOOTH_1",
+            "function": "TOOTH",
+            "direction": "down-left",
+            "curvature": "tooth",
+            "terminalStart": "join-right",
+            "terminalEnd": "hidden",
+            "thicknessProfile": "contrast-high",
+            "startLevel": "tooth-height",
+            "endLevel": "tooth-height",
+            "lengthDots": 1.4,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 5.2,
+                  "y": 1.0,
+                  "out": {
+                    "x": 5.0,
+                    "y": 0.5
+                  }
+                },
+                {
+                  "x": 4.5,
+                  "y": 0.0,
+                  "in": {
+                    "x": 5.0,
+                    "y": 0.5
+                  },
+                  "out": {
+                    "x": 4.3,
+                    "y": 0.7
+                  }
+                },
+                {
+                  "x": 4.0,
+                  "y": 1.0,
+                  "in": {
+                    "x": 4.3,
+                    "y": 0.7
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 2,
+                  "reason": "tooth-rhythm"
+                }
+              ],
+              "priority": 9,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "سن 0",
+              "en": "tooth 0"
+            }
+          },
+          {
+            "id": "S_TOOTH_2",
+            "function": "TOOTH",
+            "direction": "down-left",
+            "curvature": "tooth",
+            "terminalStart": "hidden",
+            "terminalEnd": "hidden",
+            "thicknessProfile": "contrast-high",
+            "startLevel": "tooth-height",
+            "endLevel": "tooth-height",
+            "lengthDots": 1.4,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 3.8000000000000003,
+                  "y": 1.0,
+                  "out": {
+                    "x": 3.6,
+                    "y": 0.5
+                  }
+                },
+                {
+                  "x": 3.1000000000000005,
+                  "y": 0.0,
+                  "in": {
+                    "x": 3.6,
+                    "y": 0.5
+                  },
+                  "out": {
+                    "x": 2.9000000000000004,
+                    "y": 0.7
+                  }
+                },
+                {
+                  "x": 2.6000000000000005,
+                  "y": 1.0,
+                  "in": {
+                    "x": 2.9000000000000004,
+                    "y": 0.7
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 2,
+                  "reason": "tooth-rhythm"
+                }
+              ],
+              "priority": 9,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "سن 1",
+              "en": "tooth 1"
+            }
+          },
+          {
+            "id": "S_TOOTH_3",
+            "function": "TOOTH",
+            "direction": "down-left",
+            "curvature": "tooth",
+            "terminalStart": "hidden",
+            "terminalEnd": "hidden",
+            "thicknessProfile": "contrast-high",
+            "startLevel": "tooth-height",
+            "endLevel": "tooth-height",
+            "lengthDots": 1.4,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 2.4000000000000004,
+                  "y": 1.0,
+                  "out": {
+                    "x": 2.2,
+                    "y": 0.5
+                  }
+                },
+                {
+                  "x": 1.7000000000000004,
+                  "y": 0.0,
+                  "in": {
+                    "x": 2.2,
+                    "y": 0.5
+                  },
+                  "out": {
+                    "x": 1.5000000000000004,
+                    "y": 0.7
+                  }
+                },
+                {
+                  "x": 1.2000000000000004,
+                  "y": 1.0,
+                  "in": {
+                    "x": 1.5000000000000004,
+                    "y": 0.7
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 2,
+                  "reason": "tooth-rhythm"
+                }
+              ],
+              "priority": 9,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "سن 2",
+              "en": "tooth 2"
+            }
+          },
+          {
+            "id": "S_TAIL_1",
+            "function": "TAIL",
+            "direction": "horizontal-left",
+            "curvature": "soft-curve",
+            "terminalStart": "hidden",
+            "terminalEnd": "sharp",
+            "thicknessProfile": "taper-out",
+            "startLevel": "tooth-height",
+            "endLevel": "baseline",
+            "lengthDots": 2.5,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 1.2000000000000004,
+                  "y": 1.0,
+                  "out": {
+                    "x": 0.40000000000000036,
+                    "y": 0.3
+                  }
+                },
+                {
+                  "x": -0.5999999999999996,
+                  "y": 0.0,
+                  "in": {
+                    "x": 0.3000000000000004,
+                    "y": 0.3
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "axis": "x",
+                  "minFactor": 0.9,
+                  "maxFactor": 1.8,
+                  "preserveCurvature": true,
+                  "preserveThickness": false
+                }
+              ],
+              "protectedZones": [
+                {
+                  "fromNode": 1,
+                  "toNode": 1,
+                  "reason": "final-terminal"
+                }
+              ],
+              "priority": 8,
+              "kashidaEligible": true,
+              "elongationStrategy": "linear"
+            },
+            "labels": {
+              "ar": "ذيل",
+              "en": "tail"
+            }
+          }
+        ]
+      },
+      {
+        "id": "DOTS",
+        "type": "DOT",
+        "semanticLabel": {
+          "ar": "ثلاث نقاط",
+          "en": "three dots"
+        },
+        "strokes": [
+          {
+            "id": "S_DOT_1",
+            "function": "DOT",
+            "direction": "down-left",
+            "curvature": "soft-curve",
+            "terminalStart": "teardrop",
+            "terminalEnd": "sharp",
+            "thicknessProfile": "taper-out",
+            "startLevel": "loop-height",
+            "endLevel": "loop-height",
+            "lengthDots": 0.7,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 3.4,
+                  "y": 2.0,
+                  "out": {
+                    "x": 3.25,
+                    "y": 1.8
+                  }
+                },
+                {
+                  "x": 3.1,
+                  "y": 1.6,
+                  "in": {
+                    "x": 3.25,
+                    "y": 1.8
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "reason": "dot-shape"
+                }
+              ],
+              "priority": 9,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "النقطة 1",
+              "en": "dot 1"
+            }
+          },
+          {
+            "id": "S_DOT_2",
+            "function": "DOT",
+            "direction": "down-left",
+            "curvature": "soft-curve",
+            "terminalStart": "teardrop",
+            "terminalEnd": "sharp",
+            "thicknessProfile": "taper-out",
+            "startLevel": "loop-height",
+            "endLevel": "loop-height",
+            "lengthDots": 0.7,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 2.4,
+                  "y": 2.0,
+                  "out": {
+                    "x": 2.25,
+                    "y": 1.8
+                  }
+                },
+                {
+                  "x": 2.1,
+                  "y": 1.6,
+                  "in": {
+                    "x": 2.25,
+                    "y": 1.8
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "reason": "dot-shape"
+                }
+              ],
+              "priority": 9,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "النقطة 2",
+              "en": "dot 2"
+            }
+          },
+          {
+            "id": "S_DOT_3",
+            "function": "DOT",
+            "direction": "down-left",
+            "curvature": "soft-curve",
+            "terminalStart": "teardrop",
+            "terminalEnd": "sharp",
+            "thicknessProfile": "taper-out",
+            "startLevel": "loop-height",
+            "endLevel": "loop-height",
+            "lengthDots": 0.7,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 1.4,
+                  "y": 2.0,
+                  "out": {
+                    "x": 1.25,
+                    "y": 1.8
+                  }
+                },
+                {
+                  "x": 1.0999999999999999,
+                  "y": 1.6,
+                  "in": {
+                    "x": 1.25,
+                    "y": 1.8
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "reason": "dot-shape"
+                }
+              ],
+              "priority": 9,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "النقطة 3",
+              "en": "dot 3"
+            }
+          }
+        ]
+      }
+    ],
+    "formMetadata": {
+      "connectsRight": true,
+      "connectsLeft": false,
+      "derivedFrom": "SHEEN",
+      "geometryVariant": true
+    }
+  }
+}

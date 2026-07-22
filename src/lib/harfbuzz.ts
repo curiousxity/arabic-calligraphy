@@ -73,6 +73,8 @@ export type ShapedTextResult = {
   glyphs: HarfBuzzGlyph[];
   font: opentype.Font;
   unitsPerEm: number;
+  /** The text actually shaped (after stripUnsupportedDiacritics) — `glyph.cl` cluster offsets index into THIS string, not the original input. */
+  shapableText: string;
 };
 
 export async function initHarfBuzz(): Promise<HbModule> {
@@ -311,6 +313,7 @@ export async function shapeText(
       glyphs,
       font: parsedFont,
       unitsPerEm: upm,
+      shapableText,
     };
 
     shapeCache.set(cacheKey, result);
@@ -321,6 +324,7 @@ export async function shapeText(
       glyphs: [],
       font: parsedFont,
       unitsPerEm: upm,
+      shapableText,
     };
   } finally {
     buffer.destroy?.();

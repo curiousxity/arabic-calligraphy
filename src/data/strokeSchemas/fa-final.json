@@ -1,0 +1,277 @@
+{
+  "schemaVersion": "1.0.0",
+  "styleProfile": {
+    "script": "arabic",
+    "calligraphicModel": "naskh",
+    "measurementSystem": {
+      "dotUnit": {
+        "name": "nuqta",
+        "shape": "rhombic",
+        "width": 1.0,
+        "height": 1.0
+      },
+      "angleDegrees": 45
+    },
+    "verticalLevels": [
+      {
+        "id": "earth-1",
+        "name": "earth-1",
+        "y": -3.0
+      },
+      {
+        "id": "baseline",
+        "name": "baseline",
+        "y": 0.0
+      },
+      {
+        "id": "tooth-height",
+        "name": "tooth-height",
+        "y": 1.2
+      },
+      {
+        "id": "loop-height",
+        "name": "loop-height",
+        "y": 2.2
+      },
+      {
+        "id": "eye-height",
+        "name": "eye-height",
+        "y": 2.8
+      },
+      {
+        "id": "sky-1",
+        "name": "sky-1",
+        "y": 4.5
+      }
+    ]
+  },
+  "glyph": {
+    "id": "FA_FINAL",
+    "baseLetter": "ف",
+    "joiningForm": "final",
+    "role": "base_letter",
+    "unicode": "0641",
+    "components": [
+      {
+        "id": "HEAD_1",
+        "type": "HEAD",
+        "semanticLabel": {
+          "ar": "رأس",
+          "en": "head"
+        },
+        "strokes": [
+          {
+            "id": "S_HEAD_1",
+            "function": "HEAD",
+            "direction": "horizontal-left",
+            "curvature": "compact-loop-head",
+            "terminalStart": "join-right",
+            "terminalEnd": "hidden",
+            "thicknessProfile": "contrast-low",
+            "startLevel": "loop-height",
+            "endLevel": "loop-height",
+            "lengthDots": 1.6,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 4.1,
+                  "y": 1.6,
+                  "out": {
+                    "x": 3.3,
+                    "y": 1.8
+                  }
+                },
+                {
+                  "x": 2.7,
+                  "y": 1.6,
+                  "in": {
+                    "x": 3.2,
+                    "y": 1.75
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "reason": "head-proportion"
+                }
+              ],
+              "priority": 7,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "رأس fa",
+              "en": "fa head"
+            }
+          }
+        ]
+      },
+      {
+        "id": "EYE_1",
+        "type": "EYE",
+        "semanticLabel": {
+          "ar": "عين",
+          "en": "eye"
+        },
+        "strokes": [
+          {
+            "id": "S_EYE_1",
+            "function": "EYE",
+            "direction": "counterclockwise-loop",
+            "curvature": "loop",
+            "terminalStart": "hidden",
+            "terminalEnd": "sharp",
+            "thicknessProfile": "contrast-high",
+            "startLevel": "loop-height",
+            "endLevel": "baseline",
+            "lengthDots": 4.7,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 2.7,
+                  "y": 1.6,
+                  "out": {
+                    "x": 1.8,
+                    "y": 1.6
+                  }
+                },
+                {
+                  "x": 1.0,
+                  "y": 0.8,
+                  "in": {
+                    "x": 1.9,
+                    "y": 1.6
+                  },
+                  "out": {
+                    "x": 0.9,
+                    "y": 0.0
+                  }
+                },
+                {
+                  "x": 1.8,
+                  "y": -0.3,
+                  "in": {
+                    "x": 1.0,
+                    "y": 0.1
+                  },
+                  "out": {
+                    "x": 2.9,
+                    "y": -0.4
+                  }
+                },
+                {
+                  "x": 2.8,
+                  "y": -0.2,
+                  "in": {
+                    "x": 3.0,
+                    "y": -0.1
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [
+                {
+                  "fromNode": 1,
+                  "toNode": 3,
+                  "axis": "path",
+                  "minFactor": 0.9,
+                  "maxFactor": 1.35,
+                  "preserveCurvature": true,
+                  "preserveThickness": false
+                }
+              ],
+              "protectedZones": [
+                {
+                  "fromNode": 1,
+                  "toNode": 3,
+                  "reason": "loop-legibility"
+                }
+              ],
+              "priority": 10,
+              "kashidaEligible": false,
+              "elongationStrategy": "expand-loop"
+            },
+            "labels": {
+              "ar": "عين fa",
+              "en": "fa eye"
+            }
+          }
+        ]
+      },
+      {
+        "id": "DOTS",
+        "type": "DOT",
+        "semanticLabel": {
+          "ar": "نقاط",
+          "en": "dots"
+        },
+        "strokes": [
+          {
+            "id": "S_DOT_1",
+            "function": "DOT",
+            "direction": "down-left",
+            "curvature": "soft-curve",
+            "terminalStart": "teardrop",
+            "terminalEnd": "sharp",
+            "thicknessProfile": "taper-out",
+            "startLevel": "loop-height",
+            "endLevel": "loop-height",
+            "lengthDots": 0.7,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 2.4,
+                  "y": 2.6,
+                  "out": {
+                    "x": 2.25,
+                    "y": 2.4
+                  }
+                },
+                {
+                  "x": 2.1,
+                  "y": 2.2,
+                  "in": {
+                    "x": 2.25,
+                    "y": 2.4
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [],
+              "protectedZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "reason": "dot-shape"
+                }
+              ],
+              "priority": 9,
+              "kashidaEligible": false,
+              "elongationStrategy": "none"
+            },
+            "labels": {
+              "ar": "النقطة 1",
+              "en": "dot 1"
+            }
+          }
+        ]
+      }
+    ],
+    "formMetadata": {
+      "connectsRight": true,
+      "connectsLeft": false,
+      "derivedFrom": "FA",
+      "geometryVariant": true
+    }
+  }
+}

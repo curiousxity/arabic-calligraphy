@@ -25,6 +25,8 @@ import {
   computeFitToBox,
   DEFAULT_EMPTY_BOUNDS,
 } from "./lib/canvasBounds";
+import type { StretchDefinition } from "./lib/strokeSchema/deriveCatalog";
+import { mapNormToRealBox } from "./lib/strokeSchema/schemaGeometry";
 import type { Block, GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigAxis } from "./types";
 
 const hslToHex = (h: number, s: number, l: number): string => {
@@ -230,6 +232,9 @@ const App: React.FC = () => {
   const [viewportHeight, setViewportHeight] = useState(isBrowser ? window.innerHeight : 800);
 
   const [glyphBoxesByBlock, setGlyphBoxesByBlock] = useState<Record<number, GlyphBox[]>>({});
+  const [glyphSchemaByBlock, setGlyphSchemaByBlock] = useState<
+    Record<number, Record<number, StretchDefinition[]>>
+  >({});
 
   const effectiveSidebarWidth = isMobile
     ? viewportWidth
@@ -412,39 +417,107 @@ const App: React.FC = () => {
 		});
   }, []);
 
-  const addStretchHandle = useCallback(() => {
-    if (!selectedBlock || selectedBlock.type === "image" || selectedBlock.selectedGlyphIndex == null) return;
+  const updateGlyphSchema = useCallback(
+    (blockId: number, catalog: Record<number, StretchDefinition[]>) => {
+      setGlyphSchemaByBlock((prev) =>
+        prev[blockId] === catalog ? prev : { ...prev, [blockId]: catalog }
+      );
+    },
+    []
+  );
 
-    const blockId = selectedBlock.id;
-    const glyphIndex = selectedBlock.selectedGlyphIndex;
-    const handleId = makeHandleId();
+  const addStretchHandle = useCallback(
+    (definition: StretchDefinition) => {
+      if (!selectedBlock || selectedBlock.type === "image" || selectedBlock.selectedGlyphIndex == null) return;
 
-    const boxes = glyphBoxesByBlock[blockId] ?? [];
-    const box = boxes.find((b) => b.glyphIndex === glyphIndex);
+      const blockId = selectedBlock.id;
+      const glyphIndex = selectedBlock.selectedGlyphIndex;
+      const handleId = makeHandleId();
 
-    const anchorX = box ? box.x : selectedBlock.x;
-    const anchorY = box ? box.y + box.height / 2 : selectedBlock.y;
-    const dragX = box ? box.x + box.width : selectedBlock.x + 80;
-    const dragY = anchorY;
-    const bandWidth = box ? Math.max(20, Math.min(box.width, box.height) * 0.5) : 40;
+      const boxes = glyphBoxesByBlock[blockId] ?? [];
+      const box = boxes.find((b) => b.glyphIndex === glyphIndex);
 
-    upsertGlyphEdit(blockId, glyphIndex, (prev) => ({
-      glyphIndex,
-      stretches: [
-        ...(prev?.stretches ?? []),
-        {
-          id: handleId,
-          anchorX,
-          anchorY,
-          dragOriginX: dragX,
-          dragOriginY: dragY,
-          dragX,
-          dragY,
-          bandWidth,
-        },
-      ],
-    }));
-  }, [selectedBlock, glyphBoxesByBlock, upsertGlyphEdit]);
+      // No dragging anymore — the axis is derived entirely from the schema's
+      // own authored geometry (definition.anchorNorm/dragNorm, computed in
+      // deriveStretchCatalog) mapped onto this glyph's real bounding box.
+      // dragOrigin = the schema's natural (factor=1) endpoint; drag = that
+      // same axis extrapolated out to maxFactor, which lib/glyphEdits.ts's
+      // resolveValueMultiplier uses as the "full stretch" reference.
+      const anchorPoint = box
+        ? mapNormToRealBox(definition.anchorNorm, box)
+        : { x: selectedBlock.x, y: selectedBlock.y };
+      const dragOriginPoint = box
+        ? mapNormToRealBox(definition.dragNorm, box)
+        : { x: selectedBlock.x + 80, y: selectedBlock.y };
+      const dragPoint = {
+        x: anchorPoint.x + (dragOriginPoint.x - anchorPoint.x) * definition.maxFactor,
+        y: anchorPoint.y + (dragOriginPoint.y - anchorPoint.y) * definition.maxFactor,
+      };
+      const bandWidth = box ? Math.max(20, Math.min(box.width, box.height) * 0.5) : 40;
+
+      upsertGlyphEdit(blockId, glyphIndex, (prev) => ({
+        glyphIndex,
+        stretches: [
+          ...(prev?.stretches ?? []),
+          {
+            id: handleId,
+            anchorX: anchorPoint.x,
+            anchorY: anchorPoint.y,
+            dragOriginX: dragOriginPoint.x,
+            dragOriginY: dragOriginPoint.y,
+            dragX: dragPoint.x,
+            dragY: dragPoint.y,
+            bandWidth,
+            maskAuto: true,
+            schemaStrokeId: definition.strokeId,
+            schemaZoneIndex: definition.zoneIndex,
+            factor: 1,
+            minFactor: definition.minFactor,
+            maxFactor: definition.maxFactor,
+            kashidaEligible: definition.kashidaEligible,
+            priority: definition.priority,
+          },
+        ],
+      }));
+    },
+    [selectedBlock, glyphBoxesByBlock, upsertGlyphEdit]
+  );
+
+  // Distributes a block-level "Kashida" 0-100 dial across every kashida-eligible,
+  // schema-backed stretch handle in the block, weighted by each handle's own
+  // `priority` (1-10, from the stroke schema) — a higher-priority stroke ramps
+  // toward its own maxFactor faster than a lower-priority one at the same dial
+  // position. Handles without a maxFactor (plain freehand handles) are untouched.
+  const setBlockKashidaAmount = useCallback(
+    (blockId: number, amount: number) => {
+      const clampedAmount = Math.max(0, Math.min(100, amount));
+
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || b.type === "image") return b;
+
+          return {
+            ...b,
+            kashidaAmount: clampedAmount,
+            glyphEdits: (b.glyphEdits ?? []).map((edit) => ({
+              ...edit,
+              stretches: edit.stretches.map((h) => {
+                if (!h.kashidaEligible || h.maxFactor == null) return h;
+                const weight = (h.priority ?? 5) / 10;
+                const factor = Math.min(
+                  h.maxFactor,
+                  1 + (h.maxFactor - 1) * (clampedAmount / 100) * weight
+                );
+                return { ...h, factor };
+              }),
+            })),
+          };
+        })
+      );
+      scheduleGlyphEditHistoryPush();
+    },
+    [scheduleGlyphEditHistoryPush]
+  );
 
   const updateStretchHandle = useCallback(
     (
@@ -1831,6 +1904,7 @@ const App: React.FC = () => {
           onUpdateStretchHandle={updateStretchHandle}
           glyphRigs={glyphRigs}
           onGlyphBoxesChange={updateGlyphBoxes}
+          onGlyphSchemaChange={updateGlyphSchema}
           onKashidaTextChange={updateKashidaText}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           onResizeImageBlock={resizeImageBlock}
@@ -1851,6 +1925,12 @@ const App: React.FC = () => {
       <MorphGlyphEditor
         selectedBlock={selectedBlock}
         selectedGlyphBoxes={glyphBoxesByBlock[selectedBlock?.id ?? -1] ?? []}
+        selectedGlyphCatalog={
+          (selectedBlock &&
+            selectedBlock.selectedGlyphIndex != null &&
+            glyphSchemaByBlock[selectedBlock.id]?.[selectedBlock.selectedGlyphIndex]) ||
+          []
+        }
         glyphRigs={glyphRigs}
         onSetGlyphEditTool={(tool) => {
           if (!selectedBlock || selectedBlock.type === "image") return;
@@ -1863,6 +1943,7 @@ const App: React.FC = () => {
         onSaveStretchHandleAsRig={saveStretchHandleAsRig}
         onSetGlyphRigValue={setGlyphRigValue}
         onDeleteGlyphRigAxis={deleteGlyphRigAxis}
+        onSetBlockKashidaAmount={setBlockKashidaAmount}
         isMobile={isMobile}
         width={RIGHT_PANEL_WIDTH}
         isCollapsed={rightPanelCollapsed}
