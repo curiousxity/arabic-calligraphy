@@ -35,6 +35,20 @@ describe("computeClusterSpans", () => {
 
 describe("getLigatureSchema", () => {
   it("returns undefined for a letter sequence with no authored ligature schema", () => {
-    expect(getLigatureSchema(["0627", "0644", "0644", "0647"])).toBeUndefined();
+    expect(getLigatureSchema(["0628", "0645"])).toBeUndefined();
+  });
+
+  it("loads the seeded الله ligature (alif+lam+lam+heh, the plain sequence Wessam.ttf actually fuses)", () => {
+    const schema = getLigatureSchema(["0627", "0644", "0644", "0647"]);
+    expect(schema).toBeDefined();
+    expect(schema!.glyph.id).toBe("ALLAH_LIGATURE_ISOLATED");
+    expect(schema!.glyph.role).toBe("ligature");
+    expect(schema!.glyph.components.map((c) => c.id)).toEqual(["ALIF_1", "LAM_1", "LAM_2", "HEH_1"]);
+  });
+
+  it("is case-insensitive on the codepoint sequence", () => {
+    expect(getLigatureSchema(["0627", "0644", "0644", "0647"])).toBe(
+      getLigatureSchema(["627", "644", "644", "647"].map((h) => h.padStart(4, "0")))
+    );
   });
 });

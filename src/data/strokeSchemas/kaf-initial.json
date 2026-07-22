@@ -53,66 +53,6 @@
     "unicode": "0643",
     "components": [
       {
-        "id": "HEAD_1",
-        "type": "HEAD",
-        "semanticLabel": {
-          "ar": "رأس",
-          "en": "head"
-        },
-        "strokes": [
-          {
-            "id": "S_HEAD_1",
-            "function": "HEAD",
-            "direction": "horizontal-left",
-            "curvature": "soft-curve",
-            "terminalStart": "hidden",
-            "terminalEnd": "hidden",
-            "thicknessProfile": "contrast-low",
-            "startLevel": "tooth-height",
-            "endLevel": "tooth-height",
-            "lengthDots": 1.5,
-            "path": {
-              "kind": "bezier",
-              "nodes": [
-                {
-                  "x": 4.0,
-                  "y": 1.2,
-                  "out": {
-                    "x": 3.3,
-                    "y": 1.3
-                  }
-                },
-                {
-                  "x": 2.3,
-                  "y": 1.2,
-                  "in": {
-                    "x": 3.0,
-                    "y": 1.3
-                  }
-                }
-              ]
-            },
-            "editBehavior": {
-              "stretchZones": [],
-              "protectedZones": [
-                {
-                  "fromNode": 0,
-                  "toNode": 0,
-                  "reason": "right-join-entry"
-                }
-              ],
-              "priority": 7,
-              "kashidaEligible": false,
-              "elongationStrategy": "none"
-            },
-            "labels": {
-              "ar": "رأس الكاف",
-              "en": "kaf head"
-            }
-          }
-        ]
-      },
-      {
         "id": "BODY_1",
         "type": "BODY",
         "semanticLabel": {
@@ -123,55 +63,43 @@
           {
             "id": "S_BODY_1",
             "function": "BODY",
-            "direction": "down-left",
-            "curvature": "soft-curve",
+            "direction": "horizontal-left",
+            "curvature": "bowl",
             "terminalStart": "hidden",
             "terminalEnd": "hidden",
             "thicknessProfile": "contrast-high",
             "startLevel": "tooth-height",
             "endLevel": "baseline",
-            "lengthDots": 5.0,
+            "lengthDots": 4.5,
             "path": {
               "kind": "bezier",
               "nodes": [
                 {
-                  "x": 2.3,
-                  "y": 1.2,
+                  "x": 4.5,
+                  "y": 1.0,
                   "out": {
-                    "x": 1.6,
-                    "y": 1.0
-                  }
-                },
-                {
-                  "x": 1.1,
-                  "y": 0.3,
-                  "in": {
-                    "x": 1.7,
+                    "x": 3.5,
                     "y": 0.9
-                  },
-                  "out": {
-                    "x": 0.8,
-                    "y": -0.2
                   }
                 },
                 {
-                  "x": 1.8,
-                  "y": -0.7,
+                  "x": 2.6,
+                  "y": -0.2,
                   "in": {
-                    "x": 1.0,
+                    "x": 3.6,
+                    "y": 0.8
+                  },
+                  "out": {
+                    "x": 1.7,
                     "y": -0.3
-                  },
-                  "out": {
-                    "x": 2.8,
-                    "y": -0.8
                   }
                 },
                 {
-                  "x": 3.5,
-                  "y": 0.0,
+                  "x": 1.9,
+                  "y": 0.2,
                   "in": {
-                    "x": 2.9,
-                    "y": -0.5
+                    "x": 1.8,
+                    "y": -0.1
                   }
                 }
               ]
@@ -179,35 +107,25 @@
             "editBehavior": {
               "stretchZones": [
                 {
-                  "fromNode": 1,
-                  "toNode": 3,
-                  "axis": "path",
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "axis": "x",
                   "minFactor": 0.9,
-                  "maxFactor": 1.35,
+                  "maxFactor": 1.6,
                   "preserveCurvature": true,
                   "preserveThickness": false
                 }
               ],
               "protectedZones": [
                 {
-                  "fromNode": 0,
-                  "toNode": 1,
-                  "reason": "join-integrity"
-                },
-                {
                   "fromNode": 1,
-                  "toNode": 3,
-                  "reason": "loop-legibility"
-                },
-                {
-                  "fromNode": 0,
-                  "toNode": 0,
-                  "reason": "right-join-entry"
+                  "toNode": 2,
+                  "reason": "inner-bowl"
                 }
               ],
               "priority": 10,
-              "kashidaEligible": false,
-              "elongationStrategy": "expand-loop"
+              "kashidaEligible": true,
+              "elongationStrategy": "linear"
             },
             "labels": {
               "ar": "جسم الكاف",
@@ -217,15 +135,15 @@
         ]
       },
       {
-        "id": "ASCENDER_1",
+        "id": "ARM_1",
         "type": "ASCENDER",
         "semanticLabel": {
-          "ar": "سن كاف",
-          "en": "kaf arm"
+          "ar": "ذراع",
+          "en": "arm"
         },
         "strokes": [
           {
-            "id": "S_ASC_1",
+            "id": "S_ARM_1",
             "function": "ASCENDER",
             "direction": "up-right",
             "curvature": "hook",
@@ -239,30 +157,30 @@
               "kind": "bezier",
               "nodes": [
                 {
-                  "x": 2.4,
-                  "y": -0.1,
+                  "x": 1.9,
+                  "y": 0.2,
                   "out": {
-                    "x": 2.5,
-                    "y": 0.8
+                    "x": 2.0,
+                    "y": 0.9
                   }
                 },
                 {
-                  "x": 2.6,
-                  "y": 1.9,
+                  "x": 2.4,
+                  "y": 1.7,
                   "in": {
-                    "x": 2.5,
+                    "x": 2.0,
                     "y": 1.0
                   },
                   "out": {
-                    "x": 2.9,
+                    "x": 2.8,
                     "y": 1.6
                   }
                 },
                 {
-                  "x": 3.2,
-                  "y": 1.2,
+                  "x": 3.0,
+                  "y": 1.1,
                   "in": {
-                    "x": 2.9,
+                    "x": 2.7,
                     "y": 1.5
                   }
                 }
@@ -275,7 +193,7 @@
                   "toNode": 1,
                   "axis": "y",
                   "minFactor": 0.85,
-                  "maxFactor": 1.3,
+                  "maxFactor": 1.35,
                   "preserveCurvature": true,
                   "preserveThickness": false
                 }
@@ -284,12 +202,7 @@
                 {
                   "fromNode": 1,
                   "toNode": 2,
-                  "reason": "terminal-shape"
-                },
-                {
-                  "fromNode": 0,
-                  "toNode": 0,
-                  "reason": "right-join-entry"
+                  "reason": "hook-terminal"
                 }
               ],
               "priority": 8,
@@ -298,7 +211,77 @@
             },
             "labels": {
               "ar": "ذراع الكاف",
-              "en": "kaf upper arm"
+              "en": "kaf arm"
+            }
+          }
+        ]
+      },
+      {
+        "id": "CONNECT_1",
+        "type": "BODY",
+        "semanticLabel": {
+          "ar": "وصلة",
+          "en": "connector"
+        },
+        "strokes": [
+          {
+            "id": "S_CONNECT_1",
+            "function": "BODY",
+            "direction": "horizontal-left",
+            "curvature": "linear",
+            "terminalStart": "hidden",
+            "terminalEnd": "join-left",
+            "thicknessProfile": "contrast-low",
+            "startLevel": "baseline",
+            "endLevel": "baseline",
+            "lengthDots": 1.8,
+            "path": {
+              "kind": "bezier",
+              "nodes": [
+                {
+                  "x": 1.9,
+                  "y": 0.2,
+                  "out": {
+                    "x": 1.1,
+                    "y": 0.0
+                  }
+                },
+                {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "in": {
+                    "x": 1.0,
+                    "y": 0.0
+                  }
+                }
+              ]
+            },
+            "editBehavior": {
+              "stretchZones": [
+                {
+                  "fromNode": 0,
+                  "toNode": 1,
+                  "axis": "x",
+                  "minFactor": 0.9,
+                  "maxFactor": 1.8,
+                  "preserveCurvature": true,
+                  "preserveThickness": false
+                }
+              ],
+              "protectedZones": [
+                {
+                  "fromNode": 1,
+                  "toNode": 1,
+                  "reason": "exit-join"
+                }
+              ],
+              "priority": 7,
+              "kashidaEligible": true,
+              "elongationStrategy": "linear"
+            },
+            "labels": {
+              "ar": "وصلة الكاف",
+              "en": "kaf connector"
             }
           }
         ]
@@ -308,7 +291,7 @@
       "connectsRight": false,
       "connectsLeft": true,
       "derivedFrom": "KAF",
-      "rulesNote": "Dual-joining letters may take all four contextual forms."
+      "geometryVariant": true
     }
   }
 }

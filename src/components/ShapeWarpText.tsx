@@ -1,17 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Group, Shape, Rect, Circle, Arc } from "react-konva";
+import { Group, Shape, Rect, Arc } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import { parseSvgPath, replayPath } from "../lib/svgPath";
 import { drawInsetBevel, EMBOSS_STRENGTH_SCALE } from "../lib/emboss";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
-import {
-  applyGlyphEdit,
-  prepareGlyphRig,
-  applyPreparedGlyphRig,
-  STRETCH_ANCHOR_COLOR,
-  STRETCH_DRAG_COLOR,
-} from "../lib/glyphEdits";
+import { applyGlyphEdit, prepareGlyphRig, applyPreparedGlyphRig } from "../lib/glyphEdits";
 import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import { deriveContourMask } from "../lib/glyphContours";
@@ -436,7 +430,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
     };
   }, [shapeData, selectedGlyphIndex, hitBoxes, fontSize]);
 
-  /** Recomputes a handle's auto mask from its (possibly just-updated) anchor/drag points, in text-space coords — no-ops (returns undefined) unless the handle opts into auto-masking and the outline is available. */
+  /** Derives a contour mask from a handle's (fixed, schema-auto-computed) anchor/dragOrigin points, in text-space coords — no-ops (returns undefined) unless the handle opts into auto-masking and the outline is available. */
   const autoDeriveMask = (
     h: GlyphStretchHandle,
     anchorX: number,
@@ -452,27 +446,26 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
     ]);
   };
 
+  // Handles no longer get their axis from dragging — it's auto-computed once
+  // at creation (App.tsx's addStretchHandle). The mask still needs the real
+  // glyph outline, which only this component has, so it's derived here, once,
+  // the first time a new maskAuto handle with no mask yet shows up.
+  useEffect(() => {
+    if (!onUpdateStretchHandle || selectedGlyphIndex == null || !selectedGlyphOutline) return;
+    for (const h of selectedStretches) {
+      if (!h.maskAuto || h.mask != null) continue;
+      const mask = autoDeriveMask(h, h.anchorX, h.anchorY, h.dragOriginX, h.dragOriginY);
+      if (mask) onUpdateStretchHandle(selectedGlyphIndex, h.id, { mask });
+    }
+    // autoDeriveMask is a plain function of the listed deps, not a stable
+    // reference — omitted to avoid re-running every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStretches, selectedGlyphIndex, selectedGlyphOutline, onUpdateStretchHandle]);
+
   const bw = Math.max(warpShapeWidth, 20);
   const bh = Math.max(warpShapeHeight, 20);
   const bx = -bw / 2;
   const by = -bh / 2;
-
-  // Maps a raw (pre-warp) glyph-space point to the same on-screen position
-  // the sceneFunc's own warpPoint() puts the actual glyph pixels at, so
-  // overlay handles track the rendered glyphs instead of the unwarped run.
-  const warpHandlePoint = (rawX: number, rawY: number) => {
-    const p = applyShapeWarpPoint(
-      rawX,
-      rawY,
-      glyphBounds,
-      bw,
-      bh,
-      warpShapePadding,
-      warpShapeMode,
-      warpShapeStrength
-    );
-    return { x: bx + p.x, y: by + p.y };
-  };
 
   const invertToRawPoint = (screenX: number, screenY: number) =>
     invertShapeWarpPoint(
@@ -704,75 +697,6 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           }
         }}
       />
-
-      {glyphEditTool === "stretch" &&
-        selectedGlyphIndex != null &&
-        selectedStretches.map((h) => (
-          <React.Fragment key={h.id}>
-            <Circle
-              x={warpHandlePoint(h.anchorX, h.anchorY).x}
-              y={warpHandlePoint(h.anchorX, h.anchorY).y}
-              radius={5}
-              fill={STRETCH_ANCHOR_COLOR}
-              opacity={0.55}
-              stroke="#ffffff"
-              strokeWidth={2}
-              draggable
-              onMouseDown={(e) => (e.cancelBubble = true)}
-              onTouchStart={(e) => (e.cancelBubble = true)}
-              onDragMove={(e) => {
-                e.cancelBubble = true;
-
-                const group = e.currentTarget.getParent() as Konva.Group;
-                const pos = group.getRelativePointerPosition();
-                if (!pos || !onUpdateStretchHandle) return;
-
-                const raw = invertToRawPoint(pos.x, pos.y);
-                const mask = autoDeriveMask(h, raw.x, raw.y, h.dragX, h.dragY);
-
-                onUpdateStretchHandle(selectedGlyphIndex, h.id, {
-                  anchorX: raw.x,
-                  anchorY: raw.y,
-                  ...(mask ? { mask } : {}),
-                });
-              }}
-              onDragEnd={(e) => {
-                e.cancelBubble = true;
-              }}
-            />
-            <Circle
-              x={warpHandlePoint(h.dragX, h.dragY).x}
-              y={warpHandlePoint(h.dragX, h.dragY).y}
-              radius={5}
-              fill={STRETCH_DRAG_COLOR}
-              opacity={0.55}
-              stroke="#ffffff"
-              strokeWidth={2}
-              draggable
-              onMouseDown={(e) => (e.cancelBubble = true)}
-              onTouchStart={(e) => (e.cancelBubble = true)}
-              onDragMove={(e) => {
-                e.cancelBubble = true;
-
-                const group = e.currentTarget.getParent() as Konva.Group;
-                const pos = group.getRelativePointerPosition();
-                if (!pos || !onUpdateStretchHandle) return;
-
-                const raw = invertToRawPoint(pos.x, pos.y);
-                const mask = autoDeriveMask(h, h.anchorX, h.anchorY, raw.x, raw.y);
-
-                onUpdateStretchHandle(selectedGlyphIndex, h.id, {
-                  dragX: raw.x,
-                  dragY: raw.y,
-                  ...(mask ? { mask } : {}),
-                });
-              }}
-              onDragEnd={(e) => {
-                e.cancelBubble = true;
-              }}
-            />
-          </React.Fragment>
-        ))}
 
     </Group>
   );

@@ -106,6 +106,39 @@ describe("applyGlyphEdit", () => {
     expect(applyGlyphEdit(100, 0, zero).x).toBeCloseTo(100);
   });
 
+  it("schema-backed handles (minFactor/maxFactor set) remap factor so 1 means zero displacement", () => {
+    // anchor=0, dragOrigin=100 (the schema's natural/unstretched reference),
+    // drag=200 (dragOrigin extrapolated out to maxFactor=2, per App.tsx's
+    // addStretchHandle) — matches how a schema-backed handle is now created.
+    const baseHandle = {
+      id: "h1",
+      anchorX: 0,
+      anchorY: 0,
+      dragOriginX: 100,
+      dragOriginY: 0,
+      dragX: 200,
+      dragY: 0,
+      bandWidth: 20,
+      minFactor: 0.5,
+      maxFactor: 2,
+    };
+
+    const natural: GlyphEdit = { glyphIndex: 0, stretches: [{ ...baseHandle, factor: 1 }] };
+    // factor=1 -> remapped multiplier (1-1)/(2-1)=0 -> the real glyph's own
+    // point stays exactly where the font drew it, unlike the legacy formula
+    // (which would need factor=0, not 1, for zero displacement).
+    expect(applyGlyphEdit(100, 0, natural).x).toBeCloseTo(100);
+
+    const atMax: GlyphEdit = { glyphIndex: 0, stretches: [{ ...baseHandle, factor: 2 }] };
+    // factor=maxFactor -> remapped multiplier 1 -> lands exactly on dragX (200).
+    expect(applyGlyphEdit(100, 0, atMax).x).toBeCloseTo(200);
+
+    const atMin: GlyphEdit = { glyphIndex: 0, stretches: [{ ...baseHandle, factor: 0.5 }] };
+    // factor=minFactor -> remapped multiplier (0.5-1)/(2-1)=-0.5 -> compresses
+    // to the OPPOSITE side of natural (50), not just "less than 200".
+    expect(applyGlyphEdit(100, 0, atMin).x).toBeCloseTo(50);
+  });
+
   it("with a lasso mask, only displaces points inside the polygon", () => {
     const edit: GlyphEdit = {
       glyphIndex: 0,

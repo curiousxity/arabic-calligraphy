@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getStrokeSchema } from "./registry";
+import { getStrokeSchema, getLigatureSchema } from "./registry";
 import { deriveStretchCatalog } from "./deriveCatalog";
 import type { GlyphDescription } from "./types";
 
@@ -126,5 +126,22 @@ describe("stroke schema registry + deriveStretchCatalog", () => {
     // from the first zone's fallback had it also lacked a label).
     expect(catalog[1]).toMatchObject({ strokeId: "S_BODY_1", zoneIndex: 1, minFactor: 0.8, maxFactor: 2.0 });
     expect(catalog[1].label.en).toBe("body 2");
+  });
+
+  it("derives a labeled zone-per-axis catalog for the الله ligature, none kashida-eligible", () => {
+    const schema = getLigatureSchema(["0627", "0644", "0644", "0647"]);
+    expect(schema).toBeDefined();
+
+    const catalog = deriveStretchCatalog(schema!);
+    const labels = catalog.map((c) => c.label.en);
+    expect(labels).toEqual([
+      "Alif height",
+      "First lam height",
+      "Second lam height",
+      "Second lam shoulder",
+      "Heh loop",
+      "Heh tail",
+    ]);
+    expect(catalog.every((c) => c.kashidaEligible === false)).toBe(true);
   });
 });

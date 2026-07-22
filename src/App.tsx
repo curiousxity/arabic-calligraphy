@@ -26,6 +26,7 @@ import {
   DEFAULT_EMPTY_BOUNDS,
 } from "./lib/canvasBounds";
 import type { StretchDefinition } from "./lib/strokeSchema/deriveCatalog";
+import { mapNormToRealBox } from "./lib/strokeSchema/schemaGeometry";
 import type { Block, GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigAxis } from "./types";
 
 const hslToHex = (h: number, s: number, l: number): string => {
@@ -436,10 +437,22 @@ const App: React.FC = () => {
       const boxes = glyphBoxesByBlock[blockId] ?? [];
       const box = boxes.find((b) => b.glyphIndex === glyphIndex);
 
-      const anchorX = box ? box.x : selectedBlock.x;
-      const anchorY = box ? box.y + box.height / 2 : selectedBlock.y;
-      const dragX = box ? box.x + box.width : selectedBlock.x + 80;
-      const dragY = anchorY;
+      // No dragging anymore — the axis is derived entirely from the schema's
+      // own authored geometry (definition.anchorNorm/dragNorm, computed in
+      // deriveStretchCatalog) mapped onto this glyph's real bounding box.
+      // dragOrigin = the schema's natural (factor=1) endpoint; drag = that
+      // same axis extrapolated out to maxFactor, which lib/glyphEdits.ts's
+      // resolveValueMultiplier uses as the "full stretch" reference.
+      const anchorPoint = box
+        ? mapNormToRealBox(definition.anchorNorm, box)
+        : { x: selectedBlock.x, y: selectedBlock.y };
+      const dragOriginPoint = box
+        ? mapNormToRealBox(definition.dragNorm, box)
+        : { x: selectedBlock.x + 80, y: selectedBlock.y };
+      const dragPoint = {
+        x: anchorPoint.x + (dragOriginPoint.x - anchorPoint.x) * definition.maxFactor,
+        y: anchorPoint.y + (dragOriginPoint.y - anchorPoint.y) * definition.maxFactor,
+      };
       const bandWidth = box ? Math.max(20, Math.min(box.width, box.height) * 0.5) : 40;
 
       upsertGlyphEdit(blockId, glyphIndex, (prev) => ({
@@ -448,12 +461,12 @@ const App: React.FC = () => {
           ...(prev?.stretches ?? []),
           {
             id: handleId,
-            anchorX,
-            anchorY,
-            dragOriginX: dragX,
-            dragOriginY: dragY,
-            dragX,
-            dragY,
+            anchorX: anchorPoint.x,
+            anchorY: anchorPoint.y,
+            dragOriginX: dragOriginPoint.x,
+            dragOriginY: dragOriginPoint.y,
+            dragX: dragPoint.x,
+            dragY: dragPoint.y,
             bandWidth,
             maskAuto: true,
             schemaStrokeId: definition.strokeId,

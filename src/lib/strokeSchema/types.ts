@@ -11,7 +11,8 @@ export type ComponentType =
 export type Direction =
   | "up-right" | "up-left" | "down-right" | "down-left"
   | "horizontal-right" | "horizontal-left"
-  | "loop" | "counterclockwise-loop" | "clockwise-loop";
+  | "loop" | "counterclockwise-loop" | "clockwise-loop"
+  | "up-down";
 
 // Wider than the original schema doc's enum (straight/soft-curve/tight-curve/
 // S-curve/hook/loop) — "bowl"/"zig-curve" (noon/ya/meem bowls, hamza's
@@ -24,12 +25,16 @@ export type Curvature =
   | "bowl" | "zig-curve"
   | "alif-leg" | "closed-final" | "closed-medial" | "compressed-bowl"
   | "deep-bowl" | "narrow-counter" | "shallow-bowl"
-  | "linear" | "tooth";
+  | "linear" | "tooth"
+  | "closed-bowl" | "closed-medial-ha" | "compact-loop-head" | "final-ha-loop"
+  | "hook-entry" | "open-bowl" | "open-haa"
+  | "slight-taper" | "closed-final-ha";
 
 // "join-left"/"join-right" (refined geometry variants batch) mark a terminal
-// that flows directly into a join rather than ending freely — display-only,
+// that flows directly into a join rather than ending freely; "flat" (the
+// Allah-ligature file) is a squared-off, non-tapered terminal — display-only,
 // same as the rest of this field.
-export type Terminal = "blunt" | "sharp" | "teardrop" | "taper" | "hidden" | "join-left" | "join-right";
+export type Terminal = "blunt" | "sharp" | "teardrop" | "taper" | "hidden" | "join-left" | "join-right" | "flat";
 export type ThicknessProfile =
   | "constant" | "taper-in" | "taper-out" | "taper-in-out" | "contrast-high" | "contrast-low";
 
@@ -87,7 +92,18 @@ export interface ProtectedZone {
     | "compressed-bowl"
     | "counter-legibility"
     | "narrow-counter"
-    | "tooth-rhythm";
+    | "tooth-rhythm"
+    | "counter-opening"
+    | "entry-hook"
+    | "head-proportion"
+    | "hook-terminal"
+    | "inner-bowl"
+    | "loop-closure"
+    | "tail-terminal"
+    | "alif-proportion"
+    | "join-bridge-to-second-lam"
+    | "host-for-shadda-and-superscript-alif"
+    | "final-heh-legibility";
 }
 
 export interface Stroke {
@@ -107,7 +123,10 @@ export interface Stroke {
     protectedZones: ProtectedZone[];
     priority: number;
     kashidaEligible?: boolean;
-    elongationStrategy?: "none" | "linear" | "curve-relax" | "repeat-tooth" | "expand-loop";
+    elongationStrategy?:
+      | "none" | "linear" | "curve-relax" | "repeat-tooth" | "expand-loop"
+      // Allah-ligature file: distinct vertical-scale strategies per stem.
+      | "vertical-scale" | "controlled-stem-and-shoulder";
   };
   labels?: { ar?: string; en?: string; };
 }

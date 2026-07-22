@@ -1,7 +1,5 @@
-import type { GlyphEdit, GlyphRig, GlyphRigValue, GlyphStretchMask } from "../types";
+import type { GlyphEdit, GlyphRig, GlyphRigValue, GlyphStretchHandle, GlyphStretchMask } from "../types";
 
-export const STRETCH_ANCHOR_COLOR = "#ff4d4f";
-export const STRETCH_DRAG_COLOR = "#22c55e";
 export const MASK_CONTOUR_ON_COLOR = "#22c55e";
 export const MASK_CONTOUR_OFF_COLOR = "#9ca3af";
 export const MASK_LASSO_COLOR = "#22c55e";
@@ -86,6 +84,26 @@ function applyAxisDisplacement(
 }
 
 /**
+ * A schema-backed handle's `dragX/Y` is set (at creation, see App.tsx's
+ * addStretchHandle) to the point extrapolated out to `maxFactor` along the
+ * anchor->dragOrigin axis — i.e. `dragOriginX/Y` is the schema's natural,
+ * unstretched reference and `dragX/Y` is the full-maxFactor endpoint, NOT
+ * "wherever the user last dragged to" (there's no dragging anymore). Feeding
+ * `factor` straight into applyAxisDisplacement would treat factor=0 as "no
+ * displacement," but the schema's own minFactor/maxFactor bounds treat 1 as
+ * the neutral point (e.g. 0.85-1.8) — so it's remapped to
+ * `(factor - 1) / (maxFactor - 1)`, which makes factor=1 land exactly on the
+ * real glyph's natural, undisplaced rendering, and factor=maxFactor land
+ * exactly on the extrapolated dragX/Y point.
+ */
+function resolveValueMultiplier(h: GlyphStretchHandle): number {
+  if (h.minFactor == null || h.maxFactor == null || h.maxFactor === 1) {
+    return h.factor ?? 1;
+  }
+  return ((h.factor ?? 1) - 1) / (h.maxFactor - 1);
+}
+
+/**
  * Applies a glyph's edits to a single outline point: each stretch handle
  * pulls points near its anchor→drag axis along that axis, proportional to
  * distance from the anchor (0 at the anchor, 1 at the drag handle's original
@@ -107,9 +125,7 @@ export function applyGlyphEdit(
     // Masked against the original (pre-stretch) position so a point can't be
     // carried out of, or into, its own mask by an earlier handle in the chain.
     if (!passesMask(h.mask, x, y, contourIndex)) continue;
-    // `factor` (schema-backed handles only) scales the axis the same way a
-    // rig axis's value does; absent/1 preserves this handle's authored length.
-    const p = applyAxisDisplacement(px, py, h, h.factor ?? 1);
+    const p = applyAxisDisplacement(px, py, h, resolveValueMultiplier(h));
     px = p.x;
     py = p.y;
   }

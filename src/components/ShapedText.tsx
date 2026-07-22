@@ -11,8 +11,6 @@ import {
   applyGlyphEdit,
   prepareGlyphRig,
   applyPreparedGlyphRig,
-  STRETCH_ANCHOR_COLOR,
-  STRETCH_DRAG_COLOR,
   MASK_CONTOUR_ON_COLOR,
   MASK_CONTOUR_OFF_COLOR,
   MASK_LASSO_COLOR,
@@ -528,7 +526,7 @@ export const ShapedText: React.FC<Props> = ({
     };
   }, [shapeData, selectedGlyphIndex, glyphHitBoxes, fontSize]);
 
-  /** Recomputes a handle's auto mask from its (possibly just-updated) anchor/drag points, in text-space coords — no-ops (returns undefined) unless the handle opts into auto-masking and the outline is available. */
+  /** Derives a contour mask from a handle's (fixed, schema-auto-computed) anchor/dragOrigin points, in text-space coords — no-ops (returns undefined) unless the handle opts into auto-masking and the outline is available. */
   const autoDeriveMask = (
     h: GlyphStretchHandle,
     anchorX: number,
@@ -549,6 +547,22 @@ export const ShapedText: React.FC<Props> = ({
       ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
       : undefined;
   const selectedStretches = selectedEdit?.stretches ?? [];
+
+  // Handles no longer get their axis from dragging — it's auto-computed once
+  // at creation (App.tsx's addStretchHandle). The mask still needs the real
+  // glyph outline, which only this component has, so it's derived here, once,
+  // the first time a new maskAuto handle with no mask yet shows up.
+  useEffect(() => {
+    if (!onUpdateStretchHandle || selectedGlyphIndex == null || !selectedGlyphOutline) return;
+    for (const h of selectedStretches) {
+      if (!h.maskAuto || h.mask != null) continue;
+      const mask = autoDeriveMask(h, h.anchorX, h.anchorY, h.dragOriginX, h.dragOriginY);
+      if (mask) onUpdateStretchHandle(selectedGlyphIndex, h.id, { mask });
+    }
+    // autoDeriveMask is a plain function of the listed deps, not a stable
+    // reference — omitted to avoid re-running every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStretches, selectedGlyphIndex, selectedGlyphOutline, onUpdateStretchHandle]);
 
   const activeMaskHandle =
     glyphMaskEdit != null
@@ -896,85 +910,6 @@ export const ShapedText: React.FC<Props> = ({
               setFrozenGaps(null);
             }}
           />
-        ))}
-
-      {glyphEditTool === "stretch" &&
-        selectedGlyphIndex != null &&
-        selectedStretches.map((h) => (
-          <React.Fragment key={h.id}>
-            <Circle
-              x={bx + localDrawX + h.anchorX}
-              y={by + localDrawY + h.anchorY}
-              radius={5}
-              fill={STRETCH_ANCHOR_COLOR}
-              opacity={0.55}
-              stroke="#ffffff"
-              strokeWidth={2}
-              draggable
-              onMouseDown={(e) => {
-                e.cancelBubble = true;
-              }}
-              onTouchStart={(e) => {
-                e.cancelBubble = true;
-              }}
-              onDragMove={(e) => {
-                e.cancelBubble = true;
-
-                const group = e.currentTarget.getParent() as Konva.Group;
-                const pos = group.getRelativePointerPosition();
-                if (!pos || !onUpdateStretchHandle) return;
-
-                const anchorX = pos.x - bx - localDrawX;
-                const anchorY = pos.y - by - localDrawY;
-                const mask = autoDeriveMask(h, anchorX, anchorY, h.dragX, h.dragY);
-
-                onUpdateStretchHandle(selectedGlyphIndex, h.id, {
-                  anchorX,
-                  anchorY,
-                  ...(mask ? { mask } : {}),
-                });
-              }}
-              onDragEnd={(e) => {
-                e.cancelBubble = true;
-              }}
-            />
-            <Circle
-              x={bx + localDrawX + h.dragX}
-              y={by + localDrawY + h.dragY}
-              radius={5}
-              fill={STRETCH_DRAG_COLOR}
-              opacity={0.55}
-              stroke="#ffffff"
-              strokeWidth={2}
-              draggable
-              onMouseDown={(e) => {
-                e.cancelBubble = true;
-              }}
-              onTouchStart={(e) => {
-                e.cancelBubble = true;
-              }}
-              onDragMove={(e) => {
-                e.cancelBubble = true;
-
-                const group = e.currentTarget.getParent() as Konva.Group;
-                const pos = group.getRelativePointerPosition();
-                if (!pos || !onUpdateStretchHandle) return;
-
-                const dragPtX = pos.x - bx - localDrawX;
-                const dragPtY = pos.y - by - localDrawY;
-                const mask = autoDeriveMask(h, h.anchorX, h.anchorY, dragPtX, dragPtY);
-
-                onUpdateStretchHandle(selectedGlyphIndex, h.id, {
-                  dragX: dragPtX,
-                  dragY: dragPtY,
-                  ...(mask ? { mask } : {}),
-                });
-              }}
-              onDragEnd={(e) => {
-                e.cancelBubble = true;
-              }}
-            />
-          </React.Fragment>
         ))}
 
       {glyphEditTool === "stretch" &&

@@ -36,21 +36,37 @@ export function contoursToPolygons(
  * points actually sit on the real glyph outline — used so a schema-backed
  * handle self-scopes to the stroke it's touching instead of defaulting to
  * "affects the whole glyph" (see the no-mask fallback in lib/glyphEdits.ts's
- * passesMask). Returns undefined (whole-glyph fallback, matching prior
- * behavior) when none of the points land inside any contour — e.g. a point
- * still sitting on the default bounding-box edge before the user has dragged
- * it onto the actual stroke.
+ * passesMask). Since these points are only approximately mapped from the
+ * schema's own normalized geometry onto the real glyph's bounding box (no
+ * per-font correspondence), an endpoint can land in empty space between
+ * contours (e.g. between a letter's body and its dots) even when the axis
+ * is otherwise correctly aimed at the intended stroke — so every point along
+ * the anchor-to-drag segment is sampled, not just the two endpoints, to
+ * raise the odds of landing on ink. Returns undefined (whole-glyph fallback,
+ * matching prior behavior) when no sampled point lands inside any contour.
  */
 export function deriveContourMask(
   commands: PathCommand[],
-  points: { x: number; y: number }[]
+  points: { x: number; y: number }[],
+  samplesPerSegment = 8
 ): GlyphStretchMask | undefined {
   const polygons = contoursToPolygons(splitContours(commands));
   const contourIndices = new Set<number>();
 
-  for (const p of points) {
+  const testPoint = (x: number, y: number) => {
     for (let i = 0; i < polygons.length; i++) {
-      if (pointInPolygon(p.x, p.y, polygons[i])) contourIndices.add(i);
+      if (pointInPolygon(x, y, polygons[i])) contourIndices.add(i);
+    }
+  };
+
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    testPoint(a.x, a.y);
+    const b = points[i + 1];
+    if (!b) continue;
+    for (let s = 1; s < samplesPerSegment; s++) {
+      const t = s / samplesPerSegment;
+      testPoint(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
     }
   }
 

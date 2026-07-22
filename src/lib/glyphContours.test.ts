@@ -48,4 +48,14 @@ describe("deriveContourMask", () => {
     const mask = deriveContourMask(twoSquares, [{ x: 50, y: 50 }]);
     expect(mask).toBeUndefined();
   });
+
+  it("finds a contour the segment passes through even when both endpoints miss it", () => {
+    // Anchor sits left of square A, drag sits right of it — neither endpoint
+    // is inside square A, but the straight line between them crosses it.
+    const mask = deriveContourMask(twoSquares, [
+      { x: -2, y: 5 },
+      { x: 12, y: 5 },
+    ]);
+    expect(mask).toEqual({ mode: "contours", contourIndices: [0] });
+  });
 });

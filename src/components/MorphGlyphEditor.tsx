@@ -75,33 +75,28 @@ const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <ol>
             <li>
               Labeled buttons appear per available stroke (e.g. "+ Body —
-              kashida-eligible") — click one to add a handle: a{" "}
-              <strong style={{ color: "#ff4d4f" }}>red anchor</strong> (fixed
-              point) and a <strong style={{ color: "#22c55e" }}>green drag
-              point</strong> (the point you pull).
+              kashida-eligible") — click one to add it. No dragging: its
+              position on the letter and which part of the glyph it affects
+              are derived automatically from the schema and the real glyph
+              outline.
             </li>
             <li>
-              Drag the red anchor to where the deformation should originate,
-              and the green point to where it should pull toward. Everything
-              between them stretches proportionally.
+              <strong>Kashida amount</strong> is the control — bounded to that
+              stroke's authored safe range, with 1.00 always meaning the
+              letter's natural, undistorted length.
             </li>
             <li>
               <strong>Band width</strong> controls how wide a swath around the
-              line is affected.
+              stroke is affected.
             </li>
             <li>
-              <strong>Kashida amount</strong> is bounded to that stroke's
-              authored min/max — it scales the stretch instead of dragging the
-              green point past its original length.
-            </li>
-            <li>
-              <strong>Masking</strong> limits which part of the glyph is
-              affected: By stroke (click outline contours to include/exclude
-              them, then Done), or Lasso (drag a freeform loop around the
-              region). A handle with no mask set yet affects the whole glyph.
+              <strong>Masking</strong> can override the automatic scoping if
+              it picked up the wrong part of the glyph: By stroke (click
+              outline contours to include/exclude them, then Done), or Lasso
+              (drag a freeform loop around the region).
             </li>
           </ol>
-          <p>You can add every available stroke's handle at once, per glyph.</p>
+          <p>You can add every available stroke's slider at once, per glyph.</p>
           <p>
             When a block has one or more kashida-eligible schema-backed
             handles, a block-level <strong>Kashida</strong> slider appears —
@@ -245,8 +240,8 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
           Glyph Edit
         </div>
         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-          Click a letter, then Stretch to elongate a stroke between an anchor
-          and a drag point.
+          Click a letter, then Stretch to elongate one of its strokes with a
+          slider — no dragging.
         </div>
 
         <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
