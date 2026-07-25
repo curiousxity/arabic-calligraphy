@@ -391,12 +391,23 @@ const App: React.FC = () => {
     );
   }, []);
 
+  // Arming a mask edit from the Morph panel's per-stroke rows also selects
+  // that glyph on the canvas and turns the Stretch tool on — the canvas
+  // contour/lasso overlays only render for the selected glyph while the tool
+  // is armed, and the panel no longer requires either as a precondition.
   const setGlyphMaskEditMode = useCallback(
-    (blockId: number, handleId: string, mode: "contours" | "lasso" | null) => {
+    (blockId: number, glyphIndex: number, handleId: string, mode: "contours" | "lasso" | null) => {
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === blockId && b.type !== "image"
-            ? { ...b, glyphMaskEdit: mode ? { handleId, mode } : null }
+            ? mode
+              ? {
+                  ...b,
+                  glyphEditTool: "stretch" as const,
+                  selectedGlyphIndex: glyphIndex,
+                  glyphMaskEdit: { handleId, mode },
+                }
+              : { ...b, glyphMaskEdit: null }
             : b
         )
       );
@@ -424,63 +435,6 @@ const App: React.FC = () => {
       );
     },
     []
-  );
-
-  const addStretchHandle = useCallback(
-    (definition: StretchDefinition) => {
-      if (!selectedBlock || selectedBlock.type === "image" || selectedBlock.selectedGlyphIndex == null) return;
-
-      const blockId = selectedBlock.id;
-      const glyphIndex = selectedBlock.selectedGlyphIndex;
-      const handleId = makeHandleId();
-
-      const boxes = glyphBoxesByBlock[blockId] ?? [];
-      const box = boxes.find((b) => b.glyphIndex === glyphIndex);
-
-      // No dragging anymore — the axis is derived entirely from the schema's
-      // own authored geometry (definition.anchorNorm/dragNorm, computed in
-      // deriveStretchCatalog) mapped onto this glyph's real bounding box.
-      // dragOrigin = the schema's natural (factor=1) endpoint; drag = that
-      // same axis extrapolated out to maxFactor, which lib/glyphEdits.ts's
-      // resolveValueMultiplier uses as the "full stretch" reference.
-      const anchorPoint = box
-        ? mapNormToRealBox(definition.anchorNorm, box)
-        : { x: selectedBlock.x, y: selectedBlock.y };
-      const dragOriginPoint = box
-        ? mapNormToRealBox(definition.dragNorm, box)
-        : { x: selectedBlock.x + 80, y: selectedBlock.y };
-      const dragPoint = {
-        x: anchorPoint.x + (dragOriginPoint.x - anchorPoint.x) * definition.maxFactor,
-        y: anchorPoint.y + (dragOriginPoint.y - anchorPoint.y) * definition.maxFactor,
-      };
-      const bandWidth = box ? Math.max(20, Math.min(box.width, box.height) * 0.5) : 40;
-
-      upsertGlyphEdit(blockId, glyphIndex, (prev) => ({
-        glyphIndex,
-        stretches: [
-          ...(prev?.stretches ?? []),
-          {
-            id: handleId,
-            anchorX: anchorPoint.x,
-            anchorY: anchorPoint.y,
-            dragOriginX: dragOriginPoint.x,
-            dragOriginY: dragOriginPoint.y,
-            dragX: dragPoint.x,
-            dragY: dragPoint.y,
-            bandWidth,
-            maskAuto: true,
-            schemaStrokeId: definition.strokeId,
-            schemaZoneIndex: definition.zoneIndex,
-            factor: 1,
-            minFactor: definition.minFactor,
-            maxFactor: definition.maxFactor,
-            kashidaEligible: definition.kashidaEligible,
-            priority: definition.priority,
-          },
-        ],
-      }));
-    },
-    [selectedBlock, glyphBoxesByBlock, upsertGlyphEdit]
   );
 
   // Distributes a block-level "Kashida" 0-100 dial across every kashida-eligible,
@@ -534,6 +488,96 @@ const App: React.FC = () => {
       }));
     },
     [upsertGlyphEditDebounced]
+  );
+
+  // Kaleam-style slider flow: every stroke slider in the Morph panel is live
+  // for every glyph with an authored schema — the first movement of a slider
+  // creates its schema-backed handle on the spot (one undo step, via
+  // upsertGlyphEdit's pushHistory), and subsequent movements just retune
+  // `factor` through the debounced update path. No canvas glyph selection or
+  // explicit "add handle" step exists anymore.
+  const setStretchFactor = useCallback(
+    (blockId: number, glyphIndex: number, definition: StretchDefinition, factor: number) => {
+      const block = blocks.find((b) => b.id === blockId);
+      if (!block || block.type === "image") return;
+
+      const clamped = Math.max(definition.minFactor, Math.min(definition.maxFactor, factor));
+      const existing = block.glyphEdits
+        ?.find((g) => g.glyphIndex === glyphIndex)
+        ?.stretches.find(
+          (h) =>
+            h.schemaStrokeId === definition.strokeId &&
+            (h.schemaZoneIndex ?? 0) === definition.zoneIndex
+        );
+
+      if (existing) {
+        updateStretchHandle(blockId, glyphIndex, existing.id, { factor: clamped });
+        return;
+      }
+
+      const box = (glyphBoxesByBlock[blockId] ?? []).find((b) => b.glyphIndex === glyphIndex);
+
+      // No dragging anymore — the axis is derived entirely from the schema's
+      // own authored geometry (definition.anchorNorm/dragNorm, computed in
+      // deriveStretchCatalog) mapped onto this glyph's real bounding box.
+      // dragOrigin = the schema's natural (factor=1) endpoint; drag = that
+      // same axis extrapolated out to maxFactor, which lib/glyphEdits.ts's
+      // resolveValueMultiplier uses as the "full stretch" reference.
+      const anchorPoint = box
+        ? mapNormToRealBox(definition.anchorNorm, box)
+        : { x: block.x, y: block.y };
+      const dragOriginPoint = box
+        ? mapNormToRealBox(definition.dragNorm, box)
+        : { x: block.x + 80, y: block.y };
+      const dragPoint = {
+        x: anchorPoint.x + (dragOriginPoint.x - anchorPoint.x) * definition.maxFactor,
+        y: anchorPoint.y + (dragOriginPoint.y - anchorPoint.y) * definition.maxFactor,
+      };
+      const bandWidth = box ? Math.max(20, Math.min(box.width, box.height) * 0.5) : 40;
+
+      upsertGlyphEdit(blockId, glyphIndex, (prev) => {
+        // Re-check inside the updater — a second slider event can land before
+        // the render that would have found the handle via `blocks` above.
+        const already = prev?.stretches.find(
+          (h) =>
+            h.schemaStrokeId === definition.strokeId &&
+            (h.schemaZoneIndex ?? 0) === definition.zoneIndex
+        );
+        if (already) {
+          return {
+            glyphIndex,
+            stretches: (prev?.stretches ?? []).map((h) =>
+              h.id === already.id ? { ...h, factor: clamped } : h
+            ),
+          };
+        }
+        return {
+          glyphIndex,
+          stretches: [
+            ...(prev?.stretches ?? []),
+            {
+              id: makeHandleId(),
+              anchorX: anchorPoint.x,
+              anchorY: anchorPoint.y,
+              dragOriginX: dragOriginPoint.x,
+              dragOriginY: dragOriginPoint.y,
+              dragX: dragPoint.x,
+              dragY: dragPoint.y,
+              bandWidth,
+              maskAuto: true,
+              schemaStrokeId: definition.strokeId,
+              schemaZoneIndex: definition.zoneIndex,
+              factor: clamped,
+              minFactor: definition.minFactor,
+              maxFactor: definition.maxFactor,
+              kashidaEligible: definition.kashidaEligible,
+              priority: definition.priority,
+            },
+          ],
+        };
+      });
+    },
+    [blocks, glyphBoxesByBlock, updateStretchHandle, upsertGlyphEdit]
   );
 
   const deleteStretchHandle = useCallback(
@@ -1925,18 +1969,13 @@ const App: React.FC = () => {
       <MorphGlyphEditor
         selectedBlock={selectedBlock}
         selectedGlyphBoxes={glyphBoxesByBlock[selectedBlock?.id ?? -1] ?? []}
-        selectedGlyphCatalog={
-          (selectedBlock &&
-            selectedBlock.selectedGlyphIndex != null &&
-            glyphSchemaByBlock[selectedBlock.id]?.[selectedBlock.selectedGlyphIndex]) ||
-          []
-        }
+        glyphCatalog={glyphSchemaByBlock[selectedBlock?.id ?? -1] ?? {}}
         glyphRigs={glyphRigs}
         onSetGlyphEditTool={(tool) => {
           if (!selectedBlock || selectedBlock.type === "image") return;
           updateSelectedBlock({ glyphEditTool: tool, glyphMaskEdit: null });
         }}
-        onAddStretchHandle={addStretchHandle}
+        onSetStretchFactor={setStretchFactor}
         onUpdateStretchHandle={updateStretchHandle}
         onDeleteStretchHandle={deleteStretchHandle}
         onSetGlyphMaskEditMode={setGlyphMaskEditMode}

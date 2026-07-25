@@ -9,7 +9,7 @@ import { applyGlyphEdit, prepareGlyphRig, applyPreparedGlyphRig } from "../lib/g
 import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import { deriveContourMask } from "../lib/glyphContours";
-import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue, GlyphStretchMask } from "../types";
+import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
 
 type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
 
@@ -248,7 +248,6 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   onDragEnd,
   debugBounds = false,
   glyphEditTool = null,
-  selectedGlyphIndex = null,
   glyphEdits = [],
   glyphRigs = [],
   glyphRigValues = [],
@@ -259,7 +258,11 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
   const { hbLoaded } = shapeData;
-  const glyphSchemaCatalog = useGlyphSchemaCatalog(shapeData.shapableText, shapeData.glyphs);
+  const glyphSchemaCatalog = useGlyphSchemaCatalog(
+    shapeData.shapableText,
+    shapeData.glyphs,
+    shapeData.font
+  );
 
   const [spinnerAngle, setSpinnerAngle] = useState(0);
   const spinnerFrameRef = useRef<number | null>(null);
@@ -408,59 +411,39 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
     onGlyphSchemaChange?.(glyphSchemaCatalog);
   }, [glyphSchemaCatalog, onGlyphSchemaChange]);
 
-  const selectedEdit =
-    glyphEditTool != null && selectedGlyphIndex != null
-      ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
-      : undefined;
-  const selectedStretches = selectedEdit?.stretches ?? [];
-
-  /** Raw (glyph-local, no gx/gy offset) outline commands for the selected glyph, plus its pen offset — used to auto-derive a contour mask from wherever a handle's anchor/drag points currently sit (see lib/glyphContours.ts). */
-  const selectedGlyphOutline = useMemo(() => {
-    if (selectedGlyphIndex == null) return null;
-    const { font, glyphs } = shapeData;
-    const g = font ? glyphs[selectedGlyphIndex] : undefined;
-    const glyphObj = g ? font!.glyphs.get(g.g) : undefined;
-    if (!glyphObj) return null;
-
-    const box = hitBoxes.find((b) => b.glyphIndex === selectedGlyphIndex);
-    return {
-      commands: glyphObj.getPath(0, 0, fontSize).commands as PathCommand[],
-      gx: box?.gx ?? 0,
-      gy: box?.gy ?? 0,
-    };
-  }, [shapeData, selectedGlyphIndex, hitBoxes, fontSize]);
-
-  /** Derives a contour mask from a handle's (fixed, schema-auto-computed) anchor/dragOrigin points, in text-space coords — no-ops (returns undefined) unless the handle opts into auto-masking and the outline is available. */
-  const autoDeriveMask = (
-    h: GlyphStretchHandle,
-    anchorX: number,
-    anchorY: number,
-    dragX: number,
-    dragY: number
-  ): GlyphStretchMask | undefined => {
-    if (!h.maskAuto || !selectedGlyphOutline) return undefined;
-    const { commands, gx, gy } = selectedGlyphOutline;
-    return deriveContourMask(commands, [
-      { x: anchorX - gx, y: anchorY - gy },
-      { x: dragX - gx, y: dragY - gy },
-    ]);
-  };
-
   // Handles no longer get their axis from dragging — it's auto-computed once
-  // at creation (App.tsx's addStretchHandle). The mask still needs the real
+  // at creation (App.tsx's setStretchFactor). The mask still needs the real
   // glyph outline, which only this component has, so it's derived here, once,
-  // the first time a new maskAuto handle with no mask yet shows up.
+  // the first time a new maskAuto handle with no mask yet shows up — for
+  // every glyph with pending handles, not just the canvas-selected one, since
+  // the Morph panel's sliders create handles without any canvas selection.
   useEffect(() => {
-    if (!onUpdateStretchHandle || selectedGlyphIndex == null || !selectedGlyphOutline) return;
-    for (const h of selectedStretches) {
-      if (!h.maskAuto || h.mask != null) continue;
-      const mask = autoDeriveMask(h, h.anchorX, h.anchorY, h.dragOriginX, h.dragOriginY);
-      if (mask) onUpdateStretchHandle(selectedGlyphIndex, h.id, { mask });
+    if (!onUpdateStretchHandle) return;
+    const { font, glyphs } = shapeData;
+    if (!font) return;
+
+    for (const edit of glyphEdits) {
+      const pending = edit.stretches.filter((h) => h.maskAuto && h.mask == null);
+      if (pending.length === 0) continue;
+
+      const g = glyphs[edit.glyphIndex];
+      const glyphObj = g ? font.glyphs.get(g.g) : undefined;
+      if (!glyphObj) continue;
+
+      const box = hitBoxes.find((b) => b.glyphIndex === edit.glyphIndex);
+      const gx = box?.gx ?? 0;
+      const gy = box?.gy ?? 0;
+      const commands = glyphObj.getPath(0, 0, fontSize).commands as PathCommand[];
+
+      for (const h of pending) {
+        const mask = deriveContourMask(commands, [
+          { x: h.anchorX - gx, y: h.anchorY - gy },
+          { x: h.dragOriginX - gx, y: h.dragOriginY - gy },
+        ]);
+        if (mask) onUpdateStretchHandle(edit.glyphIndex, h.id, { mask });
+      }
     }
-    // autoDeriveMask is a plain function of the listed deps, not a stable
-    // reference — omitted to avoid re-running every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStretches, selectedGlyphIndex, selectedGlyphOutline, onUpdateStretchHandle]);
+  }, [glyphEdits, shapeData, hitBoxes, fontSize, onUpdateStretchHandle]);
 
   const bw = Math.max(warpShapeWidth, 20);
   const bh = Math.max(warpShapeHeight, 20);

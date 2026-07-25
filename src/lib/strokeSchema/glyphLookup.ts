@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import type { Font } from "opentype.js";
 import { classifyJoiningForms } from "../arabicJoining";
 import type { HarfBuzzGlyph } from "../harfbuzz";
 import { deriveStretchCatalog, type StretchDefinition } from "./deriveCatalog";
@@ -47,10 +48,27 @@ export function computeClusterSpans(clusters: number[], textLength: number): Map
  *
  * Either way, no matching schema entry simply means no catalog for that
  * glyph — identical to today's generic behavior for un-authored letters.
+ *
+ * A single source cluster can shape to more than one *output* glyph — some
+ * calligraphic fonts build one letterform from a main glyph plus an
+ * auxiliary connector/serif piece via GSUB, both attributed to the same
+ * cluster (confirmed live: FatemiMaqala's kaf-initial in "كليم" shapes to
+ * a real KAF INITIAL FORM glyph plus a small unencoded connector glyph,
+ * both cl=0). Only one glyph per cluster gets the catalog — otherwise the
+ * auxiliary piece would also offer to be reshaped as if it were the
+ * letter's body/eye/tooth/etc, which is meaningless for it and, worse, can
+ * visibly distort the wrong outline. `font` (optional — omitted callers
+ * silently keep the fallback) lets this prefer whichever glyph carries a
+ * real Unicode assignment, since letterform glyphs are conventionally
+ * mapped to their Arabic Presentation Forms codepoint while auxiliary
+ * pieces conventionally aren't; falls back to the first glyph in the
+ * cluster when neither (or no font) is available, i.e. today's behavior
+ * for fonts that shape one glyph per cluster.
  */
 export function useGlyphSchemaCatalog(
   shapableText: string,
-  glyphs: HarfBuzzGlyph[]
+  glyphs: HarfBuzzGlyph[],
+  font?: Font | null
 ): Record<number, StretchDefinition[]> {
   return useMemo(() => {
     if (!shapableText || glyphs.length === 0) return {};
@@ -60,10 +78,22 @@ export function useGlyphSchemaCatalog(
       glyphs.map((g) => g.cl ?? 0),
       shapableText.length
     );
+
+    const primaryIndexByCluster = new Map<number, number>();
+    const hasUnicode = (i: number) => font?.glyphs.get(glyphs[i].g)?.unicode != null;
+    for (let i = 0; i < glyphs.length; i++) {
+      const cluster = glyphs[i].cl ?? 0;
+      const current = primaryIndexByCluster.get(cluster);
+      if (current == null || (!hasUnicode(current) && hasUnicode(i))) {
+        primaryIndexByCluster.set(cluster, i);
+      }
+    }
+
     const result: Record<number, StretchDefinition[]> = {};
 
     for (let i = 0; i < glyphs.length; i++) {
       const cluster = glyphs[i].cl ?? 0;
+      if (primaryIndexByCluster.get(cluster) !== i) continue;
       const span = clusterSpans.get(cluster) ?? 1;
 
       if (span > 1) {
@@ -71,7 +101,8 @@ export function useGlyphSchemaCatalog(
           codepointHex(ch.codePointAt(0) ?? 0)
         );
         const schema = getLigatureSchema(sequence);
-        if (schema) result[i] = deriveStretchCatalog(schema);
+        if (schema)
+          result[i] = deriveStretchCatalog(schema).map((d) => ({ ...d, cluster }));
         continue;
       }
 
@@ -81,9 +112,9 @@ export function useGlyphSchemaCatalog(
       const schema = getStrokeSchema(codepointHex(entry.codepoint), entry.form);
       if (!schema) continue;
 
-      result[i] = deriveStretchCatalog(schema);
+      result[i] = deriveStretchCatalog(schema).map((d) => ({ ...d, cluster }));
     }
 
     return result;
-  }, [shapableText, glyphs]);
+  }, [shapableText, glyphs, font]);
 }

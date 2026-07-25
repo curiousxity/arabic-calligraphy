@@ -31,7 +31,7 @@ import { applyGlyphEdit, prepareGlyphRig, applyPreparedGlyphRig } from "../lib/g
 import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import { deriveContourMask } from "../lib/glyphContours";
-import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue, GlyphStretchMask } from "../types";
+import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
 
 export type ShapeFillTextProps = {
   id?: string;
@@ -253,7 +253,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   embossShadowColor = "#000000",
   rotation = 0,
   glyphEditTool = null,
-  selectedGlyphIndex = null,
   glyphEdits = [],
   glyphRigs = [],
   glyphRigValues = [],
@@ -268,7 +267,11 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   onResizeScale,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
-  const glyphSchemaCatalog = useGlyphSchemaCatalog(shapeData.shapableText, shapeData.glyphs);
+  const glyphSchemaCatalog = useGlyphSchemaCatalog(
+    shapeData.shapableText,
+    shapeData.glyphs,
+    shapeData.font
+  );
 
   // Parse SVG path once
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
@@ -395,44 +398,32 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     polygon,
   ]);
 
-  const selectedEdit =
-    glyphEditTool != null && selectedGlyphIndex != null
-      ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
-      : undefined;
-  const selectedStretches = selectedEdit?.stretches ?? [];
-
-  /** Derives a contour mask from a handle's (fixed, schema-auto-computed) anchor/dragOrigin points — no-ops (returns undefined) unless the handle opts into auto-masking. Anchor/drag here are already glyph-local (no gx/gy offset — see the per-instance <Group> transform below), matching glyphCache's own commands. */
-  const autoDeriveMask = (
-    h: GlyphStretchHandle,
-    anchorX: number,
-    anchorY: number,
-    dragX: number,
-    dragY: number
-  ): GlyphStretchMask | undefined => {
-    if (!h.maskAuto || selectedGlyphIndex == null) return undefined;
-    const commands = glyphCache[selectedGlyphIndex]?.commands;
-    if (!commands || commands.length === 0) return undefined;
-    return deriveContourMask(commands as unknown as PathCommand[], [
-      { x: anchorX, y: anchorY },
-      { x: dragX, y: dragY },
-    ]);
-  };
-
   // Handles no longer get their axis from dragging — it's auto-computed once
-  // at creation (App.tsx's addStretchHandle). The mask still needs the real
+  // at creation (App.tsx's setStretchFactor). The mask still needs the real
   // glyph outline, which only this component has, so it's derived here, once,
-  // the first time a new maskAuto handle with no mask yet shows up.
+  // the first time a new maskAuto handle with no mask yet shows up — for
+  // every glyph with pending handles, not just the canvas-selected one, since
+  // the Morph panel's sliders create handles without any canvas selection.
+  // Anchor/drag here are already glyph-local (no gx/gy offset — see the
+  // per-instance <Group> transform below), matching glyphCache's own commands.
   useEffect(() => {
-    if (!onUpdateStretchHandle || selectedGlyphIndex == null) return;
-    for (const h of selectedStretches) {
-      if (!h.maskAuto || h.mask != null) continue;
-      const mask = autoDeriveMask(h, h.anchorX, h.anchorY, h.dragOriginX, h.dragOriginY);
-      if (mask) onUpdateStretchHandle(selectedGlyphIndex, h.id, { mask });
+    if (!onUpdateStretchHandle) return;
+    for (const edit of glyphEdits) {
+      const pending = edit.stretches.filter((h) => h.maskAuto && h.mask == null);
+      if (pending.length === 0) continue;
+
+      const commands = glyphCache[edit.glyphIndex]?.commands;
+      if (!commands || commands.length === 0) continue;
+
+      for (const h of pending) {
+        const mask = deriveContourMask(commands as unknown as PathCommand[], [
+          { x: h.anchorX, y: h.anchorY },
+          { x: h.dragOriginX, y: h.dragOriginY },
+        ]);
+        if (mask) onUpdateStretchHandle(edit.glyphIndex, h.id, { mask });
+      }
     }
-    // autoDeriveMask is a plain function of the listed deps, not a stable
-    // reference — omitted to avoid re-running every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStretches, selectedGlyphIndex, glyphCache, onUpdateStretchHandle]);
+  }, [glyphEdits, glyphCache, onUpdateStretchHandle]);
 
   return (
     <Group

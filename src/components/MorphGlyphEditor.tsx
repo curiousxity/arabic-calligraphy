@@ -57,46 +57,42 @@ const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             Warp block. Not available for image blocks.
           </p>
 
-          <h4>1. Pick a glyph</h4>
+          <h4>Stroke sliders</h4>
           <p>
-            Turn on <strong>Stretch</strong> above, then click a letter on the
-            canvas to select it. Stretch needs a selected glyph before it does
-            anything.
-          </p>
-
-          <h4>Stretch tool</h4>
-          <p>
-            Elongates or distorts one anatomical stroke of a letter (its body,
-            an eye/loop, a tooth, etc.), bounded to that stroke's authored safe
-            range — only available where a stroke schema has been authored for
-            that letter and joining form. If none is authored yet, this
-            letter/form isn't editable here.
+            Every letter in the block with an authored stroke schema gets a
+            group of sliders — one per anatomical stroke (its body, an
+            eye/loop, a tooth, etc.), bounded to that stroke's authored safe
+            range, with 1.00 always meaning the letter's natural, undistorted
+            shape. Just drag a slider; nothing needs to be clicked or added
+            first. Letters whose schema isn't authored yet simply don't
+            appear.
           </p>
           <ol>
             <li>
-              Labeled buttons appear per available stroke (e.g. "+ Body —
-              kashida-eligible") — click one to add it. No dragging: its
-              position on the letter and which part of the glyph it affects
-              are derived automatically from the schema and the real glyph
-              outline.
+              A stroke's position on the letter and which part of the glyph it
+              affects are derived automatically from the schema and the real
+              glyph outline the first time its slider moves.
             </li>
             <li>
-              <strong>Kashida amount</strong> is the control — bounded to that
-              stroke's authored safe range, with 1.00 always meaning the
-              letter's natural, undistorted length.
+              The <strong>×</strong> next to an active slider resets that
+              stroke to its natural shape.
             </li>
             <li>
-              <strong>Band width</strong> controls how wide a swath around the
-              stroke is affected.
-            </li>
-            <li>
-              <strong>Masking</strong> can override the automatic scoping if
-              it picked up the wrong part of the glyph: By stroke (click
-              outline contours to include/exclude them, then Done), or Lasso
-              (drag a freeform loop around the region).
+              <strong>Options…</strong> under an active slider reveals{" "}
+              <strong>Band width</strong> (how wide a swath around the stroke
+              is affected) and <strong>Masking</strong>, which can override
+              the automatic scoping if it picked up the wrong part of the
+              glyph: By stroke (click outline contours to include/exclude
+              them, then Done), or Lasso (drag a freeform loop around the
+              region). Starting a mask edit selects that letter on the canvas
+              automatically.
             </li>
           </ol>
-          <p>You can add every available stroke's slider at once, per glyph.</p>
+          <p>
+            The <strong>Stretch</strong> canvas tool is optional — turn it on
+            to see a stroke's handle points on the canvas by clicking a
+            letter. The sliders work with it off.
+          </p>
           <p>
             When a block has one or more kashida-eligible schema-backed
             handles, a block-level <strong>Kashida</strong> slider appears —
@@ -138,11 +134,17 @@ type GlyphBox = {
 export type MorphGlyphEditorProps = {
   selectedBlock?: Block;
   selectedGlyphBoxes?: GlyphBox[];
-  /** Stroke-schema stretch definitions available for the currently selected glyph (empty if that letter/form has no authored schema entry). */
-  selectedGlyphCatalog?: StretchDefinition[];
+  /** Stroke-schema stretch definitions for every glyph in the selected block, keyed by shaped glyph index (a glyph is simply absent if its letter/form has no authored schema entry). */
+  glyphCatalog?: Record<number, StretchDefinition[]>;
   glyphRigs?: GlyphRig[];
   onSetGlyphEditTool?: (tool: "stretch" | null) => void;
-  onAddStretchHandle?: (definition: StretchDefinition) => void;
+  /** Sets a stroke slider's value — creates the schema-backed handle on first movement, updates its factor afterwards. */
+  onSetStretchFactor?: (
+    blockId: number,
+    glyphIndex: number,
+    definition: StretchDefinition,
+    factor: number
+  ) => void;
   onUpdateStretchHandle?: (
     blockId: number,
     glyphIndex: number,
@@ -152,6 +154,7 @@ export type MorphGlyphEditorProps = {
   onDeleteStretchHandle?: (blockId: number, glyphIndex: number, handleId: string) => void;
   onSetGlyphMaskEditMode?: (
     blockId: number,
+    glyphIndex: number,
     handleId: string,
     mode: "contours" | "lasso" | null
   ) => void;
@@ -184,10 +187,10 @@ export type MorphGlyphEditorProps = {
 export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
   selectedBlock,
   selectedGlyphBoxes,
-  selectedGlyphCatalog,
+  glyphCatalog,
   glyphRigs,
   onSetGlyphEditTool,
-  onAddStretchHandle,
+  onSetStretchFactor,
   onUpdateStretchHandle,
   onDeleteStretchHandle,
   onSetGlyphMaskEditMode,
@@ -203,10 +206,24 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
   onCloseMobile,
 }) => {
   const [rigNameDrafts, setRigNameDrafts] = useState<Record<string, string>>({});
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [showHelp, setShowHelp] = useState(false);
   const selectedId = selectedBlock?.id ?? "none";
 
   const eligible = !!selectedBlock && selectedBlock.type !== "image";
+
+  // One group per glyph occurrence that has any authored schema, in typed
+  // (logical) order via each catalog entry's source cluster — the shaped
+  // glyph array itself runs in visual order, which for RTL text is reversed.
+  const glyphGroups = (() => {
+    const entries = Object.entries(glyphCatalog ?? {})
+      .map(([key, defs]) => ({ glyphIndex: Number(key), defs }))
+      .filter((e) => e.defs.length > 0);
+    entries.sort(
+      (a, b) => (a.defs[0].cluster ?? a.glyphIndex) - (b.defs[0].cluster ?? b.glyphIndex)
+    );
+    return entries;
+  })();
 
   const riggedRows = (() => {
     if (!selectedBlock) return [];
@@ -218,6 +235,27 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
     return (glyphRigs ?? [])
       .filter((r) => r.fontFamily === selectedBlock.fontFamily && glyphIds.has(r.glyphId))
       .flatMap((r) => r.axes.map((a) => ({ rig: r, axis: a })));
+  })();
+
+  // Handles that no longer correspond to any catalog definition — freehand
+  // handles from old saved projects, or schema handles orphaned by a text
+  // edit shifting glyph indexes. The slider rows only render catalog-matched
+  // handles, so these need their own escape hatch to stay deletable.
+  const orphanHandles = (() => {
+    if (!selectedBlock || selectedBlock.type === "image") return [];
+    const out: { glyphIndex: number; handle: GlyphStretchHandle }[] = [];
+    for (const edit of selectedBlock.glyphEdits ?? []) {
+      const defs = (glyphCatalog ?? {})[edit.glyphIndex] ?? [];
+      for (const h of edit.stretches) {
+        const matched =
+          h.schemaStrokeId != null &&
+          defs.some(
+            (d) => d.strokeId === h.schemaStrokeId && d.zoneIndex === (h.schemaZoneIndex ?? 0)
+          );
+        if (!matched) out.push({ glyphIndex: edit.glyphIndex, handle: h });
+      }
+    }
+    return out;
   })();
 
   // Every kashida-eligible, schema-backed handle across the whole block (not
@@ -237,11 +275,11 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
     <>
       <div>
         <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
-          Glyph Edit
+          Stroke Sliders
         </div>
         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-          Click a letter, then Stretch to elongate one of its strokes with a
-          slider — no dragging.
+          One slider per stroke of every letter with an authored schema —
+          1.00 is the letter's natural shape.
         </div>
 
         <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
@@ -266,314 +304,351 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
             </button>
           ))}
         </div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+          Stretch shows the handles on the canvas (click a letter to inspect);
+          the sliders below work either way.
+        </div>
 
-        {selectedBlock.glyphEditTool != null && (
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
-            Selected glyph:{" "}
-            {selectedBlock.selectedGlyphIndex != null
-              ? selectedBlock.selectedGlyphIndex
-              : "none"}
+        {glyphGroups.length === 0 ? (
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 10 }}>
+            No stroke schema authored yet for any letter in this text.
           </div>
-        )}
+        ) : (
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}
+          >
+            {glyphGroups.map(({ glyphIndex, defs }) => (
+              <div
+                key={glyphIndex}
+                style={{ display: "flex", flexDirection: "column", gap: 6 }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: 6,
+                    borderBottom: "1px solid var(--border-soft)",
+                    paddingBottom: 2,
+                  }}
+                >
+                  <bdi style={{ fontSize: 15, fontWeight: 600 }}>
+                    {defs[0].baseLetter || defs[0].glyphName}
+                  </bdi>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    {defs[0].joiningForm}
+                  </span>
+                </div>
 
-        {selectedBlock.glyphEditTool === "stretch" && (
-          <>
-            {selectedBlock.selectedGlyphIndex != null &&
-              (() => {
-                const glyphIndex = selectedBlock.selectedGlyphIndex as number;
-                const addedZoneKeys = new Set(
-                  (
-                    selectedBlock.glyphEdits?.find((g) => g.glyphIndex === glyphIndex)
-                      ?.stretches ?? []
-                  )
-                    .filter((h) => h.schemaStrokeId != null)
-                    .map((h) => `${h.schemaStrokeId}:${h.schemaZoneIndex ?? 0}`)
-                );
-                const available = (selectedGlyphCatalog ?? []).filter(
-                  (def) => !addedZoneKeys.has(`${def.strokeId}:${def.zoneIndex}`)
-                );
+                {defs.map((def) => {
+                  const rowKey = `${glyphIndex}:${def.strokeId}:${def.zoneIndex}`;
+                  const handle = selectedBlock.glyphEdits
+                    ?.find((g) => g.glyphIndex === glyphIndex)
+                    ?.stretches.find(
+                      (h) =>
+                        h.schemaStrokeId === def.strokeId &&
+                        (h.schemaZoneIndex ?? 0) === def.zoneIndex
+                    );
+                  const value = handle?.factor ?? 1;
+                  const expanded = !!expandedRows[rowKey];
 
-                if (available.length > 0) {
                   return (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                      {available.map((def) => (
-                        <button
-                          key={`${def.strokeId}:${def.zoneIndex}`}
-                          type="button"
-                          onClick={() => onAddStretchHandle?.(def)}
-                          className="sidebarSmallAction"
-                          title={def.label.ar}
-                        >
-                          + {def.label.en ?? def.componentType}
-                          {def.kashidaEligible ? " (kashida)" : ""}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                }
-
-                if ((selectedGlyphCatalog ?? []).length === 0) {
-                  return (
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
-                      No stroke schema authored yet for this letter/form.
-                    </div>
-                  );
-                }
-
-                return null;
-              })()}
-
-            {selectedBlock.selectedGlyphIndex != null &&
-              (() => {
-                const glyphIndex = selectedBlock.selectedGlyphIndex as number;
-                const stretches =
-                  selectedBlock.glyphEdits?.find((g) => g.glyphIndex === glyphIndex)
-                    ?.stretches ?? [];
-                if (stretches.length === 0) return null;
-
-                return (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 6,
-                      marginTop: 8,
-                    }}
-                  >
-                    {stretches.map((h) => {
-                      const catalogEntry = (selectedGlyphCatalog ?? []).find(
-                        (d) => d.strokeId === h.schemaStrokeId && d.zoneIndex === (h.schemaZoneIndex ?? 0)
-                      );
-
-                      return (
-                      <div
-                        key={h.id}
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6,
-                          background: "var(--row-bg)",
-                          borderRadius: 8,
-                          padding: "6px",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 12, color: "var(--text-muted)", flex: 1 }}>
-                            {catalogEntry?.label.en ?? "Stretch line"}
-                            {h.kashidaEligible ? " · kashida" : ""}
-                          </span>
+                    <div
+                      key={rowKey}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                        background: "var(--row-bg)",
+                        borderRadius: 8,
+                        padding: "6px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ flex: 1, minWidth: 0 }} title={def.label.ar}>
+                          <RangeRow
+                            id={makeId(`stroke-${rowKey}`, selectedId)}
+                            name={makeId(`strokeFactor-${rowKey}`, selectedId)}
+                            label={`${def.label.en ?? def.componentType}${def.kashidaEligible ? " · kashida" : ""}`}
+                            value={value}
+                            min={def.minFactor}
+                            max={def.maxFactor}
+                            step={0.01}
+                            onChange={(v) =>
+                              onSetStretchFactor?.(selectedBlock.id, glyphIndex, def, v)
+                            }
+                            suffix={value.toFixed(2)}
+                          />
+                        </div>
+                        {handle && (
                           <button
                             type="button"
                             onClick={() =>
-                              onDeleteStretchHandle?.(selectedBlock.id, glyphIndex, h.id)
+                              onDeleteStretchHandle?.(selectedBlock.id, glyphIndex, handle.id)
                             }
                             className="layerIconBtn"
-                            title="Delete stretch line"
-                            aria-label="Delete stretch line"
+                            title="Reset to natural shape"
+                            aria-label="Reset to natural shape"
                             style={{ color: "var(--danger)" }}
                           >
                             <CloseIcon size={12} />
                           </button>
-                        </div>
-
-                        {catalogEntry && catalogEntry.protectedReasons.length > 0 && (
-                          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                            ⚠ Schema notes a protected zone on this stroke (
-                            {catalogEntry.protectedReasons.join(", ")}) — avoid stretching past
-                            its terminal/join.
-                          </span>
                         )}
+                      </div>
 
-                        {h.minFactor != null && h.maxFactor != null && (
+                      {handle && (
+                        <button
+                          type="button"
+                          className="sidebarSmallAction"
+                          style={{ alignSelf: "flex-start" }}
+                          onClick={() =>
+                            setExpandedRows((prev) => ({ ...prev, [rowKey]: !prev[rowKey] }))
+                          }
+                        >
+                          {expanded ? "Hide options" : "Options…"}
+                        </button>
+                      )}
+
+                      {handle && expanded && (
+                        <>
+                          {def.protectedReasons.length > 0 && (
+                            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                              ⚠ Schema notes a protected zone on this stroke (
+                              {def.protectedReasons.join(", ")}) — avoid stretching past
+                              its terminal/join.
+                            </span>
+                          )}
+
                           <RangeRow
-                            id={makeId(`handle-factor-${h.id}`, selectedId)}
-                            name={makeId(`handleFactor-${h.id}`, selectedId)}
-                            label="Kashida amount"
-                            value={h.factor ?? 1}
-                            min={h.minFactor}
-                            max={h.maxFactor}
-                            step={0.01}
+                            id={makeId(`handle-band-${handle.id}`, selectedId)}
+                            name={makeId(`handleBand-${handle.id}`, selectedId)}
+                            label="Band width"
+                            value={handle.bandWidth}
+                            min={5}
+                            max={300}
+                            step={5}
                             onChange={(v) =>
-                              onUpdateStretchHandle?.(selectedBlock.id, glyphIndex, h.id, {
-                                factor: v,
+                              onUpdateStretchHandle?.(selectedBlock.id, glyphIndex, handle.id, {
+                                bandWidth: v,
                               })
                             }
-                            suffix={(h.factor ?? 1).toFixed(2)}
+                            suffix={`${Math.round(handle.bandWidth)}px`}
                           />
-                        )}
 
-                        <RangeRow
-                          id={makeId(`handle-band-${h.id}`, selectedId)}
-                          name={makeId(`handleBand-${h.id}`, selectedId)}
-                          label="Band width"
-                          value={h.bandWidth}
-                          min={5}
-                          max={300}
-                          step={5}
-                          onChange={(v) =>
-                            onUpdateStretchHandle?.(selectedBlock.id, glyphIndex, h.id, {
-                              bandWidth: v,
-                            })
-                          }
-                          suffix={`${Math.round(h.bandWidth)}px`}
-                        />
+                          {(() => {
+                            const armedMode =
+                              selectedBlock.glyphMaskEdit?.handleId === handle.id
+                                ? selectedBlock.glyphMaskEdit.mode
+                                : null;
+                            const activeStyle = {
+                              background: "var(--accent)",
+                              color: "var(--text-on-accent)",
+                            };
+                            const statusLabel =
+                              handle.mask == null
+                                ? "Affects the whole glyph"
+                                : handle.mask.mode === "contours"
+                                  ? `Affects ${handle.mask.contourIndices.length} selected stroke${handle.mask.contourIndices.length === 1 ? "" : "s"}`
+                                  : "Affects a lassoed region";
 
-                        {(() => {
-                          const armedMode =
-                            selectedBlock.glyphMaskEdit?.handleId === h.id
-                              ? selectedBlock.glyphMaskEdit.mode
-                              : null;
-                          const activeStyle = {
-                            background: "var(--accent)",
-                            color: "var(--text-on-accent)",
-                          };
-                          const statusLabel =
-                            h.mask == null
-                              ? "Affects the whole glyph"
-                              : h.mask.mode === "contours"
-                                ? `Affects ${h.mask.contourIndices.length} selected stroke${h.mask.contourIndices.length === 1 ? "" : "s"}`
-                                : "Affects a lassoed region";
-
-                          return (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                              <div style={{ display: "flex", gap: 4 }}>
-                                <button
-                                  type="button"
-                                  className="sidebarPillButton"
-                                  style={
-                                    armedMode === "contours" || h.mask?.mode === "contours"
-                                      ? activeStyle
-                                      : undefined
-                                  }
-                                  onClick={() =>
-                                    onSetGlyphMaskEditMode?.(selectedBlock.id, h.id, "contours")
-                                  }
-                                >
-                                  By stroke
-                                </button>
-                                <button
-                                  type="button"
-                                  className="sidebarPillButton"
-                                  style={
-                                    armedMode === "lasso" || h.mask?.mode === "lasso"
-                                      ? activeStyle
-                                      : undefined
-                                  }
-                                  onClick={() =>
-                                    onSetGlyphMaskEditMode?.(selectedBlock.id, h.id, "lasso")
-                                  }
-                                >
-                                  Lasso
-                                </button>
-                              </div>
-                              {armedMode != null ? (
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    gap: 6,
-                                  }}
-                                >
-                                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                                    {armedMode === "contours"
-                                      ? "Click strokes on the canvas to include them."
-                                      : "Drag a loop on the canvas around the stroke."}
-                                  </span>
+                            return (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <div style={{ display: "flex", gap: 4 }}>
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      onSetGlyphMaskEditMode?.(selectedBlock.id, h.id, null)
+                                    className="sidebarPillButton"
+                                    style={
+                                      armedMode === "contours" ||
+                                      handle.mask?.mode === "contours"
+                                        ? activeStyle
+                                        : undefined
                                     }
-                                    className="sidebarSmallAction"
+                                    onClick={() =>
+                                      onSetGlyphMaskEditMode?.(
+                                        selectedBlock.id,
+                                        glyphIndex,
+                                        handle.id,
+                                        "contours"
+                                      )
+                                    }
                                   >
-                                    Done
+                                    By stroke
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="sidebarPillButton"
+                                    style={
+                                      armedMode === "lasso" || handle.mask?.mode === "lasso"
+                                        ? activeStyle
+                                        : undefined
+                                    }
+                                    onClick={() =>
+                                      onSetGlyphMaskEditMode?.(
+                                        selectedBlock.id,
+                                        glyphIndex,
+                                        handle.id,
+                                        "lasso"
+                                      )
+                                    }
+                                  >
+                                    Lasso
                                   </button>
                                 </div>
-                              ) : (
-                                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                                  {statusLabel}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()}
+                                {armedMode != null ? (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      gap: 6,
+                                    }}
+                                  >
+                                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                                      {armedMode === "contours"
+                                        ? "Click strokes on the canvas to include them."
+                                        : "Drag a loop on the canvas around the stroke."}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        onSetGlyphMaskEditMode?.(
+                                          selectedBlock.id,
+                                          glyphIndex,
+                                          handle.id,
+                                          null
+                                        )
+                                      }
+                                      className="sidebarSmallAction"
+                                    >
+                                      Done
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                                    {statusLabel}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
 
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <input
-                            type="text"
-                            value={rigNameDrafts[h.id] ?? ""}
-                            onChange={(e) =>
-                              setRigNameDrafts((prev) => ({
-                                ...prev,
-                                [h.id]: e.target.value,
-                              }))
-                            }
-                            placeholder="e.g. Tip Length"
-                            className="hexInput"
-                            style={{ flex: 1 }}
-                          />
-                          <button
-                            type="button"
-                            disabled={!rigNameDrafts[h.id]?.trim()}
-                            onClick={() => {
-                              const name = rigNameDrafts[h.id]?.trim();
-                              if (!name) return;
-                              onSaveStretchHandleAsRig?.(
-                                selectedBlock.id,
-                                glyphIndex,
-                                h.id,
-                                name
-                              );
-                              setRigNameDrafts((prev) => {
-                                const next = { ...prev };
-                                delete next[h.id];
-                                return next;
-                              });
-                            }}
-                            className="sidebarSmallAction"
-                          >
-                            Save as Rig…
-                          </button>
-                        </div>
-                      </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-
-            {kashidaEligibleCount > 0 && (
-              <div
-                style={{
-                  marginTop: 12,
-                  paddingTop: 12,
-                  borderTop: "1px solid var(--border-soft)",
-                }}
-              >
-                <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
-                  Kashida
-                </div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-                  Distributes one dial across every kashida-eligible handle in
-                  this block, weighted by each stroke's authored priority.
-                </div>
-                <div style={{ marginTop: 8 }}>
-                  <RangeRow
-                    id={makeId("kashida-amount", selectedId)}
-                    name={makeId("kashidaAmount", selectedId)}
-                    label="Extend by"
-                    value={selectedBlock.kashidaAmount ?? 0}
-                    min={0}
-                    max={100}
-                    step={1}
-                    onChange={(v) => onSetBlockKashidaAmount?.(selectedBlock.id, v)}
-                    suffix={`${Math.round(selectedBlock.kashidaAmount ?? 0)}%`}
-                  />
-                </div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <input
+                              type="text"
+                              value={rigNameDrafts[handle.id] ?? ""}
+                              onChange={(e) =>
+                                setRigNameDrafts((prev) => ({
+                                  ...prev,
+                                  [handle.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="e.g. Tip Length"
+                              className="hexInput"
+                              style={{ flex: 1, minWidth: 0 }}
+                            />
+                            <button
+                              type="button"
+                              disabled={!rigNameDrafts[handle.id]?.trim()}
+                              onClick={() => {
+                                const name = rigNameDrafts[handle.id]?.trim();
+                                if (!name) return;
+                                onSaveStretchHandleAsRig?.(
+                                  selectedBlock.id,
+                                  glyphIndex,
+                                  handle.id,
+                                  name
+                                );
+                                setRigNameDrafts((prev) => {
+                                  const next = { ...prev };
+                                  delete next[handle.id];
+                                  return next;
+                                });
+                              }}
+                              className="sidebarSmallAction"
+                            >
+                              Save as Rig…
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </>
+            ))}
+          </div>
+        )}
+
+        {orphanHandles.length > 0 && (
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border-soft)",
+            }}
+          >
+            <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
+              Other Stretch Lines
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+              Stretch lines from an older save or a since-edited text that no
+              longer match a stroke above — still applied; delete to clear.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+              {orphanHandles.map(({ glyphIndex, handle }) => (
+                <div
+                  key={handle.id}
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <span style={{ fontSize: 12, color: "var(--text-muted)", flex: 1 }}>
+                    Stretch line · glyph {glyphIndex}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onDeleteStretchHandle?.(selectedBlock.id, glyphIndex, handle.id)
+                    }
+                    className="layerIconBtn"
+                    title="Delete stretch line"
+                    aria-label="Delete stretch line"
+                    style={{ color: "var(--danger)" }}
+                  >
+                    <CloseIcon size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {kashidaEligibleCount > 0 && (
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border-soft)",
+            }}
+          >
+            <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
+              Kashida
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+              Distributes one dial across every kashida-eligible handle in
+              this block, weighted by each stroke's authored priority.
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <RangeRow
+                id={makeId("kashida-amount", selectedId)}
+                name={makeId("kashidaAmount", selectedId)}
+                label="Extend by"
+                value={selectedBlock.kashidaAmount ?? 0}
+                min={0}
+                max={100}
+                step={1}
+                onChange={(v) => onSetBlockKashidaAmount?.(selectedBlock.id, v)}
+                suffix={`${Math.round(selectedBlock.kashidaAmount ?? 0)}%`}
+              />
+            </div>
+          </div>
         )}
       </div>
 

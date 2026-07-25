@@ -6,6 +6,13 @@ export type StretchDefinition = {
   /** Index into this stroke's own `editBehavior.stretchZones` array — identifies which named axis this definition represents when a stroke has more than one (e.g. "Height" vs "Length" on the same stroke). */
   zoneIndex: number;
   componentType: ComponentType;
+  /** Identity of the schema glyph this definition came from (schema's own id, e.g. "KAF_MEDIAL") — lets the Morph panel label per-glyph slider groups without re-looking-up the schema. */
+  glyphName: string;
+  /** The Arabic base letter (or fused letter sequence, for ligatures) this glyph renders — shown as the group heading in the Morph panel. */
+  baseLetter: string;
+  joiningForm: string;
+  /** Cluster (source-character index into shapableText) of the glyph occurrence this catalog entry was derived for — set by useGlyphSchemaCatalog, not by deriveStretchCatalog itself. Orders panel rows in typed order regardless of the shaped glyph array's visual order. */
+  cluster?: number;
   label: { ar?: string; en?: string };
   minFactor: number;
   maxFactor: number;
@@ -61,6 +68,9 @@ export function deriveStretchCatalog(desc: GlyphDescription): StretchDefinition[
           strokeId: stroke.id,
           zoneIndex,
           componentType: component.type,
+          glyphName: desc.glyph.id,
+          baseLetter: desc.glyph.baseLetter,
+          joiningForm: desc.glyph.joiningForm,
           label,
           minFactor: zone.minFactor,
           maxFactor: zone.maxFactor,
