@@ -417,7 +417,12 @@ export const CollapsibleSection = ({
       <span>{isOpen ? "−" : "+"}</span>
     </button>
 
-    {isOpen && children}
+    {isOpen && (
+      <>
+        <div className="sectionDivider" aria-hidden="true"><span /></div>
+        {children}
+      </>
+    )}
   </>
 );
 

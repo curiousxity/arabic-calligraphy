@@ -52,8 +52,12 @@
   --key-shadow: rgba(0, 0, 0, 0.4);
   --key-shadow-active: rgba(0, 0, 0, 0.35);
 
-  --overlay-hover: rgba(212, 175, 55, 0.1);
+  --overlay-hover: rgba(240, 230, 200, 0.06);
+  --overlay-accent-hover: rgba(212, 175, 55, 0.1);
   --toolbar-bg: rgba(19, 32, 56, 0.9);
+  --bg-panel-floating: #101b30;
+
+  --font-display: "Spectral", Georgia, "Times New Roman", serif;
 
   --info-text: #d4af37;
   --info-bg: #2a2410;
@@ -109,8 +113,10 @@
     --key-shadow: rgba(90, 70, 20, 0.25);
     --key-shadow-active: rgba(90, 70, 20, 0.2);
 
-    --overlay-hover: rgba(26, 35, 64, 0.06);
+    --overlay-hover: rgba(26, 35, 64, 0.05);
+    --overlay-accent-hover: rgba(168, 121, 26, 0.1);
     --toolbar-bg: rgba(250, 245, 232, 0.9);
+    --bg-panel-floating: #fffdf6;
 
     --info-text: #8f6a12;
     --info-bg: #f0e0b0;
@@ -129,19 +135,19 @@ html, body, #root { height: 100%; margin: 0; }
 .sidebar { width: 100%; height: 100vh; padding: 0; background: var(--bg-panel); font-family: system-ui, sans-serif; position: relative; flex-shrink: 0; }
 .sidebarInner { padding: 12px; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
 .sidebarPanel { background: var(--bg-panel); border: none; border-radius: 14px; box-shadow: none; padding: 12px; }
-.sidebarTitle { margin: 0; font-weight: 400; color: var(--text-primary); }
-.sidebarSectionTitle { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 400; color: var(--text-primary); }
+.sidebarTitle { margin: 0; font-family: var(--font-display); font-weight: 600; font-style: italic; color: var(--text-primary); }
+.sidebarSectionTitle { display: block; margin-bottom: 8px; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--text-primary); }
 
 .field { display: block; margin-bottom: 8px; min-width: 0; }
 .fieldTitle { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .shell { width: 100%; border: none; border-radius: 10px; background: var(--bg-input); box-shadow: none; padding: 8px 10px; }
 .select { width: 100%; border: none; outline: none; background: transparent; font-size: 14px; font-weight: 400; cursor: pointer; color: var(--text-primary); }
 
-.floatingKeyboard { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 1000; width: min(560px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); padding: 10px; box-sizing: border-box; }
-.floatingKeyboardHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.floatingKeyboard { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 1000; width: min(560px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; background: var(--bg-panel-floating); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); padding: 10px; box-sizing: border-box; }
+.floatingKeyboardHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--text-primary); }
 
-.morphEditorFloating { position: fixed; right: 12px; bottom: 12px; z-index: 1000; width: min(340px, calc(100vw - 24px)); max-height: 70vh; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); padding: 10px; box-sizing: border-box; }
-.morphEditorFloatingHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.morphEditorFloating { position: fixed; right: 12px; bottom: 12px; z-index: 1000; width: min(340px, calc(100vw - 24px)); max-height: 70vh; overflow-y: auto; background: var(--bg-panel-floating); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); padding: 10px; box-sizing: border-box; }
+.morphEditorFloatingHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--text-primary); }
 
 .morphEditorReopenTab { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 500; width: 28px; height: 44px; border: 1px solid var(--border); border-right: none; border-radius: 10px 0 0 10px; background: var(--bg-panel); color: var(--accent); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: -2px 0 8px rgba(0, 0, 0, 0.18); padding: 0; }
 .morphEditorReopenTab:hover { background: var(--overlay-hover); }
@@ -155,11 +161,16 @@ html, body, #root { height: 100%; margin: 0; }
 .fontSelectOption:hover { background: var(--overlay-hover); }
 .fontSelectOption--active { background: var(--accent-soft); color: var(--accent); }
 
-.sidebarSectionButton { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; border: none; border-radius: 12px; background: var(--bg-panel); cursor: pointer; font-size: 14px; font-weight: 400; color: var(--text-primary); }
-.sectionPanel { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.sidebarSectionButton { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 12px; border: none; border-radius: 12px; background: var(--bg-panel); cursor: pointer; font-size: 15px; color: var(--text-primary); }
+.sidebarSectionButton > span:first-child { font-family: var(--font-display); font-weight: 600; }
+.sectionDivider { display: flex; align-items: center; gap: 8px; margin: 10px 2px 0; }
+.sectionDivider::before, .sectionDivider::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--border-soft); }
+.sectionDivider span { flex-shrink: 0; width: 5px; height: 5px; transform: rotate(45deg); background: var(--accent); opacity: 0.6; }
+.sectionPanel { margin-top: 10px; display: flex; flex-direction: column; gap: 12px; }
 .checkboxRow { display: block; font-size: 13px; color: var(--text-primary); font-weight: 400; }
 .checkboxRow input { margin-right: 8px; }
-.sidebarSmallAction { width: 100%; border: none; border-radius: 10px; padding: 9px 10px; cursor: pointer; font-size: 13px; font-weight: 400; background: var(--bg-panel); color: var(--text-primary); }
+.sidebarSmallAction { width: 100%; border: none; border-radius: 10px; padding: 9px 10px; cursor: pointer; font-size: 13px; font-weight: 400; background: var(--bg-panel); color: var(--text-primary); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.14); transition: background 0.12s, transform 0.08s, box-shadow 0.08s; }
+.sidebarSmallAction:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
 
 .colorRowShell { display: flex; gap: 8px; align-items: center; background: var(--bg-input); border-radius: 12px; padding: 6px; }
 
@@ -209,7 +220,7 @@ html, body, #root { height: 100%; margin: 0; }
 .rangeInput:hover::-moz-range-thumb { background: var(--accent-hover); transform: scale(1.15); }
 
 .rangeResetBtn { flex-shrink: 0; border: none; background: transparent; color: var(--text-muted); font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: 4px; cursor: pointer; }
-.rangeResetBtn:hover { color: var(--accent); background: var(--overlay-hover); }
+.rangeResetBtn:hover { color: var(--accent); background: var(--overlay-accent-hover); }
 
 .sidebarCircleButton { width: 30px; height: 30px; border-radius: 999px; border: none; background: var(--accent-soft); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; transition: background 0.12s; }
 .sidebarCircleButton:hover:not(:disabled) { background: var(--accent-soft-hover); color: var(--text-on-accent); }
@@ -218,12 +229,13 @@ html, body, #root { height: 100%; margin: 0; }
 .sidebarCircleButton--danger { background: var(--danger-soft); color: var(--danger); }
 .sidebarCircleButton--danger:hover:not(:disabled) { background: var(--danger); color: var(--text-on-danger); }
 
-.sidebarPillButton { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; border: none; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.12s; flex: 1 1 auto; min-width: 0; white-space: nowrap; }
+.sidebarPillButton { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; border: none; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.12s, transform 0.08s, box-shadow 0.08s; flex: 1 1 auto; min-width: 0; white-space: nowrap; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12); }
 .sidebarPillButton:hover:not(:disabled) { background: var(--accent-soft-hover); color: var(--text-on-accent); }
+.sidebarPillButton:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
 .sidebarPillButton:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .sidebarPresetKeyboard { border: 1px solid var(--border-soft); border-radius: 14px; padding: 12px 10px 10px; background: var(--bg-input); box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.15); box-sizing: border-box; }
-.sidebarPresetKeyboardTitle { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; letter-spacing: 0.02em; color: var(--accent); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-soft); font-weight: 400; }
+.sidebarPresetKeyboardTitle { display: flex; align-items: center; justify-content: center; gap: 6px; font-family: var(--font-display); font-size: 13px; letter-spacing: 0.02em; color: var(--accent); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-soft); font-weight: 600; font-style: italic; }
 .sidebarPresetKeyboardRow { display: flex; justify-content: center; gap: 5px; flex-wrap: nowrap; }
 .sidebarPresetKeyboardRow + .sidebarPresetKeyboardRow { margin-top: 5px; }
 .sidebarPresetKeyboardKey { position: relative; flex: 1 1 0; min-width: 0; height: 42px; padding: 6px 4px; font-size: 18px; text-align: center; border-radius: 8px; border: 1px solid var(--border-soft); background: var(--key-bg); color: var(--key-text); cursor: pointer; line-height: 1.1; box-shadow: 0 2px 0 var(--key-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05); transition: background 0.1s, transform 0.06s, box-shadow 0.06s, border-color 0.12s; }
@@ -258,8 +270,8 @@ html, body, #root { height: 100%; margin: 0; }
 
 /* Confirm dialog */
 .confirmDialogOverlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.confirmDialog { width: min(380px, 100%); background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); padding: 20px; box-sizing: border-box; }
-.confirmDialogTitle { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+.confirmDialog { width: min(380px, 100%); background: var(--bg-panel-floating); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); padding: 20px; box-sizing: border-box; }
+.confirmDialogTitle { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
 .confirmDialogMessage { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 18px; }
 .confirmDialogActions { display: flex; gap: 8px; justify-content: flex-end; }
 .confirmDialogActions .sidebarSmallAction { width: auto; padding: 9px 16px; }
@@ -274,8 +286,9 @@ html, body, #root { height: 100%; margin: 0; }
 
 /* Canvas toolbar */
 .canvasToolbar { position: absolute; bottom: 12px; right: 12px; z-index: 20; display: flex; align-items: center; gap: 2px; background: var(--toolbar-bg); border: 1px solid var(--border); border-radius: 10px; padding: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); backdrop-filter: blur(6px); }
-.canvasToolbarBtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; min-width: 32px; padding: 0 8px; border: none; border-radius: 7px; background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.12s, color 0.12s; }
+.canvasToolbarBtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; min-width: 32px; padding: 0 8px; border: none; border-radius: 7px; background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.12s, color 0.12s, transform 0.08s; }
 .canvasToolbarBtn:hover { background: var(--overlay-hover); color: var(--text-primary); }
+.canvasToolbarBtn:active { transform: translateY(1px); }
 .canvasToolbarBtn--active { background: var(--accent-soft); color: var(--accent); }
 .canvasToolbarBtn--active:hover { background: var(--accent-soft-hover); color: var(--text-on-accent); }
 .canvasToolbarDivider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
