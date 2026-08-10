@@ -4,6 +4,7 @@ import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { ShapeWarpText } from "./ShapeWarpText";
+import { TextOnPathText } from "./TextOnPathText";
 import { ImageBlockView } from "./ImageBlockView";
 import { ZoomInIcon, ZoomOutIcon, FrameIcon, HandIcon } from "./Icons";
 import { isTypingTarget } from "../lib/dom";
@@ -719,7 +720,31 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 );
               }
 
-              // TextPath block rendering is not yet implemented (Task 5+).
+              if (block.type === "textPath") {
+                return (
+                  <TextOnPathText
+                    key={block.id}
+                    {...commonProps}
+                    text={block.text}
+                    x={block.x}
+                    y={block.y}
+                    fontSize={block.fontSize}
+                    color={block.color}
+                    fontFamily={block.fontFamily}
+                    fontStyle={block.fontStyle ?? "normal"}
+                    opacity={block.opacity ?? 1}
+                    stroke={block.stroke}
+                    strokeWidth={block.strokeWidth ?? 0}
+                    rotation={block.rotation ?? 0}
+                    textPathD={block.textPathD}
+                    textPathReversed={block.textPathReversed ?? false}
+                    textPathBaselineOffset={block.textPathBaselineOffset ?? 0}
+                    locked={block.locked}
+                  />
+                );
+              }
+
+              // Unreachable for known block types; kept as a safe fallback.
               return null;
             })}
 

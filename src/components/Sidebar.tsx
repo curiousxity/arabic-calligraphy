@@ -27,6 +27,7 @@ import {
   CopyIcon,
   PlusIcon,
   ShapesIcon,
+  PathTextIcon,
   CircleDashedIcon,
   UndoIcon,
   RedoIcon,
@@ -85,6 +86,7 @@ export type SidebarProps = {
 
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddShapeWarpBlock?: (svgPathData: string, w: number, h: number) => void;
+  onAddTextPathBlock?: () => void;
   onAddImageBlock?: () => void;
   onApplyTemplate?: (templateId: string) => void;
   onRandomizeLayout?: () => void;
@@ -173,6 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteNamedProject,
   onAddShapeFillBlock,
   onAddShapeWarpBlock,
+  onAddTextPathBlock,
   onAddImageBlock,
   onApplyTemplate,
   onRandomizeLayout,
@@ -534,6 +537,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => handleSvgUpload("shapeWarp")}
               >
                 <CircleDashedIcon size={14} />
+              </button>
+            )}
+
+            {onAddTextPathBlock && (
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                title="Add Text on Path"
+                onClick={onAddTextPathBlock}
+              >
+                <PathTextIcon size={14} />
               </button>
             )}
 

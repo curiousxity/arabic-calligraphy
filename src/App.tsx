@@ -27,6 +27,7 @@ import {
 } from "./lib/canvasBounds";
 import type { StretchDefinition } from "./lib/strokeSchema/deriveCatalog";
 import { mapNormToRealBox } from "./lib/strokeSchema/schemaGeometry";
+import { arcPathD } from "./lib/textPath";
 import type { Block, GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigAxis } from "./types";
 
 const hslToHex = (h: number, s: number, l: number): string => {
@@ -1725,6 +1726,32 @@ const App: React.FC = () => {
     );
   };
 
+  const addTextPathBlock = () => {
+    const newId = createNextId();
+    const width = 400;
+    const height = 120;
+
+    beginPlacement(
+      {
+        ...DEFAULT_BLOCK,
+        id: newId,
+        text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
+        type: "textPath",
+        textPathD: arcPathD(width, height),
+        textPathReversed: false,
+        textPathBaselineOffset: 0,
+        textPathEditMode: false,
+        x: 0,
+        y: 0,
+      },
+      width,
+      height,
+      -width / 2,
+      -height / 2,
+      "New Text on Path"
+    );
+  };
+
   const addImageBlock = (dataUrl: string, naturalWidth: number, naturalHeight: number) => {
     const newId = createNextId();
     const maxDim = (Math.max(canvasWidth, stageViewportHeight) / stageScale) * 0.6;
@@ -1862,6 +1889,7 @@ const App: React.FC = () => {
         onDeleteNamedProject={requestDeleteNamedProject}
         onAddShapeFillBlock={addShapeFillBlock}
         onAddShapeWarpBlock={addShapeWarpBlock}
+        onAddTextPathBlock={addTextPathBlock}
         onAddImageBlock={uploadImageBlock}
         onApplyTemplate={requestApplyStarterTemplate}
         onRandomizeLayout={randomizeLayout}
