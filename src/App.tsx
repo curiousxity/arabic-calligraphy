@@ -332,6 +332,7 @@ const App: React.FC = () => {
   const scheduleKashidaHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleGlyphEditHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleGlyphRigHistoryPush = useDebouncedHistoryPush(pushHistory);
+  const scheduleTextPathHistoryPush = useDebouncedHistoryPush(pushHistory);
 
   const upsertGlyphEditRaw = useCallback(
     (
@@ -763,6 +764,14 @@ const App: React.FC = () => {
       scheduleKashidaHistoryPush();
     },
     [scheduleKashidaHistoryPush]
+  );
+
+  const updateTextPathD = useCallback(
+    (id: number, d: string) => {
+      setBlocks((prev) => prev.map((b) => (b.id === id ? ({ ...b, textPathD: d } as Block) : b)));
+      scheduleTextPathHistoryPush();
+    },
+    [scheduleTextPathHistoryPush]
   );
 
   const zoomToRect = useCallback(
@@ -1980,6 +1989,7 @@ const App: React.FC = () => {
           onGlyphBoxesChange={updateGlyphBoxes}
           onGlyphSchemaChange={updateGlyphSchema}
           onKashidaTextChange={updateKashidaText}
+          onUpdateTextPathD={updateTextPathD}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           onResizeImageBlock={resizeImageBlock}
           ghostBlock={

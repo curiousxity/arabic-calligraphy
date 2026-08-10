@@ -897,6 +897,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
+        {selectedBlock && selectedBlock.type === "textPath" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Curve" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
+              <div className="sectionPanel">
+                <button
+                  type="button"
+                  className="sidebarPillButton"
+                  style={
+                    selectedBlock.textPathEditMode
+                      ? { background: "var(--accent)", color: "var(--text-on-accent)" }
+                      : undefined
+                  }
+                  onClick={() =>
+                    onUpdateSelectedBlock({ textPathEditMode: !selectedBlock.textPathEditMode })
+                  }
+                >
+                  {selectedBlock.textPathEditMode ? "Done Editing Curve" : "Edit Curve"}
+                </button>
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
         {selectedBlock && selectedBlock.type !== "image" && (
           <div className="sidebarPanel">
             <CollapsibleSection
