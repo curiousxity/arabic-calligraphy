@@ -92,3 +92,40 @@ describe("circlePathD", () => {
     expect(length).toBeLessThan(expected * 1.02);
   });
 });
+
+import { anchorsToD, dToAnchors, type CurveAnchor } from "./textPath";
+
+describe("anchorsToD / dToAnchors round-trip", () => {
+  it("round-trips a two-anchor straight segment (corner points, zero-length handles)", () => {
+    const anchors: CurveAnchor[] = [
+      { x: 0, y: 0, handleX: 0, handleY: 0 },
+      { x: 100, y: 0, handleX: 100, handleY: 0 },
+    ];
+    const d = anchorsToD(anchors);
+    const back = dToAnchors(parseSvgPath(d));
+    expect(back).toHaveLength(2);
+    expect(back[0]).toMatchObject({ x: 0, y: 0 });
+    expect(back[1]).toMatchObject({ x: 100, y: 0 });
+  });
+
+  it("round-trips a curved segment with an authored handle", () => {
+    const anchors: CurveAnchor[] = [
+      { x: 0, y: 0, handleX: 20, handleY: -30 },
+      { x: 100, y: 0, handleX: 100, handleY: 0 },
+    ];
+    const d = anchorsToD(anchors);
+    const back = dToAnchors(parseSvgPath(d));
+    expect(back[0]).toMatchObject({ x: 0, y: 0, handleX: 20, handleY: -30 });
+    expect(back[1].x).toBeCloseTo(100, 5);
+    expect(back[1].y).toBeCloseTo(0, 5);
+  });
+
+  it("produces a single-point path for one anchor", () => {
+    const d = anchorsToD([{ x: 5, y: 5, handleX: 5, handleY: 5 }]);
+    expect(d).toBe("M 5 5");
+  });
+
+  it("returns an empty anchor list for an empty path", () => {
+    expect(dToAnchors([])).toEqual([]);
+  });
+});

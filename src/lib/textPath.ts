@@ -98,3 +98,72 @@ export function circlePathD(width: number, height: number): string {
     `C ${bottom.x - k} ${bottom.y}, ${left.x} ${left.y + k}, ${left.x} ${left.y}`,
   ].join(" ");
 }
+
+/**
+ * One point on an editable curve, plus its single *outgoing* bezier handle
+ * (absolute position, not a delta). The incoming handle for the segment
+ * arriving at the *next* anchor is this anchor's mirror image — see
+ * `anchorsToD`.
+ */
+export type CurveAnchor = {
+  x: number;
+  y: number;
+  handleX: number;
+  handleY: number;
+};
+
+/** Serializes an anchor chain into an SVG path `d` string. */
+export function anchorsToD(anchors: CurveAnchor[]): string {
+  if (anchors.length === 0) return "";
+  if (anchors.length === 1) return `M ${anchors[0].x} ${anchors[0].y}`;
+
+  const parts = [`M ${anchors[0].x} ${anchors[0].y}`];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const a = anchors[i];
+    const b = anchors[i + 1];
+    const c1x = a.handleX;
+    const c1y = a.handleY;
+    const c2x = 2 * b.x - b.handleX;
+    const c2y = 2 * b.y - b.handleY;
+    parts.push(`C ${c1x} ${c1y}, ${c2x} ${c2y}, ${b.x} ${b.y}`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Converts parsed SVG path commands into the anchor model. Segments with
+ * independent in/out handles (e.g. an uploaded SVG authored in another
+ * tool) are lossily folded into this module's single-handle-per-anchor
+ * model — the previous anchor's handle is set from the segment's first
+ * control point, and the new anchor's handle is the mirror of the
+ * segment's second control point. `Z` (close path) is ignored — text-path
+ * curves are open paths, not closed loops.
+ */
+export function dToAnchors(cmds: SvgCmd[]): CurveAnchor[] {
+  const anchors: CurveAnchor[] = [];
+
+  for (const c of cmds) {
+    if (c.type === "M" || c.type === "L") {
+      anchors.push({ x: c.x, y: c.y, handleX: c.x, handleY: c.y });
+    } else if (c.type === "C") {
+      if (anchors.length > 0) {
+        anchors[anchors.length - 1].handleX = c.x1;
+        anchors[anchors.length - 1].handleY = c.y1;
+      }
+      anchors.push({
+        x: c.x,
+        y: c.y,
+        handleX: 2 * c.x - c.x2,
+        handleY: 2 * c.y - c.y2,
+      });
+    } else if (c.type === "Q") {
+      if (anchors.length > 0) {
+        anchors[anchors.length - 1].handleX = c.x1;
+        anchors[anchors.length - 1].handleY = c.y1;
+      }
+      anchors.push({ x: c.x, y: c.y, handleX: c.x, handleY: c.y });
+    }
+  }
+
+  return anchors;
+}
