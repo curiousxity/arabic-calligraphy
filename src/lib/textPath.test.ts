@@ -1,0 +1,63 @@
+import { describe, it, expect } from "vitest";
+import { parseSvgPath } from "./svgPath";
+import { pathLength, pointAtArcLength } from "./textPath";
+
+describe("pathLength", () => {
+  it("measures a straight line exactly", () => {
+    const cmds = parseSvgPath("M 0 0 L 100 0");
+    expect(pathLength(cmds)).toBeCloseTo(100, 5);
+  });
+
+  it("approximates a quarter-circle arc within 1%", () => {
+    const R = 100;
+    const k = 0.5522847498;
+    const d = `M ${R} 0 C ${R} ${R * k} ${R * k} ${R} 0 ${R}`;
+    const cmds = parseSvgPath(d);
+    const expected = (Math.PI / 2) * R;
+    expect(pathLength(cmds)).toBeGreaterThan(expected * 0.99);
+    expect(pathLength(cmds)).toBeLessThan(expected * 1.01);
+  });
+});
+
+describe("pointAtArcLength", () => {
+  it("returns the start point at s=0, unreversed", () => {
+    const cmds = parseSvgPath("M 0 0 L 100 0");
+    const p = pointAtArcLength(cmds, 0, false);
+    expect(p.x).toBeCloseTo(0, 5);
+    expect(p.y).toBeCloseTo(0, 5);
+    expect(p.angle).toBeCloseTo(0, 5);
+  });
+
+  it("returns the end point at s=length, unreversed", () => {
+    const cmds = parseSvgPath("M 0 0 L 100 0");
+    const p = pointAtArcLength(cmds, 100, false);
+    expect(p.x).toBeCloseTo(100, 5);
+    expect(p.y).toBeCloseTo(0, 5);
+  });
+
+  it("interpolates the midpoint, unreversed", () => {
+    const cmds = parseSvgPath("M 0 0 L 100 0");
+    const p = pointAtArcLength(cmds, 50, false);
+    expect(p.x).toBeCloseTo(50, 5);
+    expect(p.y).toBeCloseTo(0, 5);
+  });
+
+  it("anchors s=0 to the curve's end point when reversed", () => {
+    const cmds = parseSvgPath("M 0 0 L 100 0");
+    const p = pointAtArcLength(cmds, 0, true);
+    expect(p.x).toBeCloseTo(100, 5);
+    expect(p.y).toBeCloseTo(0, 5);
+  });
+
+  it("clamps s beyond the path length to the end point", () => {
+    const cmds = parseSvgPath("M 0 0 L 100 0");
+    const p = pointAtArcLength(cmds, 500, false);
+    expect(p.x).toBeCloseTo(100, 5);
+  });
+
+  it("clamps negative s to the start point", () => {
+    const cmds = parseSvgPath("M 0 0 L 100 0");
+    const p = pointAtArcLength(cmds, -50, false);
+    expect(p.x).toBeCloseTo(0, 5);
+  });
+});
