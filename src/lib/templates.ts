@@ -21,8 +21,6 @@ const baseText: Omit<TextBlock, "id" | "text" | "x" | "y" | "fontSize" | "fontFa
   shadowOffsetX: 0,
   shadowOffsetY: 0,
   shadowOpacity: 0.35,
-  embossHighlightColor: "#ffffff",
-  embossShadowColor: "#000000",
   locked: false,
   rotation: 0,
 };

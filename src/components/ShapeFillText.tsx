@@ -11,7 +11,7 @@
  *  - Replay those commands via ctx.beginPath() + individual draw calls for clipping.
  *  - For scanline hit-testing, use a simple ray-casting polygon approximation
  *    (sample the path outline into a polygon, then test each scanline point).
- *  - shapeScale, emboss, stroke all preserved.
+ *  - shapeScale, stroke all preserved.
  */
 
 import React, { useEffect, useMemo } from "react";
@@ -26,7 +26,6 @@ import {
   type SvgCmd,
 } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
-import { drawInsetBevel, EMBOSS_STRENGTH_SCALE } from "../lib/emboss";
 import { applyGlyphEdit, prepareGlyphRig, applyPreparedGlyphRig } from "../lib/glyphEdits";
 import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
@@ -58,9 +57,6 @@ export type ShapeFillTextProps = {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
-  embossStrength?: number;
-  embossHighlightColor?: string;
-  embossShadowColor?: string;
   rotation?: number;
   glyphEditTool?: "stretch" | null;
   selectedGlyphIndex?: number | null;
@@ -248,9 +244,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   shadowOffsetX = 0,
   shadowOffsetY = 0,
   shadowOpacity = 0.35,
-  embossStrength = 0,
-  embossHighlightColor = "#ffffff",
-  embossShadowColor = "#000000",
   rotation = 0,
   glyphEditTool = null,
   glyphEdits = [],
@@ -469,13 +462,13 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
         shadowOffsetX={shadowOffsetX}
         shadowOffsetY={shadowOffsetY}
         shadowOpacity={shadowOpacity}
-        sceneFunc={(ctx, shape) => {
+        sceneFunc={(ctx) => {
           if (!shapeSvgPath || parsedCmds.length === 0) return;
 
           const rotRad = (shapeFillTextRotation * Math.PI) / 180;
 
-          // If no text data yet, draw a semi-transparent placeholder fill (once,
-          // regardless of emboss — there's nothing shaped yet to emboss).
+          // If no text data yet, draw a semi-transparent placeholder fill
+          // (there's nothing shaped yet to draw).
           if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) {
             ctx.save();
             ctx.scale(shapeScale, shapeScale);
@@ -487,9 +480,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           }
 
           // Draws the whole shape-filled glyph run once, in `fillColor`, offset
-          // by (offsetX, offsetY) — called once normally against the real
-          // context for the main fill, and against a scratch context by
-          // drawInsetBevel when emboss is active.
+          // by (offsetX, offsetY).
           const drawPass = (
             targetCtx: CanvasRenderingContext2D,
             fillColor: string,
@@ -568,24 +559,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           };
 
           drawPass(ctx as unknown as CanvasRenderingContext2D, color, 0, 0, true);
-
-          if (embossStrength > 0) {
-            const absScale = shape.getAbsoluteScale();
-            const resolutionScale =
-              ctx.getCanvas().getPixelRatio() *
-              Math.max(Math.abs(absScale.x), Math.abs(absScale.y));
-            drawInsetBevel(
-              ctx as unknown as CanvasRenderingContext2D,
-              scaledW,
-              scaledH,
-              embossStrength * EMBOSS_STRENGTH_SCALE,
-              embossHighlightColor,
-              embossShadowColor,
-              (scratchCtx, offsetX, offsetY, fillColor) =>
-                drawPass(scratchCtx, fillColor, offsetX, offsetY, false),
-              resolutionScale
-            );
-          }
         }}
       />
 
