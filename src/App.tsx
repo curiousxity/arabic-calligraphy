@@ -279,7 +279,11 @@ const App: React.FC = () => {
     [blocks, selectedId]
   );
 
-  const rightPanelVisible = !isMobile && !!selectedBlock && selectedBlock.type !== "image";
+  const rightPanelVisible =
+    !isMobile &&
+    !!selectedBlock &&
+    selectedBlock.type !== "image" &&
+    selectedBlock.type !== "textPath";
   const effectiveRightPanelWidth =
     !rightPanelVisible || rightPanelCollapsed ? 0 : RIGHT_PANEL_WIDTH;
 
@@ -336,7 +340,7 @@ const App: React.FC = () => {
     ) => {
       setBlocks((prev) =>
         prev.map((b) => {
-          if (b.id !== blockId || b.type === "image") return b;
+          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
           const glyphEdits = b.glyphEdits ?? [];
           const existing = glyphEdits.find((g) => g.glyphIndex === glyphIndex);
           const next = updater(existing);
@@ -382,7 +386,7 @@ const App: React.FC = () => {
   const selectGlyphForBlock = useCallback((blockId: number, glyphIndex: number | null) => {
     setBlocks((prev) =>
       prev.map((b) =>
-        b.id === blockId && b.type !== "image"
+        b.id === blockId && b.type !== "image" && b.type !== "textPath"
           ? { ...b, selectedGlyphIndex: glyphIndex, glyphMaskEdit: null }
           : b
       )
@@ -397,7 +401,7 @@ const App: React.FC = () => {
     (blockId: number, glyphIndex: number, handleId: string, mode: "contours" | "lasso" | null) => {
       setBlocks((prev) =>
         prev.map((b) =>
-          b.id === blockId && b.type !== "image"
+          b.id === blockId && b.type !== "image" && b.type !== "textPath"
             ? mode
               ? {
                   ...b,
@@ -446,7 +450,7 @@ const App: React.FC = () => {
 
       setBlocks((prev) =>
         prev.map((b) => {
-          if (b.id !== blockId || b.type === "image") return b;
+          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
 
           return {
             ...b,
@@ -497,7 +501,7 @@ const App: React.FC = () => {
   const setStretchFactor = useCallback(
     (blockId: number, glyphIndex: number, definition: StretchDefinition, factor: number) => {
       const block = blocks.find((b) => b.id === blockId);
-      if (!block || block.type === "image") return;
+      if (!block || block.type === "image" || block.type === "textPath") return;
 
       const clamped = Math.max(definition.minFactor, Math.min(definition.maxFactor, factor));
       const existing = block.glyphEdits
@@ -583,7 +587,7 @@ const App: React.FC = () => {
       pushHistory();
       setBlocks((prev) =>
         prev.map((b) => {
-          if (b.id !== blockId || b.type === "image") return b;
+          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
           return {
             ...b,
             glyphEdits: removeStretchHandle(b.glyphEdits ?? [], glyphIndex, handleId),
@@ -599,7 +603,7 @@ const App: React.FC = () => {
     (blockId: number, glyphIndex: number, handleId: string, name: string) => {
       const trimmed = name.trim();
       const block = blocks.find((b) => b.id === blockId);
-      if (!block || block.type === "image" || !trimmed) return;
+      if (!block || block.type === "image" || block.type === "textPath" || !trimmed) return;
 
       const handle = block.glyphEdits
         ?.find((g) => g.glyphIndex === glyphIndex)
@@ -653,7 +657,7 @@ const App: React.FC = () => {
       pushHistory();
       setBlocks((prev) =>
         prev.map((b) => {
-          if (b.id !== blockId || b.type === "image") return b;
+          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
           const nextGlyphEdits = removeStretchHandle(b.glyphEdits ?? [], glyphIndex, handleId);
           const values = (b.glyphRigValues ?? []).filter((v) => v.axisId !== newAxis.id);
           return {
@@ -687,7 +691,7 @@ const App: React.FC = () => {
       const clamped = Math.max(-1, Math.min(1, value));
       setBlocks((prev) =>
         prev.map((b) => {
-          if (b.id !== blockId || b.type === "image") return b;
+          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
           const values = b.glyphRigValues ?? [];
           const existing = values.find((v) => v.axisId === axisId);
           return {

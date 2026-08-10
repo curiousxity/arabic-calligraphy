@@ -673,48 +673,54 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 );
               }
 
-              return (
-                <ShapedText
-                  key={block.id}
-                  {...commonProps}
-                  text={block.text}
-                  x={block.x}
-                  y={block.y}
-                  fontSize={block.fontSize}
-                  color={block.color}
-                  fontFamily={block.fontFamily}
-                  fontStyle={block.fontStyle ?? "normal"}
-                  align={block.align ?? "center"}
-                  lineHeight={block.lineHeight ?? 1.2}
-                  opacity={block.opacity ?? 1}
-                  stroke={block.stroke}
-                  strokeWidth={block.strokeWidth ?? 0}
-                  shadowColor={block.shadowColor}
-                  shadowBlur={block.shadowBlur ?? 0}
-                  shadowOffsetX={block.shadowOffsetX ?? 0}
-                  shadowOffsetY={block.shadowOffsetY ?? 0}
-                  shadowOpacity={block.shadowOpacity ?? 0.35}
-                  rotation={block.rotation ?? 0}
-                  warpX={block.warpX ?? 0}
-                  warpY={block.warpY ?? 0}
-                  kashidaEditMode={block.kashidaEditMode ?? false}
-                  onKashidaTextChange={(text) => onKashidaTextChange(block.id, text)}
-                  glyphEditTool={block.glyphEditTool ?? null}
-                  selectedGlyphIndex={block.selectedGlyphIndex ?? null}
-                  glyphEdits={block.glyphEdits ?? []}
-                  glyphMaskEdit={block.glyphMaskEdit ?? null}
-                  glyphRigs={glyphRigs}
-                  glyphRigValues={block.glyphRigValues ?? []}
-                  onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
-                  onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
-                    onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
-                  }
-                  onGlyphBoxesChange={(boxes) => onGlyphBoxesChange(block.id, boxes)}
-                  onGlyphSchemaChange={(catalog) => onGlyphSchemaChange(block.id, catalog)}
-                  locked={block.locked}
-                  debugBounds={false}
-                />
-              );
+              // Explicit guard for text blocks (TextPath blocks are handled by returning null below)
+              if (block.type === "text") {
+                return (
+                  <ShapedText
+                    key={block.id}
+                    {...commonProps}
+                    text={block.text}
+                    x={block.x}
+                    y={block.y}
+                    fontSize={block.fontSize}
+                    color={block.color}
+                    fontFamily={block.fontFamily}
+                    fontStyle={block.fontStyle ?? "normal"}
+                    align={block.align ?? "center"}
+                    lineHeight={block.lineHeight ?? 1.2}
+                    opacity={block.opacity ?? 1}
+                    stroke={block.stroke}
+                    strokeWidth={block.strokeWidth ?? 0}
+                    shadowColor={block.shadowColor}
+                    shadowBlur={block.shadowBlur ?? 0}
+                    shadowOffsetX={block.shadowOffsetX ?? 0}
+                    shadowOffsetY={block.shadowOffsetY ?? 0}
+                    shadowOpacity={block.shadowOpacity ?? 0.35}
+                    rotation={block.rotation ?? 0}
+                    warpX={block.warpX ?? 0}
+                    warpY={block.warpY ?? 0}
+                    kashidaEditMode={block.kashidaEditMode ?? false}
+                    onKashidaTextChange={(text) => onKashidaTextChange(block.id, text)}
+                    glyphEditTool={block.glyphEditTool ?? null}
+                    selectedGlyphIndex={block.selectedGlyphIndex ?? null}
+                    glyphEdits={block.glyphEdits ?? []}
+                    glyphMaskEdit={block.glyphMaskEdit ?? null}
+                    glyphRigs={glyphRigs}
+                    glyphRigValues={block.glyphRigValues ?? []}
+                    onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
+                    onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
+                      onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
+                    }
+                    onGlyphBoxesChange={(boxes) => onGlyphBoxesChange(block.id, boxes)}
+                    onGlyphSchemaChange={(catalog) => onGlyphSchemaChange(block.id, catalog)}
+                    locked={block.locked}
+                    debugBounds={false}
+                  />
+                );
+              }
+
+              // TextPath block rendering is not yet implemented (Task 5+).
+              return null;
             })}
 
             {guides.vertical.map((gx, i) => (
