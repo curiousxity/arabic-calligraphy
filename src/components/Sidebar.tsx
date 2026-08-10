@@ -9,6 +9,7 @@ import {
 import type { Block, TextAlign, ShapeWarpMode } from "../types";
 import type { NamedProjectMeta } from "../App";
 import { extractSvgPaths } from "../lib/svgImport";
+import { arcPathD, wavePathD, circlePathD } from "../lib/textPath";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { makeId } from "./sidebar/utils";
@@ -321,6 +322,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
           return;
         }
         onAdd(result.pathData, result.w, result.h);
+      };
+      reader.readAsText(file);
+    };
+
+    input.click();
+  };
+
+  const handleTextPathSvgUpload = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".svg,image/svg+xml";
+
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = extractSvgPaths(e.target?.result as string, undefined, true);
+        if (!result) {
+          alert(
+            "No supported shape elements found in SVG (path, rect, circle, ellipse, polygon, polyline)."
+          );
+          return;
+        }
+        onUpdateSelectedBlock({ textPathD: result.pathData });
       };
       reader.readAsText(file);
     };
@@ -819,27 +846,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   previewSuffix="— أبجد"
                 />
 
-                <RangeRow
-                  id={makeId("font-size", selectedId)}
-                  name={makeId("fontSize", selectedId)}
-                  label="Font size"
-                  value={selectedBlock.fontSize}
-                  min={
-                    selectedBlock.type === "shapeFill" ||
-                    selectedBlock.type === "shapeWarp"
-                      ? 4
-                      : 12
-                  }
-                  max={
-                    selectedBlock.type === "shapeFill" ||
-                    selectedBlock.type === "shapeWarp"
-                      ? 400
-                      : 200
-                  }
-                  onChange={(v) => onUpdateSelectedBlock({ fontSize: v })}
-                  suffix={`${Math.round(selectedBlock.fontSize)}px`}
-                  fieldKey="fontSize"
-                />
+                {selectedBlock.type === "textPath" ? (
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    Letter size on a text-path block is set by the curve's length — drag the
+                    curve longer or shorter in Edit Curve mode, or change the text.
+                  </div>
+                ) : (
+                  <RangeRow
+                    id={makeId("font-size", selectedId)}
+                    name={makeId("fontSize", selectedId)}
+                    label="Font size"
+                    value={selectedBlock.fontSize}
+                    min={
+                      selectedBlock.type === "shapeFill" ||
+                      selectedBlock.type === "shapeWarp"
+                        ? 4
+                        : 12
+                    }
+                    max={
+                      selectedBlock.type === "shapeFill" ||
+                      selectedBlock.type === "shapeWarp"
+                        ? 400
+                        : 200
+                    }
+                    onChange={(v) => onUpdateSelectedBlock({ fontSize: v })}
+                    suffix={`${Math.round(selectedBlock.fontSize)}px`}
+                    fieldKey="fontSize"
+                  />
+                )}
 
                 <ColorRow
                   id={makeId("text-color", selectedId)}
@@ -915,6 +949,61 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   {selectedBlock.textPathEditMode ? "Done Editing Curve" : "Edit Curve"}
                 </button>
+
+                <SelectRow
+                  id={makeId("text-path-preset", selectedId)}
+                  name={makeId("textPathPreset", selectedId)}
+                  label="Preset"
+                  value="custom"
+                  onChange={(v) => {
+                    if (v === "arc") {
+                      onUpdateSelectedBlock({ textPathD: arcPathD(400, 120) });
+                    } else if (v === "wave") {
+                      onUpdateSelectedBlock({ textPathD: wavePathD(400, 120) });
+                    } else if (v === "circle") {
+                      onUpdateSelectedBlock({ textPathD: circlePathD(300, 300) });
+                    }
+                  }}
+                >
+                  <option value="custom">Custom</option>
+                  <option value="arc">Arc</option>
+                  <option value="wave">Wave</option>
+                  <option value="circle">Circle</option>
+                </SelectRow>
+
+                <button
+                  type="button"
+                  className="sidebarPillButton"
+                  onClick={handleTextPathSvgUpload}
+                >
+                  Upload SVG Path
+                </button>
+
+                <label className="field">
+                  <span className="fieldTitle">
+                    <input
+                      type="checkbox"
+                      checked={selectedBlock.textPathReversed ?? false}
+                      onChange={(e) =>
+                        onUpdateSelectedBlock({ textPathReversed: e.target.checked })
+                      }
+                      style={{ marginRight: 6 }}
+                    />
+                    Flip direction
+                  </span>
+                </label>
+
+                <RangeRow
+                  id={makeId("text-path-baseline-offset", selectedId)}
+                  name={makeId("textPathBaselineOffset", selectedId)}
+                  label="Baseline offset"
+                  value={selectedBlock.textPathBaselineOffset ?? 0}
+                  min={-60}
+                  max={60}
+                  onChange={(v) => onUpdateSelectedBlock({ textPathBaselineOffset: v })}
+                  suffix={selectedBlock.textPathBaselineOffset ?? 0}
+                  fieldKey="textPathBaselineOffset"
+                />
               </div>
             </CollapsibleSection>
           </div>
