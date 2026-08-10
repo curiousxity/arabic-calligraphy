@@ -54,3 +54,47 @@ export function pointAtArcLength(
     angle: Math.atan2(y2 - y1, x2 - x1),
   };
 }
+
+/** A gentle upward bow from (0, height) to (width, height), peaking near y=0 at the midpoint. */
+export function arcPathD(width: number, height: number): string {
+  const w = Math.max(1, width);
+  const h = Math.max(1, height);
+  return `M 0 ${h} C ${w * 0.25} 0, ${w * 0.75} 0, ${w} ${h}`;
+}
+
+/** One full sine-like cycle across `width`, amplitude `height / 2` around the vertical midpoint. */
+export function wavePathD(width: number, height: number): string {
+  const w = Math.max(1, width);
+  const amp = height / 2;
+  const midY = height / 2;
+  const q = w / 4;
+  return [
+    `M 0 ${midY}`,
+    `C ${q * 0.5} ${midY - amp}, ${q * 1.5} ${midY - amp}, ${q * 2} ${midY}`,
+    `C ${q * 2.5} ${midY + amp}, ${q * 3.5} ${midY + amp}, ${w} ${midY}`,
+  ].join(" ");
+}
+
+/**
+ * Three-quarters of a circle (270°), swept clockwise from the top, leaving
+ * the bottom quarter open so the path has a clear start/end for text to
+ * anchor to instead of being a closed loop.
+ */
+export function circlePathD(width: number, height: number): string {
+  const r = Math.max(1, Math.min(width, height) / 2);
+  const cx = width / 2;
+  const cy = height / 2;
+  const k = 0.5522847498 * r;
+
+  const top = { x: cx, y: cy - r };
+  const right = { x: cx + r, y: cy };
+  const bottom = { x: cx, y: cy + r };
+  const left = { x: cx - r, y: cy };
+
+  return [
+    `M ${top.x} ${top.y}`,
+    `C ${top.x + k} ${top.y}, ${right.x} ${right.y - k}, ${right.x} ${right.y}`,
+    `C ${right.x} ${right.y + k}, ${bottom.x + k} ${bottom.y}, ${bottom.x} ${bottom.y}`,
+    `C ${bottom.x - k} ${bottom.y}, ${left.x} ${left.y + k}, ${left.x} ${left.y}`,
+  ].join(" ");
+}

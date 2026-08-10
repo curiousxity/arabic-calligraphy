@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseSvgPath } from "./svgPath";
-import { pathLength, pointAtArcLength } from "./textPath";
+import { pathLength, pointAtArcLength, arcPathD, wavePathD, circlePathD } from "./textPath";
 
 describe("pathLength", () => {
   it("measures a straight line exactly", () => {
@@ -59,5 +59,36 @@ describe("pointAtArcLength", () => {
     const cmds = parseSvgPath("M 0 0 L 100 0");
     const p = pointAtArcLength(cmds, -50, false);
     expect(p.x).toBeCloseTo(0, 5);
+  });
+});
+
+describe("arcPathD", () => {
+  it("starts and ends at the given width, height", () => {
+    const cmds = parseSvgPath(arcPathD(200, 50));
+    expect(cmds[0]).toMatchObject({ type: "M", x: 0, y: 50 });
+    const last = cmds[cmds.length - 1] as { x: number; y: number };
+    expect(last.x).toBeCloseTo(200, 5);
+    expect(last.y).toBeCloseTo(50, 5);
+  });
+});
+
+describe("wavePathD", () => {
+  it("starts at the origin and ends at the given width, mid-height", () => {
+    const cmds = parseSvgPath(wavePathD(400, 100));
+    expect(cmds[0]).toMatchObject({ type: "M", x: 0, y: 50 });
+    const last = cmds[cmds.length - 1] as { x: number; y: number };
+    expect(last.x).toBeCloseTo(400, 5);
+    expect(last.y).toBeCloseTo(50, 5);
+  });
+});
+
+describe("circlePathD", () => {
+  it("produces a path whose length is close to 3/4 of the circle's circumference", () => {
+    const r = 100;
+    const cmds = parseSvgPath(circlePathD(2 * r, 2 * r));
+    const expected = 1.5 * Math.PI * r; // 270° of circumference 2*pi*r
+    const length = pathLength(cmds);
+    expect(length).toBeGreaterThan(expected * 0.98);
+    expect(length).toBeLessThan(expected * 1.02);
   });
 });
