@@ -47,6 +47,12 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
   onToggleDiacriticHidden,
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  // Sticky-hover while a handle for this box is actively being dragged: the
+  // move handle can travel well outside the (generous but still bounded)
+  // hit-rect during a normal drag, so rect containment alone can't be
+  // trusted mid-gesture — this keeps the handle mounted regardless of
+  // pointer position until the drag ends.
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   const diacriticIndices = useMemo(
     () => findDiacriticGlyphIndices(glyphs, shapableText),
@@ -57,6 +63,16 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
 
   const diacriticBoxes = glyphHitBoxes.filter((b) => diacriticIndices.has(b.glyphIndex));
   const handleSpacing = fontSize * 0.25;
+  // The hit-rect has to cover the full reach of all three handles, not just
+  // the diacritic's own (typically tiny) bounding box: the gold/resize and
+  // red/hide handles sit at rest `handleSpacing` to either side of center,
+  // and the blue/move handle can be dragged a normal vertical distance away
+  // while the gesture is in progress. Horizontal margin clears the resting
+  // handle position plus its radius/stroke; vertical margin is generous
+  // enough to tolerate a real drag without losing hover (paired with the
+  // sticky-while-dragging fallback above for drags that exceed even this).
+  const hitRectHorizontalMargin = handleSpacing + 12;
+  const hitRectVerticalMargin = fontSize * 0.5;
 
   return (
     <Group>
@@ -65,15 +81,16 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
         const cx = offsetX + box.x + box.width / 2;
         const cy = offsetY + box.y + box.height / 2;
         const displayY = cy + (override?.offsetY ?? 0);
-        const isHovered = hoveredIndex === box.glyphIndex;
+        const isHovered =
+          hoveredIndex === box.glyphIndex || draggingIndex === box.glyphIndex;
 
         return (
           <Group key={box.glyphIndex}>
             <Rect
-              x={offsetX + box.x - 4}
-              y={offsetY + box.y - 4}
-              width={box.width + 8}
-              height={box.height + 8}
+              x={offsetX + box.x - hitRectHorizontalMargin}
+              y={offsetY + box.y - hitRectVerticalMargin}
+              width={box.width + hitRectHorizontalMargin * 2}
+              height={box.height + hitRectVerticalMargin * 2}
               fill="transparent"
               onMouseEnter={() => setHoveredIndex(box.glyphIndex)}
               onMouseLeave={() =>
@@ -95,10 +112,18 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                   onMouseDown={(e) => {
                     e.cancelBubble = true;
                   }}
+                  onDragStart={(e) => {
+                    e.cancelBubble = true;
+                    setDraggingIndex(box.glyphIndex);
+                  }}
                   onDragMove={(e) => {
                     e.cancelBubble = true;
                     const newOffsetY = e.target.y() - cy;
                     onDragDiacriticOverride?.(box.glyphIndex, { offsetY: newOffsetY });
+                  }}
+                  onDragEnd={(e) => {
+                    e.cancelBubble = true;
+                    setDraggingIndex((v) => (v === box.glyphIndex ? null : v));
                   }}
                 />
 
@@ -113,6 +138,10 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                   onMouseDown={(e) => {
                     e.cancelBubble = true;
                   }}
+                  onDragStart={(e) => {
+                    e.cancelBubble = true;
+                    setDraggingIndex(box.glyphIndex);
+                  }}
                   onDragMove={(e) => {
                     e.cancelBubble = true;
                     const pos = e.target.position();
@@ -122,6 +151,10 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                       Math.min(3, dist / Math.max(handleSpacing, 1))
                     );
                     onDragDiacriticOverride?.(box.glyphIndex, { scale: nextScale });
+                  }}
+                  onDragEnd={(e) => {
+                    e.cancelBubble = true;
+                    setDraggingIndex((v) => (v === box.glyphIndex ? null : v));
                   }}
                 />
 
