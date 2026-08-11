@@ -137,6 +137,23 @@ export const ImageIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
+// A magic wand with sparkles — "trace / vectorize this image", deliberately
+// unlike ImageIcon so the Shape Warp trace button is distinguishable from the
+// plain "add image block" button next to it.
+export const TraceWandIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    {/* the wand: a long bar on the leading diagonal, with a band marking
+        its head */}
+    <path d="M16 3 21 8 8 21 3 16Z" />
+    <path d="M13.5 5.5 18.5 10.5" />
+    {/* sparkles, one either side of the wand */}
+    <path d="M5 3.5v3" />
+    <path d="M3.5 5h3" />
+    <path d="M19 16.5v3" />
+    <path d="M17.5 18h3" />
+  </IconBase>
+);
+
 export const VectorIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>
     <circle cx="6" cy="6" r="2.5" />
