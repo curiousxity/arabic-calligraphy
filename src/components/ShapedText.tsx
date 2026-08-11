@@ -17,6 +17,7 @@ import {
 import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import { splitContours, deriveContourMask } from "../lib/glyphContours";
+import { findDiacriticGlyphIndices } from "../lib/diacritics";
 import type {
   GlyphEdit,
   GlyphStretchHandle,
@@ -375,6 +376,21 @@ export const ShapedText: React.FC<Props> = ({
     shapeData.shapableText,
     shapeData.glyphs,
     shapeData.font
+  );
+
+  // The set of glyph indices this render pass actually considers a
+  // diacritic — used to guard `diacriticOverrides` at draw time so a
+  // stale override (e.g. after a text edit shifted which glyph index it
+  // lands on) degrades to a no-op instead of hiding/scaling a base
+  // letter.
+  const diacriticGlyphIndices = useMemo(
+    () => findDiacriticGlyphIndices(shapeData.glyphs, shapeData.font),
+    [shapeData.glyphs, shapeData.font]
+  );
+
+  const activeDiacriticOverrides = useMemo(
+    () => diacriticOverrides.filter((o) => diacriticGlyphIndices.has(o.glyphIndex)),
+    [diacriticOverrides, diacriticGlyphIndices]
   );
 
   const [spinnerAngle, setSpinnerAngle] = useState(0);
@@ -798,7 +814,7 @@ export const ShapedText: React.FC<Props> = ({
             fontFamily,
             glyphRigs,
             glyphRigValues,
-            diacriticOverrides
+            activeDiacriticOverrides
           );
           ctx.restore();
 
@@ -824,7 +840,7 @@ export const ShapedText: React.FC<Props> = ({
               fontFamily,
               glyphRigs,
               glyphRigValues,
-              diacriticOverrides
+              activeDiacriticOverrides
             );
             ctx.restore();
           }
@@ -834,7 +850,7 @@ export const ShapedText: React.FC<Props> = ({
       <DiacriticHoverHandles
         isSelected={isSelected}
         glyphs={shapeData.glyphs}
-        shapableText={shapeData.shapableText}
+        font={shapeData.font}
         glyphHitBoxes={glyphHitBoxes}
         diacriticOverrides={diacriticOverrides}
         offsetX={bx + localDrawX}

@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Group, Circle, Rect } from "react-konva";
+import type * as opentype from "opentype.js";
 import type { HarfBuzzGlyph } from "../lib/harfbuzz";
 import { findDiacriticGlyphIndices } from "../lib/diacritics";
 import type { DiacriticOverride } from "../types";
@@ -8,7 +9,7 @@ import type { GlyphHitBox } from "./ShapedText";
 export type DiacriticHoverHandlesProps = {
   isSelected: boolean;
   glyphs: HarfBuzzGlyph[];
-  shapableText: string;
+  font: opentype.Font | null;
   glyphHitBoxes: GlyphHitBox[];
   diacriticOverrides: DiacriticOverride[];
   /** Group-local x/y to add to a hit box's own x/y — same `bx + localDrawX` / `by + localDrawY` offset the rest of ShapedText.tsx already uses to place its own overlays. */
@@ -37,7 +38,7 @@ const HIDE_BUTTON_COLOR_ACTIVE = "#9ca3af";
 export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
   isSelected,
   glyphs,
-  shapableText,
+  font,
   glyphHitBoxes,
   diacriticOverrides,
   offsetX,
@@ -53,10 +54,19 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
   // trusted mid-gesture — this keeps the handle mounted regardless of
   // pointer position until the drag ends.
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  // The move handle's absolute (stage-space) x at drag start. Konva's
+  // dragBoundFunc receives/returns absolute stage coordinates, but `cx`
+  // below is a group-local text-space coordinate — resetting x to `cx`
+  // directly would teleport the handle the instant a drag starts under
+  // any block offset/pan/zoom. Capturing the real absolute x once and
+  // holding it fixed for the duration of the drag keeps the handle's x
+  // stable (this handle only ever moves vertically) without mixing
+  // coordinate spaces.
+  const dragAbsoluteXRef = useRef(0);
 
   const diacriticIndices = useMemo(
-    () => findDiacriticGlyphIndices(glyphs, shapableText),
-    [glyphs, shapableText]
+    () => findDiacriticGlyphIndices(glyphs, font),
+    [glyphs, font]
   );
 
   if (!isSelected) return null;
@@ -80,17 +90,34 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
         const override = diacriticOverrides.find((o) => o.glyphIndex === box.glyphIndex);
         const cx = offsetX + box.x + box.width / 2;
         const cy = offsetY + box.y + box.height / 2;
+        const overrideScale = override?.scale ?? 1;
         const displayY = cy + (override?.offsetY ?? 0);
         const isHovered =
           hoveredIndex === box.glyphIndex || draggingIndex === box.glyphIndex;
 
+        // Hit-rect derived from the mark's actual rendered position/size
+        // (displayY + scaled box), not its original un-overridden
+        // box.y/size — otherwise a mark moved via offsetY or enlarged via
+        // scale drifts out from under its own hit area. The base margins
+        // above already cover the common (no-override) case generously;
+        // scaling them too means an enlarged mark's hit area grows with
+        // it instead of staying pinned to the natural-size rect.
+        const scaledWidth = box.width * overrideScale;
+        const scaledHeight = box.height * overrideScale;
+        const hitRectX =
+          cx - scaledWidth / 2 - hitRectHorizontalMargin * overrideScale;
+        const hitRectY =
+          displayY - scaledHeight / 2 - hitRectVerticalMargin * overrideScale;
+        const hitRectWidth = scaledWidth + hitRectHorizontalMargin * 2 * overrideScale;
+        const hitRectHeight = scaledHeight + hitRectVerticalMargin * 2 * overrideScale;
+
         return (
           <Group key={box.glyphIndex}>
             <Rect
-              x={offsetX + box.x - hitRectHorizontalMargin}
-              y={offsetY + box.y - hitRectVerticalMargin}
-              width={box.width + hitRectHorizontalMargin * 2}
-              height={box.height + hitRectVerticalMargin * 2}
+              x={hitRectX}
+              y={hitRectY}
+              width={hitRectWidth}
+              height={hitRectHeight}
               fill="transparent"
               onMouseEnter={() => setHoveredIndex(box.glyphIndex)}
               onMouseLeave={() =>
@@ -108,12 +135,13 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                   stroke="#ffffff"
                   strokeWidth={1.5}
                   draggable
-                  dragBoundFunc={(pos) => ({ x: cx, y: pos.y })}
+                  dragBoundFunc={(pos) => ({ x: dragAbsoluteXRef.current, y: pos.y })}
                   onMouseDown={(e) => {
                     e.cancelBubble = true;
                   }}
                   onDragStart={(e) => {
                     e.cancelBubble = true;
+                    dragAbsoluteXRef.current = e.target.getAbsolutePosition().x;
                     setDraggingIndex(box.glyphIndex);
                   }}
                   onDragMove={(e) => {

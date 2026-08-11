@@ -72,21 +72,46 @@ block's text — overrides only change how a diacritic *renders*, never the
 underlying text, and a "Reset diacritic overrides" button clears them
 without touching the text either.
 
-`lib/diacritics.ts`'s `findDiacriticGlyphIndices(glyphs, shapableText)`
-identifies which shaped glyphs are diacritics by looking up each glyph's
-HarfBuzz cluster (`glyph.cl`) as a character offset into `shapableText`
-and testing it against `ARABIC_DIACRITIC_RE` (now exported from
-`lib/harfbuzz.ts`, previously private to `stripUnsupportedDiacritics`) —
-the same cluster-to-source-character technique
-`strokeSchema/glyphLookup.ts` already uses for an unrelated purpose.
+`lib/diacritics.ts`'s `findDiacriticGlyphIndices(glyphs, font)` identifies
+which shaped glyphs are diacritics by glyph identity, **not** by cluster:
+HarfBuzz's default cluster level (`MONOTONE_GRAPHEMES`) merges a base
+letter with every combining mark following it into one cluster whose
+value is the *base letter's* character offset, so a mark glyph's own
+`glyph.cl` never points at the mark's own character — cluster-to-source
+lookup (what an earlier version of this function did, and what
+`strokeSchema/glyphLookup.ts` still does for its own, different, purpose)
+silently detects nothing on real shaped text. The working detection is
+two signals: (1) primary — the glyph's own Unicode codepoint(s), from
+`font.glyphs.get(g.g).unicodes` (opentype.js's cmap-derived metadata),
+tested against `ARABIC_DIACRITIC_RE`; (2) fallback, for contextual mark
+variants with no cmap entry at all (e.g. a font's own fused mark-ligature
+glyph) — within a cluster shared by more than one glyph, a base letter is
+drawn at its own designed origin (HarfBuzz position `dx`/`dy` both 0)
+while every mark stacked onto it carries a nonzero GPOS mark-attachment
+offset, so a cluster-sharing glyph with nonzero `dx`/`dy` is treated as a
+mark too. `ARABIC_DIACRITIC_RE` itself now lives in `diacritics.ts` (not
+`harfbuzz.ts`, which re-exports it for compatibility) specifically so
+this module has no runtime dependency on harfbuzzjs, which lets
+`diacritics.test.ts` shape real text with real harfbuzzjs directly rather
+than mocking it — every assertion in that suite is checked against actual
+HarfBuzz output for real fonts in `public/fonts/`, not hand-written
+`{ g, cl }` fixtures (a fabricated-cluster version of this test suite is
+exactly what let the cluster-lookup bug ship unnoticed once before).
 
 Overrides (`DiacriticOverride` in `types.ts`: `scale`/`offsetY`/`hidden`,
 default no-op) are keyed by glyph index — the same scheme
 `GlyphStretchHandle` already uses for the Stretch tool, including that
 scheme's known fragility (a text edit before a diacritic in the string can
-shift which glyph index its override lands on after re-shaping). They're
-applied inside `ShapedText.tsx`'s shared `drawWarpedGlyphRun` as an extra
-`ctx.translate`/`ctx.scale` pivoted on the glyph's own pen-origin
+shift which glyph index its override lands on after re-shaping). Because
+of that fragility, `ShapedText.tsx` recomputes `findDiacriticGlyphIndices`
+for its own current glyph run each render and filters `diacriticOverrides`
+down to only the glyph indices that call currently identifies as
+diacritics before handing them to `drawWarpedGlyphRun` — a stale override
+whose glyph index now lands on a base letter (rather than a mark) is
+silently ignored instead of hiding or grotesquely scaling that letter.
+Surviving overrides are applied inside `ShapedText.tsx`'s shared
+`drawWarpedGlyphRun` as an
+extra `ctx.translate`/`ctx.scale` pivoted on the glyph's own pen-origin
 `(gx, gy)`, structurally identical to how that same function already
 handles the Private-Use-Area "override glyph" preset symbols. A `hidden`
 override skips the glyph's draw call but not its advance width, so hiding
@@ -96,7 +121,17 @@ a mark never reflows surrounding letters.
 `ShapedText.tsx` itself) reusing `ShapedText`'s existing per-glyph
 `glyphHitBoxes` (already computed for the Stretch tool's hit-testing) —
 only the currently-hovered diacritic ever shows handles, which is what
-keeps text with many marks from becoming visual clutter. It's active only
+keeps text with many marks from becoming visual clutter. The move
+handle's `dragBoundFunc` captures the handle's absolute (stage-space) x
+at `onDragStart` and holds it fixed for the drag's duration, rather than
+returning the group-local `cx` Konva's `dragBoundFunc` contract requires
+absolute coordinates for — mixing the two spaces there previously
+teleported the handle sideways under any block offset/pan/zoom. The hover
+hit-`Rect` is derived from the mark's actual rendered position
+(`displayY`, i.e. original position + `offsetY`) and scaled size
+(`box.width/height * scale`), not its original un-overridden box, so an
+overridden mark's hoverable area tracks where it's actually drawn instead
+of drifting away from it as `offsetY`/`scale` grow. It's active only
 when the block is selected, matching every other interactive on-canvas
 overlay in this app. Live handle drags follow the same debounced-history
 pattern (`useDebouncedHistoryPush`) the Kashida tool already established;
