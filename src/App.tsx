@@ -330,10 +330,25 @@ const App: React.FC = () => {
     setBackgroundColor(snapshot.backgroundColor);
   }, []);
 
-  const { pushHistory, handleUndo, handleRedo, canUndo, canRedo } = useUndoRedo(
-    getSnapshot,
-    applySnapshot
+  /**
+   * Rasterizes the live stage at low resolution for history thumbnails.
+   * No grid/background hiding (unlike useExport's toDataURL calls) — this
+   * is a cheap approximate preview, not export-quality output.
+   */
+  const captureHistoryThumbnail = useCallback(
+    () => stageRef.current?.toDataURL({ pixelRatio: 0.15 }) ?? "",
+    []
   );
+
+  const { pushHistory, handleUndo, handleRedo, jumpBy, canUndo, canRedo, historyEntries } =
+    useUndoRedo(getSnapshot, applySnapshot, captureHistoryThumbnail);
+  // `jumpBy`/`historyEntries` aren't consumed yet — Task 3 wires them into the
+  // history popover UI. Contrary to the plan's expectation, both tsc's
+  // noUnusedLocals and eslint's no-unused-vars DO flag unused destructured
+  // object properties in this project's config, so they're referenced here
+  // as a no-op until Task 3 gives them a real use.
+  void jumpBy;
+  void historyEntries;
 
   const scheduleMoveHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleKashidaHistoryPush = useDebouncedHistoryPush(pushHistory);
