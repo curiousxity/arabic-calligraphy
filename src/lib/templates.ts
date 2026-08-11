@@ -10,9 +10,13 @@ export type StarterTemplate = {
    * One entry per block that should be user-editable through the Template
    * Wizard (TemplateWizardDialog.tsx) — every block in every template
    * currently gets exactly one field (no "primary vs. secondary block"
-   * curation), but this stays optional so a future template added without
-   * field metadata falls back to Sidebar.tsx's plain one-click-apply path
-   * instead of erroring.
+   * curation). It stays optional only for tolerance, not as a separate
+   * code path: there is no one-click-apply flow anymore, so a template
+   * added without field metadata still opens the wizard — just with zero
+   * inputs (title, description, warning, Cancel/Generate) — and Generate
+   * applies the template's blocks verbatim, since
+   * `buildBlocksFromTemplate` with an empty `fields` array simply returns
+   * copies of the authored blocks with their original text.
    */
   fields?: { blockIndex: number; label: string }[];
 };
@@ -335,6 +339,17 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
 ];
 
 /**
+ * The default value for each of a template's fields, positionally aligned
+ * with `template.fields` — i.e. the authored text of the block each field
+ * targets. Shared by TemplateWizardDialog.tsx (to pre-fill its inputs) and
+ * `buildBlocksFromTemplate` below (as the blank-value fallback), so the two
+ * definitions of "a field's default" can't drift apart.
+ */
+export function templateFieldDefaults(template: StarterTemplate): string[] {
+  return (template.fields ?? []).map((f) => template.blocks[f.blockIndex]?.text ?? "");
+}
+
+/**
  * Builds a template's blocks with each field's text substituted in, indexed
  * positionally against `template.fields` (values[i] corresponds to
  * template.fields[i], not directly to template.blocks[i] — a field's own
@@ -349,11 +364,10 @@ export function buildBlocksFromTemplate(
 ): Omit<TextBlock, "id">[] {
   const blocks = template.blocks.map((b) => ({ ...b }));
   const fields = template.fields ?? [];
+  const defaults = templateFieldDefaults(template);
   fields.forEach((field, i) => {
-    const value = values[i]?.trim();
-    if (value) {
-      blocks[field.blockIndex] = { ...blocks[field.blockIndex], text: value };
-    }
+    const text = values[i]?.trim() || defaults[i];
+    blocks[field.blockIndex] = { ...blocks[field.blockIndex], text };
   });
   return blocks;
 }

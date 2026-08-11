@@ -276,6 +276,8 @@ html, body, #root { height: 100%; margin: 0; }
 
 .sidebarSmallAction--danger { background: var(--danger-soft); color: var(--danger); }
 .sidebarSmallAction--danger:hover { background: var(--danger); color: var(--text-on-danger); }
+.sidebarSmallAction--accent { background: var(--accent); color: var(--text-on-accent); }
+.sidebarSmallAction--accent:hover { background: var(--accent); color: var(--text-on-accent); filter: brightness(1.1); }
 
 /* Confirm dialog */
 .confirmDialogOverlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -293,7 +295,7 @@ html, body, #root { height: 100%; margin: 0; }
 .morphHelpBody h4 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 14px 0 4px; }
 .morphHelpBody h4:first-child { margin-top: 0; }
 
-.templateWizardDialog { width: min(420px, 100%); }
+.templateWizardDialog { width: min(420px, 100%); max-height: min(600px, 85vh); overflow-y: auto; }
 .templateWizardField { margin-bottom: 12px; }
 .templateWizardField label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
 .templateWizardInput { width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 16px; direction: rtl; border: none; border-radius: 8px; background: var(--bg-input); color: var(--text-primary); }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import type { StarterTemplate } from "../lib/templates";
+import { templateFieldDefaults, type StarterTemplate } from "../lib/templates";
 
 export type TemplateWizardDialogProps = {
   template: StarterTemplate;
@@ -23,9 +23,7 @@ export const TemplateWizardDialog: React.FC<TemplateWizardDialogProps> = ({
   onCancel,
 }) => {
   const fields = template.fields ?? [];
-  const [values, setValues] = useState<string[]>(() =>
-    fields.map((f) => template.blocks[f.blockIndex]?.text ?? "")
-  );
+  const [values, setValues] = useState<string[]>(() => templateFieldDefaults(template));
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -54,45 +52,51 @@ export const TemplateWizardDialog: React.FC<TemplateWizardDialogProps> = ({
         </div>
         <div className="confirmDialogMessage">{template.description}</div>
 
-        {fields.map((field, i) => (
-          <div className="templateWizardField" key={field.blockIndex}>
-            <label htmlFor={`template-wizard-field-${field.blockIndex}`}>{field.label}</label>
-            <input
-              id={`template-wizard-field-${field.blockIndex}`}
-              className="templateWizardInput"
-              type="text"
-              value={values[i] ?? ""}
-              onChange={(e) => {
-                const next = [...values];
-                next[i] = e.target.value;
-                setValues(next);
-              }}
-              dir="rtl"
-              lang="ar"
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-            />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onGenerate(values);
+          }}
+        >
+          {/* Single-line only: a TextBlock's text may contain newlines, but no
+              current template's default does, and a <textarea> here would both
+              reshape the dialog layout and break Enter-to-submit. */}
+          {fields.map((field, i) => (
+            <div className="templateWizardField" key={i}>
+              <label htmlFor={`template-wizard-field-${i}`}>{field.label}</label>
+              <input
+                id={`template-wizard-field-${i}`}
+                className="templateWizardInput"
+                type="text"
+                value={values[i] ?? ""}
+                onChange={(e) => {
+                  const next = [...values];
+                  next[i] = e.target.value;
+                  setValues(next);
+                }}
+                dir="rtl"
+                lang="ar"
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
+                autoFocus={i === 0}
+              />
+            </div>
+          ))}
+
+          <div className="templateWizardWarning">
+            This replaces every block currently on the canvas. Ctrl+Z will bring your design back if you change your mind.
           </div>
-        ))}
 
-        <div className="templateWizardWarning">
-          This replaces every block currently on the canvas. Ctrl+Z will bring your design back if you change your mind.
-        </div>
-
-        <div className="confirmDialogActions">
-          <button type="button" className="sidebarSmallAction" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="sidebarSmallAction"
-            autoFocus
-            onClick={() => onGenerate(values)}
-          >
-            Generate
-          </button>
-        </div>
+          <div className="confirmDialogActions">
+            <button type="button" className="sidebarSmallAction" onClick={onCancel}>
+              Cancel
+            </button>
+            <button type="submit" className="sidebarSmallAction sidebarSmallAction--accent">
+              Generate
+            </button>
+          </div>
+        </form>
       </div>
     </div>,
     document.body
