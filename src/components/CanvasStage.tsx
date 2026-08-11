@@ -345,6 +345,19 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     e.evt.preventDefault();
     const stage = stageRef.current;
     if (!stage) return;
+
+    // Browsers report a trackpad pinch gesture (and an explicit ctrl/cmd+
+    // wheel) as a wheel event with ctrlKey set — that's the only case that
+    // should zoom. Plain two-finger scroll or a mouse wheel has no ctrlKey
+    // and should pan the canvas instead.
+    if (!e.evt.ctrlKey && !e.evt.metaKey) {
+      onUpdateStage(stageScale, {
+        x: stagePosition.x - e.evt.deltaX,
+        y: stagePosition.y - e.evt.deltaY,
+      });
+      return;
+    }
+
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
 

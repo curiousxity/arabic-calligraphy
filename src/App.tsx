@@ -1804,10 +1804,10 @@ const App: React.FC = () => {
       {
         ...DEFAULT_BLOCK,
         id: newId,
-        text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
+        text: "حرف",
         type: "textPath",
         textPathD: arcPathD(width, height),
-        textPathReversed: false,
+        textPathReversed: true,
         textPathBaselineOffset: 0,
         textPathEditMode: false,
         x: 0,
