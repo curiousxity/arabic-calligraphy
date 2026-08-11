@@ -29,11 +29,9 @@ export const HistoryPopover: React.FC<HistoryPopoverProps> = ({
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const handleToggle = () => {
-    setOpen((prevOpen) => {
-      const nextOpen = !prevOpen;
-      if (nextOpen) setCurrentThumbnail(onCaptureCurrentThumbnail());
-      return nextOpen;
-    });
+    const nextOpen = !open;
+    if (nextOpen) setCurrentThumbnail(onCaptureCurrentThumbnail());
+    setOpen(nextOpen);
   };
 
   useEffect(() => {
