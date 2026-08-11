@@ -74,6 +74,54 @@ The "Morph Glyph Editor" panel's Stretch tool lets a user click a shaped glyph a
 - **Multi-letter ligatures and multiple named sliders per stroke:** a `Stroke.editBehavior.stretchZones[]` entry can carry its own `label` (`types.ts`) — `deriveStretchCatalog` emits one `StretchDefinition` per **zone**, not per stroke, so a single stroke can expose several independently named/bounded sliders (e.g. Height vs Length) instead of collapsing to one range; every pre-existing file (one zone per stroke, no zone-level label) still produces exactly one entry each, unchanged. `GlyphStretchHandle`/`StretchDefinition` carry `schemaZoneIndex`/`zoneIndex` to track which zone a handle represents. Separately, `GlyphDescription.glyph` supports `role: "ligature"` entries keyed by `baseLetterSequence` (bare-codepoint array, e.g. `["0627","0644","0644","0647"]` for "الله") instead of a single `unicode` — `registry.ts`'s `getLigatureSchema` looks these up, and `glyphLookup.ts`'s `computeClusterSpans` detects when a shaped glyph's HarfBuzz cluster spans more than one source character (several letters fused by the font's own GSUB ligature rules — confirmed real via `fonttools`: `Wessam.ttf` fuses "الله" into exactly one glyph) and routes it through the ligature lookup instead of the normal single-letter path. `src/data/strokeSchemas/allah-ligature.json` is the first (and so far only) authored ligature — confirmed working end-to-end live in the browser (Wessam font, typed "الله", Stretch tool shows 6 labeled buttons: Alif/First lam/Second lam height, Second lam shoulder, Heh loop/tail). It was hand-adapted from a richer source file that required shadda+dagger-alif marks to trigger (per that file's own `triggerRules`/`testCases`) — `fonttools` inspection confirmed no font in `public/fonts/` actually has a GSUB rule fusing the marked sequence (only the plain 4-letter one), so the marks-required trigger and its `MARKS_1` sub-component were dropped rather than imported as dead data. If handed another ligature file with a similar "requires marks/context our fonts don't actually implement" mismatch, verify against real GSUB tables (`fontTools.ttLib`) before assuming it'll work, same as this one.
 - **A schema stroke's `protectedZones` are advisory text only** — they're never read by `applyGlyphEdit`/`applyAxisDisplacement`, so they don't by themselves stop a handle from displacing the whole glyph (its `fromNode`/`toNode` indices reference the schema's own idealized path, which has no correspondence to the real font's actual outline point indices — same mismatch as above). What actually scopes a handle is its own `mask` field. To avoid every schema handle defaulting to "affects the whole glyph," `src/lib/glyphContours.ts`'s `deriveContourMask` auto-derives a contour mask from wherever the handle's (now fixed, schema-derived) anchor/drag points sit on the real outline (point-in-polygon against the glyph's contours, reusing `lib/svgPath.ts`'s bezier-subdivision + point-in-polygon) — since the anchor/drag mapping is only proportional, not per-font-verified, it samples several points along the whole anchor→drag segment (not just the two endpoints) so a point landing in empty space between contours (e.g. between a letter's body and its dots) doesn't spuriously fall back to "whole glyph" when the segment as a whole clearly crosses the intended stroke's ink. Each of `ShapedText.tsx`/`ShapeFillText.tsx`/`ShapeWarpText.tsx` computes this **once, in a `useEffect` keyed off the handle's creation** (not on every drag — there is no more dragging) whenever `GlyphStretchHandle.maskAuto` is `true` and `mask` is still unset (every newly created handle starts this way, per `App.tsx`'s `addStretchHandle`). It can still legitimately land on "whole glyph" for a complex multi-letter ligature glyph where the per-letter schema proportions don't correspond well to the fused real outline — the block-level band width still limits which points move in that case, so this isn't unsafe, just less precisely scoped. Manually invoking "By stroke"/Lasso (`ShapedText.tsx` only) sets `maskAuto: false` so the user's explicit override is never clobbered.
 
+### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
+
+A fifth block type, `textPath`, flows shaped text along an arbitrary curve
+instead of a straight baseline. The curve is stored as a plain SVG path `d`
+string (`textPathD`) — the same representation `shapeSvgPath` already uses
+on `shapeFill`/`shapeWarp` blocks — rather than a bespoke point-array type,
+so presets, SVG upload, and freehand pen-tool drawing all converge on one
+representation and reuse `lib/svgPath.ts`'s existing parse/flatten/replay
+functions wholesale.
+
+`lib/textPath.ts` adds arc-length walking (`pathLength`/`pointAtArcLength`,
+built on the same fixed-step bezier subdivision `pathToPolygon` already
+provides), three preset-curve generators (`arcPathD`/`wavePathD`/
+`circlePathD`), and a single-handle-per-anchor bezier editing model
+(`CurveAnchor`/`anchorsToD`/`dToAnchors`) — every anchor has one *outgoing*
+handle; the incoming handle for the next segment is always that anchor's
+mirror image, trading a fully general independent-in/out-handle pen tool
+for a much simpler one-handle-per-anchor editing UI.
+
+`TextOnPathText.tsx` renders each glyph as a rigid unit — translate to its
+arc-length position on the curve, rotate to the local tangent, draw the
+outline — modeled on `ShapedText.tsx`'s glyph loop rather than
+`ShapeWarpText.tsx`'s per-point remap, since text-on-path repositions whole
+glyphs rather than distorting their outlines. Text always auto-scales to
+span the curve's length exactly (same idea `ShapeFillText` already applies
+per-row to its shape width), which means the block's `fontSize` field has
+no visible effect for this block type and its slider is hidden in the
+sidebar — curve length is the only size control. RTL text anchors to the
+curve's *end* point by default (a `textPathReversed` flag flips this per
+block when the guess is wrong for a particular curve).
+
+`TextPathEditOverlay.tsx` is a separate component (not part of
+`TextOnPathText`) providing the on-canvas pen-tool: click empty canvas to
+append an anchor, drag an anchor or its handle to reshape, right-click an
+anchor to remove it. It's shown only when a `textPath` block is both
+selected and has `textPathEditMode` set, and is hidden during export
+(`useExport.ts` toggles off every node whose id starts with
+`text-path-edit-layer-`, alongside the grid and artboard background it
+already hides).
+
+Stretch-tool glyph handles and glyph rigs do not apply to `textPath`
+blocks — `App.tsx`'s `rightPanelVisible` and every internal glyph-edit
+mutator guard exclude `"textPath"` the same way they've always excluded
+`"image"`. The anchor/drag math those tools use assumes a straight glyph
+bounding box; making it work once a glyph is rotated to a curve tangent
+is a real design problem, deliberately left for a future spec rather than
+half-supported here.
+
 ### Font files carry custom glyphs — don't blindly replace them
 
 `public/fonts/*.ttf|otf` are not stock font files. `FatemiMaqala.ttf` has 8 custom Private Use Area glyphs (U+E833-E840, honorific symbols used by the sidebar's "Presets" row) that were manually merged (via a Python `fontTools` script, not committed to the repo) into every *other* font file in `public/fonts/` too, so those symbols render regardless of the selected font. If a font file in `public/fonts/` is ever regenerated/replaced from an upstream source, those PUA glyphs will be lost and the Presets buttons will silently show missing-glyph boxes in every font except FatemiMaqala again.

@@ -4,6 +4,8 @@ import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { ShapeWarpText } from "./ShapeWarpText";
+import { TextOnPathText } from "./TextOnPathText";
+import { TextPathEditOverlay } from "./TextPathEditOverlay";
 import { ImageBlockView } from "./ImageBlockView";
 import { ZoomInIcon, ZoomOutIcon, FrameIcon, HandIcon } from "./Icons";
 import { isTypingTarget } from "../lib/dom";
@@ -73,6 +75,7 @@ export type CanvasStageProps = {
   ) => void;
   onGlyphSchemaChange: (blockId: number, catalog: Record<number, StretchDefinition[]>) => void;
   onKashidaTextChange: (blockId: number, text: string) => void;
+  onUpdateTextPathD: (blockId: number, d: string) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   onResizeImageBlock: (id: number, scale: number) => void;
   showRulers: boolean;
@@ -112,6 +115,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onGlyphBoxesChange,
   onGlyphSchemaChange,
   onKashidaTextChange,
+  onUpdateTextPathD,
   onResizeShapeFillBlock,
   onResizeImageBlock,
   showRulers,
@@ -673,48 +677,94 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 );
               }
 
-              return (
-                <ShapedText
-                  key={block.id}
-                  {...commonProps}
-                  text={block.text}
-                  x={block.x}
-                  y={block.y}
-                  fontSize={block.fontSize}
-                  color={block.color}
-                  fontFamily={block.fontFamily}
-                  fontStyle={block.fontStyle ?? "normal"}
-                  align={block.align ?? "center"}
-                  lineHeight={block.lineHeight ?? 1.2}
-                  opacity={block.opacity ?? 1}
-                  stroke={block.stroke}
-                  strokeWidth={block.strokeWidth ?? 0}
-                  shadowColor={block.shadowColor}
-                  shadowBlur={block.shadowBlur ?? 0}
-                  shadowOffsetX={block.shadowOffsetX ?? 0}
-                  shadowOffsetY={block.shadowOffsetY ?? 0}
-                  shadowOpacity={block.shadowOpacity ?? 0.35}
-                  rotation={block.rotation ?? 0}
-                  warpX={block.warpX ?? 0}
-                  warpY={block.warpY ?? 0}
-                  kashidaEditMode={block.kashidaEditMode ?? false}
-                  onKashidaTextChange={(text) => onKashidaTextChange(block.id, text)}
-                  glyphEditTool={block.glyphEditTool ?? null}
-                  selectedGlyphIndex={block.selectedGlyphIndex ?? null}
-                  glyphEdits={block.glyphEdits ?? []}
-                  glyphMaskEdit={block.glyphMaskEdit ?? null}
-                  glyphRigs={glyphRigs}
-                  glyphRigValues={block.glyphRigValues ?? []}
-                  onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
-                  onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
-                    onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
-                  }
-                  onGlyphBoxesChange={(boxes) => onGlyphBoxesChange(block.id, boxes)}
-                  onGlyphSchemaChange={(catalog) => onGlyphSchemaChange(block.id, catalog)}
-                  locked={block.locked}
-                  debugBounds={false}
-                />
-              );
+              // Explicit guard for text blocks (TextPath blocks are handled by returning null below)
+              if (block.type === "text") {
+                return (
+                  <ShapedText
+                    key={block.id}
+                    {...commonProps}
+                    text={block.text}
+                    x={block.x}
+                    y={block.y}
+                    fontSize={block.fontSize}
+                    color={block.color}
+                    fontFamily={block.fontFamily}
+                    fontStyle={block.fontStyle ?? "normal"}
+                    align={block.align ?? "center"}
+                    lineHeight={block.lineHeight ?? 1.2}
+                    opacity={block.opacity ?? 1}
+                    stroke={block.stroke}
+                    strokeWidth={block.strokeWidth ?? 0}
+                    shadowColor={block.shadowColor}
+                    shadowBlur={block.shadowBlur ?? 0}
+                    shadowOffsetX={block.shadowOffsetX ?? 0}
+                    shadowOffsetY={block.shadowOffsetY ?? 0}
+                    shadowOpacity={block.shadowOpacity ?? 0.35}
+                    rotation={block.rotation ?? 0}
+                    warpX={block.warpX ?? 0}
+                    warpY={block.warpY ?? 0}
+                    kashidaEditMode={block.kashidaEditMode ?? false}
+                    onKashidaTextChange={(text) => onKashidaTextChange(block.id, text)}
+                    glyphEditTool={block.glyphEditTool ?? null}
+                    selectedGlyphIndex={block.selectedGlyphIndex ?? null}
+                    glyphEdits={block.glyphEdits ?? []}
+                    glyphMaskEdit={block.glyphMaskEdit ?? null}
+                    glyphRigs={glyphRigs}
+                    glyphRigValues={block.glyphRigValues ?? []}
+                    onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
+                    onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
+                      onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
+                    }
+                    onGlyphBoxesChange={(boxes) => onGlyphBoxesChange(block.id, boxes)}
+                    onGlyphSchemaChange={(catalog) => onGlyphSchemaChange(block.id, catalog)}
+                    locked={block.locked}
+                    debugBounds={false}
+                  />
+                );
+              }
+
+              if (block.type === "textPath") {
+                return (
+                  <React.Fragment key={block.id}>
+                    <TextOnPathText
+                      {...commonProps}
+                      text={block.text}
+                      x={block.x}
+                      y={block.y}
+                      fontSize={block.fontSize}
+                      color={block.color}
+                      fontFamily={block.fontFamily}
+                      fontStyle={block.fontStyle ?? "normal"}
+                      opacity={block.opacity ?? 1}
+                      stroke={block.stroke}
+                      strokeWidth={block.strokeWidth ?? 0}
+                      shadowColor={block.shadowColor}
+                      shadowBlur={block.shadowBlur ?? 0}
+                      shadowOffsetX={block.shadowOffsetX ?? 0}
+                      shadowOffsetY={block.shadowOffsetY ?? 0}
+                      shadowOpacity={block.shadowOpacity ?? 0.35}
+                      rotation={block.rotation ?? 0}
+                      textPathD={block.textPathD}
+                      textPathReversed={block.textPathReversed ?? false}
+                      textPathBaselineOffset={block.textPathBaselineOffset ?? 0}
+                      locked={block.locked}
+                    />
+                    {block.textPathEditMode && block.id === selectedId && (
+                      <TextPathEditOverlay
+                        id={`text-path-edit-layer-${block.id}`}
+                        x={block.x}
+                        y={block.y}
+                        rotation={block.rotation ?? 0}
+                        textPathD={block.textPathD}
+                        onChange={(d) => onUpdateTextPathD(block.id, d)}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              }
+
+              // Unreachable for known block types; kept as a safe fallback.
+              return null;
             })}
 
             {guides.vertical.map((gx, i) => (

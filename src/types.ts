@@ -1,4 +1,4 @@
-export type BlockType = "text" | "shapeFill" | "shapeWarp" | "image";
+export type BlockType = "text" | "shapeFill" | "shapeWarp" | "image" | "textPath";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 export type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
@@ -164,4 +164,16 @@ export type ImageBlock = BlockCommon & {
   imageScale?: number;
 };
 
-export type Block = TextBlock | ShapeFillBlock | ShapeWarpBlock | ImageBlock;
+export type TextPathBlock = BlockCommon & {
+  type: "textPath";
+  /** SVG path `d` string defining the curve the text follows. */
+  textPathD: string;
+  /** Manual override for which end of the curve the text starts from. */
+  textPathReversed?: boolean;
+  /** Perpendicular offset of the text baseline from the curve; 0 = on the curve. */
+  textPathBaselineOffset?: number;
+  /** True while the on-canvas pen-tool curve editor is active for this block. */
+  textPathEditMode?: boolean;
+};
+
+export type Block = TextBlock | ShapeFillBlock | ShapeWarpBlock | ImageBlock | TextPathBlock;
