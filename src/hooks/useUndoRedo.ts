@@ -63,6 +63,9 @@ export function useUndoRedo<T>(
     if (!result) return;
     stackRef.current = result.stack;
     applySnapshot(result.restore.snapshot);
+    // Whatever now sits on top of `past` is unrelated to what a subsequent
+    // pushHistory() records — never let it coalesce into that entry.
+    lastPushAtRef.current = 0;
     syncFlags();
   }, [getSnapshot, applySnapshot, captureThumbnail, syncFlags]);
 
@@ -72,6 +75,9 @@ export function useUndoRedo<T>(
     if (!result) return;
     stackRef.current = result.stack;
     applySnapshot(result.restore.snapshot);
+    // See handleUndo: prevent the next push from coalescing into an
+    // unrelated entry now sitting on top of `past`.
+    lastPushAtRef.current = 0;
     syncFlags();
   }, [getSnapshot, applySnapshot, captureThumbnail, syncFlags]);
 
@@ -93,6 +99,9 @@ export function useUndoRedo<T>(
       if (!result) return;
       stackRef.current = result.stack;
       applySnapshot(result.restore.snapshot);
+      // See handleUndo: prevent the next push from coalescing into an
+      // unrelated entry now sitting on top of `past`.
+      lastPushAtRef.current = 0;
       syncFlags();
     },
     [getSnapshot, applySnapshot, captureThumbnail, syncFlags]
