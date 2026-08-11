@@ -330,10 +330,21 @@ const App: React.FC = () => {
     setBackgroundColor(snapshot.backgroundColor);
   }, []);
 
-  const { pushHistory, handleUndo, handleRedo, canUndo, canRedo } = useUndoRedo(
-    getSnapshot,
-    applySnapshot
-  );
+  /**
+   * Rasterizes the live stage at low resolution for history thumbnails.
+   * No grid/background hiding (unlike useExport's toDataURL calls) — this
+   * is a cheap approximate preview, not export-quality output.
+   */
+  const captureHistoryThumbnail = useCallback(() => {
+    try {
+      return stageRef.current?.toDataURL({ pixelRatio: 0.15 }) ?? "";
+    } catch {
+      return "";
+    }
+  }, []);
+
+  const { pushHistory, handleUndo, handleRedo, jumpBy, canUndo, canRedo, historyEntries } =
+    useUndoRedo(getSnapshot, applySnapshot, captureHistoryThumbnail);
 
   const scheduleMoveHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleKashidaHistoryPush = useDebouncedHistoryPush(pushHistory);
@@ -1970,6 +1981,9 @@ const App: React.FC = () => {
         onRedo={handleRedo}
         canUndo={canUndo}
         canRedo={canRedo}
+        historyEntries={historyEntries}
+        onJumpToHistory={jumpBy}
+        onCaptureCurrentThumbnail={captureHistoryThumbnail}
         onToggleKashidaEditMode={() => {
           if (!selectedBlock || selectedBlock.type !== "text") return;
           updateSelectedBlock({
