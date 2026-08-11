@@ -23,6 +23,7 @@ import type {
   GlyphRig,
   GlyphRigValue,
   GlyphStretchMask,
+  DiacriticOverride,
 } from "../types";
 import {
   isOverrideGlyphChar,
@@ -61,6 +62,7 @@ type Props = {
   glyphMaskEdit?: { handleId: string; mode: "contours" | "lasso" } | null;
   glyphRigs?: GlyphRig[];
   glyphRigValues?: GlyphRigValue[];
+  diacriticOverrides?: DiacriticOverride[];
   onGlyphSelect?: (glyphIndex: number | null) => void;
   onGlyphBoxesChange?: (boxes: GlyphHitBox[]) => void;
   onGlyphSchemaChange?: (catalog: Record<number, StretchDefinition[]>) => void;
@@ -176,7 +178,8 @@ function drawWarpedGlyphRun(
   glyphEdits: GlyphEdit[] = [],
   fontFamily = "",
   glyphRigs: GlyphRig[] = [],
-  glyphRigValues: GlyphRigValue[] = []
+  glyphRigValues: GlyphRigValue[] = [],
+  diacriticOverrides: DiacriticOverride[] = []
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -194,6 +197,12 @@ function drawWarpedGlyphRun(
       continue;
     }
 
+    const diacriticOverride = diacriticOverrides.find((o) => o.glyphIndex === glyphIndex);
+    if (diacriticOverride?.hidden) {
+      penX += advance;
+      continue;
+    }
+
     const gx = (penX + (g.dx ?? 0)) * scale;
     const gy = -(g.dy ?? 0) * scale;
     const edit = glyphEdits.find((w) => w.glyphIndex === glyphIndex);
@@ -201,6 +210,12 @@ function drawWarpedGlyphRun(
 
     ctx.save();
     ctx.translate(gx, gy);
+
+    if (diacriticOverride) {
+      ctx.translate(0, diacriticOverride.offsetY ?? 0);
+      const diacScale = diacriticOverride.scale ?? 1;
+      ctx.scale(diacScale, diacScale);
+    }
 
     if (
       overrideGlyph &&
@@ -332,6 +347,7 @@ export const ShapedText: React.FC<Props> = ({
   glyphMaskEdit = null,
   glyphRigs = [],
   glyphRigValues = [],
+  diacriticOverrides = [],
   onGlyphSelect,
   onGlyphBoxesChange,
   onGlyphSchemaChange,
@@ -774,7 +790,8 @@ export const ShapedText: React.FC<Props> = ({
             glyphEdits,
             fontFamily,
             glyphRigs,
-            glyphRigValues
+            glyphRigValues,
+            diacriticOverrides
           );
           ctx.restore();
 
@@ -799,7 +816,8 @@ export const ShapedText: React.FC<Props> = ({
               glyphEdits,
               fontFamily,
               glyphRigs,
-              glyphRigValues
+              glyphRigValues,
+              diacriticOverrides
             );
             ctx.restore();
           }
