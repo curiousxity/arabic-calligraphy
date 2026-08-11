@@ -6,6 +6,19 @@ export type StarterTemplate = {
   description: string;
   backgroundColor: string;
   blocks: Omit<TextBlock, "id">[];
+  /**
+   * One entry per block that should be user-editable through the Template
+   * Wizard (TemplateWizardDialog.tsx) — every block in every template
+   * currently gets exactly one field (no "primary vs. secondary block"
+   * curation). It stays optional only for tolerance, not as a separate
+   * code path: there is no one-click-apply flow anymore, so a template
+   * added without field metadata still opens the wizard — just with zero
+   * inputs (title, description, warning, Cancel/Generate) — and Generate
+   * applies the template's blocks verbatim, since
+   * `buildBlocksFromTemplate` with an empty `fields` array simply returns
+   * copies of the authored blocks with their original text.
+   */
+  fields?: { blockIndex: number; label: string }[];
 };
 
 const baseText: Omit<TextBlock, "id" | "text" | "x" | "y" | "fontSize" | "fontFamily" | "color"> = {
@@ -34,6 +47,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Bismillah Card",
     description: "Centered Bismillah in gold on a navy square.",
     backgroundColor: "#0d1526",
+    fields: [{ blockIndex: 0, label: "Bismillah phrase" }],
     blocks: [
       {
         ...baseText,
@@ -51,6 +65,10 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Eid Greeting",
     description: "Large greeting with a subtitle line, sized for a story post.",
     backgroundColor: "#f2ead9",
+    fields: [
+      { blockIndex: 0, label: "Main greeting" },
+      { blockIndex: 1, label: "Subtitle" },
+    ],
     blocks: [
       {
         ...baseText,
@@ -77,6 +95,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Name Monogram",
     description: "A single bold word, centered — good for names or short titles.",
     backgroundColor: "#ffffff",
+    fields: [{ blockIndex: 0, label: "Name" }],
     blocks: [
       {
         ...baseText,
@@ -94,6 +113,10 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Quote Card",
     description: "A body line with a smaller attribution, sized for print (A4).",
     backgroundColor: "#faf5e8",
+    fields: [
+      { blockIndex: 0, label: "Main verse" },
+      { blockIndex: 1, label: "Reference" },
+    ],
     blocks: [
       {
         ...baseText,
@@ -120,6 +143,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Salawat Card",
     description: "An elegant Salawat phrase in gold on deep navy.",
     backgroundColor: "#15213a",
+    fields: [{ blockIndex: 0, label: "Salawat phrase" }],
     blocks: [
       {
         ...baseText,
@@ -137,6 +161,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Ramadan Greeting",
     description: "Festive Ramadan greeting in gold on deep purple.",
     backgroundColor: "#2a1a3d",
+    fields: [{ blockIndex: 0, label: "Greeting" }],
     blocks: [
       {
         ...baseText,
@@ -154,6 +179,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "MashaAllah Tag",
     description: "A small punchy phrase — good for stickers or badges.",
     backgroundColor: "#f5eeda",
+    fields: [{ blockIndex: 0, label: "Phrase" }],
     blocks: [
       {
         ...baseText,
@@ -171,6 +197,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Alhamdulillah Tag",
     description: "A single word of gratitude on a warm cream background.",
     backgroundColor: "#f5f1e0",
+    fields: [{ blockIndex: 0, label: "Phrase" }],
     blocks: [
       {
         ...baseText,
@@ -188,6 +215,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Jumu'ah Greeting",
     description: "Friday greeting in gold on deep green, geometric Kufi style.",
     backgroundColor: "#1b3a2f",
+    fields: [{ blockIndex: 0, label: "Greeting" }],
     blocks: [
       {
         ...baseText,
@@ -205,6 +233,10 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Wedding Blessing",
     description: "A blessing line with a smaller occasion subtitle, blush palette.",
     backgroundColor: "#f9ece9",
+    fields: [
+      { blockIndex: 0, label: "Blessing" },
+      { blockIndex: 1, label: "Subtitle" },
+    ],
     blocks: [
       {
         ...baseText,
@@ -231,6 +263,10 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Newborn Mabrook",
     description: "Congratulations on a new baby, soft blue palette.",
     backgroundColor: "#eaf3f7",
+    fields: [
+      { blockIndex: 0, label: "Main word" },
+      { blockIndex: 1, label: "Subtitle" },
+    ],
     blocks: [
       {
         ...baseText,
@@ -257,6 +293,10 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Condolence Card",
     description: "A somber black-on-white card with the Quranic verse reference.",
     backgroundColor: "#ffffff",
+    fields: [
+      { blockIndex: 0, label: "Main phrase" },
+      { blockIndex: 1, label: "Verse reference" },
+    ],
     blocks: [
       {
         ...baseText,
@@ -283,6 +323,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     label: "Shukran Tag",
     description: "A punchy thank-you word — good for stickers or cards.",
     backgroundColor: "#fff8e7",
+    fields: [{ blockIndex: 0, label: "Phrase" }],
     blocks: [
       {
         ...baseText,
@@ -296,3 +337,37 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     ],
   },
 ];
+
+/**
+ * The default value for each of a template's fields, positionally aligned
+ * with `template.fields` — i.e. the authored text of the block each field
+ * targets. Shared by TemplateWizardDialog.tsx (to pre-fill its inputs) and
+ * `buildBlocksFromTemplate` below (as the blank-value fallback), so the two
+ * definitions of "a field's default" can't drift apart.
+ */
+export function templateFieldDefaults(template: StarterTemplate): string[] {
+  return (template.fields ?? []).map((f) => template.blocks[f.blockIndex]?.text ?? "");
+}
+
+/**
+ * Builds a template's blocks with each field's text substituted in, indexed
+ * positionally against `template.fields` (values[i] corresponds to
+ * template.fields[i], not directly to template.blocks[i] — a field's own
+ * `blockIndex` says which block it targets). A blank/whitespace-only value
+ * falls back to that block's original authored text, so a user can't
+ * generate a block with empty text by accident. Every other block property
+ * (font, color, size, position) is untouched. Does not mutate `template`.
+ */
+export function buildBlocksFromTemplate(
+  template: StarterTemplate,
+  values: string[]
+): Omit<TextBlock, "id">[] {
+  const blocks = template.blocks.map((b) => ({ ...b }));
+  const fields = template.fields ?? [];
+  const defaults = templateFieldDefaults(template);
+  fields.forEach((field, i) => {
+    const text = values[i]?.trim() || defaults[i];
+    blocks[field.blockIndex] = { ...blocks[field.blockIndex], text };
+  });
+  return blocks;
+}

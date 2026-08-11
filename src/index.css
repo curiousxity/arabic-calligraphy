@@ -276,6 +276,8 @@ html, body, #root { height: 100%; margin: 0; }
 
 .sidebarSmallAction--danger { background: var(--danger-soft); color: var(--danger); }
 .sidebarSmallAction--danger:hover { background: var(--danger); color: var(--text-on-danger); }
+.sidebarSmallAction--accent { background: var(--accent); color: var(--text-on-accent); }
+.sidebarSmallAction--accent:hover { background: var(--accent); color: var(--text-on-accent); filter: brightness(1.1); }
 
 /* Confirm dialog */
 .confirmDialogOverlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -292,6 +294,13 @@ html, body, #root { height: 100%; margin: 0; }
 .morphHelpBody li { margin-bottom: 6px; }
 .morphHelpBody h4 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 14px 0 4px; }
 .morphHelpBody h4:first-child { margin-top: 0; }
+
+.templateWizardDialog { width: min(420px, 100%); max-height: min(600px, 85vh); overflow-y: auto; }
+.templateWizardField { margin-bottom: 12px; }
+.templateWizardField label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.templateWizardInput { width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 16px; direction: rtl; border: none; border-radius: 8px; background: var(--bg-input); color: var(--text-primary); }
+.templateWizardInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.templateWizardWarning { font-size: 12px; color: var(--text-muted); margin: 4px 0 14px; }
 
 /* Canvas toolbar */
 .canvasToolbar { position: absolute; bottom: 12px; right: 12px; z-index: 20; display: flex; align-items: center; gap: 2px; background: var(--toolbar-bg); border: 1px solid var(--border); border-radius: 10px; padding: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); backdrop-filter: blur(6px); }

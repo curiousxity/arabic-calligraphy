@@ -15,7 +15,7 @@ import { useDebouncedHistoryPush } from "./hooks/useDebouncedHistoryPush";
 import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
 import { triggerDownload } from "./lib/download";
-import { STARTER_TEMPLATES } from "./lib/templates";
+import { STARTER_TEMPLATES, buildBlocksFromTemplate } from "./lib/templates";
 import { FONT_URLS } from "./hooks/useShapedGlyphs";
 import {
   MIN_SCALE,
@@ -1066,32 +1066,18 @@ const App: React.FC = () => {
     return id;
   };
 
-  const applyStarterTemplate = (templateId: string) => {
+  const generateFromTemplate = (templateId: string, values: string[]) => {
     const template = STARTER_TEMPLATES.find((t) => t.id === templateId);
     if (!template) return;
     pushHistory();
-    const newBlocks: Block[] = template.blocks.map((b) => ({ ...b, id: createNextId() }));
+    const templateBlocks = buildBlocksFromTemplate(template, values);
+    const newBlocks: Block[] = templateBlocks.map((b) => ({ ...b, id: createNextId() }));
     setBlocks(newBlocks);
     setBackgroundColor(template.backgroundColor);
     setShowGrid(false);
     setSelectedIds([]);
     setSelectedId(newBlocks[0]?.id ?? null);
     setTimeout(() => resetView(newBlocks), 0);
-  };
-
-  const requestApplyStarterTemplate = (templateId: string) => {
-    const template = STARTER_TEMPLATES.find((t) => t.id === templateId);
-    if (!template) return;
-    setConfirmRequest({
-      title: `Replace canvas with "${template.label}"?`,
-      message:
-        "This clears every block currently on the canvas. Ctrl+Z will bring your design back if you change your mind.",
-      confirmLabel: "Replace canvas",
-      onConfirm: () => {
-        setConfirmRequest(null);
-        applyStarterTemplate(templateId);
-      },
-    });
   };
 
   const randomizeLayout = () => {
@@ -1962,7 +1948,7 @@ const App: React.FC = () => {
         onAddShapeWarpBlock={addShapeWarpBlock}
         onAddTextPathBlock={addTextPathBlock}
         onAddImageBlock={uploadImageBlock}
-        onApplyTemplate={requestApplyStarterTemplate}
+        onGenerateFromTemplate={generateFromTemplate}
         onRandomizeLayout={randomizeLayout}
         onToggleGrid={setShowGrid}
         onToggleSnap={setSnapToGrid}

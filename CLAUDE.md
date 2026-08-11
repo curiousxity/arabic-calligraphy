@@ -216,6 +216,20 @@ half-supported here.
 
 `Sidebar.tsx` is a large single component (selection-dependent panels: Styling, Align & Arrange, Shape Fill/Warp controls, Save/Export, Canvas Size, Arabic Helpers/Presets) that reads/writes through props from `App.tsx`. Shared low-level form pieces (`SelectRow`, `ColorRow`, `RangeRow`, `PresetKeyboard`) live in `src/components/sidebar/FormControls.tsx`; the layer list is `src/components/sidebar/LayersPanel.tsx`. `src/components/sidebar/utils.ts` has one helper (`makeId`).
 
+The "Start from a Template" section's buttons don't apply a template
+directly — each opens `TemplateWizardDialog.tsx`, a small modal with one
+RTL text field per block in that template (`StarterTemplate.fields` in
+`lib/templates.ts`, hand-authored per template, pre-filled with the
+template's original text). Generate calls `App.tsx`'s
+`generateFromTemplate`, which builds the new blocks via the pure
+`buildBlocksFromTemplate(template, values)` (falls back to a field's
+original text if left blank) before doing the same replace-canvas
+sequence the old one-click apply used. This replaced a separate
+`ConfirmDialog` "this clears the canvas" step — the wizard's own warning
+text serves that purpose now, since filling out a form is already a
+deliberate action and a second confirmation on top was redundant
+friction.
+
 CSS is one global stylesheet (`src/index.css`) using CSS custom properties for theming — navy+gold is the unconditional default (`:root`), with an ivory/parchment palette under `@media (prefers-color-scheme: light)` (inverted from the usual light-default/dark-override convention — check this file's structure before assuming which block is "the default").
 
 Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default to `min-width: auto`**, which refuses to shrink below content size and causes silent overflow/clipping at narrow sidebar widths. When adding a new multi-item row (grid or flex), give items `min-width: 0` explicitly or the row will overflow at the sidebar's minimum width instead of degrading gracefully.
