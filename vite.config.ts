@@ -13,6 +13,12 @@ export default defineConfig({
         __dirname,
         'node_modules/opentype.js/dist/opentype.module.js'
       ),
+      // Same problem, same fix: imagetracerjs's package.json only has "main",
+      // no "exports" field.
+      'imagetracerjs': path.resolve(
+        __dirname,
+        'node_modules/imagetracerjs/imagetracer_v1.2.6.js'
+      ),
     },
   },
   build: {
