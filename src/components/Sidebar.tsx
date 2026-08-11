@@ -25,6 +25,7 @@ import {
   CheckboxRow,
 } from "./sidebar/FormControls";
 import { FloatingArabicKeyboard } from "./sidebar/FloatingKeyboard";
+import { ImageTraceDialog } from "./ImageTraceDialog";
 import {
   TrashIcon,
   CopyIcon,
@@ -260,6 +261,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showBackgroundSettings, setShowBackgroundSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
+  const [imageTraceFile, setImageTraceFile] = useState<File | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -362,6 +364,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onAdd(result.pathData, result.w, result.h);
       };
       reader.readAsText(file);
+    };
+
+    input.click();
+  };
+
+  const handleImageTraceUpload = () => {
+    if (!onAddShapeWarpBlock) return;
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        alert("Please choose an image file (PNG, JPG, etc.).");
+        return;
+      }
+      setImageTraceFile(file);
     };
 
     input.click();
@@ -615,6 +637,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <CircleDashedIcon size={14} />
               </button>
+            )}
+
+            {onAddShapeWarpBlock && (
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                title="Trace image for Shape Warp"
+                onClick={handleImageTraceUpload}
+              >
+                <ImageIcon size={14} />
+              </button>
+            )}
+
+            {imageTraceFile && (
+              <ImageTraceDialog
+                file={imageTraceFile}
+                onCancel={() => setImageTraceFile(null)}
+                onConfirm={(pathData, w, h) => {
+                  onAddShapeWarpBlock?.(pathData, w, h);
+                  setImageTraceFile(null);
+                }}
+              />
             )}
 
             {onAddTextPathBlock && (
