@@ -342,13 +342,6 @@ const App: React.FC = () => {
 
   const { pushHistory, handleUndo, handleRedo, jumpBy, canUndo, canRedo, historyEntries } =
     useUndoRedo(getSnapshot, applySnapshot, captureHistoryThumbnail);
-  // `jumpBy`/`historyEntries` aren't consumed yet — Task 3 wires them into the
-  // history popover UI. Contrary to the plan's expectation, both tsc's
-  // noUnusedLocals and eslint's no-unused-vars DO flag unused destructured
-  // object properties in this project's config, so they're referenced here
-  // as a no-op until Task 3 gives them a real use.
-  void jumpBy;
-  void historyEntries;
 
   const scheduleMoveHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleKashidaHistoryPush = useDebouncedHistoryPush(pushHistory);
@@ -1985,6 +1978,9 @@ const App: React.FC = () => {
         onRedo={handleRedo}
         canUndo={canUndo}
         canRedo={canRedo}
+        historyEntries={historyEntries}
+        onJumpToHistory={jumpBy}
+        onCaptureCurrentThumbnail={captureHistoryThumbnail}
         onToggleKashidaEditMode={() => {
           if (!selectedBlock || selectedBlock.type !== "text") return;
           updateSelectedBlock({

@@ -13,6 +13,7 @@ import { arcPathD, wavePathD, circlePathD } from "../lib/textPath";
 import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import { LayersPanel } from "./sidebar/LayersPanel";
+import { HistoryPopover } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
 import {
   SelectRow,
@@ -116,6 +117,9 @@ export type SidebarProps = {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  historyEntries: { thumbnail: string; steps: number }[];
+  onJumpToHistory: (steps: number) => void;
+  onCaptureCurrentThumbnail: () => string;
 
   onToggleKashidaEditMode?: () => void;
   showMorphEditorMobile?: boolean;
@@ -230,6 +234,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRedo,
   canUndo,
   canRedo,
+  historyEntries,
+  onJumpToHistory,
+  onCaptureCurrentThumbnail,
   onToggleKashidaEditMode,
   showMorphEditorMobile,
   onToggleMorphEditorMobile,
@@ -657,6 +664,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <RedoIcon size={14} />
             </button>
+
+            <HistoryPopover
+              historyEntries={historyEntries}
+              onJumpTo={onJumpToHistory}
+              onCaptureCurrentThumbnail={onCaptureCurrentThumbnail}
+            />
           </div>
         </div>
 
