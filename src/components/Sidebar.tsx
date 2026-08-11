@@ -40,6 +40,7 @@ import {
   DownloadIcon,
   UploadIcon,
   ImageIcon,
+  TraceWandIcon,
   VectorIcon,
   FileTextIcon,
   ChevronLeftIcon,
@@ -629,25 +630,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
 
             {onAddShapeWarpBlock && (
-              <button
-                type="button"
-                className="sidebarCircleButton"
-                title="Upload SVG for Shape Warp"
-                onClick={() => handleSvgUpload("shapeWarp")}
-              >
-                <CircleDashedIcon size={14} />
-              </button>
-            )}
+              <>
+                <button
+                  type="button"
+                  className="sidebarCircleButton"
+                  title="Upload SVG for Shape Warp"
+                  aria-label="Upload SVG for Shape Warp"
+                  onClick={() => handleSvgUpload("shapeWarp")}
+                >
+                  <CircleDashedIcon size={14} />
+                </button>
 
-            {onAddShapeWarpBlock && (
-              <button
-                type="button"
-                className="sidebarCircleButton"
-                title="Trace image for Shape Warp"
-                onClick={handleImageTraceUpload}
-              >
-                <ImageIcon size={14} />
-              </button>
+                <button
+                  type="button"
+                  className="sidebarCircleButton"
+                  title="Trace image for Shape Warp"
+                  aria-label="Trace image for Shape Warp"
+                  onClick={handleImageTraceUpload}
+                >
+                  <TraceWandIcon size={14} />
+                </button>
+              </>
             )}
 
             {imageTraceFile && (
