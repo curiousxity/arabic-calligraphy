@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { traceImageToPath, type TraceResult } from "../lib/imageTrace";
+import {
+  imageElementToImageData,
+  traceImageToPath,
+  type TraceResult,
+} from "../lib/imageTrace";
 
 export type ImageTraceDialogProps = {
   file: File;
@@ -33,8 +37,14 @@ export const ImageTraceDialog: React.FC<ImageTraceDialogProps> = ({
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
   const [result, setResult] = useState<TraceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isTracing, setIsTracing] = useState(false);
   const imageDataRef = useRef<ImageData | null>(null);
   const debounceRef = useRef<number | null>(null);
+  // Mirrors `threshold` so the first post-decode trace can use whatever the
+  // user has already dialed in — the slider is interactive while the image is
+  // still decoding, and reading `threshold` state inside the load effect
+  // would capture its initial value and silently discard their choice.
+  const thresholdRef = useRef(DEFAULT_THRESHOLD);
 
   const imgUrl = useMemo(() => URL.createObjectURL(file), [file]);
 
@@ -56,31 +66,29 @@ export const ImageTraceDialog: React.FC<ImageTraceDialogProps> = ({
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      const scale = Math.min(
-        1,
-        MAX_TRACE_DIMENSION / Math.max(img.naturalWidth, img.naturalHeight)
-      );
-      const w = Math.max(1, Math.round(img.naturalWidth * scale));
-      const h = Math.max(1, Math.round(img.naturalHeight * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        setError("Could not read this image.");
+      let imageData: ImageData;
+      try {
+        imageData = imageElementToImageData(img, MAX_TRACE_DIMENSION);
+      } catch {
+        setError("This browser could not prepare the image for tracing.");
         return;
       }
-      ctx.drawImage(img, 0, 0, w, h);
-      imageDataRef.current = ctx.getImageData(0, 0, w, h);
-      setDisplaySize({ w, h });
+      imageDataRef.current = imageData;
+      setDisplaySize({ w: imageData.width, h: imageData.height });
     };
-    img.onerror = () => setError("Could not load this image.");
+    img.onerror = () =>
+      setError("This file could not be decoded as an image — try a PNG or JPEG.");
     img.src = imgUrl;
   }, [file, imgUrl]);
 
   const retrace = useCallback((nextThreshold: number) => {
     const original = imageDataRef.current;
-    if (!original) return;
+    if (!original) {
+      // Nothing decoded yet (or decode failed) — drop the busy state that
+      // handleThresholdChange optimistically set, so it can't stick on.
+      setIsTracing(false);
+      return;
+    }
     // traceImageToPath binarizes in place, so pass a fresh clone of the
     // original grayscale pixels each time rather than the cached source —
     // otherwise the second retrace would binarize an already-binarized
@@ -90,14 +98,21 @@ export const ImageTraceDialog: React.FC<ImageTraceDialogProps> = ({
       original.width,
       original.height
     );
-    const traced = traceImageToPath(clone, nextThreshold);
-    setResult(traced);
-    setError(traced ? null : "No shape detected — try adjusting the threshold.");
+    setIsTracing(true);
+    try {
+      const traced = traceImageToPath(clone, nextThreshold);
+      setResult(traced);
+      setError(traced ? null : "No shape detected — try adjusting the threshold.");
+    } finally {
+      setIsTracing(false);
+    }
   }, []);
 
   useEffect(() => {
     if (!displaySize) return;
-    retrace(DEFAULT_THRESHOLD);
+    // thresholdRef, not DEFAULT_THRESHOLD: the user may already have moved
+    // the slider while the image was decoding.
+    retrace(thresholdRef.current);
   }, [displaySize, retrace]);
 
   useEffect(() => {
@@ -108,6 +123,11 @@ export const ImageTraceDialog: React.FC<ImageTraceDialogProps> = ({
 
   const handleThresholdChange = (value: number) => {
     setThreshold(value);
+    thresholdRef.current = value;
+    // Flag busy as soon as a trace is *scheduled*, not just while
+    // traceImageToPath runs: the trace itself is synchronous, so a flag
+    // raised and lowered inside one event-loop turn would never paint.
+    setIsTracing(true);
     if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(() => retrace(value), DEBOUNCE_MS);
   };
@@ -176,10 +196,24 @@ export const ImageTraceDialog: React.FC<ImageTraceDialogProps> = ({
           />
         </div>
 
-        {error && <div className="imageTraceDialogError">{error}</div>}
+        {isTracing && (
+          <div
+            className="imageTraceDialogStatus"
+            role="status"
+            style={{ fontSize: 12, color: "var(--text-secondary)" }}
+          >
+            Tracing…
+          </div>
+        )}
+
+        {error && !isTracing && <div className="imageTraceDialogError">{error}</div>}
 
         <div className="confirmDialogActions">
-          <button type="button" className="sidebarSmallAction" onClick={onCancel}>
+          {/* autoFocus on Cancel, matching ConfirmDialog.tsx: without focus
+              inside the modal, Delete/Backspace keystrokes reach App.tsx's
+              global block-delete handler behind it. Cancel rather than
+              Confirm because Confirm starts disabled until a trace lands. */}
+          <button type="button" className="sidebarSmallAction" onClick={onCancel} autoFocus>
             Cancel
           </button>
           <button
