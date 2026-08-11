@@ -55,6 +55,13 @@ export const PlusIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
+export const PathTextIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <path d="M3 17c3-8 6-12 9-12s3 8 6 8 3-4 3-4" />
+    <circle cx="3" cy="17" r="1.4" fill="currentColor" stroke="none" />
+  </IconBase>
+);
+
 export const ShapesIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>
     <rect x="3" y="3" width="8" height="8" rx="1.5" />

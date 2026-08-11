@@ -360,8 +360,8 @@ export function wavePathD(width: number, height: number): string {
 
 /**
  * Three-quarters of a circle (270°), swept clockwise from the top, leaving
- * the bottom quarter open so the path has a clear start/end for text to
- * anchor to instead of being a closed loop.
+ * the top-left quadrant (the left→top segment) open so the path has a clear
+ * start/end for text to anchor to instead of being a closed loop.
  */
 export function circlePathD(width: number, height: number): string {
   const r = Math.max(1, Math.min(width, height) / 2);

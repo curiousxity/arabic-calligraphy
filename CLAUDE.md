@@ -59,6 +59,91 @@ Text is shaped with real HarfBuzz compiled to WASM (`harfbuzzjs` npm package, lo
 
 `src/lib/normalizeGlyphs.ts` and `src/lib/svgPath.ts` have their own `*.test.ts` files — these are the two lib modules with actual test coverage; `warp.ts` also has a test.
 
+### Per-instance diacritic control (`src/lib/diacritics.ts`, `DiacriticHoverHandles.tsx`)
+
+Plain text blocks support per-instance adjustment of individual tashkeel
+marks (harakat, tanween, sukun, shadda, etc.) — hovering any diacritic on
+a selected block's canvas shows three small handles: drag one vertically
+to reposition it, drag another to resize it, and click a third to hide
+just that one instance. This is separate from, and non-destructive
+relative to, the existing "Clear diacritics" button (`clearDiacritics` in
+`App.tsx`), which permanently removes every diacritic character from the
+block's text — overrides only change how a diacritic *renders*, never the
+underlying text, and a "Reset diacritic overrides" button clears them
+without touching the text either.
+
+`lib/diacritics.ts`'s `findDiacriticGlyphIndices(glyphs, font)` identifies
+which shaped glyphs are diacritics by glyph identity, **not** by cluster:
+HarfBuzz's default cluster level (`MONOTONE_GRAPHEMES`) merges a base
+letter with every combining mark following it into one cluster whose
+value is the *base letter's* character offset, so a mark glyph's own
+`glyph.cl` never points at the mark's own character — cluster-to-source
+lookup (what an earlier version of this function did, and what
+`strokeSchema/glyphLookup.ts` still does for its own, different, purpose)
+silently detects nothing on real shaped text. The working detection is
+two signals: (1) primary — the glyph's own Unicode codepoint(s), from
+`font.glyphs.get(g.g).unicodes` (opentype.js's cmap-derived metadata),
+tested against `ARABIC_DIACRITIC_RE`; (2) fallback, for contextual mark
+variants with no cmap entry at all (e.g. a font's own fused mark-ligature
+glyph) — within a cluster shared by more than one glyph, a base letter is
+drawn at its own designed origin (HarfBuzz position `dx`/`dy` both 0)
+while every mark stacked onto it carries a nonzero GPOS mark-attachment
+offset, so a cluster-sharing glyph with nonzero `dx`/`dy` is treated as a
+mark too. `ARABIC_DIACRITIC_RE` itself now lives in `diacritics.ts` (not
+`harfbuzz.ts`, which re-exports it for compatibility) specifically so
+this module has no runtime dependency on harfbuzzjs, which lets
+`diacritics.test.ts` shape real text with real harfbuzzjs directly rather
+than mocking it — every assertion in that suite is checked against actual
+HarfBuzz output for real fonts in `public/fonts/`, not hand-written
+`{ g, cl }` fixtures (a fabricated-cluster version of this test suite is
+exactly what let the cluster-lookup bug ship unnoticed once before).
+
+Overrides (`DiacriticOverride` in `types.ts`: `scale`/`offsetY`/`hidden`,
+default no-op) are keyed by glyph index — the same scheme
+`GlyphStretchHandle` already uses for the Stretch tool, including that
+scheme's known fragility (a text edit before a diacritic in the string can
+shift which glyph index its override lands on after re-shaping). Because
+of that fragility, `ShapedText.tsx` recomputes `findDiacriticGlyphIndices`
+for its own current glyph run each render and filters `diacriticOverrides`
+down to only the glyph indices that call currently identifies as
+diacritics before handing them to `drawWarpedGlyphRun` — a stale override
+whose glyph index now lands on a base letter (rather than a mark) is
+silently ignored instead of hiding or grotesquely scaling that letter.
+Surviving overrides are applied inside `ShapedText.tsx`'s shared
+`drawWarpedGlyphRun` as an
+extra `ctx.translate`/`ctx.scale` pivoted on the glyph's own pen-origin
+`(gx, gy)`, structurally identical to how that same function already
+handles the Private-Use-Area "override glyph" preset symbols. A `hidden`
+override skips the glyph's draw call but not its advance width, so hiding
+a mark never reflows surrounding letters.
+
+`DiacriticHoverHandles.tsx` is a separate component (not folded into
+`ShapedText.tsx` itself) reusing `ShapedText`'s existing per-glyph
+`glyphHitBoxes` (already computed for the Stretch tool's hit-testing) —
+only the currently-hovered diacritic ever shows handles, which is what
+keeps text with many marks from becoming visual clutter. The move
+handle's `dragBoundFunc` captures the handle's absolute (stage-space) x
+at `onDragStart` and holds it fixed for the drag's duration, rather than
+returning the group-local `cx` Konva's `dragBoundFunc` contract requires
+absolute coordinates for — mixing the two spaces there previously
+teleported the handle sideways under any block offset/pan/zoom. The hover
+hit-`Rect` is derived from the mark's actual rendered position
+(`displayY`, i.e. original position + `offsetY`) and scaled size
+(`box.width/height * scale`), not its original un-overridden box, so an
+overridden mark's hoverable area tracks where it's actually drawn instead
+of drifting away from it as `offsetY`/`scale` grow. It's active only
+when the block is selected, matching every other interactive on-canvas
+overlay in this app. Live handle drags follow the same debounced-history
+pattern (`useDebouncedHistoryPush`) the Kashida tool already established;
+the hide-button click is a discrete, immediate `pushHistory()` mutation.
+
+This feature is `ShapedText.tsx`-only for v1 — Shape Fill (tiled rows),
+Shape Warp (bounding-envelope remap), and any curve-following text put a
+diacritic's on-screen position through additional transforms beyond
+`ShapedText.tsx`'s simple pen-advance layout, and correctly locating a
+hover-handle in each of those coordinate spaces is real, separate design
+work, deliberately left for a future spec rather than half-supported here.
+
 ### Stroke-schema-driven glyph editor (`src/lib/strokeSchema/`, `MorphGlyphEditor.tsx`)
 
 The "Morph Glyph Editor" panel's Stretch tool lets a user click a shaped glyph and add anchor→drag "stretch handles" that displace real font-outline points (`lib/glyphEdits.ts`'s `applyGlyphEdit`/`applyAxisDisplacement`, band-falloff + optional contour/lasso masking). **Handle creation is schema-only** — there is no generic/freeform "Add stretch line" button anymore (removed once enough letters had authored schema data); every handle traces back to a `StretchDefinition` from an externally-authored Arabic calligraphy stroke schema (anatomical decomposition of a letterform into HEAD/BODY/EYE/TOOTH/DOT/etc. strokes, each with a safe stretch-factor range, kashida eligibility, protected zones, and a priority weight). A letter/joining-form combination with no authored schema entry simply cannot have a stretch handle added yet — that's expected, not a bug, until more schema files are supplied.
@@ -73,6 +158,54 @@ The "Morph Glyph Editor" panel's Stretch tool lets a user click a shaped glyph a
 - The block-level "Kashida" 0–100 slider (`kashidaAmount` on `BlockCommon`, `setBlockKashidaAmount` in `App.tsx`) distributes one dial across every kashida-eligible schema-backed handle in a block, weighting each by its own `priority`: `factor = 1 + (maxFactor - 1) * (amount/100) * (priority/10)`. This is a manual dial, not automatic line-justification — the app has no "fit text to width" infrastructure to hook into.
 - **Multi-letter ligatures and multiple named sliders per stroke:** a `Stroke.editBehavior.stretchZones[]` entry can carry its own `label` (`types.ts`) — `deriveStretchCatalog` emits one `StretchDefinition` per **zone**, not per stroke, so a single stroke can expose several independently named/bounded sliders (e.g. Height vs Length) instead of collapsing to one range; every pre-existing file (one zone per stroke, no zone-level label) still produces exactly one entry each, unchanged. `GlyphStretchHandle`/`StretchDefinition` carry `schemaZoneIndex`/`zoneIndex` to track which zone a handle represents. Separately, `GlyphDescription.glyph` supports `role: "ligature"` entries keyed by `baseLetterSequence` (bare-codepoint array, e.g. `["0627","0644","0644","0647"]` for "الله") instead of a single `unicode` — `registry.ts`'s `getLigatureSchema` looks these up, and `glyphLookup.ts`'s `computeClusterSpans` detects when a shaped glyph's HarfBuzz cluster spans more than one source character (several letters fused by the font's own GSUB ligature rules — confirmed real via `fonttools`: `Wessam.ttf` fuses "الله" into exactly one glyph) and routes it through the ligature lookup instead of the normal single-letter path. `src/data/strokeSchemas/allah-ligature.json` is the first (and so far only) authored ligature — confirmed working end-to-end live in the browser (Wessam font, typed "الله", Stretch tool shows 6 labeled buttons: Alif/First lam/Second lam height, Second lam shoulder, Heh loop/tail). It was hand-adapted from a richer source file that required shadda+dagger-alif marks to trigger (per that file's own `triggerRules`/`testCases`) — `fonttools` inspection confirmed no font in `public/fonts/` actually has a GSUB rule fusing the marked sequence (only the plain 4-letter one), so the marks-required trigger and its `MARKS_1` sub-component were dropped rather than imported as dead data. If handed another ligature file with a similar "requires marks/context our fonts don't actually implement" mismatch, verify against real GSUB tables (`fontTools.ttLib`) before assuming it'll work, same as this one.
 - **A schema stroke's `protectedZones` are advisory text only** — they're never read by `applyGlyphEdit`/`applyAxisDisplacement`, so they don't by themselves stop a handle from displacing the whole glyph (its `fromNode`/`toNode` indices reference the schema's own idealized path, which has no correspondence to the real font's actual outline point indices — same mismatch as above). What actually scopes a handle is its own `mask` field. To avoid every schema handle defaulting to "affects the whole glyph," `src/lib/glyphContours.ts`'s `deriveContourMask` auto-derives a contour mask from wherever the handle's (now fixed, schema-derived) anchor/drag points sit on the real outline (point-in-polygon against the glyph's contours, reusing `lib/svgPath.ts`'s bezier-subdivision + point-in-polygon) — since the anchor/drag mapping is only proportional, not per-font-verified, it samples several points along the whole anchor→drag segment (not just the two endpoints) so a point landing in empty space between contours (e.g. between a letter's body and its dots) doesn't spuriously fall back to "whole glyph" when the segment as a whole clearly crosses the intended stroke's ink. Each of `ShapedText.tsx`/`ShapeFillText.tsx`/`ShapeWarpText.tsx` computes this **once, in a `useEffect` keyed off the handle's creation** (not on every drag — there is no more dragging) whenever `GlyphStretchHandle.maskAuto` is `true` and `mask` is still unset (every newly created handle starts this way, per `App.tsx`'s `addStretchHandle`). It can still legitimately land on "whole glyph" for a complex multi-letter ligature glyph where the per-letter schema proportions don't correspond well to the fused real outline — the block-level band width still limits which points move in that case, so this isn't unsafe, just less precisely scoped. Manually invoking "By stroke"/Lasso (`ShapedText.tsx` only) sets `maskAuto: false` so the user's explicit override is never clobbered.
+
+### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
+
+A fifth block type, `textPath`, flows shaped text along an arbitrary curve
+instead of a straight baseline. The curve is stored as a plain SVG path `d`
+string (`textPathD`) — the same representation `shapeSvgPath` already uses
+on `shapeFill`/`shapeWarp` blocks — rather than a bespoke point-array type,
+so presets, SVG upload, and freehand pen-tool drawing all converge on one
+representation and reuse `lib/svgPath.ts`'s existing parse/flatten/replay
+functions wholesale.
+
+`lib/textPath.ts` adds arc-length walking (`pathLength`/`pointAtArcLength`,
+built on the same fixed-step bezier subdivision `pathToPolygon` already
+provides), three preset-curve generators (`arcPathD`/`wavePathD`/
+`circlePathD`), and a single-handle-per-anchor bezier editing model
+(`CurveAnchor`/`anchorsToD`/`dToAnchors`) — every anchor has one *outgoing*
+handle; the incoming handle for the next segment is always that anchor's
+mirror image, trading a fully general independent-in/out-handle pen tool
+for a much simpler one-handle-per-anchor editing UI.
+
+`TextOnPathText.tsx` renders each glyph as a rigid unit — translate to its
+arc-length position on the curve, rotate to the local tangent, draw the
+outline — modeled on `ShapedText.tsx`'s glyph loop rather than
+`ShapeWarpText.tsx`'s per-point remap, since text-on-path repositions whole
+glyphs rather than distorting their outlines. Text always auto-scales to
+span the curve's length exactly (same idea `ShapeFillText` already applies
+per-row to its shape width), which means the block's `fontSize` field has
+no visible effect for this block type and its slider is hidden in the
+sidebar — curve length is the only size control. RTL text anchors to the
+curve's *end* point by default (a `textPathReversed` flag flips this per
+block when the guess is wrong for a particular curve).
+
+`TextPathEditOverlay.tsx` is a separate component (not part of
+`TextOnPathText`) providing the on-canvas pen-tool: click empty canvas to
+append an anchor, drag an anchor or its handle to reshape, right-click an
+anchor to remove it. It's shown only when a `textPath` block is both
+selected and has `textPathEditMode` set, and is hidden during export
+(`useExport.ts` toggles off every node whose id starts with
+`text-path-edit-layer-`, alongside the grid and artboard background it
+already hides).
+
+Stretch-tool glyph handles and glyph rigs do not apply to `textPath`
+blocks — `App.tsx`'s `rightPanelVisible` and every internal glyph-edit
+mutator guard exclude `"textPath"` the same way they've always excluded
+`"image"`. The anchor/drag math those tools use assumes a straight glyph
+bounding box; making it work once a glyph is rotated to a curve tangent
+is a real design problem, deliberately left for a future spec rather than
+half-supported here.
 
 ### Font files carry custom glyphs — don't blindly replace them
 

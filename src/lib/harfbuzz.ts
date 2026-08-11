@@ -5,6 +5,7 @@ import {
   type HbRawGlyph,
   type HarfBuzzGlyph,
 } from "./normalizeGlyphs";
+import { ARABIC_DIACRITIC_RE } from "./diacritics";
 
 export { normalizeGlyphs, type HbRawGlyph, type HarfBuzzGlyph };
 
@@ -123,14 +124,16 @@ async function loadParsedFont(fontUrl: string): Promise<opentype.Font> {
 }
 
 // Arabic combining marks: harakat, tanween, sukun, shadda, Quranic annotation
-// signs, etc. (U+0610-061A, U+064B-065F, U+0670, U+06D6-06DC, U+06DF-06E4,
-// U+06E7-06E8, U+06EA-06ED). Fonts (e.g. Qahiri) that ship no glyphs for
-// these render them as .notdef boxes via HarfBuzz's normal missing-glyph
-// fallback, which looks like broken/garbled text. Since these are optional
-// pronunciation marks, silently drop the ones the loaded font can't render
-// instead of shaping them into visible tofu.
-const ARABIC_DIACRITIC_RE =
-  /[ؐ-ًؚ-ٰٟۖ-ۜ۟-۪ۤۧۨ-ۭ]/;
+// signs, etc. Lives in `diacritics.ts` (a dependency-free module - no
+// harfbuzzjs import) so it, and anything built on it, stays importable
+// without dragging in the `import * as hbjsModule from "harfbuzzjs"` line
+// below, which throws under Vitest's Node ESM loader the moment this
+// module is evaluated (before any code in it runs) unless harfbuzzjs is
+// mocked. Re-exported here for backward compatibility - this file is
+// still the conceptual owner of "what counts as an Arabic diacritic" for
+// shaping purposes; see `diacritics.ts` for the regex itself and its
+// U+ range documentation.
+export { ARABIC_DIACRITIC_RE };
 
 function stripUnsupportedDiacritics(text: string, font: opentype.Font): string {
   let result = "";
