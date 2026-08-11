@@ -46,6 +46,8 @@ Because `Partial<Block>` patches spread onto a `Block` union member don't type-c
 - **`ShapeFillText.tsx`** — *tiles* the shaped text in repeating rows to fill an uploaded SVG shape's silhouette (scanline + ray-casting against a sampled polygon), auto-scaling each row to span the shape width exactly.
 - **`ShapeWarpText.tsx`** — draws the text *once* and remaps every glyph point into the shape's bounding envelope (`envelope`/`topBottom`/`stretch`/`radial` modes), with an additional per-glyph handle system (`glyphWarps`, pinch/move/scaleX/scaleY) for manual distortion in "glyph edit mode". Has its own inline warp-point math, independent of `lib/warp.ts`.
 
+  Shape Warp blocks have a second shape input alongside "Upload SVG"/hand-draw: **"Trace image"** uploads a raster photo/logo and auto-traces its silhouette client-side into the same `{ pathData, w, h }` shape `extractSvgPaths` already produces — `src/lib/imageTrace.ts` (`imagetracerjs`, aliased in `vite.config.ts` the same way `opentype.js` is, since it also has no `package.json` "exports" field) binarizes the image at a user-adjustable threshold (`ImageTraceDialog.tsx`, live preview) and hands the resulting silhouette through the *existing* `extractSvgPaths`, so `ShapeWarpText.tsx`'s envelope/topBottom/stretch/radial engine has no idea whether a shape came from an SVG upload or a traced image. Shape Fill does not have this button — YAGNI until asked for.
+
   `ShapedText.tsx`, `ShapeFillText.tsx`, and `ShapeWarpText.tsx` all additionally support the "Stretch" tool (`glyphEdits`/`GlyphStretchHandle` in `types.ts`, math in `lib/glyphEdits.ts`) — see the "Stroke-schema-driven glyph editor" section below.
 - **`ImageBlockView.tsx`** — loads a data-URL image and draws it via Konva `Image`.
 
