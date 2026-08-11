@@ -1492,6 +1492,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   Clear diacritics
                 </button>
 
+                {selectedBlock?.type === "text" &&
+                  (selectedBlock.diacriticOverrides?.length ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onUpdateSelectedBlock({ diacriticOverrides: [] })}
+                      className="sidebarSmallAction"
+                      style={{ background: "var(--bg-input)" }}
+                    >
+                      Reset diacritic overrides
+                    </button>
+                  )}
+
                 <PresetKeyboard
                   title="Presets"
                   rows={[PRESETS]}

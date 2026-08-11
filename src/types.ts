@@ -88,6 +88,22 @@ export type GlyphRigValue = {
   value: number;
 };
 
+/**
+ * A per-instance manual adjustment to one shaped diacritic glyph — keyed
+ * by glyphIndex, the same scheme GlyphStretchHandle already uses (and
+ * shares its known fragility: a text edit before this glyph in the string
+ * can shift which glyph index the override lands on after re-shaping).
+ */
+export type DiacriticOverride = {
+  glyphIndex: number;
+  /** Multiplier on the diacritic's natural size. Default 1. */
+  scale?: number;
+  /** Extra vertical shift in local (unscaled) units. Default 0. */
+  offsetY?: number;
+  /** When true, this instance is skipped entirely during drawing. */
+  hidden?: boolean;
+};
+
 type BlockCommon = {
   id: number;
   name?: string;
@@ -138,6 +154,7 @@ export type TextBlock = BlockCommon & {
   warpX?: number;
   warpY?: number;
   kashidaEditMode?: boolean;
+  diacriticOverrides?: DiacriticOverride[];
 };
 
 export type ShapeFillBlock = BlockCommon & {

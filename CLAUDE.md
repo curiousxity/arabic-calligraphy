@@ -59,6 +59,91 @@ Text is shaped with real HarfBuzz compiled to WASM (`harfbuzzjs` npm package, lo
 
 `src/lib/normalizeGlyphs.ts` and `src/lib/svgPath.ts` have their own `*.test.ts` files — these are the two lib modules with actual test coverage; `warp.ts` also has a test.
 
+### Per-instance diacritic control (`src/lib/diacritics.ts`, `DiacriticHoverHandles.tsx`)
+
+Plain text blocks support per-instance adjustment of individual tashkeel
+marks (harakat, tanween, sukun, shadda, etc.) — hovering any diacritic on
+a selected block's canvas shows three small handles: drag one vertically
+to reposition it, drag another to resize it, and click a third to hide
+just that one instance. This is separate from, and non-destructive
+relative to, the existing "Clear diacritics" button (`clearDiacritics` in
+`App.tsx`), which permanently removes every diacritic character from the
+block's text — overrides only change how a diacritic *renders*, never the
+underlying text, and a "Reset diacritic overrides" button clears them
+without touching the text either.
+
+`lib/diacritics.ts`'s `findDiacriticGlyphIndices(glyphs, font)` identifies
+which shaped glyphs are diacritics by glyph identity, **not** by cluster:
+HarfBuzz's default cluster level (`MONOTONE_GRAPHEMES`) merges a base
+letter with every combining mark following it into one cluster whose
+value is the *base letter's* character offset, so a mark glyph's own
+`glyph.cl` never points at the mark's own character — cluster-to-source
+lookup (what an earlier version of this function did, and what
+`strokeSchema/glyphLookup.ts` still does for its own, different, purpose)
+silently detects nothing on real shaped text. The working detection is
+two signals: (1) primary — the glyph's own Unicode codepoint(s), from
+`font.glyphs.get(g.g).unicodes` (opentype.js's cmap-derived metadata),
+tested against `ARABIC_DIACRITIC_RE`; (2) fallback, for contextual mark
+variants with no cmap entry at all (e.g. a font's own fused mark-ligature
+glyph) — within a cluster shared by more than one glyph, a base letter is
+drawn at its own designed origin (HarfBuzz position `dx`/`dy` both 0)
+while every mark stacked onto it carries a nonzero GPOS mark-attachment
+offset, so a cluster-sharing glyph with nonzero `dx`/`dy` is treated as a
+mark too. `ARABIC_DIACRITIC_RE` itself now lives in `diacritics.ts` (not
+`harfbuzz.ts`, which re-exports it for compatibility) specifically so
+this module has no runtime dependency on harfbuzzjs, which lets
+`diacritics.test.ts` shape real text with real harfbuzzjs directly rather
+than mocking it — every assertion in that suite is checked against actual
+HarfBuzz output for real fonts in `public/fonts/`, not hand-written
+`{ g, cl }` fixtures (a fabricated-cluster version of this test suite is
+exactly what let the cluster-lookup bug ship unnoticed once before).
+
+Overrides (`DiacriticOverride` in `types.ts`: `scale`/`offsetY`/`hidden`,
+default no-op) are keyed by glyph index — the same scheme
+`GlyphStretchHandle` already uses for the Stretch tool, including that
+scheme's known fragility (a text edit before a diacritic in the string can
+shift which glyph index its override lands on after re-shaping). Because
+of that fragility, `ShapedText.tsx` recomputes `findDiacriticGlyphIndices`
+for its own current glyph run each render and filters `diacriticOverrides`
+down to only the glyph indices that call currently identifies as
+diacritics before handing them to `drawWarpedGlyphRun` — a stale override
+whose glyph index now lands on a base letter (rather than a mark) is
+silently ignored instead of hiding or grotesquely scaling that letter.
+Surviving overrides are applied inside `ShapedText.tsx`'s shared
+`drawWarpedGlyphRun` as an
+extra `ctx.translate`/`ctx.scale` pivoted on the glyph's own pen-origin
+`(gx, gy)`, structurally identical to how that same function already
+handles the Private-Use-Area "override glyph" preset symbols. A `hidden`
+override skips the glyph's draw call but not its advance width, so hiding
+a mark never reflows surrounding letters.
+
+`DiacriticHoverHandles.tsx` is a separate component (not folded into
+`ShapedText.tsx` itself) reusing `ShapedText`'s existing per-glyph
+`glyphHitBoxes` (already computed for the Stretch tool's hit-testing) —
+only the currently-hovered diacritic ever shows handles, which is what
+keeps text with many marks from becoming visual clutter. The move
+handle's `dragBoundFunc` captures the handle's absolute (stage-space) x
+at `onDragStart` and holds it fixed for the drag's duration, rather than
+returning the group-local `cx` Konva's `dragBoundFunc` contract requires
+absolute coordinates for — mixing the two spaces there previously
+teleported the handle sideways under any block offset/pan/zoom. The hover
+hit-`Rect` is derived from the mark's actual rendered position
+(`displayY`, i.e. original position + `offsetY`) and scaled size
+(`box.width/height * scale`), not its original un-overridden box, so an
+overridden mark's hoverable area tracks where it's actually drawn instead
+of drifting away from it as `offsetY`/`scale` grow. It's active only
+when the block is selected, matching every other interactive on-canvas
+overlay in this app. Live handle drags follow the same debounced-history
+pattern (`useDebouncedHistoryPush`) the Kashida tool already established;
+the hide-button click is a discrete, immediate `pushHistory()` mutation.
+
+This feature is `ShapedText.tsx`-only for v1 — Shape Fill (tiled rows),
+Shape Warp (bounding-envelope remap), and any curve-following text put a
+diacritic's on-screen position through additional transforms beyond
+`ShapedText.tsx`'s simple pen-advance layout, and correctly locating a
+hover-handle in each of those coordinate spaces is real, separate design
+work, deliberately left for a future spec rather than half-supported here.
+
 ### Stroke-schema-driven glyph editor (`src/lib/strokeSchema/`, `MorphGlyphEditor.tsx`)
 
 The "Morph Glyph Editor" panel's Stretch tool lets a user click a shaped glyph and add anchor→drag "stretch handles" that displace real font-outline points (`lib/glyphEdits.ts`'s `applyGlyphEdit`/`applyAxisDisplacement`, band-falloff + optional contour/lasso masking). **Handle creation is schema-only** — there is no generic/freeform "Add stretch line" button anymore (removed once enough letters had authored schema data); every handle traces back to a `StretchDefinition` from an externally-authored Arabic calligraphy stroke schema (anatomical decomposition of a letterform into HEAD/BODY/EYE/TOOTH/DOT/etc. strokes, each with a safe stretch-factor range, kashida eligibility, protected zones, and a priority weight). A letter/joining-form combination with no authored schema entry simply cannot have a stretch handle added yet — that's expected, not a bug, until more schema files are supplied.
