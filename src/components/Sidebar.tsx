@@ -276,7 +276,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [namedProjectInput, setNamedProjectInput] = useState("");
   const [signInEmail, setSignInEmail] = useState("");
   const [signInStatus, setSignInStatus] = useState<
-    { kind: "idle" } | { kind: "sent" } | { kind: "error"; message: string }
+    | { kind: "idle" }
+    | { kind: "sending" }
+    | { kind: "sent" }
+    | { kind: "error"; message: string }
   >({ kind: "idle" });
   const [showSignInForm, setShowSignInForm] = useState(false);
   const selectionCount = selectedIds.length > 1 ? selectedIds.length : 1;
@@ -1723,6 +1726,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               type="email"
                               value={signInEmail}
                               onChange={(e) => setSignInEmail(e.target.value)}
+                              onKeyDown={async (e) => {
+                                if (
+                                  e.key === "Enter" &&
+                                  signInEmail.trim() &&
+                                  onSignIn &&
+                                  signInStatus.kind !== "sending"
+                                ) {
+                                  setSignInStatus({ kind: "sending" });
+                                  const { error } = await onSignIn(signInEmail.trim());
+                                  setSignInStatus(
+                                    error ? { kind: "error", message: error } : { kind: "sent" }
+                                  );
+                                }
+                              }}
                               placeholder="you@example.com"
                               className="hexInput"
                               style={{ fontFamily: "inherit", letterSpacing: 0 }}
@@ -1730,17 +1747,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <button
                               type="button"
                               onClick={async () => {
-                                if (!signInEmail.trim() || !onSignIn) return;
+                                if (
+                                  !signInEmail.trim() ||
+                                  !onSignIn ||
+                                  signInStatus.kind === "sending"
+                                )
+                                  return;
+                                setSignInStatus({ kind: "sending" });
                                 const { error } = await onSignIn(signInEmail.trim());
                                 setSignInStatus(
                                   error ? { kind: "error", message: error } : { kind: "sent" }
                                 );
                               }}
-                              disabled={!signInEmail.trim()}
+                              disabled={!signInEmail.trim() || signInStatus.kind === "sending"}
                               className="sidebarPillButton"
                               style={{ flex: "0 0 auto" }}
                             >
-                              Send link
+                              {signInStatus.kind === "sending" ? "Sending…" : "Send link"}
                             </button>
                           </div>
                           {signInStatus.kind === "sent" && (
