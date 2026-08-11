@@ -129,7 +129,7 @@ async function loadParsedFont(fontUrl: string): Promise<opentype.Font> {
 // fallback, which looks like broken/garbled text. Since these are optional
 // pronunciation marks, silently drop the ones the loaded font can't render
 // instead of shaping them into visible tofu.
-const ARABIC_DIACRITIC_RE =
+export const ARABIC_DIACRITIC_RE =
   /[ؐ-ًؚ-ٰٟۖ-ۜ۟-۪ۤۧۨ-ۭ]/;
 
 function stripUnsupportedDiacritics(text: string, font: opentype.Font): string {
