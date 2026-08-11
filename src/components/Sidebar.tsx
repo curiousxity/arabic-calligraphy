@@ -88,8 +88,15 @@ export type SidebarProps = {
   onUploadLayout: () => void;
   namedProjects?: NamedProjectMeta[];
   onSaveNamedProject?: (name: string) => void;
-  onLoadNamedProject?: (name: string) => void;
-  onDeleteNamedProject?: (name: string) => void;
+  onLoadNamedProject?: (name: string, source: "local" | "cloud") => void;
+  onDeleteNamedProject?: (name: string, source: "local" | "cloud") => void;
+
+  cloudConfigured?: boolean;
+  session?: import("@supabase/supabase-js").Session | null;
+  onSignIn?: (email: string) => Promise<{ error: string | null }>;
+  onSignOut?: () => void;
+  saveDestination?: "local" | "cloud";
+  onChangeSaveDestination?: (dest: "local" | "cloud") => void;
 
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddShapeWarpBlock?: (svgPathData: string, w: number, h: number) => void;
@@ -213,6 +220,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSaveNamedProject,
   onLoadNamedProject,
   onDeleteNamedProject,
+  cloudConfigured = false,
+  session = null,
+  onSignIn,
+  onSignOut,
+  saveDestination = "local",
+  onChangeSaveDestination,
   onAddShapeFillBlock,
   onAddShapeWarpBlock,
   onAddTextPathBlock,
@@ -261,6 +274,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showTemplates, setShowTemplates] = useState(false);
   const [wizardTemplate, setWizardTemplate] = useState<StarterTemplate | null>(null);
   const [namedProjectInput, setNamedProjectInput] = useState("");
+  const [signInEmail, setSignInEmail] = useState("");
+  const [signInStatus, setSignInStatus] = useState<
+    { kind: "idle" } | { kind: "sent" } | { kind: "error"; message: string }
+  >({ kind: "idle" });
+  const [showSignInForm, setShowSignInForm] = useState(false);
   const selectionCount = selectedIds.length > 1 ? selectedIds.length : 1;
   const [showBackgroundSettings, setShowBackgroundSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -1667,9 +1685,122 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     marginTop: 4,
                   }}
                 >
+                  {cloudConfigured && (
+                    <div style={{ marginBottom: 10 }}>
+                      {session ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontSize: 12,
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          <span
+                            style={{
+                              flex: 1,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {session.user.email}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onSignOut?.()}
+                            className="layerIconBtn"
+                            style={{ width: "auto", padding: "0 8px", fontSize: 11 }}
+                          >
+                            Sign out
+                          </button>
+                        </div>
+                      ) : showSignInForm ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <input
+                              type="email"
+                              value={signInEmail}
+                              onChange={(e) => setSignInEmail(e.target.value)}
+                              placeholder="you@example.com"
+                              className="hexInput"
+                              style={{ fontFamily: "inherit", letterSpacing: 0 }}
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!signInEmail.trim() || !onSignIn) return;
+                                const { error } = await onSignIn(signInEmail.trim());
+                                setSignInStatus(
+                                  error ? { kind: "error", message: error } : { kind: "sent" }
+                                );
+                              }}
+                              disabled={!signInEmail.trim()}
+                              className="sidebarPillButton"
+                              style={{ flex: "0 0 auto" }}
+                            >
+                              Send link
+                            </button>
+                          </div>
+                          {signInStatus.kind === "sent" && (
+                            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                              Check your email for a sign-in link.
+                            </span>
+                          )}
+                          {signInStatus.kind === "error" && (
+                            <span style={{ fontSize: 11, color: "var(--danger)" }}>
+                              {signInStatus.message}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowSignInForm(true)}
+                          className="layerIconBtn"
+                          style={{ width: "auto", padding: "0 8px", fontSize: 11 }}
+                        >
+                          Sign in to save projects to the cloud
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
                     Named saves — keep several in-progress designs in this browser at once.
                   </div>
+
+                  {cloudConfigured && (
+                    <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => onChangeSaveDestination?.("local")}
+                        className={
+                          saveDestination === "local"
+                            ? "sidebarPillButton sidebarPillButton--active"
+                            : "sidebarPillButton"
+                        }
+                        style={{ flex: "0 0 auto", padding: "0 10px" }}
+                      >
+                        Local
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => session && onChangeSaveDestination?.("cloud")}
+                        disabled={!session}
+                        title={session ? undefined : "Sign in to save to cloud"}
+                        className={
+                          saveDestination === "cloud"
+                            ? "sidebarPillButton sidebarPillButton--active"
+                            : "sidebarPillButton"
+                        }
+                        style={{ flex: "0 0 auto", padding: "0 10px" }}
+                      >
+                        Cloud
+                      </button>
+                    </div>
+                  )}
 
                   <div style={{ display: "flex", gap: 8 }}>
                     <input
@@ -1712,7 +1843,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       {namedProjects.map((p) => (
                         <div
-                          key={p.name}
+                          key={`${p.source}:${p.name}`}
                           style={{
                             display: "flex",
                             alignItems: "center",
@@ -1722,6 +1853,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             padding: "5px 7px",
                           }}
                         >
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              color: "var(--text-muted)",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.03em",
+                              flex: "0 0 auto",
+                            }}
+                          >
+                            {p.source === "cloud" ? "Cloud" : "Local"}
+                          </span>
                           <span
                             style={{
                               flex: 1,
@@ -1737,7 +1880,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           </span>
                           <button
                             type="button"
-                            onClick={() => onLoadNamedProject?.(p.name)}
+                            onClick={() => onLoadNamedProject?.(p.name, p.source)}
                             className="layerIconBtn"
                             title="Load this project"
                             aria-label={`Load ${p.name}`}
@@ -1746,7 +1889,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={() => onDeleteNamedProject?.(p.name)}
+                            onClick={() => onDeleteNamedProject?.(p.name, p.source)}
                             className="layerIconBtn"
                             title="Delete this saved project"
                             aria-label={`Delete ${p.name}`}
