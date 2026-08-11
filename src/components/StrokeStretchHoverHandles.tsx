@@ -86,11 +86,24 @@ export const StrokeStretchHoverHandles: React.FC<StrokeStretchHoverHandlesProps>
         const box = glyphHitBoxes.find((b) => b.glyphIndex === glyphIndex);
         if (!box) return null;
 
-        // Generous margin so the hover area also covers where a dot can
-        // travel while dragging — dots sit on the anchor->dragOrigin axis,
-        // which commonly reaches somewhat outside the glyph's own bounding
-        // box (e.g. a tooth or tail stroke stretching past the letter).
-        const hitMargin = Math.max(box.width, box.height) * 0.6;
+        // Small fixed margin, not a fraction of the glyph's own box — in a
+        // normal run of Arabic text nearly every letter has an authored
+        // schema (CLAUDE.md: full 28-letter alphabet), so adjacent glyphs
+        // sit close together and a large proportional margin makes
+        // neighbouring hit-Rects overlap heavily. Konva routes a pointer to
+        // the topmost listening shape (later glyphIndex wins ties), so a
+        // wide margin let a later letter's rect steal hover — and the mouse
+        // event itself — away from an earlier letter directly underneath
+        // it. A small fixed pad is enough slack for a cursor sitting just
+        // outside the glyph's ink without reintroducing that overlap.
+        const hitMargin = 4;
+        // Once some glyph is hovered/dragging, only its own rect keeps
+        // listening — every other glyph's (possibly still slightly
+        // overlapping) rect stops intercepting the pointer, so hover can't
+        // be stolen by a neighbour mid-interaction. Cursor must fully leave
+        // the active glyph's rect (firing its own onMouseLeave, which clears
+        // visibleGlyphIndex) before any other glyph can pick up hover again.
+        const rectListening = visibleGlyphIndex == null || visibleGlyphIndex === glyphIndex;
 
         return (
           <Group key={glyphIndex}>
@@ -100,6 +113,7 @@ export const StrokeStretchHoverHandles: React.FC<StrokeStretchHoverHandlesProps>
               width={box.width + hitMargin * 2}
               height={box.height + hitMargin * 2}
               fill="transparent"
+              listening={rectListening}
               onMouseEnter={() => setHoveredGlyphIndex(glyphIndex)}
               onMouseLeave={() =>
                 setHoveredGlyphIndex((v) => (v === glyphIndex ? null : v))
