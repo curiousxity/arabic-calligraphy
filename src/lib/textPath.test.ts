@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { parseSvgPath } from "./svgPath";
-import { pathLength, pointAtArcLength, arcPathD, wavePathD, circlePathD } from "./textPath";
+import {
+  pathLength,
+  pointAtArcLength,
+  buildArcTable,
+  pointAtArcLengthFromTable,
+  arcPathD,
+  wavePathD,
+  circlePathD,
+} from "./textPath";
 
 describe("pathLength", () => {
   it("measures a straight line exactly", () => {
@@ -59,6 +67,33 @@ describe("pointAtArcLength", () => {
     const cmds = parseSvgPath("M 0 0 L 100 0");
     const p = pointAtArcLength(cmds, -50, false);
     expect(p.x).toBeCloseTo(0, 5);
+  });
+});
+
+describe("buildArcTable / pointAtArcLengthFromTable", () => {
+  it("matches pointAtArcLength's from-scratch result for a curved path", () => {
+    const R = 100;
+    const k = 0.5522847498;
+    const d = `M ${R} 0 C ${R} ${R * k} ${R * k} ${R} 0 ${R}`;
+    const cmds = parseSvgPath(d);
+
+    const table = buildArcTable(cmds, false);
+    for (const s of [0, 25, 60, 123, 400]) {
+      const fromTable = pointAtArcLengthFromTable(table, s);
+      const fromScratch = pointAtArcLength(cmds, s, false);
+      expect(fromTable.x).toBeCloseTo(fromScratch.x, 5);
+      expect(fromTable.y).toBeCloseTo(fromScratch.y, 5);
+      expect(fromTable.angle).toBeCloseTo(fromScratch.angle, 5);
+    }
+  });
+
+  it("matches pointAtArcLength's reversed result too", () => {
+    const cmds = parseSvgPath("M 0 0 L 100 0");
+    const table = buildArcTable(cmds, true);
+    const fromTable = pointAtArcLengthFromTable(table, 30);
+    const fromScratch = pointAtArcLength(cmds, 30, true);
+    expect(fromTable.x).toBeCloseTo(fromScratch.x, 5);
+    expect(fromTable.y).toBeCloseTo(fromScratch.y, 5);
   });
 });
 

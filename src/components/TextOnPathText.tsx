@@ -1,8 +1,8 @@
 import React, { useMemo } from "react";
-import { Group, Shape } from "react-konva";
+import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
 import { parseSvgPath, replayPath } from "../lib/svgPath";
-import { pathLength, pointAtArcLength } from "../lib/textPath";
+import { pathLength, pathBoundingBox, buildArcTable, pointAtArcLengthFromTable } from "../lib/textPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 
 export type TextOnPathTextProps = {
@@ -17,6 +17,11 @@ export type TextOnPathTextProps = {
   opacity?: number;
   stroke?: string;
   strokeWidth?: number;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
   rotation?: number;
 
   textPathD: string;
@@ -51,6 +56,11 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   opacity = 1,
   stroke = "#000000",
   strokeWidth = 0,
+  shadowColor = "#000000",
+  shadowBlur = 0,
+  shadowOffsetX = 0,
+  shadowOffsetY = 0,
+  shadowOpacity = 0.35,
   rotation = 0,
   textPathD,
   textPathReversed = false,
@@ -71,6 +81,23 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   // RTL text anchors to the curve's end point by default (walking the
   // reversed flattened point list); textPathReversed flips that per block.
   const walkReversed = !textPathReversed;
+  // Built once per curve (not once per glyph, per render) — the arc-length
+  // lookup used inside the glyph loop below just does a table scan instead
+  // of re-flattening the whole path from scratch every time.
+  const arcTable = useMemo(
+    () => buildArcTable(parsedCmds, walkReversed),
+    [parsedCmds, walkReversed]
+  );
+
+  // Bounding box of the curve itself, padded generously since glyphs can
+  // extend above/below the baseline (mirrors ShapedText.tsx's hit-rect
+  // padding logic, keyed off fontSize instead of measured glyph extents).
+  const curveBox = useMemo(() => pathBoundingBox(parsedCmds), [parsedCmds]);
+  const pad = Math.max(fontSize, 24);
+  const hitX = curveBox.x - pad;
+  const hitY = curveBox.y - pad;
+  const hitWidth = curveBox.width + pad * 2;
+  const hitHeight = curveBox.height + pad * 2;
 
   return (
     <Group
@@ -86,7 +113,28 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
       onDragEnd={onDragEnd}
       opacity={opacity}
     >
+      {/* Transparent hit rect for selection/dragging */}
+      <Rect
+        x={hitX}
+        y={hitY}
+        width={hitWidth}
+        height={hitHeight}
+        fill="transparent"
+        strokeEnabled={false}
+        listening
+      />
+
       <Shape
+        x={hitX}
+        y={hitY}
+        width={hitWidth}
+        height={hitHeight}
+        listening={false}
+        shadowColor={shadowBlur > 0 ? shadowColor : undefined}
+        shadowBlur={shadowBlur}
+        shadowOffsetX={shadowOffsetX}
+        shadowOffsetY={shadowOffsetY}
+        shadowOpacity={shadowOpacity}
         sceneFunc={(ctx) => {
           if (!hbLoaded || !font || parsedCmds.length < 2 || curveLen <= 0) return;
 
@@ -109,11 +157,15 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
               continue;
             }
 
-            const { x: px, y: py, angle } = pointAtArcLength(parsedCmds, cursor, walkReversed);
+            const { x: px, y: py, angle } = pointAtArcLengthFromTable(arcTable, cursor);
             const opPath = glyphObj.getPath(0, 0, fontSize * fitScale);
 
             c2d.save();
-            c2d.translate(px, py);
+            // Shape is positioned at (hitX, hitY), which Konva already
+            // applies as a canvas translation before sceneFunc runs — so
+            // glyph positions (in the curve's own, un-offset coordinate
+            // space) need that same offset subtracted back out here.
+            c2d.translate(px - hitX, py - hitY);
             c2d.rotate(angle);
             c2d.translate(0, textPathBaselineOffset);
             if (isItalic) c2d.transform(1, 0, -0.25, 1, 0, 0);

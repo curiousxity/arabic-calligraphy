@@ -10,6 +10,7 @@ import type { Block, TextAlign, ShapeWarpMode } from "../types";
 import type { NamedProjectMeta } from "../App";
 import { extractSvgPaths } from "../lib/svgImport";
 import { arcPathD, wavePathD, circlePathD } from "../lib/textPath";
+import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { makeId } from "./sidebar/utils";
@@ -144,6 +145,36 @@ const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
   { value: "Scheherazade", label: "Scheherazade", cssFamily: "Scheherazade" },
   { value: "Urdu", label: "Urdu", cssFamily: "Urdu" },
 ];
+
+/** Serializes parsed SVG path commands back into a `d` string (module-local, one-off — mirrors ShapedText.tsx's commandsToSvgPath). */
+function cmdsToD(cmds: SvgCmd[]): string {
+  const parts: string[] = [];
+  for (const c of cmds) {
+    switch (c.type) {
+      case "M": parts.push(`M ${c.x} ${c.y}`); break;
+      case "L": parts.push(`L ${c.x} ${c.y}`); break;
+      case "C": parts.push(`C ${c.x1} ${c.y1}, ${c.x2} ${c.y2}, ${c.x} ${c.y}`); break;
+      case "Q": parts.push(`Q ${c.x1} ${c.y1}, ${c.x} ${c.y}`); break;
+      case "Z": parts.push("Z"); break;
+    }
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Keeps only the first subpath of an SVG path `d` string (everything up to,
+ * but not including, the second `M` command). `extractSvgPaths` legitimately
+ * concatenates every shape in an uploaded SVG into one `d` string for
+ * shapeFill/shapeWarp's union-silhouette use case, but a text-path curve
+ * needs a single open path — the phantom jump between subpaths would
+ * otherwise inflate arc length and route glyphs through empty space.
+ */
+function firstSubpath(d: string): { d: string; hadMultiple: boolean } {
+  const cmds = parseSvgPath(d);
+  const secondMoveIndex = cmds.findIndex((c, i) => i > 0 && c.type === "M");
+  if (secondMoveIndex === -1) return { d, hadMultiple: false };
+  return { d: cmdsToD(cmds.slice(0, secondMoveIndex)), hadMultiple: true };
+}
 
 export const Sidebar: React.FC<SidebarProps> = ({
   blocks,
@@ -347,7 +378,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
           return;
         }
-        onUpdateSelectedBlock({ textPathD: result.pathData });
+
+        // extractSvgPaths concatenates every matched shape into one `d`
+        // string, which is correct for shapeFill/shapeWarp (they want the
+        // union silhouette) but wrong for a text-path curve: the jump from
+        // one subpath's end to the next subpath's `M` would be treated as a
+        // real curve segment. Keep only the first subpath here.
+        const { d: firstSubpathD, hadMultiple } = firstSubpath(result.pathData);
+        if (hadMultiple) {
+          alert(
+            "This SVG has multiple shapes/subpaths — only the first one was used as the text path."
+          );
+        }
+        onUpdateSelectedBlock({ textPathD: firstSubpathD });
       };
       reader.readAsText(file);
     };

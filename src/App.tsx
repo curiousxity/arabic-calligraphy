@@ -768,7 +768,9 @@ const App: React.FC = () => {
 
   const updateTextPathD = useCallback(
     (id: number, d: string) => {
-      setBlocks((prev) => prev.map((b) => (b.id === id ? ({ ...b, textPathD: d } as Block) : b)));
+      setBlocks((prev) =>
+        prev.map((b) => (b.id === id && b.type === "textPath" ? { ...b, textPathD: d } : b))
+      );
       scheduleTextPathHistoryPush();
     },
     [scheduleTextPathHistoryPush]
