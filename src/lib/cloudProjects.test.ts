@@ -3,7 +3,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 const mockUpsert = vi.fn();
 const mockOrder = vi.fn();
 const mockSingle = vi.fn();
-const mockDeleteEq = vi.fn();
+const mockLoadEqName = vi.fn();
+const mockLoadEqUserId = vi.fn();
+const mockDeleteEqName = vi.fn();
+const mockDeleteEqUserId = vi.fn();
 const mockGetUser = vi.fn();
 const mockSignInWithOtp = vi.fn();
 const mockSignOut = vi.fn();
@@ -25,11 +28,27 @@ vi.mock("./supabaseClient", () => ({
           if (cols === "name, saved_at") {
             return { order: mockOrder };
           }
-          // payload lookup: select("payload").eq(name).single()
-          return { eq: () => ({ single: mockSingle }) };
+          // payload lookup: select("payload").eq(name).eq(user_id).single()
+          return {
+            eq: (...args: [string, string]) => {
+              mockLoadEqName(...args);
+              return {
+                eq: (...args2: [string, string]) => {
+                  mockLoadEqUserId(...args2);
+                  return { single: mockSingle };
+                },
+              };
+            },
+          };
         },
         upsert: mockUpsert,
-        delete: () => ({ eq: mockDeleteEq }),
+        // delete().eq(name).eq(user_id) resolves to { error }
+        delete: () => ({
+          eq: (...args: [string, string]) => {
+            mockDeleteEqName(...args);
+            return { eq: mockDeleteEqUserId };
+          },
+        }),
       }),
     };
   },
@@ -136,28 +155,49 @@ describe("cloudProjects", () => {
     expect(result).toEqual([]);
   });
 
-  it("loadCloudProject returns the stored payload", async () => {
+  it("loadCloudProject returns the stored payload, scoped to name and the signed-in user's id", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     mockSingle.mockResolvedValue({ data: { payload: { blocks: ["a"] } }, error: null });
     const result = await loadCloudProject("My Design");
+    expect(mockLoadEqName).toHaveBeenCalledWith("name", "My Design");
+    expect(mockLoadEqUserId).toHaveBeenCalledWith("user_id", "user-1");
     expect(result).toEqual({ payload: { blocks: ["a"] } });
   });
 
   it("loadCloudProject returns null when the row isn't found", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     mockSingle.mockResolvedValue({ data: null, error: { message: "not found" } });
     const result = await loadCloudProject("Missing");
     expect(result).toBeNull();
   });
 
-  it("deleteCloudProject deletes the row matching the given name", async () => {
-    mockDeleteEq.mockResolvedValue({ error: null });
+  it("loadCloudProject returns null without querying when there is no signed-in user", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    const result = await loadCloudProject("My Design");
+    expect(result).toBeNull();
+    expect(mockLoadEqName).not.toHaveBeenCalled();
+  });
+
+  it("deleteCloudProject deletes the row matching the given name and the signed-in user's id", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    mockDeleteEqUserId.mockResolvedValue({ error: null });
     const result = await deleteCloudProject("My Design");
-    expect(mockDeleteEq).toHaveBeenCalledWith("name", "My Design");
+    expect(mockDeleteEqName).toHaveBeenCalledWith("name", "My Design");
+    expect(mockDeleteEqUserId).toHaveBeenCalledWith("user_id", "user-1");
     expect(result.error).toBeNull();
   });
 
   it("deleteCloudProject surfaces the provider's error message", async () => {
-    mockDeleteEq.mockResolvedValue({ error: { message: "denied" } });
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    mockDeleteEqUserId.mockResolvedValue({ error: { message: "denied" } });
     const result = await deleteCloudProject("My Design");
     expect(result.error).toBe("denied");
+  });
+
+  it("deleteCloudProject errors when there is no signed-in user", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    const result = await deleteCloudProject("My Design");
+    expect(result.error).toBe("Not signed in.");
+    expect(mockDeleteEqName).not.toHaveBeenCalled();
   });
 });

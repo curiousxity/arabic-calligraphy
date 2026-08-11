@@ -224,12 +224,20 @@ const App: React.FC = () => {
   const [saveDestination, setSaveDestination] = useState<"local" | "cloud">("local");
   const cloudConfigured = isCloudConfigured();
 
+  // Incremented at the start of every refreshCloudProjects() call; a slow
+  // listCloudProjects() resolving after the user has since signed out (or
+  // into a different account) checks its captured generation against this
+  // ref and drops the stale result instead of repopulating state with it.
+  const cloudProjectsRequestRef = useRef(0);
+
   const refreshCloudProjects = useCallback(async () => {
+    const generation = ++cloudProjectsRequestRef.current;
     if (!session) {
       setCloudProjects([]);
       return;
     }
     const list = await listCloudProjects();
+    if (cloudProjectsRequestRef.current !== generation) return;
     setCloudProjects(list.map((p) => ({ ...p, source: "cloud" as const })));
   }, [session]);
 
@@ -251,6 +259,13 @@ const App: React.FC = () => {
   useEffect(() => {
     refreshCloudProjects();
   }, [refreshCloudProjects]);
+
+  // Covers externally-triggered sign-outs too (token expiry, another tab
+  // signing out) — not just the in-app Sign out button, which also resets
+  // this directly in handleSignOut.
+  useEffect(() => {
+    if (!session) setSaveDestination("local");
+  }, [session]);
 
   const namedProjects = useMemo<NamedProjectMeta[]>(
     () => [...localProjects, ...cloudProjects].sort((a, b) => b.savedAt - a.savedAt),
@@ -1680,7 +1695,11 @@ const App: React.FC = () => {
   const saveNamedProjectCloud = async (trimmed: string) => {
     const { error } = await saveCloudProject(trimmed, buildLayoutPayload());
     if (error) {
-      alert("Couldn't save to cloud — check your connection and try again.");
+      alert(
+        error === "Not signed in."
+          ? "Couldn't save to cloud — not signed in."
+          : "Couldn't save to cloud — check your connection and try again."
+      );
       return;
     }
     await refreshCloudProjects();
@@ -1709,7 +1728,11 @@ const App: React.FC = () => {
         alert("Couldn't load that cloud project — check your connection and try again.");
         return;
       }
-      applyParsedLayoutPayload(result.payload as Record<string, unknown>);
+      try {
+        applyParsedLayoutPayload(result.payload as Record<string, unknown>);
+      } catch {
+        alert("Couldn't load that cloud project — check your connection and try again.");
+      }
     });
   };
 
@@ -1739,6 +1762,7 @@ const App: React.FC = () => {
   const handleSignOut = () => {
     cloudSignOut();
     setCloudProjects([]);
+    setSaveDestination("local");
   };
 
   const requestDeleteNamedProject = (name: string, source: "local" | "cloud") => {

@@ -1876,18 +1876,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             padding: "5px 7px",
                           }}
                         >
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 600,
-                              color: "var(--text-muted)",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.03em",
-                              flex: "0 0 auto",
-                            }}
-                          >
-                            {p.source === "cloud" ? "Cloud" : "Local"}
-                          </span>
+                          {cloudConfigured && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                color: "var(--text-muted)",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.03em",
+                                flex: "0 0 auto",
+                              }}
+                            >
+                              {p.source === "cloud" ? "Cloud" : "Local"}
+                            </span>
+                          )}
                           <span
                             style={{
                               flex: 1,

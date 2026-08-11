@@ -67,10 +67,14 @@ export async function listCloudProjects(): Promise<CloudProjectMeta[]> {
 
 export async function loadCloudProject(name: string): Promise<{ payload: unknown } | null> {
   if (!supabase) return null;
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (!userId) return null;
   const { data, error } = await supabase
     .from(TABLE)
     .select("payload")
     .eq("name", name)
+    .eq("user_id", userId)
     .single();
   if (error || !data) return null;
   return { payload: data.payload };
@@ -78,6 +82,13 @@ export async function loadCloudProject(name: string): Promise<{ payload: unknown
 
 export async function deleteCloudProject(name: string): Promise<{ error: string | null }> {
   if (!supabase) return { error: NOT_CONFIGURED };
-  const { error } = await supabase.from(TABLE).delete().eq("name", name);
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (!userId) return { error: "Not signed in." };
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq("name", name)
+    .eq("user_id", userId);
   return { error: error?.message ?? null };
 }
