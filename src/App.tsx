@@ -27,7 +27,14 @@ import {
 } from "./lib/canvasBounds";
 import type { StretchDefinition } from "./lib/strokeSchema/deriveCatalog";
 import { mapNormToRealBox } from "./lib/strokeSchema/schemaGeometry";
-import type { Block, GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigAxis } from "./types";
+import type {
+  Block,
+  GlyphEdit,
+  GlyphStretchHandle,
+  GlyphRig,
+  GlyphRigAxis,
+  DiacriticOverride,
+} from "./types";
 
 const hslToHex = (h: number, s: number, l: number): string => {
   const sat = s / 100;
@@ -327,6 +334,7 @@ const App: React.FC = () => {
   const scheduleKashidaHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleGlyphEditHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleGlyphRigHistoryPush = useDebouncedHistoryPush(pushHistory);
+  const scheduleDiacriticHistoryPush = useDebouncedHistoryPush(pushHistory);
 
   const upsertGlyphEditRaw = useCallback(
     (
@@ -486,6 +494,45 @@ const App: React.FC = () => {
       }));
     },
     [upsertGlyphEditDebounced]
+  );
+
+  const dragDiacriticOverride = useCallback(
+    (blockId: number, glyphIndex: number, patch: Partial<DiacriticOverride>) => {
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || b.type !== "text") return b;
+          const existing = (b.diacriticOverrides ?? []).find((o) => o.glyphIndex === glyphIndex);
+          const nextOverrides = existing
+            ? (b.diacriticOverrides ?? []).map((o) =>
+                o.glyphIndex === glyphIndex ? { ...o, ...patch } : o
+              )
+            : [...(b.diacriticOverrides ?? []), { glyphIndex, ...patch }];
+          return { ...b, diacriticOverrides: nextOverrides };
+        })
+      );
+      scheduleDiacriticHistoryPush();
+    },
+    [scheduleDiacriticHistoryPush]
+  );
+
+  const toggleDiacriticHidden = useCallback(
+    (blockId: number, glyphIndex: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || b.type !== "text") return b;
+          const existing = (b.diacriticOverrides ?? []).find((o) => o.glyphIndex === glyphIndex);
+          const nextHidden = !(existing?.hidden ?? false);
+          const nextOverrides = existing
+            ? (b.diacriticOverrides ?? []).map((o) =>
+                o.glyphIndex === glyphIndex ? { ...o, hidden: nextHidden } : o
+              )
+            : [...(b.diacriticOverrides ?? []), { glyphIndex, hidden: nextHidden }];
+          return { ...b, diacriticOverrides: nextOverrides };
+        })
+      );
+    },
+    [pushHistory]
   );
 
   // Kaleam-style slider flow: every stroke slider in the Morph panel is live
@@ -1948,6 +1995,8 @@ const App: React.FC = () => {
           onGlyphBoxesChange={updateGlyphBoxes}
           onGlyphSchemaChange={updateGlyphSchema}
           onKashidaTextChange={updateKashidaText}
+          onDragDiacriticOverride={dragDiacriticOverride}
+          onToggleDiacriticHidden={toggleDiacriticHidden}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           onResizeImageBlock={resizeImageBlock}
           ghostBlock={

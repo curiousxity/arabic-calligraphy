@@ -31,6 +31,7 @@ import {
   OVERRIDE_RAISE,
   type OverrideGlyph,
 } from "../lib/glyphOverrides";
+import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
 
 type Props = {
   id?: string;
@@ -63,6 +64,9 @@ type Props = {
   glyphRigs?: GlyphRig[];
   glyphRigValues?: GlyphRigValue[];
   diacriticOverrides?: DiacriticOverride[];
+  isSelected?: boolean;
+  onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
+  onToggleDiacriticHidden?: (glyphIndex: number) => void;
   onGlyphSelect?: (glyphIndex: number | null) => void;
   onGlyphBoxesChange?: (boxes: GlyphHitBox[]) => void;
   onGlyphSchemaChange?: (catalog: Record<number, StretchDefinition[]>) => void;
@@ -84,7 +88,7 @@ type Props = {
 const fallbackWidth = (text: string, fs: number) =>
   Math.max(text.length * fs * 0.55, 20);
 
-type GlyphHitBox = {
+export type GlyphHitBox = {
   glyphIndex: number;
   x: number;
   y: number;
@@ -348,6 +352,9 @@ export const ShapedText: React.FC<Props> = ({
   glyphRigs = [],
   glyphRigValues = [],
   diacriticOverrides = [],
+  isSelected = false,
+  onDragDiacriticOverride,
+  onToggleDiacriticHidden,
   onGlyphSelect,
   onGlyphBoxesChange,
   onGlyphSchemaChange,
@@ -822,6 +829,19 @@ export const ShapedText: React.FC<Props> = ({
             ctx.restore();
           }
         }}
+      />
+
+      <DiacriticHoverHandles
+        isSelected={isSelected}
+        glyphs={shapeData.glyphs}
+        shapableText={shapeData.shapableText}
+        glyphHitBoxes={glyphHitBoxes}
+        diacriticOverrides={diacriticOverrides}
+        offsetX={bx + localDrawX}
+        offsetY={by + localDrawY}
+        fontSize={fontSize}
+        onDragDiacriticOverride={onDragDiacriticOverride}
+        onToggleDiacriticHidden={onToggleDiacriticHidden}
       />
 
       {kashidaEditMode &&

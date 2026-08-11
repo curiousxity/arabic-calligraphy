@@ -16,7 +16,7 @@ import {
   DEFAULT_EMPTY_BOUNDS,
 } from "../lib/canvasBounds";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
-import type { Block, GlyphStretchHandle, GlyphRig } from "../types";
+import type { Block, GlyphStretchHandle, GlyphRig, DiacriticOverride } from "../types";
 
 const GRID_SIZE = 40;
 const SNAP_GUIDE_PX = 6;
@@ -73,6 +73,12 @@ export type CanvasStageProps = {
   ) => void;
   onGlyphSchemaChange: (blockId: number, catalog: Record<number, StretchDefinition[]>) => void;
   onKashidaTextChange: (blockId: number, text: string) => void;
+  onDragDiacriticOverride: (
+    blockId: number,
+    glyphIndex: number,
+    patch: Partial<DiacriticOverride>
+  ) => void;
+  onToggleDiacriticHidden: (blockId: number, glyphIndex: number) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   onResizeImageBlock: (id: number, scale: number) => void;
   showRulers: boolean;
@@ -112,6 +118,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onGlyphBoxesChange,
   onGlyphSchemaChange,
   onKashidaTextChange,
+  onDragDiacriticOverride,
+  onToggleDiacriticHidden,
   onResizeShapeFillBlock,
   onResizeImageBlock,
   showRulers,
@@ -711,6 +719,12 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   }
                   onGlyphBoxesChange={(boxes) => onGlyphBoxesChange(block.id, boxes)}
                   onGlyphSchemaChange={(catalog) => onGlyphSchemaChange(block.id, catalog)}
+                  isSelected={block.id === selectedId}
+                  diacriticOverrides={block.diacriticOverrides ?? []}
+                  onDragDiacriticOverride={(glyphIndex, patch) =>
+                    onDragDiacriticOverride(block.id, glyphIndex, patch)
+                  }
+                  onToggleDiacriticHidden={(glyphIndex) => onToggleDiacriticHidden(block.id, glyphIndex)}
                   locked={block.locked}
                   debugBounds={false}
                 />
