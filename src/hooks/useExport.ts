@@ -25,10 +25,15 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
   ): Promise<T> => {
     const gridNode = stage.findOne("#grid-lines");
     const bgNode = opts.transparent ? stage.findOne("#artboard-background") : null;
+    const editOverlayNodes = stage.find((node: Konva.Node) =>
+      node.id().startsWith("text-path-edit-layer-")
+    );
     const gridWasVisible = gridNode?.visible() ?? false;
     const bgWasVisible = bgNode?.visible() ?? false;
+    const overlayVisibility = editOverlayNodes.map((n) => n.visible());
     gridNode?.visible(false);
     bgNode?.visible(false);
+    editOverlayNodes.forEach((n) => n.visible(false));
 
     const prevScale = { x: stage.scaleX(), y: stage.scaleY() };
     const prevPosition = { x: stage.x(), y: stage.y() };
@@ -41,6 +46,7 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
     } finally {
       gridNode?.visible(gridWasVisible);
       bgNode?.visible(bgWasVisible);
+      editOverlayNodes.forEach((n, i) => n.visible(overlayVisibility[i]));
       stage.scale(prevScale);
       stage.position(prevPosition);
       stage.batchDraw();
