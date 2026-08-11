@@ -726,7 +726,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     warpY={block.warpY ?? 0}
                     kashidaEditMode={block.kashidaEditMode ?? false}
                     onKashidaTextChange={(text) => onKashidaTextChange(block.id, text)}
-                    glyphEditTool={block.glyphEditTool ?? null}
                     selectedGlyphIndex={block.selectedGlyphIndex ?? null}
                     glyphEdits={block.glyphEdits ?? []}
                     glyphMaskEdit={block.glyphMaskEdit ?? null}

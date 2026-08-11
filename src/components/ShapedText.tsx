@@ -33,6 +33,7 @@ import {
   type OverrideGlyph,
 } from "../lib/glyphOverrides";
 import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
+import { StrokeStretchHoverHandles } from "./StrokeStretchHoverHandles";
 
 type Props = {
   id?: string;
@@ -58,7 +59,6 @@ type Props = {
   warpY?: number;
   kashidaEditMode?: boolean;
   onKashidaTextChange?: (text: string) => void;
-  glyphEditTool?: "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
   glyphMaskEdit?: { handleId: string; mode: "contours" | "lasso" } | null;
@@ -76,6 +76,12 @@ type Props = {
     handleId: string,
     patch: Partial<GlyphStretchHandle>
   ) => void;
+  onSetStretchFactor?: (
+    glyphIndex: number,
+    definition: StretchDefinition,
+    factor: number
+  ) => void;
+  onDeleteStretchHandle?: (glyphIndex: number, handleId: string) => void;
   locked?: boolean;
   draggable?: boolean;
   onClick?: () => void;
@@ -346,7 +352,6 @@ export const ShapedText: React.FC<Props> = ({
   warpY = 0,
   kashidaEditMode = false,
   onKashidaTextChange,
-  glyphEditTool = null,
   selectedGlyphIndex = null,
   glyphEdits = [],
   glyphMaskEdit = null,
@@ -356,10 +361,11 @@ export const ShapedText: React.FC<Props> = ({
   isSelected = false,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
-  onGlyphSelect,
   onGlyphBoxesChange,
   onGlyphSchemaChange,
   onUpdateStretchHandle,
+  onSetStretchFactor,
+  onDeleteStretchHandle,
   locked,
   draggable = true,
   onClick,
@@ -547,7 +553,7 @@ export const ShapedText: React.FC<Props> = ({
   }, [shapeData, selectedGlyphIndex, glyphHitBoxes, fontSize]);
 
   const selectedEdit =
-    glyphEditTool != null && selectedGlyphIndex != null
+    selectedGlyphIndex != null
       ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
       : undefined;
   const selectedStretches = selectedEdit?.stretches ?? [];
@@ -699,34 +705,14 @@ export const ShapedText: React.FC<Props> = ({
       rotation={rotation}
       opacity={opacity}
       draggable={draggable && !locked}
-      dragBoundFunc={glyphEditTool != null ? () => ({ x, y }) : undefined}
-      onClick={(e) => {
+      onClick={() => {
         onClick?.();
-
-        if (glyphEditTool == null) return;
-
-        const group = e.currentTarget;
-        const pos = group.getRelativePointerPosition();
-        if (!pos) return;
-
-        const textSpaceX = pos.x - bx - localDrawX;
-        const textSpaceY = pos.y - by - localDrawY;
-
-        const hit = glyphHitBoxes.find(
-          (b) =>
-            textSpaceX >= b.x &&
-            textSpaceX <= b.x + b.width &&
-            textSpaceY >= b.y &&
-            textSpaceY <= b.y + b.height
-        );
-
-        onGlyphSelect?.(hit?.glyphIndex ?? null);
       }}
       onTap={onTap}
       onDblClick={onDblClick}
       onDblTap={onDblClick}
-      onDragMove={glyphEditTool == null ? onDragMove : undefined}
-      onDragEnd={glyphEditTool == null ? onDragEnd : undefined}
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
       listening
     >
       {/* Transparent hit rect for selection/dragging */}
@@ -860,6 +846,17 @@ export const ShapedText: React.FC<Props> = ({
         onToggleDiacriticHidden={onToggleDiacriticHidden}
       />
 
+      <StrokeStretchHoverHandles
+        isSelected={isSelected}
+        glyphSchemaCatalog={glyphSchemaCatalog}
+        glyphEdits={glyphEdits}
+        glyphHitBoxes={glyphHitBoxes}
+        offsetX={bx + localDrawX}
+        offsetY={by + localDrawY}
+        onSetStretchFactor={onSetStretchFactor}
+        onDeleteStretchHandle={onDeleteStretchHandle}
+      />
+
       {kashidaEditMode &&
         displayedGaps.map((gap, i) => (
           <Circle
@@ -907,8 +904,7 @@ export const ShapedText: React.FC<Props> = ({
           />
         ))}
 
-      {glyphEditTool === "stretch" &&
-        glyphMaskEdit?.mode === "contours" &&
+      {glyphMaskEdit?.mode === "contours" &&
         activeMaskHandle &&
         selectedGlyphContours.map((c) => {
           const included =
@@ -939,7 +935,7 @@ export const ShapedText: React.FC<Props> = ({
           );
         })}
 
-      {glyphEditTool === "stretch" && glyphMaskEdit?.mode === "lasso" && activeMaskHandle && (
+      {glyphMaskEdit?.mode === "lasso" && activeMaskHandle && (
         <>
           <Rect
             x={bx}
