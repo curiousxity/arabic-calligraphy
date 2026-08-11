@@ -415,24 +415,26 @@ const App: React.FC = () => {
   }, []);
 
   // Arming a mask edit from the Morph panel's per-stroke rows also selects
-  // that glyph on the canvas and turns the Stretch tool on — the canvas
-  // contour/lasso overlays only render for the selected glyph while the tool
-  // is armed, and the panel no longer requires either as a precondition.
+  // that glyph on the canvas — the canvas contour/lasso overlays render for
+  // the selected glyph while a mask edit is armed. Shape Fill/Shape Warp
+  // still gate their overlay on the Stretch tool being turned on, so those
+  // block types still need `glyphEditTool` forced on here; plain text
+  // blocks dropped that gate entirely (ShapedText.tsx's overlay now checks
+  // only `glyphMaskEdit`/`selectedGlyphIndex`), so leave their
+  // `glyphEditTool` untouched.
   const setGlyphMaskEditMode = useCallback(
     (blockId: number, glyphIndex: number, handleId: string, mode: "contours" | "lasso" | null) => {
       setBlocks((prev) =>
-        prev.map((b) =>
-          b.id === blockId && b.type !== "image" && b.type !== "textPath"
-            ? mode
-              ? {
-                  ...b,
-                  glyphEditTool: "stretch" as const,
-                  selectedGlyphIndex: glyphIndex,
-                  glyphMaskEdit: { handleId, mode },
-                }
-              : { ...b, glyphMaskEdit: null }
-            : b
-        )
+        prev.map((b) => {
+          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
+          if (!mode) return { ...b, glyphMaskEdit: null };
+          return {
+            ...b,
+            glyphEditTool: b.type === "text" ? b.glyphEditTool : ("stretch" as const),
+            selectedGlyphIndex: glyphIndex,
+            glyphMaskEdit: { handleId, mode },
+          };
+        })
       );
     },
     []
@@ -2048,6 +2050,8 @@ const App: React.FC = () => {
           onEditBlock={requestTextEdit}
           onSelectGlyph={selectGlyphForBlock}
           onUpdateStretchHandle={updateStretchHandle}
+          onSetStretchFactor={setStretchFactor}
+          onDeleteStretchHandle={deleteStretchHandle}
           glyphRigs={glyphRigs}
           onGlyphBoxesChange={updateGlyphBoxes}
           onGlyphSchemaChange={updateGlyphSchema}

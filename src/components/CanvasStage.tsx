@@ -59,6 +59,13 @@ export type CanvasStageProps = {
     handleId: string,
     patch: Partial<GlyphStretchHandle>
   ) => void;
+  onSetStretchFactor: (
+    blockId: number,
+    glyphIndex: number,
+    definition: StretchDefinition,
+    factor: number
+  ) => void;
+  onDeleteStretchHandle: (blockId: number, glyphIndex: number, handleId: string) => void;
   glyphRigs: GlyphRig[];
   onGlyphBoxesChange: (
     blockId: number,
@@ -117,6 +124,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onEditBlock,
   onSelectGlyph,
   onUpdateStretchHandle,
+  onSetStretchFactor,
+  onDeleteStretchHandle,
   glyphRigs,
   onGlyphBoxesChange,
   onGlyphSchemaChange,
@@ -731,9 +740,14 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     glyphMaskEdit={block.glyphMaskEdit ?? null}
                     glyphRigs={glyphRigs}
                     glyphRigValues={block.glyphRigValues ?? []}
-                    onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
                     onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
                       onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
+                    }
+                    onSetStretchFactor={(glyphIndex, definition, factor) =>
+                      onSetStretchFactor(block.id, glyphIndex, definition, factor)
+                    }
+                    onDeleteStretchHandle={(glyphIndex, handleId) =>
+                      onDeleteStretchHandle(block.id, glyphIndex, handleId)
                     }
                     onGlyphBoxesChange={(boxes) => onGlyphBoxesChange(block.id, boxes)}
                     onGlyphSchemaChange={(catalog) => onGlyphSchemaChange(block.id, catalog)}
