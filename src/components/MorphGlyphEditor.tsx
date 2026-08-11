@@ -64,28 +64,30 @@ const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             sliders below.
           </p>
 
-          <h4>Stroke sliders</h4>
+          <h4>Stroke controls</h4>
           <p>
             Every letter in the block with an authored stroke schema gets a
-            group of sliders — one per anatomical stroke (its body, an
+            group of controls — one per anatomical stroke (its body, an
             eye/loop, a tooth, etc.), bounded to that stroke's authored safe
             range, with 1.00 always meaning the letter's natural, undistorted
-            shape. Just drag a slider; nothing needs to be clicked or added
-            first. Letters whose schema isn't authored yet simply don't
-            appear.
+            shape. On a plain text block each stroke is a canvas hover handle
+            plus a numeric field here (type a value and press Enter); on Shape
+            Fill and Shape Warp blocks it's a slider — either way, nothing
+            needs to be clicked or added first. Letters whose schema isn't
+            authored yet simply don't appear.
           </p>
           <ol>
             <li>
               A stroke's position on the letter and which part of the glyph it
               affects are derived automatically from the schema and the real
-              glyph outline the first time its slider moves.
+              glyph outline the first time its value changes.
             </li>
             <li>
-              The <strong>×</strong> next to an active slider resets that
-              stroke to its natural shape.
+              The <strong>×</strong> next to an active stroke resets it to its
+              natural shape.
             </li>
             <li>
-              <strong>Options…</strong> under an active slider reveals{" "}
+              <strong>Options…</strong> under an active stroke reveals{" "}
               <strong>Band width</strong> (how wide a swath around the stroke
               is affected) and <strong>Masking</strong>, which can override
               the automatic scoping if it picked up the wrong part of the
@@ -96,9 +98,10 @@ const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             </li>
           </ol>
           <p>
-            The <strong>Stretch</strong> canvas tool is optional — turn it on
-            to see a stroke's handle points on the canvas by clicking a
-            letter. The sliders work with it off.
+            On Shape Fill and Shape Warp blocks the <strong>Stretch</strong>{" "}
+            canvas tool is optional — turn it on to see a stroke's handle
+            points on the canvas by clicking a letter. The sliders work with
+            it off.
           </p>
           <p>
             When a block has one or more kashida-eligible schema-backed
@@ -124,6 +127,61 @@ const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       </div>
     </div>,
     document.body
+  );
+};
+
+/**
+ * Typed-precision factor field for a text block's stroke (text blocks have
+ * no slider — their canvas hover handles replace it, so this is the only
+ * way to type an exact value).
+ *
+ * The commit is deliberately deferred to blur/Enter rather than fired on
+ * every keystroke: the committing callback (`App.tsx`'s `setStretchFactor`)
+ * *creates* the stretch handle on its first call, so an on-change commit
+ * turned the first character of "0.9" into a clamped `0.85` handle (visible
+ * letter distortion plus a history push) and then rewrote the field from
+ * the controlled value, making the rest of the number impossible to type.
+ * While `draft` is non-null the field shows exactly what was typed.
+ */
+const StrokeFactorInput: React.FC<{
+  value: number;
+  min: number;
+  max: number;
+  label: string;
+  onCommit: (factor: number) => void;
+}> = ({ value, min, max, label, onCommit }) => {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = () => {
+    if (draft == null) return;
+    const parsed = parseFloat(draft);
+    setDraft(null);
+    if (Number.isNaN(parsed)) return;
+    const clamped = Math.max(min, Math.min(max, parsed));
+    if (clamped !== value) onCommit(clamped);
+  };
+
+  return (
+    <input
+      type="number"
+      value={draft ?? value.toFixed(2)}
+      min={min}
+      max={max}
+      step={0.01}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit();
+        } else if (e.key === "Escape") {
+          setDraft(null);
+        }
+      }}
+      className="hexInput"
+      style={{ width: 64 }}
+      aria-label={label}
+    />
   );
 };
 
@@ -282,17 +340,19 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
     <>
       <div>
         <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
-          Stroke Sliders
+          {selectedBlock.type === "text" ? "Stroke Handles" : "Stroke Sliders"}
         </div>
         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-          One slider per stroke of every letter with an authored schema —
-          1.00 is the letter's natural shape.
+          {selectedBlock.type === "text"
+            ? "One handle per stroke of every letter with an authored schema — 1.00 is the letter's natural shape."
+            : "One slider per stroke of every letter with an authored schema — 1.00 is the letter's natural shape."}
         </div>
 
         {selectedBlock.type === "text" ? (
           <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 10 }}>
             Hover a letter on the canvas to drag its stroke handles directly —
-            nothing needs to be turned on first.
+            nothing needs to be turned on first. Or type an exact value below
+            and press Enter.
           </div>
         ) : (
           <>
@@ -387,24 +447,20 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                                 {def.label.en ?? def.componentType}
                                 {def.kashidaEligible ? " · kashida" : ""}
                               </span>
-                              <input
-                                type="number"
-                                value={value.toFixed(2)}
+                              <StrokeFactorInput
+                                key={rowKey}
+                                value={value}
                                 min={def.minFactor}
                                 max={def.maxFactor}
-                                step={0.01}
-                                onChange={(e) => {
-                                  const v = parseFloat(e.target.value);
-                                  if (Number.isNaN(v)) return;
-                                  const clamped = Math.max(
-                                    def.minFactor,
-                                    Math.min(def.maxFactor, v)
-                                  );
-                                  onSetStretchFactor?.(selectedBlock.id, glyphIndex, def, clamped);
-                                }}
-                                className="hexInput"
-                                style={{ width: 64 }}
-                                aria-label={`${def.label.en ?? def.componentType} factor`}
+                                label={`${def.label.en ?? def.componentType} factor`}
+                                onCommit={(factor) =>
+                                  onSetStretchFactor?.(
+                                    selectedBlock.id,
+                                    glyphIndex,
+                                    def,
+                                    factor
+                                  )
+                                }
                               />
                             </div>
                           ) : (

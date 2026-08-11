@@ -68,7 +68,6 @@ type Props = {
   isSelected?: boolean;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
-  onGlyphSelect?: (glyphIndex: number | null) => void;
   onGlyphBoxesChange?: (boxes: GlyphHitBox[]) => void;
   onGlyphSchemaChange?: (catalog: Record<number, StretchDefinition[]>) => void;
   onUpdateStretchHandle?: (
@@ -705,9 +704,7 @@ export const ShapedText: React.FC<Props> = ({
       rotation={rotation}
       opacity={opacity}
       draggable={draggable && !locked}
-      onClick={() => {
-        onClick?.();
-      }}
+      onClick={onClick}
       onTap={onTap}
       onDblClick={onDblClick}
       onDblTap={onDblClick}
@@ -833,6 +830,26 @@ export const ShapedText: React.FC<Props> = ({
         }}
       />
 
+      {/*
+        Stroke-stretch overlay mounts BEFORE the diacritic overlay: Konva
+        routes a pointer to the topmost listening shape, and this overlay's
+        per-glyph hover rects are large (they cover a whole letter plus
+        wherever its dots can rest), while a diacritic's hit rect is small
+        and sits inside that same area. Mounted later, the stroke rects
+        would paint on top and steal hover from every mark above a letter
+        that has an authored schema.
+      */}
+      <StrokeStretchHoverHandles
+        isSelected={isSelected}
+        glyphSchemaCatalog={glyphSchemaCatalog}
+        glyphEdits={glyphEdits}
+        glyphHitBoxes={glyphHitBoxes}
+        offsetX={bx + localDrawX}
+        offsetY={by + localDrawY}
+        onSetStretchFactor={onSetStretchFactor}
+        onDeleteStretchHandle={onDeleteStretchHandle}
+      />
+
       <DiacriticHoverHandles
         isSelected={isSelected}
         glyphs={shapeData.glyphs}
@@ -844,17 +861,6 @@ export const ShapedText: React.FC<Props> = ({
         fontSize={fontSize}
         onDragDiacriticOverride={onDragDiacriticOverride}
         onToggleDiacriticHidden={onToggleDiacriticHidden}
-      />
-
-      <StrokeStretchHoverHandles
-        isSelected={isSelected}
-        glyphSchemaCatalog={glyphSchemaCatalog}
-        glyphEdits={glyphEdits}
-        glyphHitBoxes={glyphHitBoxes}
-        offsetX={bx + localDrawX}
-        offsetY={by + localDrawY}
-        onSetStretchFactor={onSetStretchFactor}
-        onDeleteStretchHandle={onDeleteStretchHandle}
       />
 
       {kashidaEditMode &&

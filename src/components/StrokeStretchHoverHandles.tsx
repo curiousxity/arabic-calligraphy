@@ -31,6 +31,7 @@ export type StrokeStretchHoverHandlesProps = {
 const DOT_COLOR = "#22c55e";
 const DOT_ACTIVE_COLOR = "#16a34a";
 const GUIDE_COLOR = "#22c55e";
+const DOT_RADIUS = 5;
 
 function findHandle(
   edits: GlyphEdit[],
@@ -105,13 +106,46 @@ export const StrokeStretchHoverHandles: React.FC<StrokeStretchHoverHandlesProps>
         // visibleGlyphIndex) before any other glyph can pick up hover again.
         const rectListening = visibleGlyphIndex == null || visibleGlyphIndex === glyphIndex;
 
+        const rows = glyphSchemaCatalog[glyphIndex].map((def) => {
+          const rowKey = `${glyphIndex}:${def.strokeId}:${def.zoneIndex}`;
+          const handle = findHandle(glyphEdits, glyphIndex, def);
+          const anchorLocal: AxisPoint = handle
+            ? { x: handle.anchorX, y: handle.anchorY }
+            : mapNormToRealBox(def.anchorNorm, box);
+          const dragOriginLocal: AxisPoint = handle
+            ? { x: handle.dragOriginX, y: handle.dragOriginY }
+            : mapNormToRealBox(def.dragNorm, box);
+          const factor = handle?.factor ?? 1;
+          const dotLocal = dotPositionForFactor(anchorLocal, dragOriginLocal, factor);
+          return { def, rowKey, handle, anchorLocal, dragOriginLocal, dotLocal };
+        });
+
+        // The hover rect must cover not just the glyph's own ink box but
+        // wherever this glyph's dots can currently *rest*: a dot sits at
+        // `anchor + factor·(dragOrigin - anchor)`, which for a stretched
+        // stroke travels well outside the glyph box. If the rect didn't
+        // follow, moving the cursor toward a stretched dot would cross the
+        // rect boundary, fire onMouseLeave, and unmount the dot before the
+        // cursor reached it — leaving the handle ungrabbable on canvas.
+        let rx1 = box.x - hitMargin;
+        let ry1 = box.y - hitMargin;
+        let rx2 = box.x + box.width + hitMargin;
+        let ry2 = box.y + box.height + hitMargin;
+        for (const r of rows) {
+          const pad = DOT_RADIUS + hitMargin;
+          rx1 = Math.min(rx1, r.dotLocal.x - pad);
+          ry1 = Math.min(ry1, r.dotLocal.y - pad);
+          rx2 = Math.max(rx2, r.dotLocal.x + pad);
+          ry2 = Math.max(ry2, r.dotLocal.y + pad);
+        }
+
         return (
           <Group key={glyphIndex}>
             <Rect
-              x={offsetX + box.x - hitMargin}
-              y={offsetY + box.y - hitMargin}
-              width={box.width + hitMargin * 2}
-              height={box.height + hitMargin * 2}
+              x={offsetX + rx1}
+              y={offsetY + ry1}
+              width={rx2 - rx1}
+              height={ry2 - ry1}
               fill="transparent"
               listening={rectListening}
               onMouseEnter={() => setHoveredGlyphIndex(glyphIndex)}
@@ -121,17 +155,7 @@ export const StrokeStretchHoverHandles: React.FC<StrokeStretchHoverHandlesProps>
             />
 
             {visibleGlyphIndex === glyphIndex &&
-              glyphSchemaCatalog[glyphIndex].map((def) => {
-                const rowKey = `${glyphIndex}:${def.strokeId}:${def.zoneIndex}`;
-                const handle = findHandle(glyphEdits, glyphIndex, def);
-                const anchorLocal: AxisPoint = handle
-                  ? { x: handle.anchorX, y: handle.anchorY }
-                  : mapNormToRealBox(def.anchorNorm, box);
-                const dragOriginLocal: AxisPoint = handle
-                  ? { x: handle.dragOriginX, y: handle.dragOriginY }
-                  : mapNormToRealBox(def.dragNorm, box);
-                const factor = handle?.factor ?? 1;
-                const dotLocal = dotPositionForFactor(anchorLocal, dragOriginLocal, factor);
+              rows.map(({ def, rowKey, handle, anchorLocal, dragOriginLocal, dotLocal }) => {
                 const isDragging = draggingRowKey === rowKey;
 
                 return (
@@ -153,11 +177,20 @@ export const StrokeStretchHoverHandles: React.FC<StrokeStretchHoverHandlesProps>
                     <Circle
                       x={offsetX + dotLocal.x}
                       y={offsetY + dotLocal.y}
-                      radius={5}
+                      radius={DOT_RADIUS}
                       fill={isDragging ? DOT_ACTIVE_COLOR : DOT_COLOR}
                       stroke="#ffffff"
                       strokeWidth={1.5}
                       draggable
+                      // The dot keeps hover alive on its own, so a cursor
+                      // that lands on a dot sitting near (or just past) the
+                      // rect's own boundary doesn't flicker/unmount it.
+                      onMouseEnter={() => setHoveredGlyphIndex(glyphIndex)}
+                      onMouseLeave={() =>
+                        setHoveredGlyphIndex((v) =>
+                          draggingRowKey != null ? v : v === glyphIndex ? null : v
+                        )
+                      }
                       onMouseDown={(e) => {
                         e.cancelBubble = true;
                       }}
