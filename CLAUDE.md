@@ -86,10 +86,6 @@ CSS is one global stylesheet (`src/index.css`) using CSS custom properties for t
 
 Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default to `min-width: auto`**, which refuses to shrink below content size and causes silent overflow/clipping at narrow sidebar widths. When adding a new multi-item row (grid or flex), give items `min-width: 0` explicitly or the row will overflow at the sidebar's minimum width instead of degrading gracefully.
 
-### Two files exist but are not wired into the app
-
-`src/components/SidebarPresets.tsx`, `src/components/CircularShapedText.tsx`, and `src/lib/opentype-mini.ts` are not imported anywhere in `src/` — they're leftover/unused. Don't assume they're load-bearing; don't delete them without checking with the user first (unclear if they're intentionally kept for future use).
-
 ### Undo/redo and grouping
 
 `src/hooks/useUndoRedo.ts` is a generic snapshot-stack hook (`getSnapshot`/`applySnapshot` callbacks); `App.tsx`'s `pushHistory()` wraps it and is called at the start of nearly every mutating handler (before the state change, so undo restores pre-change state). Blocks can share a `groupId` (assigned via the Layers panel's pairwise "merge" UI or the multi-select "Group selected" action) so that dragging one moves every block with the same `groupId` together; `dissolveSingletonGroups()` cleans up groups that drop to one member after a delete.

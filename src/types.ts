@@ -106,9 +106,6 @@ type BlockCommon = {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
-  embossStrength?: number;
-  embossHighlightColor: string;
-  embossShadowColor: string;
   locked?: boolean;
   rotation?: number;
   ornamental?: boolean;

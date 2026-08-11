@@ -3,7 +3,6 @@ import { Group, Shape, Rect, Arc } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import { parseSvgPath, replayPath } from "../lib/svgPath";
-import { drawInsetBevel, EMBOSS_STRENGTH_SCALE } from "../lib/emboss";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { applyGlyphEdit, prepareGlyphRig, applyPreparedGlyphRig } from "../lib/glyphEdits";
 import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
@@ -43,9 +42,6 @@ export type ShapeWarpTextProps = {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
-  embossStrength?: number;
-  embossHighlightColor?: string;
-  embossShadowColor?: string;
   rotation?: number;
 
   shapeSvgPath: string;
@@ -229,9 +225,6 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   shadowOffsetX = 0,
   shadowOffsetY = 0,
   shadowOpacity = 0.35,
-  embossStrength = 0,
-  embossHighlightColor = "#ffffff",
-  embossShadowColor = "#000000",
   rotation = 0,
   shapeSvgPath,
   warpShapeWidth,
@@ -549,7 +542,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
         shadowOffsetX={shadowOffsetX}
         shadowOffsetY={shadowOffsetY}
         shadowOpacity={shadowOpacity}
-        sceneFunc={(ctx, shape) => {
+        sceneFunc={(ctx) => {
           if (!shapeSvgPath || parsedCmds.length === 0) return;
 
           if (!hbLoaded || !shapeData.font || shapeData.glyphs.length === 0) {
@@ -567,9 +560,7 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           const scale = fontSize / Math.max(shapeData.unitsPerEm || 1000, 1);
 
           // Draws the whole warped glyph run once, in `fillColor`, offset by
-          // (offsetX, offsetY) — called once normally against the real
-          // context for the main fill, and against a scratch context by
-          // drawInsetBevel when emboss is active.
+          // (offsetX, offsetY).
           const drawPass = (
             targetCtx: CanvasRenderingContext2D,
             fillColor: string,
@@ -660,24 +651,6 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
           };
 
           drawPass(ctx as unknown as CanvasRenderingContext2D, color, 0, 0, true);
-
-          if (embossStrength > 0) {
-            const absScale = shape.getAbsoluteScale();
-            const resolutionScale =
-              ctx.getCanvas().getPixelRatio() *
-              Math.max(Math.abs(absScale.x), Math.abs(absScale.y));
-            drawInsetBevel(
-              ctx as unknown as CanvasRenderingContext2D,
-              bw,
-              bh,
-              embossStrength * EMBOSS_STRENGTH_SCALE,
-              embossHighlightColor,
-              embossShadowColor,
-              (scratchCtx, offsetX, offsetY, fillColor) =>
-                drawPass(scratchCtx, fillColor, offsetX, offsetY, false),
-              resolutionScale
-            );
-          }
         }}
       />
 

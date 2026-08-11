@@ -4,7 +4,6 @@ import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import type { HarfBuzzGlyph, ShapedTextResult } from "../lib/harfbuzz";
 import { warpPoint, type GlyphBounds } from "../lib/warp";
-import { drawInsetBevel, EMBOSS_STRENGTH_SCALE } from "../lib/emboss";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { useOverrideGlyph } from "../hooks/useOverrideGlyph";
 import {
@@ -51,9 +50,6 @@ type Props = {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
-  embossStrength?: number;
-  embossHighlightColor?: string;
-  embossShadowColor?: string;
   rotation?: number;
   warpX?: number;
   warpY?: number;
@@ -325,9 +321,6 @@ export const ShapedText: React.FC<Props> = ({
   shadowOffsetX = 0,
   shadowOffsetY = 0,
   shadowOpacity = 0.35,
-  embossStrength = 0,
-  embossHighlightColor = "#ffffff",
-  embossShadowColor = "#000000",
   rotation = 0,
   warpX = 0,
   warpY = 0,
@@ -746,7 +739,7 @@ export const ShapedText: React.FC<Props> = ({
         shadowOffsetX={shadowOffsetX}
         shadowOffsetY={shadowOffsetY}
         shadowOpacity={shadowOpacity}
-        sceneFunc={(ctx, shape) => {
+        sceneFunc={(ctx) => {
           if (!hbLoaded) return;
 
           const hasGlyphs =
@@ -784,48 +777,6 @@ export const ShapedText: React.FC<Props> = ({
             glyphRigValues
           );
           ctx.restore();
-
-          if (embossStrength > 0) {
-            const absScale = shape.getAbsoluteScale();
-            const resolutionScale =
-              ctx.getCanvas().getPixelRatio() *
-              Math.max(Math.abs(absScale.x), Math.abs(absScale.y));
-            drawInsetBevel(
-              ctx as unknown as CanvasRenderingContext2D,
-              bw,
-              bh,
-              embossStrength * EMBOSS_STRENGTH_SCALE,
-              embossHighlightColor,
-              embossShadowColor,
-              (scratchCtx, offsetX, offsetY, fillColor) => {
-                scratchCtx.save();
-                scratchCtx.translate(localDrawX + offsetX, localDrawY + offsetY);
-                if (isItalic) scratchCtx.transform(1, 0, -0.25, 1, 0, 0);
-                scratchCtx.fillStyle = fillColor;
-                drawWarpedGlyphRun(
-                  scratchCtx,
-                  shapeData.glyphs,
-                  font,
-                  fontSize,
-                  shapeData.unitsPerEm,
-                  glyphBounds,
-                  warpX,
-                  warpY,
-                  false,
-                  stroke,
-                  strokeWidth,
-                  0,
-                  overrideGlyph,
-                  glyphEdits,
-                  fontFamily,
-                  glyphRigs,
-                  glyphRigValues
-                );
-                scratchCtx.restore();
-              },
-              resolutionScale
-            );
-          }
 
           if (strokeWidth > 0) {
             ctx.save();

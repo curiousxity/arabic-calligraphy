@@ -207,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showText, setShowText] = useState(false);
   const [showTransform, setShowTransform] = useState(false);
   const [showEffects, setShowEffects] = useState(false);
-  const [effectsTab, setEffectsTab] = useState<"outline" | "shadow" | "emboss">("outline");
+  const [effectsTab, setEffectsTab] = useState<"outline" | "shadow">("outline");
   const [showHelpers, setShowHelpers] = useState(false);
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(!isMobile);
@@ -1128,7 +1128,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     [
                       { key: "outline", label: "Outline" },
                       { key: "shadow", label: "Shadow" },
-                      { key: "emboss", label: "Emboss" },
                     ] as const
                   ).map((tab) => (
                     <button
@@ -1237,38 +1236,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onChange={(v) => onUpdateSelectedBlock({ shadowOpacity: v })}
                       suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
                       fieldKey="shadowOpacity"
-                    />
-                  </div>
-                )}
-
-                {effectsTab === "emboss" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-                    <ColorRow
-                      id={makeId("emboss-highlight-color", selectedId)}
-                      name={makeId("embossHighlightColor", selectedId)}
-                      label="Highlight color"
-                      value={selectedBlock.embossHighlightColor}
-                      onChange={(v) => onUpdateSelectedBlock({ embossHighlightColor: v })}
-                    />
-
-                    <ColorRow
-                      id={makeId("emboss-shadow-color", selectedId)}
-                      name={makeId("embossShadowColor", selectedId)}
-                      label="Shadow color"
-                      value={selectedBlock.embossShadowColor}
-                      onChange={(v) => onUpdateSelectedBlock({ embossShadowColor: v })}
-                    />
-
-                    <RangeRow
-                      id={makeId("emboss-strength", selectedId)}
-                      name={makeId("embossStrength", selectedId)}
-                      label="Strength"
-                      value={selectedBlock.embossStrength ?? 0}
-                      min={0}
-                      max={5}
-                      onChange={(v) => onUpdateSelectedBlock({ embossStrength: v })}
-                      suffix={selectedBlock.embossStrength ?? 0}
-                      fieldKey="embossStrength"
                     />
                   </div>
                 )}
