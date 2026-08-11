@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STARTER_TEMPLATES, buildBlocksFromTemplate } from "./templates";
+import { STARTER_TEMPLATES, buildBlocksFromTemplate, templateFieldDefaults } from "./templates";
 
 describe("STARTER_TEMPLATES fields", () => {
   it("every template has exactly one field per block", () => {
@@ -30,9 +30,17 @@ describe("buildBlocksFromTemplate", () => {
   const bismillah = STARTER_TEMPLATES.find((t) => t.id === "bismillah-card")!;
 
   it("reproduces the original blocks when every value matches the default", () => {
-    const defaults = eidGreeting.fields!.map((f) => eidGreeting.blocks[f.blockIndex].text);
-    const result = buildBlocksFromTemplate(eidGreeting, defaults);
+    const result = buildBlocksFromTemplate(eidGreeting, templateFieldDefaults(eidGreeting));
     expect(result.map((b) => b.text)).toEqual(eidGreeting.blocks.map((b) => b.text));
+  });
+
+  it("reproduces the original text for every starter template's defaults", () => {
+    for (const t of STARTER_TEMPLATES) {
+      const result = buildBlocksFromTemplate(t, templateFieldDefaults(t));
+      expect(result.map((b) => b.text), `${t.id} changed under default values`).toEqual(
+        t.blocks.map((b) => b.text)
+      );
+    }
   });
 
   it("applies an edited value to the correct block by index, leaving the other block untouched", () => {

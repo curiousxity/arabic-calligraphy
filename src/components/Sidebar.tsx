@@ -516,7 +516,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="sectionPanel">
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  Replaces the current canvas (undo with Ctrl+Z if you change your mind).
+                  Opens a wizard to fill in the text.
                 </div>
 
                 <div
@@ -558,6 +558,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {wizardTemplate && onGenerateFromTemplate && (
           <TemplateWizardDialog
+            key={wizardTemplate.id}
             template={wizardTemplate}
             onCancel={() => setWizardTemplate(null)}
             onGenerate={(values) => {
