@@ -12,9 +12,12 @@ export type ConfirmDialogRequest = {
 /**
  * Portaled confirmation modal for actions that can't be undone with Ctrl+Z
  * (or that are easy to trigger by accident and expensive to redo by hand) —
- * see App.tsx's requestDeleteNamedProject / requestApplyStarterTemplate.
+ * see App.tsx's requestDeleteNamedProject.
  * Not used for ordinary block/layer delete, which stays a single click
  * since it's a frequent, undo-covered action; those just get danger styling.
+ * Template application (Sidebar.tsx's "Start from a Template") used to go
+ * through this dialog too, but TemplateWizardDialog.tsx now folds that
+ * same warning into its own Generate step instead.
  */
 export const ConfirmDialog: React.FC<{
   request: ConfirmDialogRequest | null;

@@ -12,6 +12,8 @@ import { extractSvgPaths } from "../lib/svgImport";
 import { arcPathD, wavePathD, circlePathD } from "../lib/textPath";
 import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import { STARTER_TEMPLATES } from "../lib/templates";
+import type { StarterTemplate } from "../lib/templates";
+import { TemplateWizardDialog } from "./TemplateWizardDialog";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { HistoryPopover, type HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
@@ -91,7 +93,7 @@ export type SidebarProps = {
   onAddShapeWarpBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddTextPathBlock?: () => void;
   onAddImageBlock?: () => void;
-  onApplyTemplate?: (templateId: string) => void;
+  onGenerateFromTemplate?: (templateId: string, values: string[]) => void;
   onRandomizeLayout?: () => void;
 
   onToggleGrid: (v: boolean) => void;
@@ -213,7 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddShapeWarpBlock,
   onAddTextPathBlock,
   onAddImageBlock,
-  onApplyTemplate,
+  onGenerateFromTemplate,
   onRandomizeLayout,
   onToggleGrid,
   onToggleSnap,
@@ -255,6 +257,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showLayers, setShowLayers] = useState(!isMobile);
   const [showAlign, setShowAlign] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [wizardTemplate, setWizardTemplate] = useState<StarterTemplate | null>(null);
   const [namedProjectInput, setNamedProjectInput] = useState("");
   const selectionCount = selectedIds.length > 1 ? selectedIds.length : 1;
   const [showBackgroundSettings, setShowBackgroundSettings] = useState(false);
@@ -504,7 +507,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {onApplyTemplate && (
+        {onGenerateFromTemplate && (
           <div className="sidebarPanel">
             <CollapsibleSection
               title="Start from a Template"
@@ -527,7 +530,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button
                       key={t.id}
                       type="button"
-                      onClick={() => onApplyTemplate(t.id)}
+                      onClick={() => setWizardTemplate(t)}
                       className="sidebarSmallAction"
                       title={t.description}
                       style={{ textAlign: "center", height: "auto", padding: "10px 8px" }}
@@ -551,6 +554,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </CollapsibleSection>
           </div>
+        )}
+
+        {wizardTemplate && onGenerateFromTemplate && (
+          <TemplateWizardDialog
+            template={wizardTemplate}
+            onCancel={() => setWizardTemplate(null)}
+            onGenerate={(values) => {
+              onGenerateFromTemplate(wizardTemplate.id, values);
+              setWizardTemplate(null);
+            }}
+          />
         )}
 
         <div className="sidebarPanel">
