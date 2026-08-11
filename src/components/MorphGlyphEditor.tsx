@@ -57,6 +57,13 @@ const MorphHelpDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             Warp block. Not available for image blocks.
           </p>
 
+          <p>
+            On a plain text block, hover a letter on the canvas to reveal its
+            stroke handles directly — drag one along its stretch axis instead
+            of using a slider. Shape Fill and Shape Warp blocks still use the
+            sliders below.
+          </p>
+
           <h4>Stroke sliders</h4>
           <p>
             Every letter in the block with an authored stroke schema gets a
@@ -282,32 +289,41 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
           1.00 is the letter's natural shape.
         </div>
 
-        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-          {(
-            [
-              { value: null, label: "Off" },
-              { value: "stretch", label: "Stretch" },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.label}
-              type="button"
-              onClick={() => onSetGlyphEditTool?.(opt.value)}
-              className="sidebarPillButton"
-              style={
-                (selectedBlock.glyphEditTool ?? null) === opt.value
-                  ? { background: "var(--accent)", color: "var(--text-on-accent)" }
-                  : undefined
-              }
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-          Stretch shows the handles on the canvas (click a letter to inspect);
-          the sliders below work either way.
-        </div>
+        {selectedBlock.type === "text" ? (
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 10 }}>
+            Hover a letter on the canvas to drag its stroke handles directly —
+            nothing needs to be turned on first.
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+              {(
+                [
+                  { value: null, label: "Off" },
+                  { value: "stretch", label: "Stretch" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => onSetGlyphEditTool?.(opt.value)}
+                  className="sidebarPillButton"
+                  style={
+                    (selectedBlock.glyphEditTool ?? null) === opt.value
+                      ? { background: "var(--accent)", color: "var(--text-on-accent)" }
+                      : undefined
+                  }
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+              Stretch shows the handles on the canvas (click a letter to inspect);
+              the sliders below work either way.
+            </div>
+          </>
+        )}
 
         {glyphGroups.length === 0 ? (
           <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 10 }}>
@@ -365,19 +381,47 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <div style={{ flex: 1, minWidth: 0 }} title={def.label.ar}>
-                          <RangeRow
-                            id={makeId(`stroke-${rowKey}`, selectedId)}
-                            name={makeId(`strokeFactor-${rowKey}`, selectedId)}
-                            label={`${def.label.en ?? def.componentType}${def.kashidaEligible ? " · kashida" : ""}`}
-                            value={value}
-                            min={def.minFactor}
-                            max={def.maxFactor}
-                            step={0.01}
-                            onChange={(v) =>
-                              onSetStretchFactor?.(selectedBlock.id, glyphIndex, def, v)
-                            }
-                            suffix={value.toFixed(2)}
-                          />
+                          {selectedBlock.type === "text" ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ fontSize: 12, flex: 1, minWidth: 0 }}>
+                                {def.label.en ?? def.componentType}
+                                {def.kashidaEligible ? " · kashida" : ""}
+                              </span>
+                              <input
+                                type="number"
+                                value={value.toFixed(2)}
+                                min={def.minFactor}
+                                max={def.maxFactor}
+                                step={0.01}
+                                onChange={(e) => {
+                                  const v = parseFloat(e.target.value);
+                                  if (Number.isNaN(v)) return;
+                                  const clamped = Math.max(
+                                    def.minFactor,
+                                    Math.min(def.maxFactor, v)
+                                  );
+                                  onSetStretchFactor?.(selectedBlock.id, glyphIndex, def, clamped);
+                                }}
+                                className="hexInput"
+                                style={{ width: 64 }}
+                                aria-label={`${def.label.en ?? def.componentType} factor`}
+                              />
+                            </div>
+                          ) : (
+                            <RangeRow
+                              id={makeId(`stroke-${rowKey}`, selectedId)}
+                              name={makeId(`strokeFactor-${rowKey}`, selectedId)}
+                              label={`${def.label.en ?? def.componentType}${def.kashidaEligible ? " · kashida" : ""}`}
+                              value={value}
+                              min={def.minFactor}
+                              max={def.maxFactor}
+                              step={0.01}
+                              onChange={(v) =>
+                                onSetStretchFactor?.(selectedBlock.id, glyphIndex, def, v)
+                              }
+                              suffix={value.toFixed(2)}
+                            />
+                          )}
                         </div>
                         {handle && (
                           <button
