@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { traceImageToPath, type TraceResult } from "../lib/imageTrace";
 
@@ -29,13 +29,18 @@ export const ImageTraceDialog: React.FC<ImageTraceDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [displaySize, setDisplaySize] = useState<{ w: number; h: number } | null>(null);
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
   const [result, setResult] = useState<TraceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const imageDataRef = useRef<ImageData | null>(null);
   const debounceRef = useRef<number | null>(null);
+
+  const imgUrl = useMemo(() => URL.createObjectURL(file), [file]);
+
+  useEffect(() => {
+    return () => URL.revokeObjectURL(imgUrl);
+  }, [imgUrl]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -49,8 +54,6 @@ export const ImageTraceDialog: React.FC<ImageTraceDialogProps> = ({
   // MAX_TRACE_DIMENSION, and stash the resulting ImageData for re-tracing on
   // every threshold change.
   useEffect(() => {
-    const url = URL.createObjectURL(file);
-    setImgUrl(url);
     const img = new Image();
     img.onload = () => {
       const scale = Math.min(
@@ -72,9 +75,8 @@ export const ImageTraceDialog: React.FC<ImageTraceDialogProps> = ({
       setDisplaySize({ w, h });
     };
     img.onerror = () => setError("Could not load this image.");
-    img.src = url;
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+    img.src = imgUrl;
+  }, [file, imgUrl]);
 
   const retrace = useCallback((nextThreshold: number) => {
     const original = imageDataRef.current;
