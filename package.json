@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
     "harfbuzzjs": "^0.10.1",
     "imagetracerjs": "1.2.6",
     "jspdf": "^4.2.1",

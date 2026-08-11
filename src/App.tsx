@@ -36,6 +36,18 @@ import type {
   GlyphRigAxis,
   DiacriticOverride,
 } from "./types";
+import type { Session } from "@supabase/supabase-js";
+import {
+  isCloudConfigured,
+  signInWithEmail,
+  signOut as cloudSignOut,
+  getSession,
+  onAuthStateChange,
+  saveCloudProject,
+  listCloudProjects,
+  loadCloudProject,
+  deleteCloudProject,
+} from "./lib/cloudProjects";
 
 const hslToHex = (h: number, s: number, l: number): string => {
   const sat = s / 100;
@@ -81,7 +93,7 @@ type PendingPlacement = {
   label: string;
 };
 
-export type NamedProjectMeta = { name: string; savedAt: number };
+export type NamedProjectMeta = { name: string; savedAt: number; source: "local" | "cloud" };
 type NamedProjectsStore = Record<string, { savedAt: number; payload: unknown }>;
 
 type GlyphBox = {
@@ -194,19 +206,71 @@ const App: React.FC = () => {
     vertical: [],
   });
   const [transparentExport, setTransparentExport] = useState(true);
-  const [namedProjects, setNamedProjects] = useState<NamedProjectMeta[]>(() => {
+  const [localProjects, setLocalProjects] = useState<NamedProjectMeta[]>(() => {
     if (!isBrowser) return [];
     try {
       const raw = localStorage.getItem(NAMED_PROJECTS_KEY);
       if (!raw) return [];
       const store = JSON.parse(raw) as NamedProjectsStore;
       return Object.entries(store)
-        .map(([name, entry]) => ({ name, savedAt: entry.savedAt }))
+        .map(([name, entry]) => ({ name, savedAt: entry.savedAt, source: "local" as const }))
         .sort((a, b) => b.savedAt - a.savedAt);
     } catch {
       return [];
     }
   });
+  const [session, setSession] = useState<Session | null>(null);
+  const [cloudProjects, setCloudProjects] = useState<NamedProjectMeta[]>([]);
+  const [saveDestination, setSaveDestination] = useState<"local" | "cloud">("local");
+  const cloudConfigured = isCloudConfigured();
+
+  // Incremented at the start of every refreshCloudProjects() call; a slow
+  // listCloudProjects() resolving after the user has since signed out (or
+  // into a different account) checks its captured generation against this
+  // ref and drops the stale result instead of repopulating state with it.
+  const cloudProjectsRequestRef = useRef(0);
+
+  const refreshCloudProjects = useCallback(async () => {
+    const generation = ++cloudProjectsRequestRef.current;
+    if (!session) {
+      setCloudProjects([]);
+      return;
+    }
+    const list = await listCloudProjects();
+    if (cloudProjectsRequestRef.current !== generation) return;
+    setCloudProjects(list.map((p) => ({ ...p, source: "cloud" as const })));
+  }, [session]);
+
+  useEffect(() => {
+    if (!cloudConfigured) return;
+    let cancelled = false;
+    getSession().then((s) => {
+      if (!cancelled) setSession(s);
+    });
+    const unsubscribe = onAuthStateChange((s) => {
+      setSession(s);
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [cloudConfigured]);
+
+  useEffect(() => {
+    refreshCloudProjects();
+  }, [refreshCloudProjects]);
+
+  // Covers externally-triggered sign-outs too (token expiry, another tab
+  // signing out) — not just the in-app Sign out button, which also resets
+  // this directly in handleSignOut.
+  useEffect(() => {
+    if (!session) setSaveDestination("local");
+  }, [session]);
+
+  const namedProjects = useMemo<NamedProjectMeta[]>(
+    () => [...localProjects, ...cloudProjects].sort((a, b) => b.savedAt - a.savedAt),
+    [localProjects, cloudProjects]
+  );
   const [glyphRigs, setGlyphRigs] = useState<GlyphRig[]>(() => {
     if (!isBrowser) return [];
     try {
@@ -1609,16 +1673,15 @@ const App: React.FC = () => {
   };
 
   const refreshNamedProjectsList = (store: NamedProjectsStore) => {
-    setNamedProjects(
+    setLocalProjects(
       Object.entries(store)
-        .map(([name, entry]) => ({ name, savedAt: entry.savedAt }))
+        .map(([name, entry]) => ({ name, savedAt: entry.savedAt, source: "local" as const }))
         .sort((a, b) => b.savedAt - a.savedAt)
     );
   };
 
-  const saveNamedProject = (name: string) => {
-    const trimmed = name.trim();
-    if (!isBrowser || !trimmed) return;
+  const saveNamedProjectLocal = (trimmed: string) => {
+    if (!isBrowser) return;
     try {
       const store = readNamedProjectsStore();
       store[trimmed] = { savedAt: Date.now(), payload: buildLayoutPayload() };
@@ -1629,33 +1692,90 @@ const App: React.FC = () => {
     }
   };
 
-  const loadNamedProject = (name: string) => {
-    const store = readNamedProjectsStore();
-    const entry = store[name];
-    if (!entry) return;
-    applyStoredPayload(JSON.stringify(entry.payload));
-  };
-
-  const deleteNamedProject = (name: string) => {
-    const store = readNamedProjectsStore();
-    delete store[name];
-    try {
-      localStorage.setItem(NAMED_PROJECTS_KEY, JSON.stringify(store));
-    } catch {
-      // best-effort
+  const saveNamedProjectCloud = async (trimmed: string) => {
+    const { error } = await saveCloudProject(trimmed, buildLayoutPayload());
+    if (error) {
+      alert(
+        error === "Not signed in."
+          ? "Couldn't save to cloud — not signed in."
+          : "Couldn't save to cloud — check your connection and try again."
+      );
+      return;
     }
-    refreshNamedProjectsList(store);
+    await refreshCloudProjects();
   };
 
-  const requestDeleteNamedProject = (name: string) => {
+  const saveNamedProject = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (saveDestination === "cloud") {
+      saveNamedProjectCloud(trimmed);
+    } else {
+      saveNamedProjectLocal(trimmed);
+    }
+  };
+
+  const loadNamedProject = (name: string, source: "local" | "cloud") => {
+    if (source === "local") {
+      const store = readNamedProjectsStore();
+      const entry = store[name];
+      if (!entry) return;
+      applyStoredPayload(JSON.stringify(entry.payload));
+      return;
+    }
+    loadCloudProject(name).then((result) => {
+      if (!result) {
+        alert("Couldn't load that cloud project — check your connection and try again.");
+        return;
+      }
+      try {
+        applyParsedLayoutPayload(result.payload as Record<string, unknown>);
+      } catch {
+        alert("Couldn't load that cloud project — check your connection and try again.");
+      }
+    });
+  };
+
+  const deleteNamedProject = (name: string, source: "local" | "cloud") => {
+    if (source === "local") {
+      const store = readNamedProjectsStore();
+      delete store[name];
+      try {
+        localStorage.setItem(NAMED_PROJECTS_KEY, JSON.stringify(store));
+      } catch {
+        // best-effort
+      }
+      refreshNamedProjectsList(store);
+      return;
+    }
+    deleteCloudProject(name).then(({ error }) => {
+      if (error) {
+        alert("Couldn't delete that cloud project — check your connection and try again.");
+        return;
+      }
+      refreshCloudProjects();
+    });
+  };
+
+  const handleSignIn = (email: string) => signInWithEmail(email);
+
+  const handleSignOut = () => {
+    cloudSignOut();
+    setCloudProjects([]);
+    setSaveDestination("local");
+  };
+
+  const requestDeleteNamedProject = (name: string, source: "local" | "cloud") => {
     setConfirmRequest({
       title: `Delete "${name}"?`,
       message:
-        "This removes the saved project from this browser for good — unlike canvas edits, it isn't covered by Ctrl+Z.",
+        source === "local"
+          ? "This removes the saved project from this browser for good — unlike canvas edits, it isn't covered by Ctrl+Z."
+          : "This removes the saved project from your cloud account for good — unlike canvas edits, it isn't covered by Ctrl+Z.",
       confirmLabel: "Delete project",
       onConfirm: () => {
         setConfirmRequest(null);
-        deleteNamedProject(name);
+        deleteNamedProject(name, source);
       },
     });
   };
@@ -1940,6 +2060,12 @@ const App: React.FC = () => {
         onLoadLayout={loadLayout}
         onDownloadLayout={downloadLayout}
         onUploadLayout={uploadLayout}
+        cloudConfigured={cloudConfigured}
+        session={session}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
+        saveDestination={saveDestination}
+        onChangeSaveDestination={setSaveDestination}
         namedProjects={namedProjects}
         onSaveNamedProject={saveNamedProject}
         onLoadNamedProject={loadNamedProject}
