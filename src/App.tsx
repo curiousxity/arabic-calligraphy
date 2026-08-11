@@ -335,10 +335,13 @@ const App: React.FC = () => {
    * No grid/background hiding (unlike useExport's toDataURL calls) — this
    * is a cheap approximate preview, not export-quality output.
    */
-  const captureHistoryThumbnail = useCallback(
-    () => stageRef.current?.toDataURL({ pixelRatio: 0.15 }) ?? "",
-    []
-  );
+  const captureHistoryThumbnail = useCallback(() => {
+    try {
+      return stageRef.current?.toDataURL({ pixelRatio: 0.15 }) ?? "";
+    } catch {
+      return "";
+    }
+  }, []);
 
   const { pushHistory, handleUndo, handleRedo, jumpBy, canUndo, canRedo, historyEntries } =
     useUndoRedo(getSnapshot, applySnapshot, captureHistoryThumbnail);

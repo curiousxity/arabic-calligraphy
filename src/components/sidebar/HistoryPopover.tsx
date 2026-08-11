@@ -65,15 +65,15 @@ export const HistoryPopover: React.FC<HistoryPopoverProps> = ({
       </button>
 
       {open && (
-        <div className="historyPopoverList" role="menu" aria-label="Edit history">
-          <button type="button" className="historyPopoverItem historyPopoverItem--current" disabled>
+        <div className="historyPopoverList" aria-label="Edit history">
+          <div className="historyPopoverItem historyPopoverItem--current">
             {currentThumbnail ? (
               <img src={currentThumbnail} alt="" className="historyPopoverThumb" />
             ) : (
               <span className="historyPopoverThumbPlaceholder" />
             )}
             <span className="historyPopoverLabel">Current</span>
-          </button>
+          </div>
 
           {historyEntries.map((entry) => (
             <button

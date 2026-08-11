@@ -7,6 +7,7 @@ import {
   canUndo,
   canRedo,
   pastTimeline,
+  replaceLastEntry,
   MAX_HISTORY,
   type HistoryStack,
   type HistoryEntry,
@@ -115,6 +116,25 @@ describe("historyStack", () => {
       { thumbnail: "thumb:B", steps: -2 },
       { thumbnail: "thumb:A", steps: -3 },
     ]);
+  });
+
+  it("replaceLastEntry swaps the most recent past entry in place without growing past, and clears future like pushEntry", () => {
+    let stack = emptyHistoryStack<string>();
+    stack = pushEntry(stack, entry("A"));
+    stack = pushEntry(stack, entry("B"));
+    const back = moveBack(stack, entry("live-after-B"))!;
+    stack = back.stack;
+    expect(canRedo(stack)).toBe(true);
+    stack = replaceLastEntry(stack, entry("A2"));
+    expect(stack.past.map((e) => e.snapshot)).toEqual(["A2"]);
+    expect(stack.past.length).toBe(1);
+    expect(canRedo(stack)).toBe(false);
+  });
+
+  it("replaceLastEntry on an empty stack falls back to appending", () => {
+    let stack = emptyHistoryStack<string>();
+    stack = replaceLastEntry(stack, entry("A"));
+    expect(stack.past.map((e) => e.snapshot)).toEqual(["A"]);
   });
 
   it("caps past length at MAX_HISTORY, dropping the oldest entries", () => {

@@ -38,6 +38,22 @@ export function pushEntry<T>(stack: HistoryStack<T>, entry: HistoryEntry<T>): Hi
 }
 
 /**
+ * Replaces the most recent past entry in place instead of appending a new
+ * one — used to coalesce rapid-fire pushes (e.g. every keystroke of a text
+ * edit, or every tick of a slider drag) into a single history entry rather
+ * than consuming the `MAX_HISTORY` cap one push at a time. Still discards
+ * `future`, same as `pushEntry` — it's still a new edit for that rule's
+ * purposes, just one that doesn't warrant its own past slot. Falls back to
+ * `pushEntry`'s append behavior if there's no existing past entry to
+ * replace.
+ */
+export function replaceLastEntry<T>(stack: HistoryStack<T>, entry: HistoryEntry<T>): HistoryStack<T> {
+  if (stack.past.length === 0) return pushEntry(stack, entry);
+  const past = [...stack.past.slice(0, -1), entry];
+  return { past, future: [] };
+}
+
+/**
  * Shared by moveBack/moveForward: pop up to `steps` entries off the front
  * (the `steps`-th one is the target to land on), and stash the live current
  * state plus every entry closer than the target onto the opposite side, in

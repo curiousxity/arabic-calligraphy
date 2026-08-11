@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import {
   emptyHistoryStack,
   pushEntry,
+  replaceLastEntry,
   moveBack,
   moveForward,
   canUndo as stackCanUndo,
@@ -10,6 +11,11 @@ import {
   type HistoryEntry,
   type HistoryStack,
 } from "../lib/historyStack";
+
+/** Rapid-fire pushes (keystrokes, slider-drag ticks) within this window of
+ * the previous push coalesce into the same history entry instead of each
+ * consuming a slot of the `MAX_HISTORY` cap — see `pushHistory` below. */
+const COALESCE_WINDOW_MS = 300;
 
 /**
  * Generic undo/redo stack, now backed by `lib/historyStack.ts`'s pure
@@ -26,6 +32,7 @@ export function useUndoRedo<T>(
   captureThumbnail: () => string
 ) {
   const stackRef = useRef<HistoryStack<T>>(emptyHistoryStack<T>());
+  const lastPushAtRef = useRef<number>(0);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   // Refs mutate silently — this just forces `historyEntries` to recompute
@@ -39,10 +46,14 @@ export function useUndoRedo<T>(
   }, []);
 
   const pushHistory = useCallback(() => {
-    stackRef.current = pushEntry(stackRef.current, {
-      snapshot: getSnapshot(),
-      thumbnail: captureThumbnail(),
-    });
+    const entry: HistoryEntry<T> = { snapshot: getSnapshot(), thumbnail: captureThumbnail() };
+    const now = Date.now();
+    const shouldCoalesce =
+      now - lastPushAtRef.current < COALESCE_WINDOW_MS && stackRef.current.past.length > 0;
+    stackRef.current = shouldCoalesce
+      ? replaceLastEntry(stackRef.current, entry)
+      : pushEntry(stackRef.current, entry);
+    lastPushAtRef.current = now;
     syncFlags();
   }, [getSnapshot, captureThumbnail, syncFlags]);
 
