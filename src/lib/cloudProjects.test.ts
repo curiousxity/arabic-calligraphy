@@ -20,7 +20,7 @@ vi.mock("./supabaseClient", () => ({
         getUser: mockGetUser,
         onAuthStateChange: mockOnAuthStateChange,
       },
-      from: (table: string) => ({
+      from: () => ({
         select: (cols: string) => {
           if (cols === "name, saved_at") {
             return { order: mockOrder };
