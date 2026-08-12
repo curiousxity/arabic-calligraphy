@@ -152,6 +152,30 @@ export type SidebarProps = {
   // ---- STREAM-B: kashida auto-justify ----
   // ---- /STREAM-B ----
   // ---- STREAM-C: export presets ----
+  // The preset shape is spelled out structurally rather than imported from
+  // `lib/exportPresets`, so this stream adds no line to the import block —
+  // the one region of this file with no per-stream anchors.
+  onCopyPNG?: () => void;
+  onExportAll?: () => void;
+  exportStatus?: string | null;
+  exportScale?: number;
+  onChangeExportScale?: (scale: number) => void;
+  exportFormats?: ("png" | "jpeg" | "svg" | "pdf")[];
+  onToggleExportFormat?: (format: "png" | "jpeg" | "svg" | "pdf") => void;
+  exportPresets?: {
+    id: string;
+    name: string;
+    scale: number;
+    transparent: boolean;
+    formats: ("png" | "jpeg" | "svg" | "pdf")[];
+  }[];
+  selectedExportPresetId?: string;
+  onSelectExportPreset?: (id: string) => void;
+  onRunExportPreset?: () => void;
+  newExportPresetName?: string;
+  onChangeNewExportPresetName?: (name: string) => void;
+  onSaveExportPreset?: () => void;
+  onDeleteExportPreset?: () => void;
   // ---- /STREAM-C ----
   // ---- STREAM-D: user guide ----
   // ---- /STREAM-D ----
@@ -312,6 +336,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // ---- STREAM-B: kashida auto-justify ----
   // ---- /STREAM-B ----
   // ---- STREAM-C: export presets ----
+  onCopyPNG,
+  onExportAll,
+  exportStatus,
+  exportScale = 2,
+  onChangeExportScale,
+  exportFormats = ["png", "jpeg", "svg", "pdf"],
+  onToggleExportFormat,
+  exportPresets = [],
+  selectedExportPresetId = "",
+  onSelectExportPreset,
+  onRunExportPreset,
+  newExportPresetName = "",
+  onChangeNewExportPresetName,
+  onSaveExportPreset,
+  onDeleteExportPreset,
   // ---- /STREAM-C ----
   // ---- STREAM-D: user guide ----
   // ---- /STREAM-D ----
@@ -1095,6 +1134,156 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <FileTextIcon size={13} /> PDF
                 </button>
               </div>
+
+              {/* ---- STREAM-C: export presets ---- */}
+              <div
+                style={{
+                  borderTop: "1px solid var(--border-soft)",
+                  paddingTop: 10,
+                  marginTop: 4,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={onCopyPNG}
+                    className="sidebarPillButton"
+                    title="Copy a PNG of the artwork to the clipboard"
+                    aria-label="Copy PNG to clipboard"
+                    style={{ minWidth: 0 }}
+                  >
+                    <ImageIcon size={13} /> Copy PNG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onExportAll}
+                    className="sidebarPillButton"
+                    title="Download every ticked format at once"
+                    aria-label="Export all ticked formats"
+                    style={{ minWidth: 0 }}
+                  >
+                    <FileTextIcon size={13} /> Export all
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <label
+                    htmlFor="export-scale"
+                    style={{ fontSize: 11, color: "var(--text-muted)", flex: "0 0 auto" }}
+                  >
+                    Scale
+                  </label>
+                  <input
+                    id="export-scale"
+                    type="number"
+                    min={0.25}
+                    max={8}
+                    step={0.25}
+                    value={exportScale}
+                    onChange={(e) => {
+                      const next = Number(e.target.value);
+                      if (Number.isFinite(next) && next > 0) onChangeExportScale?.(next);
+                    }}
+                    className="hexInput"
+                    style={{ minWidth: 0, flex: 1, fontFamily: "inherit", letterSpacing: 0 }}
+                  />
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", flex: "0 0 auto" }}>
+                    ×
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {(["png", "jpeg", "svg", "pdf"] as const).map((format) => (
+                    <button
+                      key={format}
+                      type="button"
+                      onClick={() => onToggleExportFormat?.(format)}
+                      className={
+                        exportFormats.includes(format)
+                          ? "sidebarPillButton sidebarPillButton--active"
+                          : "sidebarPillButton"
+                      }
+                      style={{ flex: "0 0 auto", padding: "0 10px", minWidth: 0 }}
+                      aria-pressed={exportFormats.includes(format)}
+                      title={`Include ${format.toUpperCase()} in "Export all" and in a new preset`}
+                    >
+                      {format.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <select
+                    value={selectedExportPresetId}
+                    onChange={(e) => onSelectExportPreset?.(e.target.value)}
+                    className="select"
+                    aria-label="Export preset"
+                    style={{ minWidth: 0, flex: 1 }}
+                  >
+                    <option value="">Preset…</option>
+                    {exportPresets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={onRunExportPreset}
+                    disabled={!selectedExportPresetId}
+                    className="sidebarPillButton"
+                    style={{ flex: "0 0 auto", padding: "0 10px" }}
+                    title="Export using this preset"
+                  >
+                    Run
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onDeleteExportPreset}
+                    disabled={!selectedExportPresetId}
+                    className="layerIconBtn"
+                    title="Delete this preset"
+                    aria-label="Delete this preset"
+                    style={{ color: "var(--danger)", flex: "0 0 auto" }}
+                  >
+                    <CloseIcon size={13} />
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="text"
+                    value={newExportPresetName}
+                    onChange={(e) => onChangeNewExportPresetName?.(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newExportPresetName.trim()) onSaveExportPreset?.();
+                    }}
+                    placeholder="Preset name…"
+                    aria-label="New export preset name"
+                    className="hexInput"
+                    style={{ minWidth: 0, fontFamily: "inherit", letterSpacing: 0 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={onSaveExportPreset}
+                    disabled={!newExportPresetName.trim()}
+                    className="sidebarPillButton"
+                    style={{ flex: "0 0 auto" }}
+                  >
+                    Save preset
+                  </button>
+                </div>
+
+                {exportStatus && (
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }} role="status">
+                    {exportStatus}
+                  </div>
+                )}
+              </div>
+              {/* ---- /STREAM-C ---- */}
             </div>
           </CollapsibleSection>
         </div>
