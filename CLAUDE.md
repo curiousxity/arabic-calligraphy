@@ -186,6 +186,65 @@ perfectly while silently discarding every edit.
 Text-on-path blocks remain unsupported — their glyphs are rotated to a
 curve tangent, which is separate design work.
 
+### Per-glyph move & scale (`src/lib/glyphTransform.ts`, `GlyphTransformHoverHandles.tsx`)
+
+Plain text blocks support rigidly moving a single shaped glyph and
+stretching or shrinking it as a whole in x or y — a third per-glyph system
+alongside `glyphEdits` (which displaces individual *outline points* with
+band falloff) and `diacriticOverrides` (uniform scale plus vertical offset,
+marks only). Ticking "Move & scale glyph" in the Morph Glyph Editor arms it;
+hovering a letter then shows three dots — blue to move, gold to scale x,
+green to scale y.
+
+`GlyphTransform` (`types.ts`: `offsetX`/`offsetY`/`scaleX`/`scaleY`, all
+defaulting to the identity) is applied in `ShapedText.tsx`'s
+`drawWarpedGlyphRun` as a `ctx.translate`/`ctx.scale` pair placed inside the
+existing `ctx.translate(gx, gy)` — which is what makes the pivot the glyph's
+**pen origin** (on the baseline, at the start of its advance) with no pivot
+arithmetic, so a scaled letter keeps sitting on the baseline. It composes
+*after* `applyGlyphEdit` and the glyph rig: stretch handles reshape the
+outline, then this moves and scales the result as a unit. A glyph carrying
+both a diacritic override and a transform gets both, multiplied.
+
+**`penX += advance` is never touched** — a moved or widened glyph does not
+reflow its neighbours, matching what `hidden` already guarantees on
+diacritic overrides. The same transform *is* applied to the glyph's entry in
+`glyphHitBoxes` (via `transformedBox`, shared with the overlay so the two
+cannot disagree) but deliberately **not** to the block-level `bounds`
+accumulated in that same loop: those must stay based on the untransformed
+run, or transforming one glyph would resize the block and shift every other
+glyph on canvas.
+
+Scales are clamped to 0.2–4 in `glyphTransform.ts`, both when reading a drag
+and when resolving a stored value, so a corrupted project file cannot
+produce a glyph too small to grab and fix.
+
+Arming is exclusive: while `glyphTransformMode` is on, `ShapedText` does not
+mount `StrokeStretchHoverHandles` at all, so a dot is never ambiguous.
+`DiacriticHoverHandles` still mounts last and stays topmost, keeping its
+smaller targets winning on marks.
+
+Transforms are keyed by glyph index and share that scheme's fragility, with
+one difference worth knowing: `diacriticOverrides` are re-filtered each
+render against `findDiacriticGlyphIndices`, so a stale override landing on a
+base letter is dropped, but a glyph transform has no such signal — every
+glyph is a legitimate target — so a stale transform applies to whatever glyph
+now holds that index, exactly as `glyphEdits` already does.
+
+A scale-handle drag snapshots its rest distance at `onDragStart` rather than
+reading it from the live hit box: the box already carries the transform the
+drag is updating, so reading it live makes the scale converge to the wrong
+value (asking for 2× lands near 1.45× at typical geometry). For the same
+reason the drag's pivot is `gx + offsetX`, not bare `gx` — the renderer
+translates by the offset *before* scaling, so a moved glyph pivots there too,
+and using the bare pen origin reads correct at rest but drifts as the offset
+grows.
+
+Plain text only. Shape Fill and Shape Warp carry the fields via
+`BlockCommon` but neither renderer reads them; `App.tsx`'s
+`supportsGlyphTransforms` gate rejects edits there rather than accepting
+and silently discarding them.
+
 ### Stroke-schema-driven glyph editor (`src/lib/strokeSchema/`, `MorphGlyphEditor.tsx`)
 
 The "Morph Glyph Editor" panel's Stretch tool lets a user click a shaped glyph and add anchor→drag "stretch handles" that displace real font-outline points (`lib/glyphEdits.ts`'s `applyGlyphEdit`/`applyAxisDisplacement`, band-falloff + optional contour/lasso masking). **Handle creation is schema-only** — there is no generic/freeform "Add stretch line" button anymore (removed once enough letters had authored schema data); every handle traces back to a `StretchDefinition` from an externally-authored Arabic calligraphy stroke schema (anatomical decomposition of a letterform into HEAD/BODY/EYE/TOOTH/DOT/etc. strokes, each with a safe stretch-factor range, kashida eligibility, protected zones, and a priority weight). A letter/joining-form combination with no authored schema entry simply cannot have a stretch handle added yet — that's expected, not a bug, until more schema files are supplied.
@@ -349,6 +408,10 @@ full design and the SQL migration under `supabase/migrations/`.
 ## Deferred features
 
 These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
+
+- **Per-glyph move & scale on Shape Fill, Shape Warp, and text-on-path blocks** — Implemented for plain text only. The `DiacriticPlacement` adapters (`src/lib/diacriticPlacement.ts`) make the two shape types a follow-up rather than a rewrite, but each renderer's coordinate space needs its own verification pass; text-on-path is excluded for the same reason every other per-glyph tool is, its glyphs being rotated to a curve tangent.
+
+- **Per-glyph rotation** — The move/scale handles cover translation and axis-aligned scale only. Rotation needs a fourth handle and its own pivot decision.
 
 - **Stretch tool and glyph-edit handles on text-on-path blocks** — The axis-derivation and per-glyph drag mathematics assume glyphs sit in a straight bounding box. Making them work once glyphs are rotated to follow a curve's tangent is a real design problem, not a trivial extension of the existing system.
 
