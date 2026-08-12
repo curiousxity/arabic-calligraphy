@@ -72,6 +72,8 @@ type Props = {
   glyphRigValues?: GlyphRigValue[];
   diacriticOverrides?: DiacriticOverride[];
   glyphTransforms?: GlyphTransform[];
+  glyphTransformMode?: boolean;
+  onUpdateGlyphTransform?: (glyphIndex: number, patch: Partial<GlyphTransform>) => void;
   isSelected?: boolean;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;

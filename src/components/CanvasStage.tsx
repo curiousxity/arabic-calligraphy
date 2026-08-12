@@ -18,7 +18,7 @@ import {
   DEFAULT_EMPTY_BOUNDS,
 } from "../lib/canvasBounds";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
-import type { Block, GlyphStretchHandle, GlyphRig, DiacriticOverride } from "../types";
+import type { Block, GlyphStretchHandle, GlyphRig, DiacriticOverride, GlyphTransform } from "../types";
 
 const GRID_SIZE = 40;
 const SNAP_GUIDE_PX = 6;
@@ -89,6 +89,11 @@ export type CanvasStageProps = {
     patch: Partial<DiacriticOverride>
   ) => void;
   onToggleDiacriticHidden: (blockId: number, glyphIndex: number) => void;
+  onUpdateGlyphTransform: (
+    blockId: number,
+    glyphIndex: number,
+    patch: Partial<GlyphTransform>
+  ) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   onResizeImageBlock: (id: number, scale: number) => void;
   showRulers: boolean;
@@ -133,6 +138,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onUpdateTextPathD,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
+  onUpdateGlyphTransform,
   onResizeShapeFillBlock,
   onResizeImageBlock,
   showRulers,
@@ -770,6 +776,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelected={block.id === selectedId}
                     diacriticOverrides={block.diacriticOverrides ?? []}
                     glyphTransforms={block.glyphTransforms ?? []}
+                    glyphTransformMode={block.glyphTransformMode ?? false}
+                    onUpdateGlyphTransform={(glyphIndex, patch) =>
+                      onUpdateGlyphTransform(block.id, glyphIndex, patch)
+                    }
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)
                     }

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Block, GlyphRig, GlyphStretchHandle } from "../types";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
-import { RangeRow } from "./sidebar/FormControls";
+import { CheckboxRow, RangeRow } from "./sidebar/FormControls";
 import { makeId } from "./sidebar/utils";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, HelpIcon } from "./Icons";
 
@@ -232,6 +232,8 @@ export type MorphGlyphEditorProps = {
   onSetGlyphRigValue?: (blockId: number, axisId: string, value: number) => void;
   onDeleteGlyphRigAxis?: (fontFamily: string, glyphId: number, axisId: string) => void;
   onSetBlockKashidaAmount?: (blockId: number, amount: number) => void;
+  onToggleGlyphTransformMode?: (blockId: number) => void;
+  onResetGlyphTransforms?: (blockId: number) => void;
   isMobile: boolean;
   width: number;
   isCollapsed: boolean;
@@ -263,6 +265,8 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
   onSetGlyphRigValue,
   onDeleteGlyphRigAxis,
   onSetBlockKashidaAmount,
+  onToggleGlyphTransformMode,
+  onResetGlyphTransforms,
   isMobile,
   width,
   isCollapsed,
@@ -717,6 +721,44 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {selectedBlock.type === "text" && (
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border-soft)",
+            }}
+          >
+            <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
+              Move &amp; Scale
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+              Hover a letter on the canvas to move it, or stretch it in x or y.
+              Neighbouring letters never shift.
+            </div>
+
+            <div style={{ marginTop: 8 }}>
+              <CheckboxRow
+                id={makeId("glyph-transform-mode", selectedId)}
+                label="Move &amp; scale glyph"
+                checked={!!selectedBlock.glyphTransformMode}
+                onChange={() => onToggleGlyphTransformMode?.(selectedBlock.id)}
+              />
+            </div>
+
+            {(selectedBlock.glyphTransforms?.length ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => onResetGlyphTransforms?.(selectedBlock.id)}
+                className="sidebarSmallAction"
+                style={{ background: "var(--bg-input)", marginTop: 8 }}
+              >
+                Reset glyph transforms
+              </button>
+            )}
           </div>
         )}
 

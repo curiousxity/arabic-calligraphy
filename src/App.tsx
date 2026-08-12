@@ -35,6 +35,7 @@ import type {
   GlyphRig,
   GlyphRigAxis,
   DiacriticOverride,
+  GlyphTransform,
 } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
@@ -426,6 +427,7 @@ const App: React.FC = () => {
   const scheduleGlyphRigHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleTextPathHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleDiacriticHistoryPush = useDebouncedHistoryPush(pushHistory);
+  const scheduleGlyphTransformHistoryPush = useDebouncedHistoryPush(pushHistory);
 
   const upsertGlyphEditRaw = useCallback(
     (
@@ -623,6 +625,58 @@ const App: React.FC = () => {
             : [...(b.diacriticOverrides ?? []), { glyphIndex, hidden: nextHidden }];
           return { ...b, diacriticOverrides: nextOverrides };
         })
+      );
+    },
+    [pushHistory]
+  );
+
+  /**
+   * Plain text blocks only for v1 — Shape Fill and Shape Warp carry the
+   * field via BlockCommon but neither renderer reads it, so accepting an
+   * edit there would silently discard it.
+   */
+  const supportsGlyphTransforms = (b: Block) => b.type === "text";
+
+  const updateGlyphTransform = useCallback(
+    (blockId: number, glyphIndex: number, patch: Partial<GlyphTransform>) => {
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || !supportsGlyphTransforms(b)) return b;
+          const existing = (b.glyphTransforms ?? []).find((t) => t.glyphIndex === glyphIndex);
+          const nextTransforms = existing
+            ? (b.glyphTransforms ?? []).map((t) =>
+                t.glyphIndex === glyphIndex ? { ...t, ...patch } : t
+              )
+            : [...(b.glyphTransforms ?? []), { glyphIndex, ...patch }];
+          return { ...b, glyphTransforms: nextTransforms };
+        })
+      );
+      // Debounced: one continuous drag collapses to a single undo entry,
+      // the same treatment diacritic drags and the Kashida dial get.
+      scheduleGlyphTransformHistoryPush();
+    },
+    [scheduleGlyphTransformHistoryPush]
+  );
+
+  const toggleGlyphTransformMode = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && supportsGlyphTransforms(b)
+            ? { ...b, glyphTransformMode: !b.glyphTransformMode }
+            : b
+        )
+      );
+    },
+    [pushHistory]
+  );
+
+  const resetGlyphTransforms = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => (b.id === blockId ? { ...b, glyphTransforms: [] } : b))
       );
     },
     [pushHistory]
@@ -2187,6 +2241,7 @@ const App: React.FC = () => {
           onUpdateTextPathD={updateTextPathD}
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
+          onUpdateGlyphTransform={updateGlyphTransform}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           onResizeImageBlock={resizeImageBlock}
           ghostBlock={
@@ -2220,6 +2275,8 @@ const App: React.FC = () => {
         onSetGlyphRigValue={setGlyphRigValue}
         onDeleteGlyphRigAxis={deleteGlyphRigAxis}
         onSetBlockKashidaAmount={setBlockKashidaAmount}
+        onToggleGlyphTransformMode={toggleGlyphTransformMode}
+        onResetGlyphTransforms={resetGlyphTransforms}
         isMobile={isMobile}
         width={RIGHT_PANEL_WIDTH}
         isCollapsed={rightPanelCollapsed}
