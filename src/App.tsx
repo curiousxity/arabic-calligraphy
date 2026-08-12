@@ -131,6 +131,16 @@ const glyphBoxesEqual = (a: GlyphBox[] | undefined, b: GlyphBox[]): boolean => {
   return true;
 };
 
+/**
+ * The three block types whose renderers mount DiacriticHoverHandles. Image
+ * and textPath blocks inherit `diacriticOverrides` from BlockCommon but have
+ * no way to edit or apply it, so the mutators below must not write to them.
+ */
+const supportsDiacriticOverrides = (
+  b: Block
+): b is Extract<Block, { type: "text" | "shapeFill" | "shapeWarp" }> =>
+  b.type === "text" || b.type === "shapeFill" || b.type === "shapeWarp";
+
 const STORAGE_KEY = "calligraphy-layout-v2";
 const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
 const GLYPH_RIGS_KEY = "harfcanvas-glyph-rigs-v1";
@@ -583,7 +593,7 @@ const App: React.FC = () => {
     (blockId: number, glyphIndex: number, patch: Partial<DiacriticOverride>) => {
       setBlocks((prev) =>
         prev.map((b) => {
-          if (b.id !== blockId || b.type !== "text") return b;
+          if (b.id !== blockId || !supportsDiacriticOverrides(b)) return b;
           const existing = (b.diacriticOverrides ?? []).find((o) => o.glyphIndex === glyphIndex);
           const nextOverrides = existing
             ? (b.diacriticOverrides ?? []).map((o) =>
@@ -603,7 +613,7 @@ const App: React.FC = () => {
       pushHistory();
       setBlocks((prev) =>
         prev.map((b) => {
-          if (b.id !== blockId || b.type !== "text") return b;
+          if (b.id !== blockId || !supportsDiacriticOverrides(b)) return b;
           const existing = (b.diacriticOverrides ?? []).find((o) => o.glyphIndex === glyphIndex);
           const nextHidden = !(existing?.hidden ?? false);
           const nextOverrides = existing
@@ -2102,6 +2112,12 @@ const App: React.FC = () => {
           if (!selectedBlock || selectedBlock.type !== "text") return;
           updateSelectedBlock({
             kashidaEditMode: !selectedBlock.kashidaEditMode,
+          });
+        }}
+        onToggleDiacriticEditMode={() => {
+          if (!selectedBlock || selectedBlock.type !== "shapeFill") return;
+          updateSelectedBlock({
+            diacriticEditMode: !selectedBlock.diacriticEditMode,
           });
         }}
         showMorphEditorMobile={showMorphEditorMobile}

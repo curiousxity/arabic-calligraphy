@@ -137,6 +137,14 @@ type BlockCommon = {
   glyphMaskEdit?: { handleId: string; mode: "contours" | "lasso" } | null;
   /** Block-level "Kashida" slider (0-100) — proportionally scales every kashida-eligible, schema-backed stretch handle's `factor` toward its `maxFactor`, weighted by each handle's `priority`. */
   kashidaAmount?: number;
+  /**
+   * Per-instance diacritic adjustments. Lives on BlockCommon rather than
+   * TextBlock because plain text, shapeFill, and shapeWarp blocks all
+   * support the on-canvas diacritic handles; image and textPath blocks
+   * inherit it unused, the same intentional simplification glyphEdits
+   * already makes.
+   */
+  diacriticOverrides?: DiacriticOverride[];
 
   // Shared shape-import fields. shapeFill and shapeWarp blocks both carry an
   // uploaded SVG path, and shapeWarp falls back to shapeWidth/shapeHeight
@@ -154,7 +162,6 @@ export type TextBlock = BlockCommon & {
   warpX?: number;
   warpY?: number;
   kashidaEditMode?: boolean;
-  diacriticOverrides?: DiacriticOverride[];
 };
 
 export type ShapeFillBlock = BlockCommon & {
@@ -164,6 +171,8 @@ export type ShapeFillBlock = BlockCommon & {
   shapeFillScaleX?: number;
   shapeFillScaleY?: number;
   shapeFillTextRotation?: number;
+  /** Arms the on-canvas diacritic hover handles. Opt-in on shapeFill only: a fill tiles its glyph run across the whole silhouette, so the handles' scanline layout pass and their per-instance hit rects are real cost. */
+  diacriticEditMode?: boolean;
 };
 
 export type ShapeWarpBlock = BlockCommon & {

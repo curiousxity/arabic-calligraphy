@@ -655,6 +655,14 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onGlyphSchemaChange={(catalog) =>
                       onGlyphSchemaChange(block.id, catalog)
                     }
+                    diacriticEditMode={block.diacriticEditMode ?? false}
+                    diacriticOverrides={block.diacriticOverrides ?? []}
+                    onDragDiacriticOverride={(glyphIndex, patch) =>
+                      onDragDiacriticOverride(block.id, glyphIndex, patch)
+                    }
+                    onToggleDiacriticHidden={(glyphIndex) =>
+                      onToggleDiacriticHidden(block.id, glyphIndex)
+                    }
                   />
                 );
               }
@@ -702,6 +710,14 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     }
                     onGlyphSchemaChange={(catalog) =>
                       onGlyphSchemaChange(block.id, catalog)
+                    }
+                    isSelected={block.id === selectedId}
+                    diacriticOverrides={block.diacriticOverrides ?? []}
+                    onDragDiacriticOverride={(glyphIndex, patch) =>
+                      onDragDiacriticOverride(block.id, glyphIndex, patch)
+                    }
+                    onToggleDiacriticHidden={(glyphIndex) =>
+                      onToggleDiacriticHidden(block.id, glyphIndex)
                     }
                   />
                 );

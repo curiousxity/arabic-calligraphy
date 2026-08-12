@@ -133,6 +133,7 @@ export type SidebarProps = {
   onCaptureCurrentThumbnail: () => string;
 
   onToggleKashidaEditMode?: () => void;
+  onToggleDiacriticEditMode?: () => void;
   showMorphEditorMobile?: boolean;
   onToggleMorphEditorMobile?: () => void;
   onResetShapeWarp?: (blockId: number) => void;
@@ -255,6 +256,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onJumpToHistory,
   onCaptureCurrentThumbnail,
   onToggleKashidaEditMode,
+  onToggleDiacriticEditMode,
   showMorphEditorMobile,
   onToggleMorphEditorMobile,
   onResetShapeWarp,
@@ -1286,6 +1288,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       Tip: drag the gold handle on the shape's corner (canvas) to resize.
                     </div>
 
+                    <CheckboxRow
+                      id={makeId("diacritic-edit-mode", selectedId)}
+                      label="Diacritic tool"
+                      checked={!!selectedBlock.diacriticEditMode}
+                      onChange={() => onToggleDiacriticEditMode?.()}
+                    />
+
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
+                      Hover a tashkeel mark on the canvas to move, resize, or hide it. One
+                      change applies to every repetition of that mark in the fill.
+                    </div>
+
                     <RangeRow
                       id={makeId("shape-scale", selectedId)}
                       name={makeId("shapeScale", selectedId)}
@@ -1588,7 +1602,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   Clear diacritics
                 </button>
 
-                {selectedBlock?.type === "text" &&
+                {(selectedBlock?.type === "text" ||
+                  selectedBlock?.type === "shapeFill" ||
+                  selectedBlock?.type === "shapeWarp") &&
                   (selectedBlock.diacriticOverrides?.length ?? 0) > 0 && (
                     <button
                       type="button"

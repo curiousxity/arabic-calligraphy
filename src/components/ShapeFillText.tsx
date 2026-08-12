@@ -30,7 +30,19 @@ import { applyGlyphEdit, prepareGlyphRig, applyPreparedGlyphRig } from "../lib/g
 import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import { deriveContourMask } from "../lib/glyphContours";
-import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
+import { findDiacriticGlyphIndices } from "../lib/diacritics";
+import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
+import {
+  makeShapeFillInstanceAdapter,
+  type DiacriticPlacement,
+} from "../lib/diacriticPlacement";
+import type {
+  GlyphEdit,
+  GlyphStretchHandle,
+  GlyphRig,
+  GlyphRigValue,
+  DiacriticOverride,
+} from "../types";
 
 export type ShapeFillTextProps = {
   id?: string;
@@ -80,6 +92,10 @@ export type ShapeFillTextProps = {
     handleId: string,
     patch: Partial<GlyphStretchHandle>
   ) => void;
+  diacriticEditMode?: boolean;
+  diacriticOverrides?: DiacriticOverride[];
+  onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
+  onToggleDiacriticHidden?: (glyphIndex: number) => void;
   locked?: boolean;
   draggable?: boolean;
   onClick?: () => void;
@@ -253,6 +269,10 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   onGlyphBoxesChange,
   onGlyphSchemaChange,
   onUpdateStretchHandle,
+  diacriticEditMode = false,
+  diacriticOverrides = [],
+  onDragDiacriticOverride,
+  onToggleDiacriticHidden,
   locked,
   draggable = true,
   onClick, onTap, onDblClick, onDragMove, onDragEnd,
@@ -328,6 +348,20 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     return boxes;
   }, [glyphCache, fontSize]);
 
+  // Recomputed per render for this component's own current glyph run, so a
+  // stale override whose glyph index now lands on a base letter (text edits
+  // shift indices) is ignored rather than hiding or ballooning that letter —
+  // the same guard ShapedText.tsx already applies.
+  const diacriticGlyphIndices = useMemo(
+    () => findDiacriticGlyphIndices(shapeData.glyphs, shapeData.font),
+    [shapeData.glyphs, shapeData.font]
+  );
+
+  const activeDiacriticOverrides = useMemo(
+    () => diacriticOverrides.filter((o) => diacriticGlyphIndices.has(o.glyphIndex)),
+    [diacriticOverrides, diacriticGlyphIndices]
+  );
+
   useEffect(() => {
     onGlyphBoxesChange?.(glyphLocalBoxes);
   }, [glyphLocalBoxes, onGlyphBoxesChange]);
@@ -341,7 +375,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   // handle placement can know where every tiled repetition actually lands.
   // Only computed while glyph edit mode is on (it's a real amount of work).
   const glyphInstances = useMemo<GlyphInstance[]>(() => {
-    if (!glyphEditTool) return [];
+    if (!glyphEditTool && !diacriticEditMode) return [];
     if (!shapeSvgPath || parsedCmds.length === 0) return [];
     if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) return [];
 
@@ -377,6 +411,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     return instances;
   }, [
     glyphEditTool,
+    diacriticEditMode,
     shapeSvgPath,
     parsedCmds,
     shapeData.font,
@@ -389,6 +424,46 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     shapeFillScaleX,
     shapeFillScaleY,
     polygon,
+  ]);
+
+  // One placement per tiled repetition of each diacritic. They all edit the
+  // same single override (keyed by glyph index), matching how glyphEdits
+  // already behaves on this block type.
+  const diacriticPlacements = useMemo<DiacriticPlacement[]>(() => {
+    if (!diacriticEditMode) return [];
+
+    const boxByIndex = new Map(glyphLocalBoxes.map((b) => [b.glyphIndex, b]));
+
+    return glyphInstances.flatMap((inst, i) => {
+      if (!diacriticGlyphIndices.has(inst.glyphIndex)) return [];
+      const box = boxByIndex.get(inst.glyphIndex);
+      if (!box) return [];
+
+      return [
+        {
+          glyphIndex: inst.glyphIndex,
+          // Unique per tiled repetition, so React can tell the instances of
+          // one mark apart.
+          key: `${i}:${inst.glyphIndex}`,
+          box: { x: box.x, y: box.y, width: box.width, height: box.height },
+          ...makeShapeFillInstanceAdapter({
+            gx: inst.gx,
+            gy: inst.gy,
+            rotationDeg: shapeFillTextRotation,
+            scX: inst.scX,
+            scY: inst.scY,
+            shapeScale,
+          }),
+        },
+      ];
+    });
+  }, [
+    diacriticEditMode,
+    glyphInstances,
+    glyphLocalBoxes,
+    diacriticGlyphIndices,
+    shapeFillTextRotation,
+    shapeScale,
   ]);
 
   // Handles no longer get their axis from dragging — it's auto-computed once
@@ -425,7 +500,9 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       rotation={rotation}
       opacity={opacity}
       draggable={draggable && !locked}
-      dragBoundFunc={glyphEditTool != null ? () => ({ x, y }) : undefined}
+      dragBoundFunc={
+        glyphEditTool != null || diacriticEditMode ? () => ({ x, y }) : undefined
+      }
       onClick={(e) => {
         onClick?.();
 
@@ -502,6 +579,13 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
               for (let gi = 0; gi < glyphCache.length; gi++) {
                 const g = glyphCache[gi];
                 if (!g.obj || g.commands.length === 0) continue;
+                // No penX accumulator to advance here — glyphCache precomputes
+                // each glyph's penX, so skipping the draw already leaves the
+                // surrounding letters untouched.
+                const diacriticOverride = activeDiacriticOverrides.find(
+                  (o) => o.glyphIndex === gi
+                );
+                if (diacriticOverride?.hidden) continue;
                 const gx = startPenX + g.penX * scX + g.dx * scX;
                 const gy = sy + g.dy * scY;
                 const edit = glyphEdits.find((w) => w.glyphIndex === gi);
@@ -518,6 +602,15 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 targetCtx.translate(gx, gy);
                 if (shapeFillTextRotation !== 0) targetCtx.rotate(rotRad);
                 targetCtx.scale(scX, scY);
+                if (diacriticOverride) {
+                  // Applied inside the row's own scale so an adjusted mark
+                  // keeps being scaled with its row, and pivoted on the
+                  // glyph's pen origin — the same meaning offsetY has on
+                  // plain text.
+                  targetCtx.translate(0, diacriticOverride.offsetY ?? 0);
+                  const ds = diacriticOverride.scale ?? 1;
+                  targetCtx.scale(ds, ds);
+                }
                 if (isItalic) targetCtx.transform(1, 0, -0.25, 1, 0, 0);
                 replayPath(targetCtx, commands);
                 targetCtx.fill();
@@ -560,6 +653,19 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
           drawPass(ctx as unknown as CanvasRenderingContext2D, color, 0, 0, true);
         }}
+      />
+
+      {/*
+        Mounted before the corner resize Circle so that handle keeps winning
+        Konva's topmost-listener contest at the shape's bottom-right corner.
+      */}
+      <DiacriticHoverHandles
+        isSelected={isSelected && diacriticEditMode}
+        placements={diacriticPlacements}
+        diacriticOverrides={diacriticOverrides}
+        fontSize={fontSize}
+        onDragDiacriticOverride={onDragDiacriticOverride}
+        onToggleDiacriticHidden={onToggleDiacriticHidden}
       />
 
       {isSelected && !locked && (

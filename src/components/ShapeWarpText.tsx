@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Shape, Rect, Arc } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
@@ -8,7 +8,16 @@ import { applyGlyphEdit, prepareGlyphRig, applyPreparedGlyphRig } from "../lib/g
 import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import { deriveContourMask } from "../lib/glyphContours";
-import type { GlyphEdit, GlyphStretchHandle, GlyphRig, GlyphRigValue } from "../types";
+import { findDiacriticGlyphIndices } from "../lib/diacritics";
+import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
+import type { DiacriticPlacement } from "../lib/diacriticPlacement";
+import type {
+  GlyphEdit,
+  GlyphStretchHandle,
+  GlyphRig,
+  GlyphRigValue,
+  DiacriticOverride,
+} from "../types";
 import {
   applyShapeWarpPoint,
   invertShapeWarpPoint,
@@ -77,6 +86,11 @@ export type ShapeWarpTextProps = {
     handleId: string,
     patch: Partial<GlyphStretchHandle>
   ) => void;
+
+  isSelected?: boolean;
+  diacriticOverrides?: DiacriticOverride[];
+  onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
+  onToggleDiacriticHidden?: (glyphIndex: number) => void;
 };
 
 type GlyphLayout = {
@@ -140,6 +154,10 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   onGlyphBoxesChange,
   onGlyphSchemaChange,
   onUpdateStretchHandle,
+  isSelected = false,
+  diacriticOverrides = [],
+  onDragDiacriticOverride,
+  onToggleDiacriticHidden,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
   const { hbLoaded } = shapeData;
@@ -288,6 +306,20 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
     }));
   }, [glyphLayouts]);
 
+  // Recomputed per render for this component's own current glyph run, so a
+  // stale override whose glyph index now lands on a base letter (text edits
+  // shift indices) is ignored rather than hiding or ballooning that letter —
+  // the same guard ShapedText.tsx already applies.
+  const diacriticGlyphIndices = useMemo(
+    () => findDiacriticGlyphIndices(shapeData.glyphs, shapeData.font),
+    [shapeData.glyphs, shapeData.font]
+  );
+
+  const activeDiacriticOverrides = useMemo(
+    () => diacriticOverrides.filter((o) => diacriticGlyphIndices.has(o.glyphIndex)),
+    [diacriticOverrides, diacriticGlyphIndices]
+  );
+
   useEffect(() => {
     onGlyphBoxesChange?.(hitBoxes);
   }, [hitBoxes, onGlyphBoxesChange]);
@@ -335,17 +367,62 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
   const bx = -bw / 2;
   const by = -bh / 2;
 
-  const invertToRawPoint = (screenX: number, screenY: number) =>
-    invertShapeWarpPoint(
-      screenX - bx,
-      screenY - by,
-      glyphBounds,
-      bw,
-      bh,
-      warpShapePadding,
-      warpShapeMode,
-      warpShapeStrength
-    );
+  const invertToRawPoint = useCallback(
+    (screenX: number, screenY: number) =>
+      invertShapeWarpPoint(
+        screenX - bx,
+        screenY - by,
+        glyphBounds,
+        bw,
+        bh,
+        warpShapePadding,
+        warpShapeMode,
+        warpShapeStrength
+      ),
+    [bx, by, glyphBounds, bw, bh, warpShapePadding, warpShapeMode, warpShapeStrength]
+  );
+
+  // The warp itself is the adapter: forward for drawing, Newton-inverted for
+  // reading a drag back. Every placement shares one pair, since the warp is a
+  // property of the block rather than of an individual mark.
+  const diacriticPlacements = useMemo<DiacriticPlacement[]>(() => {
+    const toCanvas = (x: number, y: number) => {
+      const p = applyShapeWarpPoint(
+        x,
+        y,
+        glyphBounds,
+        bw,
+        bh,
+        warpShapePadding,
+        warpShapeMode,
+        warpShapeStrength
+      );
+      return { x: p.x + bx, y: p.y + by };
+    };
+    const toLocal = (x: number, y: number) => invertToRawPoint(x, y);
+
+    return hitBoxes
+      .filter((b) => diacriticGlyphIndices.has(b.glyphIndex))
+      .map((b) => ({
+        glyphIndex: b.glyphIndex,
+        key: String(b.glyphIndex),
+        box: { x: b.x, y: b.y, width: b.width, height: b.height },
+        toCanvas,
+        toLocal,
+      }));
+  }, [
+    hitBoxes,
+    diacriticGlyphIndices,
+    glyphBounds,
+    bw,
+    bh,
+    bx,
+    by,
+    warpShapePadding,
+    warpShapeMode,
+    warpShapeStrength,
+    invertToRawPoint,
+  ]);
 
   return (
     <Group
@@ -479,13 +556,29 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
 
               const edit = glyphEdits.find((w) => w.glyphIndex === glyphIndex);
 
+              const diacriticOverride = activeDiacriticOverrides.find(
+                (o) => o.glyphIndex === glyphIndex
+              );
+              if (diacriticOverride?.hidden) {
+                penX += advance;
+                continue;
+              }
+
               const gx = (penX + (g.dx ?? 0)) * scale;
               const gy = -(g.dy ?? 0) * scale;
               const preparedRig = prepareGlyphRig(fontFamily, g.g, fontSize, glyphRigs, glyphRigValues, gx, gy);
 
               const warpPoint = (cx: number, cy: number) => {
-                const baseX = cx + gx;
-                const baseY = cy + gy;
+                // Override applied here, before applyShapeWarpPoint, so an
+                // adjusted mark keeps being bent along with the rest of the
+                // run instead of floating off its letter. This is
+                // deliberately the opposite order from ShapedText, whose own
+                // warpX/warpY is a mild distortion rather than the point of
+                // the block type — see the design spec.
+                const ds = diacriticOverride?.scale ?? 1;
+                const dy = diacriticOverride?.offsetY ?? 0;
+                const baseX = gx + cx * ds;
+                const baseY = gy + dy + cy * ds;
                 const pGlyph = applyGlyphEdit(baseX, baseY, edit);
                 const pRigged = applyPreparedGlyphRig(pGlyph.x, pGlyph.y, preparedRig);
 
@@ -546,6 +639,14 @@ export const ShapeWarpText: React.FC<ShapeWarpTextProps> = ({
         }}
       />
 
+      <DiacriticHoverHandles
+        isSelected={isSelected}
+        placements={diacriticPlacements}
+        diacriticOverrides={diacriticOverrides}
+        fontSize={fontSize}
+        onDragDiacriticOverride={onDragDiacriticOverride}
+        onToggleDiacriticHidden={onToggleDiacriticHidden}
+      />
     </Group>
   );
 };
