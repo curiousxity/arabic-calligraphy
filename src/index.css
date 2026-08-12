@@ -321,3 +321,20 @@ html, body, #root { height: 100%; margin: 0; }
 .canvasToolbarBtn--active:hover { background: var(--accent-soft-hover); color: var(--text-on-accent); }
 .canvasToolbarDivider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
 .canvasToolbarZoomLabel { min-width: 44px; }
+
+/* ------------------------------------------------------------------ */
+/* Parallel-stream style blocks — see docs/superpowers/specs/PARALLEL.md.
+   Each stream appends only inside its own anchors. Use the custom
+   properties defined at the top of this file rather than literal colours:
+   navy+gold is the unconditional :root default and an ivory palette
+   overrides it under prefers-color-scheme: light, which is inverted from
+   the usual convention. Grid and flex children default to min-width:auto
+   and will overflow the sidebar at its minimum width — set min-width:0
+   explicitly on any new multi-item row. */
+/* ------------------------------------------------------------------ */
+
+/* ---- STREAM-A: smart guides ---- */
+/* ---- /STREAM-A ---- */
+
+/* ---- STREAM-D: user guide ---- */
+/* ---- /STREAM-D ---- */

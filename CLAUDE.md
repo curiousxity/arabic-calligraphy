@@ -373,6 +373,9 @@ half-supported here.
 
 `public/fonts/*.ttf|otf` are not stock font files. `FatemiMaqala.ttf` has 8 custom Private Use Area glyphs (U+E833-E840, honorific symbols used by the sidebar's "Presets" row) that were manually merged (via a Python `fontTools` script, not committed to the repo) into every *other* font file in `public/fonts/` too, so those symbols render regardless of the selected font. If a font file in `public/fonts/` is ever regenerated/replaced from an upstream source, those PUA glyphs will be lost and the Presets buttons will silently show missing-glyph boxes in every font except FatemiMaqala again.
 
+<!-- ---- STREAM-A: smart guides — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
+<!-- ---- /STREAM-A ---- -->
+
 ### Canvas pan and zoom (`CanvasStage.tsx`, `lib/canvasBounds.ts`)
 
 A wheel event zooms only when `ctrlKey`/`metaKey` is set — which is how
@@ -396,6 +399,9 @@ step. Tune that one constant rather than either input path, or the two
 drift apart. Tested in `canvasBounds.test.ts`, which asserts the
 button/detent equality against `ZOOM_STEP` itself so the test survives
 retuning.
+
+<!-- ---- STREAM-D: user guide — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
+<!-- ---- /STREAM-D ---- -->
 
 ### Sidebar structure
 
@@ -459,6 +465,9 @@ CSS is one global stylesheet (`src/index.css`) using CSS custom properties for t
 
 Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default to `min-width: auto`**, which refuses to shrink below content size and causes silent overflow/clipping at narrow sidebar widths. When adding a new multi-item row (grid or flex), give items `min-width: 0` explicitly or the row will overflow at the sidebar's minimum width instead of degrading gracefully.
 
+<!-- ---- STREAM-B: kashida auto-justify — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
+<!-- ---- /STREAM-B ---- -->
+
 ### Undo/redo and grouping
 
 `src/hooks/useUndoRedo.ts` is a generic snapshot-stack hook (`getSnapshot`/`applySnapshot` callbacks); `App.tsx`'s `pushHistory()` wraps it and is called at the start of nearly every mutating handler (before the state change, so undo restores pre-change state). Blocks can share a `groupId` (assigned via the Layers panel's pairwise "merge" UI or the multi-select "Group selected" action) so that dragging one moves every block with the same `groupId` together; `dissolveSingletonGroups()` cleans up groups that drop to one member after a delete.
@@ -466,6 +475,9 @@ Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default 
 ### Export (`src/hooks/useExport.ts`)
 
 PNG/JPEG/PDF use `stage.toDataURL()`; SVG uses `react-konva-to-svg`. All four temporarily hide the on-screen alignment grid (`Konva.Group#grid-lines`) and, if "transparent background" is checked, the artboard background rect (`#artboard-background`) via `stage.findOne(...)`, so neither ever gets baked into exported output.
+
+<!-- ---- STREAM-C: export — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
+<!-- ---- /STREAM-C ---- -->
 
 ### History thumbnails (`src/lib/historyStack.ts`, `HistoryPopover.tsx`)
 

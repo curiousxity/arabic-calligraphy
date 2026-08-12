@@ -48,19 +48,41 @@ not merge, and the streams' regions were chosen to sit far apart.
 
 | File | A | B | C | D |
 |---|---|---|---|---|
-| `src/App.tsx` | `STREAM-A` anchors | `STREAM-B` | `STREAM-C` | — |
+| `src/App.tsx` | `STREAM-A` anchors | `STREAM-B` | `STREAM-C` | `STREAM-D` (prop bundle only) |
 | `src/components/Sidebar.tsx` | Background & Grid panel | Typography → Kashida | Project & Export | header button |
 | `src/components/CanvasStage.tsx` | **A only** | — | — | — |
 | `src/index.css` | `STREAM-A` block | — | — | `STREAM-D` block |
 | `CLAUDE.md` | after "Canvas pan and zoom" | after "Stroke-schema-driven glyph editor" | after "Export" | after "Sidebar structure" |
 
-Each anchor looks like this and appears twice per stream per file — once in the
-state/handler region, once in the JSX/props region:
+Anchors look like this, and every one of them is already in place on `main`:
 
 ```ts
-// ---- STREAM-A: smart guides (insert below) ----
+// ---- STREAM-A: smart guides — state ----
 // ---- /STREAM-A ----
 ```
+
+`src/App.tsx` gives each stream two regions — **state** (near the other
+`useState` calls, around line 227) and **handlers** (just above the `return`,
+because a handler in this file must be physically defined above its first
+reference and everything it closes over is declared higher up).
+
+**Getting props into `<Sidebar>` and `<CanvasStage>`.** Do *not* add attributes
+to those JSX elements. Their prop lists are hundreds of adjacent one-line
+attributes — precisely the shape that will not merge. Instead, each stream owns
+a prop bundle declared in its handler region:
+
+```ts
+// ---- STREAM-A: smart guides — handlers ----
+const streamASidebarProps: Partial<SidebarProps> = {};
+const streamACanvasProps: Partial<CanvasStageProps> = {};
+// ---- /STREAM-A ----
+```
+
+These are already spread into the JSX (`{...streamASidebarProps}`), so filling
+one in is all that is needed — the JSX itself never changes. Declare the props
+themselves between your anchors in `Sidebar.tsx`'s `SidebarProps` type and its
+destructuring list, and mark them optional (`?`), so the component still
+typechecks in a worktree where the other three streams' props do not exist.
 
 If your insertion does not fit inside your anchors, put it in a file you own
 and call it from between the anchors. A stream should be adding roughly

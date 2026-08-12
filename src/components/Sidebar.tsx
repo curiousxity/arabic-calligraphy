@@ -141,6 +141,18 @@ export type SidebarProps = {
   onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
   onDistributeSelected?: (axis: "x" | "y") => void;
   onGroupSelected?: () => void;
+
+  // Parallel-stream prop declarations — see docs/superpowers/specs/PARALLEL.md.
+  // Every stream's props are optional, so this component still typechecks in a
+  // worktree where the other three streams' props do not exist yet.
+  // ---- STREAM-A: smart guides ----
+  // ---- /STREAM-A ----
+  // ---- STREAM-B: kashida auto-justify ----
+  // ---- /STREAM-B ----
+  // ---- STREAM-C: export presets ----
+  // ---- /STREAM-C ----
+  // ---- STREAM-D: user guide ----
+  // ---- /STREAM-D ----
 };
 
 const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
@@ -290,6 +302,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAlignSelected,
   onDistributeSelected,
   onGroupSelected,
+  // Parallel-stream destructuring — match your declarations above.
+  // ---- STREAM-A: smart guides ----
+  // ---- /STREAM-A ----
+  // ---- STREAM-B: kashida auto-justify ----
+  // ---- /STREAM-B ----
+  // ---- STREAM-C: export presets ----
+  // ---- /STREAM-C ----
+  // ---- STREAM-D: user guide ----
+  // ---- /STREAM-D ----
 }) => {
   const [showText, setShowText] = useState(false);
   const [showTransform, setShowTransform] = useState(false);

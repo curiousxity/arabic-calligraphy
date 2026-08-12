@@ -6,8 +6,8 @@ import React, {
   useCallback,
 } from "react";
 import type Konva from "konva";
-import { Sidebar } from "./components/Sidebar";
-import { CanvasStage } from "./components/CanvasStage";
+import { Sidebar, type SidebarProps } from "./components/Sidebar";
+import { CanvasStage, type CanvasStageProps } from "./components/CanvasStage";
 import { MorphGlyphEditor } from "./components/MorphGlyphEditor";
 import { ConfirmDialog, type ConfirmDialogRequest } from "./components/ConfirmDialog";
 import { useUndoRedo } from "./hooks/useUndoRedo";
@@ -225,6 +225,17 @@ const App: React.FC = () => {
     vertical: [],
   });
   const [transparentExport, setTransparentExport] = useState(true);
+
+  // Parallel-stream insertion points — see docs/superpowers/specs/PARALLEL.md.
+  // Each stream adds its state only between its own anchors, so four
+  // independent branches merge into this file without overlapping hunks.
+  // ---- STREAM-A: smart guides — state ----
+  // ---- /STREAM-A ----
+  // ---- STREAM-B: kashida auto-justify — state ----
+  // ---- /STREAM-B ----
+  // ---- STREAM-C: export presets — state ----
+  // ---- /STREAM-C ----
+
   const [localProjects, setLocalProjects] = useState<NamedProjectMeta[]>(() => {
     if (!isBrowser) return [];
     try {
@@ -2086,6 +2097,30 @@ const App: React.FC = () => {
     setEditRequestSignal((v) => v + 1);
   }, []);
 
+  // Parallel-stream handler anchors (see PARALLEL.md). Handlers live here
+  // rather than beside their state because everything they close over —
+  // pushHistory, setBlocks, the block mutators — is declared above this point,
+  // and this file's handlers must be defined above their first reference.
+  //
+  // Each stream also owns one `stream*SidebarProps` bundle (and stream A a
+  // `streamACanvasProps`), spread into the JSX below. Filling a bundle here
+  // is how a stream gets props into <Sidebar>/<CanvasStage> without editing
+  // the shared JSX at all — the props lists are hundreds of lines of adjacent
+  // single-line attributes, which is precisely the shape that does not merge.
+  // ---- STREAM-A: smart guides — handlers ----
+  const streamASidebarProps: Partial<SidebarProps> = {};
+  const streamACanvasProps: Partial<CanvasStageProps> = {};
+  // ---- /STREAM-A ----
+  // ---- STREAM-B: kashida auto-justify — handlers ----
+  const streamBSidebarProps: Partial<SidebarProps> = {};
+  // ---- /STREAM-B ----
+  // ---- STREAM-C: export presets — handlers ----
+  const streamCSidebarProps: Partial<SidebarProps> = {};
+  // ---- /STREAM-C ----
+  // ---- STREAM-D: user guide — handlers ----
+  const streamDSidebarProps: Partial<SidebarProps> = {};
+  // ---- /STREAM-D ----
+
   return (
     <div
       style={{
@@ -2184,6 +2219,10 @@ const App: React.FC = () => {
         onAlignSelected={alignSelectedBlocks}
         onDistributeSelected={distributeSelectedBlocks}
         onGroupSelected={groupSelectedBlocks}
+        {...streamASidebarProps}
+        {...streamBSidebarProps}
+        {...streamCSidebarProps}
+        {...streamDSidebarProps}
       />
 
       {!isMobile && !sidebarCollapsed && (
@@ -2219,6 +2258,7 @@ const App: React.FC = () => {
           onAddGuide={addGuide}
           onMoveGuide={moveGuide}
           onRemoveGuide={removeGuide}
+          {...streamACanvasProps}
           viewportWidth={canvasWidth}
           stageViewportHeight={stageViewportHeight}
           backgroundColor={backgroundColor}
