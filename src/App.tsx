@@ -142,6 +142,14 @@ const supportsDiacriticOverrides = (
 ): b is Extract<Block, { type: "text" | "shapeFill" | "shapeWarp" }> =>
   b.type === "text" || b.type === "shapeFill" || b.type === "shapeWarp";
 
+/**
+ * Plain text blocks only for v1 — Shape Fill and Shape Warp carry the
+ * `glyphTransforms`/`glyphTransformMode` fields via BlockCommon but neither
+ * renderer reads them, so accepting an edit there would silently discard it.
+ */
+const supportsGlyphTransforms = (b: Block): b is Extract<Block, { type: "text" }> =>
+  b.type === "text";
+
 const STORAGE_KEY = "calligraphy-layout-v2";
 const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
 const GLYPH_RIGS_KEY = "harfcanvas-glyph-rigs-v1";
@@ -630,13 +638,6 @@ const App: React.FC = () => {
     [pushHistory]
   );
 
-  /**
-   * Plain text blocks only for v1 — Shape Fill and Shape Warp carry the
-   * field via BlockCommon but neither renderer reads it, so accepting an
-   * edit there would silently discard it.
-   */
-  const supportsGlyphTransforms = (b: Block) => b.type === "text";
-
   const updateGlyphTransform = useCallback(
     (blockId: number, glyphIndex: number, patch: Partial<GlyphTransform>) => {
       setBlocks((prev) =>
@@ -676,7 +677,9 @@ const App: React.FC = () => {
     (blockId: number) => {
       pushHistory();
       setBlocks((prev) =>
-        prev.map((b) => (b.id === blockId ? { ...b, glyphTransforms: [] } : b))
+        prev.map((b) =>
+          b.id === blockId && supportsGlyphTransforms(b) ? { ...b, glyphTransforms: [] } : b
+        )
       );
     },
     [pushHistory]
