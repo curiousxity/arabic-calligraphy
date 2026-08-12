@@ -29,7 +29,9 @@ import type {
   GlyphRigValue,
   GlyphStretchMask,
   DiacriticOverride,
+  GlyphTransform,
 } from "../types";
+import { resolveGlyphTransform, transformedBox } from "../lib/glyphTransform";
 import {
   isOverrideGlyphChar,
   OVERRIDE_SCALE,
@@ -69,6 +71,7 @@ type Props = {
   glyphRigs?: GlyphRig[];
   glyphRigValues?: GlyphRigValue[];
   diacriticOverrides?: DiacriticOverride[];
+  glyphTransforms?: GlyphTransform[];
   isSelected?: boolean;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
@@ -193,7 +196,8 @@ function drawWarpedGlyphRun(
   fontFamily = "",
   glyphRigs: GlyphRig[] = [],
   glyphRigValues: GlyphRigValue[] = [],
-  diacriticOverrides: DiacriticOverride[] = []
+  diacriticOverrides: DiacriticOverride[] = [],
+  glyphTransforms: GlyphTransform[] = []
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -229,6 +233,18 @@ function drawWarpedGlyphRun(
       ctx.translate(0, diacriticOverride.offsetY ?? 0);
       const diacScale = diacriticOverride.scale ?? 1;
       ctx.scale(diacScale, diacScale);
+    }
+
+    const transform = glyphTransforms.find((t) => t.glyphIndex === glyphIndex);
+    if (transform) {
+      // The context is already translated to this glyph's pen origin, so
+      // this scales about the pen origin — on the baseline, at the start
+      // of the advance — with no pivot arithmetic. Deliberately does NOT
+      // touch `penX += advance` below: a moved or widened glyph must never
+      // shift its neighbours.
+      const { offsetX, offsetY, scaleX, scaleY } = resolveGlyphTransform(transform);
+      ctx.translate(offsetX, offsetY);
+      ctx.scale(scaleX, scaleY);
     }
 
     if (
@@ -361,6 +377,7 @@ export const ShapedText: React.FC<Props> = ({
   glyphRigs = [],
   glyphRigValues = [],
   diacriticOverrides = [],
+  glyphTransforms = [],
   isSelected = false,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
@@ -476,12 +493,28 @@ export const ShapedText: React.FC<Props> = ({
         }
 
         if (isFinite(box.x1) && isFinite(box.x2) && isFinite(box.y1) && isFinite(box.y2)) {
-          hitBoxes.push({
-            glyphIndex: i,
+          // Hit boxes track where each glyph is actually drawn, so a moved
+          // or scaled glyph keeps its hover target under itself. The block
+          // bounds above deliberately do not — those must stay stable, or
+          // transforming one glyph would re-layout the entire block.
+          const raw = {
             x: box.x1,
             y: box.y1,
             width: Math.max(box.x2 - box.x1, 1),
             height: Math.max(box.y2 - box.y1, 1),
+          };
+          const t = transformedBox(
+            raw,
+            gx,
+            gy,
+            glyphTransforms.find((gt) => gt.glyphIndex === i)
+          );
+          hitBoxes.push({
+            glyphIndex: i,
+            x: t.x,
+            y: t.y,
+            width: Math.max(t.width, 1),
+            height: Math.max(t.height, 1),
             glyphId: g.g,
             gx,
             gy,
@@ -512,7 +545,7 @@ export const ShapedText: React.FC<Props> = ({
       },
       hitBoxes,
     };
-  }, [shapeData, text, fontSize]);
+  }, [shapeData, text, fontSize, glyphTransforms]);
 
   const glyphBounds = glyphMetrics.bounds;
   const glyphHitBoxes = glyphMetrics.hitBoxes;
@@ -816,7 +849,8 @@ export const ShapedText: React.FC<Props> = ({
             fontFamily,
             glyphRigs,
             glyphRigValues,
-            activeDiacriticOverrides
+            activeDiacriticOverrides,
+            glyphTransforms
           );
           ctx.restore();
 
@@ -842,7 +876,8 @@ export const ShapedText: React.FC<Props> = ({
               fontFamily,
               glyphRigs,
               glyphRigValues,
-              activeDiacriticOverrides
+              activeDiacriticOverrides,
+              glyphTransforms
             );
             ctx.restore();
           }

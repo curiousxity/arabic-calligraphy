@@ -769,6 +769,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onGlyphSchemaChange={(catalog) => onGlyphSchemaChange(block.id, catalog)}
                     isSelected={block.id === selectedId}
                     diacriticOverrides={block.diacriticOverrides ?? []}
+                    glyphTransforms={block.glyphTransforms ?? []}
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)
                     }
