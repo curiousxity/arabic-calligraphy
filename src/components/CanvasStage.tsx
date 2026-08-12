@@ -15,6 +15,7 @@ import {
   getBlocksBoundingBox,
   padBox,
   unionRect,
+  zoomFactorFromWheel,
   DEFAULT_EMPTY_BOUNDS,
 } from "../lib/canvasBounds";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
@@ -385,8 +386,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     if (!pointer) return;
 
     const oldScale = stageScale;
-    const scaleBy = e.evt.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = clampScale(oldScale * scaleBy);
+    // Proportional to how far the wheel actually travelled, not a fixed
+    // step per event — a trackpad pinch fires many small-delta events per
+    // second, so a per-event step made pinching rocket through the range.
+    const newScale = clampScale(oldScale * zoomFactorFromWheel(e.evt.deltaY, e.evt.deltaMode));
 
     const mousePointTo = {
       x: (pointer.x - stagePosition.x) / oldScale,
