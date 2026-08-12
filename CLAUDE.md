@@ -374,6 +374,62 @@ half-supported here.
 `public/fonts/*.ttf|otf` are not stock font files. `FatemiMaqala.ttf` has 8 custom Private Use Area glyphs (U+E833-E840, honorific symbols used by the sidebar's "Presets" row) that were manually merged (via a Python `fontTools` script, not committed to the repo) into every *other* font file in `public/fonts/` too, so those symbols render regardless of the selected font. If a font file in `public/fonts/` is ever regenerated/replaced from an upstream source, those PUA glyphs will be lost and the Presets buttons will silently show missing-glyph boxes in every font except FatemiMaqala again.
 
 <!-- ---- STREAM-A: smart guides — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
+
+### Bounds-aware snapping (`src/lib/snapping.ts`, `CanvasStage.tsx`)
+
+Dragging a block snaps its **visible rectangle** — left/centre/right and
+top/centre/bottom — to the other blocks' rectangles, the artboard's own
+edges and centres, and the user's ruler guides. This is distinct from the
+origin-to-origin snapping that came before it and which still runs
+alongside: a block's origin is not its visual edge (`ShapedText` offsets
+its box by `align`), so two blocks with coinciding origins can look
+unaligned, and "this text's right edge against that image's left edge"
+was not expressible at all.
+
+`src/lib/snapping.ts` is pure — plain rectangles, no React and no Konva —
+and fully tested in `snapping.test.ts`. `buildSnapTargets` flattens the
+candidates into `SnapTarget`s; `computeSnap` returns the `dx`/`dy` that
+closes the nearest gap plus the lines to draw. **At most one snap per
+axis**, or a block gets pulled two directions at once. Equidistant
+targets break ties by kind — user guide, then artboard, then block edge,
+then block centre — explicitly via `KIND_PRIORITY` rather than by array
+order, because a user who deliberately dropped a ruler guide means it.
+
+Three things about the `CanvasStage` side are load-bearing:
+
+- **Targets are captured once, in `onDragStart`, into a ref.**
+  `getClientRect` traverses a block's entire subtree; rebuilding every
+  block's rect on every drag frame visibly stutters a busy canvas at
+  60fps. The dragged block and all of its `getCoMovers` are excluded.
+- **The snap is computed on the rect but applied to the node's
+  `position`.** During a drag those two differ by a constant offset, so
+  adding the delta is exact — and it avoids having to model each block
+  type's own origin-to-bounds relationship, which is precisely the
+  per-renderer work this feature was scoped to avoid.
+- **Origin snapping was kept, not replaced.** Each axis goes to whichever
+  of the two pulls is nearer, a bounds match winning an exact tie. Grid
+  snapping still happens separately in `onDragEnd` and is untouched.
+
+`snapGuides` is now a `SnapLine[]` rather than a nullable x/y pair, and a
+line carries a `from`/`to` extent spanning the union of the dragged rect
+and its matched target — so a guide line covers just the two blocks it
+relates instead of the old ±100000 full-canvas line. Origin-snap lines
+have no target rect to union with, so they still span the whole
+`contentBox`. Styling (magenta, dashed, `1 / stageScale`) is unchanged.
+
+The "Snap to block edges" checkbox (Background & Grid panel) is
+`snapToBlockEdges` in `App.tsx`, defaulting **on** and deliberately not
+persisted. Off restores exactly the previous origin-only behaviour.
+
+Note that the "artboard" targets come from `contentBox`, which is unioned
+with the current viewport — so at a zoom level where the viewport is
+larger than the content, those edges sit at the viewport's edge rather
+than at any drawn boundary. This matches what the pre-existing
+centre-of-`contentBox` origin target already did.
+
+**Distribution badges (equal-gap markers) are not implemented** — the
+spec listed them as an explicitly droppable last task.
+
 <!-- ---- /STREAM-A ---- -->
 
 ### Canvas pan and zoom (`CanvasStage.tsx`, `lib/canvasBounds.ts`)
