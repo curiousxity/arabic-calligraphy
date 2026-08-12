@@ -550,6 +550,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               HarfCanvas
             </h2>
+            <div
+              style={{
+                fontSize: 11,
+                textAlign: "center",
+                color: "var(--text-muted)",
+                marginTop: 2,
+              }}
+            >
+              v{__APP_VERSION__}
+            </div>
           </div>
         </div>
 
