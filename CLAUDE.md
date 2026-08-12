@@ -22,6 +22,35 @@ There is no dedicated test-watch or coverage script beyond the above. Tests live
 
 After any non-trivial change, run typecheck + lint + tests + build in that order — this is the verification loop used throughout the project's history.
 
+### Version number — bumped automatically, don't edit it by hand
+
+`package.json`'s `version` is displayed under the wordmark in the sidebar
+(`vite.config.ts` injects it as `__APP_VERSION__` via `define`, declared in
+`src/vite-env.d.ts`), and a **pre-commit hook bumps its patch on every
+commit** so the displayed number always tracks the code. Expect
+`package.json` and `package-lock.json` to appear in every diff; that is the
+mechanism working, not stray noise.
+
+- The hook is `.githooks/pre-commit`, installed by `package.json`'s
+  `prepare` script pointing `core.hooksPath` at that directory — so a fresh
+  clone picks it up from `npm install`, with no husky-style dependency.
+- The bump logic is `scripts/bumpVersion.mjs` (tested in
+  `scripts/bumpVersion.test.mjs`). It edits `package.json` with a
+  single-line regex to preserve formatting, but parses the lockfile
+  properly and addresses its two version fields *by key* — `version` and
+  `packages[""].version` — so a dependency that happens to share the
+  project's version string is never rewritten.
+- The hook deliberately **skips merges, rebases, cherry-picks, and
+  reverts** (it checks for `MERGE_HEAD`, `rebase-merge`, etc. in the git
+  dir). Those replay or combine existing commits, and bumping during them
+  would make `package.json` conflict on essentially every one.
+- Only the patch ever moves automatically, and `nextPatch` never rolls
+  `0.1.9` over into `0.2.0`. Minor and major bumps stay a deliberate,
+  hand-made decision about what the release means; edit `package.json`
+  directly for those.
+- The value is baked in at build time, so a **running dev server shows a
+  stale version until it restarts**.
+
 ## Architecture
 
 ### State lives in one place: `src/App.tsx`
