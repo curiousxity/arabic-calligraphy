@@ -192,6 +192,32 @@ function firstSubpath(d: string): { d: string; hadMultiple: boolean } {
   return { d: cmdsToD(cmds.slice(0, secondMoveIndex)), hadMultiple: true };
 }
 
+/**
+ * A quiet rule between the sidebar's three tiers — what you set once per
+ * project, what acts on the canvas, and what belongs to the selected block.
+ * Deliberately lighter than a panel title: it groups the panels below it
+ * without competing with their own headings.
+ */
+const SidebarTier: React.FC<{ label: string }> = ({ label }) => (
+  <div
+    aria-hidden="true"
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      margin: "4px 2px 2px",
+      color: "var(--text-muted)",
+      fontSize: 10,
+      letterSpacing: "0.08em",
+      textTransform: "uppercase",
+    }}
+  >
+    <span style={{ flex: 1, height: 1, background: "var(--border-soft)", minWidth: 0 }} />
+    {label}
+    <span style={{ flex: 1, height: 1, background: "var(--border-soft)", minWidth: 0 }} />
+  </div>
+);
+
 export const Sidebar: React.FC<SidebarProps> = ({
   blocks,
   selectedBlock,
@@ -269,7 +295,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showTransform, setShowTransform] = useState(false);
   const [showEffects, setShowEffects] = useState(false);
   const [effectsTab, setEffectsTab] = useState<"outline" | "shadow">("outline");
-  const [showHelpers, setShowHelpers] = useState(false);
+  const [showContent, setShowContent] = useState(true);
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(!isMobile);
   const [showAlign, setShowAlign] = useState(false);
@@ -563,6 +589,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
+        <SidebarTier label="document" />
+
         {onGenerateFromTemplate && (
           <div className="sidebarPanel">
             <CollapsibleSection
@@ -612,1042 +640,56 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {wizardTemplate && onGenerateFromTemplate && (
-          <TemplateWizardDialog
-            key={wizardTemplate.id}
-            template={wizardTemplate}
-            onCancel={() => setWizardTemplate(null)}
-            onGenerate={(values) => {
-              onGenerateFromTemplate(wizardTemplate.id, values);
-              setWizardTemplate(null);
-            }}
-          />
-        )}
-
         <div className="sidebarPanel">
-          <div className="sidebarSectionTitle">Block Controls</div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 10,
-              flexWrap: "wrap",
-            }}
+          <CollapsibleSection
+            title="Background & Grid"
+            isOpen={showBackgroundSettings}
+            onToggle={() => setShowBackgroundSettings((v) => !v)}
           >
-            <button
-              type="button"
-              onClick={onDeleteBlock}
-              disabled={!selectedBlock || blocks.length === 0}
-              className="sidebarCircleButton sidebarCircleButton--danger"
-              title="Delete selected block"
-              aria-label="Delete block"
-            >
-              <TrashIcon size={14} />
-            </button>
-
-            <button
-              type="button"
-              onClick={onDuplicateBlock}
-              disabled={!selectedBlock}
-              className="sidebarCircleButton"
-              title="Duplicate selected block"
-              aria-label="Duplicate block"
-            >
-              <CopyIcon size={14} />
-            </button>
-
-            <button
-              type="button"
-              onClick={onAddBlock}
-              className="sidebarCircleButton"
-              title="Add text block"
-              aria-label="Add text block"
-            >
-              <PlusIcon size={14} />
-            </button>
-
-            {onAddShapeFillBlock && (
-              <button
-                type="button"
-                className="sidebarCircleButton"
-                title="Upload SVG for Shape Fill"
-                onClick={() => handleSvgUpload("shapeFill")}
-              >
-                <ShapesIcon size={14} />
-              </button>
-            )}
-
-            {onAddShapeWarpBlock && (
-              <>
-                <button
-                  type="button"
-                  className="sidebarCircleButton"
-                  title="Upload SVG for Shape Warp"
-                  aria-label="Upload SVG for Shape Warp"
-                  onClick={() => handleSvgUpload("shapeWarp")}
-                >
-                  <CircleDashedIcon size={14} />
-                </button>
-
-                <button
-                  type="button"
-                  className="sidebarCircleButton"
-                  title="Trace image for Shape Warp"
-                  aria-label="Trace image for Shape Warp"
-                  onClick={handleImageTraceUpload}
-                >
-                  <TraceWandIcon size={14} />
-                </button>
-              </>
-            )}
-
-            {imageTraceFile && (
-              <ImageTraceDialog
-                file={imageTraceFile}
-                onCancel={() => setImageTraceFile(null)}
-                onConfirm={(pathData, w, h) => {
-                  onAddShapeWarpBlock?.(pathData, w, h);
-                  setImageTraceFile(null);
-                }}
+            <div className="sectionPanel">
+              <ColorRow
+                id="background-color"
+                name="backgroundColor"
+                label="Background color"
+                value={backgroundColor}
+                onChange={onChangeBackgroundColor}
               />
-            )}
 
-            {onAddTextPathBlock && (
-              <button
-                type="button"
-                className="sidebarCircleButton"
-                title="Add Text on Path"
-                onClick={onAddTextPathBlock}
-              >
-                <PathTextIcon size={14} />
-              </button>
-            )}
+              <div style={{ display: "grid", gap: 8 }}>
+                <CheckboxRow
+                  id="show-grid"
+                  label="Show gridlines"
+                  checked={showGrid}
+                  onChange={onToggleGrid}
+                />
 
-            {onAddImageBlock && (
-              <button
-                type="button"
-                className="sidebarCircleButton"
-                title="Upload image (PNG/JPG)"
-                onClick={onAddImageBlock}
-              >
-                <ImageIcon size={14} />
-              </button>
-            )}
-          </div>
+                <CheckboxRow
+                  id="snap-to-grid"
+                  label="Snap to gridlines"
+                  checked={snapToGrid}
+                  onChange={onToggleSnap}
+                />
 
-          <div style={{ height: 8 }} />
+                <CheckboxRow
+                  id="show-rulers"
+                  label="Show rulers (click a ruler to drop a snap guide)"
+                  checked={showRulers}
+                  onChange={(checked) => onToggleRulers?.(checked)}
+                />
 
-          <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
-            <button
-              type="button"
-              onClick={onUndo}
-              disabled={!canUndo}
-              className="sidebarCircleButton"
-              title="Undo (Ctrl+Z)"
-              aria-label="Undo"
-            >
-              <UndoIcon size={14} />
-            </button>
-
-            <button
-              type="button"
-              onClick={onRedo}
-              disabled={!canRedo}
-              className="sidebarCircleButton"
-              title="Redo (Ctrl+Y)"
-              aria-label="Redo"
-            >
-              <RedoIcon size={14} />
-            </button>
-
-            <HistoryPopover
-              historyEntries={historyEntries}
-              onJumpTo={onJumpToHistory}
-              onCaptureCurrentThumbnail={onCaptureCurrentThumbnail}
-            />
-          </div>
-        </div>
-
-        <div className="sidebarPanel">
-          <CollapsibleSection title="Layers" isOpen={showLayers} onToggle={() => setShowLayers((v) => !v)}>
-            <div style={{ marginTop: 10 }}>
-              <LayersPanel
-                blocks={blocks}
-                selectedId={selectedBlock?.id}
-                selectedIds={selectedIds}
-                onSelect={(id, additive) => onSelectBlock(id, additive)}
-                onToggleLock={handleToggleLock}
-                onMoveUp={(id) => handleMoveLayer(id, "up")}
-                onMoveDown={(id) => handleMoveLayer(id, "down")}
-                onDelete={(id) => {
-                  const idx = blocks.findIndex((b) => b.id === id);
-                  const remaining = blocks.filter((b) => b.id !== id);
-                  const next = remaining[idx] ?? remaining[idx - 1];
-                  onReorderBlocks?.(remaining);
-                  onSelectBlock(next?.id ?? null);
-                }}
-                onMerge={(a, b) => onMergeBlocks?.(a, b)}
-                onUngroup={(id) => onUngroupBlock?.(id)}
-                onRename={handleRename}
-                onZoomTo={(id) => onZoomToBlock?.(id)}
-                onAddBlock={onAddBlock}
-              />
+                {guideCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={onClearGuides}
+                    className="sidebarSmallAction"
+                  >
+                    Clear {guideCount} guide{guideCount === 1 ? "" : "s"}
+                  </button>
+                )}
+              </div>
             </div>
           </CollapsibleSection>
         </div>
-
-        {selectedBlock && (
-          <div className="sidebarPanel">
-            <CollapsibleSection
-              title="Align & Arrange"
-              isOpen={showAlign}
-              onToggle={() => setShowAlign((v) => !v)}
-            >
-              <div className="sectionPanel">
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  {selectionCount > 1
-                    ? `Aligning ${selectionCount} selected layers to each other.`
-                    : "Aligning to the canvas. Shift/Ctrl-click other layers to align them to each other instead."}
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(6, 1fr)",
-                    gap: 6,
-                    justifyItems: "center",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("left")}
-                    className="sidebarCircleButton"
-                    title="Align left"
-                    aria-label="Align left"
-                  >
-                    <AlignLeftIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("centerX")}
-                    className="sidebarCircleButton"
-                    title="Align center (horizontal)"
-                    aria-label="Align center horizontal"
-                  >
-                    <AlignCenterHIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("right")}
-                    className="sidebarCircleButton"
-                    title="Align right"
-                    aria-label="Align right"
-                  >
-                    <AlignRightIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("top")}
-                    className="sidebarCircleButton"
-                    title="Align top"
-                    aria-label="Align top"
-                  >
-                    <AlignTopIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("centerY")}
-                    className="sidebarCircleButton"
-                    title="Align middle (vertical)"
-                    aria-label="Align middle vertical"
-                  >
-                    <AlignMiddleIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("bottom")}
-                    className="sidebarCircleButton"
-                    title="Align bottom"
-                    aria-label="Align bottom"
-                  >
-                    <AlignBottomIcon size={14} />
-                  </button>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <button
-                    type="button"
-                    disabled={selectionCount < 3}
-                    onClick={() => onDistributeSelected?.("x")}
-                    className="sidebarPillButton"
-                    title="Distribute horizontally (needs 3+ selected)"
-                    aria-label="Distribute horizontally"
-                  >
-                    <DistributeHorizontalIcon size={13} /> Distribute H
-                  </button>
-                  <button
-                    type="button"
-                    disabled={selectionCount < 3}
-                    onClick={() => onDistributeSelected?.("y")}
-                    className="sidebarPillButton"
-                    title="Distribute vertically (needs 3+ selected)"
-                    aria-label="Distribute vertically"
-                  >
-                    <DistributeVerticalIcon size={13} /> Distribute V
-                  </button>
-                </div>
-
-                {selectionCount > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => onGroupSelected?.()}
-                    className="sidebarSmallAction"
-                  >
-                    Group {selectionCount} selected layers
-                  </button>
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {selectedBlock && selectedBlock.type !== "image" && (
-          <div className="sidebarPanel">
-            <label htmlFor={makeId("block-text", selectedId)} className="sr-only">
-              Block text
-            </label>
-            <textarea
-              ref={textareaRef}
-              id={makeId("block-text", selectedId)}
-              name={makeId("blockText", selectedId)}
-              className="sidebarTextarea"
-              value={selectedText}
-              onChange={(e) => updateText(e.target.value)}
-              onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart ?? 0)}
-              placeholder="Type Arabic text here..."
-              dir="rtl"
-              lang="ar"
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-            />
-          </div>
-        )}
-
-        {selectedBlock && selectedBlock.type === "image" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Image" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
-              <div className="sectionPanel">
-                <RangeRow
-                  id={makeId("image-scale", selectedId)}
-                  name={makeId("imageScale", selectedId)}
-                  label="Scale"
-                  value={selectedBlock.imageScale ?? 1}
-                  min={0.05}
-                  max={10}
-                  step={0.05}
-                  onChange={(v) => onUpdateSelectedBlock({ imageScale: v })}
-                  suffix={(selectedBlock.imageScale ?? 1).toFixed(2)}
-                  fieldKey="imageScale"
-                />
-
-                <RangeRow
-                  id={makeId("opacity", selectedId)}
-                  name={makeId("opacity", selectedId)}
-                  label="Opacity"
-                  value={selectedOpacity}
-                  min={0.1}
-                  max={1}
-                  step={0.05}
-                  onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
-                  suffix={`${Math.round(selectedOpacity * 100)}%`}
-                  fieldKey="opacity"
-                />
-
-                <RangeRow
-                  id={makeId("rotation", selectedId)}
-                  name={makeId("rotation", selectedId)}
-                  label="Rotation"
-                  value={selectedRotation}
-                  min={-180}
-                  max={180}
-                  onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
-                  suffix={`${selectedRotation}°`}
-                  fieldKey="rotation"
-                />
-
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  Tip: drag the gold handle on the image's corner (canvas) to resize.
-                </div>
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {selectedBlock && selectedBlock.type !== "image" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Text" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
-              <div className="sectionPanel">
-                <FontSelectRow
-                  id={makeId("font-family", selectedId)}
-                  label="Font family"
-                  value={selectedBlock.fontFamily}
-                  options={FONT_OPTIONS}
-                  onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
-                  previewSuffix="— أبجد"
-                />
-
-                {selectedBlock.type === "textPath" ? (
-                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                    Letter size on a text-path block is set by the curve's length — drag the
-                    curve longer or shorter in Edit Curve mode, or change the text.
-                  </div>
-                ) : (
-                  <RangeRow
-                    id={makeId("font-size", selectedId)}
-                    name={makeId("fontSize", selectedId)}
-                    label="Font size"
-                    value={selectedBlock.fontSize}
-                    min={
-                      selectedBlock.type === "shapeFill" ||
-                      selectedBlock.type === "shapeWarp"
-                        ? 4
-                        : 12
-                    }
-                    max={
-                      selectedBlock.type === "shapeFill" ||
-                      selectedBlock.type === "shapeWarp"
-                        ? 400
-                        : 200
-                    }
-                    onChange={(v) => onUpdateSelectedBlock({ fontSize: v })}
-                    suffix={`${Math.round(selectedBlock.fontSize)}px`}
-                    fieldKey="fontSize"
-                  />
-                )}
-
-                <ColorRow
-                  id={makeId("text-color", selectedId)}
-                  name={makeId("textColor", selectedId)}
-                  label="Text color"
-                  value={selectedBlock.color}
-                  onChange={(v) => onUpdateSelectedBlock({ color: v })}
-                />
-
-                <RangeRow
-                  id={makeId("opacity", selectedId)}
-                  name={makeId("opacity", selectedId)}
-                  label="Opacity"
-                  value={selectedOpacity}
-                  min={0.1}
-                  max={1}
-                  step={0.05}
-                  onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
-                  suffix={`${Math.round(selectedOpacity * 100)}%`}
-                  fieldKey="opacity"
-                />
-
-                {selectedBlock.type === "text" && (
-                  <SelectRow
-                    id={makeId("text-align", selectedId)}
-                    name={makeId("textAlign", selectedId)}
-                    label="Alignment"
-                    value={selectedBlock.align ?? "center"}
-                    onChange={(v) =>
-                      onUpdateSelectedBlock({ align: v as TextAlign })
-                    }
-                  >
-                    <option value="left">Left</option>
-                    <option value="center">Center</option>
-                    <option value="right">Right</option>
-                  </SelectRow>
-                )}
-
-                {selectedBlock.type === "text" && (
-                  <RangeRow
-                    id={makeId("line-height", selectedId)}
-                    name={makeId("lineHeight", selectedId)}
-                    label="Line height"
-                    value={selectedBlock.lineHeight ?? 1.2}
-                    min={0.8}
-                    max={3}
-                    step={0.05}
-                    onChange={(v) => onUpdateSelectedBlock({ lineHeight: v })}
-                    suffix={(selectedBlock.lineHeight ?? 1.2).toFixed(2)}
-                    fieldKey="lineHeight"
-                  />
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {selectedBlock && selectedBlock.type === "textPath" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Curve" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
-              <div className="sectionPanel">
-                <button
-                  type="button"
-                  className="sidebarPillButton"
-                  style={
-                    selectedBlock.textPathEditMode
-                      ? { background: "var(--accent)", color: "var(--text-on-accent)" }
-                      : undefined
-                  }
-                  onClick={() =>
-                    onUpdateSelectedBlock({ textPathEditMode: !selectedBlock.textPathEditMode })
-                  }
-                >
-                  {selectedBlock.textPathEditMode ? "Done Editing Curve" : "Edit Curve"}
-                </button>
-
-                <SelectRow
-                  id={makeId("text-path-preset", selectedId)}
-                  name={makeId("textPathPreset", selectedId)}
-                  label="Preset"
-                  value="custom"
-                  onChange={(v) => {
-                    if (v === "arc") {
-                      onUpdateSelectedBlock({ textPathD: arcPathD(400, 120) });
-                    } else if (v === "wave") {
-                      onUpdateSelectedBlock({ textPathD: wavePathD(400, 120) });
-                    } else if (v === "circle") {
-                      onUpdateSelectedBlock({ textPathD: circlePathD(300, 300) });
-                    }
-                  }}
-                >
-                  <option value="custom">Custom</option>
-                  <option value="arc">Arc</option>
-                  <option value="wave">Wave</option>
-                  <option value="circle">Circle</option>
-                </SelectRow>
-
-                <button
-                  type="button"
-                  className="sidebarPillButton"
-                  onClick={handleTextPathSvgUpload}
-                >
-                  Upload SVG Path
-                </button>
-
-                <label className="field">
-                  <span className="fieldTitle">
-                    <input
-                      type="checkbox"
-                      checked={selectedBlock.textPathReversed ?? false}
-                      onChange={(e) =>
-                        onUpdateSelectedBlock({ textPathReversed: e.target.checked })
-                      }
-                      style={{ marginRight: 6 }}
-                    />
-                    Flip direction
-                  </span>
-                </label>
-
-                <RangeRow
-                  id={makeId("text-path-baseline-offset", selectedId)}
-                  name={makeId("textPathBaselineOffset", selectedId)}
-                  label="Baseline offset"
-                  value={selectedBlock.textPathBaselineOffset ?? 0}
-                  min={-60}
-                  max={60}
-                  onChange={(v) => onUpdateSelectedBlock({ textPathBaselineOffset: v })}
-                  suffix={selectedBlock.textPathBaselineOffset ?? 0}
-                  fieldKey="textPathBaselineOffset"
-                />
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {selectedBlock && selectedBlock.type !== "image" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection
-              title="Transform"
-              isOpen={showTransform}
-              onToggle={() => setShowTransform((v) => !v)}
-            >
-              <div className="sectionPanel">
-                <RangeRow
-                  id={makeId("rotation", selectedId)}
-                  name={makeId("rotation", selectedId)}
-                  label="Rotation"
-                  value={selectedRotation}
-                  min={-180}
-                  max={180}
-                  step={1}
-                  onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
-                  suffix={`${selectedRotation}°`}
-                  fieldKey="rotation"
-                />
-
-                {selectedBlock.type === "text" && (
-                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Warp</div>
-
-                    <RangeRow
-                      id={makeId("warp-x", selectedId)}
-                      name={makeId("warpX", selectedId)}
-                      label="Horizontal warp"
-                      value={selectedBlock.warpX ?? 0}
-                      min={-100}
-                      max={100}
-                      step={1}
-                      onChange={(v) => onUpdateSelectedBlock({ warpX: v })}
-                      suffix={selectedBlock.warpX ?? 0}
-                      fieldKey="warpX"
-                    />
-
-                    <RangeRow
-                      id={makeId("warp-y", selectedId)}
-                      name={makeId("warpY", selectedId)}
-                      label="Vertical warp"
-                      value={selectedBlock.warpY ?? 0}
-                      min={-100}
-                      max={100}
-                      step={1}
-                      onChange={(v) => onUpdateSelectedBlock({ warpY: v })}
-                      suffix={selectedBlock.warpY ?? 0}
-                      fieldKey="warpY"
-                    />
-                  </div>
-                )}
-
-                {selectedBlock.type === "shapeWarp" && (
-                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
-                        Shape Warp
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => onResetShapeWarp?.(selectedBlock.id)}
-                        className="layerIconBtn"
-                        title="Reset shape warp to defaults"
-                      >
-                        Reset
-                      </button>
-                    </div>
-
-                    <SelectRow
-                      id={makeId("warp-shape-mode", selectedId)}
-                      name={makeId("warpShapeMode", selectedId)}
-                      label="Warp mode"
-                      value={selectedBlock.warpShapeMode ?? "envelope"}
-                      onChange={(v) =>
-                        onUpdateSelectedBlock({
-                          warpShapeMode: v as ShapeWarpMode,
-                        })
-                      }
-                    >
-                      <option value="envelope">Envelope</option>
-                      <option value="topBottom">Top Bottom</option>
-                      <option value="stretch">Stretch</option>
-                      <option value="radial">Radial</option>
-                    </SelectRow>
-
-                    <RangeRow
-                      id={makeId("warp-shape-padding", selectedId)}
-                      name={makeId("warpShapePadding", selectedId)}
-                      label="Inner padding"
-                      value={selectedBlock.warpShapePadding ?? 24}
-                      min={0}
-                      max={150}
-                      step={1}
-                      onChange={(v) =>
-                        onUpdateSelectedBlock({ warpShapePadding: v })
-                      }
-                      suffix={`${selectedBlock.warpShapePadding ?? 24}px`}
-                      fieldKey="warpShapePadding"
-                    />
-
-                    <RangeRow
-                      id={makeId("warp-shape-strength", selectedId)}
-                      name={makeId("warpShapeStrength", selectedId)}
-                      label="Warp strength"
-                      value={selectedBlock.warpShapeStrength ?? 1}
-                      min={0}
-                      max={2}
-                      step={0.05}
-                      onChange={(v) =>
-                        onUpdateSelectedBlock({ warpShapeStrength: v })
-                      }
-                      suffix={(selectedBlock.warpShapeStrength ?? 1).toFixed(2)}
-                      fieldKey="warpShapeStrength"
-                    />
-
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-                      Base shape: {selectedBlock.warpShapeWidth ?? 400} ×{" "}
-                      {selectedBlock.warpShapeHeight ?? 400}px
-                    </div>
-                  </div>
-                )}
-
-                {selectedBlock.type === "shapeFill" && (
-                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle" style={{ marginBottom: 4 }}>
-                      Shape Fill
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
-                      Tip: drag the gold handle on the shape's corner (canvas) to resize.
-                    </div>
-
-                    <CheckboxRow
-                      id={makeId("diacritic-edit-mode", selectedId)}
-                      label="Diacritic tool"
-                      checked={!!selectedBlock.diacriticEditMode}
-                      onChange={() => onToggleDiacriticEditMode?.()}
-                    />
-
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
-                      Hover a tashkeel mark on the canvas to move, resize, or hide it. One
-                      change applies to every repetition of that mark in the fill.
-                    </div>
-
-                    <RangeRow
-                      id={makeId("shape-scale", selectedId)}
-                      name={makeId("shapeScale", selectedId)}
-                      label="Shape scale"
-                      value={selectedBlock.shapeScale ?? 1}
-                      min={0.2}
-                      max={3}
-                      step={0.05}
-                      onChange={(v) => onUpdateSelectedBlock({ shapeScale: v })}
-                      suffix={(selectedBlock.shapeScale ?? 1).toFixed(2)}
-                      fieldKey="shapeScale"
-                    />
-
-                    <RangeRow
-                      id={makeId("fill-spacing", selectedId)}
-                      name={makeId("shapeFillSpacing", selectedId)}
-                      label="Text spacing"
-                      value={selectedBlock.shapeFillSpacing ?? 1.3}
-                      min={0.5}
-                      max={4}
-                      step={0.05}
-                      onChange={(v) =>
-                        onUpdateSelectedBlock({ shapeFillSpacing: v })
-                      }
-                      suffix={(selectedBlock.shapeFillSpacing ?? 1.3).toFixed(2)}
-                      fieldKey="shapeFillSpacing"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => onFitShapeFillSpacing?.(selectedBlock.id)}
-                      className="sidebarSmallAction"
-                      style={{ marginTop: 4 }}
-                      title="Adjust row spacing so rows evenly fill the shape's height"
-                    >
-                      Fit exactly
-                    </button>
-
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                        gap: 10,
-                        marginTop: 8,
-                      }}
-                    >
-                      <RangeRow
-                        id={makeId("fill-scale-x", selectedId)}
-                        name={makeId("shapeFillScaleX", selectedId)}
-                        label="Scale X"
-                        value={selectedBlock.shapeFillScaleX ?? 1}
-                        min={0.1}
-                        max={3}
-                        step={0.05}
-                        onChange={(v) =>
-                          onUpdateSelectedBlock({ shapeFillScaleX: v })
-                        }
-                        suffix={(selectedBlock.shapeFillScaleX ?? 1).toFixed(2)}
-                        fieldKey="shapeFillScaleX"
-                      />
-
-                      <RangeRow
-                        id={makeId("fill-scale-y", selectedId)}
-                        name={makeId("shapeFillScaleY", selectedId)}
-                        label="Scale Y"
-                        value={selectedBlock.shapeFillScaleY ?? 1}
-                        min={0.1}
-                        max={3}
-                        step={0.05}
-                        onChange={(v) =>
-                          onUpdateSelectedBlock({ shapeFillScaleY: v })
-                        }
-                        suffix={(selectedBlock.shapeFillScaleY ?? 1).toFixed(2)}
-                        fieldKey="shapeFillScaleY"
-                      />
-                    </div>
-
-                    <RangeRow
-                      id={makeId("fill-text-rotation", selectedId)}
-                      name={makeId("shapeFillTextRotation", selectedId)}
-                      label="Text rotation"
-                      value={selectedBlock.shapeFillTextRotation ?? 0}
-                      min={-180}
-                      max={180}
-                      step={1}
-                      onChange={(v) =>
-                        onUpdateSelectedBlock({ shapeFillTextRotation: v })
-                      }
-                      suffix={selectedBlock.shapeFillTextRotation ?? 0}
-                      fieldKey="shapeFillTextRotation"
-                    />
-                  </div>
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {selectedBlock && selectedBlock.type !== "image" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Effects" isOpen={showEffects} onToggle={() => setShowEffects((v) => !v)}>
-              <div className="sectionPanel">
-                <div style={{ display: "flex", gap: 6 }}>
-                  {(
-                    [
-                      { key: "outline", label: "Outline" },
-                      { key: "shadow", label: "Shadow" },
-                    ] as const
-                  ).map((tab) => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => setEffectsTab(tab.key)}
-                      className="sidebarPillButton"
-                      style={
-                        effectsTab === tab.key
-                          ? { background: "var(--accent)", color: "var(--text-on-accent)" }
-                          : undefined
-                      }
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {effectsTab === "outline" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-                    <ColorRow
-                      id={makeId("stroke-color", selectedId)}
-                      name={makeId("strokeColor", selectedId)}
-                      label="Outline color"
-                      value={selectedBlock.stroke}
-                      onChange={(v) => onUpdateSelectedBlock({ stroke: v })}
-                    />
-
-                    <RangeRow
-                      id={makeId("stroke-width", selectedId)}
-                      name={makeId("strokeWidth", selectedId)}
-                      label="Outline width"
-                      value={selectedBlock.strokeWidth ?? 0}
-                      min={0}
-                      max={20}
-                      onChange={(v) => onUpdateSelectedBlock({ strokeWidth: v })}
-                      suffix={selectedBlock.strokeWidth ?? 0}
-                      fieldKey="strokeWidth"
-                    />
-                  </div>
-                )}
-
-                {effectsTab === "shadow" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-                    <ColorRow
-                      id={makeId("shadow-color", selectedId)}
-                      name={makeId("shadowColor", selectedId)}
-                      label="Shadow color"
-                      value={selectedBlock.shadowColor}
-                      onChange={(v) => onUpdateSelectedBlock({ shadowColor: v })}
-                    />
-
-                    <RangeRow
-                      id={makeId("shadow-blur", selectedId)}
-                      name={makeId("shadowBlur", selectedId)}
-                      label="Shadow blur"
-                      value={selectedBlock.shadowBlur ?? 0}
-                      min={0}
-                      max={60}
-                      onChange={(v) => onUpdateSelectedBlock({ shadowBlur: v })}
-                      suffix={selectedBlock.shadowBlur ?? 0}
-                      fieldKey="shadowBlur"
-                    />
-
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                        gap: 10,
-                        marginTop: 8,
-                      }}
-                    >
-                      <RangeRow
-                        id={makeId("shadow-offset-x", selectedId)}
-                        name={makeId("shadowOffsetX", selectedId)}
-                        label="Shadow X"
-                        value={selectedBlock.shadowOffsetX ?? 0}
-                        min={-60}
-                        max={60}
-                        onChange={(v) => onUpdateSelectedBlock({ shadowOffsetX: v })}
-                        suffix={selectedBlock.shadowOffsetX ?? 0}
-                        fieldKey="shadowOffsetX"
-                      />
-
-                      <RangeRow
-                        id={makeId("shadow-offset-y", selectedId)}
-                        name={makeId("shadowOffsetY", selectedId)}
-                        label="Shadow Y"
-                        value={selectedBlock.shadowOffsetY ?? 0}
-                        min={-60}
-                        max={60}
-                        onChange={(v) => onUpdateSelectedBlock({ shadowOffsetY: v })}
-                        suffix={selectedBlock.shadowOffsetY ?? 0}
-                        fieldKey="shadowOffsetY"
-                      />
-                    </div>
-
-                    <RangeRow
-                      id={makeId("shadow-opacity", selectedId)}
-                      name={makeId("shadowOpacity", selectedId)}
-                      label="Shadow opacity"
-                      value={selectedShadowOpacity}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      onChange={(v) => onUpdateSelectedBlock({ shadowOpacity: v })}
-                      suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
-                      fieldKey="shadowOpacity"
-                    />
-                  </div>
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {selectedBlock && (
-          <div className="sidebarPanel">
-            <button
-              type="button"
-              onClick={() => setShowKeyboard((v) => !v)}
-              className="sidebarSectionButton"
-              aria-expanded={showKeyboard}
-              aria-pressed={showKeyboard}
-            >
-              <span>Arabic Keyboard</span>
-              <span>{showKeyboard ? "Hide" : "Show"}</span>
-            </button>
-          </div>
-        )}
-
-        <FloatingArabicKeyboard
-          open={showKeyboard && !!selectedBlock}
-          onClose={() => setShowKeyboard(false)}
-          onInsert={handleKeyboardKey}
-          onBackspace={handleKeyboardBackspace}
-        />
-
-        {isMobile && selectedBlock && selectedBlock.type !== "image" && (
-          <div className="sidebarPanel">
-            <button
-              type="button"
-              onClick={onToggleMorphEditorMobile}
-              className="sidebarSectionButton"
-              aria-expanded={showMorphEditorMobile}
-              aria-pressed={showMorphEditorMobile}
-            >
-              <span>Morph Glyph Editor</span>
-              <span>{showMorphEditorMobile ? "Hide" : "Show"}</span>
-            </button>
-          </div>
-        )}
-
-        {selectedBlock && (
-          <div className="sidebarPanel">
-            <CollapsibleSection
-              title="Arabic Helpers"
-              isOpen={showHelpers}
-              onToggle={() => setShowHelpers((v) => !v)}
-            >
-              <div className="sectionPanel">
-                {selectedBlock?.type === "text" && (
-                  <div style={{ borderBottom: "1px solid var(--border-soft)", paddingBottom: 12 }}>
-                    <div className="sidebarSectionTitle">Kashida</div>
-
-                    <CheckboxRow
-                      id={makeId("kashida-edit-mode", selectedId)}
-                      label="Kashida tool"
-                      checked={!!selectedBlock.kashidaEditMode}
-                      onChange={() => onToggleKashidaEditMode?.()}
-                    />
-
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                      Drag a gold handle between two connected letters on the canvas to
-                      elongate the connector (tatweel).
-                    </div>
-                  </div>
-                )}
-
-                <PresetKeyboard
-                  title="إِعْرَاب"
-                  rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]}
-                  onPick={handleKeyboardKey}
-                  large
-                />
-
-                <button
-                  type="button"
-                  onClick={onClearDiacritics}
-                  className="sidebarSmallAction"
-                  style={{ background: "var(--bg-input)" }}
-                >
-                  Clear diacritics
-                </button>
-
-                {(selectedBlock?.type === "text" ||
-                  selectedBlock?.type === "shapeFill" ||
-                  selectedBlock?.type === "shapeWarp") &&
-                  (selectedBlock.diacriticOverrides?.length ?? 0) > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => onUpdateSelectedBlock({ diacriticOverrides: [] })}
-                      className="sidebarSmallAction"
-                      style={{ background: "var(--bg-input)" }}
-                    >
-                      Reset diacritic overrides
-                    </button>
-                  )}
-
-                <PresetKeyboard
-                  title="Presets"
-                  rows={[PRESETS]}
-                  onPick={handleKeyboardKey}
-                  fontFamily={selectedBlock?.fontFamily ?? "FatemiMaqala"}
-                />
-
-                <PresetKeyboard
-                  title="Specials"
-                  rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]}
-                  onPick={handleKeyboardKey}
-                />
-
-                <PresetKeyboard
-                  title="Urdu-Farsi Characters"
-                  rows={[PERSIAN, URDU]}
-                  onPick={handleKeyboardKey}
-                />
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
 
         <div className="sidebarPanel">
           <CollapsibleSection
@@ -2023,56 +1065,1039 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </CollapsibleSection>
         </div>
 
+        <SidebarTier label="canvas" />
+
         <div className="sidebarPanel">
-          <CollapsibleSection
-            title="Background & Grid"
-            isOpen={showBackgroundSettings}
-            onToggle={() => setShowBackgroundSettings((v) => !v)}
+          <div className="sidebarSectionTitle">Block Controls</div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
           >
-            <div className="sectionPanel">
-              <ColorRow
-                id="background-color"
-                name="backgroundColor"
-                label="Background color"
-                value={backgroundColor}
-                onChange={onChangeBackgroundColor}
+            <button
+              type="button"
+              onClick={onDeleteBlock}
+              disabled={!selectedBlock || blocks.length === 0}
+              className="sidebarCircleButton sidebarCircleButton--danger"
+              title="Delete selected block"
+              aria-label="Delete block"
+            >
+              <TrashIcon size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={onDuplicateBlock}
+              disabled={!selectedBlock}
+              className="sidebarCircleButton"
+              title="Duplicate selected block"
+              aria-label="Duplicate block"
+            >
+              <CopyIcon size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={onAddBlock}
+              className="sidebarCircleButton"
+              title="Add text block"
+              aria-label="Add text block"
+            >
+              <PlusIcon size={14} />
+            </button>
+
+            {onAddShapeFillBlock && (
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                title="Upload SVG for Shape Fill"
+                onClick={() => handleSvgUpload("shapeFill")}
+              >
+                <ShapesIcon size={14} />
+              </button>
+            )}
+
+            {onAddShapeWarpBlock && (
+              <>
+                <button
+                  type="button"
+                  className="sidebarCircleButton"
+                  title="Upload SVG for Shape Warp"
+                  aria-label="Upload SVG for Shape Warp"
+                  onClick={() => handleSvgUpload("shapeWarp")}
+                >
+                  <CircleDashedIcon size={14} />
+                </button>
+
+                <button
+                  type="button"
+                  className="sidebarCircleButton"
+                  title="Trace image for Shape Warp"
+                  aria-label="Trace image for Shape Warp"
+                  onClick={handleImageTraceUpload}
+                >
+                  <TraceWandIcon size={14} />
+                </button>
+              </>
+            )}
+
+            {imageTraceFile && (
+              <ImageTraceDialog
+                file={imageTraceFile}
+                onCancel={() => setImageTraceFile(null)}
+                onConfirm={(pathData, w, h) => {
+                  onAddShapeWarpBlock?.(pathData, w, h);
+                  setImageTraceFile(null);
+                }}
               />
+            )}
 
-              <div style={{ display: "grid", gap: 8 }}>
-                <CheckboxRow
-                  id="show-grid"
-                  label="Show gridlines"
-                  checked={showGrid}
-                  onChange={onToggleGrid}
-                />
+            {onAddTextPathBlock && (
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                title="Add Text on Path"
+                onClick={onAddTextPathBlock}
+              >
+                <PathTextIcon size={14} />
+              </button>
+            )}
 
-                <CheckboxRow
-                  id="snap-to-grid"
-                  label="Snap to gridlines"
-                  checked={snapToGrid}
-                  onChange={onToggleSnap}
-                />
+            {onAddImageBlock && (
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                title="Upload image (PNG/JPG)"
+                onClick={onAddImageBlock}
+              >
+                <ImageIcon size={14} />
+              </button>
+            )}
+          </div>
 
-                <CheckboxRow
-                  id="show-rulers"
-                  label="Show rulers (click a ruler to drop a snap guide)"
-                  checked={showRulers}
-                  onChange={(checked) => onToggleRulers?.(checked)}
-                />
+          <div style={{ height: 8 }} />
 
-                {guideCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={onClearGuides}
-                    className="sidebarSmallAction"
-                  >
-                    Clear {guideCount} guide{guideCount === 1 ? "" : "s"}
-                  </button>
-                )}
-              </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
+            <button
+              type="button"
+              onClick={onUndo}
+              disabled={!canUndo}
+              className="sidebarCircleButton"
+              title="Undo (Ctrl+Z)"
+              aria-label="Undo"
+            >
+              <UndoIcon size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={onRedo}
+              disabled={!canRedo}
+              className="sidebarCircleButton"
+              title="Redo (Ctrl+Y)"
+              aria-label="Redo"
+            >
+              <RedoIcon size={14} />
+            </button>
+
+            <HistoryPopover
+              historyEntries={historyEntries}
+              onJumpTo={onJumpToHistory}
+              onCaptureCurrentThumbnail={onCaptureCurrentThumbnail}
+            />
+          </div>
+        </div>
+
+        <div className="sidebarPanel">
+          <CollapsibleSection title="Layers" isOpen={showLayers} onToggle={() => setShowLayers((v) => !v)}>
+            <div style={{ marginTop: 10 }}>
+              <LayersPanel
+                blocks={blocks}
+                selectedId={selectedBlock?.id}
+                selectedIds={selectedIds}
+                onSelect={(id, additive) => onSelectBlock(id, additive)}
+                onToggleLock={handleToggleLock}
+                onMoveUp={(id) => handleMoveLayer(id, "up")}
+                onMoveDown={(id) => handleMoveLayer(id, "down")}
+                onDelete={(id) => {
+                  const idx = blocks.findIndex((b) => b.id === id);
+                  const remaining = blocks.filter((b) => b.id !== id);
+                  const next = remaining[idx] ?? remaining[idx - 1];
+                  onReorderBlocks?.(remaining);
+                  onSelectBlock(next?.id ?? null);
+                }}
+                onMerge={(a, b) => onMergeBlocks?.(a, b)}
+                onUngroup={(id) => onUngroupBlock?.(id)}
+                onRename={handleRename}
+                onZoomTo={(id) => onZoomToBlock?.(id)}
+                onAddBlock={onAddBlock}
+              />
             </div>
           </CollapsibleSection>
         </div>
+
+        {selectedBlock && (
+          <div className="sidebarPanel">
+            <CollapsibleSection
+              title="Align & Arrange"
+              isOpen={showAlign}
+              onToggle={() => setShowAlign((v) => !v)}
+            >
+              <div className="sectionPanel">
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  {selectionCount > 1
+                    ? `Aligning ${selectionCount} selected layers to each other.`
+                    : "Aligning to the canvas. Shift/Ctrl-click other layers to align them to each other instead."}
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(6, 1fr)",
+                    gap: 6,
+                    justifyItems: "center",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("left")}
+                    className="sidebarCircleButton"
+                    title="Align left"
+                    aria-label="Align left"
+                  >
+                    <AlignLeftIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("centerX")}
+                    className="sidebarCircleButton"
+                    title="Align center (horizontal)"
+                    aria-label="Align center horizontal"
+                  >
+                    <AlignCenterHIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("right")}
+                    className="sidebarCircleButton"
+                    title="Align right"
+                    aria-label="Align right"
+                  >
+                    <AlignRightIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("top")}
+                    className="sidebarCircleButton"
+                    title="Align top"
+                    aria-label="Align top"
+                  >
+                    <AlignTopIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("centerY")}
+                    className="sidebarCircleButton"
+                    title="Align middle (vertical)"
+                    aria-label="Align middle vertical"
+                  >
+                    <AlignMiddleIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("bottom")}
+                    className="sidebarCircleButton"
+                    title="Align bottom"
+                    aria-label="Align bottom"
+                  >
+                    <AlignBottomIcon size={14} />
+                  </button>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={selectionCount < 3}
+                    onClick={() => onDistributeSelected?.("x")}
+                    className="sidebarPillButton"
+                    title="Distribute horizontally (needs 3+ selected)"
+                    aria-label="Distribute horizontally"
+                  >
+                    <DistributeHorizontalIcon size={13} /> Distribute H
+                  </button>
+                  <button
+                    type="button"
+                    disabled={selectionCount < 3}
+                    onClick={() => onDistributeSelected?.("y")}
+                    className="sidebarPillButton"
+                    title="Distribute vertically (needs 3+ selected)"
+                    aria-label="Distribute vertically"
+                  >
+                    <DistributeVerticalIcon size={13} /> Distribute V
+                  </button>
+                </div>
+
+                {selectionCount > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => onGroupSelected?.()}
+                    className="sidebarSmallAction"
+                  >
+                    Group {selectionCount} selected layers
+                  </button>
+                )}
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        <SidebarTier label="selected" />
+
+        {selectedBlock && selectedBlock.type !== "image" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection
+              title="Content"
+              isOpen={showContent}
+              onToggle={() => setShowContent((v) => !v)}
+            >
+              <div className="sectionPanel">
+                <label htmlFor={makeId("block-text", selectedId)} className="sr-only">
+                  Block text
+                </label>
+                <textarea
+                  ref={textareaRef}
+                  id={makeId("block-text", selectedId)}
+                  name={makeId("blockText", selectedId)}
+                  className="sidebarTextarea"
+                  value={selectedText}
+                  onChange={(e) => updateText(e.target.value)}
+                  onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart ?? 0)}
+                  placeholder="Type Arabic text here..."
+                  dir="rtl"
+                  lang="ar"
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowKeyboard((v) => !v)}
+                  className="sidebarSectionButton"
+                  aria-expanded={showKeyboard}
+                  aria-pressed={showKeyboard}
+                >
+                  <span>Arabic Keyboard</span>
+                  <span>{showKeyboard ? "Hide" : "Show"}</span>
+                </button>
+
+
+                <PresetKeyboard
+                  title="إِعْرَاب"
+                  rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]}
+                  onPick={handleKeyboardKey}
+                  large
+                />
+
+                <button
+                  type="button"
+                  onClick={onClearDiacritics}
+                  className="sidebarSmallAction"
+                  style={{ background: "var(--bg-input)" }}
+                >
+                  Clear diacritics
+                </button>
+
+                {(selectedBlock?.type === "text" ||
+                  selectedBlock?.type === "shapeFill" ||
+                  selectedBlock?.type === "shapeWarp") &&
+                  (selectedBlock.diacriticOverrides?.length ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onUpdateSelectedBlock({ diacriticOverrides: [] })}
+                      className="sidebarSmallAction"
+                      style={{ background: "var(--bg-input)" }}
+                    >
+                      Reset diacritic overrides
+                    </button>
+                  )}
+
+                <PresetKeyboard
+                  title="Presets"
+                  rows={[PRESETS]}
+                  onPick={handleKeyboardKey}
+                  fontFamily={selectedBlock?.fontFamily ?? "FatemiMaqala"}
+                />
+
+                <PresetKeyboard
+                  title="Specials"
+                  rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]}
+                  onPick={handleKeyboardKey}
+                />
+
+                <PresetKeyboard
+                  title="Urdu-Farsi Characters"
+                  rows={[PERSIAN, URDU]}
+                  onPick={handleKeyboardKey}
+                />
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock && selectedBlock.type === "image" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Image" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
+              <div className="sectionPanel">
+                <RangeRow
+                  id={makeId("image-scale", selectedId)}
+                  name={makeId("imageScale", selectedId)}
+                  label="Scale"
+                  value={selectedBlock.imageScale ?? 1}
+                  min={0.05}
+                  max={10}
+                  step={0.05}
+                  onChange={(v) => onUpdateSelectedBlock({ imageScale: v })}
+                  suffix={(selectedBlock.imageScale ?? 1).toFixed(2)}
+                  fieldKey="imageScale"
+                />
+
+                <RangeRow
+                  id={makeId("opacity", selectedId)}
+                  name={makeId("opacity", selectedId)}
+                  label="Opacity"
+                  value={selectedOpacity}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
+                  suffix={`${Math.round(selectedOpacity * 100)}%`}
+                  fieldKey="opacity"
+                />
+
+                <RangeRow
+                  id={makeId("rotation", selectedId)}
+                  name={makeId("rotation", selectedId)}
+                  label="Rotation"
+                  value={selectedRotation}
+                  min={-180}
+                  max={180}
+                  onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
+                  suffix={`${selectedRotation}°`}
+                  fieldKey="rotation"
+                />
+
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  Tip: drag the gold handle on the image's corner (canvas) to resize.
+                </div>
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock && selectedBlock.type === "shapeFill" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection
+              title="Shape Fill"
+              isOpen={showText}
+              onToggle={() => setShowText((v) => !v)}
+            >
+              <div className="sectionPanel">
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
+                      Tip: drag the gold handle on the shape's corner (canvas) to resize.
+                    </div>
+
+                    <CheckboxRow
+                      id={makeId("diacritic-edit-mode", selectedId)}
+                      label="Diacritic tool"
+                      checked={!!selectedBlock.diacriticEditMode}
+                      onChange={() => onToggleDiacriticEditMode?.()}
+                    />
+
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
+                      Hover a tashkeel mark on the canvas to move, resize, or hide it. One
+                      change applies to every repetition of that mark in the fill.
+                    </div>
+
+                    <RangeRow
+                      id={makeId("shape-scale", selectedId)}
+                      name={makeId("shapeScale", selectedId)}
+                      label="Shape scale"
+                      value={selectedBlock.shapeScale ?? 1}
+                      min={0.2}
+                      max={3}
+                      step={0.05}
+                      onChange={(v) => onUpdateSelectedBlock({ shapeScale: v })}
+                      suffix={(selectedBlock.shapeScale ?? 1).toFixed(2)}
+                      fieldKey="shapeScale"
+                    />
+
+                    <RangeRow
+                      id={makeId("fill-spacing", selectedId)}
+                      name={makeId("shapeFillSpacing", selectedId)}
+                      label="Text spacing"
+                      value={selectedBlock.shapeFillSpacing ?? 1.3}
+                      min={0.5}
+                      max={4}
+                      step={0.05}
+                      onChange={(v) =>
+                        onUpdateSelectedBlock({ shapeFillSpacing: v })
+                      }
+                      suffix={(selectedBlock.shapeFillSpacing ?? 1.3).toFixed(2)}
+                      fieldKey="shapeFillSpacing"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => onFitShapeFillSpacing?.(selectedBlock.id)}
+                      className="sidebarSmallAction"
+                      style={{ marginTop: 4 }}
+                      title="Adjust row spacing so rows evenly fill the shape's height"
+                    >
+                      Fit exactly
+                    </button>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        gap: 10,
+                        marginTop: 8,
+                      }}
+                    >
+                      <RangeRow
+                        id={makeId("fill-scale-x", selectedId)}
+                        name={makeId("shapeFillScaleX", selectedId)}
+                        label="Scale X"
+                        value={selectedBlock.shapeFillScaleX ?? 1}
+                        min={0.1}
+                        max={3}
+                        step={0.05}
+                        onChange={(v) =>
+                          onUpdateSelectedBlock({ shapeFillScaleX: v })
+                        }
+                        suffix={(selectedBlock.shapeFillScaleX ?? 1).toFixed(2)}
+                        fieldKey="shapeFillScaleX"
+                      />
+
+                      <RangeRow
+                        id={makeId("fill-scale-y", selectedId)}
+                        name={makeId("shapeFillScaleY", selectedId)}
+                        label="Scale Y"
+                        value={selectedBlock.shapeFillScaleY ?? 1}
+                        min={0.1}
+                        max={3}
+                        step={0.05}
+                        onChange={(v) =>
+                          onUpdateSelectedBlock({ shapeFillScaleY: v })
+                        }
+                        suffix={(selectedBlock.shapeFillScaleY ?? 1).toFixed(2)}
+                        fieldKey="shapeFillScaleY"
+                      />
+                    </div>
+
+                    <RangeRow
+                      id={makeId("fill-text-rotation", selectedId)}
+                      name={makeId("shapeFillTextRotation", selectedId)}
+                      label="Text rotation"
+                      value={selectedBlock.shapeFillTextRotation ?? 0}
+                      min={-180}
+                      max={180}
+                      step={1}
+                      onChange={(v) =>
+                        onUpdateSelectedBlock({ shapeFillTextRotation: v })
+                      }
+                      suffix={selectedBlock.shapeFillTextRotation ?? 0}
+                      fieldKey="shapeFillTextRotation"
+                    />
+                  </div>
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock && selectedBlock.type === "shapeWarp" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection
+              title="Shape Warp"
+              isOpen={showText}
+              onToggle={() => setShowText((v) => !v)}
+            >
+              <div className="sectionPanel">
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                        Reset to defaults
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onResetShapeWarp?.(selectedBlock.id)}
+                        className="layerIconBtn"
+                        title="Reset shape warp to defaults"
+                      >
+                        Reset
+                      </button>
+                    </div>
+
+                    <SelectRow
+                      id={makeId("warp-shape-mode", selectedId)}
+                      name={makeId("warpShapeMode", selectedId)}
+                      label="Warp mode"
+                      value={selectedBlock.warpShapeMode ?? "envelope"}
+                      onChange={(v) =>
+                        onUpdateSelectedBlock({
+                          warpShapeMode: v as ShapeWarpMode,
+                        })
+                      }
+                    >
+                      <option value="envelope">Envelope</option>
+                      <option value="topBottom">Top Bottom</option>
+                      <option value="stretch">Stretch</option>
+                      <option value="radial">Radial</option>
+                    </SelectRow>
+
+                    <RangeRow
+                      id={makeId("warp-shape-padding", selectedId)}
+                      name={makeId("warpShapePadding", selectedId)}
+                      label="Inner padding"
+                      value={selectedBlock.warpShapePadding ?? 24}
+                      min={0}
+                      max={150}
+                      step={1}
+                      onChange={(v) =>
+                        onUpdateSelectedBlock({ warpShapePadding: v })
+                      }
+                      suffix={`${selectedBlock.warpShapePadding ?? 24}px`}
+                      fieldKey="warpShapePadding"
+                    />
+
+                    <RangeRow
+                      id={makeId("warp-shape-strength", selectedId)}
+                      name={makeId("warpShapeStrength", selectedId)}
+                      label="Warp strength"
+                      value={selectedBlock.warpShapeStrength ?? 1}
+                      min={0}
+                      max={2}
+                      step={0.05}
+                      onChange={(v) =>
+                        onUpdateSelectedBlock({ warpShapeStrength: v })
+                      }
+                      suffix={(selectedBlock.warpShapeStrength ?? 1).toFixed(2)}
+                      fieldKey="warpShapeStrength"
+                    />
+
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                      Base shape: {selectedBlock.warpShapeWidth ?? 400} ×{" "}
+                      {selectedBlock.warpShapeHeight ?? 400}px
+                    </div>
+                  </div>
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock && selectedBlock.type === "textPath" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Curve" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
+              <div className="sectionPanel">
+                <button
+                  type="button"
+                  className="sidebarPillButton"
+                  style={
+                    selectedBlock.textPathEditMode
+                      ? { background: "var(--accent)", color: "var(--text-on-accent)" }
+                      : undefined
+                  }
+                  onClick={() =>
+                    onUpdateSelectedBlock({ textPathEditMode: !selectedBlock.textPathEditMode })
+                  }
+                >
+                  {selectedBlock.textPathEditMode ? "Done Editing Curve" : "Edit Curve"}
+                </button>
+
+                <SelectRow
+                  id={makeId("text-path-preset", selectedId)}
+                  name={makeId("textPathPreset", selectedId)}
+                  label="Preset"
+                  value="custom"
+                  onChange={(v) => {
+                    if (v === "arc") {
+                      onUpdateSelectedBlock({ textPathD: arcPathD(400, 120) });
+                    } else if (v === "wave") {
+                      onUpdateSelectedBlock({ textPathD: wavePathD(400, 120) });
+                    } else if (v === "circle") {
+                      onUpdateSelectedBlock({ textPathD: circlePathD(300, 300) });
+                    }
+                  }}
+                >
+                  <option value="custom">Custom</option>
+                  <option value="arc">Arc</option>
+                  <option value="wave">Wave</option>
+                  <option value="circle">Circle</option>
+                </SelectRow>
+
+                <button
+                  type="button"
+                  className="sidebarPillButton"
+                  onClick={handleTextPathSvgUpload}
+                >
+                  Upload SVG Path
+                </button>
+
+                <label className="field">
+                  <span className="fieldTitle">
+                    <input
+                      type="checkbox"
+                      checked={selectedBlock.textPathReversed ?? false}
+                      onChange={(e) =>
+                        onUpdateSelectedBlock({ textPathReversed: e.target.checked })
+                      }
+                      style={{ marginRight: 6 }}
+                    />
+                    Flip direction
+                  </span>
+                </label>
+
+                <RangeRow
+                  id={makeId("text-path-baseline-offset", selectedId)}
+                  name={makeId("textPathBaselineOffset", selectedId)}
+                  label="Baseline offset"
+                  value={selectedBlock.textPathBaselineOffset ?? 0}
+                  min={-60}
+                  max={60}
+                  onChange={(v) => onUpdateSelectedBlock({ textPathBaselineOffset: v })}
+                  suffix={selectedBlock.textPathBaselineOffset ?? 0}
+                  fieldKey="textPathBaselineOffset"
+                />
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock && selectedBlock.type !== "image" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Typography" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
+              <div className="sectionPanel">
+                <FontSelectRow
+                  id={makeId("font-family", selectedId)}
+                  label="Font family"
+                  value={selectedBlock.fontFamily}
+                  options={FONT_OPTIONS}
+                  onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
+                  previewSuffix="— أبجد"
+                />
+
+                {selectedBlock.type === "textPath" ? (
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    Letter size on a text-path block is set by the curve's length — drag the
+                    curve longer or shorter in Edit Curve mode, or change the text.
+                  </div>
+                ) : (
+                  <RangeRow
+                    id={makeId("font-size", selectedId)}
+                    name={makeId("fontSize", selectedId)}
+                    label="Font size"
+                    value={selectedBlock.fontSize}
+                    min={
+                      selectedBlock.type === "shapeFill" ||
+                      selectedBlock.type === "shapeWarp"
+                        ? 4
+                        : 12
+                    }
+                    max={
+                      selectedBlock.type === "shapeFill" ||
+                      selectedBlock.type === "shapeWarp"
+                        ? 400
+                        : 200
+                    }
+                    onChange={(v) => onUpdateSelectedBlock({ fontSize: v })}
+                    suffix={`${Math.round(selectedBlock.fontSize)}px`}
+                    fieldKey="fontSize"
+                  />
+                )}
+
+                <ColorRow
+                  id={makeId("text-color", selectedId)}
+                  name={makeId("textColor", selectedId)}
+                  label="Text color"
+                  value={selectedBlock.color}
+                  onChange={(v) => onUpdateSelectedBlock({ color: v })}
+                />
+
+                <RangeRow
+                  id={makeId("opacity", selectedId)}
+                  name={makeId("opacity", selectedId)}
+                  label="Opacity"
+                  value={selectedOpacity}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
+                  suffix={`${Math.round(selectedOpacity * 100)}%`}
+                  fieldKey="opacity"
+                />
+
+                {selectedBlock.type === "text" && (
+                  <SelectRow
+                    id={makeId("text-align", selectedId)}
+                    name={makeId("textAlign", selectedId)}
+                    label="Alignment"
+                    value={selectedBlock.align ?? "center"}
+                    onChange={(v) =>
+                      onUpdateSelectedBlock({ align: v as TextAlign })
+                    }
+                  >
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </SelectRow>
+                )}
+
+                {selectedBlock.type === "text" && (
+                  <RangeRow
+                    id={makeId("line-height", selectedId)}
+                    name={makeId("lineHeight", selectedId)}
+                    label="Line height"
+                    value={selectedBlock.lineHeight ?? 1.2}
+                    min={0.8}
+                    max={3}
+                    step={0.05}
+                    onChange={(v) => onUpdateSelectedBlock({ lineHeight: v })}
+                    suffix={(selectedBlock.lineHeight ?? 1.2).toFixed(2)}
+                    fieldKey="lineHeight"
+                  />
+                )}
+
+                {selectedBlock.type === "text" && (
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
+                    <div className="sidebarSectionTitle">Kashida</div>
+
+                    <CheckboxRow
+                      id={makeId("kashida-edit-mode", selectedId)}
+                      label="Kashida tool"
+                      checked={!!selectedBlock.kashidaEditMode}
+                      onChange={() => onToggleKashidaEditMode?.()}
+                    />
+
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                      Drag a gold handle between two connected letters on the canvas to
+                      elongate the connector (tatweel).
+                    </div>
+                  </div>
+                )}
+
+                {selectedBlock.type === "text" && (
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
+                    <div className="sidebarSectionTitle">Warp</div>
+
+                    <RangeRow
+                      id={makeId("warp-x", selectedId)}
+                      name={makeId("warpX", selectedId)}
+                      label="Horizontal warp"
+                      value={selectedBlock.warpX ?? 0}
+                      min={-100}
+                      max={100}
+                      step={1}
+                      onChange={(v) => onUpdateSelectedBlock({ warpX: v })}
+                      suffix={selectedBlock.warpX ?? 0}
+                      fieldKey="warpX"
+                    />
+
+                    <RangeRow
+                      id={makeId("warp-y", selectedId)}
+                      name={makeId("warpY", selectedId)}
+                      label="Vertical warp"
+                      value={selectedBlock.warpY ?? 0}
+                      min={-100}
+                      max={100}
+                      step={1}
+                      onChange={(v) => onUpdateSelectedBlock({ warpY: v })}
+                      suffix={selectedBlock.warpY ?? 0}
+                      fieldKey="warpY"
+                    />
+                  </div>
+                )}
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock && selectedBlock.type !== "image" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection
+              title="Transform"
+              isOpen={showTransform}
+              onToggle={() => setShowTransform((v) => !v)}
+            >
+              <div className="sectionPanel">
+                <RangeRow
+                  id={makeId("rotation", selectedId)}
+                  name={makeId("rotation", selectedId)}
+                  label="Rotation"
+                  value={selectedRotation}
+                  min={-180}
+                  max={180}
+                  step={1}
+                  onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
+                  suffix={`${selectedRotation}°`}
+                  fieldKey="rotation"
+                />
+
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock && selectedBlock.type !== "image" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Effects" isOpen={showEffects} onToggle={() => setShowEffects((v) => !v)}>
+              <div className="sectionPanel">
+                <div style={{ display: "flex", gap: 6 }}>
+                  {(
+                    [
+                      { key: "outline", label: "Outline" },
+                      { key: "shadow", label: "Shadow" },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setEffectsTab(tab.key)}
+                      className="sidebarPillButton"
+                      style={
+                        effectsTab === tab.key
+                          ? { background: "var(--accent)", color: "var(--text-on-accent)" }
+                          : undefined
+                      }
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {effectsTab === "outline" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                    <ColorRow
+                      id={makeId("stroke-color", selectedId)}
+                      name={makeId("strokeColor", selectedId)}
+                      label="Outline color"
+                      value={selectedBlock.stroke}
+                      onChange={(v) => onUpdateSelectedBlock({ stroke: v })}
+                    />
+
+                    <RangeRow
+                      id={makeId("stroke-width", selectedId)}
+                      name={makeId("strokeWidth", selectedId)}
+                      label="Outline width"
+                      value={selectedBlock.strokeWidth ?? 0}
+                      min={0}
+                      max={20}
+                      onChange={(v) => onUpdateSelectedBlock({ strokeWidth: v })}
+                      suffix={selectedBlock.strokeWidth ?? 0}
+                      fieldKey="strokeWidth"
+                    />
+                  </div>
+                )}
+
+                {effectsTab === "shadow" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                    <ColorRow
+                      id={makeId("shadow-color", selectedId)}
+                      name={makeId("shadowColor", selectedId)}
+                      label="Shadow color"
+                      value={selectedBlock.shadowColor}
+                      onChange={(v) => onUpdateSelectedBlock({ shadowColor: v })}
+                    />
+
+                    <RangeRow
+                      id={makeId("shadow-blur", selectedId)}
+                      name={makeId("shadowBlur", selectedId)}
+                      label="Shadow blur"
+                      value={selectedBlock.shadowBlur ?? 0}
+                      min={0}
+                      max={60}
+                      onChange={(v) => onUpdateSelectedBlock({ shadowBlur: v })}
+                      suffix={selectedBlock.shadowBlur ?? 0}
+                      fieldKey="shadowBlur"
+                    />
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        gap: 10,
+                        marginTop: 8,
+                      }}
+                    >
+                      <RangeRow
+                        id={makeId("shadow-offset-x", selectedId)}
+                        name={makeId("shadowOffsetX", selectedId)}
+                        label="Shadow X"
+                        value={selectedBlock.shadowOffsetX ?? 0}
+                        min={-60}
+                        max={60}
+                        onChange={(v) => onUpdateSelectedBlock({ shadowOffsetX: v })}
+                        suffix={selectedBlock.shadowOffsetX ?? 0}
+                        fieldKey="shadowOffsetX"
+                      />
+
+                      <RangeRow
+                        id={makeId("shadow-offset-y", selectedId)}
+                        name={makeId("shadowOffsetY", selectedId)}
+                        label="Shadow Y"
+                        value={selectedBlock.shadowOffsetY ?? 0}
+                        min={-60}
+                        max={60}
+                        onChange={(v) => onUpdateSelectedBlock({ shadowOffsetY: v })}
+                        suffix={selectedBlock.shadowOffsetY ?? 0}
+                        fieldKey="shadowOffsetY"
+                      />
+                    </div>
+
+                    <RangeRow
+                      id={makeId("shadow-opacity", selectedId)}
+                      name={makeId("shadowOpacity", selectedId)}
+                      label="Shadow opacity"
+                      value={selectedShadowOpacity}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      onChange={(v) => onUpdateSelectedBlock({ shadowOpacity: v })}
+                      suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
+                      fieldKey="shadowOpacity"
+                    />
+                  </div>
+                )}
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+
+        {isMobile && selectedBlock && selectedBlock.type !== "image" && (
+          <div className="sidebarPanel">
+            <button
+              type="button"
+              onClick={onToggleMorphEditorMobile}
+              className="sidebarSectionButton"
+              aria-expanded={showMorphEditorMobile}
+              aria-pressed={showMorphEditorMobile}
+            >
+              <span>Morph Glyph Editor</span>
+              <span>{showMorphEditorMobile ? "Hide" : "Show"}</span>
+            </button>
+          </div>
+        )}
 
         <div className="sidebarPanel">
           <CollapsibleSection
@@ -2113,6 +2138,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </CollapsibleSection>
         </div>
+
+        {wizardTemplate && onGenerateFromTemplate && (
+          <TemplateWizardDialog
+            key={wizardTemplate.id}
+            template={wizardTemplate}
+            onCancel={() => setWizardTemplate(null)}
+            onGenerate={(values) => {
+              onGenerateFromTemplate(wizardTemplate.id, values);
+              setWizardTemplate(null);
+            }}
+          />
+        )}
+
+        <FloatingArabicKeyboard
+          open={showKeyboard && !!selectedBlock}
+          onClose={() => setShowKeyboard(false)}
+          onInsert={handleKeyboardKey}
+          onBackspace={handleKeyboardBackspace}
+        />
       </div>
     </div>
   );
