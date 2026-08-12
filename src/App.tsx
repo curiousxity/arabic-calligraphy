@@ -49,6 +49,18 @@ import {
   loadCloudProject,
   deleteCloudProject,
 } from "./lib/cloudProjects";
+// STREAM-C (export presets). Appended at the end of the import block on
+// purpose — see docs/superpowers/specs/PARALLEL.md; this file has no import
+// anchors, so each stream keeps its one import line as far from the others
+// as it can.
+import {
+  loadPresets as loadExportPresets,
+  savePresets as saveExportPresets,
+  upsertPreset as upsertExportPreset,
+  removePreset as removeExportPreset,
+  type ExportPreset,
+  type ExportFormat,
+} from "./lib/exportPresets";
 
 const hslToHex = (h: number, s: number, l: number): string => {
   const sat = s / 100;
@@ -234,6 +246,21 @@ const App: React.FC = () => {
   // ---- STREAM-B: kashida auto-justify — state ----
   // ---- /STREAM-B ----
   // ---- STREAM-C: export presets — state ----
+  // Presets are read once at mount; they live in this browser only, never in
+  // a saved project or the cloud store.
+  const [exportPresets, setExportPresets] = useState<ExportPreset[]>(() =>
+    loadExportPresets()
+  );
+  const [selectedExportPresetId, setSelectedExportPresetId] = useState("");
+  const [exportScale, setExportScale] = useState(2);
+  const [exportFormats, setExportFormats] = useState<ExportFormat[]>([
+    "png",
+    "jpeg",
+    "svg",
+    "pdf",
+  ]);
+  const [newExportPresetName, setNewExportPresetName] = useState("");
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
   // ---- /STREAM-C ----
 
   const [localProjects, setLocalProjects] = useState<NamedProjectMeta[]>(() => {
@@ -2115,7 +2142,108 @@ const App: React.FC = () => {
   const streamBSidebarProps: Partial<SidebarProps> = {};
   // ---- /STREAM-B ----
   // ---- STREAM-C: export presets — handlers ----
-  const streamCSidebarProps: Partial<SidebarProps> = {};
+  // A second `useExport(...)` call rather than extending the destructure at
+  // the original call site: that line sits outside every stream's anchors.
+  // The hook holds no state of its own — it only closes over the stage ref
+  // and the blocks — so calling it twice costs nothing.
+  const { handleCopyPNG, handleExportAll } = useExport(stageRef, blocks);
+
+  const copyPNGToClipboard = async () => {
+    const result = await handleCopyPNG({
+      scale: exportScale,
+      transparent: transparentExport,
+    });
+    setExportStatus(result.ok ? "Copied to the clipboard." : result.reason);
+  };
+
+  const exportAllFormats = () => {
+    setExportStatus(null);
+    void handleExportAll({
+      scale: exportScale,
+      transparent: transparentExport,
+      formats: exportFormats,
+    });
+  };
+
+  const toggleExportFormat = (format: ExportFormat) => {
+    setExportFormats((prev) =>
+      prev.includes(format)
+        ? // Never let the list empty out — "export all" with nothing ticked
+          // would be a button that silently does nothing.
+          prev.length === 1
+          ? prev
+          : prev.filter((f) => f !== format)
+        : [...prev, format]
+    );
+  };
+
+  // Selecting a preset loads its settings into the controls above, so what a
+  // preset will do is visible before it is run.
+  const selectExportPreset = (id: string) => {
+    setSelectedExportPresetId(id);
+    const preset = exportPresets.find((p) => p.id === id);
+    if (!preset) return;
+    setExportScale(preset.scale);
+    setTransparentExport(preset.transparent);
+    setExportFormats(preset.formats);
+    setNewExportPresetName(preset.name);
+  };
+
+  const runExportPreset = () => {
+    const preset = exportPresets.find((p) => p.id === selectedExportPresetId);
+    if (!preset) return;
+    setExportStatus(null);
+    void handleExportAll({
+      scale: preset.scale,
+      transparent: preset.transparent,
+      formats: preset.formats,
+    });
+  };
+
+  const saveExportPreset = () => {
+    const name = newExportPresetName.trim();
+    if (!name) return;
+    // Overwrite by name, matching how the named-project store already behaves.
+    const existing = exportPresets.find((p) => p.name === name);
+    const preset: ExportPreset = {
+      id: existing?.id ?? `preset-${Date.now().toString(36)}`,
+      name,
+      scale: exportScale,
+      transparent: transparentExport,
+      formats: exportFormats,
+    };
+    const next = upsertExportPreset(exportPresets, preset);
+    setExportPresets(next);
+    saveExportPresets(next);
+    setSelectedExportPresetId(preset.id);
+    setExportStatus(`Preset “${name}” saved.`);
+  };
+
+  const deleteExportPreset = () => {
+    if (!selectedExportPresetId) return;
+    const next = removeExportPreset(exportPresets, selectedExportPresetId);
+    setExportPresets(next);
+    saveExportPresets(next);
+    setSelectedExportPresetId("");
+  };
+
+  const streamCSidebarProps: Partial<SidebarProps> = {
+    onCopyPNG: copyPNGToClipboard,
+    onExportAll: exportAllFormats,
+    exportStatus,
+    exportScale,
+    onChangeExportScale: setExportScale,
+    exportFormats,
+    onToggleExportFormat: toggleExportFormat,
+    exportPresets,
+    selectedExportPresetId,
+    onSelectExportPreset: selectExportPreset,
+    onRunExportPreset: runExportPreset,
+    newExportPresetName,
+    onChangeNewExportPresetName: setNewExportPresetName,
+    onSaveExportPreset: saveExportPreset,
+    onDeleteExportPreset: deleteExportPreset,
+  };
   // ---- /STREAM-C ----
   // ---- STREAM-D: user guide — handlers ----
   const streamDSidebarProps: Partial<SidebarProps> = {};
