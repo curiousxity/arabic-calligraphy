@@ -305,6 +305,22 @@ shape) — there's no multi-device conflict resolution beyond that. See
 `docs/superpowers/specs/2026-08-11-cloud-persistence-design.md` for the
 full design and the SQL migration under `supabase/migrations/`.
 
+## Deferred features
+
+These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
+
+- **Diacritic hover handles on Shape Fill and Shape Warp blocks** — Currently implemented for plain text blocks only. Shape Fill's tiled-row and Shape Warp's bounding-envelope coordinate transformations place a diacritic's on-screen position through additional transforms beyond plain text's pen-advance layout. Correctly locating a hover-handle in each of those coordinate spaces is real, separate design work.
+
+- **Stretch tool and glyph-edit handles on text-on-path blocks** — The axis-derivation and per-glyph drag mathematics assume glyphs sit in a straight bounding box. Making them work once glyphs are rotated to follow a curve's tangent is a real design problem, not a trivial extension of the existing system.
+
+- **Parametric bezier schema rendering** — The stroke schema currently supplies only metadata (labels, kashida eligibility, protected-zone advisories) plus its own authored geometry (used only to derive stretch axes). It does not render letterforms itself — real fonts and HarfBuzz shaping remain the source of truth. Building a full parametric rendering engine that replaces per-font glyph outlines would be a much larger, separate feature; confirm scope before attempting it.
+
+- **Schema protectedZones enforcement** — A schema stroke's `protectedZones` are advisory text only and are never read during glyph editing. Enforcing them in the rendering would require a separate design to scope per-stroke edits by the schema's own geometry rather than by the real font's actual outline point indices.
+
+- **Automatic line-justification via Kashida** — The Kashida block-level dial (0–100) is manual only; it distributes one slider across every kashida-eligible stroke in a block. The app currently has no "fit text to width" infrastructure to hook automatic justification into.
+
+- **Image trace for Shape Fill blocks** — Auto-tracing a raster image into a silhouette shape (already implemented for Shape Warp via `ImageTraceDialog.tsx`) is not yet available for Shape Fill blocks — YAGNI until requested.
+
 ### Vite/Rolldown quirk
 
 `vite.config.ts` manually aliases `opentype.js` to its prebuilt ESM file because the package has no `exports` field, which breaks Rolldown (Vite 8's bundler) resolution otherwise. If upgrading `opentype.js` or Vite, re-check this alias still resolves.
