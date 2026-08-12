@@ -344,9 +344,67 @@ half-supported here.
 
 `public/fonts/*.ttf|otf` are not stock font files. `FatemiMaqala.ttf` has 8 custom Private Use Area glyphs (U+E833-E840, honorific symbols used by the sidebar's "Presets" row) that were manually merged (via a Python `fontTools` script, not committed to the repo) into every *other* font file in `public/fonts/` too, so those symbols render regardless of the selected font. If a font file in `public/fonts/` is ever regenerated/replaced from an upstream source, those PUA glyphs will be lost and the Presets buttons will silently show missing-glyph boxes in every font except FatemiMaqala again.
 
+### Canvas pan and zoom (`CanvasStage.tsx`, `lib/canvasBounds.ts`)
+
+A wheel event zooms only when `ctrlKey`/`metaKey` is set — which is how
+browsers report a trackpad pinch as well as an explicit ctrl+wheel; a
+plain wheel or two-finger scroll pans instead.
+
+The zoom multiplier comes from `zoomFactorFromWheel(deltaY, deltaMode)`,
+which is **exponential in the wheel's actual travel** rather than a fixed
+step per event. This distinction is the whole reason that function exists:
+a trackpad pinch fires dozens of small-delta events per second while a
+mouse wheel fires a few large ones, so the fixed ±10%-per-event this used
+to do made pinching rocket through the entire zoom range. `deltaMode` is
+normalized because Firefox commonly reports travel in lines rather than
+pixels, and a single event's factor is clamped to 1.25 so one fast flick
+cannot skip several zoom levels. `ZOOM_PER_PIXEL` is tuned so one 100px
+mouse detent lands on ~10%, matching the zoom buttons — raise it to zoom
+faster. Tested in `canvasBounds.test.ts`.
+
 ### Sidebar structure
 
-`Sidebar.tsx` is a large single component (selection-dependent panels: Styling, Align & Arrange, Shape Fill/Warp controls, Save/Export, Canvas Size, Arabic Helpers/Presets) that reads/writes through props from `App.tsx`. Shared low-level form pieces (`SelectRow`, `ColorRow`, `RangeRow`, `PresetKeyboard`) live in `src/components/sidebar/FormControls.tsx`; the layer list is `src/components/sidebar/LayersPanel.tsx`. `src/components/sidebar/utils.ts` has one helper (`makeId`).
+`Sidebar.tsx` is a large single component that reads/writes through props from `App.tsx`. Shared low-level form pieces (`SelectRow`, `ColorRow`, `RangeRow`, `CheckboxRow`, `PresetKeyboard`) live in `src/components/sidebar/FormControls.tsx`; the layer list is `src/components/sidebar/LayersPanel.tsx`. `src/components/sidebar/utils.ts` has one helper (`makeId`).
+
+Its panels are ordered in **three tiers by scope**, each introduced by a
+`SidebarTier` rule (a quiet labelled divider, deliberately lighter than a
+panel title so it groups without competing):
+
+| Tier | Panels |
+|---|---|
+| `document` | Start from a Template · Background & Grid · Project & Export |
+| `canvas` | Block Controls · Layers · Align & Arrange |
+| `selected` | Content · *type panel* · Typography · Transform · Effects |
+
+Then Shortcuts, outside any tier. The point of the split is that every
+panel which appears and disappears with the selection sits in one
+contiguous run, instead of interleaving with the permanent ones.
+
+Two naming rules in the `selected` tier are worth knowing before adding a
+panel there:
+
+- **The *type panel* is named after the block type** — `Shape Fill`,
+  `Shape Warp`, `Curve`, `Image` — and holds only what is specific to it
+  (a Shape Fill block's scale/spacing/rotation rows, a Shape Warp block's
+  mode/padding/strength). It renders directly under Content, above the
+  shared panels, because for those types it is the panel that matters
+  most. A plain text block has no type panel; its controls are the shared
+  ones.
+- **`Typography` is the shared styling panel** (font family, size,
+  colour, alignment, line height, plus the text-only Warp and Kashida
+  sections). It is *not* called "Text" precisely because it renders for
+  shape and curve blocks too, where a panel named "Text" sitting beside
+  one named "Shape Warp" reads as two competing type panels.
+
+`Transform` is therefore left holding only rotation — the one transform
+every type shares. Anything type-specific that lands there belongs in the
+type panel instead.
+
+`Content` owns everything that puts characters into the block: the RTL
+textarea, the Arabic Keyboard toggle, and the `PresetKeyboard` rows
+(إعراب, Presets, Specials, Urdu-Farsi) that were once a separate "Arabic
+Helpers" panel. That name is gone — character insertion lives in exactly
+one place now.
 
 The "Start from a Template" section's buttons don't apply a template
 directly — each opens `TemplateWizardDialog.tsx`, a small modal with one
