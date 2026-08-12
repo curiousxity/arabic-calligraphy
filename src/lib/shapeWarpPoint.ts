@@ -68,6 +68,20 @@ export function applyShapeWarpPoint(
  * position into the y-axis formula), so this solves numerically via Newton's
  * method with a finite-difference Jacobian — a few iterations converge well
  * within a pixel since the forward map is smooth and roughly linear locally.
+ *
+ * The Newton seed is deliberately NOT `(targetX, targetY)`. The target is in
+ * shape space (`0..shapeW`, `0..shapeH`); the solver's unknowns are in
+ * glyph-run space (`bounds.minX..maxX`, `bounds.minY..maxY`), and those two
+ * ranges routinely have very different scale (e.g. an 820x90 glyph run
+ * warped into a 400x400 shape). Seeding directly at the target lands the
+ * initial guess far outside the glyph-bounds box, so `clamp01` inside
+ * `applyShapeWarpPoint` saturates on iteration 0; once saturated, nudging y
+ * by the finite-difference `eps` produces no change in `ny`, so both of the
+ * Jacobian's y-derivatives come out exactly 0, `det` is exactly 0, and the
+ * loop bails out immediately — returning the untouched, wrong seed. Seeding
+ * instead at the inverse of the base (unwarped) affine map lands inside the
+ * glyph-bounds box, keeping the Jacobian non-singular so Newton can actually
+ * iterate. Do not "simplify" this back to `(targetX, targetY)`.
  */
 export function invertShapeWarpPoint(
   targetX: number,
@@ -79,8 +93,10 @@ export function invertShapeWarpPoint(
   mode: ShapeWarpMode,
   strength: number
 ) {
-  let x = targetX;
-  let y = targetY;
+  const innerW = Math.max(1, shapeW - padding * 2);
+  const innerH = Math.max(1, shapeH - padding * 2);
+  let x = bounds.minX + ((targetX - padding) / innerW) * Math.max(bounds.rawWidth, 1);
+  let y = bounds.minY + ((targetY - padding) / innerH) * Math.max(bounds.rawHeight, 1);
   const eps = 1;
 
   for (let iter = 0; iter < 12; iter++) {
