@@ -1,20 +1,19 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { Group, Circle, Rect } from "react-konva";
-import type * as opentype from "opentype.js";
-import type { HarfBuzzGlyph } from "../lib/harfbuzz";
-import { findDiacriticGlyphIndices } from "../lib/diacritics";
+import { projectOntoAxis } from "../lib/strokeSchema/dragAxis";
+import type { DiacriticPlacement } from "../lib/diacriticPlacement";
 import type { DiacriticOverride } from "../types";
-import type { GlyphHitBox } from "./ShapedText";
 
 export type DiacriticHoverHandlesProps = {
   isSelected: boolean;
-  glyphs: HarfBuzzGlyph[];
-  font: opentype.Font | null;
-  glyphHitBoxes: GlyphHitBox[];
+  /**
+   * One entry per hoverable diacritic instance on canvas, already filtered
+   * to real diacritics by the calling renderer. Each carries its own
+   * local↔canvas mapping, so this component's arithmetic stays in local
+   * space regardless of whether the host block warps, tiles, or neither.
+   */
+  placements: DiacriticPlacement[];
   diacriticOverrides: DiacriticOverride[];
-  /** Group-local x/y to add to a hit box's own x/y — same `bx + localDrawX` / `by + localDrawY` offset the rest of ShapedText.tsx already uses to place its own overlays. */
-  offsetX: number;
-  offsetY: number;
   fontSize: number;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
@@ -30,134 +29,166 @@ const HIDE_BUTTON_COLOR_ACTIVE = "#9ca3af";
  * Only the currently-hovered diacritic ever shows handles — that's what
  * keeps text with many marks from turning into visual clutter. Handles
  * are positioned at each diacritic's bounding-box center for easy
- * grabbing, while the actual render-time scale (ShapedText.tsx's
- * drawWarpedGlyphRun) pivots around the glyph's pen-origin (gx, gy) —
- * a deliberate, minor approximation: the handle sits where it's easy to
- * grab, not exactly where the glyph visually pivots from.
+ * grabbing, while the actual render-time scale pivots around the glyph's
+ * pen-origin — a deliberate, minor approximation: the handle sits where
+ * it's easy to grab, not exactly where the glyph visually pivots from.
+ *
+ * All arithmetic below is in the placement's *local* space (the glyph run
+ * for text and shape-warp blocks, one tiled glyph instance for shape-fill
+ * blocks); `toCanvas` is applied only when drawing and `toLocal` only when
+ * reading a drag back. That is the whole of what varies between block
+ * types — hover state, the rail, the hit rect, and the three handles are
+ * identical for all of them.
  */
 export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
   isSelected,
-  glyphs,
-  font,
-  glyphHitBoxes,
+  placements,
   diacriticOverrides,
-  offsetX,
-  offsetY,
   fontSize,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
 }) => {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  // Sticky-hover while a handle for this box is actively being dragged: the
-  // move handle can travel well outside the (generous but still bounded)
-  // hit-rect during a normal drag, so rect containment alone can't be
-  // trusted mid-gesture — this keeps the handle mounted regardless of
-  // pointer position until the drag ends.
-  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
-  // The move handle's absolute (stage-space) x at drag start. Konva's
-  // dragBoundFunc receives/returns absolute stage coordinates, but `cx`
-  // below is a group-local text-space coordinate — resetting x to `cx`
-  // directly would teleport the handle the instant a drag starts under
-  // any block offset/pan/zoom. Capturing the real absolute x once and
-  // holding it fixed for the duration of the drag keeps the handle's x
-  // stable (this handle only ever moves vertically) without mixing
-  // coordinate spaces.
-  const dragAbsoluteXRef = useRef(0);
-
-  const diacriticIndices = useMemo(
-    () => findDiacriticGlyphIndices(glyphs, font),
-    [glyphs, font]
-  );
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  // Sticky-hover while a handle for this placement is actively being
+  // dragged: the move handle can travel well outside the (generous but
+  // still bounded) hit-rect during a normal drag, so rect containment
+  // alone can't be trusted mid-gesture — this keeps the handle mounted
+  // regardless of pointer position until the drag ends.
+  const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  // The move handle's rail, in absolute (stage) space, captured once at
+  // drag start. Konva's dragBoundFunc receives and returns absolute
+  // coordinates while everything else here is local, and mixing the two
+  // previously teleported this handle sideways under any block
+  // offset/pan/zoom. Under a warp the rail is not vertical on screen even
+  // though it is vertical in local space, so it is stored as two mapped
+  // endpoints rather than a single fixed x.
+  const railRef = useRef<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(null);
 
   if (!isSelected) return null;
 
-  const diacriticBoxes = glyphHitBoxes.filter((b) => diacriticIndices.has(b.glyphIndex));
   const handleSpacing = fontSize * 0.25;
   // The hit-rect has to cover the full reach of all three handles, not just
   // the diacritic's own (typically tiny) bounding box: the gold/resize and
   // red/hide handles sit at rest `handleSpacing` to either side of center,
   // and the blue/move handle can be dragged a normal vertical distance away
-  // while the gesture is in progress. Horizontal margin clears the resting
-  // handle position plus its radius/stroke; vertical margin is generous
-  // enough to tolerate a real drag without losing hover (paired with the
-  // sticky-while-dragging fallback above for drags that exceed even this).
+  // while the gesture is in progress.
   const hitRectHorizontalMargin = handleSpacing + 12;
   const hitRectVerticalMargin = fontSize * 0.5;
 
   return (
     <Group>
-      {diacriticBoxes.map((box) => {
-        const override = diacriticOverrides.find((o) => o.glyphIndex === box.glyphIndex);
-        const cx = offsetX + box.x + box.width / 2;
-        const cy = offsetY + box.y + box.height / 2;
+      {placements.map((placement) => {
+        const override = diacriticOverrides.find((o) => o.glyphIndex === placement.glyphIndex);
+        const { box } = placement;
+        const cx = box.x + box.width / 2;
+        const cy = box.y + box.height / 2;
         const overrideScale = override?.scale ?? 1;
         const displayY = cy + (override?.offsetY ?? 0);
-        const isHovered =
-          hoveredIndex === box.glyphIndex || draggingIndex === box.glyphIndex;
+        const isHovered = hoveredKey === placement.key || draggingKey === placement.key;
 
-        // Hit-rect derived from the mark's actual rendered position/size
-        // (displayY + scaled box), not its original un-overridden
-        // box.y/size — otherwise a mark moved via offsetY or enlarged via
-        // scale drifts out from under its own hit area. The base margins
-        // above already cover the common (no-override) case generously;
-        // scaling them too means an enlarged mark's hit area grows with
-        // it instead of staying pinned to the natural-size rect.
+        // Local-space hit rect derived from the mark's actual rendered
+        // position/size (displayY + scaled box), not its original
+        // un-overridden box — otherwise a mark moved via offsetY or
+        // enlarged via scale drifts out from under its own hit area.
         const scaledWidth = box.width * overrideScale;
         const scaledHeight = box.height * overrideScale;
-        const hitRectX =
-          cx - scaledWidth / 2 - hitRectHorizontalMargin * overrideScale;
-        const hitRectY =
-          displayY - scaledHeight / 2 - hitRectVerticalMargin * overrideScale;
-        const hitRectWidth = scaledWidth + hitRectHorizontalMargin * 2 * overrideScale;
-        const hitRectHeight = scaledHeight + hitRectVerticalMargin * 2 * overrideScale;
+        const rx1 = cx - scaledWidth / 2 - hitRectHorizontalMargin * overrideScale;
+        const ry1 = displayY - scaledHeight / 2 - hitRectVerticalMargin * overrideScale;
+        const rx2 = cx + scaledWidth / 2 + hitRectHorizontalMargin * overrideScale;
+        const ry2 = displayY + scaledHeight / 2 + hitRectVerticalMargin * overrideScale;
+
+        // A rotated or warped local rect is not an axis-aligned rect on
+        // canvas, and Konva's Rect cannot express one. Map all four
+        // corners and take their bounding box: slightly larger than the
+        // true region, which only ever makes the mark easier to hover.
+        const corners = [
+          placement.toCanvas(rx1, ry1),
+          placement.toCanvas(rx2, ry1),
+          placement.toCanvas(rx1, ry2),
+          placement.toCanvas(rx2, ry2),
+        ];
+        const xs = corners.map((c) => c.x);
+        const ys = corners.map((c) => c.y);
+
+        const moveAt = placement.toCanvas(cx, displayY);
+        const resizeAt = placement.toCanvas(cx + handleSpacing, displayY);
+        const hideAt = placement.toCanvas(cx - handleSpacing, displayY);
+
+        // A non-invertible warp (Newton's method bailing on a near-singular
+        // Jacobian) would otherwise mount a Circle at NaN, which Konva
+        // silently renders at the origin. Drop the placement instead.
+        if (![...xs, ...ys, moveAt.x, moveAt.y, resizeAt.x, resizeAt.y, hideAt.x, hideAt.y].every(Number.isFinite)) {
+          return null;
+        }
 
         return (
-          <Group key={box.glyphIndex}>
+          <Group key={placement.key}>
             <Rect
-              x={hitRectX}
-              y={hitRectY}
-              width={hitRectWidth}
-              height={hitRectHeight}
+              x={Math.min(...xs)}
+              y={Math.min(...ys)}
+              width={Math.max(...xs) - Math.min(...xs)}
+              height={Math.max(...ys) - Math.min(...ys)}
               fill="transparent"
-              onMouseEnter={() => setHoveredIndex(box.glyphIndex)}
-              onMouseLeave={() =>
-                setHoveredIndex((v) => (v === box.glyphIndex ? null : v))
-              }
+              onMouseEnter={() => setHoveredKey(placement.key)}
+              onMouseLeave={() => setHoveredKey((v) => (v === placement.key ? null : v))}
             />
 
             {isHovered && (
               <>
                 <Circle
-                  x={cx}
-                  y={displayY}
+                  x={moveAt.x}
+                  y={moveAt.y}
                   radius={5}
                   fill={MOVE_HANDLE_COLOR}
                   stroke="#ffffff"
                   strokeWidth={1.5}
                   draggable
-                  dragBoundFunc={(pos) => ({ x: dragAbsoluteXRef.current, y: pos.y })}
+                  dragBoundFunc={(pos) => {
+                    const rail = railRef.current;
+                    if (!rail) return pos;
+                    return projectOntoAxis(rail.a, rail.b, pos);
+                  }}
                   onMouseDown={(e) => {
                     e.cancelBubble = true;
                   }}
                   onDragStart={(e) => {
                     e.cancelBubble = true;
-                    dragAbsoluteXRef.current = e.target.getAbsolutePosition().x;
-                    setDraggingIndex(box.glyphIndex);
+                    const parent = e.target.getParent();
+                    if (parent) {
+                      // The rail is "hold local x, vary local y". Two local
+                      // points a font-size apart define it; mapping both
+                      // through toCanvas and then the parent's absolute
+                      // transform expresses it in the space dragBoundFunc
+                      // actually speaks.
+                      const transform = parent.getAbsoluteTransform();
+                      const lo = placement.toCanvas(cx, displayY - fontSize);
+                      const hi = placement.toCanvas(cx, displayY + fontSize);
+                      railRef.current = {
+                        a: transform.point(lo),
+                        b: transform.point(hi),
+                      };
+                    }
+                    setDraggingKey(placement.key);
                   }}
                   onDragMove={(e) => {
                     e.cancelBubble = true;
-                    const newOffsetY = e.target.y() - cy;
-                    onDragDiacriticOverride?.(box.glyphIndex, { offsetY: newOffsetY });
+                    const pos = e.target.position();
+                    const local = placement.toLocal(pos.x, pos.y);
+                    if (!Number.isFinite(local.y)) return;
+                    onDragDiacriticOverride?.(placement.glyphIndex, {
+                      offsetY: local.y - cy,
+                    });
                   }}
                   onDragEnd={(e) => {
                     e.cancelBubble = true;
-                    setDraggingIndex((v) => (v === box.glyphIndex ? null : v));
+                    railRef.current = null;
+                    setDraggingKey((v) => (v === placement.key ? null : v));
                   }}
                 />
 
                 <Circle
-                  x={cx + handleSpacing}
-                  y={displayY}
+                  x={resizeAt.x}
+                  y={resizeAt.y}
                   radius={4}
                   fill={RESIZE_HANDLE_COLOR}
                   stroke="#ffffff"
@@ -168,27 +199,29 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                   }}
                   onDragStart={(e) => {
                     e.cancelBubble = true;
-                    setDraggingIndex(box.glyphIndex);
+                    setDraggingKey(placement.key);
                   }}
                   onDragMove={(e) => {
                     e.cancelBubble = true;
                     const pos = e.target.position();
-                    const dist = Math.hypot(pos.x - cx, pos.y - displayY);
+                    const local = placement.toLocal(pos.x, pos.y);
+                    if (!Number.isFinite(local.x) || !Number.isFinite(local.y)) return;
+                    const dist = Math.hypot(local.x - cx, local.y - displayY);
                     const nextScale = Math.max(
                       0.3,
                       Math.min(3, dist / Math.max(handleSpacing, 1))
                     );
-                    onDragDiacriticOverride?.(box.glyphIndex, { scale: nextScale });
+                    onDragDiacriticOverride?.(placement.glyphIndex, { scale: nextScale });
                   }}
                   onDragEnd={(e) => {
                     e.cancelBubble = true;
-                    setDraggingIndex((v) => (v === box.glyphIndex ? null : v));
+                    setDraggingKey((v) => (v === placement.key ? null : v));
                   }}
                 />
 
                 <Circle
-                  x={cx - handleSpacing}
-                  y={displayY}
+                  x={hideAt.x}
+                  y={hideAt.y}
                   radius={4}
                   fill={override?.hidden ? HIDE_BUTTON_COLOR_ACTIVE : HIDE_BUTTON_COLOR}
                   stroke="#ffffff"
@@ -198,11 +231,11 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                   }}
                   onClick={(e) => {
                     e.cancelBubble = true;
-                    onToggleDiacriticHidden?.(box.glyphIndex);
+                    onToggleDiacriticHidden?.(placement.glyphIndex);
                   }}
                   onTap={(e) => {
                     e.cancelBubble = true;
-                    onToggleDiacriticHidden?.(box.glyphIndex);
+                    onToggleDiacriticHidden?.(placement.glyphIndex);
                   }}
                 />
               </>

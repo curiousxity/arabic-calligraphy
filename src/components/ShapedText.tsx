@@ -18,6 +18,10 @@ import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import { splitContours, deriveContourMask } from "../lib/glyphContours";
 import { findDiacriticGlyphIndices } from "../lib/diacritics";
+import {
+  makeOffsetAdapter,
+  type DiacriticPlacement,
+} from "../lib/diacriticPlacement";
 import type {
   GlyphEdit,
   GlyphStretchHandle,
@@ -524,6 +528,21 @@ export const ShapedText: React.FC<Props> = ({
   const localDrawX = -glyphBounds.minX + (bw - glyphBounds.rawWidth) / 2;
   const localDrawY = -glyphBounds.minY + (bh - glyphBounds.rawHeight) / 2;
 
+  // Identity-plus-offset placements: this component's local space already
+  // *is* the glyph-run space its overlay draws in, so its adapter is a
+  // plain translation by the same offset every other overlay here uses.
+  const diacriticPlacements = useMemo<DiacriticPlacement[]>(() => {
+    const adapter = makeOffsetAdapter(bx + localDrawX, by + localDrawY);
+    return glyphHitBoxes
+      .filter((b) => diacriticGlyphIndices.has(b.glyphIndex))
+      .map((b) => ({
+        glyphIndex: b.glyphIndex,
+        key: String(b.glyphIndex),
+        box: { x: b.x, y: b.y, width: b.width, height: b.height },
+        ...adapter,
+      }));
+  }, [glyphHitBoxes, diacriticGlyphIndices, bx, by, localDrawX, localDrawY]);
+
   useEffect(() => {
     onGlyphBoxesChange?.(glyphHitBoxes);
   }, [glyphHitBoxes, onGlyphBoxesChange]);
@@ -852,12 +871,8 @@ export const ShapedText: React.FC<Props> = ({
 
       <DiacriticHoverHandles
         isSelected={isSelected}
-        glyphs={shapeData.glyphs}
-        font={shapeData.font}
-        glyphHitBoxes={glyphHitBoxes}
+        placements={diacriticPlacements}
         diacriticOverrides={diacriticOverrides}
-        offsetX={bx + localDrawX}
-        offsetY={by + localDrawY}
         fontSize={fontSize}
         onDragDiacriticOverride={onDragDiacriticOverride}
         onToggleDiacriticHidden={onToggleDiacriticHidden}
