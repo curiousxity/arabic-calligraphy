@@ -1,0 +1,19 @@
+#!/bin/sh
+# Bumps package.json's patch version so the number shown in the sidebar
+# always moves with the code. Installed via package.json's "prepare"
+# script, which points core.hooksPath at this directory.
+#
+# Deliberately skipped for merges, rebases, cherry-picks, and reverts: those
+# replay or combine existing commits, and bumping during them turns
+# package.json into a conflict on every single one.
+git_dir=$(git rev-parse --git-dir)
+
+for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply; do
+  if [ -e "$git_dir/$marker" ]; then
+    exit 0
+  fi
+done
+
+node scripts/bumpVersion.mjs --write || exit 1
+git add package.json package-lock.json 2>/dev/null
+exit 0
