@@ -337,4 +337,45 @@ html, body, #root { height: 100%; margin: 0; }
 /* ---- /STREAM-A ---- */
 
 /* ---- STREAM-D: user guide ---- */
+.guideBackdrop { position: fixed; inset: 0; z-index: 2100; background: rgba(0, 0, 0, 0.45); display: flex; justify-content: flex-end; }
+.guideDrawer { display: flex; flex-direction: column; width: min(720px, 100vw); height: 100%; box-sizing: border-box; background: var(--bg-panel-floating); border-left: 1px solid var(--border); box-shadow: -16px 0 40px rgba(0, 0, 0, 0.35); animation: guideDrawerIn 0.16s ease-out; }
+.guideDrawer--mobile { width: 100vw; }
+@keyframes guideDrawerIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .guideDrawer { animation: none; } }
+
+.guideDrawerHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 8px; border-bottom: 1px solid var(--border-soft); }
+.guideDrawerHeader > * { min-width: 0; }
+.guideDrawerTitle { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-primary); }
+.guideDrawerSearch { padding: 10px 14px; }
+
+.guideDrawerBody { flex: 1; min-height: 0; display: grid; grid-template-columns: 200px 1fr; }
+/* Grid children default to min-width:auto and would refuse to shrink, pushing
+   the body pane past the drawer's edge on a narrow window. */
+.guideDrawerBody > * { min-width: 0; }
+.guideDrawerBody--mobile { display: flex; flex-direction: column; overflow-y: auto; }
+
+.guideSectionList { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px 14px; overflow-y: auto; border-right: 1px solid var(--border-soft); }
+.guideDrawerBody--mobile .guideSectionList { flex-direction: row; flex-wrap: wrap; overflow: visible; border-right: none; border-bottom: 1px solid var(--border-soft); }
+.guideSectionListItem { text-align: left; border: none; border-radius: 7px; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 12.5px; line-height: 1.3; padding: 7px 9px; cursor: pointer; transition: background 0.12s, color 0.12s; }
+.guideSectionListItem:hover { background: var(--overlay-hover); color: var(--text-primary); }
+.guideSectionListItem--active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.guideSectionListItem--active:hover { background: var(--accent-soft-hover); color: var(--text-on-accent); }
+
+.guidePane { overflow-y: auto; padding: 4px 18px 28px; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+.guideDrawerBody--mobile .guidePane { overflow: visible; }
+.guidePaneTitle { margin: 12px 0 10px; font-family: var(--font-display); font-size: 19px; font-weight: 600; color: var(--text-primary); }
+.guidePane h4 { margin: 20px 0 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent); }
+.guidePane p { margin: 0 0 10px; }
+.guidePane ul, .guidePane ol { margin: 0 0 10px; padding-inline-start: 20px; }
+.guidePane li { margin-bottom: 6px; }
+.guidePane strong { color: var(--text-primary); font-weight: 600; }
+.guidePane em { color: var(--text-primary); font-style: italic; }
+
+.guideShortcuts { margin: 0 0 12px; }
+.guideShortcutRow { display: flex; justify-content: space-between; gap: 14px; padding: 5px 0; border-bottom: 1px solid var(--border-soft); }
+.guideShortcutRow > * { min-width: 0; }
+.guideShortcutKeys { margin: 0; color: var(--text-primary); }
+.guideShortcutDesc { margin: 0; text-align: right; color: var(--text-muted); }
+
+.guideEmpty { padding: 8px 2px; font-size: 12px; color: var(--text-muted); }
 /* ---- /STREAM-D ---- */

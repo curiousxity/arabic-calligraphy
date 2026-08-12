@@ -28,6 +28,7 @@ import {
 } from "./sidebar/FormControls";
 import { FloatingArabicKeyboard } from "./sidebar/FloatingKeyboard";
 import { ImageTraceDialog } from "./ImageTraceDialog";
+import { GuideLauncher } from "./guide/GuideLauncher";
 import {
   TrashIcon,
   CopyIcon,
@@ -551,6 +552,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       <div className="sidebarInner">
         <div className="sidebarPanel" style={{ position: "relative" }}>
+          {/* ---- STREAM-D: user guide ---- */}
+          <GuideLauncher isMobile={isMobile} />
+          {/* ---- /STREAM-D ---- */}
           {!isMobile && onToggleCollapse && (
             <button
               type="button"
