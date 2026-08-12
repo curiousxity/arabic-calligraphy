@@ -232,6 +232,11 @@ const App: React.FC = () => {
   // ---- STREAM-A: smart guides — state ----
   // ---- /STREAM-A ----
   // ---- STREAM-B: kashida auto-justify — state ----
+  // Margin used by "Fit to composition", in canvas px per side. Editor state,
+  // deliberately not on the block and not persisted.
+  const [justifyMarginPx, setJustifyMarginPx] = useState(24);
+  // One quiet line of feedback under the fit buttons — no alert, no toast.
+  const [justifyStatus, setJustifyStatus] = useState<string | null>(null);
   // ---- /STREAM-B ----
   // ---- STREAM-C: export presets — state ----
   // ---- /STREAM-C ----
@@ -2112,7 +2117,115 @@ const App: React.FC = () => {
   const streamACanvasProps: Partial<CanvasStageProps> = {};
   // ---- /STREAM-A ----
   // ---- STREAM-B: kashida auto-justify — handlers ----
-  const streamBSidebarProps: Partial<SidebarProps> = {};
+  /**
+   * Solves for the kashida dial position that stretches a block to a target
+   * width, then applies it through the existing `setBlockKashidaAmount` — that
+   * one call already carries the factor distribution, the debounced history
+   * push, and the re-render, so nothing else here mutates a block.
+   *
+   * The solving itself lives in `lib/justify.ts` (and is reached by a dynamic
+   * `import()`) because this file's import block sits outside this stream's
+   * merge anchors — see docs/superpowers/specs/PARALLEL.md.
+   */
+  const justifyBlock = useCallback(
+    async (
+      blockId: number,
+      target: { kind: "composition"; marginPx: number } | { kind: "block"; otherId: number }
+    ) => {
+      const block = blocks.find((b) => b.id === blockId);
+      // The same gate `setBlockKashidaAmount` applies — it is a no-op on these
+      // two types, so solving for them would report a fit that never lands.
+      if (!block || block.type === "image" || block.type === "textPath") return;
+
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      let targetWidth: number;
+
+      if (target.kind === "composition") {
+        // Every *other* block's bounding width, less a margin per side. The
+        // block being justified is excluded deliberately: this app has no
+        // fixed artboard (the canvas box is derived from the blocks' own
+        // extent), so including it would make the target grow with the answer.
+        const others = blocks.filter((b) => b.id !== blockId);
+        const box = others.length > 0 ? getBlocksBoundingBox(stage, others) : null;
+        if (!box) {
+          setJustifyStatus("Nothing else on the canvas to fit to.");
+          return;
+        }
+        targetWidth = box.width - 2 * target.marginPx;
+      } else {
+        const other = blocks.find((b) => b.id === target.otherId);
+        const box = other ? getBlocksBoundingBox(stage, [other]) : null;
+        if (!box) {
+          setJustifyStatus("Could not measure the other block.");
+          return;
+        }
+        targetWidth = box.width;
+      }
+
+      if (!(targetWidth > 0)) {
+        setJustifyStatus("That target is too narrow to fit to.");
+        return;
+      }
+
+      const { solveJustifyForBlock, hasKashidaEligibleHandles } = await import("./lib/justify");
+
+      const glyphEdits = block.glyphEdits ?? [];
+      if (!hasKashidaEligibleHandles(glyphEdits)) {
+        setJustifyStatus(
+          "No stretchable strokes yet — add a kashida-eligible stretch in the Morph Glyph Editor first."
+        );
+        return;
+      }
+
+      const solution = await solveJustifyForBlock({
+        text: block.text,
+        fontFamily: block.fontFamily,
+        fontSize: block.fontSize,
+        glyphEdits,
+        targetWidth,
+      });
+
+      if (!solution) {
+        setJustifyStatus("Could not shape this block's text.");
+        return;
+      }
+
+      setBlockKashidaAmount(blockId, solution.amount);
+      setJustifyStatus(
+        solution.reachable
+          ? `Fitted to ${Math.round(solution.achievedWidth)}px.`
+          : `Reached maximum stretch at ${Math.round(solution.achievedWidth)}px of ${Math.round(
+              targetWidth
+            )}px.`
+      );
+    },
+    [blocks, setBlockKashidaAmount]
+  );
+
+  const justifyOtherSelectedId =
+    selectedIds.length === 2 && selectedId != null
+      ? (selectedIds.find((id) => id !== selectedId) ?? null)
+      : null;
+
+  const streamBSidebarProps: Partial<SidebarProps> = {
+    justifyMarginPx,
+    onChangeJustifyMarginPx: (value: number) => {
+      setJustifyMarginPx(value);
+      setJustifyStatus(null);
+    },
+    justifyStatus,
+    canFitToComposition: blocks.length > 1,
+    canMatchBlock: justifyOtherSelectedId != null,
+    onFitToComposition: (blockId: number) => {
+      void justifyBlock(blockId, { kind: "composition", marginPx: justifyMarginPx });
+    },
+    onMatchBlockWidth: (blockId: number) => {
+      if (justifyOtherSelectedId == null) return;
+      void justifyBlock(blockId, { kind: "block", otherId: justifyOtherSelectedId });
+    },
+  };
   // ---- /STREAM-B ----
   // ---- STREAM-C: export presets — handlers ----
   const streamCSidebarProps: Partial<SidebarProps> = {};

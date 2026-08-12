@@ -466,6 +466,65 @@ CSS is one global stylesheet (`src/index.css`) using CSS custom properties for t
 Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default to `min-width: auto`**, which refuses to shrink below content size and causes silent overflow/clipping at narrow sidebar widths. When adding a new multi-item row (grid or flex), give items `min-width: 0` explicitly or the row will overflow at the sidebar's minimum width instead of degrading gracefully.
 
 <!-- ---- STREAM-B: kashida auto-justify — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
+
+### Kashida auto-justify (`src/lib/justify.ts`)
+
+The block-level Kashida dial described above stays exactly as it was — this
+feature only decides *which* dial value to pass it. Sidebar → Typography →
+**Fit width** offers "Fit to composition" and "Match block"; both reduce to a
+single target width, which `App.tsx`'s `justifyBlock` solves for and applies
+through the **existing** `setBlockKashidaAmount`. That one call already carries
+the factor distribution, the debounced history push, and the re-render, so no
+renderer, no type, and no other handler changes.
+
+**The trap this feature is built around: nothing else in the app knows how wide
+a *stretched* run is.** `ShapedText.tsx`'s glyph-metrics memo takes each glyph's
+box from the raw font outline and never applies `glyphEdits`, and
+`penX += advance` is deliberately untouched by stretching — so the block's
+bounds, its hit boxes, and its Konva client rect are all the *unstretched* width
+and do not move when the dial does. A solver reading any of them converges
+silently to nonsense. `measureStretchedRunWidth` therefore replays
+`ShapedText`'s *drawing* loop (pen advance, `dx`/`dy`, `fontSize / unitsPerEm`
+scale, per-contour index) and pushes every outline coordinate through
+`applyGlyphEdit` before taking the extent. That function is **imported, never
+reimplemented** — a divergence there would optimise a width the user never sees,
+and nothing would fail loudly. Glyph rigs, per-glyph transforms, diacritic
+overrides, and warp are deliberately excluded: the dial doesn't move them, so
+they are a constant offset the solver cannot see anyway.
+
+`applyKashidaAmountToEdits` duplicates `setBlockKashidaAmount`'s
+`factor = 1 + (maxFactor - 1) * (amount/100) * (priority/10)` formula, because
+the solver has to evaluate dozens of candidate dial positions without touching
+state. **The two must stay in step**; if they diverge the solver reports a width
+that applying its own answer would not produce.
+
+`solveKashidaAmount` bisects `[0, 100]` (width is monotonically non-decreasing
+in the dial, which is what makes that safe), default tolerance 0.5px. Both ends
+are special-cased rather than bisected into: already wide enough at 0 returns 0,
+so a fit never *adds* stretch that wasn't asked for; still short at 100 returns
+`{ amount: 100, reachable: false }` and the sidebar reports the shortfall in one
+quiet line rather than throwing or doing nothing.
+
+**"Fit to composition" targets the other blocks, not an artboard.** This app has
+no fixed artboard — `CanvasStage` derives its content box from the blocks' own
+bounding box — so "fit to the canvas" is circular: widening the block widens the
+canvas. The target is `getBlocksBoundingBox` over every block *except* the one
+being justified, less the margin per side (editor state in `App.tsx`, not on the
+block, not persisted). "Match block" needs exactly two selected blocks and uses
+the other one's client rect.
+
+`App.tsx` reaches `lib/justify.ts` through a dynamic `import()`, and `justify.ts`
+reaches `shapeText`/`FONT_URLS` the same way. That is not stylistic: a static
+`harfbuzzjs` import in this module's graph throws under Vitest's Node ESM loader
+the moment `justify.test.ts` evaluates it — the same constraint that keeps
+`diacritics.ts` harfbuzz-free, and what lets `justify.test.ts` shape real text
+with real harfbuzzjs against real fonts instead of hand-written glyph fixtures.
+
+Gated to the block types `setBlockKashidaAmount` already accepts (everything but
+`image` and `textPath`). Note that `measureStretchedRunWidth` measures the
+straight shaped run, so on Shape Fill / Shape Warp blocks it is the *underlying
+run's* ink width, which those renderers then tile or warp — the fit is exact
+only for plain text blocks.
 <!-- ---- /STREAM-B ---- -->
 
 ### Undo/redo and grouping
