@@ -701,19 +701,23 @@ git commit -m "Generalise DiacriticHoverHandles to coordinate-space placements"
 
 ---
 
-### Task 4: Move state onto `BlockCommon` and wire the UI
+### Task 4: Wire the state and support both shape renderers
 
-No rendering yet — this task makes the state reachable, so after it the "Diacritic tool" checkbox toggles and persists but nothing new draws.
+This is one task in three parts. The state wiring (Part A) adds props that only Parts B and C declare, so splitting them would produce a commit that does not typecheck — which the Global Constraints forbid. Implement all three parts, then verify and commit once.
 
 **Files:**
 - Modify: `src/types.ts:150-167`
 - Modify: `src/App.tsx:2101-2106`
 - Modify: `src/components/Sidebar.tsx:1280` (Shape Fill panel), `:1591` (reset gate), plus prop type/destructure
 - Modify: `src/components/CanvasStage.tsx:613-707`
+- Modify: `src/components/ShapeWarpText.tsx`
+- Modify: `src/components/ShapeFillText.tsx`
 
 **Interfaces:**
-- Consumes: nothing from earlier tasks.
-- Produces: `diacriticOverrides` readable on every block type; `diacriticEditMode?: boolean` on `ShapeFillBlock`; `onToggleDiacriticEditMode?: () => void` on `SidebarProps`; `diacriticOverrides` / `onDragDiacriticOverride` / `onToggleDiacriticHidden` props passed to `ShapeFillText` and `ShapeWarpText`, plus `isSelected` and `diacriticEditMode` on those two components. Tasks 5 and 6 declare the matching props on the components themselves.
+- Consumes: `applyShapeWarpPoint` / `invertShapeWarpPoint` (Task 1); `makeShapeFillInstanceAdapter` / `DiacriticPlacement` (Task 2); `DiacriticHoverHandlesProps` (Task 3).
+- Produces: nothing later tasks depend on in code — Task 5 only verifies and documents.
+
+#### Part A — state and UI wiring
 
 - [ ] **Step 1: Move the field in `types.ts`**
 
@@ -818,35 +822,13 @@ onDragDiacriticOverride={(glyphIndex, patch) =>
 onToggleDiacriticHidden={(glyphIndex) => onToggleDiacriticHidden(block.id, glyphIndex)}
 ```
 
-`ShapeWarpText` currently has **no** `isSelected` prop at all (`commonProps` does not supply one), so this genuinely is new for that component — Task 5 declares it.
+`ShapeWarpText` currently has **no** `isSelected` prop at all (`commonProps` does not supply one), so this genuinely is new for that component — Part B declares it.
 
-- [ ] **Step 5: Verify**
+At this point `tsc` will report unknown props on both components. That is expected mid-task; Parts B and C close it. Do not commit here.
 
-`tsc` will now fail on the four/five unknown props for `ShapeFillText` and `ShapeWarpText` — that is expected and is resolved by Tasks 5 and 6. Verify only what can pass now:
+#### Part B — Shape Warp
 
-```bash
-npm run lint && npm test
-```
-
-Expected: clean. Commit with the type errors outstanding, since Tasks 5 and 6 close them:
-
-```bash
-git add src/types.ts src/App.tsx src/components/Sidebar.tsx src/components/CanvasStage.tsx
-git commit -m "Move diacriticOverrides to BlockCommon and wire shape-block diacritic UI"
-```
-
----
-
-### Task 5: Shape Warp — apply overrides and mount the overlay
-
-**Files:**
-- Modify: `src/components/ShapeWarpText.tsx`
-
-**Interfaces:**
-- Consumes: `applyShapeWarpPoint` / `invertShapeWarpPoint` (Task 1), `DiacriticPlacement` (Task 2), `DiacriticHoverHandles` props (Task 3), `CanvasStage` props (Task 4).
-- Produces: nothing later tasks depend on.
-
-- [ ] **Step 1: Add the props**
+- [ ] **Step 5: Add the props**
 
 Add to `ShapeWarpTextProps`:
 
@@ -870,7 +852,7 @@ import type { DiacriticOverride } from "../types";
 
 Add `DiacriticOverride` to the existing `../types` import rather than a second import statement if lint prefers that.
 
-- [ ] **Step 2: Filter overrides to real diacritics**
+- [ ] **Step 6: Filter overrides to real diacritics**
 
 After the `hitBoxes` memo (line 384–397), add — mirroring what `ShapedText.tsx:387-398` already does, so a stale override whose index now lands on a base letter is ignored instead of hiding or ballooning that letter:
 
@@ -886,7 +868,7 @@ const activeDiacriticOverrides = useMemo(
 );
 ```
 
-- [ ] **Step 3: Apply overrides in the draw pass**
+- [ ] **Step 7: Apply overrides in the draw pass**
 
 Inside `sceneFunc`'s glyph loop, right after `const edit = glyphEdits.find(...)` and before `const gx = ...`, add:
 
@@ -929,7 +911,7 @@ const warpPoint = (cx: number, cy: number) => {
 };
 ```
 
-- [ ] **Step 4: Build placements and mount the overlay**
+- [ ] **Step 8: Build placements and mount the overlay**
 
 After the `invertToRawPoint` helper (line 446–456), add:
 
@@ -981,31 +963,9 @@ Mount the overlay as the last child of the outer `<Group>`, after the drawing `<
 />
 ```
 
-- [ ] **Step 5: Verify and commit**
+#### Part C — Shape Fill
 
-```bash
-npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build
-```
-
-Expected: the `ShapeWarpText` prop errors from Task 4 are now gone; `ShapeFillText`'s remain until Task 6.
-
-```bash
-git add src/components/ShapeWarpText.tsx
-git commit -m "Support diacritic hover handles on Shape Warp blocks"
-```
-
----
-
-### Task 6: Shape Fill — apply overrides, gate on the tool, mount the overlay
-
-**Files:**
-- Modify: `src/components/ShapeFillText.tsx`
-
-**Interfaces:**
-- Consumes: `makeShapeFillInstanceAdapter` / `DiacriticPlacement` (Task 2), `DiacriticHoverHandles` props (Task 3), `CanvasStage` props and `diacriticEditMode` (Task 4).
-- Produces: nothing later tasks depend on.
-
-- [ ] **Step 1: Add the props**
+- [ ] **Step 9: Add the props**
 
 Add to `ShapeFillTextProps`:
 
@@ -1016,9 +976,9 @@ Add to `ShapeFillTextProps`:
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
 ```
 
-Destructure with defaults `diacriticEditMode = false`, `diacriticOverrides = []`. Add the same four imports Task 5 Step 1 lists, plus `makeShapeFillInstanceAdapter`.
+Destructure with defaults `diacriticEditMode = false`, `diacriticOverrides = []`. Add the same four imports Part B Step 5 lists, plus `makeShapeFillInstanceAdapter`.
 
-- [ ] **Step 2: Widen the two `glyphEditTool` gates**
+- [ ] **Step 10: Widen the two `glyphEditTool` gates**
 
 `glyphInstances` (line 343) currently starts `if (!glyphEditTool) return [];`. Change to:
 
@@ -1036,7 +996,7 @@ dragBoundFunc={glyphEditTool != null || diacriticEditMode ? () => ({ x, y }) : u
 
 so dragging a mark's handle cannot drag the whole block with it. Leave `onDragMove`/`onDragEnd`'s `glyphEditTool == null` guards and the `onClick` glyph-picking logic alone — those are the Stretch tool's, and the diacritic handles stop their own events with `cancelBubble`.
 
-- [ ] **Step 3: Filter overrides to real diacritics**
+- [ ] **Step 11: Filter overrides to real diacritics**
 
 After the `glyphLocalBoxes` memo (line 304–329), add:
 
@@ -1052,7 +1012,7 @@ const activeDiacriticOverrides = useMemo(
 );
 ```
 
-- [ ] **Step 4: Apply overrides in `drawGlyphRow`**
+- [ ] **Step 12: Apply overrides in `drawGlyphRow`**
 
 Inside `drawGlyphRow`'s glyph loop, right after `if (!g.obj || g.commands.length === 0) continue;`, add:
 
@@ -1078,7 +1038,7 @@ if (diacriticOverride) {
 
 Note `fauxBoldWidth` and `strokeWidth` are divided by `scX` further down that block; leave them as they are — the extra diacritic scale makes those stroke widths approximate on an overridden mark only, which is not worth complicating the expression for.
 
-- [ ] **Step 5: Build placements and mount the overlay**
+- [ ] **Step 13: Build placements and mount the overlay**
 
 After the `glyphInstances` memo, add:
 
@@ -1132,22 +1092,22 @@ Mount the overlay **after** the drawing `<Shape>` (closes line 563) and **before
 />
 ```
 
-- [ ] **Step 6: Verify and commit**
+- [ ] **Step 14: Verify and commit**
 
 ```bash
 npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build
 ```
 
-Expected: fully clean — all Task 4 prop errors are now resolved.
+Expected: fully clean. All three parts land in one commit, so no intermediate commit is left un-typechecked.
 
 ```bash
-git add src/components/ShapeFillText.tsx
-git commit -m "Support diacritic hover handles on Shape Fill blocks"
+git add src/types.ts src/App.tsx src/components/Sidebar.tsx src/components/CanvasStage.tsx src/components/ShapeWarpText.tsx src/components/ShapeFillText.tsx
+git commit -m "Support diacritic hover handles on Shape Fill and Shape Warp blocks"
 ```
 
 ---
 
-### Task 7: Browser verification and documentation
+### Task 5: Browser verification and documentation
 
 The overlay components have no unit tests — jsdom cannot drive Konva hit-testing, the same reason `imageTrace.ts`'s canvas work is untested. This task is where the feature is actually proven to work.
 
@@ -1243,24 +1203,24 @@ git commit -m "Document diacritic handles on shape blocks; drop from deferred li
 | Spec section | Task |
 |---|---|
 | Overlay contract (`DiacriticPlacement`, rail change) | 2, 3 |
-| Adapters table (text / warp / fill) | 2 (fill, text), 5 (warp) |
-| Render-time application, `hidden` keeps advance | 5, 6 |
-| Mount points and Konva ordering | 3, 5, 6 |
-| Text-space offset semantics | 5, 6 |
-| Known order asymmetry vs `ShapedText` | 5 (code comment), 7 (CLAUDE.md) |
-| Arming: warp on selection, fill on checkbox | 4, 6 |
-| `glyphInstances` guard + `dragBoundFunc` pin | 6 Step 2 |
-| `types.ts` / `App.tsx` / `Sidebar.tsx` / `CanvasStage.tsx` | 4 |
+| Adapters table (text / warp / fill) | 2 (fill, text), 4 Part B (warp) |
+| Render-time application, `hidden` keeps advance | 4 Parts B and C |
+| Mount points and Konva ordering | 3, 4 |
+| Text-space offset semantics | 4 |
+| Known order asymmetry vs `ShapedText` | 4 (code comment), 5 (CLAUDE.md) |
+| Arming: warp on selection, fill on checkbox | 4 Parts A and C |
+| `glyphInstances` guard + `dragBoundFunc` pin | 4 Step 10 |
+| `types.ts` / `App.tsx` / `Sidebar.tsx` / `CanvasStage.tsx` | 4 Part A |
 | Non-finite `toLocal` drops the placement | 3 |
 | Near-zero divisor guards | 2 (`safeDivisor`) |
-| No shape path → zero placements | 6 (`glyphInstances` returns `[]`) |
-| Stale overrides filtered per render | 5, 6 |
+| No shape path → zero placements | 4 (`glyphInstances` returns `[]`) |
+| Stale overrides filtered per render | 4 Parts B and C |
 | `diacriticPlacement.ts` round-trip tests | 2 |
 | `invertShapeWarpPoint` round-trip tests | 1 |
-| Browser verification | 7 |
+| Browser verification | 5 |
 
 No gaps.
 
-**Type consistency:** `DiacriticPlacement`, `PlacementAdapter`, `makeOffsetAdapter`, `makeShapeFillInstanceAdapter`, `applyShapeWarpPoint`, `invertShapeWarpPoint`, `findDiacriticGlyphIndices`, `projectOntoAxis`, and the `DiacriticHoverHandlesProps` field names are used identically across Tasks 1–6.
+**Type consistency:** `DiacriticPlacement`, `PlacementAdapter`, `makeOffsetAdapter`, `makeShapeFillInstanceAdapter`, `applyShapeWarpPoint`, `invertShapeWarpPoint`, `findDiacriticGlyphIndices`, `projectOntoAxis`, and the `DiacriticHoverHandlesProps` field names are used identically across Tasks 1–4.
 
-**Known cross-task compile gap:** Task 4 deliberately commits with `tsc` failing on props that Tasks 5 and 6 declare. This is called out in Task 4 Step 5 with the reduced verification command for that task only. If a reviewer requires every commit to typecheck, merge Tasks 4–6 into one.
+**Commit integrity:** every task commits only after the full verification loop passes, so no commit on the branch fails to typecheck. Task 4 is deliberately larger than the others for exactly this reason — its three parts are mutually dependent at the type level.
