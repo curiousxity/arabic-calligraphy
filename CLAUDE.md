@@ -138,12 +138,53 @@ overlay in this app. Live handle drags follow the same debounced-history
 pattern (`useDebouncedHistoryPush`) the Kashida tool already established;
 the hide-button click is a discrete, immediate `pushHistory()` mutation.
 
-This feature is `ShapedText.tsx`-only for v1 — Shape Fill (tiled rows),
-Shape Warp (bounding-envelope remap), and any curve-following text put a
-diacritic's on-screen position through additional transforms beyond
-`ShapedText.tsx`'s simple pen-advance layout, and correctly locating a
-hover-handle in each of those coordinate spaces is real, separate design
-work, deliberately left for a future spec rather than half-supported here.
+This feature covers plain text, Shape Fill, and Shape Warp blocks.
+`DiacriticHoverHandles.tsx` takes a list of `DiacriticPlacement`s
+(`src/lib/diacriticPlacement.ts`) rather than raw hit boxes — each carries
+the mark's box in its renderer's own local space plus a matched
+`toCanvas`/`toLocal` pair, so all of the overlay's arithmetic (hover, the
+drag rail, the hit rect, the three handles) stays in local space and only
+drawing and drag-readback cross into canvas space. `ShapedText`'s adapter
+is a plain translation; `ShapeWarpText`'s is
+`applyShapeWarpPoint`/`invertShapeWarpPoint` (moved to
+`src/lib/shapeWarpPoint.ts` to be testable — the inverse is Newton's
+method, since none of the four warp modes has a closed-form inverse);
+`ShapeFillText`'s is the per-tile affine transform, which deliberately
+ignores the italic shear.
+
+`invertShapeWarpPoint`'s Newton search is seeded through the inverse of the
+base (unwarped) affine map, **not** at `(targetX, targetY)`. The target is
+in shape space while the solver's unknowns are in glyph-run space, and
+those ranges routinely differ in scale; seeding at the target lands outside
+the glyph-bounds box, `clamp01` saturates, the Jacobian's y-column comes
+out exactly zero, and the singular-determinant guard bails on iteration 0 —
+returning the untouched seed. All four modes failed to invert at all before
+this was fixed, so the seed is load-bearing, not a micro-optimisation;
+`shapeWarpPoint.test.ts` pins it with a per-mode scale-mismatch case.
+
+Two behaviours differ per block type, both deliberate. **Order:**
+`ShapedText` applies an override *after* its own `warpX`/`warpY` (it is a
+`ctx` transform wrapping already-warped point math), while Shape Fill and
+Shape Warp apply it *before* their deformation — those deformations are
+the entire point of those block types, and an override applied after would
+detach the mark from its letter. **Arming:** Shape Warp shows handles on
+selection like plain text, but Shape Fill requires an explicit "Diacritic
+tool" checkbox (`diacriticEditMode` on `ShapeFillBlock`), because a fill
+tiles its run across the whole silhouette and two marks can become 200+
+instances — that checkbox also widens `glyphInstances`'s memo guard and
+the block's `dragBoundFunc` pin, both of which were previously
+`glyphEditTool`-only. Because overrides are keyed by glyph index, one
+adjustment applies to every tiled repetition, exactly as `glyphEdits`
+already does there.
+
+`App.tsx`'s `dragDiacriticOverride`/`toggleDiacriticHidden` gate on
+`supportsDiacriticOverrides(b)` rather than `b.type === "text"`. Widening
+that guard is what actually makes the feature work on the two shape types —
+`diacriticOverrides` lives on `BlockCommon`, so a narrower guard type-checks
+perfectly while silently discarding every edit.
+
+Text-on-path blocks remain unsupported — their glyphs are rotated to a
+curve tangent, which is separate design work.
 
 ### Stroke-schema-driven glyph editor (`src/lib/strokeSchema/`, `MorphGlyphEditor.tsx`)
 
@@ -308,8 +349,6 @@ full design and the SQL migration under `supabase/migrations/`.
 ## Deferred features
 
 These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
-
-- **Diacritic hover handles on Shape Fill and Shape Warp blocks** — Currently implemented for plain text blocks only. Shape Fill's tiled-row and Shape Warp's bounding-envelope coordinate transformations place a diacritic's on-screen position through additional transforms beyond plain text's pen-advance layout. Correctly locating a hover-handle in each of those coordinate spaces is real, separate design work.
 
 - **Stretch tool and glyph-edit handles on text-on-path blocks** — The axis-derivation and per-glyph drag mathematics assume glyphs sit in a straight bounding box. Making them work once glyphs are rotated to follow a curve's tangent is a real design problem, not a trivial extension of the existing system.
 

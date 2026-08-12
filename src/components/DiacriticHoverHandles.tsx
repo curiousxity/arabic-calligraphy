@@ -124,6 +124,7 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
         return (
           <Group key={placement.key}>
             <Rect
+              name="diacritic-hit"
               x={Math.min(...xs)}
               y={Math.min(...ys)}
               width={Math.max(...xs) - Math.min(...xs)}
