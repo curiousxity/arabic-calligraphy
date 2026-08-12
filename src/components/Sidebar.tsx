@@ -146,6 +146,8 @@ export type SidebarProps = {
   // Every stream's props are optional, so this component still typechecks in a
   // worktree where the other three streams' props do not exist yet.
   // ---- STREAM-A: smart guides ----
+  snapToBlockEdges?: boolean;
+  onToggleSnapToBlockEdges?: (checked: boolean) => void;
   // ---- /STREAM-A ----
   // ---- STREAM-B: kashida auto-justify ----
   // ---- /STREAM-B ----
@@ -304,6 +306,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onGroupSelected,
   // Parallel-stream destructuring — match your declarations above.
   // ---- STREAM-A: smart guides ----
+  snapToBlockEdges,
+  onToggleSnapToBlockEdges,
   // ---- /STREAM-A ----
   // ---- STREAM-B: kashida auto-justify ----
   // ---- /STREAM-B ----
@@ -690,6 +694,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   checked={snapToGrid}
                   onChange={onToggleSnap}
                 />
+
+                {/* ---- STREAM-A: smart guides ---- */}
+                <CheckboxRow
+                  id="snap-to-block-edges"
+                  label="Snap to block edges"
+                  checked={snapToBlockEdges ?? true}
+                  onChange={(checked) => onToggleSnapToBlockEdges?.(checked)}
+                />
+                {/* ---- /STREAM-A ---- */}
 
                 <CheckboxRow
                   id="show-rulers"

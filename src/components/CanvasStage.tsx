@@ -19,6 +19,13 @@ import {
   ZOOM_STEP,
   DEFAULT_EMPTY_BOUNDS,
 } from "../lib/canvasBounds";
+import {
+  buildSnapTargets,
+  computeSnap,
+  type Rect as SnapRect,
+  type SnapLine,
+  type SnapTarget,
+} from "../lib/snapping";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import type { Block, GlyphStretchHandle, GlyphRig, DiacriticOverride, GlyphTransform } from "../types";
 
@@ -113,6 +120,12 @@ export type CanvasStageProps = {
   onRemoveGuide: (axis: "horizontal" | "vertical", index: number) => void;
   /** A new block awaiting placement — follows the cursor until the user clicks to drop it (see App.tsx's pendingPlacement). */
   ghostBlock?: { x: number; y: number; width: number; height: number; label: string } | null;
+  /**
+   * Snap a dragged block's visible bounds — its edges and centres — to the
+   * other blocks and the artboard, not only its origin. Defaults to on;
+   * turning it off restores origin-only snapping exactly.
+   */
+  snapToBlockEdges?: boolean;
 };
 
 const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
@@ -157,13 +170,17 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onMoveGuide,
   onRemoveGuide,
   ghostBlock,
+  snapToBlockEdges = true,
 }) => {
   const snapCoord = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
-  const [snapGuides, setSnapGuides] = useState<{ x: number | null; y: number | null }>({
-    x: null,
-    y: null,
-  });
+  const [snapGuides, setSnapGuides] = useState<SnapLine[]>([]);
+  /**
+   * Bounds targets, captured once per drag. `getClientRect` walks a block's
+   * whole subtree, so rebuilding these every frame visibly stutters a busy
+   * canvas at 60fps.
+   */
+  const snapTargetsRef = useRef<SnapTarget[]>([]);
 
   const [spacePan, setSpacePan] = useState(false);
   const effectivePanMode = panMode || spacePan;
@@ -233,6 +250,35 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     return best;
   };
 
+  /**
+   * The bounds of every block a drag can snap against, measured once as the
+   * drag begins. The dragged block and everything that moves with it are
+   * excluded — a block cannot align to itself.
+   */
+  const makeDragStartHandler =
+    (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
+      snapTargetsRef.current = [];
+      if (block.locked || effectivePanMode || !snapToBlockEdges) return;
+      const stage = e.target.getStage();
+      if (!stage) return;
+
+      const moving = new Set([block.id, ...getCoMovers(block).map((b) => b.id)]);
+      const others: SnapRect[] = [];
+      for (const other of blocks) {
+        if (moving.has(other.id)) continue;
+        const node = stage.findOne(`#block-${other.id}`);
+        if (!node) continue;
+        others.push(node.getClientRect({ relativeTo: stage }));
+      }
+      snapTargetsRef.current = buildSnapTargets(others, contentBox, guides);
+    };
+
+  /** A full-extent line, as origin-to-origin snapping has always drawn. */
+  const originLine = (axis: "x" | "y", position: number): SnapLine =>
+    axis === "x"
+      ? { axis, position, from: contentBox.y, to: contentBox.y + contentBox.height }
+      : { axis, position, from: contentBox.x, to: contentBox.x + contentBox.width };
+
   const makeDragMoveHandler =
     (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
       if (block.locked || effectivePanMode) return;
@@ -250,16 +296,46 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       const snappedX = findNearest(x, xTargets, threshold);
       const snappedY = findNearest(y, yTargets, threshold);
 
-      const finalX = snappedX ?? x;
-      const finalY = snappedY ?? y;
+      // Bounds snapping runs alongside the origin snapping above rather than
+      // replacing it. The dragged rect and the node's position differ by a
+      // constant offset for the length of a drag, so applying the rect's delta
+      // to the position is exact — no need to model each block type's own
+      // origin-to-bounds relationship.
+      const stage = e.target.getStage();
+      const draggedRect =
+        snapToBlockEdges && stage
+          ? e.target.getClientRect({ relativeTo: stage })
+          : null;
+      const rectSnap = draggedRect
+        ? computeSnap(draggedRect, snapTargetsRef.current, threshold)
+        : { dx: 0, dy: 0, lines: [] as SnapLine[] };
+
+      const lines: SnapLine[] = [];
+      const resolve = (axis: "x" | "y", value: number, origin: number | null) => {
+        const rectLine = rectSnap.lines.find((l) => l.axis === axis) ?? null;
+        const rectDelta = axis === "x" ? rectSnap.dx : rectSnap.dy;
+        // The nearer pull wins the axis; a bounds match ties in its own favour,
+        // being the more visually meaningful of the two.
+        if (rectLine && (origin === null || Math.abs(rectDelta) <= Math.abs(origin - value))) {
+          lines.push(rectLine);
+          return value + rectDelta;
+        }
+        if (origin !== null) {
+          lines.push(originLine(axis, origin));
+          return origin;
+        }
+        return value;
+      };
+
+      const finalX = resolve("x", x, snappedX);
+      const finalY = resolve("y", y, snappedY);
       e.target.position({ x: finalX, y: finalY });
-      setSnapGuides({ x: snappedX, y: snappedY });
+      setSnapGuides(lines);
 
       const coMovers = getCoMovers(block);
       if (coMovers.length > 0) {
         const deltaX = finalX - block.x;
         const deltaY = finalY - block.y;
-        const stage = e.target.getStage();
         if (stage) {
           for (const other of coMovers) {
             const node = stage.findOne(`#block-${other.id}`);
@@ -410,7 +486,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
   const makeDragEndHandler =
     (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
-      setSnapGuides({ x: null, y: null });
+      setSnapGuides([]);
+      snapTargetsRef.current = [];
       if (block.locked || effectivePanMode) return;
       let { x, y } = e.target.position();
       if (snapToGrid) {
@@ -596,12 +673,14 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             {blocks.map((block) => {
               const onDragEnd = makeDragEndHandler(block);
               const onDragMove = makeDragMoveHandler(block);
+              const onDragStart = makeDragStartHandler(block);
               const commonProps = {
                 id: `block-${block.id}`,
                 draggable: !block.locked && !effectivePanMode,
                 onClick: () => onSelectBlock(block.id, additiveSelectRef.current),
                 onTap: () => onSelectBlock(block.id),
                 onDblClick: () => onEditBlock(block.id),
+                onDragStart,
                 onDragMove,
                 onDragEnd,
               };
@@ -883,24 +962,20 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
               />
             ))}
 
-            {snapGuides.x != null && (
+            {snapGuides.map((line) => (
               <Line
-                points={[snapGuides.x, -100000, snapGuides.x, 100000]}
+                key={`${line.axis}-${line.position}`}
+                points={
+                  line.axis === "x"
+                    ? [line.position, line.from, line.position, line.to]
+                    : [line.from, line.position, line.to, line.position]
+                }
                 stroke="#ff2d78"
                 strokeWidth={1 / stageScale}
                 dash={[4 / stageScale, 3 / stageScale]}
                 listening={false}
               />
-            )}
-            {snapGuides.y != null && (
-              <Line
-                points={[-100000, snapGuides.y, 100000, snapGuides.y]}
-                stroke="#ff2d78"
-                strokeWidth={1 / stageScale}
-                dash={[4 / stageScale, 3 / stageScale]}
-                listening={false}
-              />
-            )}
+            ))}
 
             {ghostBlock && (
               <Group

@@ -230,6 +230,9 @@ const App: React.FC = () => {
   // Each stream adds its state only between its own anchors, so four
   // independent branches merge into this file without overlapping hunks.
   // ---- STREAM-A: smart guides — state ----
+  // Snap a dragged block's visible edges and centres, not just its origin.
+  // Session-only, like the grid toggle beside it — deliberately not persisted.
+  const [snapToBlockEdges, setSnapToBlockEdges] = useState(true);
   // ---- /STREAM-A ----
   // ---- STREAM-B: kashida auto-justify — state ----
   // ---- /STREAM-B ----
@@ -2108,8 +2111,11 @@ const App: React.FC = () => {
   // the shared JSX at all — the props lists are hundreds of lines of adjacent
   // single-line attributes, which is precisely the shape that does not merge.
   // ---- STREAM-A: smart guides — handlers ----
-  const streamASidebarProps: Partial<SidebarProps> = {};
-  const streamACanvasProps: Partial<CanvasStageProps> = {};
+  const streamASidebarProps: Partial<SidebarProps> = {
+    snapToBlockEdges,
+    onToggleSnapToBlockEdges: setSnapToBlockEdges,
+  };
+  const streamACanvasProps: Partial<CanvasStageProps> = { snapToBlockEdges };
   // ---- /STREAM-A ----
   // ---- STREAM-B: kashida auto-justify — handlers ----
   const streamBSidebarProps: Partial<SidebarProps> = {};
