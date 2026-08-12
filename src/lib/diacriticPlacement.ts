@@ -44,6 +44,47 @@ export function makeOffsetAdapter(offsetX: number, offsetY: number): PlacementAd
 }
 
 /**
+ * A plain-text glyph that also carries a per-glyph move/scale
+ * (`GlyphTransform`), for the diacritic overlay mounted on top of it.
+ *
+ * `ShapedText` draws such a glyph as `translate(pivot) → translate(offset)
+ * → scale → [diacritic override] → outline`, so the mark's own override
+ * lives *inside* the glyph transform. Expressing that transform as the
+ * placement's adapter is what keeps the override in the glyph's own
+ * pre-transform space: a drag read back through `toLocal` yields an
+ * `offsetY` in text units, unaffected by how much the glyph itself has
+ * been scaled.
+ *
+ * `makeOffsetAdapter` remains the right adapter for the overwhelmingly
+ * common case of a glyph with no transform — this one reduces to exactly
+ * that when the transform is the identity.
+ */
+export function makeGlyphTransformAdapter(p: {
+  offsetX: number;
+  offsetY: number;
+  pivotX: number;
+  pivotY: number;
+  transformOffsetX: number;
+  transformOffsetY: number;
+  scaleX: number;
+  scaleY: number;
+}): PlacementAdapter {
+  const sx = safeDivisor(p.scaleX);
+  const sy = safeDivisor(p.scaleY);
+
+  return {
+    toCanvas: (x, y) => ({
+      x: p.pivotX + p.transformOffsetX + (x - p.pivotX) * sx + p.offsetX,
+      y: p.pivotY + p.transformOffsetY + (y - p.pivotY) * sy + p.offsetY,
+    }),
+    toLocal: (x, y) => ({
+      x: p.pivotX + (x - p.offsetX - p.pivotX - p.transformOffsetX) / sx,
+      y: p.pivotY + (y - p.offsetY - p.pivotY - p.transformOffsetY) / sy,
+    }),
+  };
+}
+
+/**
  * One tiled repetition of one glyph in a Shape Fill block.
  *
  * Mirrors `ShapeFillText`'s own draw transform exactly: the tile loop does

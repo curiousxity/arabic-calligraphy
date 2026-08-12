@@ -4,6 +4,7 @@ import {
   GLYPH_SCALE_MIN,
   resolveGlyphTransform,
   scaleFromDrag,
+  scaleFromHandleDrag,
   transformedBox,
 } from "./glyphTransform";
 
@@ -37,6 +38,19 @@ describe("resolveGlyphTransform", () => {
     expect(r.scaleX).toBe(GLYPH_SCALE_MAX);
     expect(r.scaleY).toBe(GLYPH_SCALE_MIN);
   });
+
+  it("falls back to 1 for a non-finite stored scale rather than propagating NaN", () => {
+    // Reachable only from a hand-edited or corrupted project file, but the
+    // fallback has to be the identity: NaN would make the glyph vanish and
+    // leave no handle to grab and fix it with.
+    const r = resolveGlyphTransform({
+      glyphIndex: 0,
+      scaleX: Number.NaN,
+      scaleY: Number.POSITIVE_INFINITY,
+    });
+    expect(r.scaleX).toBe(1);
+    expect(r.scaleY).toBe(1);
+  });
 });
 
 describe("scaleFromDrag", () => {
@@ -62,6 +76,53 @@ describe("scaleFromDrag", () => {
 
   it("treats a drag past the pivot as a shrink, not a negative scale", () => {
     expect(scaleFromDrag(40, -30)).toBe(GLYPH_SCALE_MIN);
+  });
+});
+
+describe("scaleFromHandleDrag", () => {
+  // A glyph whose edge sits 50 units from the pivot, with the dot resting
+  // 10 units beyond it — so at scale 1 the dot is at 60.
+  const EXTENT = 50;
+  const GAP = 10;
+  const restAt = (scale: number) => EXTENT * scale + GAP;
+
+  it("returns the starting scale when the pointer has not moved", () => {
+    for (const s of [1, 0.5, 1.8, 3]) {
+      expect(scaleFromHandleDrag(restAt(s), restAt(s), GAP, s)).toBeCloseTo(s, 6);
+    }
+  });
+
+  it("keeps the dot exactly `gap` beyond the glyph edge throughout a drag", () => {
+    // Dragging the dot to where scale 2 would rest must read back as 2,
+    // from any starting scale — this is the property the old
+    // startDistance/startScale rest distance violated.
+    for (const startScale of [1, 0.5, 1.8, 3]) {
+      const target = restAt(2);
+      expect(
+        scaleFromHandleDrag(restAt(startScale), target, GAP, startScale)
+      ).toBeCloseTo(2, 6);
+    }
+  });
+
+  it("reads a drag toward the pivot as a shrink", () => {
+    expect(scaleFromHandleDrag(restAt(1), restAt(0.5), GAP, 1)).toBeCloseTo(0.5, 6);
+  });
+
+  it("clamps rather than inverting when dragged past the pivot", () => {
+    expect(scaleFromHandleDrag(restAt(1), -80, GAP, 1)).toBe(GLYPH_SCALE_MIN);
+  });
+
+  it("stays finite when the glyph has no extent to measure", () => {
+    // A bare combining mark can collapse to a zero-width box, putting the
+    // dot exactly at the gap.
+    const s = scaleFromHandleDrag(GAP, 40, GAP, 1);
+    expect(Number.isFinite(s)).toBe(true);
+    expect(s).toBe(GLYPH_SCALE_MAX);
+  });
+
+  it("stays finite at a degenerate zero starting scale", () => {
+    const s = scaleFromHandleDrag(restAt(1), restAt(1), GAP, 0);
+    expect(Number.isFinite(s)).toBe(true);
   });
 });
 

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Group, Circle, Rect } from "react-konva";
 import { projectOntoAxis } from "../lib/strokeSchema/dragAxis";
-import { scaleFromDrag } from "../lib/glyphTransform";
+import { scaleFromHandleDrag } from "../lib/glyphTransform";
 import type { GlyphHitBox } from "./ShapedText";
 import type { GlyphTransform } from "../types";
 
@@ -60,7 +60,7 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
   // props during onDragMove would compound each frame's scale onto the
   // previous one and run away exponentially.
   //
-  // `restDistanceX`/`restDistanceY`/`pivotX`/`pivotY` are likewise
+  // `startDistanceX`/`startDistanceY`/`pivotX`/`pivotY` are likewise
   // snapshotted here rather than recomputed from the live `box` on every
   // move: `glyphHitBoxes` is memoized on `glyphTransforms`, so each
   // `onUpdateGlyphTransform` call re-renders a new, already-scaled box.
@@ -76,8 +76,8 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
     offsetY: number;
     pointerX: number;
     pointerY: number;
-    restDistanceX: number;
-    restDistanceY: number;
+    startDistanceX: number;
+    startDistanceY: number;
     pivotX: number;
     pivotY: number;
   } | null>(null);
@@ -125,13 +125,13 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
             offsetY: transform?.offsetY ?? 0,
             pointerX: pointer.x,
             pointerY: pointer.y,
-            // Rest distance is measured at scale 1, so divide the dot's
-            // current (already-scaled) distance from the pivot by the
-            // scale it was drawn at. Snapshotted once here — see the
-            // dragStartRef comment above for why this must not be
-            // recomputed from the live box on every move.
-            restDistanceX: (scaleXAt.x - pivotX) / (scaleX || 1),
-            restDistanceY: (scaleYAt.y - pivotY) / (scaleY || 1),
+            // Where each dot sits right now, relative to the pivot.
+            // `scaleFromHandleDrag` recovers the glyph's unscaled extent
+            // from this plus the scale it was drawn at. Snapshotted once
+            // here — see the dragStartRef comment above for why this must
+            // not be recomputed from the live box on every move.
+            startDistanceX: scaleXAt.x - pivotX,
+            startDistanceY: scaleYAt.y - pivotY,
             pivotX,
             pivotY,
           };
@@ -240,7 +240,12 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
                     // box — see the dragStartRef comment above.
                     const dragDistance = pos.x - (start.pivotX + offsetX);
                     onUpdateGlyphTransform?.(box.glyphIndex, {
-                      scaleX: scaleFromDrag(start.restDistanceX, dragDistance),
+                      scaleX: scaleFromHandleDrag(
+                        start.startDistanceX,
+                        dragDistance,
+                        SCALE_HANDLE_GAP,
+                        start.scaleX
+                      ),
                     });
                   }}
                   onDragEnd={(e) => {
@@ -289,7 +294,15 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
                     // box — see the dragStartRef comment above.
                     const dragDistance = pos.y - (start.pivotY + offsetY);
                     onUpdateGlyphTransform?.(box.glyphIndex, {
-                      scaleY: scaleFromDrag(start.restDistanceY, dragDistance),
+                      // Negative gap: this dot sits *above* the glyph while
+                      // canvas y grows downward, so every distance along
+                      // this rail is signed the other way.
+                      scaleY: scaleFromHandleDrag(
+                        start.startDistanceY,
+                        dragDistance,
+                        -SCALE_HANDLE_GAP,
+                        start.scaleY
+                      ),
                     });
                   }}
                   onDragEnd={(e) => {

@@ -48,6 +48,36 @@ export function scaleFromDrag(restDistance: number, dragDistance: number): numbe
 }
 
 /**
+ * The scale a glyph should take when its scale handle has been dragged to
+ * `dragDistance` from the pivot.
+ *
+ * A scale dot rests a fixed `gap` beyond the glyph's own edge, so at scale
+ * `s` it sits at `extent · s + gap` from the pivot, where `extent` is the
+ * glyph's unscaled edge distance. Inverting that gives the exact scale for
+ * any dot position, which is what keeps the dot glued exactly `gap` past
+ * the edge for the whole drag instead of slowly outrunning it.
+ *
+ * `extent` is recovered from the dot's position at drag start rather than
+ * measured directly, because the caller only knows where the dot sits and
+ * what scale the glyph was already drawn at. Recovering it this way also
+ * makes the first frame of a drag return exactly `startScale`, so grabbing
+ * a handle never makes the glyph jump — including when a glyph that has
+ * already been scaled is dragged a second time, which a naive
+ * `startDistance / startScale` rest distance gets wrong by
+ * `gap · (1 - 1/startScale)`.
+ */
+export function scaleFromHandleDrag(
+  startDistance: number,
+  dragDistance: number,
+  gap: number,
+  startScale: number
+): number {
+  const s = Math.abs(startScale) < 1e-6 ? 1 : startScale;
+  const extent = (startDistance - gap) / s;
+  return scaleFromDrag(extent, dragDistance - gap);
+}
+
+/**
  * Where a glyph's bounding box lands once its transform is applied.
  *
  * Mirrors the draw order in ShapedText's `drawWarpedGlyphRun` exactly —

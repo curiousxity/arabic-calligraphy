@@ -203,17 +203,39 @@ existing `ctx.translate(gx, gy)` — which is what makes the pivot the glyph's
 **pen origin** (on the baseline, at the start of its advance) with no pivot
 arithmetic, so a scaled letter keeps sitting on the baseline. It composes
 *after* `applyGlyphEdit` and the glyph rig: stretch handles reshape the
-outline, then this moves and scales the result as a unit. A glyph carrying
-both a diacritic override and a transform gets both, multiplied.
+outline, then this moves and scales the result as a unit. It is likewise the
+**outermost** transform relative to a diacritic override: a mark carrying
+both is first placed by its override in the glyph's own pre-transform space
+and then moved/scaled by the transform, never the reverse. That ordering is
+load-bearing rather than cosmetic — reversing the two `ctx` blocks multiplies
+the transform's offset by the diacritic's scale, which no adapter can invert,
+so `DiacriticHoverHandles` could no longer read a drag back as an unscaled
+`offsetY`.
 
 **`penX += advance` is never touched** — a moved or widened glyph does not
 reflow its neighbours, matching what `hidden` already guarantees on
-diacritic overrides. The same transform *is* applied to the glyph's entry in
-`glyphHitBoxes` (via `transformedBox`, shared with the overlay so the two
-cannot disagree) but deliberately **not** to the block-level `bounds`
-accumulated in that same loop: those must stay based on the untransformed
-run, or transforming one glyph would resize the block and shift every other
-glyph on canvas.
+diacritic overrides.
+
+Two consumers need the glyph's box in *different* spaces, so
+`ShapedText.tsx`'s metrics memo emits both from one font walk.
+`glyphHitBoxes` stays **raw** and `glyphTransformedHitBoxes` carries the
+transform (via `transformedBox`). Only `GlyphTransformHoverHandles` gets the
+transformed variant; `onGlyphBoxesChange`, the mask-derivation effect,
+`selectedGlyphContours`, the diacritic placements, and
+`StrokeStretchHoverHandles` all get the raw one, because every one of them
+reasons in raw outline space — `applyGlyphEdit` displaces raw outline points,
+so feeding it a transformed box lands the stretch band on the wrong part of
+the letter and silently degrades `deriveContourMask` to a whole-glyph mask.
+The block-level `bounds` in that same loop are deliberately raw too: they
+must stay based on the untransformed run, or transforming one glyph would
+resize the block and shift every other glyph on canvas.
+
+A mark that itself carries a transform gets `makeGlyphTransformAdapter`
+(`lib/diacriticPlacement.ts`) as its placement adapter instead of the plain
+`makeOffsetAdapter`, which is how its handles reach the mark where it is
+actually drawn while its `offsetY` stays in unscaled text units. The adapter
+reduces to exactly `makeOffsetAdapter` at the identity transform, which is
+the case for almost every glyph.
 
 Scales are clamped to 0.2–4 in `glyphTransform.ts`, both when reading a drag
 and when resolving a stored value, so a corrupted project file cannot
@@ -231,14 +253,23 @@ base letter is dropped, but a glyph transform has no such signal — every
 glyph is a legitimate target — so a stale transform applies to whatever glyph
 now holds that index, exactly as `glyphEdits` already does.
 
-A scale-handle drag snapshots its rest distance at `onDragStart` rather than
-reading it from the live hit box: the box already carries the transform the
-drag is updating, so reading it live makes the scale converge to the wrong
-value (asking for 2× lands near 1.45× at typical geometry). For the same
-reason the drag's pivot is `gx + offsetX`, not bare `gx` — the renderer
-translates by the offset *before* scaling, so a moved glyph pivots there too,
-and using the bare pen origin reads correct at rest but drifts as the offset
-grows.
+A scale-handle drag snapshots the dot's starting distance from the pivot at
+`onDragStart` rather than reading it from the live hit box: the box already
+carries the transform the drag is updating, so reading it live makes the
+scale converge to the wrong value (asking for 2× lands near 1.45× at typical
+geometry). For the same reason the drag's pivot is `gx + offsetX`, not bare
+`gx` — the renderer translates by the offset *before* scaling, so a moved
+glyph pivots there too, and using the bare pen origin reads correct at rest
+but drifts as the offset grows.
+
+`scaleFromHandleDrag` then recovers the glyph's unscaled extent from that
+snapshot (`(startDistance - gap) / startScale`) and inverts the dot's own
+rest formula, so the dot stays exactly `gap` beyond the glyph's edge for the
+whole gesture and the first frame returns the starting scale unchanged — no
+jump on mouse-down, and no drift when an already-scaled glyph is dragged a
+second time. The `gap` argument is **signed along each dot's rail**: positive
+for the x dot, negative for the y dot, which sits above the glyph while
+canvas y grows downward.
 
 Plain text only. Shape Fill and Shape Warp carry the fields via
 `BlockCommon` but neither renderer reads them; `App.tsx`'s
@@ -409,7 +440,7 @@ full design and the SQL migration under `supabase/migrations/`.
 
 These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
 
-- **Per-glyph move & scale on Shape Fill, Shape Warp, and text-on-path blocks** — Implemented for plain text only. The `DiacriticPlacement` adapters (`src/lib/diacriticPlacement.ts`) make the two shape types a follow-up rather than a rewrite, but each renderer's coordinate space needs its own verification pass; text-on-path is excluded for the same reason every other per-glyph tool is, its glyphs being rotated to a curve tangent.
+- **Per-glyph move & scale on Shape Fill, Shape Warp, and text-on-path blocks** — Implemented for plain text only. `src/lib/diacriticPlacement.ts`'s adapters are the nearest existing precedent for expressing another renderer's coordinate space, but they were authored for placing *diacritic marks*, not for a general per-glyph transform — treat them as a starting point to evaluate, not as a drop-in that makes this cheap. Each renderer's coordinate space needs its own design and verification pass. Text-on-path is excluded for the same reason every other per-glyph tool is, its glyphs being rotated to a curve tangent.
 
 - **Per-glyph rotation** — The move/scale handles cover translation and axis-aligned scale only. Rotation needs a fourth handle and its own pivot decision.
 

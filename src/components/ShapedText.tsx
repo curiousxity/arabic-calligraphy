@@ -19,6 +19,7 @@ import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import { splitContours, deriveContourMask } from "../lib/glyphContours";
 import { findDiacriticGlyphIndices } from "../lib/diacritics";
 import {
+  makeGlyphTransformAdapter,
   makeOffsetAdapter,
   type DiacriticPlacement,
 } from "../lib/diacriticPlacement";
@@ -232,12 +233,6 @@ function drawWarpedGlyphRun(
     ctx.save();
     ctx.translate(gx, gy);
 
-    if (diacriticOverride) {
-      ctx.translate(0, diacriticOverride.offsetY ?? 0);
-      const diacScale = diacriticOverride.scale ?? 1;
-      ctx.scale(diacScale, diacScale);
-    }
-
     const transform = glyphTransforms.find((t) => t.glyphIndex === glyphIndex);
     if (transform) {
       // The context is already translated to this glyph's pen origin, so
@@ -248,6 +243,19 @@ function drawWarpedGlyphRun(
       const { offsetX, offsetY, scaleX, scaleY } = resolveGlyphTransform(transform);
       ctx.translate(offsetX, offsetY);
       ctx.scale(scaleX, scaleY);
+    }
+
+    // Applied *inside* the glyph transform: the transform is the outermost
+    // rigid transform of the finished glyph, so a mark carrying both keeps
+    // its override expressed in the glyph's own pre-transform (text) space.
+    // That is what lets DiacriticHoverHandles hand this same composition to
+    // `makeGlyphTransformAdapter` and read a drag back as an unscaled
+    // offsetY. Reversing these two blocks multiplies the transform's offset
+    // by the diacritic's scale and leaves the overlay unable to invert it.
+    if (diacriticOverride) {
+      ctx.translate(0, diacriticOverride.offsetY ?? 0);
+      const diacScale = diacriticOverride.scale ?? 1;
+      ctx.scale(diacScale, diacScale);
     }
 
     if (
@@ -596,16 +604,50 @@ export const ShapedText: React.FC<Props> = ({
   // *is* the glyph-run space its overlay draws in, so its adapter is a
   // plain translation by the same offset every other overlay here uses.
   const diacriticPlacements = useMemo<DiacriticPlacement[]>(() => {
-    const adapter = makeOffsetAdapter(bx + localDrawX, by + localDrawY);
+    const dx = bx + localDrawX;
+    const dy = by + localDrawY;
+    const plain = makeOffsetAdapter(dx, dy);
+
     return glyphHitBoxes
       .filter((b) => diacriticGlyphIndices.has(b.glyphIndex))
-      .map((b) => ({
-        glyphIndex: b.glyphIndex,
-        key: String(b.glyphIndex),
-        box: { x: b.x, y: b.y, width: b.width, height: b.height },
-        ...adapter,
-      }));
-  }, [glyphHitBoxes, diacriticGlyphIndices, bx, by, localDrawX, localDrawY]);
+      .map((b) => {
+        // A mark that also carries a glyph transform needs that transform
+        // in its adapter, or its handles sit where the mark *would* be
+        // undistorted. `glyphHitBoxes` are raw (the stretch-handle
+        // pipeline needs them that way), so the adapter is what applies it.
+        const transform = glyphTransforms.find((t) => t.glyphIndex === b.glyphIndex);
+        let adapter = plain;
+
+        if (transform) {
+          const resolved = resolveGlyphTransform(transform);
+          adapter = makeGlyphTransformAdapter({
+            offsetX: dx,
+            offsetY: dy,
+            pivotX: b.gx,
+            pivotY: b.gy,
+            transformOffsetX: resolved.offsetX,
+            transformOffsetY: resolved.offsetY,
+            scaleX: resolved.scaleX,
+            scaleY: resolved.scaleY,
+          });
+        }
+
+        return {
+          glyphIndex: b.glyphIndex,
+          key: String(b.glyphIndex),
+          box: { x: b.x, y: b.y, width: b.width, height: b.height },
+          ...adapter,
+        };
+      });
+  }, [
+    glyphHitBoxes,
+    glyphTransforms,
+    diacriticGlyphIndices,
+    bx,
+    by,
+    localDrawX,
+    localDrawY,
+  ]);
 
   useEffect(() => {
     onGlyphBoxesChange?.(glyphHitBoxes);
