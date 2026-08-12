@@ -104,6 +104,31 @@ export type DiacriticOverride = {
   hidden?: boolean;
 };
 
+/**
+ * A rigid whole-glyph transform — move and independent x/y scale — keyed
+ * by glyphIndex. Distinct from GlyphEdit (which displaces individual
+ * outline points) and DiacriticOverride (uniform scale + vertical offset,
+ * marks only): this moves and scales the finished glyph as a unit.
+ *
+ * Shares glyphIndex keying with both, including its known fragility: a
+ * text edit before this glyph shifts which index the transform lands on
+ * after re-shaping. Unlike DiacriticOverride there is no identity signal
+ * to re-check against at render time (every glyph is a legitimate
+ * target), so a stale transform simply applies to whatever glyph now
+ * holds that index — the same behaviour GlyphEdit already has.
+ */
+export type GlyphTransform = {
+  glyphIndex: number;
+  /** Horizontal shift in local (unscaled) units. Default 0. */
+  offsetX?: number;
+  /** Vertical shift in local (unscaled) units. Default 0. */
+  offsetY?: number;
+  /** Multiplier on the glyph's natural width. Default 1. */
+  scaleX?: number;
+  /** Multiplier on the glyph's natural height. Default 1. */
+  scaleY?: number;
+};
+
 type BlockCommon = {
   id: number;
   name?: string;
@@ -145,6 +170,15 @@ type BlockCommon = {
    * already makes.
    */
   diacriticOverrides?: DiacriticOverride[];
+
+  /**
+   * Per-glyph rigid move/scale. Plain text blocks only for v1 — the other
+   * block types inherit the field unused, the same intentional
+   * simplification BlockCommon already makes for glyphEdits.
+   */
+  glyphTransforms?: GlyphTransform[];
+  /** Arms the on-canvas move/scale handles. While on, ShapedText does not mount the stroke-stretch dots. */
+  glyphTransformMode?: boolean;
 
   // Shared shape-import fields. shapeFill and shapeWarp blocks both carry an
   // uploaded SVG path, and shapeWarp falls back to shapeWidth/shapeHeight
