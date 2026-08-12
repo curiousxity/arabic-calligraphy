@@ -22,6 +22,8 @@ import {
 import {
   buildSnapTargets,
   computeSnap,
+  findEqualGaps,
+  type GapBadge,
   type Rect as SnapRect,
   type SnapLine,
   type SnapTarget,
@@ -181,6 +183,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
    * canvas at 60fps.
    */
   const snapTargetsRef = useRef<SnapTarget[]>([]);
+  /** The same measurement as rectangles, for the equal-spacing markers. */
+  const snapRectsRef = useRef<SnapRect[]>([]);
+  /** Which block `snapTargetsRef` was measured for, so it is built once a drag. */
+  const snapTargetsForRef = useRef<number | null>(null);
+  const [gapBadges, setGapBadges] = useState<GapBadge[]>([]);
 
   const [spacePan, setSpacePan] = useState(false);
   const effectivePanMode = panMode || spacePan;
@@ -251,27 +258,41 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   };
 
   /**
-   * The bounds of every block a drag can snap against, measured once as the
-   * drag begins. The dragged block and everything that moves with it are
-   * excluded — a block cannot align to itself.
+   * Measure the bounds of every block this drag can snap against — once per
+   * gesture, on its first move frame. The dragged block and everything that
+   * moves with it are excluded; a block cannot align to itself.
+   *
+   * This belongs in `onDragStart`, but the block renderers forward only
+   * `onDragMove`/`onDragEnd` to their Konva groups, so there is no drag-start
+   * event to hang it on without editing them. The first move frame is
+   * equivalent: nothing but the dragged block has moved by then.
    */
-  const makeDragStartHandler =
-    (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
-      snapTargetsRef.current = [];
-      if (block.locked || effectivePanMode || !snapToBlockEdges) return;
-      const stage = e.target.getStage();
-      if (!stage) return;
+  const ensureSnapTargets = (block: Block, node: Konva.Node) => {
+    if (snapTargetsForRef.current === block.id) return;
+    snapTargetsForRef.current = block.id;
+    snapTargetsRef.current = [];
+    snapRectsRef.current = [];
+    if (!snapToBlockEdges) return;
+    const stage = node.getStage();
+    if (!stage) return;
 
-      const moving = new Set([block.id, ...getCoMovers(block).map((b) => b.id)]);
-      const others: SnapRect[] = [];
-      for (const other of blocks) {
-        if (moving.has(other.id)) continue;
-        const node = stage.findOne(`#block-${other.id}`);
-        if (!node) continue;
-        others.push(node.getClientRect({ relativeTo: stage }));
-      }
-      snapTargetsRef.current = buildSnapTargets(others, contentBox, guides);
-    };
+    const moving = new Set([block.id, ...getCoMovers(block).map((b) => b.id)]);
+    const others: SnapRect[] = [];
+    for (const other of blocks) {
+      if (moving.has(other.id)) continue;
+      const otherNode = stage.findOne(`#block-${other.id}`);
+      if (!otherNode) continue;
+      others.push(otherNode.getClientRect({ relativeTo: stage }));
+    }
+    snapRectsRef.current = others;
+    snapTargetsRef.current = buildSnapTargets(others, contentBox, guides);
+  };
+
+  const clearSnapTargets = () => {
+    snapTargetsRef.current = [];
+    snapRectsRef.current = [];
+    snapTargetsForRef.current = null;
+  };
 
   /** A full-extent line, as origin-to-origin snapping has always drawn. */
   const originLine = (axis: "x" | "y", position: number): SnapLine =>
@@ -279,10 +300,20 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       ? { axis, position, from: contentBox.y, to: contentBox.y + contentBox.height }
       : { axis, position, from: contentBox.x, to: contentBox.x + contentBox.width };
 
-  const makeDragMoveHandler =
-    (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
-      if (block.locked || effectivePanMode) return;
-
+  /**
+   * Where a dragged node should actually sit, and the guide lines that say
+   * why.
+   *
+   * Called from the drag-*end* handler as well as from every drag-move frame,
+   * because Konva re-applies the raw pointer position on mouse-up before it
+   * fires `dragend` — so a block released mid-snap would otherwise land a
+   * fraction off the line it was visibly stuck to.
+   */
+  const resolveDragPosition = (
+    block: Block,
+    node: Konva.Node
+  ): { x: number; y: number; lines: SnapLine[]; rect: SnapRect | null } => {
+      ensureSnapTargets(block, node);
       const threshold = SNAP_GUIDE_PX / stageScale;
       const xTargets = [contentBox.x + contentBox.width / 2, ...guides.vertical];
       const yTargets = [contentBox.y + contentBox.height / 2, ...guides.horizontal];
@@ -292,7 +323,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         yTargets.push(other.y);
       }
 
-      const { x, y } = e.target.position();
+      const { x, y } = node.position();
       const snappedX = findNearest(x, xTargets, threshold);
       const snappedY = findNearest(y, yTargets, threshold);
 
@@ -301,10 +332,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       // constant offset for the length of a drag, so applying the rect's delta
       // to the position is exact — no need to model each block type's own
       // origin-to-bounds relationship.
-      const stage = e.target.getStage();
+      const stage = node.getStage();
       const draggedRect =
         snapToBlockEdges && stage
-          ? e.target.getClientRect({ relativeTo: stage })
+          ? node.getClientRect({ relativeTo: stage })
           : null;
       const rectSnap = draggedRect
         ? computeSnap(draggedRect, snapTargetsRef.current, threshold)
@@ -329,13 +360,40 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
       const finalX = resolve("x", x, snappedX);
       const finalY = resolve("y", y, snappedY);
+      return {
+        x: finalX,
+        y: finalY,
+        lines,
+        // Where the bounds end up, without a second `getClientRect`: the rect
+        // and the position move together.
+        rect: draggedRect
+          ? {
+              ...draggedRect,
+              x: draggedRect.x + (finalX - x),
+              y: draggedRect.y + (finalY - y),
+            }
+          : null,
+      };
+  };
+
+  const makeDragMoveHandler =
+    (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
+      if (block.locked || effectivePanMode) return;
+
+      const { x: finalX, y: finalY, lines, rect } = resolveDragPosition(block, e.target);
       e.target.position({ x: finalX, y: finalY });
       setSnapGuides(lines);
+      setGapBadges(
+        rect
+          ? findEqualGaps(rect, snapRectsRef.current, SNAP_GUIDE_PX / stageScale)
+          : []
+      );
 
       const coMovers = getCoMovers(block);
       if (coMovers.length > 0) {
         const deltaX = finalX - block.x;
         const deltaY = finalY - block.y;
+        const stage = e.target.getStage();
         if (stage) {
           for (const other of coMovers) {
             const node = stage.findOne(`#block-${other.id}`);
@@ -487,14 +545,20 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   const makeDragEndHandler =
     (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {
       setSnapGuides([]);
-      snapTargetsRef.current = [];
-      if (block.locked || effectivePanMode) return;
-      let { x, y } = e.target.position();
+      setGapBadges([]);
+      if (block.locked || effectivePanMode) {
+        clearSnapTargets();
+        return;
+      }
+      // Re-snap before committing: Konva's mouse-up sets the node straight to
+      // the raw pointer position, discarding the last frame's correction.
+      let { x, y } = resolveDragPosition(block, e.target);
+      clearSnapTargets();
       if (snapToGrid) {
         x = snapCoord(x);
         y = snapCoord(y);
-        e.target.position({ x, y });
       }
+      e.target.position({ x, y });
       onUpdateBlockPosition(block.id, x, y);
 
       const coMovers = getCoMovers(block);
@@ -673,14 +737,12 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             {blocks.map((block) => {
               const onDragEnd = makeDragEndHandler(block);
               const onDragMove = makeDragMoveHandler(block);
-              const onDragStart = makeDragStartHandler(block);
               const commonProps = {
                 id: `block-${block.id}`,
                 draggable: !block.locked && !effectivePanMode,
                 onClick: () => onSelectBlock(block.id, additiveSelectRef.current),
                 onTap: () => onSelectBlock(block.id),
                 onDblClick: () => onEditBlock(block.id),
-                onDragStart,
                 onDragMove,
                 onDragEnd,
               };
@@ -961,6 +1023,34 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 hitStrokeWidth={10}
               />
             ))}
+
+            {/* Equal-spacing markers: a bar across each of two even gaps,
+                capped at both ends. Advisory only — nothing snaps to them. */}
+            {gapBadges.map((badge) => {
+              const cap = 4 / stageScale;
+              const strokeWidth = 1 / stageScale;
+              const segments =
+                badge.axis === "x"
+                  ? [
+                      [badge.from, badge.cross, badge.to, badge.cross],
+                      [badge.from, badge.cross - cap, badge.from, badge.cross + cap],
+                      [badge.to, badge.cross - cap, badge.to, badge.cross + cap],
+                    ]
+                  : [
+                      [badge.cross, badge.from, badge.cross, badge.to],
+                      [badge.cross - cap, badge.from, badge.cross + cap, badge.from],
+                      [badge.cross - cap, badge.to, badge.cross + cap, badge.to],
+                    ];
+              return segments.map((points, i) => (
+                <Line
+                  key={`gap-${badge.axis}-${badge.from}-${i}`}
+                  points={points}
+                  stroke="#ff2d78"
+                  strokeWidth={strokeWidth}
+                  listening={false}
+                />
+              ));
+            })}
 
             {snapGuides.map((line) => (
               <Line

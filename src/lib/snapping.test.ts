@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSnapTargets,
   computeSnap,
+  findEqualGaps,
   rectEdges,
   type Rect,
   type SnapTarget,
@@ -135,6 +136,48 @@ describe("computeSnap", () => {
     );
     const result = computeSnap(rect(197, 400, 100, 100), targets, 6);
     expect(result.lines.filter((l) => l.axis === "x")).toHaveLength(1);
+  });
+});
+
+describe("findEqualGaps", () => {
+  const left = rect(0, 0, 100, 100);
+  const right = rect(400, 0, 100, 100);
+
+  it("flags both gaps when the dragged rect is evenly spaced between two others", () => {
+    // Gaps of 99 and 101 — even to within the threshold.
+    const badges = findEqualGaps(rect(199, 0, 100, 100), [left, right], 6);
+    expect(badges).toEqual([
+      { axis: "x", from: 100, to: 199, cross: 50 },
+      { axis: "x", from: 299, to: 400, cross: 50 },
+    ]);
+  });
+
+  it("stays quiet when the two gaps differ by more than the threshold", () => {
+    expect(findEqualGaps(rect(150, 0, 100, 100), [left, right], 6)).toEqual([]);
+  });
+
+  it("ignores rects that overlap the dragged one rather than flanking it", () => {
+    expect(findEqualGaps(rect(199, 0, 100, 100), [rect(150, 0, 100, 100)], 6)).toEqual([]);
+  });
+
+  it("works on the vertical axis too", () => {
+    const above = rect(0, 0, 50, 100);
+    const below = rect(0, 400, 50, 100);
+    const badges = findEqualGaps(rect(0, 200, 50, 100), [above, below], 6);
+    expect(badges).toEqual([
+      { axis: "y", from: 100, to: 200, cross: 25 },
+      { axis: "y", from: 300, to: 400, cross: 25 },
+    ]);
+  });
+
+  it("reports only the most even pair on each axis", () => {
+    const badges = findEqualGaps(
+      rect(199, 0, 100, 100),
+      [left, right, rect(402, 0, 100, 100)],
+      6
+    );
+    expect(badges).toHaveLength(2);
+    expect(badges[1].to).toBe(400);
   });
 });
 

@@ -48,6 +48,15 @@ export const section: GuideSection = {
         canvas where several blocks share a column.
       </p>
 
+      <h3>Even spacing</h3>
+      <p>
+        Drag a block into the space between two others and, once the gap on
+        each side is the same, a small bar appears in both gaps to tell you so.
+        These are a reading, not a magnet — nothing is pulled into place by
+        them, so you can settle a piece by eye and use them only as
+        confirmation.
+      </p>
+
       <h3>Your own guides</h3>
       <p>
         Turn on <strong>Show rulers</strong> in Background &amp; Grid, then

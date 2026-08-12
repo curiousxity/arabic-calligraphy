@@ -145,6 +145,68 @@ const lineFor = (match: Match, dragged: Rect, axis: "x" | "y"): SnapLine => {
  * At most one snap per axis — considering several would let a block be pulled
  * two directions at once along the same axis.
  */
+/**
+ * A marker drawn inside one of two equal gaps, at `cross` along the
+ * perpendicular axis.
+ */
+export type GapBadge = {
+  axis: "x" | "y";
+  from: number;
+  to: number;
+  cross: number;
+};
+
+/**
+ * The pair of gaps to flag when the dragged rect sits between two others at
+ * even spacing — purely advisory, it never moves anything.
+ *
+ * At most one pair per axis (the most even one), because a crowded canvas can
+ * satisfy this several ways at once and drawing them all is noise.
+ */
+export function findEqualGaps(
+  dragged: Rect,
+  others: Rect[],
+  threshold: number
+): GapBadge[] {
+  const badges: GapBadge[] = [];
+
+  for (const axis of ["x", "y"] as const) {
+    const size = axis === "x" ? "width" : "height";
+    const cross =
+      axis === "x"
+        ? dragged.y + dragged.height / 2
+        : dragged.x + dragged.width / 2;
+
+    const near = dragged[axis];
+    const far = near + dragged[size];
+    const before = others.filter((o) => o[axis] + o[size] <= near);
+    const after = others.filter((o) => o[axis] >= far);
+
+    let best: { badges: GapBadge[]; evenness: number } | null = null;
+    for (const a of before) {
+      const gapBefore = near - (a[axis] + a[size]);
+      if (gapBefore <= 0) continue;
+      for (const b of after) {
+        const gapAfter = b[axis] - far;
+        if (gapAfter <= 0) continue;
+        const evenness = Math.abs(gapBefore - gapAfter);
+        if (evenness > threshold) continue;
+        if (best && evenness >= best.evenness) continue;
+        best = {
+          evenness,
+          badges: [
+            { axis, from: a[axis] + a[size], to: near, cross },
+            { axis, from: far, to: b[axis], cross },
+          ],
+        };
+      }
+    }
+    if (best) badges.push(...best.badges);
+  }
+
+  return badges;
+}
+
 export function computeSnap(
   dragged: Rect,
   targets: SnapTarget[],

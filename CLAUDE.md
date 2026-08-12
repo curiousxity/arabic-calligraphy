@@ -395,12 +395,23 @@ targets break ties by kind — user guide, then artboard, then block edge,
 then block centre — explicitly via `KIND_PRIORITY` rather than by array
 order, because a user who deliberately dropped a ruler guide means it.
 
-Three things about the `CanvasStage` side are load-bearing:
+Four things about the `CanvasStage` side are load-bearing:
 
-- **Targets are captured once, in `onDragStart`, into a ref.**
-  `getClientRect` traverses a block's entire subtree; rebuilding every
-  block's rect on every drag frame visibly stutters a busy canvas at
-  60fps. The dragged block and all of its `getCoMovers` are excluded.
+- **Targets are measured once per gesture, into a ref, on the drag's
+  first move frame.** `getClientRect` traverses a block's entire subtree;
+  rebuilding every block's rect on every frame visibly stutters a busy
+  canvas at 60fps. This belongs in `onDragStart` — but **the block
+  renderers forward only `onDragMove`/`onDragEnd` to their Konva groups**,
+  so there is no drag-start event to hang it on without editing them, and
+  they were off-limits. The first move frame is equivalent: nothing but
+  the dragged block has moved by then. `snapTargetsForRef` holds the
+  block id the measurement belongs to; `onDragEnd` clears it. The dragged
+  block and all of its `getCoMovers` are excluded.
+- **The snap is re-run in `onDragEnd`, not just on move frames.** Konva's
+  mouse-up sets the node straight to the raw pointer position before
+  firing `dragend`, so without this a block released mid-snap lands a
+  fraction off the line it was visibly stuck to. `resolveDragPosition` is
+  shared by both handlers for exactly this reason.
 - **The snap is computed on the rect but applied to the node's
   `position`.** During a drag those two differ by a constant offset, so
   adding the delta is exact — and it avoids having to model each block
@@ -427,8 +438,12 @@ larger than the content, those edges sit at the viewport's edge rather
 than at any drawn boundary. This matches what the pre-existing
 centre-of-`contentBox` origin target already did.
 
-**Distribution badges (equal-gap markers) are not implemented** — the
-spec listed them as an explicitly droppable last task.
+`findEqualGaps` adds the equal-spacing markers: when the dragged rect
+sits between two others with gaps even to within the threshold, a capped
+bar is drawn across each gap. **Advisory only — nothing snaps to them**,
+and at most one pair per axis (the most even), because a crowded canvas
+satisfies the condition several ways at once and drawing them all is
+noise.
 
 <!-- ---- /STREAM-A ---- -->
 
