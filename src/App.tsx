@@ -1922,7 +1922,7 @@ const App: React.FC = () => {
       {
         ...DEFAULT_BLOCK,
         id: newId,
-        text: "حرف",
+        text: "“السحر يسكن في المنحنيات، لا في الزوايا.” — ماسون كولي",
         type: "textPath",
         textPathD: arcPathD(width, height),
         textPathReversed: true,
