@@ -1856,7 +1856,7 @@ const App: React.FC = () => {
       {
         ...DEFAULT_BLOCK,
         id: newId,
-        text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
+        text: "“كما أن كل المنحنيات ترتبط بمراكزها أو بؤرها، كذلك يرتبط كل جمالٍ في الشخصية بالروح.” — هنري ديفيد ثورو",
         fontSize: autoFontSize,
         type: "shapeFill",
         shapeSvgPath: svgPathData,
@@ -1890,7 +1890,7 @@ const App: React.FC = () => {
       {
         ...DEFAULT_BLOCK,
         id: newId,
-        text: "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ",
+        text: "“كما أن كل المنحنيات ترتبط بمراكزها أو بؤرها، كذلك يرتبط كل جمالٍ في الشخصية بالروح.” — هنري ديفيد ثورو",
         fontSize: autoFontSize,
         type: "shapeWarp",
         shapeSvgPath: svgPathData,
