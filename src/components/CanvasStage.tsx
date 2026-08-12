@@ -16,6 +16,7 @@ import {
   padBox,
   unionRect,
   zoomFactorFromWheel,
+  ZOOM_STEP,
   DEFAULT_EMPTY_BOUNDS,
 } from "../lib/canvasBounds";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
@@ -404,8 +405,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     onUpdateStage(newScale, newPos);
   };
 
-  const handleZoomOut = () => onUpdateStage(clampScale(stageScale / 1.1), stagePosition);
-  const handleZoomIn = () => onUpdateStage(clampScale(stageScale * 1.1), stagePosition);
+  const handleZoomOut = () => onUpdateStage(clampScale(stageScale / ZOOM_STEP), stagePosition);
+  const handleZoomIn = () => onUpdateStage(clampScale(stageScale * ZOOM_STEP), stagePosition);
 
   const makeDragEndHandler =
     (block: Block) => (e: Konva.KonvaEventObject<DragEvent>) => {

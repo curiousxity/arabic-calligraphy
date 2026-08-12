@@ -10,13 +10,23 @@ export const MAX_SCALE = 3;
 export const CONTENT_PADDING = 80;
 
 /**
- * Zoom per pixel of wheel travel, as an exponent. Tuned so one detent of a
- * typical mouse wheel (100px of deltaY) is about a 10% step — the same feel
- * the zoom buttons give — which then makes a trackpad pinch's much smaller
- * per-event deltas produce correspondingly smaller steps. Raise to zoom
- * faster, lower to zoom slower.
+ * One "step" of zoom: what the +/- buttons apply per click, and what one
+ * detent of a typical mouse wheel amounts to. This is the dial to turn if
+ * zooming feels too fast or too slow overall — both input paths derive
+ * from it, so they can't drift apart.
  */
-const ZOOM_PER_PIXEL = 0.00095;
+export const ZOOM_STEP = 1.15;
+
+/** Wheel travel, in pixels, that one `ZOOM_STEP` corresponds to — one mouse detent. */
+const PIXELS_PER_STEP = 100;
+
+/**
+ * Zoom per pixel of wheel travel, as an exponent, derived so that
+ * `PIXELS_PER_STEP` of travel produces exactly `ZOOM_STEP`. A trackpad
+ * pinch's much smaller per-event deltas then produce correspondingly
+ * smaller steps.
+ */
+const ZOOM_PER_PIXEL = Math.log(ZOOM_STEP) / PIXELS_PER_STEP;
 
 /**
  * Largest zoom change a single wheel event may cause. Some browser/OS

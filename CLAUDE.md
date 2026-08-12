@@ -358,9 +358,15 @@ mouse wheel fires a few large ones, so the fixed ±10%-per-event this used
 to do made pinching rocket through the entire zoom range. `deltaMode` is
 normalized because Firefox commonly reports travel in lines rather than
 pixels, and a single event's factor is clamped to 1.25 so one fast flick
-cannot skip several zoom levels. `ZOOM_PER_PIXEL` is tuned so one 100px
-mouse detent lands on ~10%, matching the zoom buttons — raise it to zoom
-faster. Tested in `canvasBounds.test.ts`.
+cannot skip several zoom levels.
+
+`ZOOM_STEP` (currently 1.15) is the single dial for how fast zooming
+feels: the +/- buttons apply it per click, and `ZOOM_PER_PIXEL` is
+*derived* from it so that one 100px mouse detent produces exactly the same
+step. Tune that one constant rather than either input path, or the two
+drift apart. Tested in `canvasBounds.test.ts`, which asserts the
+button/detent equality against `ZOOM_STEP` itself so the test survives
+retuning.
 
 ### Sidebar structure
 

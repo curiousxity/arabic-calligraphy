@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { zoomFactorFromWheel } from "./canvasBounds";
+import { ZOOM_STEP, zoomFactorFromWheel } from "./canvasBounds";
 
 describe("zoomFactorFromWheel", () => {
   it("does nothing at zero travel", () => {
@@ -11,10 +11,11 @@ describe("zoomFactorFromWheel", () => {
     expect(zoomFactorFromWheel(100)).toBeLessThan(1);
   });
 
-  it("gives one mouse-wheel detent roughly the same step as the zoom buttons", () => {
-    // The buttons use 1.1 / (1/1.1); a 100px detent should feel the same.
-    expect(zoomFactorFromWheel(-100)).toBeCloseTo(1.1, 2);
-    expect(zoomFactorFromWheel(100)).toBeCloseTo(1 / 1.1, 2);
+  it("gives one mouse-wheel detent exactly the zoom buttons' step", () => {
+    // Both input paths derive from ZOOM_STEP, so a 100px detent and a
+    // button click must stay identical however that constant is tuned.
+    expect(zoomFactorFromWheel(-100)).toBeCloseTo(ZOOM_STEP, 6);
+    expect(zoomFactorFromWheel(100)).toBeCloseTo(1 / ZOOM_STEP, 6);
   });
 
   it("scales with travel instead of stepping once per event", () => {
@@ -23,6 +24,8 @@ describe("zoomFactorFromWheel", () => {
     const small = zoomFactorFromWheel(-4);
     expect(small).toBeGreaterThan(1);
     expect(small).toBeLessThan(1.01);
+    // A pinch event is a small fraction of a detent, not a whole one.
+    expect(small).toBeLessThan(zoomFactorFromWheel(-100));
   });
 
   it("composes: two half-travel events equal one full-travel event", () => {
