@@ -150,6 +150,17 @@ export type SidebarProps = {
   onToggleSnapToBlockEdges?: (checked: boolean) => void;
   // ---- /STREAM-A ----
   // ---- STREAM-B: kashida auto-justify ----
+  /** Margin per side, in canvas px, subtracted from the "Fit to composition" target. */
+  justifyMarginPx?: number;
+  onChangeJustifyMarginPx?: (value: number) => void;
+  /** One quiet line reporting the last fit's outcome, or null. */
+  justifyStatus?: string | null;
+  /** False when the canvas holds no other block to measure against. */
+  canFitToComposition?: boolean;
+  /** True only at exactly two selected blocks. */
+  canMatchBlock?: boolean;
+  onFitToComposition?: (blockId: number) => void;
+  onMatchBlockWidth?: (blockId: number) => void;
   // ---- /STREAM-B ----
   // ---- STREAM-C: export presets ----
   // The preset shape is spelled out structurally rather than imported from
@@ -334,6 +345,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleSnapToBlockEdges,
   // ---- /STREAM-A ----
   // ---- STREAM-B: kashida auto-justify ----
+  justifyMarginPx = 24,
+  onChangeJustifyMarginPx,
+  justifyStatus,
+  canFitToComposition,
+  canMatchBlock,
+  onFitToComposition,
+  onMatchBlockWidth,
   // ---- /STREAM-B ----
   // ---- STREAM-C: export presets ----
   onCopyPNG,
@@ -2116,6 +2134,92 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       Drag a gold handle between two connected letters on the canvas to
                       elongate the connector (tatweel).
                     </div>
+                  </div>
+                )}
+
+                {/* The same set `setBlockKashidaAmount` accepts — everything but
+                    `image` and `textPath`. The enclosing panel already excludes
+                    image blocks, so only textPath needs excluding here. */}
+                {selectedBlock.type !== "textPath" && (
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
+                    <div className="sidebarSectionTitle">Fit width</div>
+
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
+                      Solves the Kashida dial for you, elongating this block's strokes until
+                      it reaches the width you name.
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 8,
+                        minWidth: 0,
+                      }}
+                    >
+                      <label
+                        htmlFor={makeId("justify-margin", selectedId)}
+                        style={{ fontSize: 12, color: "var(--text-secondary)", minWidth: 0 }}
+                      >
+                        Margin
+                      </label>
+                      <input
+                        id={makeId("justify-margin", selectedId)}
+                        type="number"
+                        min={0}
+                        max={400}
+                        step={1}
+                        value={justifyMarginPx}
+                        onChange={(e) => {
+                          const parsed = parseFloat(e.target.value);
+                          if (Number.isNaN(parsed)) return;
+                          onChangeJustifyMarginPx?.(Math.max(0, Math.min(400, parsed)));
+                        }}
+                        className="hexInput"
+                        style={{ width: 72, flex: "0 0 auto" }}
+                      />
+                      <span style={{ fontSize: 11, color: "var(--text-muted)", minWidth: 0 }}>
+                        px per side
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8, minWidth: 0 }}>
+                      <button
+                        type="button"
+                        className="sidebarSmallAction"
+                        style={{ minWidth: 0 }}
+                        disabled={!canFitToComposition}
+                        title={
+                          canFitToComposition
+                            ? "Stretch this block to span the rest of the composition."
+                            : "Add another block to the canvas to fit to."
+                        }
+                        onClick={() => onFitToComposition?.(selectedBlock.id)}
+                      >
+                        Fit to composition
+                      </button>
+                      <button
+                        type="button"
+                        className="sidebarSmallAction"
+                        style={{ minWidth: 0 }}
+                        disabled={!canMatchBlock}
+                        title={
+                          canMatchBlock
+                            ? "Stretch this block to the other selected block's width."
+                            : "Select exactly two blocks to match one to the other."
+                        }
+                        onClick={() => onMatchBlockWidth?.(selectedBlock.id)}
+                      >
+                        Match block
+                      </button>
+                    </div>
+
+                    {justifyStatus && (
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+                        {justifyStatus}
+                      </div>
+                    )}
                   </div>
                 )}
 
