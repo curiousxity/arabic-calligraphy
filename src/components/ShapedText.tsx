@@ -40,6 +40,7 @@ import {
 } from "../lib/glyphOverrides";
 import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
 import { StrokeStretchHoverHandles } from "./StrokeStretchHoverHandles";
+import { GlyphTransformHoverHandles } from "./GlyphTransformHoverHandles";
 
 type Props = {
   id?: string;
@@ -380,6 +381,7 @@ export const ShapedText: React.FC<Props> = ({
   glyphRigValues = [],
   diacriticOverrides = [],
   glyphTransforms = [],
+  glyphTransformMode = false,
   isSelected = false,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
@@ -388,6 +390,7 @@ export const ShapedText: React.FC<Props> = ({
   onUpdateStretchHandle,
   onSetStretchFactor,
   onDeleteStretchHandle,
+  onUpdateGlyphTransform,
   locked,
   draggable = true,
   onClick,
@@ -895,15 +898,34 @@ export const ShapedText: React.FC<Props> = ({
         would paint on top and steal hover from every mark above a letter
         that has an authored schema.
       */}
-      <StrokeStretchHoverHandles
+      {!glyphTransformMode && (
+        <StrokeStretchHoverHandles
+          isSelected={isSelected}
+          glyphSchemaCatalog={glyphSchemaCatalog}
+          glyphEdits={glyphEdits}
+          glyphHitBoxes={glyphHitBoxes}
+          offsetX={bx + localDrawX}
+          offsetY={by + localDrawY}
+          onSetStretchFactor={onSetStretchFactor}
+          onDeleteStretchHandle={onDeleteStretchHandle}
+        />
+      )}
+
+      {/*
+        Mounted between the stroke-stretch dots and the diacritic handles
+        for the same topmost-wins reason the comment above describes: these
+        rects are glyph-sized, so they must not paint over a mark's smaller,
+        more precise target. The stroke dots stand down entirely while this
+        tool is armed — one tool at a time, so a dot is never ambiguous.
+      */}
+      <GlyphTransformHoverHandles
         isSelected={isSelected}
-        glyphSchemaCatalog={glyphSchemaCatalog}
-        glyphEdits={glyphEdits}
+        enabled={glyphTransformMode}
         glyphHitBoxes={glyphHitBoxes}
+        glyphTransforms={glyphTransforms}
         offsetX={bx + localDrawX}
         offsetY={by + localDrawY}
-        onSetStretchFactor={onSetStretchFactor}
-        onDeleteStretchHandle={onDeleteStretchHandle}
+        onUpdateGlyphTransform={onUpdateGlyphTransform}
       />
 
       <DiacriticHoverHandles
