@@ -444,10 +444,17 @@ export const ShapedText: React.FC<Props> = ({
   }, [shapeData.isLoading]);
 
   // Computes glyph bounding-box extents (glyphBounds) and per-glyph hit boxes
-  // (glyphHitBoxes) in one pass over the glyph run — both need the same
+  // — both the RAW (untransformed) boxes every outline-space consumer needs
+  // (stretch handles, mask derivation, diacritic placements, glyph picking)
+  // and the transform-folded boxes only `GlyphTransformHoverHandles` reads —
+  // in one pass over the glyph run, since both variants need the same
   // (expensive) glyphObj.getPath(...).getBoundingBox() call per glyph, so
   // walking the font twice to get each independently would do that work twice.
-  const glyphMetrics = useMemo<{ bounds: GlyphBounds; hitBoxes: GlyphHitBox[] }>(() => {
+  const glyphMetrics = useMemo<{
+    bounds: GlyphBounds;
+    hitBoxes: GlyphHitBox[];
+    transformedHitBoxes: GlyphHitBox[];
+  }>(() => {
     const fallbackBounds = (): GlyphBounds => {
       const rw = fallbackWidth(text, fontSize);
       const rh = Math.max(fontSize, 24);
@@ -464,7 +471,7 @@ export const ShapedText: React.FC<Props> = ({
     const { font, glyphs, unitsPerEm } = shapeData;
 
     if (!font || glyphs.length === 0) {
-      return { bounds: fallbackBounds(), hitBoxes: [] };
+      return { bounds: fallbackBounds(), hitBoxes: [], transformedHitBoxes: [] };
     }
 
     const upm = Math.max(unitsPerEm || 1000, 1);
@@ -476,6 +483,7 @@ export const ShapedText: React.FC<Props> = ({
     let maxX = -Infinity;
     let maxY = -Infinity;
     const hitBoxes: GlyphHitBox[] = [];
+    const transformedHitBoxes: GlyphHitBox[] = [];
 
     for (let i = 0; i < glyphs.length; i++) {
       const g = glyphs[i];
@@ -498,23 +506,39 @@ export const ShapedText: React.FC<Props> = ({
         }
 
         if (isFinite(box.x1) && isFinite(box.x2) && isFinite(box.y1) && isFinite(box.y2)) {
-          // Hit boxes track where each glyph is actually drawn, so a moved
-          // or scaled glyph keeps its hover target under itself. The block
-          // bounds above deliberately do not — those must stay stable, or
-          // transforming one glyph would re-layout the entire block.
+          // `hitBoxes` stays in raw outline space — every consumer besides
+          // the move/scale overlay (stretch handles, mask derivation,
+          // diacritic placements, glyph picking) reasons about real font
+          // outline points, which a folded-in transform would misalign.
+          // `transformedHitBoxes` tracks where each glyph is actually
+          // drawn, for the move/scale overlay's own hover targets. The
+          // block bounds above deliberately follow neither — those must
+          // stay stable, or transforming one glyph would re-layout the
+          // entire block.
           const raw = {
             x: box.x1,
             y: box.y1,
             width: Math.max(box.x2 - box.x1, 1),
             height: Math.max(box.y2 - box.y1, 1),
           };
+          hitBoxes.push({
+            glyphIndex: i,
+            x: raw.x,
+            y: raw.y,
+            width: raw.width,
+            height: raw.height,
+            glyphId: g.g,
+            gx,
+            gy,
+          });
+
           const t = transformedBox(
             raw,
             gx,
             gy,
             glyphTransforms.find((gt) => gt.glyphIndex === i)
           );
-          hitBoxes.push({
+          transformedHitBoxes.push({
             glyphIndex: i,
             x: t.x,
             y: t.y,
@@ -536,7 +560,7 @@ export const ShapedText: React.FC<Props> = ({
       !isFinite(maxX) ||
       !isFinite(maxY)
     ) {
-      return { bounds: fallbackBounds(), hitBoxes };
+      return { bounds: fallbackBounds(), hitBoxes, transformedHitBoxes };
     }
 
     return {
@@ -549,11 +573,13 @@ export const ShapedText: React.FC<Props> = ({
         rawHeight: Math.max(maxY - minY, 1),
       },
       hitBoxes,
+      transformedHitBoxes,
     };
   }, [shapeData, text, fontSize, glyphTransforms]);
 
   const glyphBounds = glyphMetrics.bounds;
   const glyphHitBoxes = glyphMetrics.hitBoxes;
+  const glyphTransformedHitBoxes = glyphMetrics.transformedHitBoxes;
 
   const isBold = fontStyle === "bold" || fontStyle === "bold italic";
   const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
@@ -921,7 +947,7 @@ export const ShapedText: React.FC<Props> = ({
       <GlyphTransformHoverHandles
         isSelected={isSelected}
         enabled={glyphTransformMode}
-        glyphHitBoxes={glyphHitBoxes}
+        glyphHitBoxes={glyphTransformedHitBoxes}
         glyphTransforms={glyphTransforms}
         offsetX={bx + localDrawX}
         offsetY={by + localDrawY}
