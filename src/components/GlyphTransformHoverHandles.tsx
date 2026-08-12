@@ -59,6 +59,16 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
   // The transform as it stood when this drag began. Reading it live from
   // props during onDragMove would compound each frame's scale onto the
   // previous one and run away exponentially.
+  //
+  // `restDistanceX`/`restDistanceY`/`pivotX`/`pivotY` are likewise
+  // snapshotted here rather than recomputed from the live `box` on every
+  // move: `glyphHitBoxes` is memoized on `glyphTransforms`, so each
+  // `onUpdateGlyphTransform` call re-renders a new, already-scaled box.
+  // Deriving "rest distance" from that live box every frame feeds the
+  // previous frame's scale back into the current frame's math and the
+  // gesture converges on the wrong value instead of tracking the pointer
+  // linearly. The rest position at scale 1 never changes during a single
+  // gesture, so it only needs to be read once.
   const dragStartRef = useRef<{
     scaleX: number;
     scaleY: number;
@@ -66,6 +76,10 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
     offsetY: number;
     pointerX: number;
     pointerY: number;
+    restDistanceX: number;
+    restDistanceY: number;
+    pivotX: number;
+    pivotY: number;
   } | null>(null);
 
   if (!isSelected || !enabled) return null;
@@ -84,10 +98,14 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
         const scaleXAt = { x: box.x + box.width + SCALE_HANDLE_GAP, y: cy };
         const scaleYAt = { x: cx, y: box.y - SCALE_HANDLE_GAP };
 
-        // The pen origin is the scale pivot — the same point the renderer
-        // pivots on, so a drag reads back the scale the glyph will draw at.
-        const pivotX = box.gx;
-        const pivotY = box.gy;
+        // The scale pivot is the renderer's own pivot: it translates to the
+        // pen origin, THEN to the transform's offset, THEN scales (see
+        // `drawWarpedGlyphRun`/`transformedBox`) — so once a glyph has been
+        // moved, the pen origin alone (`box.gx`/`box.gy`) is no longer the
+        // point the renderer actually scales about. Folding in the current
+        // offset keeps this in agreement with `transformedBox`.
+        const pivotX = box.gx + (transform?.offsetX ?? 0);
+        const pivotY = box.gy + (transform?.offsetY ?? 0);
 
         // The hit rect covers the glyph plus every dot's rest position, so
         // a dot dragged outward can't leave the rect, fire onMouseLeave,
@@ -98,13 +116,24 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
         const ry2 = Math.max(box.y + box.height, scaleXAt.y, scaleYAt.y) + SCALE_HANDLE_GAP;
 
         const beginDrag = (pointer: { x: number; y: number }) => {
+          const scaleX = transform?.scaleX ?? 1;
+          const scaleY = transform?.scaleY ?? 1;
           dragStartRef.current = {
-            scaleX: transform?.scaleX ?? 1,
-            scaleY: transform?.scaleY ?? 1,
+            scaleX,
+            scaleY,
             offsetX: transform?.offsetX ?? 0,
             offsetY: transform?.offsetY ?? 0,
             pointerX: pointer.x,
             pointerY: pointer.y,
+            // Rest distance is measured at scale 1, so divide the dot's
+            // current (already-scaled) distance from the pivot by the
+            // scale it was drawn at. Snapshotted once here — see the
+            // dragStartRef comment above for why this must not be
+            // recomputed from the live box on every move.
+            restDistanceX: (scaleXAt.x - pivotX) / (scaleX || 1),
+            restDistanceY: (scaleYAt.y - pivotY) / (scaleY || 1),
+            pivotX,
+            pivotY,
           };
           setDraggingIndex(box.glyphIndex);
         };
@@ -125,9 +154,13 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
               fill="transparent"
               // Konva routes a pointer only to the topmost listening shape,
               // and these rects are deliberately wide. Switching every
-              // other glyph's rect off while one is active stops them
-              // stealing hover from each other.
-              listening={hoveredIndex === null || isActive}
+              // other glyph's rect off while one is hovered OR dragging
+              // stops them stealing hover from each other — gating on
+              // hover alone would re-arm every neighbour the moment a
+              // drag carries the pointer outside this rect, popping a
+              // neighbour's dots up mid-gesture (StrokeStretchHoverHandles
+              // established this same fix).
+              listening={(hoveredIndex === null && draggingIndex === null) || isActive}
               onMouseEnter={() => setHoveredIndex(box.glyphIndex)}
               onMouseLeave={() =>
                 setHoveredIndex((v) => (v === box.glyphIndex ? null : v))
@@ -202,13 +235,12 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
                     const start = dragStartRef.current;
                     if (!start) return;
                     const pos = e.target.position();
-                    // Rest distance is measured at scale 1, so divide the
-                    // current dot distance by the scale it was drawn at.
-                    const restDistance =
-                      (scaleXAt.x + offsetX - (pivotX + offsetX)) / (start.scaleX || 1);
-                    const dragDistance = pos.x - (pivotX + offsetX);
+                    // Both the rest distance and the pivot come from the
+                    // drag-start snapshot, not the live (already-updated)
+                    // box — see the dragStartRef comment above.
+                    const dragDistance = pos.x - (start.pivotX + offsetX);
                     onUpdateGlyphTransform?.(box.glyphIndex, {
-                      scaleX: scaleFromDrag(restDistance, dragDistance),
+                      scaleX: scaleFromDrag(start.restDistanceX, dragDistance),
                     });
                   }}
                   onDragEnd={(e) => {
@@ -252,11 +284,12 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
                     const start = dragStartRef.current;
                     if (!start) return;
                     const pos = e.target.position();
-                    const restDistance =
-                      (scaleYAt.y + offsetY - (pivotY + offsetY)) / (start.scaleY || 1);
-                    const dragDistance = pos.y - (pivotY + offsetY);
+                    // Both the rest distance and the pivot come from the
+                    // drag-start snapshot, not the live (already-updated)
+                    // box — see the dragStartRef comment above.
+                    const dragDistance = pos.y - (start.pivotY + offsetY);
                     onUpdateGlyphTransform?.(box.glyphIndex, {
-                      scaleY: scaleFromDrag(restDistance, dragDistance),
+                      scaleY: scaleFromDrag(start.restDistanceY, dragDistance),
                     });
                   }}
                   onDragEnd={(e) => {
