@@ -1,7 +1,18 @@
 # Per-stroke editing that preserves letter joining
 
-**Status:** design approved 2026-08-12. No code written yet. Next step is an
-implementation plan.
+**Status:** Phases A and B are implemented (2026-08-13, plan:
+`docs/superpowers/plans/2026-08-13-per-stroke-editing-phase-ab.md`) —
+change 3 (clamp/taper the axis) and change 5 (nuqta quantization) from
+Phase A, and change 1 (overlap-based join pins) from Phase B. Join pins
+landed **plain-text only**, per the user's 2026-08-13 decision recorded
+below as no longer undecided. Detection has a measured, documented gap:
+of 20 (font, word) pairs tested, 3 abut without overlapping and go
+unpinned — see "Diagnosis" and "Deferred, not forgotten" below; this is
+not a regression, it is the pre-existing tearing behaviour, simply not
+yet fixed for that geometry. Changes 2 and 4 remain unbuilt. **Phase C —
+measuring how far the schema→real-glyph mapping actually drifts from
+Naskh — is the next step**, and gates whether Phase D (changes 2 and 4)
+proceeds as designed.
 
 **Goal (user's words):** "I want every stroke to be able to be modified
 separately but I still want the glyphs/letters to join to each other
@@ -251,6 +262,23 @@ Falsifiable, not a matter of taste:
 
 ## Deferred, not forgotten
 
+- **Join-pin detection for abutting-but-not-overlapping glyphs.**
+  `overlapCentroid` (`lib/joinPins.ts`) finds a join only where two adjacent
+  glyphs' real outlines physically overlap; measured 2026-08-13, 3 of 20
+  (font, word) pairs shape to glyphs that merely abut, so no pin is placed
+  and those joins keep the pre-existing tearing behaviour (see
+  "Implementation notes" above for the full breakdown). Deliberately **not**
+  improvised with a dilation radius here: dilate enough to catch abutting
+  letters and false joins start getting manufactured between letters that
+  merely pass near each other without connecting — its own new failure mode,
+  not a free fix. A baseline-scan heuristic was considered and rejected for
+  the same reason changes 2 and 4 were deferred to Phase C: it assumes
+  Naskh-shaped geometry the design explicitly does not want to bake in this
+  early. Extending detection to this case is new design work.
+- **Join pins on Shape Fill and text-on-path blocks.** Plain text only, per
+  the 2026-08-13 decision recorded above. `ShapeFillText` tiles its run
+  through a per-tile affine transform; computing pins in that space is
+  separate work.
 - **Diwani and Ruq'ah support**, and with them the per-style schema override
   layer: one base schema per letter-form plus a thin per-style layer carrying
   only the numbers that differ (`minFactor`/`maxFactor`, `priority`), rather
@@ -320,11 +348,31 @@ No new geometry library.
 beyond the drag origin (`x = 200`) is excluded by a lasso mask, so it asserts
 masking, not overshoot.
 
-**Undecided — needs a call before implementing Phase B.** Whether Shape Fill
-blocks get join pins too. `ShapeFillText` shares `applyGlyphEdit` but tiles
-its run through a per-tile affine transform, so computing pins there is real
-work, not a one-line change. Plain text only is the smaller, safer first
-step, but it was never explicitly agreed.
+**Decided 2026-08-13 — plain text only.** Shape Fill blocks do not get join
+pins in this phase. `ShapeFillText` shares `applyGlyphEdit` but tiles its run
+through a per-tile affine transform, so computing pins there is real work,
+not a one-line change; it was scoped out rather than attempted alongside the
+plain-text fix. See "Deferred, not forgotten" below.
+
+**Detection coverage, measured 2026-08-13
+(`src/lib/joinPins.fonts.test.ts`).** 5 fonts (TahaNaskhRegular, Amiri,
+Thuluth, Kufi, Urdu) × 4 connected words (`حرف`, `بسم`, `كتب`, `سلام`) = 20
+pairs, shaped with real harfbuzzjs against the real fonts. The 0px
+displacement-at-a-pinned-join invariance held for every join that was
+detected. 5 of 20 pairs detected no join, in two distinct categories,
+confirmed by independently re-shaping and counting glyphs:
+
+- **Correct-by-design (2 pairs):** `Urdu/بسم` and `Urdu/كتب` each shape to a
+  single glyph — the font fuses the letters via GSUB. No glyph boundary
+  means no seam to tear, so "no pin" is the right answer, not a gap.
+- **A real, currently-inert gap (3 pairs):** `Urdu/حرف`, `Urdu/سلام`, and
+  `Thuluth/سلام` shape to multiple glyphs whose ink genuinely does not
+  overlap — those letters abut rather than overlap, so `overlapCentroid`
+  correctly finds nothing and the join stays unpinned. This is not a
+  regression: those joins have exactly the pre-existing tearing behaviour
+  this whole feature exists to fix, just not yet fixed for this geometry.
+  See "Deferred, not forgotten" for why this was not improvised with a
+  dilation radius.
 
 ## Repro notes
 
