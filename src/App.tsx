@@ -28,6 +28,7 @@ import {
 import type { StretchDefinition } from "./lib/strokeSchema/deriveCatalog";
 import { mapNormToRealBox } from "./lib/strokeSchema/schemaGeometry";
 import { snapStretchFactor } from "./lib/strokeSchema/quantize";
+import { kashidaFactorForHandle } from "./lib/kashidaFactor";
 import { arcPathD } from "./lib/textPath";
 import type {
   Block,
@@ -617,13 +618,11 @@ const App: React.FC = () => {
             glyphEdits: (b.glyphEdits ?? []).map((edit) => ({
               ...edit,
               stretches: edit.stretches.map((h) => {
-                if (!h.kashidaEligible || h.maxFactor == null) return h;
-                const weight = (h.priority ?? 5) / 10;
-                const factor = Math.min(
-                  h.maxFactor,
-                  1 + (h.maxFactor - 1) * (clampedAmount / 100) * weight
-                );
-                return { ...h, factor };
+                const factor = kashidaFactorForHandle(h, clampedAmount, {
+                  fontFamily: b.fontFamily,
+                  enabled: snapStrokesToNuqta,
+                });
+                return factor == null ? h : { ...h, factor };
               }),
             })),
           };
@@ -631,7 +630,7 @@ const App: React.FC = () => {
       );
       scheduleGlyphEditHistoryPush();
     },
-    [scheduleGlyphEditHistoryPush]
+    [scheduleGlyphEditHistoryPush, snapStrokesToNuqta]
   );
 
   const updateStretchHandle = useCallback(
@@ -2197,6 +2196,7 @@ const App: React.FC = () => {
         fontSize: block.fontSize,
         glyphEdits,
         targetWidth,
+        snapToNuqta: snapStrokesToNuqta,
       });
 
       if (!solution) {
@@ -2213,7 +2213,7 @@ const App: React.FC = () => {
             )}px.`
       );
     },
-    [blocks, setBlockKashidaAmount]
+    [blocks, setBlockKashidaAmount, snapStrokesToNuqta]
   );
 
   const justifyOtherSelectedId =
