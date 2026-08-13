@@ -11,13 +11,23 @@ python3 -m venv .venv && ./.venv/bin/pip install fonttools
 
 ## Adding a font — the whole checklist
 
-A font must be registered in **four** places or it half-works in ways that
+A font must be registered in **five** places or it half-works in ways that
 fail quietly. See CLAUDE.md's "Font files carry custom glyphs" section.
 
 1. the file in `public/fonts/`
 2. an `@font-face` rule at the top of `src/index.css`
 3. `FONT_OPTIONS` in `src/components/Sidebar.tsx` — controls the picker
 4. `FONT_URLS` in `src/hooks/useShapedGlyphs.ts` — what HarfBuzz shapes with
+5. `NUQTA_EM_RATIO` in `src/lib/nuqta.ts` — the font's measured nuqta as a
+   dot/em ratio, from `measureNuqta.py` below
+
+Step 5 is unlike the others in two ways. The value must be **measured**, not
+picked — there is no formula, and the obvious rule (the alif's stem is one
+nuqta) fails across this library by a factor of 3. And leaving it out is a
+*legitimate* choice: absence is how a font is declared out of scope for
+per-stroke editing, which is why `Ruqaa` and `HarfCanvasDiwani` are absent.
+Just do it deliberately — a font missing from the table looks completely
+normal but silently has no nuqta snapping and no join pinning.
 
 Then merge the honorific PUA glyphs:
 

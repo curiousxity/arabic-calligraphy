@@ -6,6 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 HarfCanvas — a browser-based Arabic calligraphy design tool (React 19 + TypeScript + Vite, canvas rendering via Konva/react-konva). Users compose text, SVG-shape, and image blocks on a resizable artboard and export to PNG/JPEG/SVG/PDF.
 
+### Which document to write in
+
+Three docs, three jobs. Putting content in the wrong one is how they drift
+into contradicting each other.
+
+| | holds | organised by |
+|---|---|---|
+| **this file** | how a subsystem works and why, and the traps in it | subsystem |
+| `PROGRESS.md` | what shipped when, what is known-broken, what is blocked | date / status |
+| `docs/superpowers/specs/` | the argument for a design, and its open questions | feature |
+
+`README.md` is outward-facing and describes the product, not the code.
+
+The rule that keeps them honest: **state a fact in one place and link to it
+from the others.** A limitation explained in full here gets one line and a
+pointer in `PROGRESS.md`, not a second copy that will rot.
+
 ## Commands
 
 ```bash
