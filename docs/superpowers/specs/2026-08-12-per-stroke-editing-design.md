@@ -179,11 +179,17 @@ Measured table (2026-08-12), in-scope fonts:
 | ThuluthDeco.ttf | 2048 | 188×219 | 0.0918 | high |
 | Urdu.ttf | 2048 | 315×283 | 0.1538 | high |
 | Wessam.ttf | 2048 | 156×177 | 0.0762 | high |
-| Yekan.ttf | 2048 | 276×248 | 0.1348 | **medium — methods disagree** |
+| Yekan.ttf | 2048 | 276×248 | 0.1348 | accepted (see note) |
 
 Two methods cross-checked (beh dot contour; modal-contour sweep over every
-glyph). They agree within ~2% on all of the above except Yekan (276×248 vs
-260×220), which needs a human eye before it is relied on.
+glyph). They agree within ~2% on every row above except Yekan, where the beh
+dot gives 276×248 and the modal sweep 260×220 — a ~6% spread. **Reviewed and
+accepted by the user 2026-08-12**; the table uses the beh-dot figure, which
+is the more direct measurement (the actual dot of an actual letter, rather
+than the commonest compact contour in the font). At a ~6% spread the
+practical consequence is sub-pixel at normal sizes, and change 5's
+quantization is advisory anyway, so a small error degrades the snap
+increment rather than corrupting geometry.
 
 ## Sequencing
 
@@ -239,8 +245,6 @@ Falsifiable, not a matter of taste:
 
 ## Open questions
 
-- Yekan's nuqta (276×248 vs 260×220) needs a human decision before change 5
-  relies on it.
 - Phase C's outcome decides whether Phase D proceeds as designed.
 - Pin radius as a multiple of the nuqta: exact factor to be tuned once
   change 1 is testable.
