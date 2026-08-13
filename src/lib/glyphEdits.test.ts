@@ -235,6 +235,80 @@ describe("applyGlyphEdit", () => {
     expect(outside.x).toBeCloseTo(200);
     expect(outside.y).toBeCloseTo(0);
   });
+
+  it("does not move a point at a pinned join, at any factor", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 200,
+          dragY: 0,
+          bandWidth: 200,
+          minFactor: 0.85,
+          maxFactor: 1.8,
+        },
+      ],
+    };
+    const pins = [{ x: 60, y: 0, radius: 20 }];
+
+    for (const factor of [0.85, 1, 1.2, 1.5, 1.8]) {
+      const withFactor: GlyphEdit = {
+        ...edit,
+        stretches: [{ ...edit.stretches[0], factor }],
+      };
+      const p = applyGlyphEdit(60, 0, withFactor, -1, pins);
+      expect(p.x, `factor ${factor}`).toBeCloseTo(60, 9);
+      expect(p.y, `factor ${factor}`).toBeCloseTo(0, 9);
+    }
+  });
+
+  it("leaves displacement untouched well outside the pin radius", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 200,
+        },
+      ],
+    };
+    const unpinned = applyGlyphEdit(100, 0, edit);
+    const pinnedFarAway = applyGlyphEdit(100, 0, edit, -1, [{ x: 0, y: 0, radius: 20 }]);
+    expect(pinnedFarAway.x).toBeCloseTo(unpinned.x, 9);
+  });
+
+  it("partially suppresses displacement inside the pin radius", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 200,
+        },
+      ],
+    };
+    const unpinned = applyGlyphEdit(100, 0, edit).x;
+    const pinned = applyGlyphEdit(100, 0, edit, -1, [{ x: 90, y: 0, radius: 20 }]).x;
+    expect(pinned).toBeGreaterThan(100);
+    expect(pinned).toBeLessThan(unpinned);
+  });
 });
 
 describe("applyGlyphRig", () => {

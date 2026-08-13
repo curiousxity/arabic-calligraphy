@@ -1,4 +1,5 @@
 import type { GlyphEdit, GlyphRig, GlyphRigValue, GlyphStretchHandle, GlyphStretchMask } from "../types";
+import { joinGuard, type JoinPin } from "./joinPins";
 
 export const MASK_CONTOUR_ON_COLOR = "#22c55e";
 export const MASK_CONTOUR_OFF_COLOR = "#9ca3af";
@@ -116,16 +117,28 @@ function resolveValueMultiplier(h: GlyphStretchHandle): number {
 /**
  * Applies a glyph's edits to a single outline point: each stretch handle
  * pulls points near its anchor→drag axis along that axis, proportional to
- * distance from the anchor (0 at the anchor, 1 at the drag handle's original
- * position and held at 1 beyond it (clamped — see the note at the `tAlong`
- * computation)) and tapered by perpendicular distance from
- * the axis (a smoothstep band falloff).
+ * clamped distance from the anchor (0 at the anchor, 1 at the drag handle's
+ * original position and held there beyond it) and tapered by perpendicular
+ * distance from the axis (a smoothstep band falloff).
+ *
+ * `pins` are the connection points this glyph shares with its neighbours
+ * (see lib/joinPins.ts). Displacement is scaled to zero at each pin and
+ * ramped smoothly back to full beyond its radius, so stretching a letter
+ * cannot tear the seam where it joins the next one. The guard is applied to
+ * the *net* result rather than per handle deliberately: a glyph can carry
+ * several handles, and guarding each one separately would let two of them
+ * each individually respect the pin while still summing to a net movement
+ * there. Optional, and absent for every caller that does not have pins —
+ * Shape Fill blocks tile their run through a per-tile affine transform, so
+ * computing pins in that space is separate work and they deliberately pass
+ * none.
  */
 export function applyGlyphEdit(
   x: number,
   y: number,
   edit: GlyphEdit | undefined,
-  contourIndex = -1
+  contourIndex = -1,
+  pins?: JoinPin[]
 ): { x: number; y: number } {
   if (!edit) return { x, y };
 
@@ -141,7 +154,13 @@ export function applyGlyphEdit(
     py = p.y;
   }
 
-  return { x: px, y: py };
+  // Evaluated at the point's original position, for the same reason the mask
+  // is: a point must not be able to escape its own join guard by being
+  // displaced out of the pin radius first.
+  const guard = joinGuard(x, y, pins);
+  if (guard >= 1) return { x: px, y: py };
+
+  return { x: x + (px - x) * guard, y: y + (py - y) * guard };
 }
 
 type PreparedRigAxis = {
