@@ -151,8 +151,8 @@ const glyphBoxesEqual = (a: GlyphBox[] | undefined, b: GlyphBox[]): boolean => {
  */
 const supportsDiacriticOverrides = (
   b: Block
-): b is Extract<Block, { type: "text" | "shapeFill" | "shapeWarp" }> =>
-  b.type === "text" || b.type === "shapeFill" || b.type === "shapeWarp";
+): b is Extract<Block, { type: "text" | "shapeFill" }> =>
+  b.type === "text" || b.type === "shapeFill";
 
 /**
  * Plain text blocks only for v1 — Shape Fill and Shape Warp carry the
@@ -946,27 +946,6 @@ const App: React.FC = () => {
     [scheduleGlyphRigHistoryPush]
   );
 
-  const resetShapeWarp = useCallback(
-    (blockId: number) => {
-      pushHistory();
-      setBlocks((prev) =>
-        prev.map((b) =>
-          b.id === blockId && b.type === "shapeWarp"
-            ? {
-                ...b,
-                warpShapePadding: 24,
-                warpShapeStrength: 1,
-                warpShapeMode: "envelope",
-                glyphEdits: [],
-                selectedGlyphIndex: null,
-              }
-            : b
-        )
-      );
-    },
-    [pushHistory]
-  );
-
   const fitShapeFillSpacing = useCallback(
     (blockId: number) => {
       pushHistory();
@@ -1720,7 +1699,15 @@ const App: React.FC = () => {
     parsed: Record<string, unknown>,
     opts: { mergeRigs?: boolean } = {}
   ) => {
-    const parsedBlocks = Array.isArray(parsed.blocks) ? (parsed.blocks as Block[]) : null;
+    // Projects saved before the Shape Warp block type was removed can still
+    // carry blocks of that type. Nothing renders them any more, so drop them
+    // rather than letting CanvasStage's exhaustive type switch fall through to
+    // an unrendered block that still occupies the layer list and selection.
+    const parsedBlocks = Array.isArray(parsed.blocks)
+      ? (parsed.blocks as Block[]).filter(
+          (b) => (b as { type?: string }).type !== "shapeWarp"
+        )
+      : null;
     const loadedBlocks: Block[] = parsedBlocks ?? blocks;
     if (parsedBlocks) setBlocks(parsedBlocks);
     if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
@@ -1978,41 +1965,6 @@ const App: React.FC = () => {
       -shapeWidth / 2,
       -shapeHeight / 2,
       "New Shape Fill"
-    );
-  };
-
-  const addShapeWarpBlock = (
-    svgPathData: string,
-    shapeWidth: number,
-    shapeHeight: number
-  ) => {
-    const newId = createNextId();
-    const autoFontSize = Math.max(8, Math.round(shapeHeight / 6));
-
-    beginPlacement(
-      {
-        ...DEFAULT_BLOCK,
-        id: newId,
-        text: "“كما أن كل المنحنيات ترتبط بمراكزها أو بؤرها، كذلك يرتبط كل جمالٍ في الشخصية بالروح.” — هنري ديفيد ثورو",
-        fontSize: autoFontSize,
-        type: "shapeWarp",
-        shapeSvgPath: svgPathData,
-        warpShapeWidth: shapeWidth,
-        warpShapeHeight: shapeHeight,
-        warpShapePadding: 24,
-        warpShapeStrength: 1,
-        warpShapeMode: "envelope",
-        x: 0,
-        y: 0,
-        glyphEditTool: null,
-        selectedGlyphIndex: null,
-        glyphEdits: [],
-      },
-      shapeWidth,
-      shapeHeight,
-      -shapeWidth / 2,
-      -shapeHeight / 2,
-      "New Shape Warp"
     );
   };
 
@@ -2420,7 +2372,6 @@ const App: React.FC = () => {
         onLoadNamedProject={loadNamedProject}
         onDeleteNamedProject={requestDeleteNamedProject}
         onAddShapeFillBlock={addShapeFillBlock}
-        onAddShapeWarpBlock={addShapeWarpBlock}
         onAddTextPathBlock={addTextPathBlock}
         onAddImageBlock={uploadImageBlock}
         onGenerateFromTemplate={generateFromTemplate}
@@ -2461,7 +2412,6 @@ const App: React.FC = () => {
         }}
         showMorphEditorMobile={showMorphEditorMobile}
         onToggleMorphEditorMobile={() => setShowMorphEditorMobile((v) => !v)}
-        onResetShapeWarp={resetShapeWarp}
         onFitShapeFillSpacing={fitShapeFillSpacing}
         onAlignSelected={alignSelectedBlocks}
         onDistributeSelected={distributeSelectedBlocks}

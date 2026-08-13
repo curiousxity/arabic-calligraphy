@@ -3,7 +3,6 @@ import { Stage, Layer, Group, Rect, Line, Text } from "react-konva";
 import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
-import { ShapeWarpText } from "./ShapeWarpText";
 import { TextOnPathText } from "./TextOnPathText";
 import { TextPathEditOverlay } from "./TextPathEditOverlay";
 import { ImageBlockView } from "./ImageBlockView";
@@ -815,62 +814,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                       onGlyphSchemaChange(block.id, catalog)
                     }
                     diacriticEditMode={block.diacriticEditMode ?? false}
-                    diacriticOverrides={block.diacriticOverrides ?? []}
-                    onDragDiacriticOverride={(glyphIndex, patch) =>
-                      onDragDiacriticOverride(block.id, glyphIndex, patch)
-                    }
-                    onToggleDiacriticHidden={(glyphIndex) =>
-                      onToggleDiacriticHidden(block.id, glyphIndex)
-                    }
-                  />
-                );
-              }
-
-              if (block.type === "shapeWarp") {
-                return (
-                  <ShapeWarpText
-                    key={block.id}
-                    {...commonProps}
-                    text={block.text}
-                    x={block.x}
-                    y={block.y}
-                    fontSize={block.fontSize}
-                    color={block.color}
-                    fontFamily={block.fontFamily}
-                    fontStyle={block.fontStyle ?? "normal"}
-                    shapeSvgPath={block.shapeSvgPath ?? ""}
-                    warpShapeWidth={block.warpShapeWidth ?? block.shapeWidth ?? 400}
-                    warpShapeHeight={block.warpShapeHeight ?? block.shapeHeight ?? 400}
-                    warpShapeMode={block.warpShapeMode ?? "envelope"}
-                    warpShapePadding={block.warpShapePadding ?? 24}
-                    warpShapeStrength={block.warpShapeStrength ?? 1}
-                    opacity={block.opacity ?? 1}
-                    stroke={block.stroke}
-                    strokeWidth={block.strokeWidth ?? 0}
-                    shadowColor={block.shadowColor}
-                    shadowBlur={block.shadowBlur ?? 0}
-                    shadowOffsetX={block.shadowOffsetX ?? 0}
-                    shadowOffsetY={block.shadowOffsetY ?? 0}
-                    shadowOpacity={block.shadowOpacity ?? 0.35}
-                    rotation={block.rotation ?? 0}
-                    locked={block.locked}
-                    debugBounds={false}
-                    glyphEditTool={block.glyphEditTool ?? null}
-                    selectedGlyphIndex={block.selectedGlyphIndex ?? null}
-                    glyphEdits={block.glyphEdits ?? []}
-                    glyphRigs={glyphRigs}
-                    glyphRigValues={block.glyphRigValues ?? []}
-                    onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
-                    onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
-                      onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
-                    }
-                    onGlyphBoxesChange={(boxes) =>
-                      onGlyphBoxesChange(block.id, boxes)
-                    }
-                    onGlyphSchemaChange={(catalog) =>
-                      onGlyphSchemaChange(block.id, catalog)
-                    }
-                    isSelected={block.id === selectedId}
                     diacriticOverrides={block.diacriticOverrides ?? []}
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)

@@ -341,15 +341,21 @@ function drawWarpedGlyphRun(
       tracePath(ctx, cmds);
     }
 
+    // Outline first, fill second. A canvas stroke straddles the path, so
+    // stroking *after* the fill lays half the outline's width back over the
+    // letter — thickening every stem and closing up counters as the width
+    // rises. Filling over the stroke hides that inner half, leaving the
+    // letterform at its designed weight with the outline sitting outside it.
+    if (drawStroke && strokeWidth > 0) {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth;
+      ctx.stroke();
+    }
+
     ctx.fill();
     if (fauxBoldWidth > 0 && !drawStroke) {
       ctx.strokeStyle = ctx.fillStyle as string;
       ctx.lineWidth = fauxBoldWidth;
-      ctx.stroke();
-    }
-    if (drawStroke && strokeWidth > 0) {
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = strokeWidth;
       ctx.stroke();
     }
 

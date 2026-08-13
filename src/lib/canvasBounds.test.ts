@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ZOOM_STEP, zoomFactorFromWheel } from "./canvasBounds";
+import { MAX_STEP, ZOOM_STEP, zoomFactorFromWheel } from "./canvasBounds";
 
 describe("zoomFactorFromWheel", () => {
   it("does nothing at zero travel", () => {
@@ -23,7 +23,10 @@ describe("zoomFactorFromWheel", () => {
     // produce correspondingly small steps, not a full detent each.
     const small = zoomFactorFromWheel(-4);
     expect(small).toBeGreaterThan(1);
-    expect(small).toBeLessThan(1.01);
+    // 4px of travel is 4% of a detent, so the factor is ZOOM_STEP to that
+    // power — asserted against the constant rather than a literal bound, so
+    // retuning ZOOM_STEP can't quietly invalidate this test's premise.
+    expect(small).toBeCloseTo(ZOOM_STEP ** 0.04, 6);
     // A pinch event is a small fraction of a detent, not a whole one.
     expect(small).toBeLessThan(zoomFactorFromWheel(-100));
   });
@@ -50,8 +53,11 @@ describe("zoomFactorFromWheel", () => {
   });
 
   it("clamps a single enormous flick rather than jumping zoom levels", () => {
-    expect(zoomFactorFromWheel(-100000)).toBeLessThanOrEqual(1.25);
-    expect(zoomFactorFromWheel(100000)).toBeGreaterThanOrEqual(1 / 1.25);
+    expect(zoomFactorFromWheel(-100000)).toBeLessThanOrEqual(MAX_STEP);
+    expect(zoomFactorFromWheel(100000)).toBeGreaterThanOrEqual(1 / MAX_STEP);
+    // The clamp must stay above one detent, or a single wheel click would
+    // zoom less than one button press.
+    expect(MAX_STEP).toBeGreaterThan(ZOOM_STEP);
   });
 
   it("returns the identity for a non-finite delta", () => {

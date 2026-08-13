@@ -6,7 +6,7 @@ import {
   URDU,
   PRESETS,
 } from "../lib/presets";
-import type { Block, TextAlign, ShapeWarpMode } from "../types";
+import type { Block, TextAlign } from "../types";
 import type { NamedProjectMeta } from "../App";
 import { extractSvgPaths } from "../lib/svgImport";
 import { arcPathD, wavePathD, circlePathD } from "../lib/textPath";
@@ -27,7 +27,6 @@ import {
   CheckboxRow,
 } from "./sidebar/FormControls";
 import { FloatingArabicKeyboard } from "./sidebar/FloatingKeyboard";
-import { ImageTraceDialog } from "./ImageTraceDialog";
 import { GuideLauncher } from "./guide/GuideLauncher";
 import {
   TrashIcon,
@@ -35,7 +34,6 @@ import {
   PlusIcon,
   ShapesIcon,
   PathTextIcon,
-  CircleDashedIcon,
   UndoIcon,
   RedoIcon,
   SaveIcon,
@@ -43,7 +41,6 @@ import {
   DownloadIcon,
   UploadIcon,
   ImageIcon,
-  TraceWandIcon,
   VectorIcon,
   FileTextIcon,
   ChevronLeftIcon,
@@ -100,7 +97,6 @@ export type SidebarProps = {
   onChangeSaveDestination?: (dest: "local" | "cloud") => void;
 
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
-  onAddShapeWarpBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddTextPathBlock?: () => void;
   onAddImageBlock?: () => void;
   onGenerateFromTemplate?: (templateId: string, values: string[]) => void;
@@ -137,7 +133,6 @@ export type SidebarProps = {
   onToggleDiacriticEditMode?: () => void;
   showMorphEditorMobile?: boolean;
   onToggleMorphEditorMobile?: () => void;
-  onResetShapeWarp?: (blockId: number) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
   onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
   onDistributeSelected?: (axis: "x" | "y") => void;
@@ -231,7 +226,7 @@ function cmdsToD(cmds: SvgCmd[]): string {
  * Keeps only the first subpath of an SVG path `d` string (everything up to,
  * but not including, the second `M` command). `extractSvgPaths` legitimately
  * concatenates every shape in an uploaded SVG into one `d` string for
- * shapeFill/shapeWarp's union-silhouette use case, but a text-path curve
+ * shapeFill's union-silhouette use case, but a text-path curve
  * needs a single open path — the phantom jump between subpaths would
  * otherwise inflate arc length and route glyphs through empty space.
  */
@@ -304,7 +299,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   saveDestination = "local",
   onChangeSaveDestination,
   onAddShapeFillBlock,
-  onAddShapeWarpBlock,
   onAddTextPathBlock,
   onAddImageBlock,
   onGenerateFromTemplate,
@@ -335,7 +329,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleDiacriticEditMode,
   showMorphEditorMobile,
   onToggleMorphEditorMobile,
-  onResetShapeWarp,
   onFitShapeFillSpacing,
   onAlignSelected,
   onDistributeSelected,
@@ -397,7 +390,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showBackgroundSettings, setShowBackgroundSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
-  const [imageTraceFile, setImageTraceFile] = useState<File | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -476,8 +468,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     else if (selectedBlock?.id === id) onUpdateSelectedBlock({ name });
   };
 
-  const handleSvgUpload = (mode: "shapeFill" | "shapeWarp") => {
-    const onAdd = mode === "shapeFill" ? onAddShapeFillBlock : onAddShapeWarpBlock;
+  const handleSvgUpload = () => {
+    const onAdd = onAddShapeFillBlock;
     if (!onAdd) return;
 
     const input = document.createElement("input");
@@ -505,26 +497,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     input.click();
   };
 
-  const handleImageTraceUpload = () => {
-    if (!onAddShapeWarpBlock) return;
-
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      if (!file.type.startsWith("image/")) {
-        alert("Please choose an image file (PNG, JPG, etc.).");
-        return;
-      }
-      setImageTraceFile(file);
-    };
-
-    input.click();
-  };
-
   const handleTextPathSvgUpload = () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -545,7 +517,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
 
         // extractSvgPaths concatenates every matched shape into one `d`
-        // string, which is correct for shapeFill/shapeWarp (they want the
+        // string, which is correct for shapeFill (it wants the
         // union silhouette) but wrong for a text-path curve: the jump from
         // one subpath's end to the next subpath's `M` would be treated as a
         // real curve segment. Keep only the first subpath here.
@@ -1359,46 +1331,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 className="sidebarCircleButton"
                 title="Upload SVG for Shape Fill"
-                onClick={() => handleSvgUpload("shapeFill")}
+                onClick={() => handleSvgUpload()}
               >
                 <ShapesIcon size={14} />
               </button>
             )}
 
-            {onAddShapeWarpBlock && (
-              <>
-                <button
-                  type="button"
-                  className="sidebarCircleButton"
-                  title="Upload SVG for Shape Warp"
-                  aria-label="Upload SVG for Shape Warp"
-                  onClick={() => handleSvgUpload("shapeWarp")}
-                >
-                  <CircleDashedIcon size={14} />
-                </button>
-
-                <button
-                  type="button"
-                  className="sidebarCircleButton"
-                  title="Trace image for Shape Warp"
-                  aria-label="Trace image for Shape Warp"
-                  onClick={handleImageTraceUpload}
-                >
-                  <TraceWandIcon size={14} />
-                </button>
-              </>
-            )}
-
-            {imageTraceFile && (
-              <ImageTraceDialog
-                file={imageTraceFile}
-                onCancel={() => setImageTraceFile(null)}
-                onConfirm={(pathData, w, h) => {
-                  onAddShapeWarpBlock?.(pathData, w, h);
-                  setImageTraceFile(null);
-                }}
-              />
-            )}
 
             {onAddTextPathBlock && (
               <button
@@ -1657,8 +1595,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
 
                 {(selectedBlock?.type === "text" ||
-                  selectedBlock?.type === "shapeFill" ||
-                  selectedBlock?.type === "shapeWarp") &&
+                  selectedBlock?.type === "shapeFill") &&
                   (selectedBlock.diacriticOverrides?.length ?? 0) > 0 && (
                     <button
                       type="button"
@@ -1865,92 +1802,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {selectedBlock && selectedBlock.type === "shapeWarp" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection
-              title="Shape Warp"
-              isOpen={showText}
-              onToggle={() => setShowText((v) => !v)}
-            >
-              <div className="sectionPanel">
-                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                        Reset to defaults
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => onResetShapeWarp?.(selectedBlock.id)}
-                        className="layerIconBtn"
-                        title="Reset shape warp to defaults"
-                      >
-                        Reset
-                      </button>
-                    </div>
-
-                    <SelectRow
-                      id={makeId("warp-shape-mode", selectedId)}
-                      name={makeId("warpShapeMode", selectedId)}
-                      label="Warp mode"
-                      value={selectedBlock.warpShapeMode ?? "envelope"}
-                      onChange={(v) =>
-                        onUpdateSelectedBlock({
-                          warpShapeMode: v as ShapeWarpMode,
-                        })
-                      }
-                    >
-                      <option value="envelope">Envelope</option>
-                      <option value="topBottom">Top Bottom</option>
-                      <option value="stretch">Stretch</option>
-                      <option value="radial">Radial</option>
-                    </SelectRow>
-
-                    <RangeRow
-                      id={makeId("warp-shape-padding", selectedId)}
-                      name={makeId("warpShapePadding", selectedId)}
-                      label="Inner padding"
-                      value={selectedBlock.warpShapePadding ?? 24}
-                      min={0}
-                      max={150}
-                      step={1}
-                      onChange={(v) =>
-                        onUpdateSelectedBlock({ warpShapePadding: v })
-                      }
-                      suffix={`${selectedBlock.warpShapePadding ?? 24}px`}
-                      fieldKey="warpShapePadding"
-                    />
-
-                    <RangeRow
-                      id={makeId("warp-shape-strength", selectedId)}
-                      name={makeId("warpShapeStrength", selectedId)}
-                      label="Warp strength"
-                      value={selectedBlock.warpShapeStrength ?? 1}
-                      min={0}
-                      max={2}
-                      step={0.05}
-                      onChange={(v) =>
-                        onUpdateSelectedBlock({ warpShapeStrength: v })
-                      }
-                      suffix={(selectedBlock.warpShapeStrength ?? 1).toFixed(2)}
-                      fieldKey="warpShapeStrength"
-                    />
-
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-                      Base shape: {selectedBlock.warpShapeWidth ?? 400} ×{" "}
-                      {selectedBlock.warpShapeHeight ?? 400}px
-                    </div>
-                  </div>
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
         {selectedBlock && selectedBlock.type === "textPath" && (
           <div className="sidebarPanel">
             <CollapsibleSection title="Curve" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
@@ -2053,18 +1904,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     name={makeId("fontSize", selectedId)}
                     label="Font size"
                     value={selectedBlock.fontSize}
-                    min={
-                      selectedBlock.type === "shapeFill" ||
-                      selectedBlock.type === "shapeWarp"
-                        ? 4
-                        : 12
-                    }
-                    max={
-                      selectedBlock.type === "shapeFill" ||
-                      selectedBlock.type === "shapeWarp"
-                        ? 400
-                        : 200
-                    }
+                    min={selectedBlock.type === "shapeFill" ? 4 : 12}
+                    max={selectedBlock.type === "shapeFill" ? 400 : 200}
                     onChange={(v) => onUpdateSelectedBlock({ fontSize: v })}
                     suffix={`${Math.round(selectedBlock.fontSize)}px`}
                     fieldKey="fontSize"

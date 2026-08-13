@@ -40,7 +40,7 @@ export type TextOnPathTextProps = {
 /**
  * Renders shaped text flowing along an arbitrary curve. Each glyph is drawn
  * as a rigid unit (translate to its curve position, rotate to the local
- * tangent), modeled on ShapedText.tsx's glyph loop — not ShapeWarpText.tsx's
+ * tangent), modeled on ShapedText.tsx's glyph loop rather than a
  * per-point remap, since text-on-path doesn't distort individual glyph
  * outlines, it just repositions whole glyphs.
  */
@@ -172,13 +172,14 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
 
             c2d.fillStyle = color;
             replayPath(c2d, opPath.commands);
-            c2d.fill();
 
+            // Outline before fill — see the same ordering in ShapedText.tsx.
             if (strokeWidth > 0) {
               c2d.strokeStyle = stroke;
               c2d.lineWidth = strokeWidth;
               c2d.stroke();
             }
+            c2d.fill();
 
             c2d.restore();
             cursor += advance;

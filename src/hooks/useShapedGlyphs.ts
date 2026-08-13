@@ -41,7 +41,7 @@ export type ShapedGlyphsState = {
  * Shapes `text` in `fontFamily` via HarfBuzz, tracking load/error state and
  * guarding against setting state after the component has unmounted or the
  * inputs have changed again. Shared by ShapedText, ShapeFillText, and
- * ShapeWarpText, which all need the same glyph data.
+ * TextOnPathText, which all need the same glyph data.
  */
 export function useShapedGlyphs(text: string, fontFamily: string): ShapedGlyphsState {
   const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;

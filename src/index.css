@@ -304,13 +304,6 @@ html, body, #root { height: 100%; margin: 0; }
 .templateWizardInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .templateWizardWarning { font-size: 12px; color: var(--text-muted); margin: 4px 0 14px; }
 
-.imageTraceDialog { width: min(460px, 100%); }
-.imageTraceDialogPreview { display: flex; justify-content: center; margin-bottom: 14px; border: 1px solid var(--border-soft); border-radius: 8px; overflow: hidden; background: var(--bg-panel); }
-.imageTraceDialogControls { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.imageTraceDialogControls input[type="range"] { flex: 1; }
-.imageTraceDialogError { font-size: 12px; color: var(--danger); margin-bottom: 10px; }
-.imageTraceDialogConfirm { background: var(--accent); color: var(--text-on-accent); }
-.imageTraceDialogConfirm:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Canvas toolbar */
 .canvasToolbar { position: absolute; bottom: 12px; right: 12px; z-index: 20; display: flex; align-items: center; gap: 2px; background: var(--toolbar-bg); border: 1px solid var(--border); border-radius: 10px; padding: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); backdrop-filter: blur(6px); }

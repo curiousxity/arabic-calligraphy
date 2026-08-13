@@ -1,7 +1,6 @@
-export type BlockType = "text" | "shapeFill" | "shapeWarp" | "image" | "textPath";
+export type BlockType = "text" | "shapeFill" | "image" | "textPath";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
-export type ShapeWarpMode = "envelope" | "topBottom" | "stretch" | "radial";
 
 /**
  * Restricts a stretch handle to a subset of a glyph's outline points, for
@@ -153,7 +152,7 @@ type BlockCommon = {
   groupId?: number;
 
   // Per-glyph editing (Stretch Line tool) — shared across text, shapeFill,
-  // and shapeWarp blocks; not meaningful on image blocks.
+  // blocks; not meaningful on image blocks.
   glyphEditTool?: "stretch" | null;
   selectedGlyphIndex?: number | null;
   glyphEdits?: GlyphEdit[];
@@ -164,7 +163,7 @@ type BlockCommon = {
   kashidaAmount?: number;
   /**
    * Per-instance diacritic adjustments. Lives on BlockCommon rather than
-   * TextBlock because plain text, shapeFill, and shapeWarp blocks all
+   * TextBlock because plain text and shapeFill blocks all
    * support the on-canvas diacritic handles; image and textPath blocks
    * inherit it unused, the same intentional simplification glyphEdits
    * already makes.
@@ -180,10 +179,9 @@ type BlockCommon = {
   /** Arms the on-canvas move/scale handles. While on, ShapedText does not mount the stroke-stretch dots. */
   glyphTransformMode?: boolean;
 
-  // Shared shape-import fields. shapeFill and shapeWarp blocks both carry an
-  // uploaded SVG path, and shapeWarp falls back to shapeWidth/shapeHeight
-  // when warpShapeWidth/warpShapeHeight aren't set, so these stay common
-  // rather than being duplicated per type.
+  // Shape-import fields, carried by shapeFill blocks. They live on
+  // BlockCommon rather than on ShapeFillBlock because the save/load and
+  // clipboard paths copy them generically across block types.
   shapeSvgPath?: string;
   shapeWidth?: number;
   shapeHeight?: number;
@@ -209,15 +207,6 @@ export type ShapeFillBlock = BlockCommon & {
   diacriticEditMode?: boolean;
 };
 
-export type ShapeWarpBlock = BlockCommon & {
-  type: "shapeWarp";
-  warpShapeWidth?: number;
-  warpShapeHeight?: number;
-  warpShapePadding?: number;
-  warpShapeStrength?: number;
-  warpShapeMode?: ShapeWarpMode;
-};
-
 export type ImageBlock = BlockCommon & {
   type: "image";
   imageDataUrl: string;
@@ -236,4 +225,4 @@ export type TextPathBlock = BlockCommon & {
   textPathEditMode?: boolean;
 };
 
-export type Block = TextBlock | ShapeFillBlock | ShapeWarpBlock | ImageBlock | TextPathBlock;
+export type Block = TextBlock | ShapeFillBlock | ImageBlock | TextPathBlock;

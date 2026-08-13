@@ -61,27 +61,29 @@ Because handlers reference each other via closures declared later in the same fu
 
 ### The `Block` discriminated union (`src/types.ts`)
 
-Everything drawn on the canvas is a `Block`: `TextBlock | ShapeFillBlock | ShapeWarpBlock | ImageBlock`, discriminated by `type`. All four share a large `BlockCommon` (position, font fields, stroke/shadow, `groupId`, lock state, etc.) even where a variant doesn't conceptually need them (e.g. `ImageBlock` still carries unused `text`/`fontSize`/`color`/`fontFamily` because `BlockCommon` requires them) — this is an intentional simplification, not an oversight.
+Everything drawn on the canvas is a `Block`: `TextBlock | ShapeFillBlock | ImageBlock | TextPathBlock`, discriminated by `type`. All four share a large `BlockCommon` (position, font fields, stroke/shadow, `groupId`, lock state, etc.) even where a variant doesn't conceptually need them (e.g. `ImageBlock` still carries unused `text`/`fontSize`/`color`/`fontFamily` because `BlockCommon` requires them) — this is an intentional simplification, not an oversight.
 
 Because `Partial<Block>` patches spread onto a `Block` union member don't type-check cleanly across 4+ variants, the two generic update paths (`updateBlock`, `updateSelectedBlock` in `App.tsx`) cast the result `as Block`. This is a deliberate, narrow trust-the-caller escape hatch — don't propagate `as Block` elsewhere; fix the type properly if a new case needs it.
 
-`shapeFill`/`shapeWarp`/`image` blocks are fundamentally different rendering algorithms, not variants of one engine — see the component-by-component notes below. There was an explicit decision *not* to merge them into one engine (too much regression risk for little gain); if asked to "unify" them, favor UI-level consolidation over touching the render math.
+`shapeFill`/`textPath`/`image` blocks are fundamentally different rendering algorithms, not variants of one engine — see the component-by-component notes below. There was an explicit decision *not* to merge them into one engine (too much regression risk for little gain); if asked to "unify" them, favor UI-level consolidation over touching the render math.
+
+**`shapeWarp` was a fifth block type and was deleted outright** (it drew the text once and bent it into a shape's envelope, with `envelope`/`topBottom`/`stretch`/`radial` modes). It took `ShapeWarpText.tsx`, `lib/shapeWarpPoint.ts`, and the "Trace image" input — `ImageTraceDialog.tsx`, `lib/imageTrace.ts`, and the `imagetracerjs` dependency plus its version-pinned Vite alias — with it, since tracing existed only on that block type. `applyParsedLayoutPayload` in `App.tsx` filters `type === "shapeWarp"` blocks out of any project saved before the removal, so an old save loads with those blocks dropped rather than half-rendered. Don't resurrect any of it piecemeal from git history without re-reading this note.
 
 ### Rendering: one Konva component per block type
 
-`CanvasStage.tsx` maps `blocks` to one of `ShapedText` (text), `ShapeFillText` (shapeFill), `ShapeWarpText` (shapeWarp), or `ImageBlockView` (image), each a `react-konva` `Group`. Common per-block wiring (id, draggable, click/drag handlers) is built once as `commonProps` and spread into whichever component renders.
+`CanvasStage.tsx` maps `blocks` to one of `ShapedText` (text), `ShapeFillText` (shapeFill), `TextOnPathText` (textPath), or `ImageBlockView` (image), each a `react-konva` `Group`. Common per-block wiring (id, draggable, click/drag handlers) is built once as `commonProps` and spread into whichever component renders.
 
 - **`ShapedText.tsx`** — a normal text block; single shaped run, optional per-glyph `warpX`/`warpY` distortion via `src/lib/warp.ts`.
 - **`ShapeFillText.tsx`** — *tiles* the shaped text in repeating rows to fill an uploaded SVG shape's silhouette (scanline + ray-casting against a sampled polygon), auto-scaling each row to span the shape width exactly.
-- **`ShapeWarpText.tsx`** — draws the text *once* and remaps every glyph point into the shape's bounding envelope (`envelope`/`topBottom`/`stretch`/`radial` modes), with an additional per-glyph handle system (`glyphWarps`, pinch/move/scaleX/scaleY) for manual distortion in "glyph edit mode". Has its own inline warp-point math, independent of `lib/warp.ts`.
 
-  `ShapedText.tsx`, `ShapeFillText.tsx`, and `ShapeWarpText.tsx` all additionally support the "Stretch" tool (`glyphEdits`/`GlyphStretchHandle` in `types.ts`, math in `lib/glyphEdits.ts`) — see the "Stroke-schema-driven glyph editor" section below.
-- Shape Warp blocks have a second shape input alongside "Upload SVG"/hand-draw: **"Trace image"** uploads a raster photo/logo and auto-traces its silhouette client-side into the same `{ pathData, w, h }` shape `extractSvgPaths` already produces — `src/lib/imageTrace.ts` (`imagetracerjs`, aliased in `vite.config.ts` the same way `opentype.js` is, since it also has no `package.json` "exports" field) binarizes the image at a user-adjustable threshold (`ImageTraceDialog.tsx`, live preview) and hands the resulting silhouette through the *existing* `extractSvgPaths`, so `ShapeWarpText.tsx`'s envelope/topBottom/stretch/radial engine has no idea whether a shape came from an SVG upload or a traced image. Binarization is **alpha-aware** (any pixel with alpha < 128 is background regardless of its RGB) — the source is drawn onto a fresh, transparent canvas, so without that check a transparent PNG's untouched pixels read back as `rgba(0,0,0,0)`, i.e. maximally dark, and the whole image traces to a solid rectangle at every threshold. All of this feature's canvas work lives in `imageTrace.ts` (`imageElementToImageData`), not the dialog; it's the one part with no unit test, since jsdom can't rasterize. Shape Fill does not have this button — YAGNI until asked for.
+  `ShapedText.tsx` and `ShapeFillText.tsx` both additionally support the "Stretch" tool (`glyphEdits`/`GlyphStretchHandle` in `types.ts`, math in `lib/glyphEdits.ts`) — see the "Stroke-schema-driven glyph editor" section below.
 - **`ImageBlockView.tsx`** — loads a data-URL image and draws it via Konva `Image`.
 
-`ShapeFillText.tsx` and `ShapeWarpText.tsx` each reimplement their own SVG-path-replay-to-canvas-context helper (`replayPath`/`tracePath`) because Konva's context wrapper doesn't support `Path2D` — this duplication is known and intentional, not an oversight to "fix" by extracting a shared helper (their fill/clip logic differs enough that past attempts kept them separate).
+`ShapedText.tsx`, `ShapeFillText.tsx`, and `TextOnPathText.tsx` each reimplement their own SVG-path-replay-to-canvas-context helper (`replayPath`/`tracePath`) because Konva's context wrapper doesn't support `Path2D` — this duplication is known and intentional, not an oversight to "fix" by extracting a shared helper (their fill/clip logic differs enough that past attempts kept them separate).
 
-Selected/grouped/multi-selected blocks currently have **no persistent on-canvas outline** (a dashed selection-box `Transformer` was tried and explicitly removed per user feedback) — the two exceptions are: a small drag-to-resize corner handle shown only on the *selected* `shapeFill`/`image` block, and colored glyph-edit handles for `shapeWarp`. Don't reintroduce a general selection bounding box without checking this history.
+All three draw a block's **outline before its fill**, not after. A canvas stroke straddles the path it follows, so stroking after the fill lays half the outline's width back over the letter, thickening every stem and closing counters as the width rises; filling over the stroke hides that inner half and leaves the letterform at its designed weight. `strokeWidth` therefore reads as the visible outline, and reversing the order in any one renderer would silently make that block type's outlines twice as heavy as the others'.
+
+Selected/grouped/multi-selected blocks currently have **no persistent on-canvas outline** (a dashed selection-box `Transformer` was tried and explicitly removed per user feedback) — the two exceptions are: a small drag-to-resize corner handle shown only on the *selected* `shapeFill`/`image` block, and colored glyph-edit handles on the selected block. Don't reintroduce a general selection bounding box without checking this history.
 
 ### Arabic text shaping pipeline (`src/lib/harfbuzz.ts` + `src/hooks/useShapedGlyphs.ts`)
 
@@ -167,38 +169,23 @@ overlay in this app. Live handle drags follow the same debounced-history
 pattern (`useDebouncedHistoryPush`) the Kashida tool already established;
 the hide-button click is a discrete, immediate `pushHistory()` mutation.
 
-This feature covers plain text, Shape Fill, and Shape Warp blocks.
+This feature covers plain text and Shape Fill blocks.
 `DiacriticHoverHandles.tsx` takes a list of `DiacriticPlacement`s
 (`src/lib/diacriticPlacement.ts`) rather than raw hit boxes — each carries
 the mark's box in its renderer's own local space plus a matched
 `toCanvas`/`toLocal` pair, so all of the overlay's arithmetic (hover, the
 drag rail, the hit rect, the three handles) stays in local space and only
 drawing and drag-readback cross into canvas space. `ShapedText`'s adapter
-is a plain translation; `ShapeWarpText`'s is
-`applyShapeWarpPoint`/`invertShapeWarpPoint` (moved to
-`src/lib/shapeWarpPoint.ts` to be testable — the inverse is Newton's
-method, since none of the four warp modes has a closed-form inverse);
-`ShapeFillText`'s is the per-tile affine transform, which deliberately
-ignores the italic shear.
-
-`invertShapeWarpPoint`'s Newton search is seeded through the inverse of the
-base (unwarped) affine map, **not** at `(targetX, targetY)`. The target is
-in shape space while the solver's unknowns are in glyph-run space, and
-those ranges routinely differ in scale; seeding at the target lands outside
-the glyph-bounds box, `clamp01` saturates, the Jacobian's y-column comes
-out exactly zero, and the singular-determinant guard bails on iteration 0 —
-returning the untouched seed. All four modes failed to invert at all before
-this was fixed, so the seed is load-bearing, not a micro-optimisation;
-`shapeWarpPoint.test.ts` pins it with a per-mode scale-mismatch case.
+is a plain translation; `ShapeFillText`'s is the per-tile affine
+transform, which deliberately ignores the italic shear.
 
 Two behaviours differ per block type, both deliberate. **Order:**
 `ShapedText` applies an override *after* its own `warpX`/`warpY` (it is a
-`ctx` transform wrapping already-warped point math), while Shape Fill and
-Shape Warp apply it *before* their deformation — those deformations are
-the entire point of those block types, and an override applied after would
-detach the mark from its letter. **Arming:** Shape Warp shows handles on
-selection like plain text, but Shape Fill requires an explicit "Diacritic
-tool" checkbox (`diacriticEditMode` on `ShapeFillBlock`), because a fill
+`ctx` transform wrapping already-warped point math), while Shape Fill
+applies it *before* its deformation — that deformation is the entire point
+of the block type, and an override applied after would detach the mark from
+its letter. **Arming:** plain text shows handles on selection, but Shape
+Fill requires an explicit "Diacritic tool" checkbox (`diacriticEditMode` on `ShapeFillBlock`), because a fill
 tiles its run across the whole silhouette and two marks can become 200+
 instances — that checkbox also widens `glyphInstances`'s memo guard and
 the block's `dragBoundFunc` pin, both of which were previously
@@ -300,8 +287,8 @@ second time. The `gap` argument is **signed along each dot's rail**: positive
 for the x dot, negative for the y dot, which sits above the glyph while
 canvas y grows downward.
 
-Plain text only. Shape Fill and Shape Warp carry the fields via
-`BlockCommon` but neither renderer reads them; `App.tsx`'s
+Plain text only. Shape Fill carries the fields via
+`BlockCommon` but its renderer doesn't read them; `App.tsx`'s
 `supportsGlyphTransforms` gate rejects edits there rather than accepting
 and silently discarding them.
 
@@ -315,18 +302,18 @@ The "Morph Glyph Editor" panel's Stretch tool lets a user click a shaped glyph a
 - `src/lib/strokeSchema/glyphLookup.ts`'s `useGlyphSchemaCatalog(shapableText, glyphs)` hook maps each shaped glyph's HarfBuzz cluster (`glyph.cl`) back to a source character + joining form, looks up the registry, and (via `deriveCatalog.ts`'s `deriveStretchCatalog`) flattens any match into labeled `StretchDefinition`s. **Important:** `glyph.cl` indexes into `shapableText` (the text *after* `stripUnsupportedDiacritics()` in `harfbuzz.ts`), not the block's raw `text` — `ShapedTextResult`/`useShapedGlyphs` expose `shapableText` specifically so this mapping stays correct.
 - **This intentionally does NOT become a parametric bezier rendering engine.** The schema's own `path`/`fromNode`/`toNode` coordinates describe *its own* idealized geometry, which cannot be mapped onto an arbitrary font's actual outline points — real fonts and HarfBuzz shaping remain the source of truth for letterform shape. The schema only supplies metadata (labels, kashida eligibility, min/maxFactor bounds, protected-zone advisories, priority) plus its own authored geometry (used only to *derive* an axis — see below). If asked to make the schema "actually render" the letterforms, that's a much larger, different feature (an entire custom letterform library replacing per-font glyph outlines) — confirm scope before attempting it.
 - **No manual dragging — the axis is auto-derived from the schema's own geometry, sliders are the only control.** Every handle used to require the user to drag a red anchor dot and a green drag dot onto the real glyph before its slider did anything; this was removed entirely (not kept as a fallback) in favor of a Kaleam-style slider-only flow. `src/lib/strokeSchema/schemaGeometry.ts`'s `computeNodeBoundingBox(desc)` scans every stroke's authored path nodes across all components to get the schema's own bounding box; `normalizePoint`/`mapNormToRealBox` convert a schema stroke-zone's `fromNode`/`toNode` into a plain 0–1 proportion and back onto the *real* glyph's actual bounding box (flipping Y — schema convention is baseline-up, canvas convention is top-down). `deriveCatalog.ts`'s `deriveStretchCatalog` attaches this as `anchorNorm`/`dragNorm` on every `StretchDefinition`; `App.tsx`'s `addStretchHandle` maps those onto the selected glyph's real hit-box (from `glyphBoxesByBlock`) to get `anchorX/Y`/`dragOriginX/Y`, then extrapolates `dragX/Y = anchor + (dragOrigin - anchor) * maxFactor` — the "full stretch" reference point the displacement math needs. This is approximate (a proportional guess, not a per-font-verified point), not pixel-perfect, by design.
-- **Plain text blocks moved back to on-canvas dragging (Shape Fill/Shape Warp did not).** `StrokeStretchHoverHandles.tsx` (modeled directly on `DiacriticHoverHandles.tsx`) is a second reversal, layered on top of the schema-derived axis the previous bullet describes: hovering a letter on a *selected plain text block* reveals one draggable dot per authored stroke zone, replacing that stroke's Morph-panel slider with direct on-canvas dragging (the panel keeps a small numeric input for typed precision instead). A dot's rest position for a given `factor` is `anchor + factor · (dragOrigin - anchor)` (`lib/strokeSchema/dragAxis.ts`) — since `dragOrigin` is already the schema-derived `factor=1` point and `dragX` the `factor=maxFactor` point (both established at handle-creation time, unchanged from before), `factor` itself doubles as the axis-interpolation parameter, with no new "manual anchor/drag positioning" reintroduced. Dragging is rail-constrained (Konva `dragBoundFunc` via `dragAxis.ts`'s `projectOntoAxis`, absolute-space, same technique `DiacriticHoverHandles.tsx`'s move handle already established) rather than free 2D movement. This is **plain text only** — same reasoning that kept the diacritic hover handles (see below) text-only: Shape Fill's tiled-row and Shape Warp's warped-envelope coordinate spaces are real, separate work. `ShapedText.tsx` also dropped the `glyphEditTool` ("Off"/"Stretch") gate entirely for its own click-to-select-glyph and mask-overlay-rendering logic — mask editing ("By stroke"/"Lasso") now arms directly via `selectedGlyphIndex` regardless of any tool state. `ShapeFillText.tsx`/`ShapeWarpText.tsx` still use `glyphEditTool` exactly as before. Hit-testing footgun worth remembering: because Konva routes a pointer only to the *topmost listening* shape and neighbouring Arabic letters (nearly all of which now have authored schemas) sit close together, each glyph's hover hit-`Rect` is sized to the union of the glyph's own box and the current rest position of every one of its dots — a stretched dot travels far outside the glyph box, and a rect that didn't follow it would fire `onMouseLeave` and unmount the dot before the cursor could reach it — while a `listening` toggle switches every *other* glyph's rect off as soon as one glyph is hovered or dragging, so those deliberately-wide rects can't steal hover from each other. For the same topmost-wins reason, `StrokeStretchHoverHandles` mounts *before* `DiacriticHoverHandles` in `ShapedText.tsx`'s JSX, so the smaller, more precise diacritic hit targets win wherever the two overlap.
+- **Plain text blocks moved back to on-canvas dragging (Shape Fill did not).** `StrokeStretchHoverHandles.tsx` (modeled directly on `DiacriticHoverHandles.tsx`) is a second reversal, layered on top of the schema-derived axis the previous bullet describes: hovering a letter on a *selected plain text block* reveals one draggable dot per authored stroke zone, replacing that stroke's Morph-panel slider with direct on-canvas dragging (the panel keeps a small numeric input for typed precision instead). A dot's rest position for a given `factor` is `anchor + factor · (dragOrigin - anchor)` (`lib/strokeSchema/dragAxis.ts`) — since `dragOrigin` is already the schema-derived `factor=1` point and `dragX` the `factor=maxFactor` point (both established at handle-creation time, unchanged from before), `factor` itself doubles as the axis-interpolation parameter, with no new "manual anchor/drag positioning" reintroduced. Dragging is rail-constrained (Konva `dragBoundFunc` via `dragAxis.ts`'s `projectOntoAxis`, absolute-space, same technique `DiacriticHoverHandles.tsx`'s move handle already established) rather than free 2D movement. This is **plain text only** — same reasoning that kept the diacritic hover handles (see below) text-only: Shape Fill's tiled-row coordinate space is real, separate work. `ShapedText.tsx` also dropped the `glyphEditTool` ("Off"/"Stretch") gate entirely for its own click-to-select-glyph and mask-overlay-rendering logic — mask editing ("By stroke"/"Lasso") now arms directly via `selectedGlyphIndex` regardless of any tool state. `ShapeFillText.tsx` still uses `glyphEditTool` exactly as before. Hit-testing footgun worth remembering: because Konva routes a pointer only to the *topmost listening* shape and neighbouring Arabic letters (nearly all of which now have authored schemas) sit close together, each glyph's hover hit-`Rect` is sized to the union of the glyph's own box and the current rest position of every one of its dots — a stretched dot travels far outside the glyph box, and a rect that didn't follow it would fire `onMouseLeave` and unmount the dot before the cursor could reach it — while a `listening` toggle switches every *other* glyph's rect off as soon as one glyph is hovered or dragging, so those deliberately-wide rects can't steal hover from each other. For the same topmost-wins reason, `StrokeStretchHoverHandles` mounts *before* `DiacriticHoverHandles` in `ShapedText.tsx`'s JSX, so the smaller, more precise diacritic hit targets win wherever the two overlap.
 - **`factor` is now absolute, not drag-relative.** The old `applyAxisDisplacement` formula treated `factor=0` as "no displacement" and scaled whatever distance the user's manual drag established — meaningless with no drag to scale. `lib/glyphEdits.ts`'s `resolveValueMultiplier(h)` remaps `factor` to `(factor - 1) / (maxFactor - 1)` for any handle with `minFactor`/`maxFactor` set (i.e. every schema-backed handle), so `factor=1` now means exactly zero displacement (the real font's own natural rendering) and `factor=maxFactor` means the full extrapolated stretch to `dragX/Y` — this also finally matches what `setBlockKashidaAmount`'s formula below already assumed. Handles without `minFactor`/`maxFactor` (none are created anymore, but old saved projects may have them) keep using `factor ?? 1` directly, unchanged. `GlyphStretchHandle` (`types.ts`) still declares all schema fields as optional purely for this old-save backward compatibility.
 - The block-level "Kashida" 0–100 slider (`kashidaAmount` on `BlockCommon`, `setBlockKashidaAmount` in `App.tsx`) distributes one dial across every kashida-eligible schema-backed handle in a block, weighting each by its own `priority`: `factor = 1 + (maxFactor - 1) * (amount/100) * (priority/10)`. This is a manual dial, not automatic line-justification — the app has no "fit text to width" infrastructure to hook into.
 - **Multi-letter ligatures and multiple named sliders per stroke:** a `Stroke.editBehavior.stretchZones[]` entry can carry its own `label` (`types.ts`) — `deriveStretchCatalog` emits one `StretchDefinition` per **zone**, not per stroke, so a single stroke can expose several independently named/bounded sliders (e.g. Height vs Length) instead of collapsing to one range; every pre-existing file (one zone per stroke, no zone-level label) still produces exactly one entry each, unchanged. `GlyphStretchHandle`/`StretchDefinition` carry `schemaZoneIndex`/`zoneIndex` to track which zone a handle represents. Separately, `GlyphDescription.glyph` supports `role: "ligature"` entries keyed by `baseLetterSequence` (bare-codepoint array, e.g. `["0627","0644","0644","0647"]` for "الله") instead of a single `unicode` — `registry.ts`'s `getLigatureSchema` looks these up, and `glyphLookup.ts`'s `computeClusterSpans` detects when a shaped glyph's HarfBuzz cluster spans more than one source character (several letters fused by the font's own GSUB ligature rules — confirmed real via `fonttools`: `Wessam.ttf` fuses "الله" into exactly one glyph) and routes it through the ligature lookup instead of the normal single-letter path. `src/data/strokeSchemas/allah-ligature.json` is the first (and so far only) authored ligature — confirmed working end-to-end live in the browser (Wessam font, typed "الله", Stretch tool shows 6 labeled buttons: Alif/First lam/Second lam height, Second lam shoulder, Heh loop/tail). It was hand-adapted from a richer source file that required shadda+dagger-alif marks to trigger (per that file's own `triggerRules`/`testCases`) — `fonttools` inspection confirmed no font in `public/fonts/` actually has a GSUB rule fusing the marked sequence (only the plain 4-letter one), so the marks-required trigger and its `MARKS_1` sub-component were dropped rather than imported as dead data. If handed another ligature file with a similar "requires marks/context our fonts don't actually implement" mismatch, verify against real GSUB tables (`fontTools.ttLib`) before assuming it'll work, same as this one.
-- **A schema stroke's `protectedZones` are advisory text only** — they're never read by `applyGlyphEdit`/`applyAxisDisplacement`, so they don't by themselves stop a handle from displacing the whole glyph (its `fromNode`/`toNode` indices reference the schema's own idealized path, which has no correspondence to the real font's actual outline point indices — same mismatch as above). What actually scopes a handle is its own `mask` field. To avoid every schema handle defaulting to "affects the whole glyph," `src/lib/glyphContours.ts`'s `deriveContourMask` auto-derives a contour mask from wherever the handle's (now fixed, schema-derived) anchor/drag points sit on the real outline (point-in-polygon against the glyph's contours, reusing `lib/svgPath.ts`'s bezier-subdivision + point-in-polygon) — since the anchor/drag mapping is only proportional, not per-font-verified, it samples several points along the whole anchor→drag segment (not just the two endpoints) so a point landing in empty space between contours (e.g. between a letter's body and its dots) doesn't spuriously fall back to "whole glyph" when the segment as a whole clearly crosses the intended stroke's ink. Each of `ShapedText.tsx`/`ShapeFillText.tsx`/`ShapeWarpText.tsx` computes this **once, in a `useEffect` keyed off the handle's creation** (not on every drag — there is no more dragging) whenever `GlyphStretchHandle.maskAuto` is `true` and `mask` is still unset (every newly created handle starts this way, per `App.tsx`'s `addStretchHandle`). It can still legitimately land on "whole glyph" for a complex multi-letter ligature glyph where the per-letter schema proportions don't correspond well to the fused real outline — the block-level band width still limits which points move in that case, so this isn't unsafe, just less precisely scoped. Manually invoking "By stroke"/Lasso (`ShapedText.tsx` only) sets `maskAuto: false` so the user's explicit override is never clobbered.
+- **A schema stroke's `protectedZones` are advisory text only** — they're never read by `applyGlyphEdit`/`applyAxisDisplacement`, so they don't by themselves stop a handle from displacing the whole glyph (its `fromNode`/`toNode` indices reference the schema's own idealized path, which has no correspondence to the real font's actual outline point indices — same mismatch as above). What actually scopes a handle is its own `mask` field. To avoid every schema handle defaulting to "affects the whole glyph," `src/lib/glyphContours.ts`'s `deriveContourMask` auto-derives a contour mask from wherever the handle's (now fixed, schema-derived) anchor/drag points sit on the real outline (point-in-polygon against the glyph's contours, reusing `lib/svgPath.ts`'s bezier-subdivision + point-in-polygon) — since the anchor/drag mapping is only proportional, not per-font-verified, it samples several points along the whole anchor→drag segment (not just the two endpoints) so a point landing in empty space between contours (e.g. between a letter's body and its dots) doesn't spuriously fall back to "whole glyph" when the segment as a whole clearly crosses the intended stroke's ink. Each of `ShapedText.tsx`/`ShapeFillText.tsx` computes this **once, in a `useEffect` keyed off the handle's creation** (not on every drag — there is no more dragging) whenever `GlyphStretchHandle.maskAuto` is `true` and `mask` is still unset (every newly created handle starts this way, per `App.tsx`'s `addStretchHandle`). It can still legitimately land on "whole glyph" for a complex multi-letter ligature glyph where the per-letter schema proportions don't correspond well to the fused real outline — the block-level band width still limits which points move in that case, so this isn't unsafe, just less precisely scoped. Manually invoking "By stroke"/Lasso (`ShapedText.tsx` only) sets `maskAuto: false` so the user's explicit override is never clobbered.
 
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
-A fifth block type, `textPath`, flows shaped text along an arbitrary curve
+A fourth block type, `textPath`, flows shaped text along an arbitrary curve
 instead of a straight baseline. The curve is stored as a plain SVG path `d`
 string (`textPathD`) — the same representation `shapeSvgPath` already uses
-on `shapeFill`/`shapeWarp` blocks — rather than a bespoke point-array type,
+on `shapeFill` blocks — rather than a bespoke point-array type,
 so presets, SVG upload, and freehand pen-tool drawing all converge on one
 representation and reuse `lib/svgPath.ts`'s existing parse/flatten/replay
 functions wholesale.
@@ -342,8 +329,8 @@ for a much simpler one-handle-per-anchor editing UI.
 
 `TextOnPathText.tsx` renders each glyph as a rigid unit — translate to its
 arc-length position on the curve, rotate to the local tangent, draw the
-outline — modeled on `ShapedText.tsx`'s glyph loop rather than
-`ShapeWarpText.tsx`'s per-point remap, since text-on-path repositions whole
+outline — modeled on `ShapedText.tsx`'s glyph loop rather than a
+per-point remap, since text-on-path repositions whole
 glyphs rather than distorting their outlines. Text always auto-scales to
 span the curve's length exactly (same idea `ShapeFillText` already applies
 per-row to its shape width), which means the block's `fontSize` field has
@@ -535,9 +522,9 @@ Two naming rules in the `selected` tier are worth knowing before adding a
 panel there:
 
 - **The *type panel* is named after the block type** — `Shape Fill`,
-  `Shape Warp`, `Curve`, `Image` — and holds only what is specific to it
-  (a Shape Fill block's scale/spacing/rotation rows, a Shape Warp block's
-  mode/padding/strength). It renders directly under Content, above the
+  `Curve`, `Image` — and holds only what is specific to it (a Shape Fill
+  block's scale/spacing/rotation rows, a Curve block's preset and pen-tool
+  controls). It renders directly under Content, above the
   shared panels, because for those types it is the panel that matters
   most. A plain text block has no type panel; its controls are the shared
   ones.
@@ -545,7 +532,7 @@ panel there:
   colour, alignment, line height, plus the text-only Warp and Kashida
   sections). It is *not* called "Text" precisely because it renders for
   shape and curve blocks too, where a panel named "Text" sitting beside
-  one named "Shape Warp" reads as two competing type panels.
+  one named "Shape Fill" reads as two competing type panels.
 
 `Transform` is therefore left holding only rotation — the one transform
 every type shares. Anything type-specific that lands there belongs in the
@@ -632,9 +619,9 @@ with real harfbuzzjs against real fonts instead of hand-written glyph fixtures.
 
 Gated to the block types `setBlockKashidaAmount` already accepts (everything but
 `image` and `textPath`). Note that `measureStretchedRunWidth` measures the
-straight shaped run, so on Shape Fill / Shape Warp blocks it is the *underlying
-run's* ink width, which those renderers then tile or warp — the fit is exact
-only for plain text blocks.
+straight shaped run, so on a Shape Fill block it is the *underlying run's*
+ink width, which that renderer then tiles — the fit is exact only for plain
+text blocks.
 <!-- ---- /STREAM-B ---- -->
 
 ### Undo/redo and grouping
@@ -772,7 +759,7 @@ full design and the SQL migration under `supabase/migrations/`.
 
 These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
 
-- **Per-glyph move & scale on Shape Fill, Shape Warp, and text-on-path blocks** — Implemented for plain text only. `src/lib/diacriticPlacement.ts`'s adapters are the nearest existing precedent for expressing another renderer's coordinate space, but they were authored for placing *diacritic marks*, not for a general per-glyph transform — treat them as a starting point to evaluate, not as a drop-in that makes this cheap. Each renderer's coordinate space needs its own design and verification pass. Text-on-path is excluded for the same reason every other per-glyph tool is, its glyphs being rotated to a curve tangent.
+- **Per-glyph move & scale on Shape Fill and text-on-path blocks** — Implemented for plain text only. `src/lib/diacriticPlacement.ts`'s adapters are the nearest existing precedent for expressing another renderer's coordinate space, but they were authored for placing *diacritic marks*, not for a general per-glyph transform — treat them as a starting point to evaluate, not as a drop-in that makes this cheap. Each renderer's coordinate space needs its own design and verification pass. Text-on-path is excluded for the same reason every other per-glyph tool is, its glyphs being rotated to a curve tangent.
 
 - **Per-glyph rotation** — The move/scale handles cover translation and axis-aligned scale only. Rotation needs a fourth handle and its own pivot decision.
 
@@ -784,10 +771,10 @@ These are capabilities that have been explicitly identified as valuable but deli
 
 - **Automatic line-justification via Kashida** — The Kashida block-level dial (0–100) is manual only; it distributes one slider across every kashida-eligible stroke in a block. The app currently has no "fit text to width" infrastructure to hook automatic justification into.
 
-- **Image trace for Shape Fill blocks** — Auto-tracing a raster image into a silhouette shape (already implemented for Shape Warp via `ImageTraceDialog.tsx`) is not yet available for Shape Fill blocks — YAGNI until requested.
+- **Image trace** — Auto-tracing a raster image into a silhouette shape existed on Shape Warp blocks and was removed with that block type. Rebuilding it for Shape Fill means restoring `lib/imageTrace.ts`, `ImageTraceDialog.tsx`, and the `imagetracerjs` dependency from git history; the tracing itself was block-type agnostic, producing the same `{ pathData, w, h }` shape `extractSvgPaths` returns.
 
 ### Vite/Rolldown quirk
 
 `vite.config.ts` manually aliases `opentype.js` to its prebuilt ESM file because the package has no `exports` field, which breaks Rolldown (Vite 8's bundler) resolution otherwise. If upgrading `opentype.js` or Vite, re-check this alias still resolves.
 
-`imagetracerjs` (the image-trace Shape Warp input) has the **same** missing-`exports` problem and the same kind of alias — plus one extra fragility: its entry file is named with the version in it (`imagetracer_v1.2.6.js`), so the alias path is version-specific. `package.json` therefore pins it exactly (`"imagetracerjs": "1.2.6"`, deliberately no caret); bumping the version *requires* updating the filename in `vite.config.ts` in the same change, or resolution breaks with a confusing "cannot resolve" error.
+`imagetracerjs` had the **same** missing-`exports` problem and its own version-numbered entry filename, needing a second alias pinned in lockstep with the dependency. Both are gone — the package was removed along with Shape Warp and its "Trace image" input. If image tracing ever returns, that alias and the exact version pin have to return with it.

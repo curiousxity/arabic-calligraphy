@@ -8,22 +8,18 @@ export const section: GuideSection = {
     "block",
     "text",
     "shape fill",
-    "shape warp",
     "curve",
     "path",
     "image",
     "svg",
     "silhouette",
-    "trace",
-    "logo",
-    "photo",
     "duplicate",
     "delete",
   ],
   Body: () => (
     <>
       <p>
-        There are five kinds of block, all added from{" "}
+        There are four kinds of block, all added from{" "}
         <strong>Block Controls</strong>. Every one of them can be dragged,
         rotated, coloured, and given an outline or shadow; what differs is how
         the text is laid out.
@@ -36,38 +32,17 @@ export const section: GuideSection = {
         mark handles are all built around it.
       </p>
 
-      <h4>Shape Fill and Shape Warp</h4>
+      <h4>Shape Fill</h4>
       <p>
-        These two both take a silhouette — an uploaded SVG, or for Shape Warp a
-        traced image — and put your text inside it. They are constantly
-        confused for each other, and the difference is simple:
-      </p>
-      <ul>
-        <li>
-          <strong>Shape Fill</strong> <em>repeats</em> your text in row after
-          row until the silhouette is full, scaling each row to span the shape
-          at that height. Use it when you want a shape woven out of many
-          repetitions of a phrase.
-        </li>
-        <li>
-          <strong>Shape Warp</strong> draws your text <em>once</em> and bends
-          it so it fills the silhouette. Use it when you want one phrase to
-          take the shape.
-        </li>
-      </ul>
-      <p>
-        A Shape Fill block has controls for the shape's scale, the spacing
-        between rows, a button to space the rows evenly through the shape's
-        height, and a rotation for the text inside. A Shape Warp block instead
-        has a warp mode, inner padding, and warp strength — try the modes, they
-        bend the text in genuinely different ways.
+        Takes a silhouette — an SVG you upload — and fills it with your text,{" "}
+        <em>repeating</em> the phrase in row after row until the shape is full
+        and scaling each row to span the shape at that height. Use it when you
+        want a shape woven out of many repetitions of a phrase.
       </p>
       <p>
-        <strong>Trace image</strong> is a Shape Warp option only. It takes a
-        photo or a logo, reduces it to black and white at a threshold you
-        choose in a preview dialog, and uses the resulting silhouette as the
-        shape. If the trace comes out as one solid block, move the threshold
-        slider until the outline separates from the background.
+        Its controls are the shape's scale, the spacing between rows, a button
+        to space the rows evenly through the shape's height, and a rotation for
+        the text inside.
       </p>
 
       <h4>Curve (text on a path)</h4>

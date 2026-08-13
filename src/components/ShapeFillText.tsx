@@ -613,15 +613,18 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 }
                 if (isItalic) targetCtx.transform(1, 0, -0.25, 1, 0, 0);
                 replayPath(targetCtx, commands);
+                // Outline before fill — see the same ordering in
+                // ShapedText.tsx: a centred stroke drawn after the fill lays
+                // half its width back over the letter and thickens it.
+                if (includeExtras && strokeWidth > 0) {
+                  targetCtx.strokeStyle = stroke;
+                  targetCtx.lineWidth = strokeWidth / scX;
+                  targetCtx.stroke();
+                }
                 targetCtx.fill();
                 if (includeExtras && fauxBoldWidth > 0) {
                   targetCtx.strokeStyle = fillColor;
                   targetCtx.lineWidth = fauxBoldWidth / scX;
-                  targetCtx.stroke();
-                }
-                if (includeExtras && strokeWidth > 0) {
-                  targetCtx.strokeStyle = stroke;
-                  targetCtx.lineWidth = strokeWidth / scX;
                   targetCtx.stroke();
                 }
                 targetCtx.restore();

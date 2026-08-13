@@ -4,7 +4,15 @@ import type { Block } from "../types";
 export type Rect = { x: number; y: number; width: number; height: number };
 
 export const MIN_SCALE = 0.05;
-export const MAX_SCALE = 3;
+
+/**
+ * Zoom ceiling. Deliberately far above the ~2.75× the app opens at: the
+ * per-glyph tools (stretch dots, diacritic handles, move/scale handles) put
+ * several small targets on one letter, and inspecting or grabbing them needs
+ * to get much closer than the whole composition does. A ceiling near the
+ * default view leaves barely one click of zoom-in available.
+ */
+export const MAX_SCALE = 10;
 
 /** Padding (content-space px) added around live content by `padBox`. */
 export const CONTENT_PADDING = 80;
@@ -15,7 +23,7 @@ export const CONTENT_PADDING = 80;
  * zooming feels too fast or too slow overall — both input paths derive
  * from it, so they can't drift apart.
  */
-export const ZOOM_STEP = 1.15;
+export const ZOOM_STEP = 1.3;
 
 /** Wheel travel, in pixels, that one `ZOOM_STEP` corresponds to — one mouse detent. */
 const PIXELS_PER_STEP = 100;
@@ -32,8 +40,14 @@ const ZOOM_PER_PIXEL = Math.log(ZOOM_STEP) / PIXELS_PER_STEP;
  * Largest zoom change a single wheel event may cause. Some browser/OS
  * combinations emit one enormous delta for a fast flick, which would
  * otherwise jump several zoom levels in one frame.
+ *
+ * Derived from `ZOOM_STEP` (one and a half steps) rather than fixed, because
+ * a literal here can silently fall *below* `ZOOM_STEP` when that dial is
+ * turned up — which would clamp a single mouse detent to less than one
+ * button click and quietly break the equality the two input paths are
+ * built to guarantee.
  */
-const MAX_STEP = 1.25;
+export const MAX_STEP = ZOOM_STEP ** 1.5;
 
 /**
  * Converts one wheel event into a zoom multiplier.

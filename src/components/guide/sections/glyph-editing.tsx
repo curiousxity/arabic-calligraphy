@@ -32,8 +32,7 @@ export const section: GuideSection = {
         The <strong>Morph Glyph Editor</strong> is where a composition stops
         being typesetting and starts being calligraphy: it reshapes individual
         letters rather than the block as a whole. It appears as a panel beside
-        the canvas whenever a text, Shape Fill, or Shape Warp block is
-        selected, and tucks away to a tab you can click to bring it back. Its
+        the canvas whenever a text or Shape Fill block is selected, and tucks away to a tab you can click to bring it back. Its
         own <strong>?</strong> button opens a shorter reference of the same
         controls.
       </p>
@@ -56,8 +55,8 @@ export const section: GuideSection = {
           an exact value.
         </li>
         <li>
-          On <strong>Shape Fill</strong> and <strong>Shape Warp</strong>{" "}
-          blocks, use the sliders in the panel instead.
+          On <strong>Shape Fill</strong> blocks, use the sliders in the panel
+          instead.
         </li>
       </ul>
       <p>

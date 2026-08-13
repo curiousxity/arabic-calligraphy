@@ -110,6 +110,13 @@ export const section: GuideSection = {
         width) and the shadow (colour, blur, horizontal and vertical offset,
         and opacity), on two tabs.
       </p>
+      <p>
+        The outline is drawn <em>outside</em> the letters rather than over
+        them, so raising its width never thickens the letterform itself or
+        closes up the counters inside a loop. Widths read thinner than you may
+        expect from other tools for that reason — the number is the outline you
+        see, not a band straddling the edge.
+      </p>
     </>
   ),
 };
