@@ -19,7 +19,27 @@ import type { HarfBuzzGlyph } from "./normalizeGlyphs";
  */
 export type JoinPin = { x: number; y: number; radius: number };
 
-/** The pin radius, as a multiple of the font's measured nuqta. Tunable — see the spec's open questions. */
+/**
+ * The pin radius, as a multiple of the font's measured nuqta.
+ *
+ * **This is the dial for how completely a join holds, and it is deliberately
+ * not maxed out.** Verified by eye 2026-08-13 (default `حرف` in Naskh at
+ * 275%, stretching the ra down-left): at 0.5 the cleft that motivated this
+ * whole feature is "much better, almost imperceptible" — but not entirely
+ * gone. That residue is structural rather than a leftover bug. The pin sits
+ * at the *centroid* of the overlap region and `joinGuard` ramps back to full
+ * displacement across this radius, so the centre of the seam is nailed to
+ * exactly 0px (which `joinPins.fonts.test.ts` asserts) while ink toward the
+ * edges of the overlap still moves a little. A seam is a region; a pin is a
+ * point.
+ *
+ * Raising this shrinks the residue. It also costs something real: too wide
+ * and the guard suppresses displacement the user is actually asking for, so
+ * the stroke goes unresponsive near its own join and stretching feels dead
+ * at that end. Retune by eye against the repro above, not by reasoning —
+ * the tests cannot see this tradeoff, because 0px at the pin holds at every
+ * radius.
+ */
 export const PIN_RADIUS_NUQTA = 0.5;
 
 /**

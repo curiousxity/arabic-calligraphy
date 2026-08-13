@@ -371,6 +371,20 @@ hairline gap appeared at the hah/ra junction, on the side dragged
   `ShapeFillText` tiles its run through a per-tile affine transform, so
   computing pins in that space is separate, deliberately-deferred work —
   it passes no pins and keeps the pre-existing tearing behaviour there.
+
+**Verified by eye 2026-08-13, and the honest result is "much better, not
+gone."** On the repro above in Naskh, the cleft is now almost imperceptible
+rather than absent — reviewed and accepted by the user at that standard.
+The residue is structural, not a leftover bug: the pin sits at the
+*centroid* of the overlap region and `joinGuard` ramps back to full
+displacement across `PIN_RADIUS_NUQTA` (0.5 nuqta), so the centre of the
+seam is nailed to exactly 0px — which is what `joinPins.fonts.test.ts`
+asserts, and it holds at any radius — while ink toward the edges of the
+overlap still moves a little. A seam is a region; a pin is a point.
+Widening the radius shrinks the residue at the cost of making the stroke
+unresponsive near its own join. **No test can see that tradeoff**, so
+retune it against the repro by eye or not at all; see the constant's own
+comment in `lib/joinPins.ts`.
 - **Marks are skipped when pairing, and that is load-bearing.** Adjacency
   in a shaped run is not adjacency between letters: HarfBuzz emits every
   tashkeel mark as its own glyph *between* the base letters it sits on, so
