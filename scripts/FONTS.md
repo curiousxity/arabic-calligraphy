@@ -90,3 +90,10 @@ Worth checking on any candidate:
 intuitive rule that the alif's stem is one nuqta wide does not hold here
 (`alif/dot` ranges ~0.53 to ~1.68 across `public/fonts/`). See the
 per-stroke-editing design doc under `docs/superpowers/specs/`.
+
+`deriveStrokeSpines.py` additionally needs numpy, Pillow, scikit-image and
+scipy:
+
+    pip install fonttools numpy Pillow scikit-image scipy
+
+These are offline tooling only — nothing here ships to the browser.
