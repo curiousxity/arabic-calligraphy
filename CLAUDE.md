@@ -463,6 +463,35 @@ counter pinches shut instead of growing around its curve. Separately,
 `left-tail-terminal`) while the axis runs 0→2 — displacement is **maximum
 exactly where the schema says do not deform.** The protection is inverted.
 
+**Both fixes for this are blocked on a measurement that already came back
+negative, so don't start them.** They are changes 2 and 4 of the design, and
+both are built on mapping the schema's own node coordinates onto the real
+glyph's bounding box. `src/lib/strokeSchema/spineError.test.ts` measured how
+far that mapping actually lands from real ink — all 105 schemas × 5 fonts,
+using the app's own `mapNormToRealBox`, error in nuqta since a stroke feature
+is about one nuqta thick:
+
+    landed inside ink   14.5%
+    median 0.37 nuqta   p90 1.43   max 4.68
+
+A p90 of 1.43 means the node routinely sits more than a whole stroke-width
+off the stroke it is supposed to describe. Enforcing `protectedZones` on top
+of that would freeze the wrong part of the letter most of the time — a new
+failure mode, not a fixed one. Three explanations are ruled out by the data,
+so don't re-derive them: it is **not** distance from Naskh (the two Naskh
+faces are no better than Kufi, which has the best median), **not** per-form
+skeleton reuse (all four joining forms sit in one band), and **not** only
+compound letters (single-component glyphs still land outside the ink 90% of
+the time, though the tail does worsen with component count). The mechanism
+itself is what is inaccurate. Re-anchoring — snapping the spine to nearest
+ink, or fitting it to a medial axis derived from the real outline — is the
+prerequisite, and it needs its own design pass. Full breakdown in
+`docs/superpowers/specs/2026-08-12-per-stroke-editing-design.md`.
+
+That test is a **characterization**, not a guard: it asserts the error is
+still this large, so if you improve the mapping it will fail and tell you to
+re-run the numbers and reconsider. A failure there is good news.
+
 **Do not "fix" this by reaching for parametric rendering.** The stroke
 schemas contain no joining geometry whatsoever (`formMetadata`'s
 `connectsRight`/`connectsLeft` are prose and are consumed by nothing), so

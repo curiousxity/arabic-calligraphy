@@ -9,10 +9,16 @@ below as no longer undecided. Detection has a measured, documented gap:
 of 30 (font, word) pairs tested, 5 abut without overlapping and go
 unpinned — see "Diagnosis" and "Deferred, not forgotten" below; this is
 not a regression, it is the pre-existing tearing behaviour, simply not
-yet fixed for that geometry. Changes 2 and 4 remain unbuilt. **Phase C —
-measuring how far the schema→real-glyph mapping actually drifts from
-Naskh — is the next step**, and gates whether Phase D (changes 2 and 4)
-proceeds as designed.
+yet fixed for that geometry.
+
+**Phase C ran 2026-08-13 and its answer was no.** The schema→real-glyph
+mapping lands a mapped spine node a median 0.37 nuqta and a p90 of 1.43
+nuqta from the ink it describes, with only 14.5% of nodes inside the ink at
+all — against a pre-registered bar of median ≤ 0.25 / p90 ≤ 0.5. **Changes 2
+and 4 (Phase D) are therefore blocked pending a re-anchoring design**; see
+"Phase C result" under Sequencing for the full breakdown and for what the
+data rules out. The measurement is committed as a characterization test at
+`src/lib/strokeSchema/spineError.test.ts`.
 
 **Goal (user's words):** "I want every stroke to be able to be modified
 separately but I still want the glyphs/letters to join to each other
@@ -222,10 +228,70 @@ is expected to grow with distance from Naskh proportions and Phase D's
 viability depends on the worst case, not the average. This is investigation,
 not implementation.
 
-**Phase D — changes 2 and 4**, *if and only if* Phase C shows the mapping is
-accurate enough. If the error is large they need re-anchoring (snapping the
-mapped spine to nearest ink, or to a medial axis), which is a different
-design and should come back here first.
+### Phase C result, 2026-08-13 — the mapping is NOT accurate enough
+
+Measured over **every** authored schema (105) × 5 fonts = 1318 mapped nodes,
+by `src/lib/strokeSchema/spineError.test.ts`, which imports the app's real
+`mapNormToRealBox`/`deriveStretchCatalog` rather than reimplementing them.
+Error is each mapped node's distance to the nearest ink (0 if inside),
+expressed in nuqta because a stroke feature is about one nuqta thick.
+
+The bar was set **before** looking at the data: median ≤ 0.25 and p90 ≤ 0.5
+to proceed as designed; p90 > 1 to require re-anchoring first.
+
+    landed inside ink   14.5%
+    median 0.37   p90 1.43   p99 2.98   max 4.68
+
+| font | style | inside | median | p90 | max |
+|---|---|---:|---:|---:|---:|
+| TahaNaskhRegular | Naskh | 8% | 0.41 | 1.47 | 2.86 |
+| Amiri | Naskh | 11% | 0.38 | 1.18 | 2.75 |
+| Thuluth | Thuluth | 13% | 0.54 | 1.74 | 3.79 |
+| Kufi | Kufi | 26% | 0.24 | 1.27 | 3.09 |
+| Urdu | Nastaliq-ish | 13% | 0.26 | 1.49 | 4.68 |
+
+**p90 is 1.43 nuqta — the mapped node routinely lands more than a full
+stroke-width away from the ink it is supposed to describe, and 85% of nodes
+land outside the ink altogether.** Phase D must not proceed as designed.
+
+Three things in the breakdown matter more than the headline number, because
+they say *why*, and they rule out the explanations the spec itself offered:
+
+- **It is not a style-mismatch problem.** This spec predicted the error would
+  "grow with distance from Naskh proportions". It does not. The two Naskh
+  faces the schemas were authored against are no better than Kufi, and Kufi
+  has the *best* median of the five. Distance from Naskh is not the variable.
+- **It is not per-form skeleton reuse.** Split by joining form, everything
+  sits in the same band (isolated p90 1.68, initial 1.06, medial 1.24, final
+  1.74). The `formMetadata` caveat about reused skeletons is real but is not
+  what is driving this.
+- **Multi-component letters are worse, but simple ones already fail.** By
+  component count, p90 climbs 0.95 → 1.35 → 1.37 → 1.74 → 2.75 for 1…5
+  components, so normalizing against the whole-glyph bounding box does hurt
+  compound letters (seen/sheen with their teeth, kaf, theh dominate the worst
+  15). But a *single*-component glyph still lands outside the ink 90% of the
+  time. Per-component normalization would cut the tail without rescuing the
+  design.
+
+What that leaves: the proportional whole-glyph bounding-box mapping is
+inaccurate for reasons independent of style, contextual form, and letter
+complexity. It is the mechanism itself, exactly as suspected when this phase
+was written — the schema's box and the font's box are simply not in
+correspondence beyond "same letter, roughly this region".
+
+**Phase D — changes 2 and 4 — is therefore blocked**, and re-anchoring is
+required first: snap the mapped spine to nearest ink, or derive a medial
+axis from the real outline and fit the schema's node sequence to it. That is
+a different design and needs its own pass through this document. Note the
+prize is still worth it — change 4 in particular is what stops a stretch
+deforming a letter's protected terminal — but building it on the current
+mapping would freeze the wrong part of the letter 85% of the time, which is
+a new failure mode rather than a fixed one.
+
+The measurement is committed as a **characterization test**: it asserts the
+error is still this large, so an improved mapping fails the suite and tells
+whoever improved it to re-run these numbers and reconsider Phase D. A
+failure there is good news.
 
 **Why C gates D.** Changes 2 and 4 are the only two built on the proportional
 mapping — the exact mechanism that caused the cleft. Change 4 is the riskier
