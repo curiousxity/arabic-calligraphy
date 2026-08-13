@@ -6,7 +6,7 @@ change 3 (clamp/taper the axis) and change 5 (nuqta quantization) from
 Phase A, and change 1 (overlap-based join pins) from Phase B. Join pins
 landed **plain-text only**, per the user's 2026-08-13 decision recorded
 below as no longer undecided. Detection has a measured, documented gap:
-of 20 (font, word) pairs tested, 3 abut without overlapping and go
+of 30 (font, word) pairs tested, 5 abut without overlapping and go
 unpinned — see "Diagnosis" and "Deferred, not forgotten" below; this is
 not a regression, it is the pre-existing tearing behaviour, simply not
 yet fixed for that geometry. Changes 2 and 4 remain unbuilt. **Phase C —
@@ -264,7 +264,7 @@ Falsifiable, not a matter of taste:
 
 - **Join-pin detection for abutting-but-not-overlapping glyphs.**
   `overlapCentroid` (`lib/joinPins.ts`) finds a join only where two adjacent
-  glyphs' real outlines physically overlap; measured 2026-08-13, 3 of 20
+  glyphs' real outlines physically overlap; measured 2026-08-13, 5 of 30
   (font, word) pairs shape to glyphs that merely abut, so no pin is placed
   and those joins keep the pre-existing tearing behaviour (see
   "Implementation notes" above for the full breakdown). Deliberately **not**
@@ -275,6 +275,16 @@ Falsifiable, not a matter of taste:
   the same reason changes 2 and 4 were deferred to Phase C: it assumes
   Naskh-shaped geometry the design explicitly does not want to bake in this
   early. Extending detection to this case is new design work.
+- **Mark detection for fonts that encode marks in the Private Use Area.**
+  Because pairing now skips marks, join-pin coverage on vocalized text is
+  only as good as `findDiacriticGlyphIndices`, and that detector cannot see
+  `Thuluth.ttf`'s marks (PUA codepoints, positioned by advance rather than
+  GPOS). A third signal — the font's own GDEF glyph classes, which mark up
+  mark glyphs directly — would likely fix it, and would simultaneously make
+  the per-mark diacritic overlay work on that font. It was not bolted on
+  here: the detector is shared by every diacritic feature in the app and
+  changing it needs its own real-font verification pass, on the same
+  reasoning that keeps its test suite free of fabricated glyph fixtures.
 - **Join pins on Shape Fill and text-on-path blocks.** Plain text only, per
   the 2026-08-13 decision recorded above. `ShapeFillText` tiles its run
   through a per-tile affine transform; computing pins in that space is
@@ -343,6 +353,19 @@ and `pointInPolygon`, which is enough: intersect the two glyphs' bounding
 boxes, sample a grid inside, keep points inside both outlines, take the mean.
 No new geometry library.
 
+**The clamp is shared with the glyph-rig path, and that changes how old
+projects render.** `applyPreparedGlyphRig` runs through the same
+`applyAxisDisplacement`, and unlike a schema stretch handle it has no
+`factor = 1` neutral — a rig axis's slider value *is* the multiplier. So a
+saved project carrying a nonzero rig value draws slightly differently after
+this change: points beyond the axis tip stop overshooting, and points behind
+the anchor stop moving backwards. Kept deliberately. It is the same
+overshoot bug in the same function, a rig axis tears a join exactly as a
+stretch handle does, and forking the math to preserve the old rig behaviour
+would mean maintaining two displacement engines differing only in a defect.
+Recorded because the difference is small enough to be mistaken later for an
+unrelated regression.
+
 **Clamping `tAlong` is safe for the existing suite.** No test in
 `glyphEdits.test.ts` asserts the unbounded behaviour — the one point tested
 beyond the drag origin (`x = 200`) is excluded by a lasso mask, so it asserts
@@ -354,25 +377,61 @@ through a per-tile affine transform, so computing pins there is real work,
 not a one-line change; it was scoped out rather than attempted alongside the
 plain-text fix. See "Deferred, not forgotten" below.
 
+**Marks break adjacency, so pairing skips them (2026-08-13).** The first
+implementation paired shaped glyphs `i` and `i+1`. HarfBuzz emits every
+tashkeel mark as its own glyph *between* the base letters it attaches to,
+so a single harakah destroyed the adjacency of the two letters around it
+and the run produced no pins at all — measured against real shaping,
+`حَرْف` in Amiri went from 2 pins to 0 and `مُحَمَّد` from 4 to 0, in both
+TahaNaskh and Amiri. With an إعراب keyboard, a diacritics subsystem and a
+per-mark canvas overlay in the app, vocalized Arabic is a core use case,
+so a join feature that silently switched off on it did not deliver the
+goal at the top of this document.
+
+`computeJoinPins` now pairs each base glyph with the **next base glyph**,
+passing over marks. A mark receives no pin of its own — it floats above
+the baseline and is not what tears. Marks are identified by
+`lib/diacritics.ts`'s `findDiacriticGlyphIndices`, the app's single mark
+detector (tested against real HarfBuzz output for real fonts); a second
+detector here would be a second thing to keep true, and the obvious
+hand-rolled approach — cluster-to-source-character lookup — provably
+detects nothing, as that module's header explains. The consequence worth
+carrying into the next design pass: **join-pin coverage on vocalized text
+is bounded by that detector's accuracy**, so anything that widens it (the
+GDEF-class signal noted below) widens join detection too.
+
 **Detection coverage, measured 2026-08-13
 (`src/lib/joinPins.fonts.test.ts`).** 5 fonts (TahaNaskhRegular, Amiri,
-Thuluth, Kufi, Urdu) × 4 connected words (`حرف`, `بسم`, `كتب`, `سلام`) = 20
-pairs, shaped with real harfbuzzjs against the real fonts. The 0px
+Thuluth, Kufi, Urdu) × 6 words — four connected (`حرف`, `بسم`, `كتب`,
+`سلام`) and two vocalized (`حَرْف`, `مُحَمَّد`) = 30 pairs, shaped with real
+harfbuzzjs against the real fonts. The 0px
 displacement-at-a-pinned-join invariance held for every join that was
-detected. 5 of 20 pairs detected no join, in two distinct categories,
+detected. 9 of 30 pairs detected no join, in three distinct categories,
 confirmed by independently re-shaping and counting glyphs:
 
 - **Correct-by-design (2 pairs):** `Urdu/بسم` and `Urdu/كتب` each shape to a
   single glyph — the font fuses the letters via GSUB. No glyph boundary
   means no seam to tear, so "no pin" is the right answer, not a gap.
-- **A real, currently-inert gap (3 pairs):** `Urdu/حرف`, `Urdu/سلام`, and
-  `Thuluth/سلام` shape to multiple glyphs whose ink genuinely does not
+- **A real, currently-inert gap (5 pairs):** `Urdu/حرف`, `Urdu/سلام`,
+  `Urdu/حَرْف`, `Urdu/مُحَمَّد` and `Thuluth/سلام` shape to multiple glyphs
+  whose ink genuinely does not
   overlap — those letters abut rather than overlap, so `overlapCentroid`
   correctly finds nothing and the join stays unpinned. This is not a
   regression: those joins have exactly the pre-existing tearing behaviour
   this whole feature exists to fix, just not yet fixed for this geometry.
   See "Deferred, not forgotten" for why this was not improvised with a
   dilation radius.
+- **The mark detector cannot see the font's marks (2 pairs):**
+  `Thuluth/حَرْف` and `Thuluth/مُحَمَّد`. `Thuluth.ttf` maps its shaped mark
+  glyphs into the *Private Use Area* (U+E012 and U+E016 observed for fatha
+  and sukun) rather than U+064B–U+065F, and positions them by advance with
+  `dx === dy === 0` instead of by GPOS — defeating both signals
+  `findDiacriticGlyphIndices` uses. Its marks therefore read as base
+  letters, break the pairing, and the font behaves exactly as it did
+  before the mark-skipping fix; its unvocalized words are unaffected. Note
+  this is the *same* blind spot that already stops the per-mark diacritic
+  overlay arming on Thuluth, i.e. one detector fix would resolve two
+  features. See "Deferred, not forgotten".
 
 ## Repro notes
 
