@@ -121,7 +121,24 @@ async function shapeReal(
 // Deliberately spread across styles, not only the Naskh faces the schemas
 // were authored against — the mapping's error is expected to grow with
 // distance from Naskh proportions.
-const FONTS = ["TahaNaskhRegular.ttf", "Amiri.ttf", "Thuluth.ttf", "Kufi.ttf", "Urdu.ttf"];
+//
+// `FatemiMaqala` and `Kufi2` were added after the first five, because both
+// decompose glyphs in ways the original matrix never exercised and each
+// exposed something the others could not: FatemiMaqala emits a unit or two
+// of `dx` rounding noise on ordinary *letters* (which the mark detector
+// misreads — see `computeJoinPins`'s advance guard and category (d) below),
+// and Kufi2 decomposes its nuqat into separately positioned GPOS mark
+// glyphs, which is exactly the shape of run that pairing base letters was
+// introduced to handle.
+const FONTS = [
+  "TahaNaskhRegular.ttf",
+  "Amiri.ttf",
+  "Thuluth.ttf",
+  "Kufi.ttf",
+  "Urdu.ttf",
+  "FatemiMaqala.ttf",
+  "Kufi2.ttf",
+];
 
 const FONT_FAMILY_BY_FILE: Record<string, string> = {
   "TahaNaskhRegular.ttf": "TahaNaskhRegular",
@@ -129,6 +146,8 @@ const FONT_FAMILY_BY_FILE: Record<string, string> = {
   "Thuluth.ttf": "Thuluth",
   "Kufi.ttf": "Kufi",
   "Urdu.ttf": "Urdu",
+  "FatemiMaqala.ttf": "FatemiMaqala",
+  "Kufi2.ttf": "Kufi2",
 };
 
 // Connected words, each exercising several joining forms. The last two are
@@ -141,10 +160,12 @@ const FONT_SIZE = 200;
 
 /**
  * Detection coverage as verified against real shaping, one entry per
- * FONTS × WORDS pair (30 total). This is today's *observed reality*, not an
+ * FONTS × WORDS pair (42 total). This is today's *observed reality*, not an
  * aspiration — see the coverage `describe` block below for the full
- * (a)/(b)/(c) classification of every `pins: false` entry and the glyph
- * counts that back it up.
+ * (a)/(b)/(c)/(d) classification of every `pins: false` entry and the glyph
+ * counts that back it up. 33 of the 42 pairs detect a join; the 9 that do
+ * not are all Thuluth or Urdu, and every one of them was measured and
+ * classified rather than assumed.
  */
 const EXPECTED_COVERAGE: Record<string, Record<string, boolean>> = {
   TahaNaskhRegular: { حرف: true, بسم: true, كتب: true, سلام: true, حَرْف: true, مُحَمَّد: true },
@@ -152,6 +173,8 @@ const EXPECTED_COVERAGE: Record<string, Record<string, boolean>> = {
   Thuluth: { حرف: true, بسم: true, كتب: true, سلام: false, حَرْف: false, مُحَمَّد: false },
   Kufi: { حرف: true, بسم: true, كتب: true, سلام: true, حَرْف: true, مُحَمَّد: true },
   Urdu: { حرف: false, بسم: false, كتب: false, سلام: false, حَرْف: false, مُحَمَّد: false },
+  FatemiMaqala: { حرف: true, بسم: true, كتب: true, سلام: true, حَرْف: true, مُحَمَّد: true },
+  Kufi2: { حرف: true, بسم: true, كتب: true, سلام: true, حَرْف: true, مُحَمَّد: true },
 };
 
 describe("join invariance against real fonts", () => {
@@ -274,8 +297,9 @@ describe("join invariance against real fonts", () => {
  * failing assertion here instead of being invisible.
  *
  * Every `false` entry in EXPECTED_COVERAGE was investigated by hand (see
- * `task-10-report.md` for the full walkthrough with per-pair glyph counts)
- * and falls into one of two structurally different cases:
+ * `task-10-report.md` for the full walkthrough with per-pair glyph counts,
+ * and `second-fix-report.md` for the two fonts added afterwards) and falls
+ * into one of four structurally different cases:
  *
  * (a) THE WORD SHAPED TO A SINGLE GLYPH — the font's own GSUB fused the
  *     whole word into one glyph, so there is no glyph *boundary* and
@@ -318,6 +342,21 @@ describe("join invariance against real fonts", () => {
  *     limitation that already stops the per-mark diacritic overlay working
  *     on that font; the fix belongs in the detector (one module, several
  *     features), not in a second detector here.
+ *
+ * (d) THE MARK DETECTOR FLAGS A REAL LETTER — the mirror image of (c), and
+ *     the reason `computeJoinPins` pairs on `markIndices.has(i) && ax === 0`
+ *     rather than on the detector alone. `FatemiMaqala.ttf` emits `dx`
+ *     values of 1–4 units out of an upem of 2048 — shaper rounding noise —
+ *     on ordinary letters, and the detector's cluster-plus-nonzero-`dx`
+ *     fallback reads those as mark attachment. Measured on unvocalized
+ *     `كتب` in that font: glyph 2 (gid1549, dx=1, ax=263) and glyph 3
+ *     (U+FEDB kaf initial, dx=4, ax=584) are both flagged, and dropping
+ *     them from the base list cost the pins on 2 and 3 outright; `مُحَمَّد`
+ *     lost *every* pin the same way. The advance is what separates the two
+ *     cases — a genuine mark has `ax === 0`, a letter always advances the
+ *     pen. No `false` entry in the table above is of this class any more;
+ *     it is documented because the regression block at the bottom of this
+ *     file exists to keep it that way.
  *
  * Do not "fix" a `false` entry here by widening detection (polygon
  * dilation, a proximity fallback, a baseline scan) — that is new design
@@ -416,6 +455,120 @@ describe("vocalized text still detects joins (marks are skipped when pairing)", 
             false
           );
         }
+      },
+      20000
+    );
+  }
+});
+
+/**
+ * Detector false positives — the regression this block exists to hold.
+ *
+ * `lib/diacritics.ts`'s fallback signal treats any glyph carrying a nonzero
+ * HarfBuzz `dx`/`dy` inside a shared cluster as a mark attached to its base.
+ * `FatemiMaqala.ttf` emits `dx` values of 1–4 units out of an upem of 2048 —
+ * shaper rounding noise — on ordinary letters, so the detector flags real
+ * letters there. Once `computeJoinPins` started skipping marks when pairing,
+ * those false positives silently deleted joins that had been detected before:
+ * unvocalized `كتب` dropped from four pinned glyphs to two, and `مُحَمَّد`
+ * from three to none.
+ *
+ * The guard is `markIndices.has(i) && (g.ax ?? 0) === 0` — a genuine mark
+ * takes no horizontal space and so cannot participate in a join, while a
+ * letter always advances the pen. These cases assert the *exact* pinned
+ * glyph sets, and each first asserts the premise (the detector really does
+ * flag an advancing glyph in this run), so removing the guard fails here
+ * loudly rather than quietly narrowing what the stretch tool protects.
+ */
+describe("mark detector false positives do not delete joins (advance guard)", () => {
+  const CASES: Array<{
+    word: string;
+    /** Glyph indices the detector wrongly flags — real letters, nonzero `ax`. */
+    falsePositives: number[];
+    /** Glyph indices expected to carry at least one pin. */
+    pinnedGlyphs: number[];
+  }> = [
+    // كتب — beh final, teh medial, an uncmapped component glyph, kaf initial.
+    // Glyphs 2 (dx=1, ax=263) and 3 (dx=4, ax=584) are the false positives.
+    { word: "كتب", falsePositives: [2, 3], pinnedGlyphs: [0, 1, 2, 3] },
+    // مُحَمَّد — four genuine marks (ax=0) plus two flagged letters: glyph 3
+    // (meem, dx=1, ax=586) and glyph 6 (U+FCCF, dx=-3, ax=1296). Without the
+    // guard every base but one is filtered out and the word gets no pin at all.
+    { word: "مُحَمَّد", falsePositives: [3, 6], pinnedGlyphs: [0, 3, 6] },
+  ];
+
+  for (const { word, falsePositives, pinnedGlyphs } of CASES) {
+    it(
+      `FatemiMaqala / ${word}: pins the letters the dx heuristic misreads as marks`,
+      async () => {
+        const { glyphs, font, unitsPerEm } = await shapeReal(word, "FatemiMaqala.ttf");
+        const nuqta = nuqtaPx("FatemiMaqala", FONT_SIZE)!;
+
+        // The premise: these really are advancing glyphs the detector flags.
+        // If a future detector change stops flagging them, this test is no
+        // longer exercising the guard and should be re-measured, not deleted.
+        const marks = findDiacriticGlyphIndices(glyphs, font!);
+        for (const i of falsePositives) {
+          expect(marks.has(i), `FatemiMaqala ${word} glyph ${i} expected to be flagged`).toBe(true);
+          expect(glyphs[i].ax ?? 0, `FatemiMaqala ${word} glyph ${i} advance`).toBeGreaterThan(0);
+        }
+
+        const pins = computeJoinPins({
+          glyphs,
+          font: font!,
+          fontSize: FONT_SIZE,
+          unitsPerEm,
+          pinRadius: nuqta * PIN_RADIUS_NUQTA,
+        });
+
+        expect([...pins.keys()].sort((a, b) => a - b)).toEqual(pinnedGlyphs);
+
+        // Genuine marks — the zero-advance ones — are still never pinned.
+        for (const markIndex of marks) {
+          if ((glyphs[markIndex].ax ?? 0) !== 0) continue;
+          expect(pins.has(markIndex), `FatemiMaqala ${word} pinned mark glyph ${markIndex}`).toBe(
+            false
+          );
+        }
+      },
+      20000
+    );
+  }
+});
+
+/**
+ * Kufi2 decomposes its nuqat into separately positioned GPOS mark glyphs, so
+ * pairing raw run neighbours breaks on words that carry no tashkeel at all —
+ * a dot glyph sits between two letters and severs their adjacency. Measured
+ * with raw-neighbour pairing versus base-letter pairing at FONT_SIZE 200:
+ * `بسم` goes from 2 pinned glyphs to 3, and `كتب` from 2 to 3. This is a
+ * *gain* from the mark-skipping change on a font the original five-font
+ * matrix did not cover, and these exact sets hold it.
+ */
+describe("Kufi2 recovers joins severed by decomposed nuqat", () => {
+  const CASES: Array<{ word: string; pinnedGlyphs: number[] }> = [
+    // بسم — 4 glyphs, the dot at index 2; raw-neighbour pairing pinned [0,1].
+    { word: "بسم", pinnedGlyphs: [0, 1, 3] },
+    // كتب — 5 glyphs, dots at 0 and 2; raw-neighbour pairing pinned [3,4].
+    { word: "كتب", pinnedGlyphs: [1, 3, 4] },
+  ];
+
+  for (const { word, pinnedGlyphs } of CASES) {
+    it(
+      `Kufi2 / ${word}: pins across its decomposed dot glyphs`,
+      async () => {
+        const { glyphs, font, unitsPerEm } = await shapeReal(word, "Kufi2.ttf");
+        const nuqta = nuqtaPx("Kufi2", FONT_SIZE)!;
+
+        const pins = computeJoinPins({
+          glyphs,
+          font: font!,
+          fontSize: FONT_SIZE,
+          unitsPerEm,
+          pinRadius: nuqta * PIN_RADIUS_NUQTA,
+        });
+
+        expect([...pins.keys()].sort((a, b) => a - b)).toEqual(pinnedGlyphs);
       },
       20000
     );

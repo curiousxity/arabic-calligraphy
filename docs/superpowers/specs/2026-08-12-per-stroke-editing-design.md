@@ -401,13 +401,18 @@ is bounded by that detector's accuracy**, so anything that widens it (the
 GDEF-class signal noted below) widens join detection too.
 
 **Detection coverage, measured 2026-08-13
-(`src/lib/joinPins.fonts.test.ts`).** 5 fonts (TahaNaskhRegular, Amiri,
-Thuluth, Kufi, Urdu) × 6 words — four connected (`حرف`, `بسم`, `كتب`,
-`سلام`) and two vocalized (`حَرْف`, `مُحَمَّد`) = 30 pairs, shaped with real
-harfbuzzjs against the real fonts. The 0px
+(`src/lib/joinPins.fonts.test.ts`).** 7 fonts (TahaNaskhRegular, Amiri,
+Thuluth, Kufi, Urdu, FatemiMaqala, Kufi2) × 6 words — four connected
+(`حرف`, `بسم`, `كتب`, `سلام`) and two vocalized (`حَرْف`, `مُحَمَّد`) = 42
+pairs, shaped with real harfbuzzjs against the real fonts. The 0px
 displacement-at-a-pinned-join invariance held for every join that was
-detected. 9 of 30 pairs detected no join, in three distinct categories,
-confirmed by independently re-shaping and counting glyphs:
+detected. 9 of 42 pairs detected no join, in three distinct categories,
+confirmed by independently re-shaping and counting glyphs. (The matrix was
+5 fonts × 6 words when first measured; `FatemiMaqala` and `Kufi2` were
+added 2026-08-13 and both detect a join on all six words. A fourth
+category — the mark detector flagging a real letter — was found in that
+pass and fixed, so it no longer produces a `false` entry; it is documented
+below because the guard that closed it must not be removed.)
 
 - **Correct-by-design (2 pairs):** `Urdu/بسم` and `Urdu/كتب` each shape to a
   single glyph — the font fuses the letters via GSUB. No glyph boundary
@@ -432,6 +437,29 @@ confirmed by independently re-shaping and counting glyphs:
   this is the *same* blind spot that already stops the per-mark diacritic
   overlay arming on Thuluth, i.e. one detector fix would resolve two
   features. See "Deferred, not forgotten".
+- **The mark detector flags a real letter (0 pairs — found and fixed
+  2026-08-13):** the mirror image of the case above, and the reason
+  `computeJoinPins` treats a glyph as a mark only when the detector flags it
+  **and** its advance is zero. `FatemiMaqala.ttf` emits `dx` values of 1–4
+  units out of an upem of 2048 — shaper rounding noise — on ordinary
+  letters, which the detector's cluster-plus-nonzero-`dx` fallback reads as
+  mark attachment. Measured on unvocalized `كتب`: glyphs 2 (`gid1549`,
+  dx=1, ax=263) and 3 (`U+FEDB` kaf initial, dx=4, ax=584) were both
+  flagged, dropping the pinned set from `[0,1,2,3]` to `[0,1]`; `مُحَمَّد`
+  lost every pin (`[0,3,6]` → `[]`). A genuine mark takes no horizontal
+  space of its own and so cannot participate in a join, while a letter
+  always advances the pen — across the 17-font corpus measured for this
+  branch, every true mark had `ax === 0` and every false positive carried a
+  real advance. The guard is deliberately local to join pairing;
+  `lib/diacritics.ts` is shared with the per-mark canvas overlay and was
+  left untouched.
+
+Adding `Kufi2` also confirmed a *gain* the mark-skipping change had made
+outside the original matrix: that face decomposes its nuqat into separately
+positioned GPOS mark glyphs, so a dot glyph sits between two letters and
+severs their adjacency under raw-neighbour pairing. Measured at FONT_SIZE
+200, `Kufi2/بسم` goes from 2 pinned glyphs to 3 and `Kufi2/كتب` from 2 to 3
+once marks are skipped.
 
 ## Repro notes
 

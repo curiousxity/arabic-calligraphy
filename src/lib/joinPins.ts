@@ -228,7 +228,29 @@ export function computeJoinPins(args: {
   const markIndices = findDiacriticGlyphIndices(glyphs, font);
   const baseIndices: number[] = [];
   for (let i = 0; i < glyphs.length; i++) {
-    if (!markIndices.has(i)) baseIndices.push(i);
+    // A glyph counts as a mark *for pairing purposes* only if the detector
+    // flags it AND it advances the pen by nothing. The detector's fallback
+    // signal treats any nonzero HarfBuzz `dx`/`dy` inside a shared cluster as
+    // mark attachment, and some faces emit a unit or two of shaper rounding
+    // noise on ordinary letters — measured on `FatemiMaqala.ttf`, whose
+    // unvocalized `كتب` carries dx=1 and dx=4 out of an upem of 2048 on its
+    // last two *letters*, which the detector duly reads as marks. Dropping
+    // them from the base list loses the very join a stretch of that letter
+    // would tear. A zero-advance glyph occupies no horizontal space of its
+    // own and so cannot be a letter participating in a join, whereas a real
+    // letter always advances the pen: the advance is the signal that
+    // separates a genuine mark from a base letter the `dx` heuristic
+    // misread. Across the 17-font corpus measured for this branch, every
+    // true mark had `ax === 0` and every false positive carried a real
+    // advance.
+    //
+    // This guard is deliberately local to join pairing, where the cost of a
+    // false positive is a silently lost pin. `lib/diacritics.ts` itself is
+    // left alone: it is shared with the per-mark canvas overlay and other
+    // features, and widening or narrowing it needs its own verification pass
+    // across every consumer.
+    const isMark = markIndices.has(i) && (glyphs[i].ax ?? 0) === 0;
+    if (!isMark) baseIndices.push(i);
   }
 
   for (let k = 0; k < baseIndices.length - 1; k++) {

@@ -389,10 +389,10 @@ hairline gap appeared at the hah/ra junction, on the side dragged
   detector's blind spots (see the Thuluth case below), where the behaviour
   degrades to exactly what it was before this fix rather than misbehaving.
 - **Detection has a real, documented gap — not every abutting join is
-  found.** `joinPins.fonts.test.ts` measured 5 fonts × 6 words (30 pairs)
+  found.** `joinPins.fonts.test.ts` measured 7 fonts × 6 words (42 pairs)
   against real harfbuzzjs shaping. The 0px displacement-at-a-pinned-join
   invariance held for *every* join that was detected — no regressions, no
-  partial credit. But 9 of the 30 pairs detect **no join at all**, in three
+  partial credit. But 9 of the 42 pairs detect **no join at all**, in three
   distinct categories, all confirmed by independently re-shaping and
   counting glyphs:
   - **Correct-by-design:** `Urdu/بسم` and `Urdu/كتب` each shape to a
@@ -419,6 +419,27 @@ hairline gap appeared at the hah/ra junction, on the side dragged
     per-mark diacritic overlay working on that font: the fix belongs in
     the one detector, which several features share, not in a second copy
     inside `joinPins.ts`.
+  - **The mark detector flags a real letter** — the mirror image of the
+    case above, found and fixed 2026-08-13, so it produces no `false`
+    entry today. It is why `computeJoinPins` treats a glyph as a mark only
+    when the detector flags it **and** `ax === 0`. `FatemiMaqala.ttf`
+    emits `dx` of 1–4 units out of an upem of 2048 — shaper rounding
+    noise — on ordinary letters, and the detector's
+    cluster-plus-nonzero-`dx` fallback reads that as mark attachment: its
+    unvocalized `كتب` lost the pins on glyphs 2 and 3, and `مُحَمَّد` lost
+    every pin it had. A genuine mark takes no horizontal space and cannot
+    participate in a join; a letter always advances the pen, which is the
+    signal that separates them. **The guard is local to join pairing on
+    purpose** — `lib/diacritics.ts` is shared with the per-mark canvas
+    overlay and other features, and changing it needs its own verification
+    pass across every consumer.
+
+  `FatemiMaqala` and `Kufi2` were added to that matrix in the same pass and
+  detect a join on all six words. `Kufi2` also confirms a *gain* from
+  base-letter pairing outside the original five: it decomposes its nuqat
+  into separately positioned GPOS mark glyphs, so a dot glyph severs two
+  letters' adjacency under raw-neighbour pairing — `Kufi2/بسم` goes from 2
+  pinned glyphs to 3 and `Kufi2/كتب` from 2 to 3 once marks are skipped.
 
 **Symptom 2 — strokes deform rather than extend — still open, unchanged.** `fa-medial.json`'s eye
 loop asks for `axis: "path"` and `preserveCurvature: true`; the catalog
@@ -1036,7 +1057,7 @@ These are capabilities that have been explicitly identified as valuable but deli
 
 - **Schema protectedZones enforcement** — A schema stroke's `protectedZones` are advisory text only and are never read during glyph editing. Enforcing them in the rendering would require a separate design to scope per-stroke edits by the schema's own geometry rather than by the real font's actual outline point indices.
 
-- **Join-pin detection for abutting-but-not-overlapping glyphs** — `lib/joinPins.ts`'s `overlapCentroid` finds a join only where two adjacent glyphs' real outlines physically overlap; measured 2026-08-13 (`joinPins.fonts.test.ts`, 5 fonts × 6 words), 5 of 30 pairs (`Urdu/حرف`, `Urdu/سلام`, `Urdu/حَرْف`, `Urdu/مُحَمَّد`, `Thuluth/سلام`) shape to multiple glyphs that merely abut, so no pin is placed and those joins keep the pre-existing tearing behaviour. Deliberately **not** improvised with a dilation radius: dilate enough to catch abutting letters and false joins start getting manufactured between letters that merely pass near each other without connecting, and the spec already rejected a baseline-scan heuristic for assuming Naskh-shaped geometry. Extending detection to this case is new design work, not a tuning knob on the existing one.
+- **Join-pin detection for abutting-but-not-overlapping glyphs** — `lib/joinPins.ts`'s `overlapCentroid` finds a join only where two adjacent glyphs' real outlines physically overlap; measured 2026-08-13 (`joinPins.fonts.test.ts`, 7 fonts × 6 words), 5 of 42 pairs (`Urdu/حرف`, `Urdu/سلام`, `Urdu/حَرْف`, `Urdu/مُحَمَّد`, `Thuluth/سلام`) shape to multiple glyphs that merely abut, so no pin is placed and those joins keep the pre-existing tearing behaviour. Deliberately **not** improvised with a dilation radius: dilate enough to catch abutting letters and false joins start getting manufactured between letters that merely pass near each other without connecting, and the spec already rejected a baseline-scan heuristic for assuming Naskh-shaped geometry. Extending detection to this case is new design work, not a tuning knob on the existing one.
 
 - **Mark detection for fonts that encode marks in the Private Use Area** — `lib/diacritics.ts`'s `findDiacriticGlyphIndices` keys on a mark's own cmap codepoint, with a nonzero-GPOS-offset fallback. `Thuluth.ttf` defeats both (PUA codepoints, marks positioned by advance), so on that font the per-mark diacritic overlay does not arm and, since 2026-08-13, join pins on vocalized text find nothing either. A third signal — e.g. reading the font's own GDEF glyph classes, which mark up mark glyphs directly — would fix both features at once, but it touches the detector every diacritic feature depends on and deserves its own real-font verification pass rather than being bolted on beside a join fix.
 
