@@ -20,6 +20,16 @@ export const section: GuideSection = {
     "mask",
     "lasso",
     "band",
+    "nuqta",
+    "dot",
+    "measure",
+    "proportion",
+    "snap",
+    "join",
+    "joining",
+    "connect",
+    "gap",
+    "split",
     "diacritic",
     "tashkeel",
     "harakat",
@@ -63,6 +73,56 @@ export const section: GuideSection = {
         Only letters whose shapes have been described in advance offer these
         controls. A letter that shows nothing simply has not been described
         yet — that is expected, not a fault.
+      </p>
+
+      <h4>Measured in nuqta, not decimals</h4>
+      <p>
+        Lengths are read in <strong>nuqta</strong> — the rhombic dot the nib
+        makes, which is how stroke length has been measured in this craft for
+        centuries. As you drag, the stroke reports{" "}
+        <strong>+½ nuqta</strong>, <strong>+1 nuqta</strong>, and so on, and
+        it steps in half-nuqta increments rather than sliding freely, so a
+        line's proportions stay in whole units instead of drifting into
+        arbitrary decimals.
+      </p>
+      <ul>
+        <li>
+          <strong>Hold Alt while dragging</strong> for a stroke that needs to
+          sit between the steps.
+        </li>
+        <li>
+          Typing a number into the field beside a stroke is always taken
+          exactly as typed — the field is there precisely for values the steps
+          will not give you.
+        </li>
+        <li>
+          To turn the stepping off altogether, untick{" "}
+          <strong>Snap strokes to nuqta</strong> in the Background &amp; Grid
+          panel. It sits beside the block-snapping tick-boxes but is unrelated
+          to them: it governs letters, not layout.
+        </li>
+      </ul>
+      <p>
+        The nuqta is a property of each typeface, measured from its own dot,
+        so the same "+1 nuqta" means the right thing in Naskh and in Thuluth.
+        A few faces have not been measured — on those, stretching simply moves
+        freely and no nuqta reading appears.
+      </p>
+
+      <h4>Joins hold while you stretch</h4>
+      <p>
+        Lengthening a letter used to drag it away from its neighbour and open
+        a hairline split at the join. The point where two letters actually
+        meet is now held still while the rest of the stroke moves, so you can
+        draw a letter out without breaking the word.
+      </p>
+      <p>
+        This is worth knowing about rather than trusting blindly. On most
+        typefaces it holds. On a few it cannot: where a typeface fuses letters
+        into a single form, or sets them so they touch without quite
+        overlapping, there is no seam to hold and stretching behaves as it did
+        before. If you see a join open up, that is the case you are in —
+        shorten the stretch, or set that word in another face.
       </p>
       <p>
         <strong>Options…</strong> under an active stroke reveals{" "}

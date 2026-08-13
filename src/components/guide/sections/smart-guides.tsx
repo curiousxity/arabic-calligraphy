@@ -84,6 +84,13 @@ export const section: GuideSection = {
         tickbox says, but blocks stop reaching for each other's edges. The
         setting lasts for the session and starts on again next time.
       </p>
+      <p>
+        One tick-box in that panel is not about layout at all:{" "}
+        <strong>Snap strokes to nuqta</strong> steps the stretching of
+        individual <em>letters</em> in half-nuqta units. It keeps company with
+        these only because it is also a kind of snapping — see{" "}
+        <em>Shaping individual letters</em>.
+      </p>
     </>
   ),
 };

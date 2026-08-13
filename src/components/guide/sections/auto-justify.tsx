@@ -41,6 +41,12 @@ export const section: GuideSection = {
         smaller ones follow more gently. At 0 the letters sit exactly as the font drew
         them.
       </p>
+      <p>
+        Each stroke it moves still lands on a half-nuqta step, the same as when
+        you stretch one by hand, so a line loosened by the dial keeps whole-unit
+        proportions. If you would rather it moved freely, untick{" "}
+        <strong>Snap strokes to nuqta</strong> in Background &amp; Grid.
+      </p>
 
       <h3>Fitting to a width instead</h3>
       <p>
