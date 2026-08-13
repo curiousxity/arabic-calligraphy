@@ -89,7 +89,8 @@ type Props = {
   onSetStretchFactor?: (
     glyphIndex: number,
     definition: StretchDefinition,
-    factor: number
+    factor: number,
+    opts?: { snap?: boolean }
   ) => void;
   onDeleteStretchHandle?: (glyphIndex: number, handleId: string) => void;
   locked?: boolean;

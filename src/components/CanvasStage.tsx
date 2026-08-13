@@ -81,7 +81,8 @@ export type CanvasStageProps = {
     blockId: number,
     glyphIndex: number,
     definition: StretchDefinition,
-    factor: number
+    factor: number,
+    opts?: { snap?: boolean }
   ) => void;
   onDeleteStretchHandle: (blockId: number, glyphIndex: number, handleId: string) => void;
   glyphRigs: GlyphRig[];
@@ -861,8 +862,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
                       onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
                     }
-                    onSetStretchFactor={(glyphIndex, definition, factor) =>
-                      onSetStretchFactor(block.id, glyphIndex, definition, factor)
+                    onSetStretchFactor={(glyphIndex, definition, factor, opts) =>
+                      onSetStretchFactor(block.id, glyphIndex, definition, factor, opts)
                     }
                     onDeleteStretchHandle={(glyphIndex, handleId) =>
                       onDeleteStretchHandle(block.id, glyphIndex, handleId)

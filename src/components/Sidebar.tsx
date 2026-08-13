@@ -145,6 +145,8 @@ export type SidebarProps = {
   snapToBlockEdges?: boolean;
   onToggleSnapToBlockEdges?: (checked: boolean) => void;
   // ---- /STREAM-A ----
+  snapStrokesToNuqta?: boolean;
+  onToggleSnapStrokesToNuqta?: (checked: boolean) => void;
   // ---- STREAM-B: kashida auto-justify ----
   /** Margin per side, in canvas px, subtracted from the "Fit to composition" target. */
   justifyMarginPx?: number;
@@ -339,6 +341,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   snapToBlockEdges,
   onToggleSnapToBlockEdges,
   // ---- /STREAM-A ----
+  snapStrokesToNuqta,
+  onToggleSnapStrokesToNuqta,
   // ---- STREAM-B: kashida auto-justify ----
   justifyMarginPx = 24,
   onChangeJustifyMarginPx,
@@ -737,6 +741,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onChange={(checked) => onToggleSnapToBlockEdges?.(checked)}
                 />
                 {/* ---- /STREAM-A ---- */}
+
+                <CheckboxRow
+                  id="snap-strokes-to-nuqta"
+                  label="Snap strokes to nuqta"
+                  checked={snapStrokesToNuqta ?? true}
+                  onChange={(checked) => onToggleSnapStrokesToNuqta?.(checked)}
+                />
 
                 <CheckboxRow
                   id="show-rulers"

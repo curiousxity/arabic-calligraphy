@@ -23,7 +23,8 @@ export type StrokeStretchHoverHandlesProps = {
   onSetStretchFactor?: (
     glyphIndex: number,
     definition: StretchDefinition,
-    factor: number
+    factor: number,
+    opts?: { snap?: boolean }
   ) => void;
   onDeleteStretchHandle?: (glyphIndex: number, handleId: string) => void;
 };
@@ -226,7 +227,11 @@ export const StrokeStretchHoverHandles: React.FC<StrokeStretchHoverHandlesProps>
                           def.minFactor,
                           def.maxFactor
                         );
-                        onSetStretchFactor?.(glyphIndex, def, nextFactor);
+                        // Alt held = free, unsnapped positioning, the same
+                        // escape the artboard's grid snapping offers.
+                        onSetStretchFactor?.(glyphIndex, def, nextFactor, {
+                          snap: !e.evt.altKey,
+                        });
                       }}
                       onDragEnd={(e) => {
                         e.cancelBubble = true;
