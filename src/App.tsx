@@ -813,6 +813,7 @@ const App: React.FC = () => {
               maxFactor: definition.maxFactor,
               kashidaEligible: definition.kashidaEligible,
               priority: definition.priority,
+              lengthDots: definition.lengthDots,
             },
           ],
         };

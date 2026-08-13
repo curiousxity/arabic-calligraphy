@@ -58,3 +58,8 @@ export function getStrokeSchema(
 export function getLigatureSchema(codepointHexSequence: string[]): GlyphDescription | undefined {
   return ligatureRegistry.get(ligatureKey(codepointHexSequence));
 }
+
+/** Every registered schema, for suites that assert a property across the whole authored set. */
+export function allStrokeSchemas(): GlyphDescription[] {
+  return Array.from(registry.values());
+}
