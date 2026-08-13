@@ -22,6 +22,10 @@ export const FONT_URLS: Record<string, string> = {
   Urdu: "/fonts/Urdu.ttf",
   AlFatemi: "/fonts/AlFatemi.otf",
   FatemiMaqala: "/fonts/FatemiMaqala.ttf",
+  // Modified version of Layla Diwani (OFL, Mohammed Isam) — renamed as the
+  // OFL requires, with the honorific PUA glyphs merged in. Provenance and
+  // licence: public/fonts/HarfCanvasDiwani-OFL.txt.
+  HarfCanvasDiwani: "/fonts/HarfCanvasDiwani.ttf",
 };
 
 const DEBUG_LOG = import.meta.env.DEV;
