@@ -191,13 +191,23 @@ displacement engine.
   each shaped glyph's `glyph.g`, so it attaches the polyline to the
   `StretchDefinition` it is already building. Nothing else in the catalog
   changes.
-- **`addStretchHandle` gets simpler.** Today it maps `anchorNorm`/`dragNorm`
-  onto the glyph's hit box from `glyphBoxesByBlock`. With a spine it converts
-  the polyline from font units into the block's text units —
-  `p × fontSize / unitsPerEm`, offset by the glyph's pen origin, the same
-  transform `ShapedText` already applies per glyph — and takes `anchor` and
+- **`setStretchFactor` gets simpler.** (`CLAUDE.md` calls this
+  `addStretchHandle` in two places; that name does not exist — the handle is
+  created on a slider's first movement inside `setStretchFactor`. Fix the name
+  while touching those paragraphs.) Today it maps `anchorNorm`/`dragNorm` onto
+  the glyph's hit box from `glyphBoxesByBlock`. With a spine it converts the
+  polyline from font units into the block's text units and takes `anchor` and
   `dragOrigin` from the polyline's ends. `dragX`/`dragY` still extrapolate by
-  `maxFactor`. The hit box is no longer needed for spine-backed handles.
+  `maxFactor`. The bounding box is no longer used for spine-backed handles —
+  but the `GlyphHitBox` still is, because it already carries `glyphId`, `gx`
+  and `gy`, which are exactly the table key and the pen origin the conversion
+  needs:
+
+      x = gx + px * fontSize / unitsPerEm
+      y = gy - py * fontSize / unitsPerEm
+
+  The Y negation is the font's y-up convention against canvas y-down, the same
+  flip `mapNormToRealBox` performs today.
 - **The handle stores the whole polyline** — `spine?: Point[]` on
   `GlyphStretchHandle`, optional and ignored by the current displacement math.
   Nothing reads it yet; it is there so change 2 has its input without a second
@@ -240,7 +250,7 @@ not available at runtime. They live in the script's report, and this document
 says so rather than implying the test covers them.
 
 **End-to-end**, over a few real font × word pairs: shape, build the catalog,
-construct handles as `addStretchHandle` does, assert the anchor lands on ink,
+construct handles as `setStretchFactor` does, assert the anchor lands on ink,
 and assert the join-invariance property (0px movement at a pinned join across
 every factor) still holds.
 
