@@ -265,6 +265,67 @@ Falsifiable, not a matter of taste:
   `public/fonts/` already ships Thuluth and Ruqaa, so those proportions do not
   require it.
 
+## Implementation notes (gathered while drafting the plan, 2026-08-13)
+
+The plan itself was not written — work paused before it. These are the
+concrete findings from reading the code, recorded so they need not be
+re-derived.
+
+**Quantization must snap the ADDED length, not the absolute length.** This
+corrects an ambiguity in change 5 above. A stroke's natural `lengthDots` is
+not itself a half-nuqta multiple (beh's body is 4.2), so snapping absolute
+length would move `factor = 1` off the font's natural rendering and violate
+success criterion 4. Snap the delta instead:
+
+    step      = 0.5 / lengthDots
+    quantized = 1 + round((factor - 1) / step) * step
+
+`factor = 1` then maps to itself exactly, and the step in factor space is the
+`0.5 / lengthDots` the spec already describes.
+
+**`lengthDots` is authored but not carried.** It exists on `Stroke`
+(`src/lib/strokeSchema/types.ts:119`) but `deriveStretchCatalog` never copies
+it, so it never reaches a handle. Change 5 needs it added to
+`StretchDefinition` and to `GlyphStretchHandle`, and set at creation in
+`App.tsx`'s `addStretchHandle`.
+
+**Nuqta table shape.** Store `dot/em` ratios keyed by font family, not raw
+font units — then nuqta in px is `ratio * fontSize`. A font absent from the
+table should return `null` and **disable quantization** rather than snap to a
+guess. That gives Diwani and Ruq'ah correct out-of-scope behaviour for free:
+they simply do not snap.
+
+**The kashida formula is duplicated and both copies must change together.**
+`App.tsx:600` (`setBlockKashidaAmount`) and `src/lib/justify.ts:114`
+(`applyKashidaAmountToEdits`) each compute
+`factor = 1 + (maxFactor - 1) * (amount/100) * (priority/10)`. If
+quantization is applied to one and not the other, the auto-justify solver
+optimises a width that applying its own answer would not produce.
+
+**Join guard plumbing.** `applyGlyphEdit(x, y, edit, contourIndex)` has four
+call sites: `ShapedText.tsx` (291/307/323), `ShapeFillText.tsx:596`, and
+`justify.ts` (85/88/91). Add pins as an **optional fifth parameter** so all
+existing call sites keep working untouched. Apply the guard to the *total*
+displacement — run the handles as now, then blend
+`result = p0 + (p1 - p0) * guard` — rather than threading it through
+`applyAxisDisplacement`.
+
+**Overlap detection.** `src/lib/svgPath.ts` already exports `pathToPolygon`
+and `pointInPolygon`, which is enough: intersect the two glyphs' bounding
+boxes, sample a grid inside, keep points inside both outlines, take the mean.
+No new geometry library.
+
+**Clamping `tAlong` is safe for the existing suite.** No test in
+`glyphEdits.test.ts` asserts the unbounded behaviour — the one point tested
+beyond the drag origin (`x = 200`) is excluded by a lasso mask, so it asserts
+masking, not overshoot.
+
+**Undecided — needs a call before implementing Phase B.** Whether Shape Fill
+blocks get join pins too. `ShapeFillText` shares `applyGlyphEdit` but tiles
+its run through a per-tile affine transform, so computing pins there is real
+work, not a one-line change. Plain text only is the smaller, safer first
+step, but it was never explicitly agreed.
+
 ## Repro notes
 
 - `npm run dev`, default text `حرف` at 275% zoom.
