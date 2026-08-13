@@ -89,7 +89,24 @@ Selected/grouped/multi-selected blocks currently have **no persistent on-canvas 
 
 Text is shaped with real HarfBuzz compiled to WASM (`harfbuzzjs` npm package, loaded async), not a JS approximation. `shapeText(text, fontUrl)` loads the font bytes, shapes via HarfBuzz (`rtl` direction, `arab` script), and returns glyph IDs/advances plus the font parsed by `opentype.js` (used afterward to fetch actual glyph outlines for Konva drawing). Results are cached by `text|fontUrl` in-memory (`shapeCache`); call `clearShapeCache()` if a font file changes at the same URL. `FONT_URLS` (in `useShapedGlyphs.ts`) maps font-family keys to `/fonts/*.ttf|otf` — this is the single place new fonts get registered for the app to shape with.
 
-`src/lib/normalizeGlyphs.ts` and `src/lib/svgPath.ts` have their own `*.test.ts` files — these are the two lib modules with actual test coverage; `warp.ts` also has a test.
+Most of `src/lib/` now has real test coverage — 27 `*.test.ts` files beside
+the modules they cover. Two conventions in there are worth knowing before
+adding another:
+
+- **Anything that needs real shaping must use real harfbuzzjs and real fonts
+  from `public/fonts/`**, never hand-written `{ g, cl }` fixtures.
+  `diacritics.test.ts` is the precedent and `justify.test.ts`,
+  `joinPins.fonts.test.ts` and `strokeSchema/spineError.test.ts` all follow
+  it. This is not a style preference: a fabricated-fixture suite is exactly
+  what let the cluster-lookup bug ship unnoticed once. Copy the `shapeReal`
+  helper rather than inventing a second loading mechanism — harfbuzzjs must
+  be pulled in via `createRequire`, because a static ESM import of it throws
+  under Vitest's Node ESM loader before any test code runs.
+- **Some suites are characterizations, not guards** — they pin measured
+  reality so a change becomes visible, and a *failure* can be good news.
+  `joinPins.fonts.test.ts`'s `EXPECTED_COVERAGE` and
+  `strokeSchema/spineError.test.ts` are both this. Read their header
+  comments before "fixing" one.
 
 ### Per-instance diacritic control (`src/lib/diacritics.ts`, `DiacriticHoverHandles.tsx`)
 
@@ -624,9 +641,9 @@ rendering as missing-glyph boxes in the affected font. That exact bug was
 hit and fixed on 2026-08-12. **Derive the list from `PRESETS`, never from a
 range.**
 
-**Adding a new font is a four-place edit plus a glyph merge, not a file
+**Adding a new font is a five-place edit plus a glyph merge, not a file
 copy.** There is no single font registry — a font must be added to *all
-four* of these or it half-works in a way that is easy to misdiagnose:
+five* of these or it half-works in a way that is easy to misdiagnose:
 
 1. the file itself in `public/fonts/`;
 2. an `@font-face` rule at the top of `src/index.css` — this is what the
@@ -636,12 +653,25 @@ four* of these or it half-works in a way that is easy to misdiagnose:
    a font appears in the picker at all**;
 4. `FONT_URLS` in `src/hooks/useShapedGlyphs.ts` — what HarfBuzz actually
    shapes with.
+5. `NUQTA_EM_RATIO` in `src/lib/nuqta.ts` — the font's **measured** nuqta as
+   a dot/em ratio. This one is different from the other four: it must be
+   *measured*, not chosen (`scripts/measureNuqta.py`, cross-checked by eye —
+   see "The nuqta is per-font and must be measured" above), and omitting it
+   is a *legitimate* choice rather than a mistake, because absence is how a
+   font is declared out of scope for per-stroke editing. `nuqta.ts`'s own
+   comment explains which fonts are deliberately absent and why.
 
 Then merge the ten honorific glyphs into the file (see above).
-Registering in `FONT_URLS` alone shapes correctly but leaves the font
+
+Each omission fails differently, and none of them fails loudly:
+registering in `FONT_URLS` alone shapes correctly but leaves the font
 invisible in the UI; adding to `FONT_OPTIONS` alone makes it selectable but
 `FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans` silently falls back to Noto
-Sans, so the picker shows a name that renders as a different font.
+Sans, so the picker shows a name that renders as a different font; and
+leaving it out of `NUQTA_EM_RATIO` gives a font that looks completely
+normal but silently has **no nuqta snapping and no join pinning** — stroke
+stretch reverts to free decimals and tears at letter joins, with nothing in
+the UI saying so.
 
 `HarfCanvasDiwani.ttf` is the worked example of all of this, added
 2026-08-12. It is a **modified version of Layla Diwani** (OFL, Mohammed
@@ -740,6 +770,13 @@ have no target rect to union with, so they still span the whole
 The "Snap to block edges" checkbox (Background & Grid panel) is
 `snapToBlockEdges` in `App.tsx`, defaulting **on** and deliberately not
 persisted. Off restores exactly the previous origin-only behaviour.
+
+The panel's other checkbox, **"Snap strokes to nuqta"** (`snapStrokesToNuqta`),
+looks like a sibling but governs something unrelated — it quantizes *stroke
+stretch* to half-nuqta increments, not block position. It shares this panel
+only because both are snapping toggles, and it follows the same two
+conventions: defaulting **on**, and deliberately not persisted. See the
+stroke-schema section for what it actually does.
 
 Note that the "artboard" targets come from `contentBox`, which is unioned
 with the current viewport — so at a zoom level where the viewport is
@@ -1096,9 +1133,9 @@ These are capabilities that have been explicitly identified as valuable but deli
 
 - **Stretch tool and glyph-edit handles on text-on-path blocks** — The axis-derivation and per-glyph drag mathematics assume glyphs sit in a straight bounding box. Making them work once glyphs are rotated to follow a curve's tangent is a real design problem, not a trivial extension of the existing system.
 
-- **Parametric bezier schema rendering** — The stroke schema currently supplies only metadata (labels, kashida eligibility, protected-zone advisories) plus its own authored geometry (used only to derive stretch axes). It does not render letterforms itself — real fonts and HarfBuzz shaping remain the source of truth. Building a full parametric rendering engine that replaces per-font glyph outlines would be a much larger, separate feature; confirm scope before attempting it. **Scoped and deferred again 2026-08-12:** it was considered as the route to Kaleam-style stroke editing and rejected for now, because the schemas carry no joining geometry — drawing from skeletons would forfeit seamless letter joining, which is the property the request was actually about. Repairing the existing displacement engine to honour the schema comes first; see the "Known defects" section above and `docs/superpowers/specs/2026-08-12-per-stroke-editing-design.md`. Note also that `public/fonts/` already ships `Thuluth.ttf`, `ThuluthDeco.ttf` and `Ruqaa.ttf`, so those proportions do **not** require a parametric engine.
+- **Parametric bezier schema rendering** — The stroke schema currently supplies only metadata (labels, kashida eligibility, protected-zone advisories) plus its own authored geometry (used only to derive stretch axes). It does not render letterforms itself — real fonts and HarfBuzz shaping remain the source of truth. Building a full parametric rendering engine that replaces per-font glyph outlines would be a much larger, separate feature; confirm scope before attempting it. **Scoped and deferred again 2026-08-12:** it was considered as the route to Kaleam-style stroke editing and rejected for now, because the schemas carry no joining geometry — drawing from skeletons would forfeit seamless letter joining, which is the property the request was actually about. Repairing the existing displacement engine to honour the schema comes first; see the "Known defects" section above and `docs/superpowers/specs/2026-08-12-per-stroke-editing-design.md`. Note also that `public/fonts/` already ships `Thuluth.ttf`, `ThuluthDeco.ttf` and `Ruqaa.ttf`, so those proportions do **not** require a parametric engine. **Update 2026-08-13:** that repair is itself now blocked on re-anchoring (see the entry above), so "do the repair first" is no longer a short path to this — but the reason for rejecting parametric rendering is unchanged and unaffected by the measurement, since it was about forfeiting joining geometry, not about mapping accuracy.
 
-- **Schema protectedZones enforcement** — A schema stroke's `protectedZones` are advisory text only and are never read during glyph editing. Enforcing them in the rendering would require a separate design to scope per-stroke edits by the schema's own geometry rather than by the real font's actual outline point indices.
+- **Schema-driven stroke spines and `protectedZones` enforcement — BLOCKED, not merely deferred.** These are changes 2 and 4 of the per-stroke editing design: replacing a stretch zone's straight chord with a real polyline spine (`axis: "path"` actually implemented), and zeroing displacement for outline points inside a protected node span. Both would be built on mapping the schema's own node coordinates onto the real glyph's bounding box, and **that mapping was measured on 2026-08-13 and is not accurate enough** — median 0.37 nuqta, p90 1.43, with only 14.5% of mapped nodes landing inside the ink at all (`src/lib/strokeSchema/spineError.test.ts`). Enforcing protected zones on top of it would freeze the wrong part of the letter most of the time, which is a *new* failure mode rather than a fixed one. The prerequisite is a re-anchoring design — snapping the mapped spine to nearest ink, or fitting it to a medial axis derived from the real outline — and that needs its own pass through the spec. Do not start either change before that exists; the measurement already ruled out the three obvious cheaper explanations (style distance, per-form skeleton reuse, compound letters), so there is no quick win hiding here.
 
 - **Join-pin detection for abutting-but-not-overlapping glyphs** — `lib/joinPins.ts`'s `overlapCentroid` finds a join only where two adjacent glyphs' real outlines physically overlap; measured 2026-08-13 (`joinPins.fonts.test.ts`, 7 fonts × 6 words), 5 of 42 pairs (`Urdu/حرف`, `Urdu/سلام`, `Urdu/حَرْف`, `Urdu/مُحَمَّد`, `Thuluth/سلام`) shape to multiple glyphs that merely abut, so no pin is placed and those joins keep the pre-existing tearing behaviour. Deliberately **not** improvised with a dilation radius: dilate enough to catch abutting letters and false joins start getting manufactured between letters that merely pass near each other without connecting, and the spec already rejected a baseline-scan heuristic for assuming Naskh-shaped geometry. Extending detection to this case is new design work, not a tuning knob on the existing one.
 
