@@ -17,6 +17,8 @@ import {
 import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
 import { splitContours, deriveContourMask } from "../lib/glyphContours";
+import { computeJoinPins, PIN_RADIUS_NUQTA, type JoinPin } from "../lib/joinPins";
+import { nuqtaPx } from "../lib/nuqta";
 import { findDiacriticGlyphIndices } from "../lib/diacritics";
 import {
   makeGlyphTransformAdapter,
@@ -202,7 +204,8 @@ function drawWarpedGlyphRun(
   glyphRigs: GlyphRig[] = [],
   glyphRigValues: GlyphRigValue[] = [],
   diacriticOverrides: DiacriticOverride[] = [],
-  glyphTransforms: GlyphTransform[] = []
+  glyphTransforms: GlyphTransform[] = [],
+  joinPins: Map<number, JoinPin[]> = new Map()
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -229,6 +232,7 @@ function drawWarpedGlyphRun(
     const gx = (penX + (g.dx ?? 0)) * scale;
     const gy = -(g.dy ?? 0) * scale;
     const edit = glyphEdits.find((w) => w.glyphIndex === glyphIndex);
+    const pins = joinPins.get(glyphIndex);
     const preparedRig = prepareGlyphRig(fontFamily, g.g, fontSize, glyphRigs, glyphRigValues, gx, gy);
 
     ctx.save();
@@ -289,7 +293,7 @@ function drawWarpedGlyphRun(
         if (c.type === "M") contourIndex++;
 
         if (typeof c.x === "number" && typeof c.y === "number") {
-          const handled = applyGlyphEdit(c.x + gx, c.y + gy, edit, contourIndex);
+          const handled = applyGlyphEdit(c.x + gx, c.y + gy, edit, contourIndex, pins);
           const rigged = applyPreparedGlyphRig(handled.x, handled.y, preparedRig, contourIndex);
           const p = warpPoint(
             rigged.x,
@@ -305,7 +309,7 @@ function drawWarpedGlyphRun(
         }
 
         if (typeof c.x1 === "number" && typeof c.y1 === "number") {
-          const handled1 = applyGlyphEdit(c.x1 + gx, c.y1 + gy, edit, contourIndex);
+          const handled1 = applyGlyphEdit(c.x1 + gx, c.y1 + gy, edit, contourIndex, pins);
           const rigged1 = applyPreparedGlyphRig(handled1.x, handled1.y, preparedRig, contourIndex);
           const p1 = warpPoint(
             rigged1.x,
@@ -321,7 +325,7 @@ function drawWarpedGlyphRun(
         }
 
         if (typeof c.x2 === "number" && typeof c.y2 === "number") {
-          const handled2 = applyGlyphEdit(c.x2 + gx, c.y2 + gy, edit, contourIndex);
+          const handled2 = applyGlyphEdit(c.x2 + gx, c.y2 + gy, edit, contourIndex, pins);
           const rigged2 = applyPreparedGlyphRig(handled2.x, handled2.y, preparedRig, contourIndex);
           const p2 = warpPoint(
             rigged2.x,
@@ -595,6 +599,29 @@ export const ShapedText: React.FC<Props> = ({
   const glyphBounds = glyphMetrics.bounds;
   const glyphHitBoxes = glyphMetrics.hitBoxes;
   const glyphTransformedHitBoxes = glyphMetrics.transformedHitBoxes;
+
+  /**
+   * Where this run's letters actually connect, so a stroke stretch cannot
+   * tear a seam. Memoized per shaped run because it flattens every glyph's
+   * outline to polygons and grid-samples each adjacent pair — far too much
+   * to redo per drawn point.
+   *
+   * A font with no measured nuqta (Ruq'ah, Diwani — deliberately out of
+   * scope for per-stroke editing) yields no pins at all, which is exactly
+   * today's behaviour for them.
+   */
+  const joinPins = useMemo<Map<number, JoinPin[]>>(() => {
+    const { font, glyphs, unitsPerEm } = shapeData;
+    const nuqta = nuqtaPx(fontFamily, fontSize);
+    if (!font || glyphs.length < 2 || nuqta == null) return new Map();
+    return computeJoinPins({
+      glyphs,
+      font,
+      fontSize,
+      unitsPerEm,
+      pinRadius: nuqta * PIN_RADIUS_NUQTA,
+    });
+  }, [shapeData, fontFamily, fontSize]);
 
   const isBold = fontStyle === "bold" || fontStyle === "bold italic";
   const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
@@ -930,7 +957,8 @@ export const ShapedText: React.FC<Props> = ({
             glyphRigs,
             glyphRigValues,
             activeDiacriticOverrides,
-            glyphTransforms
+            glyphTransforms,
+            joinPins
           );
           ctx.restore();
 
@@ -957,7 +985,8 @@ export const ShapedText: React.FC<Props> = ({
               glyphRigs,
               glyphRigValues,
               activeDiacriticOverrides,
-              glyphTransforms
+              glyphTransforms,
+              joinPins
             );
             ctx.restore();
           }
