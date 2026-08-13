@@ -109,8 +109,14 @@ repository. If you intend to redistribute this project or its fonts, verify
 each file's licence yourself first. `scripts/FONTS.md` describes the tooling
 and the obligations that come with modifying a font.
 
-This repository does not currently carry a licence of its own, which means
-default copyright applies to the code.
+## Licence
+
+The **source code** is MIT licensed — see [LICENSE](LICENSE).
+
+That grant covers the code only. It explicitly does **not** cover the font
+files in `public/fonts/`, which are third-party typefaces under their own
+terms, as set out in the scope note at the bottom of the licence file and in
+the section above.
 
 ## Project documentation
 

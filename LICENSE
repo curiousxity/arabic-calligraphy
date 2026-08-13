@@ -1,0 +1,51 @@
+MIT License
+
+Copyright (c) 2026 Mohammed Ezuddin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+SCOPE — THIS LICENCE DOES NOT COVER THE BUNDLED FONTS
+
+The MIT grant above applies to the source code of this project only.
+
+It does NOT apply to the font files in `public/fonts/`. Those are
+third-party typefaces, obtained under their own separate licences, and are
+merely distributed alongside this software. They are not the copyright of the
+holder named above, who therefore cannot and does not grant any rights in
+them.
+
+Every bundled font has additionally been modified: a set of ten honorific
+symbol glyphs was merged into each file so those symbols render regardless of
+which typeface is selected. Modifying a font can trigger obligations under
+its licence — renaming requirements for reserved font names, notices that
+must travel with the file, or restrictions on redistribution altogether.
+
+One case is documented in full as the worked example: `HarfCanvasDiwani.ttf`
+is a Modified Version of Layla Diwani (SIL Open Font License, Mohammed Isam),
+renamed as the OFL requires because the upstream reserves its name. Its
+licence text and a note on what was changed are in
+`public/fonts/HarfCanvasDiwani-OFL.txt`, which must stay with that font file.
+
+The provenance and licence terms of the remaining font files are not
+documented in this repository. If you intend to redistribute this project, or
+any font from it, you must establish each file's licence and its
+modification terms for yourself first. Do not assume the MIT grant above
+extends to them, because it does not.
