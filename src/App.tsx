@@ -27,6 +27,8 @@ import {
 } from "./lib/canvasBounds";
 import type { StretchDefinition } from "./lib/strokeSchema/deriveCatalog";
 import { mapNormToRealBox } from "./lib/strokeSchema/schemaGeometry";
+import { snapStretchFactor } from "./lib/strokeSchema/quantize";
+import { kashidaFactorForHandle } from "./lib/kashidaFactor";
 import { arcPathD } from "./lib/textPath";
 import type {
   Block,
@@ -246,6 +248,11 @@ const App: React.FC = () => {
   // Session-only, like the grid toggle beside it — deliberately not persisted.
   const [snapToBlockEdges, setSnapToBlockEdges] = useState(true);
   // ---- /STREAM-A ----
+  // Advisory, like grid snapping: on by default, bypassed per-drag by holding
+  // Alt, and applied only when a factor is *edited* — a value already stored
+  // off-grid is never re-snapped, so deliberate off-grid work survives a
+  // save/load round trip. Deliberately not persisted, matching snapToBlockEdges.
+  const [snapStrokesToNuqta, setSnapStrokesToNuqta] = useState(true);
   // ---- STREAM-B: kashida auto-justify — state ----
   // Margin used by "Fit to composition", in canvas px per side. Editor state,
   // deliberately not on the block and not persisted.
@@ -611,13 +618,11 @@ const App: React.FC = () => {
             glyphEdits: (b.glyphEdits ?? []).map((edit) => ({
               ...edit,
               stretches: edit.stretches.map((h) => {
-                if (!h.kashidaEligible || h.maxFactor == null) return h;
-                const weight = (h.priority ?? 5) / 10;
-                const factor = Math.min(
-                  h.maxFactor,
-                  1 + (h.maxFactor - 1) * (clampedAmount / 100) * weight
-                );
-                return { ...h, factor };
+                const factor = kashidaFactorForHandle(h, clampedAmount, {
+                  fontFamily: b.fontFamily,
+                  enabled: snapStrokesToNuqta,
+                });
+                return factor == null ? h : { ...h, factor };
               }),
             })),
           };
@@ -625,7 +630,7 @@ const App: React.FC = () => {
       );
       scheduleGlyphEditHistoryPush();
     },
-    [scheduleGlyphEditHistoryPush]
+    [scheduleGlyphEditHistoryPush, snapStrokesToNuqta]
   );
 
   const updateStretchHandle = useCallback(
@@ -738,11 +743,31 @@ const App: React.FC = () => {
   // `factor` through the debounced update path. No canvas glyph selection or
   // explicit "add handle" step exists anymore.
   const setStretchFactor = useCallback(
-    (blockId: number, glyphIndex: number, definition: StretchDefinition, factor: number) => {
+    (
+      blockId: number,
+      glyphIndex: number,
+      definition: StretchDefinition,
+      factor: number,
+      // `snap: false` is the deliberate off-grid escape — the typed precision
+      // field in the Morph panel, and an Alt-held canvas drag, both pass it.
+      opts?: { snap?: boolean }
+    ) => {
       const block = blocks.find((b) => b.id === blockId);
       if (!block || block.type === "image" || block.type === "textPath") return;
 
-      const clamped = Math.max(definition.minFactor, Math.min(definition.maxFactor, factor));
+      // Snap before clamping: the snap can only move a value by less than one
+      // half-nuqta step, and quantizeFactor already keeps its own result
+      // inside [minFactor, maxFactor], so clamping afterwards is a no-op
+      // safety net rather than something the snap has to work around.
+      const snapped = snapStretchFactor({
+        factor,
+        lengthDots: definition.lengthDots,
+        fontFamily: block.fontFamily,
+        minFactor: definition.minFactor,
+        maxFactor: definition.maxFactor,
+        enabled: snapStrokesToNuqta && opts?.snap !== false,
+      });
+      const clamped = Math.max(definition.minFactor, Math.min(definition.maxFactor, snapped));
       const existing = block.glyphEdits
         ?.find((g) => g.glyphIndex === glyphIndex)
         ?.stretches.find(
@@ -813,12 +838,13 @@ const App: React.FC = () => {
               maxFactor: definition.maxFactor,
               kashidaEligible: definition.kashidaEligible,
               priority: definition.priority,
+              lengthDots: definition.lengthDots,
             },
           ],
         };
       });
     },
-    [blocks, glyphBoxesByBlock, updateStretchHandle, upsertGlyphEdit]
+    [blocks, glyphBoxesByBlock, snapStrokesToNuqta, updateStretchHandle, upsertGlyphEdit]
   );
 
   const deleteStretchHandle = useCallback(
@@ -2170,6 +2196,7 @@ const App: React.FC = () => {
         fontSize: block.fontSize,
         glyphEdits,
         targetWidth,
+        snapToNuqta: snapStrokesToNuqta,
       });
 
       if (!solution) {
@@ -2186,7 +2213,7 @@ const App: React.FC = () => {
             )}px.`
       );
     },
-    [blocks, setBlockKashidaAmount]
+    [blocks, setBlockKashidaAmount, snapStrokesToNuqta]
   );
 
   const justifyOtherSelectedId =
@@ -2339,6 +2366,8 @@ const App: React.FC = () => {
         selectedIds={selectedIds}
         showGrid={showGrid}
         snapToGrid={snapToGrid}
+        snapStrokesToNuqta={snapStrokesToNuqta}
+        onToggleSnapStrokesToNuqta={setSnapStrokesToNuqta}
         isMobile={isMobile}
         width={effectiveSidebarWidth}
         isCollapsed={sidebarCollapsed}

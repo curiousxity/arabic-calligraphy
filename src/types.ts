@@ -45,6 +45,8 @@ export type GlyphStretchHandle = {
   maxFactor?: number;
   kashidaEligible?: boolean;
   priority?: number;
+  /** The schema stroke's natural length in nuqta, copied from StretchDefinition at handle creation — the divisor for the half-nuqta snap step. Absent on handles created before nuqta quantization existed, which simply do not snap. */
+  lengthDots?: number;
 };
 
 export type GlyphEdit = {

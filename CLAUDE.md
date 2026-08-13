@@ -313,7 +313,7 @@ The "Morph Glyph Editor" panel's Stretch tool lets a user click a shaped glyph a
 Investigated 2026-08-12 and reproduced live in the browser. **Read this
 before changing `lib/glyphEdits.ts` or the catalog derivation.** Full
 write-up, including the proposed fix and its open questions, is in
-`docs/superpowers/specs/2026-08-12-per-stroke-editing-DRAFT.md`.
+`docs/superpowers/specs/2026-08-12-per-stroke-editing-design.md`.
 
 **Three layers of authored schema data are consumed by nothing.** Verified
 by grep across `src/`:
@@ -322,29 +322,126 @@ by grep across `src/`:
   for display. The zones themselves never scope an edit.
 - `preserveCurvature`, `preserveThickness`, and each zone's own `axis`
   field (`"x"` / `"path"`) are read **nowhere**.
-- `lengthDots`, `styleProfile.measurementSystem.dotUnit`, and
-  `verticalLevels` appear **only in test fixtures** — never in real code.
+- `styleProfile.measurementSystem.dotUnit` and `verticalLevels` appear
+  **only in test fixtures** — never in real code.
+
+`lengthDots` no longer belongs on this list — see below, it is now the
+divisor behind half-nuqta quantization.
 
 This is why stretching misbehaves. The engine is not missing information;
-it has it and discards it.
+it has it and discards it — for the pieces still listed above.
 
-**Symptom 1 — a cleft opens at a join.** Reproduce: default `حرف`, stretch
-the ra down-left; a hairline gap appears at the hah/ra junction, on the
-side dragged *toward*. Two causes compound:
+**Symptom 1 — a cleft opens at a join — fixed 2026-08-13.** Reproduce (on
+`main` before that date): default `حرف`, stretch the ra down-left; a
+hairline gap appeared at the hah/ra junction, on the side dragged
+*toward*. Two causes compounded, and both halves were fixed:
 
-- `applyAxisDisplacement`'s `tAlong = along / axisLen` is **unbounded and
+- `applyAxisDisplacement`'s `tAlong = along / axisLen` was **unbounded and
   signed**, with falloff only *perpendicular* to the axis and none along
-  it. Points past the drag origin travel further than the drag itself;
-  points behind the anchor travel backwards.
-- The anchor is a *proportional guess* — `anchorNorm` mapped from the
-  schema's idealized bounding box onto the real font glyph's box — so it
-  never lands exactly on the true connection point. `ra-final.json`'s zone
-  spans the whole stroke (`fromNode 0` → `toNode 2`) while
-  `connectsRight: true` means node 0 **is** the join. Any nonzero
-  displacement there tears the seam, and nothing pins it, because
-  `join-integrity` is never read.
+  it — points past the drag origin travelled further than the drag itself,
+  points behind the anchor travelled backwards. `tAlong` is now clamped to
+  `[0, 1]` and eased with smoothstep (`lib/glyphEdits.ts`).
 
-**Symptom 2 — strokes deform rather than extend.** `fa-medial.json`'s eye
+  **That clamp is shared with the glyph-rig path, and quietly changed how
+  old projects render.** `applyPreparedGlyphRig` calls the same
+  `applyAxisDisplacement`, and unlike a schema handle it has no `factor = 1`
+  neutral — a rig axis's slider value *is* the multiplier, so any saved
+  project with a nonzero rig value draws slightly differently after this
+  branch than before it: outline points beyond the axis tip no longer
+  overshoot, and points behind the anchor no longer move the wrong way.
+  This was deliberate and is kept. It is the identical overshoot bug in the
+  identical function, a rig axis tears a join exactly as a stretch handle
+  does, and giving the rig its own unclamped copy of the math would mean
+  maintaining two displacement engines that differ only in a bug. Recorded
+  here because the visual change is small enough to be rediscovered later
+  as a mystery.
+- The anchor is still only a *proportional guess* — `anchorNorm` mapped
+  from the schema's idealized bounding box onto the real font glyph's box
+  — and still never lands exactly on the true connection point. Rather
+  than trust it, `lib/joinPins.ts`'s `computeJoinPins` finds joins a
+  different way: wherever two adjacent shaped glyphs' real outlines
+  physically overlap, by construction correct per font, assuming nothing
+  about baselines or letterform style. `applyGlyphEdit` takes the result
+  as an optional 5th `pins` parameter and applies it as a guard on the
+  **net** displacement (after the handle loop, not per handle — guarding
+  each handle separately would let two of them each individually respect
+  a pin while still summing to a net movement there), evaluated at the
+  point's *original* position so a point can't escape its own guard by
+  being displaced out of the pin radius first. **Plain text only.**
+  `ShapeFillText` tiles its run through a per-tile affine transform, so
+  computing pins in that space is separate, deliberately-deferred work —
+  it passes no pins and keeps the pre-existing tearing behaviour there.
+- **Marks are skipped when pairing, and that is load-bearing.** Adjacency
+  in a shaped run is not adjacency between letters: HarfBuzz emits every
+  tashkeel mark as its own glyph *between* the base letters it sits on, so
+  the original `i`/`i+1` pairing found no join at all the moment a word was
+  vocalized — measured, `حَرْف` in Amiri went 2 pins → 0, `مُحَمَّد` 4 → 0,
+  purely because of the harakat. With an إعراب keyboard, a diacritics
+  subsystem and a per-mark canvas overlay in this app, that switched the
+  whole feature off for a core use case. `computeJoinPins` therefore pairs
+  each base glyph with the *next base glyph*; a mark never receives a pin
+  of its own, which is right — a mark floats above the baseline and is not
+  what tears. Marks are identified with `lib/diacritics.ts`'s
+  `findDiacriticGlyphIndices`, this app's one detector for the job — do not
+  hand-roll a second one here, and in particular do not reach for
+  cluster-to-character lookup, which that module's header explains detects
+  nothing on real shaped text. Being a heuristic, it inherits that
+  detector's blind spots (see the Thuluth case below), where the behaviour
+  degrades to exactly what it was before this fix rather than misbehaving.
+- **Detection has a real, documented gap — not every abutting join is
+  found.** `joinPins.fonts.test.ts` measured 7 fonts × 6 words (42 pairs)
+  against real harfbuzzjs shaping. The 0px displacement-at-a-pinned-join
+  invariance held for *every* join that was detected — no regressions, no
+  partial credit. But 9 of the 42 pairs detect **no join at all**, in three
+  distinct categories, all confirmed by independently re-shaping and
+  counting glyphs:
+  - **Correct-by-design:** `Urdu/بسم` and `Urdu/كتب` each shape to a
+    single glyph — the font fuses the letters via GSUB. There is no glyph
+    boundary, therefore no seam to tear, so "no pin" is the right answer.
+  - **A real, currently-inert gap:** `Urdu/حرف`, `Urdu/سلام`, and
+    `Thuluth/سلام` shape to multiple glyphs whose ink genuinely does not
+    overlap — those letters abut rather than overlap, so
+    `overlapCentroid` correctly returns null and the join goes unpinned.
+    This is not a regression: it is exactly the pre-existing tearing
+    behaviour, just not yet fixed for this geometry. Extending detection
+    to abutting-but-not-overlapping glyphs is deliberately **not**
+    improvised here — see "Deferred features" below. Urdu's two vocalized
+    words land here too, for the same reason: its base glyphs abut once
+    the marks are set aside.
+  - **The mark detector can't see the font's marks:** `Thuluth/حَرْف` and
+    `Thuluth/مُحَمَّد`. `Thuluth.ttf` maps its shaped mark glyphs to
+    *Private Use Area* codepoints (U+E012, U+E016 observed for fatha and
+    sukun) instead of U+064B–U+065F, and positions them by advance with
+    `dx === dy === 0` rather than by GPOS — which defeats both signals
+    `findDiacriticGlyphIndices` uses, so those marks read as base letters
+    and break the pairing exactly as before. Its *unvocalized* words are
+    unaffected. This is the same blind spot that already stops the
+    per-mark diacritic overlay working on that font: the fix belongs in
+    the one detector, which several features share, not in a second copy
+    inside `joinPins.ts`.
+  - **The mark detector flags a real letter** — the mirror image of the
+    case above, found and fixed 2026-08-13, so it produces no `false`
+    entry today. It is why `computeJoinPins` treats a glyph as a mark only
+    when the detector flags it **and** `ax === 0`. `FatemiMaqala.ttf`
+    emits `dx` of 1–4 units out of an upem of 2048 — shaper rounding
+    noise — on ordinary letters, and the detector's
+    cluster-plus-nonzero-`dx` fallback reads that as mark attachment: its
+    unvocalized `كتب` lost the pins on glyphs 2 and 3, and `مُحَمَّد` lost
+    every pin it had. A genuine mark takes no horizontal space and cannot
+    participate in a join; a letter always advances the pen, which is the
+    signal that separates them. **The guard is local to join pairing on
+    purpose** — `lib/diacritics.ts` is shared with the per-mark canvas
+    overlay and other features, and changing it needs its own verification
+    pass across every consumer.
+
+  `FatemiMaqala` and `Kufi2` were added to that matrix in the same pass and
+  detect a join on all six words. `Kufi2` also confirms a *gain* from
+  base-letter pairing outside the original five: it decomposes its nuqat
+  into separately positioned GPOS mark glyphs, so a dot glyph severs two
+  letters' adjacency under raw-neighbour pairing — `Kufi2/بسم` goes from 2
+  pinned glyphs to 3 and `Kufi2/كتب` from 2 to 3 once marks are skipped.
+
+**Symptom 2 — strokes deform rather than extend — still open, unchanged.** `fa-medial.json`'s eye
 loop asks for `axis: "path"` and `preserveCurvature: true`; the catalog
 collapses it to a straight chord, so the loop shears sideways and its
 counter pinches shut instead of growing around its curve. Separately,
@@ -375,7 +472,7 @@ was measured across all fonts and **fails**: `alif ÷ dot` ranges from 0.53
 `dot/em` itself varies ~2× across the library (0.0762 Wessam → 0.1538
 Urdu), so no global constant can serve either.
 
-The measured per-font table lives in the DRAFT spec above. Two independent
+The measured per-font table lives in the spec above. Two independent
 methods were cross-checked and agree within ~2% on 14 of 17 fonts: the
 beh (U+0628) dot contour, and a **modal-contour sweep** (scan every glyph,
 keep small compact contours, take the mode — dots recur across many
@@ -390,6 +487,34 @@ Gotcha for any offline font analysis: `Kufi2.ttf` and `NotoSans.ttf` are
 variable fonts whose `gvar` glyph count disagrees with `maxp` (825 vs 815;
 1718 vs 1708). fontTools throws on `getGlyphSet()` until the `gvar` table
 is dropped. Harmless to the app's own rendering path.
+
+**The measured table now lives in code, `src/lib/nuqta.ts`**, as dot/em
+ratios (`NUQTA_EM_RATIO`) rather than only in the spec — `nuqtaEmRatio`/
+`nuqtaPx` look a font up and return `null` for any font not in the table.
+`Ruqaa` and `HarfCanvasDiwani` are absent **deliberately**: every stroke
+schema declares `calligraphicModel: "naskh"`, which fits Diwani's sloped
+letterforms worst, and Ruq'ah merges dot pairs into strokes, making its
+nuqta the least reliable figure measured. That `null` is the out-of-scope
+mechanism for both fonts — it disables nuqta snapping *and* join pins
+(`lib/joinPins.ts` needs a pin radius sized from the nuqta and gets none),
+not an oversight to fill in with a guess.
+
+Quantization (`src/lib/strokeSchema/quantize.ts`) snaps the stroke's
+**added** length, not its absolute length: `factor = 1 +
+round((factor - 1) / step) * step`, where `step = 0.5 / lengthDots`. A
+stroke's natural `lengthDots` is generally not itself a half-nuqta
+multiple (beh's body is 4.2), so snapping the *absolute* length to a
+half-nuqta grid would move `factor = 1` off the font's own natural
+rendering — silently breaking the rule that factor 1 renders exactly as
+it does today. The added-length formula maps `factor = 1` to itself
+exactly at every step size, which is what keeps that rule intact.
+Wired into `App.tsx`'s `setStretchFactor` — the single funnel every
+stretch path (drag, typed field, kashida dial) goes through — behind a
+"Snap strokes to nuqta" checkbox (default on), with Alt bypassing it
+mid-drag and the typed precision field passing `{ snap: false }`.
+Snapping happens at edit time only, never on load and never in a
+renderer, so an off-grid value a user saved deliberately round-trips
+through save/load unchanged.
 
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
@@ -741,13 +866,22 @@ scale, per-contour index) and pushes every outline coordinate through
 reimplemented** — a divergence there would optimise a width the user never sees,
 and nothing would fail loudly. Glyph rigs, per-glyph transforms, diacritic
 overrides, and warp are deliberately excluded: the dial doesn't move them, so
-they are a constant offset the solver cannot see anyway.
+they are a constant offset the solver cannot see anyway. `measureStretchedRunWidth`
+must also be handed the **same `joinPins`** `ShapedText` is rendering with (both
+come from `lib/joinPins.ts`'s `computeJoinPins`) — for exactly the same reason it
+imports rather than reimplements `applyGlyphEdit`: measuring unpinned ink while
+the renderer pins it would optimise a width the render never actually produces.
 
-`applyKashidaAmountToEdits` duplicates `setBlockKashidaAmount`'s
-`factor = 1 + (maxFactor - 1) * (amount/100) * (priority/10)` formula, because
-the solver has to evaluate dozens of candidate dial positions without touching
-state. **The two must stay in step**; if they diverge the solver reports a width
-that applying its own answer would not produce.
+`applyKashidaAmountToEdits` used to duplicate `setBlockKashidaAmount`'s
+`factor = 1 + (maxFactor - 1) * (amount/100) * (priority/10)` formula by hand,
+because the solver has to evaluate dozens of candidate dial positions without
+touching state. That duplication is gone: the formula now lives once, in
+`src/lib/kashidaFactor.ts`'s `kashidaFactorForHandle`, and both
+`setBlockKashidaAmount` and `applyKashidaAmountToEdits` call it. **The two
+call sites must stay fed the same inputs**; if they ever diverged again the
+solver would report a width that applying its own answer would not produce —
+nuqta quantization (see above) is exactly the kind of change that would have
+silently split them apart if the formula still lived twice.
 
 `solveKashidaAmount` bisects `[0, 100]` (width is monotonically non-decreasing
 in the dial, which is what makes that safe), default tolerance 0.5px. Both ends
@@ -919,9 +1053,15 @@ These are capabilities that have been explicitly identified as valuable but deli
 
 - **Stretch tool and glyph-edit handles on text-on-path blocks** — The axis-derivation and per-glyph drag mathematics assume glyphs sit in a straight bounding box. Making them work once glyphs are rotated to follow a curve's tangent is a real design problem, not a trivial extension of the existing system.
 
-- **Parametric bezier schema rendering** — The stroke schema currently supplies only metadata (labels, kashida eligibility, protected-zone advisories) plus its own authored geometry (used only to derive stretch axes). It does not render letterforms itself — real fonts and HarfBuzz shaping remain the source of truth. Building a full parametric rendering engine that replaces per-font glyph outlines would be a much larger, separate feature; confirm scope before attempting it. **Scoped and deferred again 2026-08-12:** it was considered as the route to Kaleam-style stroke editing and rejected for now, because the schemas carry no joining geometry — drawing from skeletons would forfeit seamless letter joining, which is the property the request was actually about. Repairing the existing displacement engine to honour the schema comes first; see the "Known defects" section above and `docs/superpowers/specs/2026-08-12-per-stroke-editing-DRAFT.md`. Note also that `public/fonts/` already ships `Thuluth.ttf`, `ThuluthDeco.ttf` and `Ruqaa.ttf`, so those proportions do **not** require a parametric engine.
+- **Parametric bezier schema rendering** — The stroke schema currently supplies only metadata (labels, kashida eligibility, protected-zone advisories) plus its own authored geometry (used only to derive stretch axes). It does not render letterforms itself — real fonts and HarfBuzz shaping remain the source of truth. Building a full parametric rendering engine that replaces per-font glyph outlines would be a much larger, separate feature; confirm scope before attempting it. **Scoped and deferred again 2026-08-12:** it was considered as the route to Kaleam-style stroke editing and rejected for now, because the schemas carry no joining geometry — drawing from skeletons would forfeit seamless letter joining, which is the property the request was actually about. Repairing the existing displacement engine to honour the schema comes first; see the "Known defects" section above and `docs/superpowers/specs/2026-08-12-per-stroke-editing-design.md`. Note also that `public/fonts/` already ships `Thuluth.ttf`, `ThuluthDeco.ttf` and `Ruqaa.ttf`, so those proportions do **not** require a parametric engine.
 
 - **Schema protectedZones enforcement** — A schema stroke's `protectedZones` are advisory text only and are never read during glyph editing. Enforcing them in the rendering would require a separate design to scope per-stroke edits by the schema's own geometry rather than by the real font's actual outline point indices.
+
+- **Join-pin detection for abutting-but-not-overlapping glyphs** — `lib/joinPins.ts`'s `overlapCentroid` finds a join only where two adjacent glyphs' real outlines physically overlap; measured 2026-08-13 (`joinPins.fonts.test.ts`, 7 fonts × 6 words), 5 of 42 pairs (`Urdu/حرف`, `Urdu/سلام`, `Urdu/حَرْف`, `Urdu/مُحَمَّد`, `Thuluth/سلام`) shape to multiple glyphs that merely abut, so no pin is placed and those joins keep the pre-existing tearing behaviour. Deliberately **not** improvised with a dilation radius: dilate enough to catch abutting letters and false joins start getting manufactured between letters that merely pass near each other without connecting, and the spec already rejected a baseline-scan heuristic for assuming Naskh-shaped geometry. Extending detection to this case is new design work, not a tuning knob on the existing one.
+
+- **Mark detection for fonts that encode marks in the Private Use Area** — `lib/diacritics.ts`'s `findDiacriticGlyphIndices` keys on a mark's own cmap codepoint, with a nonzero-GPOS-offset fallback. `Thuluth.ttf` defeats both (PUA codepoints, marks positioned by advance), so on that font the per-mark diacritic overlay does not arm and, since 2026-08-13, join pins on vocalized text find nothing either. A third signal — e.g. reading the font's own GDEF glyph classes, which mark up mark glyphs directly — would fix both features at once, but it touches the detector every diacritic feature depends on and deserves its own real-font verification pass rather than being bolted on beside a join fix.
+
+- **Join pins on Shape Fill and text-on-path blocks** — Plain text only, per the 2026-08-13 decision. `ShapeFillText` tiles its run through a per-tile affine transform; computing pins in that space is separate work, deliberately deferred rather than attempted alongside the plain-text fix.
 
 - **Automatic line-justification via Kashida** — The Kashida block-level dial (0–100) is manual only; it distributes one slider across every kashida-eligible stroke in a block. The app currently has no "fit text to width" infrastructure to hook automatic justification into.
 

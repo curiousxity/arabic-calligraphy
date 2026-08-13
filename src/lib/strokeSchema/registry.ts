@@ -58,3 +58,14 @@ export function getStrokeSchema(
 export function getLigatureSchema(codepointHexSequence: string[]): GlyphDescription | undefined {
   return ligatureRegistry.get(ligatureKey(codepointHexSequence));
 }
+
+/**
+ * Every registered schema — single letters *and* ligatures — for suites that
+ * assert a property across the whole authored set. Ligatures live in their
+ * own registry (they are keyed by a codepoint sequence rather than one
+ * codepoint), and omitting them here made any such assertion silently skip
+ * them.
+ */
+export function allStrokeSchemas(): GlyphDescription[] {
+  return [...registry.values(), ...ligatureRegistry.values()];
+}

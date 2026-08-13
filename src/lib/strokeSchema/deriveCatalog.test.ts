@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getStrokeSchema, getLigatureSchema } from "./registry";
+import { getStrokeSchema, getLigatureSchema, allStrokeSchemas } from "./registry";
 import { deriveStretchCatalog } from "./deriveCatalog";
 import type { GlyphDescription } from "./types";
 
@@ -143,5 +143,27 @@ describe("stroke schema registry + deriveStretchCatalog", () => {
       "Heh tail",
     ]);
     expect(catalog.every((c) => c.kashidaEligible === false)).toBe(true);
+  });
+
+  it("carries the stroke's authored lengthDots onto its definitions", () => {
+    // beh-isolated.json: S_BODY_1 is 4.2 nuqta long, with one stretch zone.
+    const beh = deriveStretchCatalog(getStrokeSchema("0628", "isolated")!);
+    expect(beh.find((d) => d.strokeId === "S_BODY_1")!.lengthDots).toBe(4.2);
+
+    // seen-medial.json: only the connector stroke is stretchable, 1.6 long.
+    const seen = deriveStretchCatalog(getStrokeSchema("0633", "medial")!);
+    expect(seen[0].lengthDots).toBe(1.6);
+  });
+
+  it("carries a length onto every stretchable stroke in every authored schema", () => {
+    // Every schema file authored so far gives its stretchable strokes a
+    // lengthDots. If a newly added file forgets one, that stroke silently
+    // loses nuqta quantization — it degrades rather than breaking, so
+    // nothing else would catch it.
+    for (const schema of allStrokeSchemas()) {
+      for (const def of deriveStretchCatalog(schema)) {
+        expect(def.lengthDots, `${schema.glyph.id} / ${def.strokeId}`).toBeGreaterThan(0);
+      }
+    }
   });
 });

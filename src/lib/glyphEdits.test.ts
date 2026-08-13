@@ -139,6 +139,69 @@ describe("applyGlyphEdit", () => {
     expect(applyGlyphEdit(100, 0, atMin).x).toBeCloseTo(50);
   });
 
+  it("does not displace a point past the drag origin further than the drag itself", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 20,
+        },
+      ],
+    };
+    // x=200 is twice as far along the axis as the drag origin. Unclamped,
+    // tAlong=2 gave it a 100px displacement (double the 50px drag) — the
+    // overshoot half of the cleft at a letter join.
+    const p = applyGlyphEdit(200, 0, edit);
+    expect(p.x).toBeCloseTo(250);
+  });
+
+  it("does not displace a point behind the anchor backwards", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 20,
+        },
+      ],
+    };
+    // tAlong = -0.5 used to pull this point 25px in the *opposite* direction.
+    const p = applyGlyphEdit(-50, 0, edit);
+    expect(p.x).toBeCloseTo(-50);
+  });
+
+  it("still displaces the drag origin itself by the full drag delta", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 20,
+        },
+      ],
+    };
+    expect(applyGlyphEdit(100, 0, edit).x).toBeCloseTo(150);
+  });
+
   it("with a lasso mask, only displaces points inside the polygon", () => {
     const edit: GlyphEdit = {
       glyphIndex: 0,
@@ -171,6 +234,80 @@ describe("applyGlyphEdit", () => {
     const outside = applyGlyphEdit(200, 0, edit);
     expect(outside.x).toBeCloseTo(200);
     expect(outside.y).toBeCloseTo(0);
+  });
+
+  it("does not move a point at a pinned join, at any factor", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 200,
+          dragY: 0,
+          bandWidth: 200,
+          minFactor: 0.85,
+          maxFactor: 1.8,
+        },
+      ],
+    };
+    const pins = [{ x: 60, y: 0, radius: 20 }];
+
+    for (const factor of [0.85, 1, 1.2, 1.5, 1.8]) {
+      const withFactor: GlyphEdit = {
+        ...edit,
+        stretches: [{ ...edit.stretches[0], factor }],
+      };
+      const p = applyGlyphEdit(60, 0, withFactor, -1, pins);
+      expect(p.x, `factor ${factor}`).toBeCloseTo(60, 9);
+      expect(p.y, `factor ${factor}`).toBeCloseTo(0, 9);
+    }
+  });
+
+  it("leaves displacement untouched well outside the pin radius", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 200,
+        },
+      ],
+    };
+    const unpinned = applyGlyphEdit(100, 0, edit);
+    const pinnedFarAway = applyGlyphEdit(100, 0, edit, -1, [{ x: 0, y: 0, radius: 20 }]);
+    expect(pinnedFarAway.x).toBeCloseTo(unpinned.x, 9);
+  });
+
+  it("partially suppresses displacement inside the pin radius", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 200,
+        },
+      ],
+    };
+    const unpinned = applyGlyphEdit(100, 0, edit).x;
+    const pinned = applyGlyphEdit(100, 0, edit, -1, [{ x: 90, y: 0, radius: 20 }]).x;
+    expect(pinned).toBeGreaterThan(100);
+    expect(pinned).toBeLessThan(unpinned);
   });
 });
 

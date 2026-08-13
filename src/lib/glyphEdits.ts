@@ -1,4 +1,5 @@
 import type { GlyphEdit, GlyphRig, GlyphRigValue, GlyphStretchHandle, GlyphStretchMask } from "../types";
+import { joinGuard, type JoinPin } from "./joinPins";
 
 export const MASK_CONTOUR_ON_COLOR = "#22c55e";
 export const MASK_CONTOUR_OFF_COLOR = "#9ca3af";
@@ -43,7 +44,8 @@ type AxisGeometry = {
 /**
  * Displaces a single outline point along one anchor→dragOrigin axis,
  * proportional to distance from the anchor (0 at the anchor, 1 at the
- * dragOrigin, unbounded beyond it), tapered by perpendicular distance from
+ * dragOrigin and held at 1 beyond it (clamped — see the note at the
+ * `tAlong` computation)), tapered by perpendicular distance from
  * the axis (a smoothstep band falloff), and scaled by `valueMultiplier` —
  * 1 for a live-dragged stretch handle (dragX/dragY already ARE the target
  * position), or a [-1, 1] slider value for a rig axis (dragX/dragY are the
@@ -77,7 +79,16 @@ function applyAxisDisplacement(
 
   const t = 1 - perpDist / axis.bandWidth;
   const falloff = t * t * (3 - 2 * t); // smoothstep — no hard seam at the band edge
-  const tAlong = along / axisLen;
+  // Clamped, and eased with the same smoothstep the perpendicular band
+  // already uses. Unbounded and signed, this was half of the cleft that
+  // opens at a letter join: a point past the drag origin (tAlong > 1)
+  // travelled further than the drag itself, and a point behind the anchor
+  // (tAlong < 0) travelled backwards. Clamping makes the region past the
+  // drag origin translate rigidly with the axis tip — which is what
+  // "extending a stroke" means — and easing removes the crease the bare
+  // clamp would leave at each boundary.
+  const tRaw = Math.max(0, Math.min(1, along / axisLen));
+  const tAlong = tRaw * tRaw * (3 - 2 * tRaw);
 
   const displacement = deltaAlong * tAlong * falloff;
   return { x: x + displacement * dirX, y: y + displacement * dirY };
@@ -106,15 +117,28 @@ function resolveValueMultiplier(h: GlyphStretchHandle): number {
 /**
  * Applies a glyph's edits to a single outline point: each stretch handle
  * pulls points near its anchor→drag axis along that axis, proportional to
- * distance from the anchor (0 at the anchor, 1 at the drag handle's original
- * position, unbounded beyond it) and tapered by perpendicular distance from
- * the axis (a smoothstep band falloff).
+ * clamped distance from the anchor (0 at the anchor, 1 at the drag handle's
+ * original position and held there beyond it) and tapered by perpendicular
+ * distance from the axis (a smoothstep band falloff).
+ *
+ * `pins` are the connection points this glyph shares with its neighbours
+ * (see lib/joinPins.ts). Displacement is scaled to zero at each pin and
+ * ramped smoothly back to full beyond its radius, so stretching a letter
+ * cannot tear the seam where it joins the next one. The guard is applied to
+ * the *net* result rather than per handle deliberately: a glyph can carry
+ * several handles, and guarding each one separately would let two of them
+ * each individually respect the pin while still summing to a net movement
+ * there. Optional, and absent for every caller that does not have pins —
+ * Shape Fill blocks tile their run through a per-tile affine transform, so
+ * computing pins in that space is separate work and they deliberately pass
+ * none.
  */
 export function applyGlyphEdit(
   x: number,
   y: number,
   edit: GlyphEdit | undefined,
-  contourIndex = -1
+  contourIndex = -1,
+  pins?: JoinPin[]
 ): { x: number; y: number } {
   if (!edit) return { x, y };
 
@@ -130,7 +154,13 @@ export function applyGlyphEdit(
     py = p.y;
   }
 
-  return { x: px, y: py };
+  // Evaluated at the point's original position, for the same reason the mask
+  // is: a point must not be able to escape its own join guard by being
+  // displaced out of the pin radius first.
+  const guard = joinGuard(x, y, pins);
+  if (guard >= 1) return { x: px, y: py };
+
+  return { x: x + (px - x) * guard, y: y + (py - y) * guard };
 }
 
 type PreparedRigAxis = {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Block, GlyphRig, GlyphStretchHandle } from "../types";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
+import { addedNuqta, formatNuqtaDelta } from "../lib/strokeSchema/quantize";
 import { CheckboxRow, RangeRow } from "./sidebar/FormControls";
 import { makeId } from "./sidebar/utils";
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, HelpIcon } from "./Icons";
@@ -208,7 +209,8 @@ export type MorphGlyphEditorProps = {
     blockId: number,
     glyphIndex: number,
     definition: StretchDefinition,
-    factor: number
+    factor: number,
+    opts?: { snap?: boolean }
   ) => void;
   onUpdateStretchHandle?: (
     blockId: number,
@@ -429,6 +431,7 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                         (h.schemaZoneIndex ?? 0) === def.zoneIndex
                     );
                   const value = handle?.factor ?? 1;
+                  const nuqtaLabel = formatNuqtaDelta(addedNuqta(value, def.lengthDots));
                   const expanded = !!expandedRows[rowKey];
 
                   return (
@@ -450,6 +453,7 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                               <span style={{ fontSize: 12, flex: 1, minWidth: 0 }}>
                                 {def.label.en ?? def.componentType}
                                 {def.kashidaEligible ? " · kashida" : ""}
+                                {nuqtaLabel ? ` · ${nuqtaLabel}` : ""}
                               </span>
                               <StrokeFactorInput
                                 key={rowKey}
@@ -462,7 +466,8 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                                     selectedBlock.id,
                                     glyphIndex,
                                     def,
-                                    factor
+                                    factor,
+                                    { snap: false }
                                   )
                                 }
                               />
@@ -479,7 +484,7 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                               onChange={(v) =>
                                 onSetStretchFactor?.(selectedBlock.id, glyphIndex, def, v)
                               }
-                              suffix={value.toFixed(2)}
+                              suffix={nuqtaLabel || value.toFixed(2)}
                             />
                           )}
                         </div>

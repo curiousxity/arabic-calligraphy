@@ -7,6 +7,8 @@ import type { GlyphEdit } from "../types";
 // reasoning that moved ARABIC_DIACRITIC_RE into `diacritics.ts`.
 import type { HarfBuzzGlyph } from "./normalizeGlyphs";
 import { applyGlyphEdit } from "./glyphEdits";
+import type { JoinPin } from "./joinPins";
+import { kashidaFactorForHandle, type KashidaSnap } from "./kashidaFactor";
 
 /**
  * Ink width of a shaped run with `glyphEdits` applied — the *stretched* width
@@ -33,6 +35,11 @@ import { applyGlyphEdit } from "./glyphEdits";
  * `glyphEdits`, so anything else is a constant offset between this measurement
  * and the drawn ink, identical at every dial position and therefore invisible
  * to the solver.
+ *
+ * `joinPins` must be the same set `ShapedText` is rendering with (both come
+ * from `lib/joinPins.ts`'s `computeJoinPins`). Measuring unpinned ink while
+ * the renderer draws pinned ink would make the solver optimise a width the
+ * user never sees, and nothing would fail loudly.
  */
 export function measureStretchedRunWidth(args: {
   glyphs: HarfBuzzGlyph[];
@@ -40,6 +47,7 @@ export function measureStretchedRunWidth(args: {
   fontSize: number;
   unitsPerEm: number;
   glyphEdits: GlyphEdit[];
+  joinPins?: Map<number, JoinPin[]>;
 }): number {
   const { glyphs, font, fontSize, glyphEdits } = args;
   if (!font || glyphs.length === 0) return 0;
@@ -66,6 +74,7 @@ export function measureStretchedRunWidth(args: {
       const gx = (penX + (g.dx ?? 0)) * scale;
       const gy = -(g.dy ?? 0) * scale;
       const edit = glyphEdits.find((e) => e.glyphIndex === i);
+      const pins = args.joinPins?.get(i);
 
       let contourIndex = -1;
       for (const cmd of glyphObj.getPath(0, 0, fontSize).commands as PathCommand[]) {
@@ -82,13 +91,13 @@ export function measureStretchedRunWidth(args: {
         if (c.type === "M") contourIndex++;
 
         if (typeof c.x === "number" && typeof c.y === "number") {
-          track(applyGlyphEdit(c.x + gx, c.y + gy, edit, contourIndex).x);
+          track(applyGlyphEdit(c.x + gx, c.y + gy, edit, contourIndex, pins).x);
         }
         if (typeof c.x1 === "number" && typeof c.y1 === "number") {
-          track(applyGlyphEdit(c.x1 + gx, c.y1 + gy, edit, contourIndex).x);
+          track(applyGlyphEdit(c.x1 + gx, c.y1 + gy, edit, contourIndex, pins).x);
         }
         if (typeof c.x2 === "number" && typeof c.y2 === "number") {
-          track(applyGlyphEdit(c.x2 + gx, c.y2 + gy, edit, contourIndex).x);
+          track(applyGlyphEdit(c.x2 + gx, c.y2 + gy, edit, contourIndex, pins).x);
         }
       }
     }
@@ -101,32 +110,26 @@ export function measureStretchedRunWidth(args: {
 }
 
 /**
- * The kashida dial's distribution formula, lifted verbatim from `App.tsx`'s
- * `setBlockKashidaAmount`: each eligible, schema-backed handle ramps toward
- * its own `maxFactor` at a rate weighted by its `priority`.
+ * Applies the kashida dial's distribution across a block's edits, without
+ * touching state — this is what lets `solveKashidaAmount` evaluate dozens of
+ * candidate dial positions.
  *
- * It is duplicated rather than shared because `setBlockKashidaAmount` is a
- * state mutator, not a pure function, and the solver has to evaluate dozens of
- * candidate dial positions without touching state. **The two must stay in
- * step** — if they diverge, the solver reports a width that applying the very
- * amount it returned would not produce.
+ * The formula itself lives in `lib/kashidaFactor.ts` and is shared with
+ * `App.tsx`'s `setBlockKashidaAmount`. It used to be duplicated here, which
+ * meant the two had to be kept in step by hand or the solver would optimise
+ * a width that applying its own answer would not reproduce. Pass the same
+ * `snap` the app is using, for the same reason.
  */
 export function applyKashidaAmountToEdits(
   glyphEdits: GlyphEdit[],
-  amount: number
+  amount: number,
+  snap?: KashidaSnap
 ): GlyphEdit[] {
-  const clamped = Math.max(0, Math.min(100, amount));
-
   return glyphEdits.map((edit) => ({
     ...edit,
     stretches: edit.stretches.map((h) => {
-      if (!h.kashidaEligible || h.maxFactor == null) return h;
-      const weight = (h.priority ?? 5) / 10;
-      const factor = Math.min(
-        h.maxFactor,
-        1 + (h.maxFactor - 1) * (clamped / 100) * weight
-      );
-      return { ...h, factor };
+      const factor = kashidaFactorForHandle(h, amount, snap);
+      return factor == null ? h : { ...h, factor };
     }),
   }));
 }
@@ -232,6 +235,7 @@ export async function solveJustifyForBlock(args: {
   glyphEdits: GlyphEdit[];
   targetWidth: number;
   opts?: SolveKashidaOptions;
+  snapToNuqta?: boolean;
 }): Promise<JustifySolution | null> {
   const [{ shapeText }, { FONT_URLS }] = await Promise.all([
     import("./harfbuzz"),
@@ -242,6 +246,20 @@ export async function solveJustifyForBlock(args: {
   const { glyphs, font, unitsPerEm } = await shapeText(args.text || "", fontUrl);
   if (!font || glyphs.length === 0) return null;
 
+  const { computeJoinPins, PIN_RADIUS_NUQTA } = await import("./joinPins");
+  const { nuqtaPx } = await import("./nuqta");
+  const nuqta = nuqtaPx(args.fontFamily, args.fontSize);
+  const joinPins =
+    nuqta == null
+      ? undefined
+      : computeJoinPins({
+          glyphs,
+          font,
+          fontSize: args.fontSize,
+          unitsPerEm,
+          pinRadius: nuqta * PIN_RADIUS_NUQTA,
+        });
+
   return solveKashidaAmount(
     (amount) =>
       measureStretchedRunWidth({
@@ -249,7 +267,11 @@ export async function solveJustifyForBlock(args: {
         font,
         fontSize: args.fontSize,
         unitsPerEm,
-        glyphEdits: applyKashidaAmountToEdits(args.glyphEdits, amount),
+        glyphEdits: applyKashidaAmountToEdits(args.glyphEdits, amount, {
+          fontFamily: args.fontFamily,
+          enabled: args.snapToNuqta ?? false,
+        }),
+        joinPins,
       }),
     args.targetWidth,
     args.opts

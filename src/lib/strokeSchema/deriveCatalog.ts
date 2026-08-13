@@ -19,6 +19,13 @@ export type StretchDefinition = {
   kashidaEligible: boolean;
   elongationStrategy: Stroke["editBehavior"]["elongationStrategy"];
   priority: number;
+  /**
+   * The stroke's natural length in nuqta, straight from the schema
+   * (`Stroke.lengthDots`). Optional because a schema file may omit it. This
+   * is what makes a half-nuqta stretch increment computable:
+   * `step = 0.5 / lengthDots` in factor space (see lib/strokeSchema/quantize.ts).
+   */
+  lengthDots?: number;
   protectedReasons: string[];
   /**
    * The zone's fromNode/toNode, as a 0-1 proportion of the whole glyph's own
@@ -77,6 +84,7 @@ export function deriveStretchCatalog(desc: GlyphDescription): StretchDefinition[
           kashidaEligible: stroke.editBehavior.kashidaEligible ?? false,
           elongationStrategy: stroke.editBehavior.elongationStrategy,
           priority: stroke.editBehavior.priority,
+          lengthDots: stroke.lengthDots,
           protectedReasons: stroke.editBehavior.protectedZones.map((p) => p.reason),
           anchorNorm: normalizePoint(fromNode, glyphBBox),
           dragNorm: normalizePoint(toNode, glyphBBox),

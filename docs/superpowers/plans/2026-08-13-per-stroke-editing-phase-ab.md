@@ -215,16 +215,39 @@ Create `src/lib/nuqta.test.ts`:
 ```ts
 import { describe, it, expect } from "vitest";
 import { NUQTA_EM_RATIO, nuqtaEmRatio, nuqtaPx } from "./nuqta";
-import { FONT_URLS } from "../hooks/useShapedGlyphs";
 
-const OUT_OF_SCOPE = ["Ruqaa", "HarfCanvasDiwani"];
+/**
+ * The in-scope half of `FONT_URLS` (src/hooks/useShapedGlyphs.ts), which is
+ * the real source of truth for which fonts the app ships.
+ *
+ * It is written out rather than imported **deliberately**: that module
+ * statically imports `../lib/harfbuzz`, which throws under Vitest's Node ESM
+ * loader the moment this file evaluates it ("Method Promise.prototype.then
+ * called on incompatible receiver") — the same constraint that keeps
+ * `diacritics.ts` and `justify.ts` free of a static harfbuzz import. Adding a
+ * font is already a multi-place edit (CLAUDE.md); the nuqta table is one more.
+ */
+const IN_SCOPE_FONTS = [
+  "AlFatemi",
+  "Amiri",
+  "FatemiMaqala",
+  "Kufi",
+  "Kufi2",
+  "Lateef",
+  "NotoSans",
+  "Qahiri",
+  "Scheherazade",
+  "TahaNaskhRegular",
+  "Thuluth",
+  "ThuluthDeco",
+  "Urdu",
+  "Wessam",
+  "Yekan",
+];
 
 describe("nuqta table", () => {
-  it("covers every registered font except the two deliberately out of scope", () => {
-    const expected = Object.keys(FONT_URLS)
-      .filter((f) => !OUT_OF_SCOPE.includes(f))
-      .sort();
-    expect(Object.keys(NUQTA_EM_RATIO).sort()).toEqual(expected);
+  it("covers exactly the in-scope fonts", () => {
+    expect(Object.keys(NUQTA_EM_RATIO).sort()).toEqual([...IN_SCOPE_FONTS].sort());
   });
 
   it("returns null for a font that was measured out of scope", () => {
