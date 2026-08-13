@@ -2,6 +2,10 @@ import type * as opentype from "opentype.js";
 import type { PathCommand } from "opentype.js";
 import { pointInPolygon } from "./svgPath";
 import { contoursToPolygons, splitContours } from "./glyphContours";
+// This app's one trusted mark detector. It is deliberately harfbuzz-free
+// (see its own header), so importing it here does not reintroduce the
+// harfbuzzjs-under-Vitest problem the type-only import below avoids.
+import { findDiacriticGlyphIndices } from "./diacritics";
 // Types only, from `normalizeGlyphs` rather than `harfbuzz` — importing the
 // latter drags in harfbuzzjs, which throws under Vitest's Node ESM loader the
 // moment this module is evaluated. Same reasoning as lib/justify.ts.
@@ -18,7 +22,26 @@ export type JoinPin = { x: number; y: number; radius: number };
 /** The pin radius, as a multiple of the font's measured nuqta. Tunable — see the spec's open questions. */
 export const PIN_RADIUS_NUQTA = 0.5;
 
-/** Even-odd containment across a glyph's whole contour set, so a counter (a hole) reads as outside the ink. */
+/**
+ * Even-odd containment across a glyph's whole contour set: a point is
+ * reported as inside when it falls within an odd number of the glyph's
+ * contours.
+ *
+ * That is NOT how a font is actually filled — TrueType/CFF outlines use the
+ * nonzero-winding rule, and Arabic faces routinely build one letter from
+ * several *overlapping, same-direction* contours, which winding fills solid
+ * and even-odd misreads as a hole. So this is exact for the common
+ * outer-contour-plus-counter case, and can under-report ink where two
+ * same-direction contours overlap.
+ *
+ * Kept as-is on purpose. Under-reporting only shrinks the sampled overlap
+ * region, which nudges the pin's centroid or (at worst) finds no overlap and
+ * yields no pin — the same inert outcome as the abutting-glyph gap
+ * documented in `joinPins.fonts.test.ts`. It never manufactures a join that
+ * isn't there. Switching to winding means tracking each contour's
+ * orientation through `glyphContours.ts`'s flattening, which is design work
+ * for the later measurement phase, not a comment fix.
+ */
 export function insideContours(
   x: number,
   y: number,
@@ -128,9 +151,29 @@ export function joinGuard(x: number, y: number, pins: JoinPin[] | undefined): nu
 /**
  * Every join in a shaped run, keyed by the glyph index each one constrains.
  *
- * A join between glyphs i and i+1 is recorded against **both** of them: each
+ * A join between two glyphs is recorded against **both** of them: each
  * glyph's own edits have to leave the shared seam alone, or one letter pulls
  * away from a neighbour that stayed put.
+ *
+ * **Marks are skipped when pairing.** Adjacency in a shaped run is not
+ * adjacency between letters: HarfBuzz emits each tashkeel mark as its own
+ * glyph interleaved between the base letters it sits on, so pairing bare
+ * `i`/`i+1` finds no join at all the moment a word is vocalized — measured
+ * on real shaping, `حَرْف` in Amiri went from 2 pins to 0 purely because of
+ * its fatha and sukun. Since this app has an إعراب keyboard and a whole
+ * per-mark overlay, that would switch the feature off for a core use case.
+ * Each base glyph is therefore paired with the *next base glyph*, and marks
+ * are passed over — a mark receives no pin of its own, which is right:
+ * a mark floats above the baseline and is not what tears at a seam.
+ *
+ * Marks are identified with `lib/diacritics.ts`'s
+ * `findDiacriticGlyphIndices`, this app's one detector for the job, tested
+ * against real HarfBuzz output for real fonts. Do not hand-roll a second
+ * one, and in particular do not reach for cluster-to-character lookup —
+ * that module's header explains why it silently detects nothing. The
+ * detector is a heuristic, so a font whose marks it cannot see (Thuluth is
+ * one, observed) simply behaves as it did before this fix rather than
+ * misbehaving.
  *
  * The walk mirrors the renderers' *drawing* loop exactly — same pen advance,
  * same `dx`/`dy` handling, same `fontSize`-scaled outline — so the pins land
@@ -182,12 +225,20 @@ export function computeJoinPins(args: {
     else pins.set(glyphIndex, [pin]);
   };
 
-  for (let i = 0; i < glyphs.length - 1; i++) {
-    const centre = overlapCentroid(polygons[i], polygons[i + 1]);
+  const markIndices = findDiacriticGlyphIndices(glyphs, font);
+  const baseIndices: number[] = [];
+  for (let i = 0; i < glyphs.length; i++) {
+    if (!markIndices.has(i)) baseIndices.push(i);
+  }
+
+  for (let k = 0; k < baseIndices.length - 1; k++) {
+    const i = baseIndices[k];
+    const j = baseIndices[k + 1];
+    const centre = overlapCentroid(polygons[i], polygons[j]);
     if (!centre) continue;
     const pin: JoinPin = { x: centre.x, y: centre.y, radius: pinRadius };
     add(i, pin);
-    add(i + 1, pin);
+    add(j, pin);
   }
 
   return pins;

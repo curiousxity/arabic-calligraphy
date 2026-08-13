@@ -9,6 +9,7 @@ import { computeJoinPins, PIN_RADIUS_NUQTA } from "./joinPins";
 import { applyGlyphEdit } from "./glyphEdits";
 import { nuqtaPx } from "./nuqta";
 import { normalizeGlyphs } from "./normalizeGlyphs";
+import { findDiacriticGlyphIndices } from "./diacritics";
 import type { HarfBuzzGlyph } from "./normalizeGlyphs";
 import type { GlyphEdit } from "../types";
 
@@ -130,23 +131,27 @@ const FONT_FAMILY_BY_FILE: Record<string, string> = {
   "Urdu.ttf": "Urdu",
 };
 
-// Connected words, each exercising several joining forms.
-const WORDS = ["حرف", "بسم", "كتب", "سلام"];
+// Connected words, each exercising several joining forms. The last two are
+// vocalized: HarfBuzz emits every tashkeel mark as its own glyph between the
+// base letters, so these are what prove `computeJoinPins` pairs base letters
+// rather than raw run neighbours (before that fix every vocalized entry
+// below detected zero joins).
+const WORDS = ["حرف", "بسم", "كتب", "سلام", "حَرْف", "مُحَمَّد"];
 const FONT_SIZE = 200;
 
 /**
  * Detection coverage as verified against real shaping, one entry per
- * FONTS × WORDS pair (20 total). This is today's *observed reality*, not an
+ * FONTS × WORDS pair (30 total). This is today's *observed reality*, not an
  * aspiration — see the coverage `describe` block below for the full
- * (a)/(b) classification of every `pins: false` entry and the glyph counts
- * that back it up.
+ * (a)/(b)/(c) classification of every `pins: false` entry and the glyph
+ * counts that back it up.
  */
 const EXPECTED_COVERAGE: Record<string, Record<string, boolean>> = {
-  TahaNaskhRegular: { حرف: true, بسم: true, كتب: true, سلام: true },
-  Amiri: { حرف: true, بسم: true, كتب: true, سلام: true },
-  Thuluth: { حرف: true, بسم: true, كتب: true, سلام: false },
-  Kufi: { حرف: true, بسم: true, كتب: true, سلام: true },
-  Urdu: { حرف: false, بسم: false, كتب: false, سلام: false },
+  TahaNaskhRegular: { حرف: true, بسم: true, كتب: true, سلام: true, حَرْف: true, مُحَمَّد: true },
+  Amiri: { حرف: true, بسم: true, كتب: true, سلام: true, حَرْف: true, مُحَمَّد: true },
+  Thuluth: { حرف: true, بسم: true, كتب: true, سلام: false, حَرْف: false, مُحَمَّد: false },
+  Kufi: { حرف: true, بسم: true, كتب: true, سلام: true, حَرْف: true, مُحَمَّد: true },
+  Urdu: { حرف: false, بسم: false, كتب: false, سلام: false, حَرْف: false, مُحَمَّد: false },
 };
 
 describe("join invariance against real fonts", () => {
@@ -217,6 +222,34 @@ describe("join invariance against real fonts", () => {
                   Math.hypot(moved.x - pin.x, moved.y - pin.y),
                   `${fontFamily} ${word} glyph ${glyphIndex} factor ${factor}`
                 ).toBeLessThan(1e-9);
+
+                // Exactly at the pin, `joinGuard` returns 0 by construction,
+                // so the assertion above proves the guard function and not
+                // much about where the pin was placed. The ring below is the
+                // part that exercises the pin's neighbourhood: points that
+                // sit *inside* the radius — i.e. the ink actually forming
+                // the seam — must move strictly less than the same points
+                // would with no pins at all. (At factor 1 the handle is
+                // neutral and nothing moves either way; that is asserted
+                // rather than skipped.)
+                for (const fraction of [0.25, 0.5, 0.75]) {
+                  for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+                    const rx = pin.x + Math.cos(angle) * pin.radius * fraction;
+                    const ry = pin.y + Math.sin(angle) * pin.radius * fraction;
+
+                    const free = applyGlyphEdit(rx, ry, edit, -1);
+                    const pinned = applyGlyphEdit(rx, ry, edit, -1, [pin]);
+                    const freeDist = Math.hypot(free.x - rx, free.y - ry);
+                    const pinnedDist = Math.hypot(pinned.x - rx, pinned.y - ry);
+                    const label = `${fontFamily} ${word} glyph ${glyphIndex} factor ${factor} ring ${fraction}@${angle.toFixed(2)}`;
+
+                    if (freeDist > 1e-9) {
+                      expect(pinnedDist, label).toBeLessThan(freeDist);
+                    } else {
+                      expect(pinnedDist, label).toBeLessThan(1e-9);
+                    }
+                  }
+                }
               }
             }
           }
@@ -269,6 +302,23 @@ describe("join invariance against real fonts", () => {
  *         inside both glyphs' actual ink; the second adjacent pair's boxes
  *         touch at a single, zero-width coordinate.
  *
+ * (c) THE FONT'S MARKS ARE INVISIBLE TO THE MARK DETECTOR — pairing base
+ *     letters (see `computeJoinPins`) depends on `lib/diacritics.ts`'s
+ *     `findDiacriticGlyphIndices`, which is a heuristic over two signals:
+ *     a mark's own cmap codepoint, and a nonzero GPOS attachment offset
+ *     within a shared cluster. `Thuluth.ttf` defeats both — its shaped
+ *     mark glyphs are mapped to *Private Use Area* codepoints (U+E012,
+ *     U+E016 observed for fatha and sukun) rather than U+064B..U+065F, and
+ *     they carry `dx === dy === 0` because the font positions marks by
+ *     advance rather than GPOS. So its marks read as base letters, break
+ *     the pairing exactly as before this fix, and:
+ *       - Thuluth.ttf / حَرْف    → 5 glyphs, 0 marks detected, no pins
+ *       - Thuluth.ttf / مُحَمَّد  → 7 glyphs, 0 marks detected, no pins
+ *     while its *unvocalized* words are unaffected. This is the same
+ *     limitation that already stops the per-mark diacritic overlay working
+ *     on that font; the fix belongs in the detector (one module, several
+ *     features), not in a second detector here.
+ *
  * Do not "fix" a `false` entry here by widening detection (polygon
  * dilation, a proximity fallback, a baseline scan) — that is new design
  * work with its own failure mode (dilate enough to catch abutting letters
@@ -298,9 +348,76 @@ describe("join detection coverage (characterization, not aspiration)", () => {
         if (expectPins) {
           expect(pins.size, `${fontFamily} ${word} expected at least one join`).toBeGreaterThan(0);
         } else {
-          expect(pins.size, `${fontFamily} ${word} expected no join (see class (a)/(b) comment above)`).toBe(0);
+          expect(pins.size, `${fontFamily} ${word} expected no join (see class (a)/(b)/(c) comment above)`).toBe(0);
         }
       });
     }
+  }
+});
+
+/**
+ * Vocalized text — the regression this block exists to hold.
+ *
+ * HarfBuzz interleaves each tashkeel mark as its own glyph between the base
+ * letters, so pairing raw run neighbours (`i`, `i+1`) found no join at all
+ * the moment a word carried a single harakah: every case below produced
+ * **zero** pins before `computeJoinPins` started skipping marks. Since this
+ * app has an إعراب keyboard, a diacritics subsystem and a per-mark canvas
+ * overlay, vocalized Arabic is a core use case, not an edge one.
+ *
+ * The pinned glyph indices are asserted exactly (not just "> 0") so that a
+ * future change which starts pinning a mark, or drops a join, fails here
+ * rather than quietly changing what the stretch tool protects.
+ */
+describe("vocalized text still detects joins (marks are skipped when pairing)", () => {
+  const CASES: Array<{
+    fontFile: string;
+    fontFamily: string;
+    word: string;
+    /** Glyph indices expected to carry at least one pin. */
+    pinnedGlyphs: number[];
+  }> = [
+    // حَرْف — hah + fatha, ra + sukun, feh: 5 glyphs, marks at 1 and 3.
+    { fontFile: "Amiri.ttf", fontFamily: "Amiri", word: "حَرْف", pinnedGlyphs: [2, 4] },
+    {
+      fontFile: "TahaNaskhRegular.ttf",
+      fontFamily: "TahaNaskhRegular",
+      word: "حَرْف",
+      pinnedGlyphs: [2, 4],
+    },
+    // مُحَمَّد — 8 glyphs in Amiri, four of them marks.
+    { fontFile: "Amiri.ttf", fontFamily: "Amiri", word: "مُحَمَّد", pinnedGlyphs: [0, 3, 5, 7] },
+  ];
+
+  for (const { fontFile, fontFamily, word, pinnedGlyphs } of CASES) {
+    it(
+      `${fontFamily} / ${word}: pins the base letters and never a mark`,
+      async () => {
+        const { glyphs, font, unitsPerEm } = await shapeReal(word, fontFile);
+        const nuqta = nuqtaPx(fontFamily, FONT_SIZE)!;
+
+        const pins = computeJoinPins({
+          glyphs,
+          font: font!,
+          fontSize: FONT_SIZE,
+          unitsPerEm,
+          pinRadius: nuqta * PIN_RADIUS_NUQTA,
+        });
+
+        // The premise: this run really is mark-interleaved, so the test is
+        // not a vacuous pass on a font that dropped the marks entirely.
+        const marks = findDiacriticGlyphIndices(glyphs, font!);
+        expect(marks.size, `${fontFamily} ${word} expected marks in the run`).toBeGreaterThan(0);
+
+        expect([...pins.keys()].sort((a, b) => a - b)).toEqual(pinnedGlyphs);
+
+        for (const markIndex of marks) {
+          expect(pins.has(markIndex), `${fontFamily} ${word} pinned mark glyph ${markIndex}`).toBe(
+            false
+          );
+        }
+      },
+      20000
+    );
   }
 });
