@@ -139,6 +139,69 @@ describe("applyGlyphEdit", () => {
     expect(applyGlyphEdit(100, 0, atMin).x).toBeCloseTo(50);
   });
 
+  it("does not displace a point past the drag origin further than the drag itself", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 20,
+        },
+      ],
+    };
+    // x=200 is twice as far along the axis as the drag origin. Unclamped,
+    // tAlong=2 gave it a 100px displacement (double the 50px drag) — the
+    // overshoot half of the cleft at a letter join.
+    const p = applyGlyphEdit(200, 0, edit);
+    expect(p.x).toBeCloseTo(250);
+  });
+
+  it("does not displace a point behind the anchor backwards", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 20,
+        },
+      ],
+    };
+    // tAlong = -0.5 used to pull this point 25px in the *opposite* direction.
+    const p = applyGlyphEdit(-50, 0, edit);
+    expect(p.x).toBeCloseTo(-50);
+  });
+
+  it("still displaces the drag origin itself by the full drag delta", () => {
+    const edit: GlyphEdit = {
+      glyphIndex: 0,
+      stretches: [
+        {
+          id: "h1",
+          anchorX: 0,
+          anchorY: 0,
+          dragOriginX: 100,
+          dragOriginY: 0,
+          dragX: 150,
+          dragY: 0,
+          bandWidth: 20,
+        },
+      ],
+    };
+    expect(applyGlyphEdit(100, 0, edit).x).toBeCloseTo(150);
+  });
+
   it("with a lasso mask, only displaces points inside the polygon", () => {
     const edit: GlyphEdit = {
       glyphIndex: 0,

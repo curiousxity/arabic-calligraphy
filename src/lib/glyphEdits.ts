@@ -43,7 +43,8 @@ type AxisGeometry = {
 /**
  * Displaces a single outline point along one anchor→dragOrigin axis,
  * proportional to distance from the anchor (0 at the anchor, 1 at the
- * dragOrigin, unbounded beyond it), tapered by perpendicular distance from
+ * dragOrigin and held at 1 beyond it (clamped — see the note at the
+ * `tAlong` computation)), tapered by perpendicular distance from
  * the axis (a smoothstep band falloff), and scaled by `valueMultiplier` —
  * 1 for a live-dragged stretch handle (dragX/dragY already ARE the target
  * position), or a [-1, 1] slider value for a rig axis (dragX/dragY are the
@@ -77,7 +78,16 @@ function applyAxisDisplacement(
 
   const t = 1 - perpDist / axis.bandWidth;
   const falloff = t * t * (3 - 2 * t); // smoothstep — no hard seam at the band edge
-  const tAlong = along / axisLen;
+  // Clamped, and eased with the same smoothstep the perpendicular band
+  // already uses. Unbounded and signed, this was half of the cleft that
+  // opens at a letter join: a point past the drag origin (tAlong > 1)
+  // travelled further than the drag itself, and a point behind the anchor
+  // (tAlong < 0) travelled backwards. Clamping makes the region past the
+  // drag origin translate rigidly with the axis tip — which is what
+  // "extending a stroke" means — and easing removes the crease the bare
+  // clamp would leave at each boundary.
+  const tRaw = Math.max(0, Math.min(1, along / axisLen));
+  const tAlong = tRaw * tRaw * (3 - 2 * tRaw);
 
   const displacement = deltaAlong * tAlong * falloff;
   return { x: x + displacement * dirX, y: y + displacement * dirY };
@@ -107,7 +117,8 @@ function resolveValueMultiplier(h: GlyphStretchHandle): number {
  * Applies a glyph's edits to a single outline point: each stretch handle
  * pulls points near its anchor→drag axis along that axis, proportional to
  * distance from the anchor (0 at the anchor, 1 at the drag handle's original
- * position, unbounded beyond it) and tapered by perpendicular distance from
+ * position and held at 1 beyond it (clamped — see the note at the `tAlong`
+ * computation)) and tapered by perpendicular distance from
  * the axis (a smoothstep band falloff).
  */
 export function applyGlyphEdit(
