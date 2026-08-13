@@ -205,6 +205,7 @@ const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
   { value: "Qahiri", label: "Qahiri", cssFamily: "Qahiri" },
   { value: "Scheherazade", label: "Scheherazade", cssFamily: "Scheherazade" },
   { value: "Urdu", label: "Urdu", cssFamily: "Urdu" },
+  { value: "HarfCanvasDiwani", label: "Diwani", cssFamily: "HarfCanvasDiwani" },
 ];
 
 /** Serializes parsed SVG path commands back into a `d` string (module-local, one-off — mirrors ShapedText.tsx's commandsToSvgPath). */

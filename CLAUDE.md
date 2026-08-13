@@ -308,6 +308,89 @@ The "Morph Glyph Editor" panel's Stretch tool lets a user click a shaped glyph a
 - **Multi-letter ligatures and multiple named sliders per stroke:** a `Stroke.editBehavior.stretchZones[]` entry can carry its own `label` (`types.ts`) — `deriveStretchCatalog` emits one `StretchDefinition` per **zone**, not per stroke, so a single stroke can expose several independently named/bounded sliders (e.g. Height vs Length) instead of collapsing to one range; every pre-existing file (one zone per stroke, no zone-level label) still produces exactly one entry each, unchanged. `GlyphStretchHandle`/`StretchDefinition` carry `schemaZoneIndex`/`zoneIndex` to track which zone a handle represents. Separately, `GlyphDescription.glyph` supports `role: "ligature"` entries keyed by `baseLetterSequence` (bare-codepoint array, e.g. `["0627","0644","0644","0647"]` for "الله") instead of a single `unicode` — `registry.ts`'s `getLigatureSchema` looks these up, and `glyphLookup.ts`'s `computeClusterSpans` detects when a shaped glyph's HarfBuzz cluster spans more than one source character (several letters fused by the font's own GSUB ligature rules — confirmed real via `fonttools`: `Wessam.ttf` fuses "الله" into exactly one glyph) and routes it through the ligature lookup instead of the normal single-letter path. `src/data/strokeSchemas/allah-ligature.json` is the first (and so far only) authored ligature — confirmed working end-to-end live in the browser (Wessam font, typed "الله", Stretch tool shows 6 labeled buttons: Alif/First lam/Second lam height, Second lam shoulder, Heh loop/tail). It was hand-adapted from a richer source file that required shadda+dagger-alif marks to trigger (per that file's own `triggerRules`/`testCases`) — `fonttools` inspection confirmed no font in `public/fonts/` actually has a GSUB rule fusing the marked sequence (only the plain 4-letter one), so the marks-required trigger and its `MARKS_1` sub-component were dropped rather than imported as dead data. If handed another ligature file with a similar "requires marks/context our fonts don't actually implement" mismatch, verify against real GSUB tables (`fontTools.ttLib`) before assuming it'll work, same as this one.
 - **A schema stroke's `protectedZones` are advisory text only** — they're never read by `applyGlyphEdit`/`applyAxisDisplacement`, so they don't by themselves stop a handle from displacing the whole glyph (its `fromNode`/`toNode` indices reference the schema's own idealized path, which has no correspondence to the real font's actual outline point indices — same mismatch as above). What actually scopes a handle is its own `mask` field. To avoid every schema handle defaulting to "affects the whole glyph," `src/lib/glyphContours.ts`'s `deriveContourMask` auto-derives a contour mask from wherever the handle's (now fixed, schema-derived) anchor/drag points sit on the real outline (point-in-polygon against the glyph's contours, reusing `lib/svgPath.ts`'s bezier-subdivision + point-in-polygon) — since the anchor/drag mapping is only proportional, not per-font-verified, it samples several points along the whole anchor→drag segment (not just the two endpoints) so a point landing in empty space between contours (e.g. between a letter's body and its dots) doesn't spuriously fall back to "whole glyph" when the segment as a whole clearly crosses the intended stroke's ink. Each of `ShapedText.tsx`/`ShapeFillText.tsx` computes this **once, in a `useEffect` keyed off the handle's creation** (not on every drag — there is no more dragging) whenever `GlyphStretchHandle.maskAuto` is `true` and `mask` is still unset (every newly created handle starts this way, per `App.tsx`'s `addStretchHandle`). It can still legitimately land on "whole glyph" for a complex multi-letter ligature glyph where the per-letter schema proportions don't correspond well to the fused real outline — the block-level band width still limits which points move in that case, so this isn't unsafe, just less precisely scoped. Manually invoking "By stroke"/Lasso (`ShapedText.tsx` only) sets `maskAuto: false` so the user's explicit override is never clobbered.
 
+#### Known defects in the stretch math, and the schema data nobody reads
+
+Investigated 2026-08-12 and reproduced live in the browser. **Read this
+before changing `lib/glyphEdits.ts` or the catalog derivation.** Full
+write-up, including the proposed fix and its open questions, is in
+`docs/superpowers/specs/2026-08-12-per-stroke-editing-DRAFT.md`.
+
+**Three layers of authored schema data are consumed by nothing.** Verified
+by grep across `src/`:
+
+- `protectedZones` survives only as `protectedReasons`, a string list used
+  for display. The zones themselves never scope an edit.
+- `preserveCurvature`, `preserveThickness`, and each zone's own `axis`
+  field (`"x"` / `"path"`) are read **nowhere**.
+- `lengthDots`, `styleProfile.measurementSystem.dotUnit`, and
+  `verticalLevels` appear **only in test fixtures** — never in real code.
+
+This is why stretching misbehaves. The engine is not missing information;
+it has it and discards it.
+
+**Symptom 1 — a cleft opens at a join.** Reproduce: default `حرف`, stretch
+the ra down-left; a hairline gap appears at the hah/ra junction, on the
+side dragged *toward*. Two causes compound:
+
+- `applyAxisDisplacement`'s `tAlong = along / axisLen` is **unbounded and
+  signed**, with falloff only *perpendicular* to the axis and none along
+  it. Points past the drag origin travel further than the drag itself;
+  points behind the anchor travel backwards.
+- The anchor is a *proportional guess* — `anchorNorm` mapped from the
+  schema's idealized bounding box onto the real font glyph's box — so it
+  never lands exactly on the true connection point. `ra-final.json`'s zone
+  spans the whole stroke (`fromNode 0` → `toNode 2`) while
+  `connectsRight: true` means node 0 **is** the join. Any nonzero
+  displacement there tears the seam, and nothing pins it, because
+  `join-integrity` is never read.
+
+**Symptom 2 — strokes deform rather than extend.** `fa-medial.json`'s eye
+loop asks for `axis: "path"` and `preserveCurvature: true`; the catalog
+collapses it to a straight chord, so the loop shears sideways and its
+counter pinches shut instead of growing around its curve. Separately,
+`ra-final.json` protects nodes 1→2 (`terminal-shape`,
+`left-tail-terminal`) while the axis runs 0→2 — displacement is **maximum
+exactly where the schema says do not deform.** The protection is inverted.
+
+**Do not "fix" this by reaching for parametric rendering.** The stroke
+schemas contain no joining geometry whatsoever (`formMetadata`'s
+`connectsRight`/`connectsLeft` are prose and are consumed by nothing), so
+drawing letters from skeletons would forfeit the seamless joining that
+HarfBuzz plus real contextual forms currently provide for free. That
+tradeoff was examined explicitly and rejected for now.
+
+#### The nuqta is per-font and must be measured, not derived
+
+Traditional Arabic calligraphy measures stroke length in whole and half
+nuqta (the rhombic dot the nib makes), and the schemas are authored that
+way — hence `lengthDots` on every stroke. Quantizing stretch to nuqta
+increments needs no new schema data: a stroke's stretched length is
+`lengthDots × factor`, so half-nuqta steps mean snapping the factor to
+multiples of `0.5 / lengthDots`.
+
+What it *does* need is the nuqta's size in each font, and **there is no
+formula for it.** The natural guess — the alif's stem is one nuqta wide —
+was measured across all fonts and **fails**: `alif ÷ dot` ranges from 0.53
+(Urdu) to 1.68 (Kufi2), a 3.2× spread, where the rule predicts ~1.00.
+`dot/em` itself varies ~2× across the library (0.0762 Wessam → 0.1538
+Urdu), so no global constant can serve either.
+
+The measured per-font table lives in the DRAFT spec above. Two independent
+methods were cross-checked and agree within ~2% on 14 of 17 fonts: the
+beh (U+0628) dot contour, and a **modal-contour sweep** (scan every glyph,
+keep small compact contours, take the mode — dots recur across many
+letters). The modal method needs no cmap, GSUB walk, or naming convention,
+and was the only one able to read `Qahiri.ttf`, whose base-codepoint
+glyphs are all empty. Ruqaa and Yekan remain unresolved and need a human
+eye. Quantization is to be **advisory, not compulsory** — snap by default
+with a modifier to override, mirroring the existing grid snapping, and
+off-grid values must round-trip through save/load unchanged.
+
+Gotcha for any offline font analysis: `Kufi2.ttf` and `NotoSans.ttf` are
+variable fonts whose `gvar` glyph count disagrees with `maxp` (825 vs 815;
+1718 vs 1708). fontTools throws on `getGlyphSet()` until the `gvar` table
+is dropped. Harmless to the app's own rendering path.
+
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
 A fourth block type, `textPath`, flows shaped text along an arbitrary curve
@@ -358,7 +441,78 @@ half-supported here.
 
 ### Font files carry custom glyphs — don't blindly replace them
 
-`public/fonts/*.ttf|otf` are not stock font files. `FatemiMaqala.ttf` has 8 custom Private Use Area glyphs (U+E833-E840, honorific symbols used by the sidebar's "Presets" row) that were manually merged (via a Python `fontTools` script, not committed to the repo) into every *other* font file in `public/fonts/` too, so those symbols render regardless of the selected font. If a font file in `public/fonts/` is ever regenerated/replaced from an upstream source, those PUA glyphs will be lost and the Presets buttons will silently show missing-glyph boxes in every font except FatemiMaqala again.
+`public/fonts/*.ttf|otf` are not stock font files. `FatemiMaqala.ttf` has custom Private Use Area glyphs (honorific symbols used by the sidebar's "Presets" row) that were manually merged (via a Python `fontTools` script, not committed to the repo) into every *other* font file in `public/fonts/` too, so those symbols render regardless of the selected font. If a font file in `public/fonts/` is ever regenerated/replaced from an upstream source, those PUA glyphs will be lost and the Presets buttons will silently show missing-glyph boxes in every font except FatemiMaqala again.
+
+**There are TEN of those glyphs, and they are not a contiguous range.** The
+authoritative list is `PRESETS` in `src/lib/presets.ts`:
+
+    E833 E834 E835 E836 E837 E838 E839 E840 E841 E842
+
+`E83A`–`E83F` are unused, and `E841`/`E842` sit *past* `E840`. Earlier
+revisions of this file described them as "8 glyphs, U+E833-E840", which is
+wrong twice over — a merge script written from that range silently omits
+the last two, and the only symptom is the final two Presets buttons
+rendering as missing-glyph boxes in the affected font. That exact bug was
+hit and fixed on 2026-08-12. **Derive the list from `PRESETS`, never from a
+range.**
+
+**Adding a new font is a four-place edit plus a glyph merge, not a file
+copy.** There is no single font registry — a font must be added to *all
+four* of these or it half-works in a way that is easy to misdiagnose:
+
+1. the file itself in `public/fonts/`;
+2. an `@font-face` rule at the top of `src/index.css` — this is what the
+   sidebar's dropdown uses to preview each font's own name;
+3. `FONT_OPTIONS` in `src/components/Sidebar.tsx` — a hand-ordered array of
+   `{ value, label, cssFamily }`, and **the only thing that decides whether
+   a font appears in the picker at all**;
+4. `FONT_URLS` in `src/hooks/useShapedGlyphs.ts` — what HarfBuzz actually
+   shapes with.
+
+Then merge the ten honorific glyphs into the file (see above).
+Registering in `FONT_URLS` alone shapes correctly but leaves the font
+invisible in the UI; adding to `FONT_OPTIONS` alone makes it selectable but
+`FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans` silently falls back to Noto
+Sans, so the picker shows a name that renders as a different font.
+
+`HarfCanvasDiwani.ttf` is the worked example of all of this, added
+2026-08-12. It is a **modified version of Layla Diwani** (OFL, Mohammed
+Isam): the ten honorifics were merged in, and the family / full / PostScript
+names were changed because the upstream reserves the name `LaylaDiwani`
+under the OFL, and a Modified Version may not carry a Reserved Font Name.
+Four of the ten codepoints (U+E833–E836) were already mapped by the original
+to its own contextual variants; only those *cmap entries* were replaced —
+the original glyphs remain in the file, and its GSUB is unaffected because
+substitutions reference glyph names rather than codepoints. Provenance and
+the full licence live beside it in `public/fonts/HarfCanvasDiwani-OFL.txt`;
+keep that file with the font. Known limitation: the upstream has **no GPOS
+table**, so mark positioning relies on advances alone and the
+diacritic-detection fallback in `lib/diacritics.ts` that keys on nonzero
+GPOS `dx`/`dy` cannot fire on it.
+
+Two traps when merging those PUA glyphs into a third-party font:
+
+- **The target range may already be occupied.** Fonts built in FontForge
+  routinely auto-assign PUA codepoints to unencoded contextual variants.
+  Layla Diwani, evaluated 2026-08-12, already maps U+E833–E836 — four of
+  the eight honorific slots. Overwriting those *cmap entries* is safe in
+  practice because GSUB substitutions reference glyph names rather than
+  codepoints, so the font's internal contextual logic keeps working; but
+  the collision must be checked and handled deliberately, not assumed away.
+- **OFL Reserved Font Names.** Merging glyphs creates a Modified Version.
+  If the upstream font declares a Reserved Font Name (Layla Diwani reserves
+  `LaylaDiwani` among others), the modified file **must be renamed** — its
+  `name` table included — or redistribution breaches the licence.
+
+`Diwani.ttf` was **deleted** on 2026-08-12. It mapped **zero Arabic
+codepoints**: its cmaps were 8-bit legacy tables of the old "Arabic
+letterforms on Latin byte positions" kind, so HarfBuzz could not shape with
+it at all. It was also never registered in `FONT_URLS`, which is why the
+breakage went unnoticed. Do not restore it from git history expecting a
+working Diwani — **`HarfCanvasDiwani.ttf` replaces it** (see above). Worth
+knowing if another Diwani is ever sought: Google Fonts has none, and most
+named Diwani faces (DecoType Diwani, Diwani Letter, Diwani Bent) are
+proprietary or free-for-personal-use only, so they cannot be vendored here.
 
 <!-- ---- STREAM-A: smart guides — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
 
@@ -765,7 +919,7 @@ These are capabilities that have been explicitly identified as valuable but deli
 
 - **Stretch tool and glyph-edit handles on text-on-path blocks** — The axis-derivation and per-glyph drag mathematics assume glyphs sit in a straight bounding box. Making them work once glyphs are rotated to follow a curve's tangent is a real design problem, not a trivial extension of the existing system.
 
-- **Parametric bezier schema rendering** — The stroke schema currently supplies only metadata (labels, kashida eligibility, protected-zone advisories) plus its own authored geometry (used only to derive stretch axes). It does not render letterforms itself — real fonts and HarfBuzz shaping remain the source of truth. Building a full parametric rendering engine that replaces per-font glyph outlines would be a much larger, separate feature; confirm scope before attempting it.
+- **Parametric bezier schema rendering** — The stroke schema currently supplies only metadata (labels, kashida eligibility, protected-zone advisories) plus its own authored geometry (used only to derive stretch axes). It does not render letterforms itself — real fonts and HarfBuzz shaping remain the source of truth. Building a full parametric rendering engine that replaces per-font glyph outlines would be a much larger, separate feature; confirm scope before attempting it. **Scoped and deferred again 2026-08-12:** it was considered as the route to Kaleam-style stroke editing and rejected for now, because the schemas carry no joining geometry — drawing from skeletons would forfeit seamless letter joining, which is the property the request was actually about. Repairing the existing displacement engine to honour the schema comes first; see the "Known defects" section above and `docs/superpowers/specs/2026-08-12-per-stroke-editing-DRAFT.md`. Note also that `public/fonts/` already ships `Thuluth.ttf`, `ThuluthDeco.ttf` and `Ruqaa.ttf`, so those proportions do **not** require a parametric engine.
 
 - **Schema protectedZones enforcement** — A schema stroke's `protectedZones` are advisory text only and are never read during glyph editing. Enforcing them in the rendering would require a separate design to scope per-stroke edits by the schema's own geometry rather than by the real font's actual outline point indices.
 
