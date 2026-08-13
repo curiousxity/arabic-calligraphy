@@ -55,6 +55,19 @@ regression, and what it would take to fix.
   touches a detector several features share.
 - **Only plain text blocks get join pins.** Shape Fill tiles its run through
   a per-tile affine transform; pins in that space are separate work.
+- **The kashida dial does not widen a run, so "Fit width" can never fit.**
+  Verified in a browser 2026-08-13 on `بسم` in two fonts: cranking every
+  stretch to its maximum leaves the ink's horizontal extent unchanged to
+  within a pixel, and the app's own measurement has it *shrinking* slightly
+  (60.505px at dial 0 → 60.105px at 100). Fit width therefore always reports
+  "Reached maximum stretch", and applying its answer makes the block
+  marginally narrower. The solver is not at fault — it measures what the
+  renderer draws. The derived stretch axes point inward, and the run's
+  outermost ink belongs to glyphs no interior stroke handle touches, since
+  `penX += advance` never moves. Same root cause as the two blocked changes
+  below: the schema→glyph mapping. Note this also falsifies
+  `solveKashidaAmount`'s stated invariant that width is monotonically
+  non-decreasing in the dial.
 
 ### Elsewhere
 
@@ -78,10 +91,11 @@ driven by them is unverifiable in CI by design.
 - **Verified by hand 2026-08-13:** the join cleft on the original repro
   (much improved, see above); nuqta snap increments; the Alt bypass; the
   typed-precision field.
-- **Not verified by hand:** the auto-justify "fit to composition" round trip
-  after nuqta quantization was added to the kashida dial; nuqta snapping on
-  Shape Fill blocks, whose slider takes a different path to the same
-  handler.
+- **Verified by hand 2026-08-13, second pass:** nuqta snapping on Shape Fill
+  blocks — passes, snapping to the correct half-nuqta grid off `lengthDots`
+  (1.13 → 1.11, 1.27 → 1.22, 1.41 → 1.44). The auto-justify "fit to
+  composition" round trip — **fails**, see the kashida entry under Known
+  limitations. Quantization was not the cause; the two formulas are in step.
 
 ---
 
@@ -162,12 +176,19 @@ Canvas, HarfBuzz shaping, block model, PNG/PDF export.
 Not "unbuilt" — these have a known blocker and a known prerequisite.
 
 - **Schema-driven stroke spines, and enforcing protected zones** (changes 2
-  and 4). Blocked on the Phase C measurement above. The prerequisite is a
-  re-anchoring design: snap the mapped spine to the nearest real ink, or fit
-  it to a medial axis derived from the outline. The measurement already ruled
-  out the three cheaper explanations — style distance from Naskh, per-form
-  skeleton reuse, and compound letters — so there is no quick win hiding in
-  it. Full breakdown in the spec.
+  and 4). Blocked on the Phase C measurement above. The prerequisite — a
+  re-anchoring design — now **exists but is unbuilt**:
+  `docs/superpowers/specs/2026-08-13-stroke-spine-reanchoring-design.md`
+  matches the schema's stroke skeleton against the real glyph's medial axis
+  offline and ships the result as a per-font table, omitting any match it
+  cannot verify. Building that unblocks both changes. The Phase C measurement
+  already ruled out the three cheaper explanations — style distance from
+  Naskh, per-form skeleton reuse, and compound letters — so there is no quick
+  win hiding in it.
+- **Advance-level kashida elongation**, which is what the dial would need to
+  widen a run at all (see the kashida entry under Known limitations).
+  Re-anchoring does **not** fix it: displacing outline points never moves
+  `penX += advance`, so neighbouring letters never separate. Not yet designed.
 
 ## Not built yet
 
