@@ -105,6 +105,11 @@ driven by them is unverifiable in CI by design.
   result. Also unverified: whether a spine-derived handle actually stretches
   the stroke it names, and whether the `fontFamily` argument survives at the
   two call sites no test guards (see the trap in `CLAUDE.md`).
+- **Covered by automation 2026-08-14, so no longer debt:** that a created
+  handle's anchor lands on real ink, on three fonts and three words
+  (`strokeSpines/endToEnd.test.ts`), and that every shipped spine is keyed
+  to a glyph real shaping produces. The browser checks below are unaffected
+  by this — a test can see the anchor, not the dot.
 - **Verified by hand 2026-08-13, second pass:** nuqta snapping on Shape Fill
   blocks — passes, snapping to the correct half-nuqta grid off `lengthDots`
   (1.13 → 1.11, 1.27 → 1.22, 1.41 → 1.44). The auto-justify "fit to
@@ -115,7 +120,43 @@ driven by them is unverifiable in CI by design.
 
 ## Shipped
 
-### 2026-08-14 — Stroke-spine re-anchoring (Tasks 1–9 of 11, paused)
+### 2026-08-14 — Spine tables keyed to the glyphs the app draws (Task 10)
+
+Task 10's end-to-end test — real fonts, real shaping, three words — found on
+its first run that one of its three cases created **zero** handles, and the
+cause was not the test.
+
+The offline generator decided which glyph a letter's spine belonged to by
+walking GSUB by hand: the cmap for the base, then the single substitution
+under the joining form's own feature. That diverged from HarfBuzz twice, so
+**46 of 401 shipped spines were filed under glyph ids no shaping ever
+emits** — dead data the app cannot tell apart from a stroke the gates
+rejected. It stopped at the form feature, missing the chained contextual
+substitution Amiri applies afterwards; and it never applied `isol` at all,
+which killed every one of Kufi2's ten entries.
+
+The generator now resolves the glyph by shaping, with the same settings the
+app uses. That also fixed something the walk could not express: one joining
+form is not one glyph — Amiri draws seven distinct ra-finals depending on
+the preceding letter, each a different outline needing its own spine.
+
+- Reachable spines: **355/401 → 486/486**, verified by shaping every letter
+  in every joining context.
+- Accuracy unchanged: **99.82%** of shipped spine points inside real ink,
+  against 99.81% before — measured by nonzero winding on flattened outlines,
+  deliberately not the generator's own raster mask.
+- Per-font counts moved both ways and the characterization snapshot in
+  `spineTable.test.ts` records it. Three fonts ship fewer spines, mostly
+  because the cross-font consensus pass compares each schema stroke across
+  every font and every font's rows changed.
+
+The honest coverage figure got stricter with the denominator: taking a letter
+as a font actually draws it, about **14%** of its authored zones offer a
+handle (3% ThuluthDeco to 28% Kufi). The entry below's "quarter to a third"
+counted one canonical glyph per form. Fewer strokes are adjustable than that
+number implied; more are adjustable than actually worked.
+
+### 2026-08-14 — Stroke-spine re-anchoring (Tasks 1–9 of 11)
 
 Replaces the proportional schema-to-glyph mapping with a real spine measured
 off each glyph's own medial axis. `docs/superpowers/specs/2026-08-13-stroke-spine-reanchoring-design.md`
@@ -138,7 +179,8 @@ the guess. Suite went 393 → 512 tests.
 
 **Paused before:** Task 10 (end-to-end test on real fonts) and Task 11 (docs
 + hand verification in the browser). Everything up to and including Task 9,
-plus the follow-up below, has been independently reviewed.
+plus the follow-up below, has been independently reviewed. Task 10 is done —
+see the entry above, and note that its figures supersede the ones here.
 
 **The coverage trade, which is the thing to understand about this feature.**
 There are 151 authored stretch zones across the schemas, and a typical font
