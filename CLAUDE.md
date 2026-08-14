@@ -619,8 +619,21 @@ it reads the tables.
   `mapNormToRealBox` as a deliberate characterization of what was replaced.
 - **The cost is coverage, and it is large.** 151 authored stretch zones
   exist across the schemas; a typical font has a verified spine for only a
-  quarter to a third of them. So most stroke sliders have no handle to
-  drive. That is the trade, not a bug.
+  quarter to a third of them. So most strokes are not adjustable at all.
+  That is the trade, not a bug — and the UI is built to *say* so rather than
+  no-op silently: `MorphGlyphEditor` keeps a spine-less zone's row but shows
+  its label plus a muted "no verified stroke in this font" instead of the
+  factor input, and `StrokeStretchHoverHandles` renders no dot for it. The
+  row is deliberately **not** hidden; hiding it would make the panel differ
+  from font to font with nothing to explain why. A handle saved *before*
+  this feature, on a zone with no spine in the current font, still gets its
+  dot so it remains adjustable and removable.
+- **`StrokeStretchHoverHandles` must keep using the same
+  `spineToBlockSpace` call as `setStretchFactor`** — same `gx`/`gy`/
+  `fontSize`, and `unitsPerEm` from `getSpineTableIfLoaded(fontFamily)`.
+  That identity is the only thing guaranteeing a dot does not visibly jump
+  the moment its handle is created. Do not compute the pre-creation dot
+  position a second, independent way.
 - **Orientation is load-bearing and was the hardest thing here.** A spine's
   points run from its zone's `fromNode` end to its `toNode` end
   (`types.ts:26`), and `anchorFromSpine.ts` reads `anchor` off the first

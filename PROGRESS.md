@@ -91,13 +91,20 @@ driven by them is unverifiable in CI by design.
 - **Verified by hand 2026-08-13:** the join cleft on the original repro
   (much improved, see above); nuqta snap increments; the Alt bypass; the
   typed-precision field.
-- **Not verified by hand at all: the whole stroke-spine re-anchoring run**
-  (Tasks 1–9, 2026-08-14). Nothing in it has been seen in a browser. Two
-  specific things automated tests structurally cannot catch here: whether a
-  spine-derived handle actually sits on the stroke it names, and whether the
-  fourth argument threading `fontFamily` into `useGlyphSchemaCatalog`
-  survives — see the trap in `CLAUDE.md`, no test guards those call sites.
-  Task 11 exists to do this pass.
+- **Stroke-spine re-anchoring, partially checked 2026-08-14.** Passing in a
+  browser: the app loads with no console errors, and the Morph panel reads
+  as intended — in the default font, `حرف` shows `ر`'s stroke with a live
+  1.00 input while `ح`'s and `ف`'s show "no verified stroke in this font".
+  That is one of three zones, matching the predicted quarter-to-a-third.
+  **Still unverified, and needing a human's hand on a real mouse:** the
+  on-canvas dots. Konva's hover-mounted overlays do not respond reliably to
+  synthetic mouse events, so neither the no-jump property (a dot must not
+  move when its handle is created) nor "no dot where there is no spine"
+  could be confirmed by automation — hovering produced no dot on either a
+  spine-bearing or a spine-less letter, which is inconclusive rather than a
+  result. Also unverified: whether a spine-derived handle actually stretches
+  the stroke it names, and whether the `fontFamily` argument survives at the
+  two call sites no test guards (see the trap in `CLAUDE.md`).
 - **Verified by hand 2026-08-13, second pass:** nuqta snapping on Shape Fill
   blocks — passes, snapping to the correct half-nuqta grid off `lengthDots`
   (1.13 → 1.11, 1.27 → 1.22, 1.41 → 1.44). The auto-justify "fit to
@@ -130,34 +137,36 @@ catalog; and `setStretchFactor` building handles from the spine instead of
 the guess. Suite went 393 → 512 tests.
 
 **Paused before:** Task 10 (end-to-end test on real fonts) and Task 11 (docs
-+ hand verification in the browser). **Task 9 is committed but unreviewed** —
-every other task in this plan got an independent review, and those reviews
-caught three real Criticals, so this is a genuine gap rather than a
-formality.
++ hand verification in the browser). Everything up to and including Task 9,
+plus the follow-up below, has been independently reviewed.
 
-**Two open items, both from Task 9:**
+**The coverage trade, which is the thing to understand about this feature.**
+There are 151 authored stretch zones across the schemas, and a typical font
+has a verified spine for only about a quarter to a third of them
+(TahaNaskhRegular 46, Kufi 42, Amiri 36). Where there is no spine,
+`setStretchFactor` creates nothing, by design — an unverifiable match must
+ship nothing rather than a guess. So most strokes are no longer adjustable,
+and the ones that are sit on real ink. The UI says so rather than failing
+silently: a zone with no spine keeps its Morph panel row, showing its label
+and a muted "no verified stroke in this font" in place of the input, and
+renders no on-canvas dot.
 
-- **Three quarters of the Morph panel's stroke sliders now silently do
-  nothing.** There are 151 authored stretch zones across the schemas, and a
-  typical font has a verified spine for only about a quarter to a third of
-  them (TahaNaskhRegular 46, Kufi 42, Amiri 36). Where there is no spine,
-  `setStretchFactor` returns early by design — an unverifiable match must
-  ship nothing rather than a guess. But `deriveStretchCatalog` still emits a
-  `StretchDefinition` per authored zone and `MorphGlyphEditor` does not
-  filter on spine presence, so the row still renders and the control is
-  dead. Deliberately not fixed inside Task 9; it needs a decision between
-  hiding the row and disabling it with a reason. Disabling reads better
-  against this project's preference for legible absence, but that is a
-  judgement, not a conclusion.
-- **`box.gx ?? 0` in `setStretchFactor` may mis-place a handle rather than
-  decline to place one.** `App.tsx`'s local `GlyphBox` declares the pen
-  origin optional, so the brief's literal `box.gx` would not typecheck.
-  Defaulting to 0 puts the handle at the block origin instead of on the
-  letter, which is the one behaviour this feature's rule forbids. It copies
-  an existing pattern at `App.tsx:898-899`. Unresolved: whether `gx`/`gy`
-  can ever actually be absent by the time they reach here — if they cannot,
-  this is dead defensive code; if they can, the correct behaviour is to
-  `return`.
+**Both of Task 9's open items are closed** (follow-up commit, reviewed):
+
+- The dead-slider gap is fixed as described above. `MorphGlyphEditor` no
+  longer offers a control that cannot act, and `StrokeStretchHoverHandles`
+  no longer positions a not-yet-created dot with the replaced proportional
+  mapping — it derives the axis from the spine using the *same*
+  `spineToBlockSpace` call `setStretchFactor` uses, so creating a handle
+  does not move the dot. A handle saved before this change, for a zone with
+  no spine in the current font, still gets its dot so it can be adjusted or
+  removed.
+- `box.gx ?? 0` was investigated and is **correct, not a guess** — and is
+  now commented to say why. `ShapedText` declares `gx`/`gy` required and
+  always populates them; `ShapeFillText`'s boxes carry no `gx`/`gy` but are
+  glyph-local (from `getPath(0, 0, fontSize)`, whose pen origin *is* the
+  origin), so 0 is the identity there. `App.tsx:898-899` uses the same
+  convention.
 
 Reverse chronological. Dates are commit dates.
 
