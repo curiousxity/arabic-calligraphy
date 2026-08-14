@@ -35,4 +35,12 @@ describe("stroke spine registry", () => {
     expect(getSpine(table, Number(glyphId), first.strokeId, 99)).toBeNull();
     expect(getSpine(null, 1, "x", 0)).toBeNull();
   });
+
+  it("caches concurrent loads of the same not-yet-cached font to one object", async () => {
+    // "Amiri" is untouched by every earlier test in this file, so this
+    // exercises the in-flight path rather than the already-settled cache.
+    const [a, b] = await Promise.all([loadSpineTable("Amiri"), loadSpineTable("Amiri")]);
+    expect(a).not.toBeNull();
+    expect(a).toBe(b);
+  });
 });
