@@ -87,6 +87,12 @@ function distanceToPolygon(px: number, py: number, poly: Array<[number, number]>
  * catch. Do not raise it without re-measuring; do not switch to a
  * containment *rate* — a rate lets one catastrophic outlier hide inside a
  * large denominator, exactly the failure mode this test is for.
+ *
+ * This figure is tied to `contoursToPolygons`'s default subdivision
+ * (`steps = 8`) — it is the disagreement between that resolution and the
+ * generator's own flattening. Changing the subdivision step count changes
+ * the measured error, so re-measure this tolerance then, don't just retune
+ * it until green.
  */
 const INK_TOLERANCE_NUQTA = 0.05;
 
@@ -133,7 +139,10 @@ describe("committed stroke spine tables", () => {
     const nuqtaUnits = ratio * table.unitsPerEm;
     for (const [glyphIdStr, entry] of Object.entries(table.glyphs)) {
       const glyph = font.glyphs.get(Number(glyphIdStr));
-      if (!glyph) continue;
+      // A glyph id the font doesn't have means the table is stale relative to
+      // this binary — exactly what this suite exists to catch, so fail loudly
+      // rather than skip it.
+      expect(glyph, `${family}: table references glyph ${glyphIdStr}, which this font file does not have`).toBeDefined();
       // Font units, y-up: getPath at size = unitsPerEm gives y-down, so flip
       // the spine's y to compare in the same space.
       const polygons = contoursToPolygons(
@@ -169,10 +178,19 @@ describe("committed stroke spine tables", () => {
    * skipped rather than scaled by node-span fraction, because that fraction
    * assumes length is distributed evenly across a stroke's schema nodes —
    * exactly the kind of proportional guess `spineError.test.ts` already
-   * measured and rejected (median 0.37 nuqta error, p90 1.43). A future
-   * full-stroke failure here is a real generator defect and should not be
-   * waved through; a partial-zone one is not evidence of anything, which is
-   * why it is never reached.
+   * measured and rejected (median 0.37 nuqta error, p90 1.43).
+   *
+   * **Near-tautological, by design — say so plainly.** `scripts/
+   * deriveStrokeSpines.py`'s own `gate()` already enforces this same 0.5x-2x
+   * band on the whole stroke before a table is emitted, so on the 279
+   * full-stroke spines this assertion mostly re-checks a condition the
+   * generator already guaranteed at generation time: the surviving ratios
+   * saturate the band at its edges (0.501, 1.996), which is what a
+   * pre-filtered population looks like. Its real, narrower value is as a
+   * guard that the *committed* data still satisfies the gate it was emitted
+   * under — it would catch a hand-edited table or a retuned gate applied to
+   * one but not the other, not discover a fresh geometric defect the
+   * generator's own gate would have already rejected.
    */
   it.each(all)("$family: every full-stroke spine's length agrees with the schema's lengthDots", ({ family, table }) => {
     const ratio = nuqtaEmRatio(family)!;
@@ -219,8 +237,8 @@ describe("committed stroke spine tables", () => {
   });
 
   it("coverage has not silently collapsed", () => {
-    // CHARACTERIZATION — fill these in from Task 4's report, then treat a
-    // change as a prompt to look rather than as a failure to suppress.
+    // CHARACTERIZATION — treat a snapshot change as a prompt to look rather
+    // than as a failure to suppress.
     const counts = Object.fromEntries(
       all.map(({ family, table }) => [
         family,
