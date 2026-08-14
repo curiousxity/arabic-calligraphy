@@ -49,7 +49,12 @@ import {
   type ExportPreset,
   type ExportFormat,
 } from "./lib/exportPresets";
-// ---- STREAM-A: artboard — imports ----
+// ---- STREAM-E: styles & palettes — imports ----
+// ---- /STREAM-E ----
+// ---- STREAM-F: ink & surface — imports ----
+// ---- /STREAM-F ----
+// ---- STREAM-G: font upload — imports ----
+// ---- /STREAM-G ----
 import {
   DEFAULT_CUSTOM_ARTBOARD,
   artboardRect,
@@ -63,8 +68,6 @@ import {
   type ArtboardConfig,
   type ArtboardUnit,
 } from "./lib/artboard";
-// ---- /STREAM-A ----
-// ---- STREAM-B: muthanna/radial — imports ----
 import {
   buildMirrorBlock,
   dropOrphanedMirrors,
@@ -72,12 +75,7 @@ import {
   isMirrorSourceCandidate,
 } from "./lib/mirror";
 import type { MirrorMode } from "./types";
-// ---- /STREAM-B ----
-// ---- STREAM-C: ornament library — imports ----
-// ---- /STREAM-C ----
-// ---- STREAM-D: tatweel kashida — imports ----
 import { applyKashida, type KashidaSlot } from "./lib/tatweel";
-// ---- /STREAM-D ----
 
 const hslToHex = (h: number, s: number, l: number): string => {
   const sat = s / 100;
@@ -224,10 +222,15 @@ const App: React.FC = () => {
   const [transparentExport, setTransparentExport] = useState(true);
 
   // Parallel-stream insertion points — see docs/superpowers/specs/
-  // PARALLEL-PHASE-1.md. Each stream adds its state only between its own
+  // PARALLEL-PHASE-2.md. Each stream adds its state only between its own
   // anchors, so independent branches merge into this file without
   // overlapping hunks.
-  // ---- STREAM-A: artboard — state ----
+  // ---- STREAM-E: styles & palettes — state ----
+  // ---- /STREAM-E ----
+  // ---- STREAM-F: ink & surface — state ----
+  // ---- /STREAM-F ----
+  // ---- STREAM-G: font upload — state ----
+  // ---- /STREAM-G ----
   // `null` is freeform — no page, exactly the behaviour that predates this
   // feature, and what every save written before it loads as. Part of the
   // document (saved, and in the undo snapshot) rather than of the view.
@@ -236,12 +239,6 @@ const App: React.FC = () => {
   // preference, not a document property — deliberately not saved, like the
   // transparency and scale controls beside it.
   const [clipToPage, setClipToPage] = useState(true);
-  // ---- /STREAM-A ----
-  // ---- STREAM-B: muthanna/radial — state ----
-  // ---- /STREAM-B ----
-  // ---- STREAM-C: ornament library — state ----
-  // ---- /STREAM-C ----
-  // ---- STREAM-D: tatweel kashida — state ----
   // Which slot the Kashida stepper is pointed at, as an *ordinal* into
   // `findKashidaSlots`' list rather than a text offset: inserting tatweels
   // shifts every later offset but never reorders or renumbers the slots, so
@@ -249,7 +246,6 @@ const App: React.FC = () => {
   // clamps it against the current slot count, which is what makes an
   // arbitrary text edit (or a different block) safe rather than out of range.
   const [kashidaSlotOrdinal, setKashidaSlotOrdinal] = useState(0);
-  // ---- /STREAM-D ----
 
   // Snap a dragged block's visible edges and centres, not just its origin.
   // Session-only, like the grid toggle beside it — deliberately not persisted.
@@ -1230,9 +1226,9 @@ const App: React.FC = () => {
     panMode,
     viewportWidth,
     viewportHeight,
-    // ---- STREAM-A: artboard — payload fields ----
     artboard,
-    // ---- /STREAM-A ----
+    // ---- STREAM-F: ink & surface — payload fields ----
+    // ---- /STREAM-F ----
     version: 5,
   });
 
@@ -1265,14 +1261,12 @@ const App: React.FC = () => {
       : null;
     // `let` because the STREAM-B sanitation region below reassigns it.
     let blocksToLoad: Block[] | null = parsedBlocks;
-    // ---- STREAM-B: muthanna/radial — payload sanitation (reassign
     // blocksToLoad, e.g. dropping mirrors whose sourceId no longer resolves) ----
     // A mirror renders its source's content, so one whose source is missing
     // from the payload would occupy the layer list and the selection while
     // drawing nothing. Dropped on load for the same reason, and by the same
     // precedent, as the `shapeWarp` filter above.
     if (blocksToLoad) blocksToLoad = dropOrphanedMirrors(blocksToLoad);
-    // ---- /STREAM-B ----
     const loadedBlocks: Block[] = blocksToLoad ?? blocks;
     if (blocksToLoad) setBlocks(blocksToLoad);
     if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
@@ -1281,13 +1275,13 @@ const App: React.FC = () => {
     }
     if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
     if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
-    // ---- STREAM-A: artboard — payload read ----
     // Anything that isn't a well-formed config — including the field being
     // absent, which is every project saved before pages existed — loads as
     // freeform. Loading replaces the document, so this must run even when the
     // key is missing, or an old project would inherit the current page.
     setArtboard(isArtboardConfig(parsed.artboard) ? parsed.artboard : null);
-    // ---- /STREAM-A ----
+    // ---- STREAM-F: ink & surface — payload read ----
+    // ---- /STREAM-F ----
 
     const savedViewportWidth =
       typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
@@ -1775,7 +1769,6 @@ const App: React.FC = () => {
   // Phase 1 (2026-08-14 run) prop bundles — same mechanism as above, fresh
   // names so they can't collide with the merged 2026-08-12 bundles. Each
   // stream fills only its own pair; all are already spread at the call sites.
-  // ---- STREAM-A: artboard — handlers & props ----
   const applyArtboard = (next: ArtboardConfig | null) => {
     pushHistory();
     setArtboard(next);
@@ -1893,8 +1886,6 @@ const App: React.FC = () => {
     },
   };
   const p1aCanvasProps: Partial<CanvasStageProps> = { artboard };
-  // ---- /STREAM-A ----
-  // ---- STREAM-B: muthanna/radial — handlers & props ----
   /**
    * A mirror reflects exactly one block, so the add actions need exactly one
    * block selected — and that block may not itself be a mirror. Rejecting a
@@ -1953,8 +1944,6 @@ const App: React.FC = () => {
       : undefined,
   };
   const p1bCanvasProps: Partial<CanvasStageProps> = {};
-  // ---- /STREAM-B ----
-  // ---- STREAM-C: ornament library — handlers & props ----
   // Both actions deliberately delegate to the existing creation paths rather
   // than building a block themselves: a built-in ornament must land on the
   // canvas in exactly the state an uploaded SVG or image does, placement
@@ -1971,8 +1960,6 @@ const App: React.FC = () => {
     onInsertOrnamentShapeFill: insertOrnamentShapeFill,
     onInsertOrnamentFrame: insertOrnamentFrame,
   };
-  // ---- /STREAM-C ----
-  // ---- STREAM-D: tatweel kashida — handlers & props ----
   // Kashida is an ordinary text edit — `applyKashida` returns a new string
   // and it goes through `updateSelectedBlock` like anything the user could
   // have typed, so shaping, history (that call pushes it), saving, and every
@@ -1994,7 +1981,21 @@ const App: React.FC = () => {
     onSelectKashidaSlot: setKashidaSlotOrdinal,
     onSetKashidaAtSlot: setKashidaAtSlot,
   };
-  // ---- /STREAM-D ----
+
+  // Phase 2 (2026-08-14 run) prop bundles — same mechanism as the p1* set
+  // above, which is now finished feature code. Each stream fills only its
+  // own; all are already spread at the call sites. F's canvas bundle is how
+  // the page surface reaches CanvasStage's `surfaceRectProps` seam.
+  // ---- STREAM-E: styles & palettes — handlers & props ----
+  const p2eSidebarProps: Partial<SidebarProps> = {};
+  // ---- /STREAM-E ----
+  // ---- STREAM-F: ink & surface — handlers & props ----
+  const p2fSidebarProps: Partial<SidebarProps> = {};
+  const p2fCanvasProps: Partial<CanvasStageProps> = {};
+  // ---- /STREAM-F ----
+  // ---- STREAM-G: font upload — handlers & props ----
+  const p2gSidebarProps: Partial<SidebarProps> = {};
+  // ---- /STREAM-G ----
 
   return (
     <div
@@ -2093,6 +2094,9 @@ const App: React.FC = () => {
         {...p1bSidebarProps}
         {...p1cSidebarProps}
         {...p1dSidebarProps}
+        {...p2eSidebarProps}
+        {...p2fSidebarProps}
+        {...p2gSidebarProps}
       />
 
       {!isMobile && !sidebarCollapsed && (
@@ -2131,6 +2135,7 @@ const App: React.FC = () => {
           {...streamACanvasProps}
           {...p1aCanvasProps}
           {...p1bCanvasProps}
+          {...p2fCanvasProps}
           viewportWidth={canvasWidth}
           stageViewportHeight={stageViewportHeight}
           backgroundColor={backgroundColor}

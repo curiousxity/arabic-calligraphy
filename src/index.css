@@ -355,7 +355,6 @@ html, body, #root { height: 100%; margin: 0; }
 
 .guideEmpty { padding: 8px 2px; font-size: 12px; color: var(--text-muted); }
 
-/* ---- STREAM-A: artboard ---- */
 /* Grid children default to `min-width: auto`, which refuses to shrink below
    their content and overflows the sidebar at its minimum width — hence the
    explicit `min-width: 0` on every item in these two rows. */
@@ -366,9 +365,7 @@ html, body, #root { height: 100%; margin: 0; }
 .artboardOrientation > * { min-width: 0; }
 .artboardReadout { font-size: 11px; line-height: 1.5; color: var(--text-muted); }
 .artboardReadout strong { color: var(--text-primary); font-weight: 600; }
-/* ---- /STREAM-A ---- */
 
-/* ---- STREAM-C: ornament library — picker dialog ---- */
 /* Reuses .confirmDialogOverlay for the backdrop; the panel itself is its own
    class because it is a wide grid rather than a message box. */
 .ornamentPickerDialog { width: min(880px, 94vw); max-height: 86vh; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-panel-floating); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); }
@@ -398,4 +395,6 @@ html, body, #root { height: 100%; margin: 0; }
 .ornamentCardActions > * { min-width: 0; }
 
 .ornamentPickerOpenWide { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-/* ---- /STREAM-C ---- */
+
+/* ---- STREAM-G: font upload — dialog ---- */
+/* ---- /STREAM-G ---- */

@@ -66,8 +66,6 @@ const chooseRulerStep = (scale: number) => {
 // file's edits, EXCEPT the STREAM-B anchored regions below, which belong to
 // stream B (muthanna/radial) alone.
 export type CanvasStageProps = {
-  // ---- STREAM-B: muthanna/radial — props ----
-  // ---- /STREAM-B ----
   blocks: Block[];
   selectedId: number | null;
   selectedIds: number[];
@@ -121,13 +119,18 @@ export type CanvasStageProps = {
    * Blocks may still overhang it freely — nothing clips on canvas.
    */
   artboard?: ArtboardConfig | null;
+  /**
+   * Extra Konva props spread last into the `#artboard-background` rect —
+   * the seam that lets the page surface (texture/tint, Phase 2 stream F)
+   * arrive from App state without this file changing hands. Overrides
+   * `fill` when it carries one.
+   */
+  surfaceRectProps?: Konva.RectConfig;
 };
 
 const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
 
 export const CanvasStage: React.FC<CanvasStageProps> = ({
-  // ---- STREAM-B: muthanna/radial — destructure ----
-  // ---- /STREAM-B ----
   blocks,
   selectedId,
   selectedIds,
@@ -161,6 +164,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   ghostBlock,
   snapToBlockEdges = true,
   artboard = null,
+  surfaceRectProps,
 }) => {
   const snapCoord = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
@@ -735,6 +739,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
               height={paperBox.height}
               fill={backgroundColor}
               listening={false}
+              {...surfaceRectProps}
             />
 
             {showGrid && (
@@ -786,7 +791,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 onDragEnd,
               };
 
-              // ---- STREAM-B: muthanna/radial — render case (mirror blocks) ----
               // A mirror draws another block's content, so its source is
               // looked up in `blocks` here on every render — that lookup is
               // the entire "stays live as the source is edited" mechanism.
@@ -809,7 +813,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   />
                 );
               }
-              // ---- /STREAM-B ----
               if (block.type === "image") {
                 return (
                   <ImageBlockView

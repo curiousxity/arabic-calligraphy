@@ -76,11 +76,24 @@ import {
   type ArtboardUnit,
 } from "../lib/artboard";
 import { OrnamentPickerButton } from "./OrnamentPicker";
+// ---- STREAM-E: styles & palettes — imports ----
+// ---- /STREAM-E ----
+// ---- STREAM-F: ink & surface — imports ----
+// ---- /STREAM-F ----
+// ---- STREAM-G: font upload — imports ----
+// ---- /STREAM-G ----
 
 export type SidebarProps = {
+  // Phase 2 parallel-stream prop declarations — each stream adds its own
+  // (all optional, arriving via App.tsx's p2* bundles). See PARALLEL-PHASE-2.md.
+  // ---- STREAM-E: styles & palettes — props ----
+  // ---- /STREAM-E ----
+  // ---- STREAM-F: ink & surface — props ----
+  // ---- /STREAM-F ----
+  // ---- STREAM-G: font upload — props ----
+  // ---- /STREAM-G ----
   // Phase 1 parallel-stream prop declarations — each stream adds its own
   // (all optional, arriving via App.tsx's p1* bundles). See PARALLEL-PHASE-1.md.
-  // ---- STREAM-A: artboard — props ----
   /** The document's page, or null for freeform. */
   artboard?: ArtboardConfig | null;
   /** `""` = freeform, `"custom"` = keep the size but detach it, otherwise a preset id. */
@@ -93,8 +106,6 @@ export type SidebarProps = {
   onChangeArtboardMargin?: (margin: number) => void;
   clipToPage?: boolean;
   onToggleClipToPage?: (value: boolean) => void;
-  // ---- /STREAM-A ----
-  // ---- STREAM-B: muthanna/radial — props ----
   /** Adds a mirror of the selected block. Enabled only while `canAddMirrorBlock`. */
   onAddMirrorBlock?: (mode: MirrorMode) => void;
   /** Exactly one block is selected and it is not itself a mirror. */
@@ -103,16 +114,11 @@ export type SidebarProps = {
   onSelectMirrorSource?: () => void;
   /** What to call that source in the Mirror panel. */
   mirrorSourceLabel?: string;
-  // ---- /STREAM-B ----
-  // ---- STREAM-C: ornament library — props ----
   onInsertOrnamentShapeFill?: (pathData: string, w: number, h: number) => void;
   onInsertOrnamentFrame?: (dataUrl: string, w: number, h: number) => void;
-  // ---- /STREAM-C ----
-  // ---- STREAM-D: tatweel kashida — props ----
   kashidaSlotOrdinal?: number;
   onSelectKashidaSlot?: (ordinal: number) => void;
   onSetKashidaAtSlot?: (slot: KashidaSlot, count: number) => void;
-  // ---- /STREAM-D ----
   blocks: Block[];
   selectedBlock?: Block;
   showGrid: boolean;
@@ -302,8 +308,13 @@ const SidebarTier: React.FC<{ label: string }> = ({ label }) => (
 );
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  // ---- STREAM-E: styles & palettes — destructure ----
+  // ---- /STREAM-E ----
+  // ---- STREAM-F: ink & surface — destructure ----
+  // ---- /STREAM-F ----
+  // ---- STREAM-G: font upload — destructure ----
+  // ---- /STREAM-G ----
   blocks,
-  // ---- STREAM-A: artboard — destructure ----
   artboard = null,
   onChooseArtboardPreset,
   onChangeArtboardSize,
@@ -313,22 +324,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onChangeArtboardMargin,
   clipToPage = true,
   onToggleClipToPage,
-  // ---- /STREAM-A ----
-  // ---- STREAM-B: muthanna/radial — destructure ----
   onAddMirrorBlock,
   canAddMirrorBlock,
   onSelectMirrorSource,
   mirrorSourceLabel,
-  // ---- /STREAM-B ----
-  // ---- STREAM-C: ornament library — destructure ----
   onInsertOrnamentShapeFill,
   onInsertOrnamentFrame,
-  // ---- /STREAM-C ----
-  // ---- STREAM-D: tatweel kashida — destructure ----
   kashidaSlotOrdinal = 0,
   onSelectKashidaSlot,
   onSetKashidaAtSlot,
-  // ---- /STREAM-D ----
   selectedBlock,
   selectedIds = [],
   showGrid,
@@ -747,7 +751,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* ---- STREAM-A: artboard — document-tier panel ---- */}
         <div className="sidebarPanel">
           <CollapsibleSection
             title="Artboard"
@@ -928,10 +931,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 value={backgroundColor}
                 onChange={onChangeBackgroundColor}
               />
+              {/* ---- STREAM-F: ink & surface — Surface row ---- */}
+              {/* ---- /STREAM-F ---- */}
             </div>
           </CollapsibleSection>
         </div>
-        {/* ---- /STREAM-A ---- */}
 
         <div className="sidebarPanel">
           <CollapsibleSection
@@ -1584,7 +1588,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <ImageIcon size={14} />
               </button>
             )}
-            {/* ---- STREAM-B: muthanna/radial — add-block buttons ---- */}
             {/* Inline SVGs rather than entries in Icons.tsx: that file is not
                 this stream's to edit during the Phase 1 parallel run. */}
             {onAddMirrorBlock && (
@@ -1636,8 +1639,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </>
             )}
-            {/* ---- /STREAM-B ---- */}
-            {/* ---- STREAM-C: ornament library — add-block button ---- */}
             {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
               <OrnamentPickerButton
                 variant="circle"
@@ -1645,7 +1646,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onInsertFrame={onInsertOrnamentFrame}
               />
             )}
-            {/* ---- /STREAM-C ---- */}
           </div>
 
           <div style={{ height: 8 }} />
@@ -1970,7 +1970,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* ---- STREAM-B: muthanna/radial — Mirror type panel ---- */}
         {selectedBlock && selectedBlock.type === "mirror" && (
           <div className="sidebarPanel">
             <CollapsibleSection
@@ -2062,7 +2061,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </CollapsibleSection>
           </div>
         )}
-        {/* ---- /STREAM-B ---- */}
 
         {selectedBlock && selectedBlock.type === "shapeFill" && (
           <div className="sidebarPanel">
@@ -2072,7 +2070,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onToggle={() => setShowText((v) => !v)}
             >
               <div className="sectionPanel">
-                {/* ---- STREAM-C: ornament library — shape picker button ---- */}
                 {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
                   <OrnamentPickerButton
                     variant="wide"
@@ -2080,7 +2077,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onInsertFrame={onInsertOrnamentFrame}
                   />
                 )}
-                {/* ---- /STREAM-C ---- */}
                   <div>
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
                       Tip: drag the gold handle on the shape's corner (canvas) to resize.
@@ -2277,7 +2273,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="sidebarPanel">
             <CollapsibleSection title="Typography" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
               <div className="sectionPanel">
-                {/* ---- STREAM-D: tatweel kashida — Kashida section ---- */}
+                {/* ---- STREAM-E: styles & palettes — Styles row ---- */}
+                {/* ---- /STREAM-E ---- */}
                 {/* Everything this section needs is derived from the block's
                     own text, so it holds no state of its own beyond the
                     selected slot (which lives in App.tsx). Written as an IIFE
@@ -2380,7 +2377,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </>
                   );
                 })()}
-                {/* ---- /STREAM-D ---- */}
+                {/* ---- STREAM-G: font upload — upload entry + custom font list ---- */}
+                {/* ---- /STREAM-G ---- */}
                 <FontSelectRow
                   id={makeId("font-family", selectedId)}
                   label="Font family"
@@ -2560,6 +2558,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="sidebarPanel">
             <CollapsibleSection title="Effects" isOpen={showEffects} onToggle={() => setShowEffects((v) => !v)}>
               <div className="sectionPanel">
+                {/* ---- STREAM-F: ink & surface — Fill section ---- */}
+                {/* ---- /STREAM-F ---- */}
                 <div style={{ display: "flex", gap: 6 }}>
                   {(
                     [

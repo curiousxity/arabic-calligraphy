@@ -102,7 +102,6 @@ All three draw a block's **outline before its fill**, not after. A canvas stroke
 
 Selected/grouped/multi-selected blocks currently have **no persistent on-canvas outline** (a dashed selection-box `Transformer` was tried and explicitly removed per user feedback) — the two exceptions are: a small drag-to-resize corner handle shown only on the *selected* `shapeFill`/`image` block, and the coloured per-glyph hover handles (move/scale, diacritics) on the selected block. Don't reintroduce a general selection bounding box without checking this history.
 
-<!-- ---- STREAM-B: muthanna/radial — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-1.md) ---- -->
 
 ### Mirror blocks — muthanna and radial (`src/lib/mirror.ts`, `MirrorBlockView.tsx`)
 
@@ -159,7 +158,6 @@ shamsa). It is the one primitive both compositions reduce to.
   Content and Typography are hidden for this type — a mirror has neither of
   its own — the same way `image` already hides them.
 
-<!-- ---- /STREAM-B ---- -->
 
 ### Arabic text shaping pipeline (`src/lib/harfbuzz.ts` + `src/hooks/useShapedGlyphs.ts`)
 
@@ -183,7 +181,6 @@ rather than guards, pinning measured reality so a change became visible.
 Every one of them belonged to the removed stroke subsystem and went with it.
 The idea is still a good one if a future measurement wants pinning.)
 
-<!-- ---- STREAM-D: tatweel kashida — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-1.md) ---- -->
 ### Kashida elongation (`src/lib/tatweel.ts`, Sidebar → Typography)
 
 Widening a run is done by inserting **tatweel** (U+0640, ـ) into the block's
@@ -254,7 +251,6 @@ and textPath all get it with no separate gate.
 Known and correct: some fonts substitute differently across a tatweel (الله
 decomposes when interrupted). That is the font doing its job; offering only
 legal joins is the guardrail, and the guide says so.
-<!-- ---- /STREAM-D ---- -->
 
 ### Per-instance diacritic control (`src/lib/diacritics.ts`, `DiacriticHoverHandles.tsx`)
 
@@ -550,6 +546,9 @@ glyph is rotated to a curve tangent
 is a real design problem, deliberately left for a future spec rather than
 half-supported here.
 
+<!-- ---- STREAM-G: font upload — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-2.md) ---- -->
+<!-- ---- /STREAM-G ---- -->
+
 ### Font files carry custom glyphs — don't blindly replace them
 
 `public/fonts/*.ttf|otf` are not stock font files. `FatemiMaqala.ttf` has custom Private Use Area glyphs (honorific symbols used by the sidebar's "Presets" row) that were manually merged (via a Python `fontTools` script, not committed to the repo) into every *other* font file in `public/fonts/` too, so those symbols render regardless of the selected font. If a font file in `public/fonts/` is ever regenerated/replaced from an upstream source, those PUA glyphs will be lost and the Presets buttons will silently show missing-glyph boxes in every font except FatemiMaqala again.
@@ -704,7 +703,6 @@ satisfies the condition several ways at once and drawing them all is
 noise.
 
 
-<!-- ---- STREAM-A: artboard — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-1.md) ---- -->
 ### The artboard (`src/lib/artboard.ts`, `CanvasStage.tsx`, `useExport.ts`)
 
 A document can have a **page**: `artboard: ArtboardConfig | null` in `App.tsx`.
@@ -772,7 +770,6 @@ units/dpi selects, the orientation toggle, the export-size readout and the
 
 Out of scope, deliberately: multiple artboards, bleed marks, dimming the
 overhang on canvas, and clipping during editing.
-<!-- ---- /STREAM-A ---- -->
 
 ### Canvas pan and zoom (`CanvasStage.tsx`, `lib/canvasBounds.ts`)
 
@@ -898,7 +895,6 @@ CSS is one global stylesheet (`src/index.css`) using CSS custom properties for t
 
 Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default to `min-width: auto`**, which refuses to shrink below content size and causes silent overflow/clipping at narrow sidebar widths. When adding a new multi-item row (grid or flex), give items `min-width: 0` explicitly or the row will overflow at the sidebar's minimum width instead of degrading gracefully.
 
-<!-- ---- STREAM-C: ornament library — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-1.md) ---- -->
 ### Ornament & frame library (`src/data/ornaments/`, `src/lib/ornaments.ts`, `OrnamentPicker.tsx`)
 
 Ten built-in shapes — arches, stars, a medallion, a scalloped roundel, an
@@ -956,11 +952,16 @@ the colour in its thumbnails before you commit.
 
 `ornamentSvgMarkup` is deliberately ASCII-only — no `nameAr`, no comment —
 because `btoa` throws above U+00FF.
-<!-- ---- /STREAM-C ---- -->
+
+<!-- ---- STREAM-E: styles & palettes — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-2.md) ---- -->
+<!-- ---- /STREAM-E ---- -->
 
 ### Undo/redo and grouping
 
 `src/hooks/useUndoRedo.ts` is a generic snapshot-stack hook (`getSnapshot`/`applySnapshot` callbacks); `App.tsx`'s `pushHistory()` wraps it and is called at the start of nearly every mutating handler (before the state change, so undo restores pre-change state). Blocks can share a `groupId` (assigned via the Layers panel's pairwise "merge" UI or the multi-select "Group selected" action) so that dragging one moves every block with the same `groupId` together; `dissolveSingletonGroups()` cleans up groups that drop to one member after a delete.
+
+<!-- ---- STREAM-F: ink & surface — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-2.md) ---- -->
+<!-- ---- /STREAM-F ---- -->
 
 ### Export (`src/hooks/useExport.ts`)
 

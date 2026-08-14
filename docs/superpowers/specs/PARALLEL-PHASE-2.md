@@ -49,3 +49,32 @@ The three renderers belong to F alone this phase; the font-URL seam to G
 alone. E stays out of both — a style *apply* is a normal
 `updateSelectedBlock` patch and needs no renderer change. Full verification
 loop plus your own e2e file before reporting done.
+
+## Anchor mechanics (landed by the prep commit — all on `main` now)
+
+Same paired-comment convention as Phase 1; insert only between your own
+`STREAM-E` / `STREAM-F` / `STREAM-G` pair. The Phase 1 anchors were retired
+after that merge — informational comments naming other streams are history,
+not licences.
+
+- **App.tsx** regions per stream: imports, state, handlers (with pre-created
+  prop bundles `p2eSidebarProps`, `p2fSidebarProps` + `p2fCanvasProps`,
+  `p2gSidebarProps`, already spread at the call sites); F additionally gets
+  payload-build and payload-read regions for persisting the page surface.
+  Fill your bundle; never edit the shared JSX prop lists.
+- **The page-surface seam already exists** — F does **not** touch
+  `CanvasStage.tsx`: the prep commit added `surfaceRectProps?: Konva.RectConfig`,
+  spread last into the `#artboard-background` rect. Put the texture/tint
+  fill props into `p2fCanvasProps.surfaceRectProps` and they land on the
+  page rect (they override its `fill`).
+- **Sidebar.tsx**: per-stream import, props-type and destructure regions,
+  plus JSX regions — E at the top of Typography's panel; F at the top of
+  Effects' panel and at the end of the Artboard panel (Surface row); G
+  beside the font picker in Typography. All stream props must be optional
+  (they arrive via `Partial<SidebarProps>`).
+- **types.ts**: F has a region above `BlockCommon` for `BlockFill` and one
+  inside `BlockCommon` for the optional `fill` field.
+- **index.css**: `STREAM-G` block at the end. **CLAUDE.md** and
+  **PROGRESS.md**: one labeled region per stream.
+- Commit your work on your branch when done — Phase 1's streams left
+  everything uncommitted and the orchestrator had to commit for them.

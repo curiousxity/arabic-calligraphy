@@ -94,7 +94,13 @@ defects under Known limitations, and the mechanics in `CLAUDE.md`'s
 
 ## Shipped
 
-<!-- ---- STREAM-A: artboard — add your Shipped entry here ---- -->
+<!-- ---- STREAM-E: styles & palettes — add your Shipped entry here ---- -->
+<!-- ---- /STREAM-E ---- -->
+<!-- ---- STREAM-F: ink & surface — add your Shipped entry here ---- -->
+<!-- ---- /STREAM-F ---- -->
+<!-- ---- STREAM-G: font upload — add your Shipped entry here ---- -->
+<!-- ---- /STREAM-G ---- -->
+
 ### 2026-08-14 — Artboard (stream A)
 
 A document can now have a page. Preset sizes (A5/A4/A3/US Letter at 300dpi,
@@ -123,8 +129,6 @@ overhangs the page while editing; clipping on canvas rather than only on
 export. The export-scale control is inert while a page is set — that is
 intended, but a "scale the page itself" affordance (export A4 at 2×) has no
 home yet.
-<!-- ---- /STREAM-A ---- -->
-<!-- ---- STREAM-B: muthanna/radial — add your Shipped entry here ---- -->
 
 ### 2026-08-14 — Muthanna & radial composition (stream B)
 
@@ -145,8 +149,6 @@ reflection to kiss the source's baseline, and "flatten to independent
 blocks" are all out of scope. The Layers panel shows a mirror with the plain
 text badge, since that file was not this stream's to edit.
 
-<!-- ---- /STREAM-B ---- -->
-<!-- ---- STREAM-C: ornament library — add your Shipped entry here ---- -->
 ### 2026-08-14 — Ornament & frame library (stream C)
 
 Ten built-in shapes behind a "Shapes & frames" picker, reachable from the
@@ -168,8 +170,6 @@ Known limits, both deliberate: a frame's colour cannot be changed after
 insert (it is a rasterized image — recolouring needs a vector-shape block
 type), and there is no way to import ornaments of your own beyond the
 existing "upload an SVG" button.
-<!-- ---- /STREAM-C ---- -->
-<!-- ---- STREAM-D: tatweel kashida — add your Shipped entry here ---- -->
 ### 2026-08-14 — Tatweel kashida (stream D)
 
 Elongation that actually elongates, replacing the inert stroke-stretch dial
@@ -196,7 +196,6 @@ shifts the glyph indices that per-glyph mark and move/scale overrides are
 keyed by — the same fragility any typed edit has. Documented, not
 engineered around. Fit-to-width remains deferred; it needs stream A's
 artboard as its target.
-<!-- ---- /STREAM-D ---- -->
 
 ### 2026-08-14 — Playwright e2e harness (stream P)
 

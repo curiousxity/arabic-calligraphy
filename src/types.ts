@@ -41,6 +41,9 @@ export type GlyphTransform = {
   scaleY?: number;
 };
 
+// ---- STREAM-F: ink & surface — BlockFill type ----
+// ---- /STREAM-F ----
+
 type BlockCommon = {
   id: number;
   name?: string;
@@ -80,6 +83,10 @@ type BlockCommon = {
   glyphTransforms?: GlyphTransform[];
   /** Arms the on-canvas move/scale handles. */
   glyphTransformMode?: boolean;
+
+  // ---- STREAM-F: ink & surface — `fill` field on BlockCommon. Absent
+  // means the existing flat `color` renders exactly as today. ----
+  // ---- /STREAM-F ----
 
   // Shape-import fields, carried by shapeFill blocks. They live on
   // BlockCommon rather than on ShapeFillBlock because the save/load and
@@ -126,7 +133,6 @@ export type TextPathBlock = BlockCommon & {
   textPathEditMode?: boolean;
 };
 
-// ---- STREAM-B: muthanna/radial — MirrorBlock. Stream B is also the sole
 // owner of the `BlockType` union (line 1) and the `Block` union just below
 // this phase, and may edit those two lines directly. ----
 
@@ -160,6 +166,5 @@ export type MirrorBlock = BlockCommon & {
   /** Radial only: how far each copy sits from the mirror block's origin, in px. */
   radialRadius?: number;
 };
-// ---- /STREAM-B ----
 
 export type Block = TextBlock | ShapeFillBlock | ImageBlock | TextPathBlock | MirrorBlock;
