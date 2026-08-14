@@ -473,6 +473,10 @@ def glyph_name_for(tt, unicode_hex, form):
 # Matching and zone sampling
 # ---------------------------------------------------------------------------
 
+def point_distance(p, q):
+    return ((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2) ** 0.5
+
+
 def polyline_length(pts):
     return sum(((pts[i + 1][0] - pts[i][0]) ** 2 + (pts[i + 1][1] - pts[i][1]) ** 2) ** 0.5
                for i in range(len(pts) - 1))
@@ -590,12 +594,85 @@ def node_t_values(nodes):
 # candidates — here to decide, not to guess geometry.
 ORIENTATION_AMBIGUOUS_NUQTA = 0.5
 
+# Task 4 fix round, the partial-zone reversal. The endpoint rule below is a
+# comparison of TWO DISTANCES TO ONE POINT, which is only a direction test
+# when the stroke actually travels away from its own fromNode. It is not one
+# for a stroke that doubles back — a CUP/EYE bowl (jeem, hah, khah, fa, qaf)
+# curls round so both of its ends sit near the same side of the glyph, and
+# there the comparison is decided by whichever end the mapping's own error
+# happens to favour. Measured: it was confidently wrong, with margins of
+# 1.7-3.6 nuqta, on exactly those letters across five unrelated fonts.
+#
+# The second estimator is a rank vote over ALL of the stroke's nodes, not two
+# of them: map every node, project each onto the branch, and ask whether the
+# projections advance along the branch in the same order the schema authored
+# the nodes in (Kendall tau over every node pair). A rank statistic ignores
+# how far off each individual node landed and reads only their order, which
+# is what survives the mapping's median-0.37/p90-1.43-nuqta error; and a
+# doubling-back stroke, which defeats the endpoint rule outright, is exactly
+# the case it reads best, since its nodes sweep the whole arc.
+#
+# The two are combined as an AGREEMENT REQUIREMENT, never as a tiebreak: a
+# stroke ships only when both estimators independently pick the same
+# direction. Disagreement, and a vote too tied to have an opinion, are both
+# drops — the vote is not permitted to overrule the endpoint rule and orient
+# a branch by itself, because that would be substituting one mapping-derived
+# guess for another rather than verifying anything.
+ORIENTATION_VOTE_MIN_TAU = 0.0
+
+
+def nearest_arc_t(branch, q):
+    """Arc-length proportion (0-1) along `branch` of the point on it nearest
+    to `q` — the projection the orientation vote ranks."""
+    total = polyline_length(branch)
+    best_t, best_d, acc = 0.0, float("inf"), 0.0
+    for i in range(len(branch) - 1):
+        ax, ay = branch[i][0], branch[i][1]
+        vx, vy = branch[i + 1][0] - ax, branch[i + 1][1] - ay
+        seg = (vx * vx + vy * vy) ** 0.5
+        if seg <= 0:
+            continue
+        u = max(0.0, min(1.0, ((q[0] - ax) * vx + (q[1] - ay) * vy) / (seg * seg)))
+        d = ((ax + u * vx - q[0]) ** 2 + (ay + u * vy - q[1]) ** 2) ** 0.5
+        if d < best_d:
+            best_d, best_t = d, (acc + u * seg) / max(total, 1e-9)
+        acc += seg
+    return best_t
+
+
+def kendall_tau(seq):
+    """(concordant - discordant) / total pairs. +1 = strictly increasing,
+    -1 = strictly decreasing, 0 = no majority either way (which includes the
+    degenerate case of every value being equal)."""
+    concordant = discordant = 0
+    for i in range(len(seq)):
+        for j in range(i + 1, len(seq)):
+            if seq[j] > seq[i]:
+                concordant += 1
+            elif seq[j] < seq[i]:
+                discordant += 1
+    total = concordant + discordant
+    return (concordant - discordant) / total if total else 0.0
+
+
+def orientation_vote_tau(branch, stroke, map_point):
+    """Kendall tau of the stroke's mapped nodes' projections onto the RAW
+    branch, in authored node order. Positive means the branch as given runs
+    fromNode-to-toNode; negative means it runs backwards. Computed on the raw
+    branch so its sign is directly comparable with the endpoint rule's own
+    `d_start < d_end`."""
+    nodes = stroke["path"]["nodes"]
+    seeds = [map_point(n["x"], n["y"]) for n in nodes]
+    return kendall_tau([nearest_arc_t(branch, q) for q in seeds])
+
 
 def canonicalize_branch_orientation(branch, stroke, map_point, nuqta_units):
     """Reorients `branch` so its first point sits nearer the stroke's own
     fromNode end (`nodes[0]`, mapped through `map_point`) than its last point
     does — decided from each raw branch endpoint's distance to the fromNode
-    seed *alone*, not a joint two-anchor (fromNode + toNode) sum.
+    seed *alone*, not a joint two-anchor (fromNode + toNode) sum — and then
+    only if the all-node rank vote (`orientation_vote_tau`, see
+    ORIENTATION_VOTE_MIN_TAU) independently agrees.
 
     A joint two-anchor sum was tried first (minimize
     dist(start,fromSeed)+dist(end,toSeed) vs the swapped pairing) and
@@ -609,11 +686,18 @@ def canonicalize_branch_orientation(branch, stroke, map_point, nuqta_units):
     noisy ones removes that failure mode and is what the shipped table is
     actually verified against.
 
-    Returns (oriented_branch, d_start, d_end) — the two raw-endpoint
-    distances to the fromNode seed, in nuqta. `oriented_branch` is `None`
-    when they are within `ORIENTATION_AMBIGUOUS_NUQTA` of each other (no
-    confident way to choose), in which case the caller drops the stroke's
-    spines rather than guess, per "a rejected match ships nothing".
+    Returns (oriented_branch, d_start, d_end, tau, reason) — the two
+    raw-endpoint distances to the fromNode seed, in nuqta, plus the vote's
+    tau. `oriented_branch` is `None`, and `reason` names which check
+    refused, when either
+
+      "ambiguous"  the two endpoint distances are within
+                   ORIENTATION_AMBIGUOUS_NUQTA of each other, or
+      "vote"       the rank vote has no majority (|tau| at or below
+                   ORIENTATION_VOTE_MIN_TAU) or picks the other direction,
+
+    in which case the caller drops the stroke's spines rather than guess, per
+    "a rejected match ships nothing".
     """
     nodes = stroke["path"]["nodes"]
     seed_from = map_point(nodes[0]["x"], nodes[0]["y"])
@@ -624,9 +708,13 @@ def canonicalize_branch_orientation(branch, stroke, map_point, nuqta_units):
 
     d_start = dist(b_start, seed_from) / nuqta_units
     d_end = dist(b_end, seed_from) / nuqta_units
+    tau = orientation_vote_tau(branch, stroke, map_point)
     if abs(d_start - d_end) < ORIENTATION_AMBIGUOUS_NUQTA:
-        return None, d_start, d_end
-    return (branch if d_start < d_end else list(reversed(branch))), d_start, d_end
+        return None, d_start, d_end, tau, "ambiguous"
+    endpoint_forward = d_start < d_end
+    if abs(tau) <= ORIENTATION_VOTE_MIN_TAU or (tau > 0) != endpoint_forward:
+        return None, d_start, d_end, tau, "vote"
+    return (branch if endpoint_forward else list(reversed(branch))), d_start, d_end, tau, None
 
 
 def match_strokes(desc, branches, nuqta_units, seed_box):
@@ -951,11 +1039,21 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
         "fontSha256": sha256(path),
         "glyphs": {},
     }
-    drops = {"length": 0, "margin": 0, "orientation": 0, "connectivity": 0}
+    drops = {"length": 0, "margin": 0, "orientation": 0, "orientation_vote": 0,
+             "zone_orientation": 0, "connectivity": 0}
     accounting = {
         "shipped": 0, "unassigned": 0, "no_glyph_name": 0, "no_geometry": 0,
         "collision": 0, "invalid_zone": 0, "single_candidate": 0,
-        "anchors_disagree": 0,
+        # Task 4 fix round: split, because conflating the two is precisely how
+        # the partial-zone reversal stayed invisible through two review
+        # rounds. `_full` counts zones spanning the whole stroke (where the
+        # zone's own endpoints ARE the stroke's, so only the toNode seed can
+        # dissent); `_partial` counts interior-node zones measured against
+        # their OWN fromNode/toNode seeds. Both are pre-consensus, like every
+        # other accounting bucket — a counted zone may still be removed later
+        # by drop_cross_font_outliers, so these figures are an upper bound on
+        # what actually ships, not a count of it.
+        "anchors_disagree_full": 0, "anchors_disagree_partial": 0,
     }
     sheet_glyph_names = []
     spines_by_glyph = {}
@@ -1044,30 +1142,11 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
             # is which BEFORE any zone slicing — see
             # canonicalize_branch_orientation's own comment. An ambiguous
             # orientation drops the whole stroke's spines rather than guess.
-            oriented, fwd, bwd = canonicalize_branch_orientation(branch, stroke, map_point, nuqta_units)
+            oriented, fwd, bwd, tau, why = canonicalize_branch_orientation(
+                branch, stroke, map_point, nuqta_units)
             if oriented is None:
-                drops["orientation"] += n_stroke_zones
+                drops["orientation" if why == "ambiguous" else "orientation_vote"] += n_stroke_zones
                 continue
-
-            # Task 4, addition (A): "anchors disagree" measurement. The
-            # rereview (task-3-rereview-1.md, NEW-1) found that on 8 of 38
-            # full-stroke zones the toNode seed disagrees with the fromNode
-            # seed the orientation decision above actually used, and in 6 of
-            # those both anchors are individually decisive (each beyond
-            # ORIENTATION_AMBIGUOUS_NUQTA) yet point opposite ways — those
-            # ship silently today. This block does NOT change the decision
-            # (the single-anchor rule stays, per the ruling) — it only counts
-            # how often a shipped, full-stroke-spanning zone would have been
-            # oriented the other way had the toNode seed been used instead.
-            stroke_nodes = stroke["path"]["nodes"]
-            seed_to = map_point(stroke_nodes[-1]["x"], stroke_nodes[-1]["y"])
-            e_start = (((branch[0][0] - seed_to[0]) ** 2 + (branch[0][1] - seed_to[1]) ** 2) ** 0.5) / nuqta_units
-            e_end = (((branch[-1][0] - seed_to[0]) ** 2 + (branch[-1][1] - seed_to[1]) ** 2) ** 0.5) / nuqta_units
-            from_decisive = abs(fwd - bwd) >= ORIENTATION_AMBIGUOUS_NUQTA  # true here by construction
-            to_decisive = abs(e_start - e_end) >= ORIENTATION_AMBIGUOUS_NUQTA
-            from_forward = fwd < bwd
-            to_forward = e_end < e_start
-            anchors_contradict_decisive = from_decisive and to_decisive and (from_forward != to_forward)
 
             branch = oriented
 
@@ -1081,6 +1160,7 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
             nodes = stroke["path"]["nodes"]
             t_values = node_t_values(nodes)
             n = len(nodes)
+            node_seed = [map_point(nd["x"], nd["y"]) for nd in nodes]
             for zone_index, zone in enumerate(stroke["editBehavior"]["stretchZones"]):
                 from_idx = clamp_index(zone.get("fromNode"), n)
                 to_idx = clamp_index(zone.get("toNode"), n)
@@ -1094,17 +1174,52 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
                     # doesn't fail this silently either.
                     accounting["invalid_zone"] += 1
                     continue
-                if {from_idx, to_idx} == {0, n - 1} and anchors_contradict_decisive:
-                    # This zone spans the whole stroke (a fair comparison for
-                    # the toNode seed, per the rereview's methodology) and the
-                    # toNode seed — deliberately not consulted by the
-                    # orientation decision — would have picked the opposite
-                    # direction, decisively. Counted, not corrected.
-                    accounting["anchors_disagree"] += 1
                 t0, t1 = t_values[from_idx], t_values[to_idx]
                 sliced = arc_slice(branch, min(t0, t1), max(t0, t1))
                 if t0 > t1:
                     sliced = list(reversed(sliced))
+
+                # Task 4 fix round. The audit this replaces asked its question
+                # only of zones spanning the whole stroke, which is exactly
+                # the population that CANNOT fail it: for those the slice's
+                # endpoints are the branch's endpoints, so the fromNode signal
+                # restates the orientation decision itself. 156 shipped
+                # partial zones were therefore never checked at all, and 35 of
+                # them were running backwards. The check below is asked of
+                # every zone, against the zone's OWN fromNode/toNode seeds and
+                # the SLICE's own endpoints — the literal statement of the
+                # StrokeSpine.points contract ("ordered from the zone's
+                # fromNode end to its toNode end", src/lib/strokeSpines/types.ts).
+                #
+                # The fromNode signal is a gate and the toNode signal a
+                # counter, which is not an inconsistency: the toNode seed is
+                # the noisier of the two by construction (fix round 1's own
+                # measurement, and the reason the orientation rule anchors on
+                # fromNode alone), so dropping on it would discard matches
+                # that were traced by hand and found correct. Splitting the
+                # counter full/partial is the part that must never be undone —
+                # a single figure is what let this hide.
+                from_backwards = (point_distance(sliced[0], node_seed[from_idx])
+                                  - point_distance(sliced[-1], node_seed[from_idx])) / nuqta_units
+                to_backwards = (point_distance(sliced[-1], node_seed[to_idx])
+                                - point_distance(sliced[0], node_seed[to_idx])) / nuqta_units
+                is_full = {from_idx, to_idx} == {0, n - 1}
+                if to_backwards >= ORIENTATION_AMBIGUOUS_NUQTA:
+                    accounting["anchors_disagree_full" if is_full
+                               else "anchors_disagree_partial"] += 1
+                if from_backwards >= ORIENTATION_AMBIGUOUS_NUQTA:
+                    # Inert on full-stroke zones by construction (see above),
+                    # so every hit here is a partial zone whose window was
+                    # sliced off the wrong end of its stroke. Latent as of
+                    # this fix — the orientation vote removes the population
+                    # that used to trip it — and kept as a permanent guard
+                    # against it returning unnoticed, the same way
+                    # invalid_zone is kept.
+                    print(f"    {family}: {desc['glyph']['id']} {stroke['id']} zone {zone_index} "
+                          f"runs backwards from its own fromNode by {from_backwards:.2f}nq — dropping zone")
+                    drops["zone_orientation"] += 1
+                    continue
+
                 points = [{"x": x, "y": y, "radius": r} for x, y, r in sliced]
                 spines.append({
                     "strokeId": stroke["id"],
@@ -1130,16 +1245,54 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
     return table, drops, accounting
 
 
+def run_sweep(families, ratios, schemas) -> None:
+    """Task 4 review, MINOR 2. The two orientation thresholds' sensitivity,
+    re-runnable rather than pasted into a report from a throwaway edit of the
+    constants — which is how the last sweep became unreproducible.
+
+    Writes nothing: it rebuilds each font's table in memory at each setting
+    and reports only the pre-consensus shipped count, so a reader can see how
+    much coverage each threshold is responsible for.
+    """
+    global ORIENTATION_AMBIGUOUS_NUQTA, ORIENTATION_VOTE_MIN_TAU
+    base_nq, base_tau = ORIENTATION_AMBIGUOUS_NUQTA, ORIENTATION_VOTE_MIN_TAU
+    try:
+        for name, values in (("ORIENTATION_AMBIGUOUS_NUQTA", (0.0, 0.25, 0.5, 1.0)),
+                             ("ORIENTATION_VOTE_MIN_TAU", (-1.0, 0.0, 0.34, 0.5, 0.9))):
+            print(f"\nsweep {name} (other threshold held at its committed value; "
+                  f"pre-consensus shipped zones)")
+            print(f"  {'value':>7} " + "".join(f"{f[:12]:>13}" for f in families) + f"{'TOTAL':>8}")
+            for v in values:
+                ORIENTATION_AMBIGUOUS_NUQTA, ORIENTATION_VOTE_MIN_TAU = base_nq, base_tau
+                if name == "ORIENTATION_AMBIGUOUS_NUQTA":
+                    ORIENTATION_AMBIGUOUS_NUQTA = v
+                else:
+                    ORIENTATION_VOTE_MIN_TAU = v
+                counts = [build_table(f, ratios[f], False, schemas)[2]["shipped"] for f in families]
+                marker = "  <- committed" if v == (base_nq if name == "ORIENTATION_AMBIGUOUS_NUQTA"
+                                                   else base_tau) else ""
+                print(f"  {v:>7} " + "".join(f"{c:>13}" for c in counts)
+                      + f"{sum(counts):>8}{marker}")
+    finally:
+        ORIENTATION_AMBIGUOUS_NUQTA, ORIENTATION_VOTE_MIN_TAU = base_nq, base_tau
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("fonts", nargs="*")
     ap.add_argument("--sheets", action="store_true")
+    ap.add_argument("--sweep", action="store_true",
+                    help="report the orientation thresholds' sensitivity and write nothing")
     args = ap.parse_args()
 
     ratios = in_scope_fonts()
     families = args.fonts or sorted(ratios)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     schemas = load_schemas()
+
+    if args.sweep:
+        run_sweep([f for f in families if f in ratios], ratios, schemas)
+        return
 
     total_zones = sum(zone_count(desc) for desc in schemas.values())
     print(f"schemas: {len(schemas)} non-ligature entries, {total_zones} authored zones")
@@ -1175,7 +1328,7 @@ def main() -> None:
 
     print()
     header = (f"{'font':<18} {'glyphs':>7} {'spines':>7} {'length':>8} {'margin':>8} "
-              f"{'orient.':>8} {'connect.':>9} {'consensus':>10}")
+              f"{'orient.':>8} {'vote':>6} {'zoneor.':>8} {'connect.':>9} {'consensus':>10}")
     print(header)
     print("-" * len(header))
     for family in sorted(tables):
@@ -1184,7 +1337,8 @@ def main() -> None:
         n_glyphs = len(table["glyphs"])
         n_spines = sum(len(e["spines"]) for e in table["glyphs"].values())
         print(f"{family:<18} {n_glyphs:>7} {n_spines:>7} {drops['length']:>8} {drops['margin']:>8} "
-              f"{drops['orientation']:>8} {drops['connectivity']:>9} {consensus_drops.get(family, 0):>10}")
+              f"{drops['orientation']:>8} {drops['orientation_vote']:>6} {drops['zone_orientation']:>8} "
+              f"{drops['connectivity']:>9} {consensus_drops.get(family, 0):>10}")
 
         out = OUT_DIR / f"{family}.json"
         out.write_text(json.dumps(table, separators=(",", ":")) + "\n", encoding="utf-8")
@@ -1205,11 +1359,13 @@ def main() -> None:
         status = "OK" if accounted == total_zones else "MISMATCH"
         print(f"  {family}: reconcile {accounted}/{total_zones} zones [{status}] "
               f"(shipped {acc['shipped']}, length {drops['length']}, margin {drops['margin']}, "
-              f"orientation {drops['orientation']}, connectivity {drops['connectivity']}, "
+              f"orientation {drops['orientation']}, orientation_vote {drops['orientation_vote']}, "
+              f"zone_orientation {drops['zone_orientation']}, connectivity {drops['connectivity']}, "
               f"unassigned {acc['unassigned']}, no_glyph_name {acc['no_glyph_name']}, "
               f"no_geometry {acc['no_geometry']}, collision {acc['collision']}, "
               f"invalid_zone {acc['invalid_zone']}; of which single_candidate {acc['single_candidate']}, "
-              f"anchors_disagree {acc['anchors_disagree']})")
+              f"anchors_disagree full {acc['anchors_disagree_full']} "
+              f"partial {acc['anchors_disagree_partial']} [pre-consensus])")
         assert accounted == total_zones, (
             f"{family}: {accounted} zones accounted for out of {total_zones} authored — "
             f"some zone was silently dropped without an accounting bucket"
