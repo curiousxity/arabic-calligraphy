@@ -13,7 +13,7 @@ Usage:
     python3 scripts/deriveStrokeSpines.py TahaNaskhRegular # one font
     python3 scripts/deriveStrokeSpines.py --sheets         # also write overlay PNGs
 
-Requires: pip install fonttools numpy Pillow scikit-image scipy
+Requires: pip install fonttools numpy Pillow scikit-image scipy uharfbuzz
 """
 import argparse
 import hashlib
@@ -55,6 +55,13 @@ def font_path(family: str) -> Path:
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _hb_font(path: Path):
+    """One HarfBuzz font per font file, for resolving which glyph gets drawn."""
+    import uharfbuzz as hb
+
+    return hb.Font(hb.Face(path.read_bytes()))
 
 
 RASTER = 512  # px across the em square
@@ -422,51 +429,100 @@ def load_schemas():
     return out
 
 
-FORM_SUFFIX = {"isolated": "isol", "initial": "init", "medial": "medi", "final": "fina"}
+# Every dual-joining letter, i.e. every letter that can sit on either side of
+# a target letter and keep the cursive join — the same classification the app
+# applies at runtime (DUAL_JOINING in src/lib/arabicJoining.ts), including
+# tatweel and the Persian/Urdu extensions, since this repo ships fonts for
+# those too. This is the neighbour set the contexts below are built from: a
+# letter's joining form is not one glyph, and which variant a font draws
+# depends on what it is joined to.
+JOINING_NEIGHBOURS = [
+    0x0626, 0x0628, 0x062A, 0x062B, 0x062C, 0x062D, 0x062E, 0x0633, 0x0634,
+    0x0635, 0x0636, 0x0637, 0x0638, 0x0639, 0x063A, 0x0640, 0x0641, 0x0642,
+    0x0643, 0x0644, 0x0645, 0x0646, 0x0647, 0x064A,
+    0x0679, 0x067E, 0x0686, 0x06A9, 0x06AF, 0x06CC,
+]
 
 
-def glyph_name_for(tt, unicode_hex, form):
-    """The font's glyph name for one letter in one joining form.
+def shaped_base_glyph(hb_font, text, cluster):
+    """The one base glyph HarfBuzz emits for `cluster` of `text`, or None.
 
-    Walks the cmap for the base codepoint, then follows GSUB's single
-    substitutions for the matching form feature — which is how the font itself
-    decides, rather than us guessing from naming conventions.
+    Shaped exactly as the app shapes (RTL, `arab`, `ar` — see
+    src/lib/harfbuzz.ts), so the glyph id this returns is by construction the
+    glyph the app will draw.
+
+    Zero-advance glyphs sharing the cluster are the font's separately
+    positioned marks and nuqat — Kufi2 decomposes its dots this way — and are
+    not the letter's body. This is the same advance test `lib/joinPins.ts`
+    uses to separate a real mark from a base letter, for the same reason.
+
+    None, never a guess, when the cluster carries no such glyph (the font
+    fused these letters into a ligature belonging to another cluster) or more
+    than one: absence is this subsystem's mechanism for a match that cannot
+    be verified.
     """
-    cp = int(unicode_hex, 16)
-    base = tt.getBestCmap().get(cp)
-    if base is None:
-        return None
+    import uharfbuzz as hb
+
+    buf = hb.Buffer()
+    buf.add_str(text)
+    buf.direction = "rtl"
+    buf.script = "arab"
+    buf.language = "ar"
+    hb.shape(hb_font, buf)
+    hits = [
+        info.codepoint
+        for info, pos in zip(buf.glyph_infos, buf.glyph_positions)
+        if info.cluster == cluster and pos.x_advance != 0
+    ]
+    return hits[0] if len(hits) == 1 else None
+
+
+def shaped_glyph_names(hb_font, tt, unicode_hex, form):
+    """Every glyph name real shaping can produce for this letter in this form.
+
+    This replaces a hand-rolled GSUB walk (cmap for the base, then the single
+    substitution under `isol`/`init`/`medi`/`fina`) that diverged from
+    HarfBuzz in two ways, leaving 46 of 401 shipped spines filed under glyph
+    ids no shaping ever emits — dead data indistinguishable, from the app's
+    side, from a stroke the gates rejected:
+
+    - It stopped at the form feature, missing substitutions applied
+      afterwards. Amiri's `fina` gives ra glyph 1830, and a chained
+      contextual rule then turns that into 3455, which is what gets drawn.
+    - It never applied `isol` at all, returning the bare cmap glyph. Kufi2
+      has an explicit `isol`, so every one of its ten entries was dead.
+
+    Asking the shaper cannot drift from the app the way a reimplementation
+    can. It also exposes what the walk could not represent: one form is not
+    one glyph. Amiri draws seven distinct ra-finals depending on the letter
+    before it, each a different outline needing its own measured spine. All
+    of them are returned — the table is keyed by glyph id, so each is
+    matched against its own ink — in a deterministic order fixed by
+    JOINING_NEIGHBOURS.
+    """
+    ch = chr(int(unicode_hex, 16))
+    order = tt.getGlyphOrder()
+
     if form == "isolated":
-        return base
-    feature = FORM_SUFFIX.get(form)
-    gsub = tt.get("GSUB")
-    if feature is None or gsub is None:
-        return None
-    for record in gsub.table.FeatureList.FeatureRecord:
-        if record.FeatureTag != feature:
+        contexts = [(ch, 0)]
+    elif form == "initial":
+        contexts = [(ch + chr(n), 0) for n in JOINING_NEIGHBOURS]
+    elif form == "final":
+        contexts = [(chr(n) + ch, 1) for n in JOINING_NEIGHBOURS]
+    elif form == "medial":
+        contexts = [(chr(n) + ch + chr(n), 1) for n in JOINING_NEIGHBOURS]
+    else:
+        return []
+
+    names = []
+    for text, cluster in contexts:
+        gid = shaped_base_glyph(hb_font, text, cluster)
+        if gid is None or gid >= len(order):
             continue
-        for idx in record.Feature.LookupListIndex:
-            lookup = gsub.table.LookupList.Lookup[idx]
-            for sub in lookup.SubTable:
-                mapping = getattr(sub, "mapping", None)
-                if not mapping or base not in mapping:
-                    continue
-                target = mapping[base]
-                # Task 4: found on Amiri, which encodes its fina/init/medi
-                # substitutions as GSUB LookupType 2 (Multiple Substitution)
-                # rather than LookupType 1 (Single Substitution) — fontTools
-                # represents a MultipleSubst's mapping as name -> [names], a
-                # sequence, even when that sequence has exactly one entry.
-                # Un-wrap the unambiguous one-glyph case; a real multi-glyph
-                # output (this app has no use for a letter that expands to
-                # several glyphs) is treated the same as no match, not
-                # silently collapsed to its first element.
-                if isinstance(target, list):
-                    if len(target) == 1:
-                        return target[0]
-                    continue
-                return target
-    return None
+        name = order[gid]
+        if name not in names:
+            names.append(name)
+    return names
 
 
 # ---------------------------------------------------------------------------
@@ -1012,15 +1068,18 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
     zones dropped by the four per-match gates (consensus is a separate,
     later pass over every font at once — see drop_cross_font_outliers).
 
-    `accounting` reconciles every authored zone to exactly one bucket (fix
+    `accounting` reconciles every match attempt to exactly one bucket (fix
     round 1's "make the report's numbers total" requirement) — for a given
     font, `accounting["shipped"] + sum(drops.values()) +
     accounting["unassigned"] + accounting["no_glyph_name"] +
     accounting["no_geometry"] + accounting["collision"] +
-    accounting["invalid_zone"]` must equal that font's total authored zone
-    count (`zone_count` summed over `schemas`). `single_candidate` is
-    reported separately and is a *subset* of `shipped`, not an addend of its
-    own — see IMPORTANT 3.
+    accounting["invalid_zone"]` must equal `accounting["attempted"]`.
+
+    That denominator is per-font rather than the authored zone count, because
+    one authored (letter, form) is attempted once per glyph the font actually
+    draws for it — see shaped_glyph_names. `single_candidate` is reported
+    separately and is a *subset* of `shipped`, not an addend of its own — see
+    IMPORTANT 3.
     """
     from fontTools.ttLib import TTFont
     path = font_path(family)
@@ -1054,18 +1113,31 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
         # by drop_cross_font_outliers, so these figures are an upper bound on
         # what actually ships, not a count of it.
         "anchors_disagree_full": 0, "anchors_disagree_partial": 0,
+        # The reconciliation's denominator. It is not the authored zone count
+        # any more: one authored (letter, form) is matched once per glyph the
+        # font actually draws for it, and a Naskh face draws several. Every
+        # (zone x glyph) attempt still lands in exactly one bucket.
+        "attempted": 0,
     }
     sheet_glyph_names = []
     spines_by_glyph = {}
     seen_glyph_ids = {}  # glyph_id -> (unicode_hex, form) that claimed it first, for a deterministic collision log
 
+    hb_font = _hb_font(path)
+    targets = []  # (unicode_hex, form, glyph_name), deterministic
     for unicode_hex, form in sorted(schemas):
+        n_zones = zone_count(schemas[(unicode_hex, form)])
+        names = shaped_glyph_names(hb_font, tt, unicode_hex, form)
+        if not names:
+            accounting["no_glyph_name"] += n_zones
+            accounting["attempted"] += n_zones
+            continue
+        accounting["attempted"] += n_zones * len(names)
+        targets.extend((unicode_hex, form, name) for name in names)
+
+    for unicode_hex, form, glyph_name in targets:
         desc = schemas[(unicode_hex, form)]
         n_zones = zone_count(desc)
-        glyph_name = glyph_name_for(tt, unicode_hex, form)
-        if glyph_name is None:
-            accounting["no_glyph_name"] += n_zones
-            continue
 
         branches = glyph_branches(tt, glyph_name, upm, nuqta_units)
         bbox = glyph_bbox_font_units(tt, glyph_name) if branches else None
@@ -1356,8 +1428,10 @@ def main() -> None:
         accounted = (acc["shipped"] + sum(drops.values()) + acc["unassigned"]
                      + acc["no_glyph_name"] + acc["no_geometry"] + acc["collision"]
                      + acc["invalid_zone"])
-        status = "OK" if accounted == total_zones else "MISMATCH"
-        print(f"  {family}: reconcile {accounted}/{total_zones} zones [{status}] "
+        attempted = acc["attempted"]
+        status = "OK" if accounted == attempted else "MISMATCH"
+        print(f"  {family}: reconcile {accounted}/{attempted} attempts "
+              f"({total_zones} authored zones x the glyphs this font draws them as) [{status}] "
               f"(shipped {acc['shipped']}, length {drops['length']}, margin {drops['margin']}, "
               f"orientation {drops['orientation']}, orientation_vote {drops['orientation_vote']}, "
               f"zone_orientation {drops['zone_orientation']}, connectivity {drops['connectivity']}, "
@@ -1366,8 +1440,8 @@ def main() -> None:
               f"invalid_zone {acc['invalid_zone']}; of which single_candidate {acc['single_candidate']}, "
               f"anchors_disagree full {acc['anchors_disagree_full']} "
               f"partial {acc['anchors_disagree_partial']} [pre-consensus])")
-        assert accounted == total_zones, (
-            f"{family}: {accounted} zones accounted for out of {total_zones} authored — "
+        assert accounted == attempted, (
+            f"{family}: {accounted} attempts accounted for out of {attempted} made — "
             f"some zone was silently dropped without an accounting bucket"
         )
 
