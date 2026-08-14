@@ -26,6 +26,12 @@
  * in nuqta because a stroke feature is roughly one nuqta thick, so "1.43
  * nuqta away" reads directly as "more than a stroke width off the ink it
  * was supposed to describe".
+ *
+ * SINCE 2026-08-13 THIS MEASURES THE SEED, NOT THE SHIPPED MAPPING.
+ * Stretch handles now take their axis from the generated spine tables
+ * (src/data/strokeSpines/, see spineTable.test.ts); mapNormToRealBox survives
+ * only as the seed hint the offline matcher starts from. The numbers below are
+ * still the reason that replacement happened, so they stay pinned here.
  */
 import fs from "node:fs";
 import path from "node:path";

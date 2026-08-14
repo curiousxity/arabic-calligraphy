@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`committed stroke spine tables > coverage has not silently collapsed 1`] = `
+{
+  "AlFatemi": 33,
+  "Amiri": 36,
+  "FatemiMaqala": 35,
+  "Kufi": 42,
+  "Kufi2": 10,
+  "Lateef": 41,
+  "NotoSans": 14,
+  "Qahiri": 15,
+  "Scheherazade": 40,
+  "TahaNaskhRegular": 46,
+  "Thuluth": 23,
+  "ThuluthDeco": 10,
+  "Urdu": 5,
+  "Wessam": 15,
+  "Yekan": 36,
+}
+`;
