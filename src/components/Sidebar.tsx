@@ -32,6 +32,13 @@ import {
 import { FloatingArabicKeyboard } from "./sidebar/FloatingKeyboard";
 import { GuideLauncher } from "./guide/GuideLauncher";
 import {
+  findKashidaSlots,
+  readKashida,
+  MAX_KASHIDA_PER_SLOT,
+  TATWEEL,
+  type KashidaSlot,
+} from "../lib/tatweel";
+import {
   TrashIcon,
   CopyIcon,
   PlusIcon,
@@ -99,6 +106,9 @@ export type SidebarProps = {
   // ---- STREAM-C: ornament library — props ----
   // ---- /STREAM-C ----
   // ---- STREAM-D: tatweel kashida — props ----
+  kashidaSlotOrdinal?: number;
+  onSelectKashidaSlot?: (ordinal: number) => void;
+  onSetKashidaAtSlot?: (slot: KashidaSlot, count: number) => void;
   // ---- /STREAM-D ----
   blocks: Block[];
   selectedBlock?: Block;
@@ -310,6 +320,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // ---- STREAM-C: ornament library — destructure ----
   // ---- /STREAM-C ----
   // ---- STREAM-D: tatweel kashida — destructure ----
+  kashidaSlotOrdinal = 0,
+  onSelectKashidaSlot,
+  onSetKashidaAtSlot,
   // ---- /STREAM-D ----
   selectedBlock,
   selectedIds = [],
@@ -2246,6 +2259,108 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <CollapsibleSection title="Typography" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
               <div className="sectionPanel">
                 {/* ---- STREAM-D: tatweel kashida — Kashida section ---- */}
+                {/* Everything this section needs is derived from the block's
+                    own text, so it holds no state of its own beyond the
+                    selected slot (which lives in App.tsx). Written as an IIFE
+                    rather than a helper component because this stream owns
+                    only the region between these two anchors. */}
+                {(() => {
+                  const slots = findKashidaSlots(selectedBlock.text);
+                  if (slots.length === 0) {
+                    return (
+                      <div className="field">
+                        <span className="fieldTitle">Kashida</span>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          No stretchable joins in this text — a kashida needs two
+                          letters that join to each other.
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // The ordinal is clamped rather than reset, so editing the
+                  // text (which changes how many slots there are) can never
+                  // point the stepper past the end of the list.
+                  const ordinal = Math.min(Math.max(0, kashidaSlotOrdinal), slots.length - 1);
+                  const slot = slots[ordinal];
+                  const counts = readKashida(selectedBlock.text, slots);
+                  const count = counts.get(slot.index) ?? 0;
+                  const setCount = (n: number) =>
+                    onSetKashidaAtSlot?.(slot, Math.min(MAX_KASHIDA_PER_SLOT, Math.max(0, n)));
+                  const slotLabel = (s: KashidaSlot) => `${s.before} ${TATWEEL} ${s.after}`;
+
+                  return (
+                    <>
+                      <SelectRow
+                        id={makeId("kashida-slot", selectedId)}
+                        name={makeId("kashidaSlot", selectedId)}
+                        label="Kashida join"
+                        value={String(ordinal)}
+                        onChange={(v) => onSelectKashidaSlot?.(Number(v))}
+                      >
+                        {slots.map((s, i) => (
+                          <option key={`${s.index}-${i}`} value={String(i)}>
+                            {`${i + 1}. ${slotLabel(s)}`}
+                            {(counts.get(s.index) ?? 0) > 0 ? ` (${counts.get(s.index)})` : ""}
+                          </option>
+                        ))}
+                      </SelectRow>
+
+                      <div className="field">
+                        <span className="fieldTitle">Stretch this join</span>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            minWidth: 0,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="sidebarCircleButton"
+                            aria-label="Shorten kashida"
+                            disabled={count === 0}
+                            onClick={() => setCount(count - 1)}
+                          >
+                            −
+                          </button>
+                          <span
+                            aria-label="Kashida length"
+                            style={{
+                              minWidth: 24,
+                              textAlign: "center",
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {count}
+                          </span>
+                          <button
+                            type="button"
+                            className="sidebarCircleButton"
+                            aria-label="Lengthen kashida"
+                            disabled={count >= MAX_KASHIDA_PER_SLOT}
+                            onClick={() => setCount(count + 1)}
+                          >
+                            +
+                          </button>
+                          <span
+                            dir="rtl"
+                            style={{ flex: 1, minWidth: 0, fontSize: 16, textAlign: "center" }}
+                          >
+                            {slot.before}
+                            {TATWEEL.repeat(Math.max(1, count))}
+                            {slot.after}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                          Adds tatweel characters to the text itself, so the letters
+                          really connect. Apply kashida before fine-tuning marks.
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
                 {/* ---- /STREAM-D ---- */}
                 <FontSelectRow
                   id={makeId("font-family", selectedId)}

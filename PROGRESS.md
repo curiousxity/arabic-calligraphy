@@ -149,6 +149,32 @@ text badge, since that file was not this stream's to edit.
 <!-- ---- STREAM-C: ornament library — add your Shipped entry here ---- -->
 <!-- ---- /STREAM-C ---- -->
 <!-- ---- STREAM-D: tatweel kashida — add your Shipped entry here ---- -->
+### 2026-08-14 — Tatweel kashida (stream D)
+
+Elongation that actually elongates, replacing the inert stroke-stretch dial
+removed in Phase 0. Typography now carries a **Kashida join** picker listing
+every legal join in the block's text (labelled with the letter pair, «ب ـ س»)
+and a 0–8 stepper that inserts real U+0640 tatweels there.
+
+- `src/lib/tatweel.ts` — pure `findKashidaSlots` / `applyKashida` /
+  `readKashida`, kept free of React and font loading so the deferred
+  fit-to-width solver can call them unchanged. Slots are letter *pairs*, so
+  the stepper is absolute rather than additive; lam-alef is excluded.
+- 18 unit tests, of which the load-bearing ones shape with **real harfbuzzjs
+  and real fonts** and assert the total advance strictly increases with the
+  count in Amiri, Scheherazade and Lateef. This is the measurement the
+  removed subsystem failed.
+- `e2e/tatweel.spec.ts` — 4 tests: the stepper widens the ink extent on the
+  live canvas, lam-alef is never offered, undo reverts a step, a saved
+  project round-trips the tatweels.
+- Guide page "Stretching joins (kashida)", including the warning to apply
+  kashida before fine-tuning marks.
+
+Known limitation, inherited and deliberate: kashida is a text edit, so it
+shifts the glyph indices that per-glyph mark and move/scale overrides are
+keyed by — the same fragility any typed edit has. Documented, not
+engineered around. Fit-to-width remains deferred; it needs stream A's
+artboard as its target.
 <!-- ---- /STREAM-D ---- -->
 
 ### 2026-08-14 — Playwright e2e harness (stream P)

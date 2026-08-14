@@ -76,6 +76,7 @@ import type { MirrorMode } from "./types";
 // ---- STREAM-C: ornament library — imports ----
 // ---- /STREAM-C ----
 // ---- STREAM-D: tatweel kashida — imports ----
+import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 // ---- /STREAM-D ----
 
 const hslToHex = (h: number, s: number, l: number): string => {
@@ -241,6 +242,13 @@ const App: React.FC = () => {
   // ---- STREAM-C: ornament library — state ----
   // ---- /STREAM-C ----
   // ---- STREAM-D: tatweel kashida — state ----
+  // Which slot the Kashida stepper is pointed at, as an *ordinal* into
+  // `findKashidaSlots`' list rather than a text offset: inserting tatweels
+  // shifts every later offset but never reorders or renumbers the slots, so
+  // the ordinal survives the edit the stepper itself makes. The Sidebar
+  // clamps it against the current slot count, which is what makes an
+  // arbitrary text edit (or a different block) safe rather than out of range.
+  const [kashidaSlotOrdinal, setKashidaSlotOrdinal] = useState(0);
   // ---- /STREAM-D ----
 
   // Snap a dragged block's visible edges and centres, not just its origin.
@@ -1950,7 +1958,27 @@ const App: React.FC = () => {
   const p1cSidebarProps: Partial<SidebarProps> = {};
   // ---- /STREAM-C ----
   // ---- STREAM-D: tatweel kashida — handlers & props ----
-  const p1dSidebarProps: Partial<SidebarProps> = {};
+  // Kashida is an ordinary text edit — `applyKashida` returns a new string
+  // and it goes through `updateSelectedBlock` like anything the user could
+  // have typed, so shaping, history (that call pushes it), saving, and every
+  // downstream per-glyph consumer see exactly what they always see. That is
+  // the point: the removed stroke-stretch kashida sat outside the text and
+  // therefore never widened the shaped run at all.
+  const setKashidaAtSlot = useCallback(
+    (slot: KashidaSlot, count: number) => {
+      if (!selectedBlock) return;
+      const next = applyKashida(selectedBlock.text, slot, count);
+      if (next === selectedBlock.text) return;
+      updateSelectedBlock({ text: next });
+    },
+    [selectedBlock, updateSelectedBlock]
+  );
+
+  const p1dSidebarProps: Partial<SidebarProps> = {
+    kashidaSlotOrdinal,
+    onSelectKashidaSlot: setKashidaSlotOrdinal,
+    onSetKashidaAtSlot: setKashidaAtSlot,
+  };
   // ---- /STREAM-D ----
 
   return (
