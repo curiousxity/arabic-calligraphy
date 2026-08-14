@@ -91,6 +91,13 @@ driven by them is unverifiable in CI by design.
 - **Verified by hand 2026-08-13:** the join cleft on the original repro
   (much improved, see above); nuqta snap increments; the Alt bypass; the
   typed-precision field.
+- **Not verified by hand at all: the whole stroke-spine re-anchoring run**
+  (Tasks 1–9, 2026-08-14). Nothing in it has been seen in a browser. Two
+  specific things automated tests structurally cannot catch here: whether a
+  spine-derived handle actually sits on the stroke it names, and whether the
+  fourth argument threading `fontFamily` into `useGlyphSchemaCatalog`
+  survives — see the trap in `CLAUDE.md`, no test guards those call sites.
+  Task 11 exists to do this pass.
 - **Verified by hand 2026-08-13, second pass:** nuqta snapping on Shape Fill
   blocks — passes, snapping to the correct half-nuqta grid off `lengthDots`
   (1.13 → 1.11, 1.27 → 1.22, 1.41 → 1.44). The auto-justify "fit to
@@ -100,6 +107,57 @@ driven by them is unverifiable in CI by design.
 ---
 
 ## Shipped
+
+### 2026-08-14 — Stroke-spine re-anchoring (Tasks 1–9 of 11, paused)
+
+Replaces the proportional schema-to-glyph mapping with a real spine measured
+off each glyph's own medial axis. `docs/superpowers/specs/2026-08-13-stroke-spine-reanchoring-design.md`
+is the design; `docs/superpowers/plans/2026-08-13-stroke-spine-reanchoring.md`
+is the plan. 18 commits on `spine-reanchoring-design`.
+
+**What it achieves.** 99.81% of shipped spine points lie inside real ink,
+against **14.5%** for the mapping being replaced — that 14.5% is the Phase C
+figure that blocked this whole effort. Measured across all 15 in-scope fonts,
+independently at review, not self-reported.
+
+**What is in.** An offline generator (`scripts/deriveStrokeSpines.py`) that
+skeletonizes each glyph and matches schema strokes to branches behind five
+gates; 15 committed per-font tables (`src/data/strokeSpines/`, 401 spines
+across 372 glyphs); a lazy runtime registry; a suite that checks the tables
+against the real font binaries including a SHA-256 staleness guard; a pure
+font-units-to-block-space converter; spine attachment to the stretch
+catalog; and `setStretchFactor` building handles from the spine instead of
+the guess. Suite went 393 → 512 tests.
+
+**Paused before:** Task 10 (end-to-end test on real fonts) and Task 11 (docs
++ hand verification in the browser). **Task 9 is committed but unreviewed** —
+every other task in this plan got an independent review, and those reviews
+caught three real Criticals, so this is a genuine gap rather than a
+formality.
+
+**Two open items, both from Task 9:**
+
+- **Three quarters of the Morph panel's stroke sliders now silently do
+  nothing.** There are 151 authored stretch zones across the schemas, and a
+  typical font has a verified spine for only about a quarter to a third of
+  them (TahaNaskhRegular 46, Kufi 42, Amiri 36). Where there is no spine,
+  `setStretchFactor` returns early by design — an unverifiable match must
+  ship nothing rather than a guess. But `deriveStretchCatalog` still emits a
+  `StretchDefinition` per authored zone and `MorphGlyphEditor` does not
+  filter on spine presence, so the row still renders and the control is
+  dead. Deliberately not fixed inside Task 9; it needs a decision between
+  hiding the row and disabling it with a reason. Disabling reads better
+  against this project's preference for legible absence, but that is a
+  judgement, not a conclusion.
+- **`box.gx ?? 0` in `setStretchFactor` may mis-place a handle rather than
+  decline to place one.** `App.tsx`'s local `GlyphBox` declares the pen
+  origin optional, so the brief's literal `box.gx` would not typecheck.
+  Defaulting to 0 puts the handle at the block origin instead of on the
+  letter, which is the one behaviour this feature's rule forbids. It copies
+  an existing pattern at `App.tsx:898-899`. Unresolved: whether `gx`/`gy`
+  can ever actually be absent by the time they reach here — if they cannot,
+  this is dead defensive code; if they can, the correct behaviour is to
+  `return`.
 
 Reverse chronological. Dates are commit dates.
 
@@ -175,16 +233,16 @@ Canvas, HarfBuzz shaping, block model, PNG/PDF export.
 
 Not "unbuilt" — these have a known blocker and a known prerequisite.
 
-- **Schema-driven stroke spines, and enforcing protected zones** (changes 2
-  and 4). Blocked on the Phase C measurement above. The prerequisite — a
-  re-anchoring design — now **exists but is unbuilt**:
-  `docs/superpowers/specs/2026-08-13-stroke-spine-reanchoring-design.md`
-  matches the schema's stroke skeleton against the real glyph's medial axis
-  offline and ships the result as a per-font table, omitting any match it
-  cannot verify. Building that unblocks both changes. The Phase C measurement
-  already ruled out the three cheaper explanations — style distance from
-  Naskh, per-form skeleton reuse, and compound letters — so there is no quick
-  win hiding in it.
+- **Enforcing protected zones, and `axis: "path"` spine displacement**
+  (changes 2 and 4). These were blocked on the Phase C measurement above.
+  The prerequisite — re-anchoring — is now **built and merged as far as
+  Task 9 of 11**, see the 2026-08-14 entry under Shipped: the schema's
+  proportional guess is replaced by a real per-font spine measured off each
+  glyph's own medial axis, and 99.8% of shipped spine points lie inside real
+  ink against 14.5% for the mapping they replace. Changes 2 and 4 themselves
+  are still unbuilt, but they are no longer blocked on accuracy — they are
+  now blocked only on their own design work, plus the two open items in the
+  2026-08-14 entry.
 - **Advance-level kashida elongation**, which is what the dial would need to
   widen a run at all (see the kashida entry under Known limitations).
   Re-anchoring does **not** fix it: displacing outline points never moves

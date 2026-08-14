@@ -593,6 +593,72 @@ Snapping happens at edit time only, never on load and never in a
 renderer, so an off-grid value a user saved deliberately round-trips
 through save/load unchanged.
 
+### Stroke spines — the real anchor, replacing the proportional guess (`src/lib/strokeSpines/`, `scripts/deriveStrokeSpines.py`)
+
+The section above ends by explaining that the schema's node coordinates
+cannot be mapped onto a real font's outline accurately — median 0.37 nuqta,
+p90 1.43, only **14.5%** of mapped nodes landing inside the ink at all. This
+subsystem is the fix, built 2026-08-14 (Tasks 1–9 of an 11-task plan; see
+`PROGRESS.md` for what is still open and unverified).
+
+An **offline** Python generator (`scripts/deriveStrokeSpines.py`, needs the
+repo-local `.venv`) skeletonizes each glyph with `skimage.morphology.medial_axis`,
+prunes spurs, matches the schema's strokes onto the resulting branches, and
+writes one committed table per font to `src/data/strokeSpines/`. **99.81% of
+shipped spine points lie inside real ink.** The app never runs the generator;
+it reads the tables.
+
+- **Absence is the mechanism, everywhere in here.** A match the gates cannot
+  verify ships **nothing** — no spine, therefore no handle. This is the same
+  convention as `nuqtaEmRatio` returning `null` for an out-of-scope font, and
+  it is deliberate: a guessed anchor freezes or stretches the wrong part of
+  the letter, which is the defect this subsystem exists to remove. Never add
+  a fallback to `mapNormToRealBox`, never interpolate a missing anchor.
+  `schemaGeometry.ts` still exists and must stay — `deriveStretchCatalog`
+  uses `normalizePoint`, and `spineError.test.ts` still measures
+  `mapNormToRealBox` as a deliberate characterization of what was replaced.
+- **The cost is coverage, and it is large.** 151 authored stretch zones
+  exist across the schemas; a typical font has a verified spine for only a
+  quarter to a third of them. So most stroke sliders have no handle to
+  drive. That is the trade, not a bug.
+- **Orientation is load-bearing and was the hardest thing here.** A spine's
+  points run from its zone's `fromNode` end to its `toNode` end
+  (`types.ts:26`), and `anchorFromSpine.ts` reads `anchor` off the first
+  point and `dragOrigin` off the last. Reverse a spine and the stretch pulls
+  the wrong way; slice a partial zone off a reversed branch and the window
+  lands on the wrong end of the stroke. Two separate review rounds were
+  spent on this. **Do not "normalise" or re-sort spine points.**
+- **A verification trap that already bit once.** Orientation was audited
+  three times against the *stroke's* first node, which for a full-stroke zone
+  is the same as the *zone's* `fromNode` — so the audit structurally could
+  not see partial zones, and 35 reversed partial spines shipped through a
+  review that had declared orientation clean. More generally: **checks built
+  out of the generator's own logic keep coming back near-tautological.** The
+  full-stroke length assertion in `spineTable.test.ts` is another instance
+  and says so in its own comment. Prefer a signal the generator never
+  consults.
+- **`ORIENTATION_VOTE_MIN_TAU = 0.0` oversells itself.** The "vote" it gates
+  is a bare sign test with no confidence floor. The rule it belongs to can
+  only ever *subtract* candidate spines, never orient one, so it is safe —
+  but read the constant's name sceptically.
+- **Nothing guards the two call sites that switch this feature on.**
+  `useGlyphSchemaCatalog`'s fourth parameter (`fontFamily`) is optional, and
+  it is what triggers the table load. Drop it at `ShapedText.tsx:425` or
+  `ShapeFillText.tsx:283` and every spine silently becomes `undefined`, every
+  handle stops being created, and **tsc, lint, the whole test suite and the
+  build all stay green** — the feature simply does nothing. This exact
+  regression was introduced once during development, by instruction, and
+  caught only by reading Task 9's brief. No automated test covers it, because
+  the repo has no component-test infrastructure (Konva needs a real canvas).
+  If you touch either call site, check the result in a browser.
+- Contract conformance and staleness are covered by
+  `src/lib/strokeSpines/spineTable.test.ts`, whose highest-value assertion is
+  the **SHA-256** one: a font regenerated or replaced without re-running the
+  generator leaves a table anchored to outlines that no longer exist, and
+  nothing else would notice. That test is also why adding a font is now a
+  *six*-place edit — the five in the font section above, plus regenerating
+  its spine table.
+
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
 A fourth block type, `textPath`, flows shaped text along an arbitrary curve
