@@ -39,10 +39,8 @@ import {
   loadCloudProject,
   deleteCloudProject,
 } from "./lib/cloudProjects";
-// STREAM-C (export presets). Appended at the end of the import block on
-// purpose — see docs/superpowers/specs/PARALLEL.md; this file has no import
-// anchors, so each stream keeps its one import line as far from the others
-// as it can.
+// Appended at the end of the import block on purpose (2026-08-12 parallel
+// run); later parallel streams use the labeled import anchors below instead.
 import {
   loadPresets as loadExportPresets,
   savePresets as saveExportPresets,
@@ -51,6 +49,14 @@ import {
   type ExportPreset,
   type ExportFormat,
 } from "./lib/exportPresets";
+// ---- STREAM-A: artboard — imports ----
+// ---- /STREAM-A ----
+// ---- STREAM-B: muthanna/radial — imports ----
+// ---- /STREAM-B ----
+// ---- STREAM-C: ornament library — imports ----
+// ---- /STREAM-C ----
+// ---- STREAM-D: tatweel kashida — imports ----
+// ---- /STREAM-D ----
 
 const hslToHex = (h: number, s: number, l: number): string => {
   const sat = s / 100;
@@ -194,15 +200,22 @@ const App: React.FC = () => {
   });
   const [transparentExport, setTransparentExport] = useState(true);
 
-  // Parallel-stream insertion points — see docs/superpowers/specs/PARALLEL.md.
-  // Each stream adds its state only between its own anchors, so four
-  // independent branches merge into this file without overlapping hunks.
-  // ---- STREAM-A: smart guides — state ----
+  // Parallel-stream insertion points — see docs/superpowers/specs/
+  // PARALLEL-PHASE-1.md. Each stream adds its state only between its own
+  // anchors, so independent branches merge into this file without
+  // overlapping hunks.
+  // ---- STREAM-A: artboard — state ----
+  // ---- /STREAM-A ----
+  // ---- STREAM-B: muthanna/radial — state ----
+  // ---- /STREAM-B ----
+  // ---- STREAM-C: ornament library — state ----
+  // ---- /STREAM-C ----
+  // ---- STREAM-D: tatweel kashida — state ----
+  // ---- /STREAM-D ----
+
   // Snap a dragged block's visible edges and centres, not just its origin.
   // Session-only, like the grid toggle beside it — deliberately not persisted.
   const [snapToBlockEdges, setSnapToBlockEdges] = useState(true);
-  // ---- /STREAM-A ----
-  // ---- STREAM-C: export presets — state ----
   // Presets are read once at mount; they live in this browser only, never in
   // a saved project or the cloud store.
   const [exportPresets, setExportPresets] = useState<ExportPreset[]>(() =>
@@ -218,7 +231,6 @@ const App: React.FC = () => {
   ]);
   const [newExportPresetName, setNewExportPresetName] = useState("");
   const [exportStatus, setExportStatus] = useState<string | null>(null);
-  // ---- /STREAM-C ----
 
   const [localProjects, setLocalProjects] = useState<NamedProjectMeta[]>(() => {
     if (!isBrowser) return [];
@@ -1179,6 +1191,8 @@ const App: React.FC = () => {
     panMode,
     viewportWidth,
     viewportHeight,
+    // ---- STREAM-A: artboard — payload fields ----
+    // ---- /STREAM-A ----
     version: 5,
   });
 
@@ -1209,14 +1223,22 @@ const App: React.FC = () => {
           .filter((b) => (b as { type?: string }).type !== "shapeWarp")
           .map(stripMorphFields)
       : null;
-    const loadedBlocks: Block[] = parsedBlocks ?? blocks;
-    if (parsedBlocks) setBlocks(parsedBlocks);
+    // `let` so a parallel stream's sanitation region below can reassign it.
+    // eslint-disable-next-line prefer-const -- reassigned inside the STREAM-B region once that stream lands
+    let blocksToLoad: Block[] | null = parsedBlocks;
+    // ---- STREAM-B: muthanna/radial — payload sanitation (reassign
+    // blocksToLoad, e.g. dropping mirrors whose sourceId no longer resolves) ----
+    // ---- /STREAM-B ----
+    const loadedBlocks: Block[] = blocksToLoad ?? blocks;
+    if (blocksToLoad) setBlocks(blocksToLoad);
     if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
       setSelectedIds([]);
       setSelectedId(parsed.selectedId);
     }
     if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
     if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
+    // ---- STREAM-A: artboard — payload read ----
+    // ---- /STREAM-A ----
 
     const savedViewportWidth =
       typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
@@ -1592,14 +1614,11 @@ const App: React.FC = () => {
   // is how a stream gets props into <Sidebar>/<CanvasStage> without editing
   // the shared JSX at all — the props lists are hundreds of lines of adjacent
   // single-line attributes, which is precisely the shape that does not merge.
-  // ---- STREAM-A: smart guides — handlers ----
   const streamASidebarProps: Partial<SidebarProps> = {
     snapToBlockEdges,
     onToggleSnapToBlockEdges: setSnapToBlockEdges,
   };
   const streamACanvasProps: Partial<CanvasStageProps> = { snapToBlockEdges };
-  // ---- /STREAM-A ----
-  // ---- STREAM-C: export presets — handlers ----
   // A second `useExport(...)` call rather than extending the destructure at
   // the original call site: that line sits outside every stream's anchors.
   // The hook holds no state of its own — it only closes over the stage ref
@@ -1702,9 +1721,24 @@ const App: React.FC = () => {
     onSaveExportPreset: saveExportPreset,
     onDeleteExportPreset: deleteExportPreset,
   };
-  // ---- /STREAM-C ----
-  // ---- STREAM-D: user guide — handlers ----
   const streamDSidebarProps: Partial<SidebarProps> = {};
+
+  // Phase 1 (2026-08-14 run) prop bundles — same mechanism as above, fresh
+  // names so they can't collide with the merged 2026-08-12 bundles. Each
+  // stream fills only its own pair; all are already spread at the call sites.
+  // ---- STREAM-A: artboard — handlers & props ----
+  const p1aSidebarProps: Partial<SidebarProps> = {};
+  const p1aCanvasProps: Partial<CanvasStageProps> = {};
+  // ---- /STREAM-A ----
+  // ---- STREAM-B: muthanna/radial — handlers & props ----
+  const p1bSidebarProps: Partial<SidebarProps> = {};
+  const p1bCanvasProps: Partial<CanvasStageProps> = {};
+  // ---- /STREAM-B ----
+  // ---- STREAM-C: ornament library — handlers & props ----
+  const p1cSidebarProps: Partial<SidebarProps> = {};
+  // ---- /STREAM-C ----
+  // ---- STREAM-D: tatweel kashida — handlers & props ----
+  const p1dSidebarProps: Partial<SidebarProps> = {};
   // ---- /STREAM-D ----
 
   return (
@@ -1800,6 +1834,10 @@ const App: React.FC = () => {
         {...streamASidebarProps}
         {...streamCSidebarProps}
         {...streamDSidebarProps}
+        {...p1aSidebarProps}
+        {...p1bSidebarProps}
+        {...p1cSidebarProps}
+        {...p1dSidebarProps}
       />
 
       {!isMobile && !sidebarCollapsed && (
@@ -1836,6 +1874,8 @@ const App: React.FC = () => {
           onMoveGuide={moveGuide}
           onRemoveGuide={removeGuide}
           {...streamACanvasProps}
+          {...p1aCanvasProps}
+          {...p1bCanvasProps}
           viewportWidth={canvasWidth}
           stageViewportHeight={stageViewportHeight}
           backgroundColor={backgroundColor}

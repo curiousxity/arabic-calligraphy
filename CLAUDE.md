@@ -102,6 +102,9 @@ All three draw a block's **outline before its fill**, not after. A canvas stroke
 
 Selected/grouped/multi-selected blocks currently have **no persistent on-canvas outline** (a dashed selection-box `Transformer` was tried and explicitly removed per user feedback) — the two exceptions are: a small drag-to-resize corner handle shown only on the *selected* `shapeFill`/`image` block, and the coloured per-glyph hover handles (move/scale, diacritics) on the selected block. Don't reintroduce a general selection bounding box without checking this history.
 
+<!-- ---- STREAM-B: muthanna/radial — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-1.md) ---- -->
+<!-- ---- /STREAM-B ---- -->
+
 ### Arabic text shaping pipeline (`src/lib/harfbuzz.ts` + `src/hooks/useShapedGlyphs.ts`)
 
 Text is shaped with real HarfBuzz compiled to WASM (`harfbuzzjs` npm package, loaded async), not a JS approximation. `shapeText(text, fontUrl)` loads the font bytes, shapes via HarfBuzz (`rtl` direction, `arab` script), and returns glyph IDs/advances plus the font parsed by `opentype.js` (used afterward to fetch actual glyph outlines for Konva drawing). Results are cached by `text|fontUrl` in-memory (`shapeCache`); call `clearShapeCache()` if a font file changes at the same URL. `FONT_URLS` (in `useShapedGlyphs.ts`) maps font-family keys to `/fonts/*.ttf|otf` — this is the single place new fonts get registered for the app to shape with.
@@ -123,6 +126,9 @@ another:
 rather than guards, pinning measured reality so a change became visible.
 Every one of them belonged to the removed stroke subsystem and went with it.
 The idea is still a good one if a future measurement wants pinning.)
+
+<!-- ---- STREAM-D: tatweel kashida — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-1.md) ---- -->
+<!-- ---- /STREAM-D ---- -->
 
 ### Per-instance diacritic control (`src/lib/diacritics.ts`, `DiacriticHoverHandles.tsx`)
 
@@ -500,7 +506,6 @@ knowing if another Diwani is ever sought: Google Fonts has none, and most
 named Diwani faces (DecoType Diwani, Diwani Letter, Diwani Bent) are
 proprietary or free-for-personal-use only, so they cannot be vendored here.
 
-<!-- ---- STREAM-A: smart guides — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
 
 ### Bounds-aware snapping (`src/lib/snapping.ts`, `CanvasStage.tsx`)
 
@@ -572,6 +577,8 @@ and at most one pair per axis (the most even), because a crowded canvas
 satisfies the condition several ways at once and drawing them all is
 noise.
 
+
+<!-- ---- STREAM-A: artboard — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-1.md) ---- -->
 <!-- ---- /STREAM-A ---- -->
 
 ### Canvas pan and zoom (`CanvasStage.tsx`, `lib/canvasBounds.ts`)
@@ -598,7 +605,6 @@ drift apart. Tested in `canvasBounds.test.ts`, which asserts the
 button/detent equality against `ZOOM_STEP` itself so the test survives
 retuning.
 
-<!-- ---- STREAM-D: user guide — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
 ### In-app user guide (`src/components/guide/`)
 
 A "?" button at the top-left of the sidebar header opens a right-side
@@ -636,7 +642,6 @@ properties and stay in the repo beside the code they describe.
   names, no architecture. `order` values leave gaps (10, 20, 30, 50, 70, 90,
   100) for feature pages added later.
 
-<!-- ---- /STREAM-D ---- -->
 
 ### Sidebar structure
 
@@ -700,6 +705,9 @@ CSS is one global stylesheet (`src/index.css`) using CSS custom properties for t
 
 Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default to `min-width: auto`**, which refuses to shrink below content size and causes silent overflow/clipping at narrow sidebar widths. When adding a new multi-item row (grid or flex), give items `min-width: 0` explicitly or the row will overflow at the sidebar's minimum width instead of degrading gracefully.
 
+<!-- ---- STREAM-C: ornament library — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-1.md) ---- -->
+<!-- ---- /STREAM-C ---- -->
+
 ### Undo/redo and grouping
 
 `src/hooks/useUndoRedo.ts` is a generic snapshot-stack hook (`getSnapshot`/`applySnapshot` callbacks); `App.tsx`'s `pushHistory()` wraps it and is called at the start of nearly every mutating handler (before the state change, so undo restores pre-change state). Blocks can share a `groupId` (assigned via the Layers panel's pairwise "merge" UI or the multi-select "Group selected" action) so that dragging one moves every block with the same `groupId` together; `dissolveSingletonGroups()` cleans up groups that drop to one member after a delete.
@@ -708,7 +716,6 @@ Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default 
 
 PNG/JPEG/PDF use `stage.toDataURL()`; SVG uses `react-konva-to-svg`. All four temporarily hide the on-screen alignment grid (`Konva.Group#grid-lines`) and, if "transparent background" is checked, the artboard background rect (`#artboard-background`) via `stage.findOne(...)`, so neither ever gets baked into exported output.
 
-<!-- ---- STREAM-C: export — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
 
 #### Export options, clipboard copy, export-all, and presets
 
@@ -767,7 +774,6 @@ transparency / format controls (so what it will do is visible before running),
 while Run always exports from the preset's own stored values. Saving
 overwrites by name, matching the named-project store.
 
-<!-- ---- /STREAM-C ---- -->
 
 ### History thumbnails (`src/lib/historyStack.ts`, `HistoryPopover.tsx`)
 

@@ -57,6 +57,16 @@ import {
 } from "./Icons";
 
 export type SidebarProps = {
+  // Phase 1 parallel-stream prop declarations — each stream adds its own
+  // (all optional, arriving via App.tsx's p1* bundles). See PARALLEL-PHASE-1.md.
+  // ---- STREAM-A: artboard — props ----
+  // ---- /STREAM-A ----
+  // ---- STREAM-B: muthanna/radial — props ----
+  // ---- /STREAM-B ----
+  // ---- STREAM-C: ornament library — props ----
+  // ---- /STREAM-C ----
+  // ---- STREAM-D: tatweel kashida — props ----
+  // ---- /STREAM-D ----
   blocks: Block[];
   selectedBlock?: Block;
   showGrid: boolean;
@@ -141,11 +151,8 @@ export type SidebarProps = {
   // Parallel-stream prop declarations — see docs/superpowers/specs/PARALLEL.md.
   // Every stream's props are optional, so this component still typechecks in a
   // worktree where the other three streams' props do not exist yet.
-  // ---- STREAM-A: smart guides ----
   snapToBlockEdges?: boolean;
   onToggleSnapToBlockEdges?: (checked: boolean) => void;
-  // ---- /STREAM-A ----
-  // ---- STREAM-C: export presets ----
   // The preset shape is spelled out structurally rather than imported from
   // `lib/exportPresets`, so this stream adds no line to the import block —
   // the one region of this file with no per-stream anchors.
@@ -170,9 +177,6 @@ export type SidebarProps = {
   onChangeNewExportPresetName?: (name: string) => void;
   onSaveExportPreset?: () => void;
   onDeleteExportPreset?: () => void;
-  // ---- /STREAM-C ----
-  // ---- STREAM-D: user guide ----
-  // ---- /STREAM-D ----
 };
 
 const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
@@ -253,6 +257,14 @@ const SidebarTier: React.FC<{ label: string }> = ({ label }) => (
 
 export const Sidebar: React.FC<SidebarProps> = ({
   blocks,
+  // ---- STREAM-A: artboard — destructure ----
+  // ---- /STREAM-A ----
+  // ---- STREAM-B: muthanna/radial — destructure ----
+  // ---- /STREAM-B ----
+  // ---- STREAM-C: ornament library — destructure ----
+  // ---- /STREAM-C ----
+  // ---- STREAM-D: tatweel kashida — destructure ----
+  // ---- /STREAM-D ----
   selectedBlock,
   selectedIds = [],
   showGrid,
@@ -321,11 +333,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDistributeSelected,
   onGroupSelected,
   // Parallel-stream destructuring — match your declarations above.
-  // ---- STREAM-A: smart guides ----
   snapToBlockEdges,
   onToggleSnapToBlockEdges,
-  // ---- /STREAM-A ----
-  // ---- STREAM-C: export presets ----
   onCopyPNG,
   onExportAll,
   exportStatus,
@@ -341,9 +350,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onChangeNewExportPresetName,
   onSaveExportPreset,
   onDeleteExportPreset,
-  // ---- /STREAM-C ----
-  // ---- STREAM-D: user guide ----
-  // ---- /STREAM-D ----
 }) => {
   const [showText, setShowText] = useState(false);
   const [showTransform, setShowTransform] = useState(false);
@@ -563,9 +569,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       <div className="sidebarInner">
         <div className="sidebarPanel" style={{ position: "relative" }}>
-          {/* ---- STREAM-D: user guide ---- */}
           <GuideLauncher isMobile={isMobile} />
-          {/* ---- /STREAM-D ---- */}
           {!isMobile && onToggleCollapse && (
             <button
               type="button"
@@ -676,6 +680,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
+        {/* ---- STREAM-A: artboard — document-tier panel ---- */}
+        {/* ---- /STREAM-A ---- */}
+
         <div className="sidebarPanel">
           <CollapsibleSection
             title="Background & Grid"
@@ -706,14 +713,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onChange={onToggleSnap}
                 />
 
-                {/* ---- STREAM-A: smart guides ---- */}
                 <CheckboxRow
                   id="snap-to-block-edges"
                   label="Snap to block edges"
                   checked={snapToBlockEdges ?? true}
                   onChange={(checked) => onToggleSnapToBlockEdges?.(checked)}
                 />
-                {/* ---- /STREAM-A ---- */}
 
                 <CheckboxRow
                   id="show-rulers"
@@ -1107,7 +1112,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </div>
 
-              {/* ---- STREAM-C: export presets ---- */}
               <div
                 style={{
                   borderTop: "1px solid var(--border-soft)",
@@ -1255,7 +1259,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
               </div>
-              {/* ---- /STREAM-C ---- */}
             </div>
           </CollapsibleSection>
         </div>
@@ -1337,6 +1340,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <ImageIcon size={14} />
               </button>
             )}
+            {/* ---- STREAM-B: muthanna/radial — add-block buttons ---- */}
+            {/* ---- /STREAM-B ---- */}
+            {/* ---- STREAM-C: ornament library — add-block button ---- */}
+            {/* ---- /STREAM-C ---- */}
           </div>
 
           <div style={{ height: 8 }} />
@@ -1658,6 +1665,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
+        {/* ---- STREAM-B: muthanna/radial — Mirror type panel ---- */}
+        {/* ---- /STREAM-B ---- */}
+
         {selectedBlock && selectedBlock.type === "shapeFill" && (
           <div className="sidebarPanel">
             <CollapsibleSection
@@ -1666,6 +1676,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onToggle={() => setShowText((v) => !v)}
             >
               <div className="sectionPanel">
+                {/* ---- STREAM-C: ornament library — shape picker button ---- */}
+                {/* ---- /STREAM-C ---- */}
                   <div>
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
                       Tip: drag the gold handle on the shape's corner (canvas) to resize.
@@ -1862,6 +1874,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="sidebarPanel">
             <CollapsibleSection title="Typography" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
               <div className="sectionPanel">
+                {/* ---- STREAM-D: tatweel kashida — Kashida section ---- */}
+                {/* ---- /STREAM-D ---- */}
                 <FontSelectRow
                   id={makeId("font-family", selectedId)}
                   label="Font family"

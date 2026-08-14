@@ -126,4 +126,9 @@ export type TextPathBlock = BlockCommon & {
   textPathEditMode?: boolean;
 };
 
+// ---- STREAM-B: muthanna/radial — MirrorBlock. Stream B is also the sole
+// owner of the `BlockType` union (line 1) and the `Block` union just below
+// this phase, and may edit those two lines directly. ----
+// ---- /STREAM-B ----
+
 export type Block = TextBlock | ShapeFillBlock | ImageBlock | TextPathBlock;

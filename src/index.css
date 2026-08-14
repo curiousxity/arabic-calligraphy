@@ -312,10 +312,7 @@ html, body, #root { height: 100%; margin: 0; }
    explicitly on any new multi-item row. */
 /* ------------------------------------------------------------------ */
 
-/* ---- STREAM-A: smart guides ---- */
-/* ---- /STREAM-A ---- */
 
-/* ---- STREAM-D: user guide ---- */
 .guideBackdrop { position: fixed; inset: 0; z-index: 2100; background: rgba(0, 0, 0, 0.45); display: flex; justify-content: flex-end; }
 .guideDrawer { display: flex; flex-direction: column; width: min(720px, 100vw); height: 100%; box-sizing: border-box; background: var(--bg-panel-floating); border-left: 1px solid var(--border); box-shadow: -16px 0 40px rgba(0, 0, 0, 0.35); animation: guideDrawerIn 0.16s ease-out; }
 .guideDrawer--mobile { width: 100vw; }
@@ -357,4 +354,9 @@ html, body, #root { height: 100%; margin: 0; }
 .guideShortcutDesc { margin: 0; text-align: right; color: var(--text-muted); }
 
 .guideEmpty { padding: 8px 2px; font-size: 12px; color: var(--text-muted); }
-/* ---- /STREAM-D ---- */
+
+/* ---- STREAM-A: artboard ---- */
+/* ---- /STREAM-A ---- */
+
+/* ---- STREAM-C: ornament library — picker dialog ---- */
+/* ---- /STREAM-C ---- */

@@ -60,3 +60,34 @@ Anything not listed in either table is off-limits to everyone (the
 orchestrator resolves stragglers at merge). Every stream: full verification
 loop (tsc → lint → test → build) plus `npm run e2e` for your own spec file
 before reporting done.
+
+## Anchor mechanics (landed by the prep commit — all on `main` now)
+
+Anchors are paired comments; insert only between your own pair:
+
+```ts
+// ---- STREAM-A: artboard — state ----
+// ---- /STREAM-A ----
+```
+
+- **App.tsx** gives each stream four regions: imports (end of the import
+  block), state, payload (A: build + read; B: sanitation via the
+  `blocksToLoad` local in `applyParsedLayoutPayload`), and handlers. The
+  handlers region pre-creates your prop bundles — `p1aSidebarProps`/
+  `p1aCanvasProps`, `p1bSidebarProps`/`p1bCanvasProps`, `p1cSidebarProps`,
+  `p1dSidebarProps` — already spread into `<Sidebar>`/`<CanvasStage>`. Fill
+  your bundle; never edit the shared JSX prop lists. (Ignore the merged
+  2026-08-12 `stream*Props` bundles — they are finished features.)
+- **Sidebar.tsx** gives each stream a props-type region, a destructure
+  region, and its JSX region(s): A before Background & Grid; B in the
+  add-block row and before the Shape Fill type panel; C in the add-block row
+  and inside the Shape Fill panel; D at the top of Typography's panel. All
+  stream props must be optional (they arrive via `Partial<SidebarProps>`).
+- **CanvasStage.tsx** is stream A's file except the three `STREAM-B` regions
+  (props, destructure, render case).
+- **types.ts**: stream B's region sits above the `Block` union; B alone may
+  also edit the `BlockType` and `Block` union lines directly this phase.
+- **CLAUDE.md** and **PROGRESS.md** have one labeled region per stream.
+
+The retired 2026-08-12 anchors were removed in the same prep commit — the
+old run's `PARALLEL.md` and its specs describe finished work, not yours.

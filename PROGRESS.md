@@ -94,6 +94,15 @@ defects under Known limitations, and the mechanics in `CLAUDE.md`'s
 
 ## Shipped
 
+<!-- ---- STREAM-A: artboard — add your Shipped entry here ---- -->
+<!-- ---- /STREAM-A ---- -->
+<!-- ---- STREAM-B: muthanna/radial — add your Shipped entry here ---- -->
+<!-- ---- /STREAM-B ---- -->
+<!-- ---- STREAM-C: ornament library — add your Shipped entry here ---- -->
+<!-- ---- /STREAM-C ---- -->
+<!-- ---- STREAM-D: tatweel kashida — add your Shipped entry here ---- -->
+<!-- ---- /STREAM-D ---- -->
+
 ### 2026-08-14 — Playwright e2e harness (stream P)
 
 Seven browser tests, `npm run e2e`, ~4s wall clock, stable across repeated

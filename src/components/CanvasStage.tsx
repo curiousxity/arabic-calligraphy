@@ -49,7 +49,12 @@ const chooseRulerStep = (scale: number) => {
   return RULER_STEPS[RULER_STEPS.length - 1];
 };
 
+// PHASE-1 ownership (PARALLEL-PHASE-1.md): stream A (artboard) owns this
+// file's edits, EXCEPT the STREAM-B anchored regions below, which belong to
+// stream B (muthanna/radial) alone.
 export type CanvasStageProps = {
+  // ---- STREAM-B: muthanna/radial — props ----
+  // ---- /STREAM-B ----
   blocks: Block[];
   selectedId: number | null;
   selectedIds: number[];
@@ -101,6 +106,8 @@ export type CanvasStageProps = {
 const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
 
 export const CanvasStage: React.FC<CanvasStageProps> = ({
+  // ---- STREAM-B: muthanna/radial — destructure ----
+  // ---- /STREAM-B ----
   blocks,
   selectedId,
   selectedIds,
@@ -707,6 +714,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 onDragEnd,
               };
 
+              // ---- STREAM-B: muthanna/radial — render case (mirror blocks) ----
+              // ---- /STREAM-B ----
               if (block.type === "image") {
                 return (
                   <ImageBlockView
