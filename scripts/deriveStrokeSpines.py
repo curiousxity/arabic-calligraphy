@@ -449,8 +449,23 @@ def glyph_name_for(tt, unicode_hex, form):
             lookup = gsub.table.LookupList.Lookup[idx]
             for sub in lookup.SubTable:
                 mapping = getattr(sub, "mapping", None)
-                if mapping and base in mapping:
-                    return mapping[base]
+                if not mapping or base not in mapping:
+                    continue
+                target = mapping[base]
+                # Task 4: found on Amiri, which encodes its fina/init/medi
+                # substitutions as GSUB LookupType 2 (Multiple Substitution)
+                # rather than LookupType 1 (Single Substitution) — fontTools
+                # represents a MultipleSubst's mapping as name -> [names], a
+                # sequence, even when that sequence has exactly one entry.
+                # Un-wrap the unambiguous one-glyph case; a real multi-glyph
+                # output (this app has no use for a letter that expands to
+                # several glyphs) is treated the same as no match, not
+                # silently collapsed to its first element.
+                if isinstance(target, list):
+                    if len(target) == 1:
+                        return target[0]
+                    continue
+                return target
     return None
 
 
@@ -940,6 +955,7 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
     accounting = {
         "shipped": 0, "unassigned": 0, "no_glyph_name": 0, "no_geometry": 0,
         "collision": 0, "invalid_zone": 0, "single_candidate": 0,
+        "anchors_disagree": 0,
     }
     sheet_glyph_names = []
     spines_by_glyph = {}
@@ -1032,6 +1048,27 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
             if oriented is None:
                 drops["orientation"] += n_stroke_zones
                 continue
+
+            # Task 4, addition (A): "anchors disagree" measurement. The
+            # rereview (task-3-rereview-1.md, NEW-1) found that on 8 of 38
+            # full-stroke zones the toNode seed disagrees with the fromNode
+            # seed the orientation decision above actually used, and in 6 of
+            # those both anchors are individually decisive (each beyond
+            # ORIENTATION_AMBIGUOUS_NUQTA) yet point opposite ways — those
+            # ship silently today. This block does NOT change the decision
+            # (the single-anchor rule stays, per the ruling) — it only counts
+            # how often a shipped, full-stroke-spanning zone would have been
+            # oriented the other way had the toNode seed been used instead.
+            stroke_nodes = stroke["path"]["nodes"]
+            seed_to = map_point(stroke_nodes[-1]["x"], stroke_nodes[-1]["y"])
+            e_start = (((branch[0][0] - seed_to[0]) ** 2 + (branch[0][1] - seed_to[1]) ** 2) ** 0.5) / nuqta_units
+            e_end = (((branch[-1][0] - seed_to[0]) ** 2 + (branch[-1][1] - seed_to[1]) ** 2) ** 0.5) / nuqta_units
+            from_decisive = abs(fwd - bwd) >= ORIENTATION_AMBIGUOUS_NUQTA  # true here by construction
+            to_decisive = abs(e_start - e_end) >= ORIENTATION_AMBIGUOUS_NUQTA
+            from_forward = fwd < bwd
+            to_forward = e_end < e_start
+            anchors_contradict_decisive = from_decisive and to_decisive and (from_forward != to_forward)
+
             branch = oriented
 
             if margins[i] is None:
@@ -1057,6 +1094,13 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
                     # doesn't fail this silently either.
                     accounting["invalid_zone"] += 1
                     continue
+                if {from_idx, to_idx} == {0, n - 1} and anchors_contradict_decisive:
+                    # This zone spans the whole stroke (a fair comparison for
+                    # the toNode seed, per the rereview's methodology) and the
+                    # toNode seed — deliberately not consulted by the
+                    # orientation decision — would have picked the opposite
+                    # direction, decisively. Counted, not corrected.
+                    accounting["anchors_disagree"] += 1
                 t0, t1 = t_values[from_idx], t_values[to_idx]
                 sliced = arc_slice(branch, min(t0, t1), max(t0, t1))
                 if t0 > t1:
@@ -1164,7 +1208,8 @@ def main() -> None:
               f"orientation {drops['orientation']}, connectivity {drops['connectivity']}, "
               f"unassigned {acc['unassigned']}, no_glyph_name {acc['no_glyph_name']}, "
               f"no_geometry {acc['no_geometry']}, collision {acc['collision']}, "
-              f"invalid_zone {acc['invalid_zone']}; of which single_candidate {acc['single_candidate']})")
+              f"invalid_zone {acc['invalid_zone']}; of which single_candidate {acc['single_candidate']}, "
+              f"anchors_disagree {acc['anchors_disagree']})")
         assert accounted == total_zones, (
             f"{family}: {accounted} zones accounted for out of {total_zones} authored — "
             f"some zone was silently dropped without an accounting bucket"
