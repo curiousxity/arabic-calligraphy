@@ -39,6 +39,14 @@ describe("stroke spine registry", () => {
   it("caches concurrent loads of the same not-yet-cached font to one object", async () => {
     // "Amiri" is untouched by every earlier test in this file, so this
     // exercises the in-flight path rather than the already-settled cache.
+    //
+    // This documents the identity contract, not a guard: it passes even
+    // with registry.ts's `inFlight` Map deleted, verified by hand. Vite/
+    // Vitest's ESM loader already dedups concurrent import() calls for the
+    // same specifier, so both loadSpineTable() calls resolve to the same
+    // module object regardless of our own cache. The `inFlight` Map is
+    // therefore defensive in this runtime, not load-bearing — it guards
+    // against a loader that doesn't dedup, not one that already does.
     const [a, b] = await Promise.all([loadSpineTable("Amiri"), loadSpineTable("Amiri")]);
     expect(a).not.toBeNull();
     expect(a).toBe(b);
