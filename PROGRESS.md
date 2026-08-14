@@ -84,9 +84,12 @@ regression, and what it would take to fix.
 
 ## Verification debt
 
-Things that pass tests but have not been exercised by a human. Konva's
-hover-mounted handles do not take scripted drags reliably, so anything
-driven by them is unverifiable in CI by design.
+Things that pass tests but have not been exercised by a human. The line
+here is narrower than it was long assumed to be: scripted **hovers** do
+reach Konva's hover-mounted handles, so whether a dot appears, and where,
+can be checked by automation. Scripted **drags** do not — they land on the
+block underneath — so anything that depends on moving a handle stays
+unverifiable outside a real browser session.
 
 - **Verified by hand 2026-08-13:** the join cleft on the original repro
   (much improved, see above); nuqta snap increments; the Alt bypass; the
@@ -122,11 +125,39 @@ driven by them is unverifiable in CI by design.
     limitation above, seen on a correctly anchored stroke.
   - No console errors throughout.
 
-  **Still needing a human's hand on a real mouse**, unchanged: everything
-  involving the on-canvas dots — the no-jump property, "no dot where there is
-  no spine", and dragging one. A synthetic hover again produced no dot, which
-  is the tooling's limit rather than a result. The `حرف` cleft repro has also
-  not been re-compared since the tables changed.
+- **Third browser pass 2026-08-14 — the on-canvas dots, mostly cleared.**
+  The earlier passes concluded synthetic hovers do not reach Konva's
+  hover-mounted overlays. That is **too pessimistic**: hovers land fine, and
+  three of the four checks that were waiting on a human are now done. Only
+  *drags* miss.
+  - **A dot appears only where there is a verified spine.** Hovering `ر`
+    shows exactly one dot, at the tip of its tail — which is where
+    `dragOrigin` belongs at factor 1.00. Hovering `ح` or `ف` shows none,
+    matching what their Morph rows say.
+  - **No jump when the handle is created.** The pre-creation dot's position
+    was fixed inside a 40x40px box; a handle was then created and its factor
+    returned to 1.00, and the dot re-rendered pixel-identically in that same
+    box. Checked non-vacuously — the row still showed its remove button and
+    Options, so a handle really did exist rather than having been deleted
+    back to the pre-creation state.
+  - **No cleft opens at the `ح`/`ر` join** in Amiri between factor 1.00 and
+    the maximum, compared at 604% canvas zoom on the same screen region. At
+    least as good as the "almost imperceptible" standard the pin work was
+    accepted at.
+  - **Still needs a real mouse: dragging a dot.** Two attempts, both landing
+    dead-centre on a ~21px target with the dot confirmed mounted, and both
+    dragged the *block* instead — the pointer reaches the block group rather
+    than the handle. Whether that is purely a synthetic-event artifact or
+    something a user would also feel is not established either way here.
+- **A handle created under one font does not act after switching fonts.**
+  Found during the pass above and reproduced deliberately. A handle stores
+  its axis in block space, captured against the glyph it was created on, so
+  after a font change the Morph row still reports a factor and a nuqta
+  delta while the ink does not move at all. Removing the handle and
+  re-creating it on the new font works immediately. This is the dead-control
+  problem the Task 9 follow-up removed for spine-less zones, reappearing by
+  a different route; it is not a regression from the glyph-id fix, and it is
+  not yet designed away.
 - **Covered by automation 2026-08-14, so no longer debt:** that a created
   handle's anchor lands on real ink, on three fonts and three words
   (`strokeSpines/endToEnd.test.ts`), and that every shipped spine is keyed
