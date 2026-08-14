@@ -425,7 +425,8 @@ export const ShapedText: React.FC<Props> = ({
   const glyphSchemaCatalog = useGlyphSchemaCatalog(
     shapeData.shapableText,
     shapeData.glyphs,
-    shapeData.font
+    shapeData.font,
+    fontFamily
   );
 
   // The set of glyph indices this render pass actually considers a

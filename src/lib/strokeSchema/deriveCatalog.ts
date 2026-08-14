@@ -1,5 +1,6 @@
 import type { ComponentType, GlyphDescription, Stroke } from "./types";
 import { computeNodeBoundingBox, normalizePoint, type Point } from "./schemaGeometry";
+import type { StrokeSpine } from "../strokeSpines/types";
 
 export type StretchDefinition = {
   strokeId: string;
@@ -37,6 +38,17 @@ export type StretchDefinition = {
    */
   anchorNorm: Point;
   dragNorm: Point;
+  /**
+   * The stroke's spine on this specific font's real glyph, from the generated
+   * tables in src/data/strokeSpines/ — attached by useGlyphSchemaCatalog, not
+   * by deriveStretchCatalog, since it is the only place that knows the font.
+   *
+   * Present = the axis is measured against real ink. Absent = the offline
+   * matcher could not verify a match for this stroke on this font, and the
+   * stroke offers no handle at all. `anchorNorm`/`dragNorm` remain only as the
+   * offline matcher's seed; nothing at runtime maps them any more.
+   */
+  spine?: StrokeSpine;
 };
 
 /**

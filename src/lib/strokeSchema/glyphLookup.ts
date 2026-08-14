@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Font } from "opentype.js";
 import { classifyJoiningForms } from "../arabicJoining";
 import type { HarfBuzzGlyph } from "../harfbuzz";
 import { deriveStretchCatalog, type StretchDefinition } from "./deriveCatalog";
 import { getLigatureSchema, getStrokeSchema } from "./registry";
+import { getSpine, getSpineTableIfLoaded, loadSpineTable } from "../strokeSpines/registry";
+import type { SpineTable } from "../strokeSpines/types";
 
 function codepointHex(cp: number): string {
   return cp.toString(16).toUpperCase().padStart(4, "0");
@@ -68,8 +70,27 @@ export function computeClusterSpans(clusters: number[], textLength: number): Map
 export function useGlyphSchemaCatalog(
   shapableText: string,
   glyphs: HarfBuzzGlyph[],
-  font?: Font | null
+  font?: Font | null,
+  fontFamily?: string
 ): Record<number, StretchDefinition[]> {
+  const [spineTable, setSpineTable] = useState<SpineTable | null>(
+    fontFamily ? getSpineTableIfLoaded(fontFamily) : null
+  );
+
+  useEffect(() => {
+    if (!fontFamily) {
+      setSpineTable(null);
+      return;
+    }
+    let cancelled = false;
+    void loadSpineTable(fontFamily).then((t) => {
+      if (!cancelled) setSpineTable(t);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fontFamily]);
+
   return useMemo(() => {
     if (!shapableText || glyphs.length === 0) return {};
 
@@ -102,7 +123,11 @@ export function useGlyphSchemaCatalog(
         );
         const schema = getLigatureSchema(sequence);
         if (schema)
-          result[i] = deriveStretchCatalog(schema).map((d) => ({ ...d, cluster }));
+          result[i] = deriveStretchCatalog(schema).map((d) => ({
+            ...d,
+            cluster,
+            spine: getSpine(spineTable, glyphs[i].g, d.strokeId, d.zoneIndex) ?? undefined,
+          }));
         continue;
       }
 
@@ -112,9 +137,13 @@ export function useGlyphSchemaCatalog(
       const schema = getStrokeSchema(codepointHex(entry.codepoint), entry.form);
       if (!schema) continue;
 
-      result[i] = deriveStretchCatalog(schema).map((d) => ({ ...d, cluster }));
+      result[i] = deriveStretchCatalog(schema).map((d) => ({
+        ...d,
+        cluster,
+        spine: getSpine(spineTable, glyphs[i].g, d.strokeId, d.zoneIndex) ?? undefined,
+      }));
     }
 
     return result;
-  }, [shapableText, glyphs, font]);
+  }, [shapableText, glyphs, font, spineTable]);
 }

@@ -283,7 +283,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   const glyphSchemaCatalog = useGlyphSchemaCatalog(
     shapeData.shapableText,
     shapeData.glyphs,
-    shapeData.font
+    shapeData.font,
+    fontFamily
   );
 
   // Parse SVG path once
