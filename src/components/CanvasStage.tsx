@@ -27,6 +27,7 @@ import {
   type SnapLine,
   type SnapTarget,
 } from "../lib/snapping";
+import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
 import type { Block, DiacriticOverride, GlyphTransform } from "../types";
 
 const GRID_SIZE = 40;
@@ -41,6 +42,13 @@ const RULER_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 25
 // inline would hand it a fresh array identity every render and defeat the
 // memo on every drag/pan/zoom frame.
 const NO_GLYPH_TRANSFORMS: GlyphTransform[] = [];
+
+/**
+ * `buildSnapTargets` folds the ruler guides in with the artboard's own lines.
+ * The margin rectangle is added by a *second* call, which needs no guides —
+ * they are already in the list from the first.
+ */
+const NO_GUIDES = { horizontal: [], vertical: [] };
 
 const chooseRulerStep = (scale: number) => {
   for (const step of RULER_STEPS) {
@@ -101,6 +109,13 @@ export type CanvasStageProps = {
    * turning it off restores origin-only snapping exactly.
    */
   snapToBlockEdges?: boolean;
+  /**
+   * The document's page, or `null` for freeform. With a page set, the
+   * background fill, the alignment grid and the "artboard" snap candidates
+   * all come from it instead of from the viewport-dependent `contentBox`.
+   * Blocks may still overhang it freely — nothing clips on canvas.
+   */
+  artboard?: ArtboardConfig | null;
 };
 
 const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
@@ -140,8 +155,15 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onRemoveGuide,
   ghostBlock,
   snapToBlockEdges = true,
+  artboard = null,
 }) => {
   const snapCoord = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
+
+  // The page and its margin guide, in stage space. Null throughout when the
+  // document is freeform, which is what makes every `?? contentBox` below
+  // reduce to exactly the pre-artboard behaviour.
+  const pageRect = artboard ? artboardRect(artboard) : null;
+  const pageMarginRect = artboard ? marginRect(artboard) : null;
 
   const [snapGuides, setSnapGuides] = useState<SnapLine[]>([]);
   /**
@@ -161,6 +183,16 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   const additiveSelectRef = useRef(false);
 
   const [contentBox, setContentBox] = useState(padBox(DEFAULT_EMPTY_BOUNDS));
+
+  /**
+   * What the background fill, the alignment grid and the "artboard" snap
+   * candidates are drawn from. `contentBox` is retained regardless — it is
+   * still what sizes the scroll extents and what the full-length origin-snap
+   * lines span — but it is the union of the padded content *and the current
+   * viewport*, so using it as the page made every one of those three depend
+   * on the zoom level.
+   */
+  const paperBox = pageRect ?? contentBox;
 
   const recomputeContentBox = () => {
     const stage = stageRef.current;
@@ -252,7 +284,12 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       others.push(otherNode.getClientRect({ relativeTo: stage }));
     }
     snapRectsRef.current = others;
-    snapTargetsRef.current = buildSnapTargets(others, contentBox, guides);
+    // The margin guide is a second set of "artboard" lines rather than a new
+    // kind — `lib/snapping.ts` already models a page rectangle, so feeding it
+    // the inset rectangle too is enough and the module needs no fork.
+    const targets = buildSnapTargets(others, paperBox, guides);
+    if (pageMarginRect) targets.push(...buildSnapTargets([], pageMarginRect, NO_GUIDES));
+    snapTargetsRef.current = targets;
   };
 
   const clearSnapTargets = () => {
@@ -375,10 +412,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   const renderGridLines = () => {
     const lines: React.ReactNode[] = [];
 
-    const startX = Math.floor(contentBox.x / GRID_SIZE) * GRID_SIZE;
-    const endX = Math.ceil((contentBox.x + contentBox.width) / GRID_SIZE) * GRID_SIZE;
-    const startY = Math.floor(contentBox.y / GRID_SIZE) * GRID_SIZE;
-    const endY = Math.ceil((contentBox.y + contentBox.height) / GRID_SIZE) * GRID_SIZE;
+    const startX = Math.floor(paperBox.x / GRID_SIZE) * GRID_SIZE;
+    const endX = Math.ceil((paperBox.x + paperBox.width) / GRID_SIZE) * GRID_SIZE;
+    const startY = Math.floor(paperBox.y / GRID_SIZE) * GRID_SIZE;
+    const endY = Math.ceil((paperBox.y + paperBox.height) / GRID_SIZE) * GRID_SIZE;
 
     for (let x = startX; x <= endX; x += GRID_SIZE) {
       lines.push(
@@ -687,10 +724,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
           <Layer>
             <Rect
               id="artboard-background"
-              x={contentBox.x}
-              y={contentBox.y}
-              width={contentBox.width}
-              height={contentBox.height}
+              x={paperBox.x}
+              y={paperBox.y}
+              width={paperBox.width}
+              height={paperBox.height}
               fill={backgroundColor}
               listening={false}
             />
@@ -699,6 +736,36 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
               <Group id="grid-lines" listening={false}>
                 {renderGridLines()}
               </Group>
+            )}
+
+            {/* Page chrome. Every node here carries the `artboard-chrome-` id
+                prefix `useExport` hides, so none of it is ever baked into an
+                export — the same arrangement the alignment grid already has. */}
+            {pageRect && (
+              <Rect
+                id="artboard-chrome-outline"
+                x={pageRect.x}
+                y={pageRect.y}
+                width={pageRect.width}
+                height={pageRect.height}
+                stroke="rgba(120, 120, 120, 0.55)"
+                strokeWidth={1 / stageScale}
+                listening={false}
+              />
+            )}
+            {pageMarginRect && (
+              <Rect
+                id="artboard-chrome-margin"
+                x={pageMarginRect.x}
+                y={pageMarginRect.y}
+                width={pageMarginRect.width}
+                height={pageMarginRect.height}
+                stroke="#00b4d8"
+                strokeWidth={1 / stageScale}
+                dash={[6 / stageScale, 5 / stageScale]}
+                opacity={0.55}
+                listening={false}
+              />
             )}
 
             {blocks.map((block) => {

@@ -356,6 +356,16 @@ html, body, #root { height: 100%; margin: 0; }
 .guideEmpty { padding: 8px 2px; font-size: 12px; color: var(--text-muted); }
 
 /* ---- STREAM-A: artboard ---- */
+/* Grid children default to `min-width: auto`, which refuses to shrink below
+   their content and overflows the sidebar at its minimum width — hence the
+   explicit `min-width: 0` on every item in these two rows. */
+.artboardSizeRow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.artboardSizeRow > * { min-width: 0; margin-bottom: 0; }
+.artboardNumberInput { width: 100%; min-width: 0; }
+.artboardOrientation { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.artboardOrientation > * { min-width: 0; }
+.artboardReadout { font-size: 11px; line-height: 1.5; color: var(--text-muted); }
+.artboardReadout strong { color: var(--text-primary); font-weight: 600; }
 /* ---- /STREAM-A ---- */
 
 /* ---- STREAM-C: ornament library — picker dialog ---- */

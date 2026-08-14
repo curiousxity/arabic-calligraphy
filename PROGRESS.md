@@ -95,6 +95,34 @@ defects under Known limitations, and the mechanics in `CLAUDE.md`'s
 ## Shipped
 
 <!-- ---- STREAM-A: artboard — add your Shipped entry here ---- -->
+### 2026-08-14 — Artboard (stream A)
+
+A document can now have a page. Preset sizes (A5/A4/A3/US Letter at 300dpi,
+Instagram square and portrait, story, X header), custom width/height in
+px/mm/in at a chosen dpi, an orientation toggle and a uniform margin guide.
+The page draws the background fill and the alignment grid, its edges, centres
+and margin lines are snap targets, and every export crops to it — so an
+Instagram-square document exports at exactly 1080 × 1080 and an A4@300dpi one
+at 2480 × 3508, whatever the export scale slider says and wherever the blocks
+happen to sit. The PDF finally gets real paper dimensions instead of a
+hardcoded 96dpi conversion. Background colour moved into the new Artboard
+panel as the page's colour.
+
+No artboard is the default and means exactly the old behaviour; every project
+saved before this loads that way. The page is undoable and saved with the
+project. See CLAUDE.md, "The artboard", for how it is put together.
+
+Verified: 30 unit tests in `src/lib/artboard.test.ts`, four browser tests in
+`e2e/artboard.spec.ts` (preset fixes the exported pixel size; it stays fixed
+after a block is dragged; freeform still exports content-sized; a drag near
+the page edge snaps flush), plus the full typecheck/lint/test/build loop.
+
+**Not built, and noted rather than attempted:** multiple artboards per
+document; bleed and crop marks; dimming or hiding the part of a block that
+overhangs the page while editing; clipping on canvas rather than only on
+export. The export-scale control is inert while a page is set — that is
+intended, but a "scale the page itself" affordance (export A4 at 2×) has no
+home yet.
 <!-- ---- /STREAM-A ---- -->
 <!-- ---- STREAM-B: muthanna/radial — add your Shipped entry here ---- -->
 <!-- ---- /STREAM-B ---- -->

@@ -1,7 +1,17 @@
 import type { RefObject } from "react";
 import type Konva from "konva";
 import type { Block } from "../types";
-import { getBlocksBoundingBox as getBlocksBoundingBoxShared } from "../lib/canvasBounds";
+import {
+  getBlocksBoundingBox as getBlocksBoundingBoxShared,
+  unionRect,
+} from "../lib/canvasBounds";
+import {
+  SCREEN_DPI,
+  artboardRect,
+  exportPixelRatio,
+  pxToMm,
+  type ArtboardConfig,
+} from "../lib/artboard";
 import { triggerDownload } from "../lib/download";
 import type { ExportFormat } from "../lib/exportPresets";
 
@@ -52,10 +62,50 @@ const dataURLToBlob = (dataURL: string): Blob => {
 const DOWNLOAD_GAP_MS = 250;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * How the page (if any) shapes an export. Both fields default to the
+ * pre-artboard behaviour, so `useExport(stageRef, blocks)` — which is how
+ * this hook has always been called — is byte-identical to before.
+ */
+export type ExportArtboard = {
+  /** The document's page, or null for freeform (crop to the blocks, as ever). */
+  config: ArtboardConfig | null;
+  /** Crop overhanging ink at the page edge. Off exports the union of page and content. */
+  clipToPage: boolean;
+};
+
+const NO_ARTBOARD: ExportArtboard = { config: null, clipToPage: true };
+
 /** PNG/JPEG/SVG/PDF export handlers (plus clipboard copy and export-all) for the current stage contents. */
-export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block[]) {
+export function useExport(
+  stageRef: RefObject<Konva.Stage | null>,
+  blocks: Block[],
+  artboard: ExportArtboard = NO_ARTBOARD
+) {
   const getBlocksBoundingBox = (stage: Konva.Stage) =>
     getBlocksBoundingBoxShared(stage, blocks);
+
+  /**
+   * The rectangle every format crops to.
+   *
+   * Without a page this is the blocks' bounding box, exactly as it always
+   * was — which is why export dimensions used to move whenever a block did.
+   * With one, the page *is* the crop, so the output size is a property of the
+   * document rather than of where its contents happen to sit. A page with
+   * nothing on it still exports (a blank sheet of that size); a freeform
+   * canvas with nothing on it still returns null and the handlers bail, as
+   * they always have.
+   */
+  const exportBox = (stage: Konva.Stage) => {
+    const content = getBlocksBoundingBox(stage);
+    if (!artboard.config) return content;
+    const page = artboardRect(artboard.config);
+    if (artboard.clipToPage || !content) return page;
+    return unionRect(page, content);
+  };
+
+  const pixelRatio = (requestedScale: number) =>
+    exportPixelRatio(artboard.config, requestedScale);
 
   /**
    * Hides the on-screen alignment grid (and, optionally, the artboard
@@ -73,8 +123,14 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
   ): Promise<T> => {
     const gridNode = stage.findOne("#grid-lines");
     const bgNode = opts.transparent ? stage.findOne("#artboard-background") : null;
-    const editOverlayNodes = stage.find((node: Konva.Node) =>
-      node.id().startsWith("text-path-edit-layer-")
+    // The page outline and the margin guide are editing chrome drawn on the
+    // artboard itself, so they hide alongside the grid rather than being
+    // baked into the output. `artboard-chrome-` is the id prefix CanvasStage
+    // gives every such node.
+    const editOverlayNodes = stage.find(
+      (node: Konva.Node) =>
+        node.id().startsWith("text-path-edit-layer-") ||
+        node.id().startsWith("artboard-chrome-")
     );
     const gridWasVisible = gridNode?.visible() ?? false;
     const bgWasVisible = bgNode?.visible() ?? false;
@@ -101,7 +157,7 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
     }
   };
 
-  /** Rasterizes the blocks' bounding box; assumes it is already inside an adjustment pass. */
+  /** Rasterizes `box` (see `exportBox`); assumes it is already inside an adjustment pass. */
   const rasterize = (
     s: Konva.Stage,
     box: { x: number; y: number; width: number; height: number },
@@ -141,16 +197,21 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
     triggerDownload(url, filename, true);
   };
 
-  /** px→mm at 96dpi, the conversion the PDF export has always used. */
-  const pxToMm = (px: number) => (px * 25.4) / 96;
+  /**
+   * px→mm for the PDF's page size. The conversion used to hardcode 96dpi,
+   * which is right for a freeform export (stage px are screen px) but turns
+   * an A4@300dpi page into a 656 × 928 mm poster. With a page set, its own
+   * dpi is what makes 2480px come back out as 210mm.
+   */
+  const boxToMm = (px: number) => pxToMm(px, artboard.config?.dpi ?? SCREEN_DPI);
 
   const savePdf = async (
     dataURL: string,
     box: { width: number; height: number },
     filename: string
   ) => {
-    const imgWidthMm = pxToMm(box.width);
-    const imgHeightMm = pxToMm(box.height);
+    const imgWidthMm = boxToMm(box.width);
+    const imgHeightMm = boxToMm(box.height);
     const { default: jsPDF } = await import("jspdf");
     const pdf = new jsPDF({
       orientation: imgWidthMm > imgHeightMm ? "landscape" : "portrait",
@@ -167,9 +228,9 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
     if (!stage) return;
 
     const result = await withExportAdjustments(stage, { transparent }, (s) => {
-      const box = getBlocksBoundingBox(s);
+      const box = exportBox(s);
       if (!box) return null;
-      return { dataURL: rasterize(s, box, "image/png", scale) };
+      return { dataURL: rasterize(s, box, "image/png", pixelRatio(scale)) };
     });
     if (!result) return;
 
@@ -184,9 +245,9 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
     if (!stage) return;
 
     const result = await withExportAdjustments(stage, {}, (s) => {
-      const box = getBlocksBoundingBox(s);
+      const box = exportBox(s);
       if (!box) return null;
-      return { dataURL: rasterize(s, box, "image/jpeg", scale) };
+      return { dataURL: rasterize(s, box, "image/jpeg", pixelRatio(scale)) };
     });
     if (!result) return;
 
@@ -200,7 +261,7 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
 
     const { exportStageSVG } = await import("react-konva-to-svg");
     const result = await withExportAdjustments(stage, { transparent }, async (s) => {
-      const box = getBlocksBoundingBox(s);
+      const box = exportBox(s);
       if (!box) return null;
       const exported = await exportStageSVG(s, false);
       return { box, exported };
@@ -216,9 +277,9 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
     if (!stage) return;
 
     const result = await withExportAdjustments(stage, {}, (s) => {
-      const box = getBlocksBoundingBox(s);
+      const box = exportBox(s);
       if (!box) return null;
-      return { box, dataURL: rasterize(s, box, "image/png", scale) };
+      return { box, dataURL: rasterize(s, box, "image/png", pixelRatio(scale)) };
     });
     if (!result) return;
 
@@ -251,8 +312,8 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
 
     const blobPromise = (async () => {
       const dataURL = await withExportAdjustments(stage, { transparent }, (s) => {
-        const box = getBlocksBoundingBox(s);
-        return box ? rasterize(s, box, "image/png", scale) : null;
+        const box = exportBox(s);
+        return box ? rasterize(s, box, "image/png", pixelRatio(scale)) : null;
       });
       if (!dataURL) throw new Error("nothing to copy");
       return dataURLToBlob(dataURL);
@@ -280,10 +341,10 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
     if (!stage) return;
 
     const result = await withExportAdjustments(stage, { transparent }, async (s) => {
-      const box = getBlocksBoundingBox(s);
+      const box = exportBox(s);
       if (!box) return null;
 
-      const png = formats.includes("png") ? rasterize(s, box, "image/png", scale) : null;
+      const png = formats.includes("png") ? rasterize(s, box, "image/png", pixelRatio(scale)) : null;
 
       let svgText: string | null = null;
       if (formats.includes("svg")) {
@@ -297,8 +358,8 @@ export function useExport(stageRef: RefObject<Konva.Stage | null>, blocks: Block
       // the outer pass's `finally` still restores the original state.
       const bgNode = transparent ? s.findOne("#artboard-background") : null;
       bgNode?.visible(true);
-      const jpeg = formats.includes("jpeg") ? rasterize(s, box, "image/jpeg", scale) : null;
-      const pdf = formats.includes("pdf") ? rasterize(s, box, "image/png", scale) : null;
+      const jpeg = formats.includes("jpeg") ? rasterize(s, box, "image/jpeg", pixelRatio(scale)) : null;
+      const pdf = formats.includes("pdf") ? rasterize(s, box, "image/png", pixelRatio(scale)) : null;
       bgNode?.visible(false);
 
       return { box, png, svgText, jpeg, pdf };

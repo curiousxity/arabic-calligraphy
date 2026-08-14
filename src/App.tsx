@@ -50,6 +50,19 @@ import {
   type ExportFormat,
 } from "./lib/exportPresets";
 // ---- STREAM-A: artboard — imports ----
+import {
+  DEFAULT_CUSTOM_ARTBOARD,
+  artboardRect,
+  clampMargin,
+  configFromPreset,
+  findArtboardPreset,
+  isArtboardConfig,
+  withDpi,
+  withOrientation,
+  withSize,
+  type ArtboardConfig,
+  type ArtboardUnit,
+} from "./lib/artboard";
 // ---- /STREAM-A ----
 // ---- STREAM-B: muthanna/radial — imports ----
 // ---- /STREAM-B ----
@@ -82,6 +95,8 @@ const dissolveSingletonGroups = (list: Block[]): Block[] => {
 type EditorSnapshot = {
   blocks: Block[];
   backgroundColor: string;
+  /** The page — a document property like the background colour, so undoable like one. */
+  artboard: ArtboardConfig | null;
 };
 
 /**
@@ -205,6 +220,14 @@ const App: React.FC = () => {
   // anchors, so independent branches merge into this file without
   // overlapping hunks.
   // ---- STREAM-A: artboard — state ----
+  // `null` is freeform — no page, exactly the behaviour that predates this
+  // feature, and what every save written before it loads as. Part of the
+  // document (saved, and in the undo snapshot) rather than of the view.
+  const [artboard, setArtboard] = useState<ArtboardConfig | null>(null);
+  // Whether an export crops overhanging ink at the page edge. A view/export
+  // preference, not a document property — deliberately not saved, like the
+  // transparency and scale controls beside it.
+  const [clipToPage, setClipToPage] = useState(true);
   // ---- /STREAM-A ----
   // ---- STREAM-B: muthanna/radial — state ----
   // ---- /STREAM-B ----
@@ -391,13 +414,14 @@ const App: React.FC = () => {
   );
 
   const getSnapshot = useCallback(
-    (): EditorSnapshot => ({ blocks, backgroundColor }),
-    [blocks, backgroundColor]
+    (): EditorSnapshot => ({ blocks, backgroundColor, artboard }),
+    [blocks, backgroundColor, artboard]
   );
 
   const applySnapshot = useCallback((snapshot: EditorSnapshot) => {
     setBlocks(snapshot.blocks);
     setBackgroundColor(snapshot.backgroundColor);
+    setArtboard(snapshot.artboard);
   }, []);
 
   /**
@@ -1192,6 +1216,7 @@ const App: React.FC = () => {
     viewportWidth,
     viewportHeight,
     // ---- STREAM-A: artboard — payload fields ----
+    artboard,
     // ---- /STREAM-A ----
     version: 5,
   });
@@ -1238,6 +1263,11 @@ const App: React.FC = () => {
     if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
     if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
     // ---- STREAM-A: artboard — payload read ----
+    // Anything that isn't a well-formed config — including the field being
+    // absent, which is every project saved before pages existed — loads as
+    // freeform. Loading replaces the document, so this must run even when the
+    // key is missing, or an old project would inherit the current page.
+    setArtboard(isArtboardConfig(parsed.artboard) ? parsed.artboard : null);
     // ---- /STREAM-A ----
 
     const savedViewportWidth =
@@ -1727,8 +1757,123 @@ const App: React.FC = () => {
   // names so they can't collide with the merged 2026-08-12 bundles. Each
   // stream fills only its own pair; all are already spread at the call sites.
   // ---- STREAM-A: artboard — handlers & props ----
-  const p1aSidebarProps: Partial<SidebarProps> = {};
-  const p1aCanvasProps: Partial<CanvasStageProps> = {};
+  const applyArtboard = (next: ArtboardConfig | null) => {
+    pushHistory();
+    setArtboard(next);
+  };
+
+  /**
+   * `""` is the freeform option, `"custom"` keeps the current dimensions but
+   * detaches them from a named size; anything else is a preset id.
+   *
+   * Choosing a page also fits the view to it. Without that, picking A4 at
+   * 300dpi drops a 2480 × 3508 rectangle around a block sized for the old
+   * viewport and nothing visibly happens — the page is simply off-screen.
+   */
+  const chooseArtboardPreset = (id: string) => {
+    if (id === "") {
+      applyArtboard(null);
+      return;
+    }
+    if (id === "custom") {
+      applyArtboard(artboard ? { ...artboard, presetId: null } : DEFAULT_CUSTOM_ARTBOARD);
+      if (!artboard) {
+        setTimeout(() => zoomToRect(padBox(artboardRect(DEFAULT_CUSTOM_ARTBOARD)), 0), 0);
+      }
+      return;
+    }
+    const preset = findArtboardPreset(id);
+    if (!preset) return;
+    const next = configFromPreset(preset, artboard?.margin ?? 0);
+    applyArtboard(next);
+    setTimeout(() => zoomToRect(padBox(artboardRect(next)), 0), 0);
+  };
+
+  const updateArtboard = (next: ArtboardConfig) => applyArtboard(next);
+
+  const changeArtboardSize = (width: number, height: number) => {
+    if (!artboard) return;
+    updateArtboard(withSize(artboard, width, height));
+  };
+
+  const changeArtboardUnit = (unit: ArtboardUnit) => {
+    if (!artboard) return;
+    // Display-only: the stored pixels don't move, so this isn't undoable.
+    setArtboard({ ...artboard, unit });
+  };
+
+  const changeArtboardDpi = (dpi: number) => {
+    if (!artboard) return;
+    updateArtboard(withDpi(artboard, dpi));
+  };
+
+  const changeArtboardOrientation = (orientation: "portrait" | "landscape") => {
+    if (!artboard) return;
+    updateArtboard(withOrientation(artboard, orientation));
+  };
+
+  const changeArtboardMargin = (margin: number) => {
+    if (!artboard) return;
+    updateArtboard({ ...artboard, margin: clampMargin(margin, artboard) });
+  };
+
+  // A third `useExport(...)`, for the same reason the second one above exists:
+  // the original call site sits outside every stream's anchors, and the hook
+  // holds no state of its own. These handlers replace the artboard-unaware
+  // ones in the props bundle below — every `p1a*` spread lands after the
+  // explicit JSX props and after the other bundles, so the last write wins.
+  // With `artboard` null they are byte-identical to the ones they shadow.
+  const artboardExport = { config: artboard, clipToPage };
+  const {
+    handleExportPNG: exportPagePNG,
+    handleExportJPEG: exportPageJPEG,
+    handleExportSVG: exportPageSVG,
+    handleExportPDF: exportPagePDF,
+    handleCopyPNG: copyPagePNG,
+    handleExportAll: exportPageAll,
+  } = useExport(stageRef, blocks, artboardExport);
+
+  const p1aSidebarProps: Partial<SidebarProps> = {
+    artboard,
+    onChooseArtboardPreset: chooseArtboardPreset,
+    onChangeArtboardSize: changeArtboardSize,
+    onChangeArtboardUnit: changeArtboardUnit,
+    onChangeArtboardDpi: changeArtboardDpi,
+    onChangeArtboardOrientation: changeArtboardOrientation,
+    onChangeArtboardMargin: changeArtboardMargin,
+    clipToPage,
+    onToggleClipToPage: setClipToPage,
+    onExportPNG: () => exportPagePNG({ transparent: transparentExport }),
+    onExportJPEG: () => exportPageJPEG({}),
+    onExportSVG: () => exportPageSVG({ transparent: transparentExport }),
+    onExportPDF: () => exportPagePDF({}),
+    onCopyPNG: async () => {
+      const result = await copyPagePNG({
+        scale: exportScale,
+        transparent: transparentExport,
+      });
+      setExportStatus(result.ok ? "Copied to the clipboard." : result.reason);
+    },
+    onExportAll: () => {
+      setExportStatus(null);
+      void exportPageAll({
+        scale: exportScale,
+        transparent: transparentExport,
+        formats: exportFormats,
+      });
+    },
+    onRunExportPreset: () => {
+      const preset = exportPresets.find((p) => p.id === selectedExportPresetId);
+      if (!preset) return;
+      setExportStatus(null);
+      void exportPageAll({
+        scale: preset.scale,
+        transparent: preset.transparent,
+        formats: preset.formats,
+      });
+    },
+  };
+  const p1aCanvasProps: Partial<CanvasStageProps> = { artboard };
   // ---- /STREAM-A ----
   // ---- STREAM-B: muthanna/radial — handlers & props ----
   const p1bSidebarProps: Partial<SidebarProps> = {};

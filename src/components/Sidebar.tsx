@@ -55,11 +55,33 @@ import {
   DistributeHorizontalIcon,
   DistributeVerticalIcon,
 } from "./Icons";
+// Appended at the end of the import block: this file's imports carry no
+// per-stream anchors, and appending is the lowest-conflict place to add one.
+import {
+  ARTBOARD_PRESETS,
+  exportPixelSize,
+  toDisplayUnit,
+  fromDisplayUnit,
+  type ArtboardConfig,
+  type ArtboardUnit,
+} from "../lib/artboard";
 
 export type SidebarProps = {
   // Phase 1 parallel-stream prop declarations — each stream adds its own
   // (all optional, arriving via App.tsx's p1* bundles). See PARALLEL-PHASE-1.md.
   // ---- STREAM-A: artboard — props ----
+  /** The document's page, or null for freeform. */
+  artboard?: ArtboardConfig | null;
+  /** `""` = freeform, `"custom"` = keep the size but detach it, otherwise a preset id. */
+  onChooseArtboardPreset?: (id: string) => void;
+  /** Both dimensions at once — a page's aspect is usually edited as a pair. */
+  onChangeArtboardSize?: (width: number, height: number) => void;
+  onChangeArtboardUnit?: (unit: ArtboardUnit) => void;
+  onChangeArtboardDpi?: (dpi: number) => void;
+  onChangeArtboardOrientation?: (orientation: "portrait" | "landscape") => void;
+  onChangeArtboardMargin?: (margin: number) => void;
+  clipToPage?: boolean;
+  onToggleClipToPage?: (value: boolean) => void;
   // ---- /STREAM-A ----
   // ---- STREAM-B: muthanna/radial — props ----
   // ---- /STREAM-B ----
@@ -258,6 +280,15 @@ const SidebarTier: React.FC<{ label: string }> = ({ label }) => (
 export const Sidebar: React.FC<SidebarProps> = ({
   blocks,
   // ---- STREAM-A: artboard — destructure ----
+  artboard = null,
+  onChooseArtboardPreset,
+  onChangeArtboardSize,
+  onChangeArtboardUnit,
+  onChangeArtboardDpi,
+  onChangeArtboardOrientation,
+  onChangeArtboardMargin,
+  clipToPage = true,
+  onToggleClipToPage,
   // ---- /STREAM-A ----
   // ---- STREAM-B: muthanna/radial — destructure ----
   // ---- /STREAM-B ----
@@ -372,6 +403,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showSignInForm, setShowSignInForm] = useState(false);
   const selectionCount = selectedIds.length > 1 ? selectedIds.length : 1;
   const [showBackgroundSettings, setShowBackgroundSettings] = useState(false);
+  // Stream A (artboard). Panel open/close state has no anchor region in this
+  // file; one line beside its neighbours is the smallest possible addition.
+  const [showArtboard, setShowArtboard] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
 
@@ -681,6 +715,189 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* ---- STREAM-A: artboard — document-tier panel ---- */}
+        <div className="sidebarPanel">
+          <CollapsibleSection
+            title="Artboard"
+            isOpen={showArtboard}
+            onToggle={() => setShowArtboard((v) => !v)}
+          >
+            <div className="sectionPanel">
+              <SelectRow
+                id="artboard-preset"
+                name="artboardPreset"
+                label="Page size"
+                value={artboard ? artboard.presetId ?? "custom" : ""}
+                onChange={(v) => onChooseArtboardPreset?.(v)}
+              >
+                <option value="">No artboard (freeform)</option>
+                <optgroup label="Print">
+                  {ARTBOARD_PRESETS.filter((p) => p.group === "print").map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Screen">
+                  {ARTBOARD_PRESETS.filter((p) => p.group === "screen").map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <option value="custom">Custom size…</option>
+              </SelectRow>
+
+              {/* An IIFE rather than a helper component: everything below needs
+                  the same unit-formatting closure, and this file's module scope
+                  carries no per-stream anchor to declare one in. */}
+              {artboard &&
+                (() => {
+                  const decimals = artboard.unit === "in" ? 2 : artboard.unit === "mm" ? 1 : 0;
+                  const show = (px: number) =>
+                    toDisplayUnit(px, artboard).toFixed(decimals);
+                  const commit = (which: "width" | "height") => (raw: string) => {
+                    const parsed = Number.parseFloat(raw);
+                    if (!Number.isFinite(parsed) || parsed <= 0) return;
+                    const px = fromDisplayUnit(parsed, artboard);
+                    onChangeArtboardSize?.(
+                      which === "width" ? px : artboard.width,
+                      which === "height" ? px : artboard.height
+                    );
+                  };
+                  const marginMax = Math.round(
+                    Math.min(artboard.width, artboard.height) * 0.45
+                  );
+                  const size = exportPixelSize(artboard);
+
+                  return (
+                    <>
+                      <div className="artboardSizeRow">
+                        <label className="field" htmlFor="artboard-width">
+                          <span className="fieldTitle">Width</span>
+                          <input
+                            id="artboard-width"
+                            // Remounts whenever the stored size changes, so the
+                            // field re-syncs after a preset or orientation
+                            // switch without fighting the user mid-typing.
+                            key={`w-${artboard.width}-${artboard.unit}`}
+                            type="number"
+                            min={1}
+                            step={decimals ? 0.1 : 1}
+                            defaultValue={show(artboard.width)}
+                            className="hexInput artboardNumberInput"
+                            onBlur={(e) => commit("width")(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") e.currentTarget.blur();
+                            }}
+                          />
+                        </label>
+                        <label className="field" htmlFor="artboard-height">
+                          <span className="fieldTitle">Height</span>
+                          <input
+                            id="artboard-height"
+                            key={`h-${artboard.height}-${artboard.unit}`}
+                            type="number"
+                            min={1}
+                            step={decimals ? 0.1 : 1}
+                            defaultValue={show(artboard.height)}
+                            className="hexInput artboardNumberInput"
+                            onBlur={(e) => commit("height")(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") e.currentTarget.blur();
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      <div className="artboardSizeRow">
+                        <SelectRow
+                          id="artboard-unit"
+                          name="artboardUnit"
+                          label="Units"
+                          value={artboard.unit}
+                          onChange={(v) => onChangeArtboardUnit?.(v as ArtboardUnit)}
+                        >
+                          <option value="px">Pixels</option>
+                          <option value="mm">Millimetres</option>
+                          <option value="in">Inches</option>
+                        </SelectRow>
+                        <SelectRow
+                          id="artboard-dpi"
+                          name="artboardDpi"
+                          label="Resolution"
+                          value={String(artboard.dpi)}
+                          onChange={(v) => onChangeArtboardDpi?.(Number.parseInt(v, 10))}
+                        >
+                          <option value="72">72 dpi</option>
+                          <option value="96">96 dpi (screen)</option>
+                          <option value="150">150 dpi</option>
+                          <option value="300">300 dpi (print)</option>
+                          <option value="600">600 dpi</option>
+                        </SelectRow>
+                      </div>
+
+                      <div className="field">
+                        <span className="fieldTitle">Orientation</span>
+                        <div className="artboardOrientation">
+                          {(["portrait", "landscape"] as const).map((o) => (
+                            <button
+                              key={o}
+                              type="button"
+                              onClick={() => onChangeArtboardOrientation?.(o)}
+                              className={
+                                artboard.orientation === o
+                                  ? "sidebarSmallAction sidebarSmallAction--accent"
+                                  : "sidebarSmallAction"
+                              }
+                              aria-pressed={artboard.orientation === o}
+                            >
+                              {o === "portrait" ? "Portrait" : "Landscape"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <RangeRow
+                        id="artboard-margin"
+                        name="artboardMargin"
+                        label="Margin"
+                        value={Math.min(artboard.margin, marginMax)}
+                        min={0}
+                        max={marginMax}
+                        onChange={(v) => onChangeArtboardMargin?.(v)}
+                        suffix={
+                          artboard.margin > 0
+                            ? `${show(artboard.margin)} ${artboard.unit}`
+                            : "none"
+                        }
+                      />
+
+                      <div className="artboardReadout">
+                        Exports at <strong>{size.width} × {size.height} px</strong> — the
+                        page's own pixel size, so the export scale setting doesn't
+                        apply while an artboard is set.
+                      </div>
+
+                      <CheckboxRow
+                        id="artboard-clip"
+                        label="Clip exports to the page"
+                        checked={clipToPage}
+                        onChange={(checked) => onToggleClipToPage?.(checked)}
+                      />
+                    </>
+                  );
+                })()}
+
+              <ColorRow
+                id="background-color"
+                name="backgroundColor"
+                label={artboard ? "Page color" : "Background color"}
+                value={backgroundColor}
+                onChange={onChangeBackgroundColor}
+              />
+            </div>
+          </CollapsibleSection>
+        </div>
         {/* ---- /STREAM-A ---- */}
 
         <div className="sidebarPanel">
@@ -689,15 +906,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             isOpen={showBackgroundSettings}
             onToggle={() => setShowBackgroundSettings((v) => !v)}
           >
+            {/* Background colour used to live here; it moved into the
+                Artboard panel above, where it is the page's own colour. */}
             <div className="sectionPanel">
-              <ColorRow
-                id="background-color"
-                name="backgroundColor"
-                label="Background color"
-                value={backgroundColor}
-                onChange={onChangeBackgroundColor}
-              />
-
               <div style={{ display: "grid", gap: 8 }}>
                 <CheckboxRow
                   id="show-grid"
