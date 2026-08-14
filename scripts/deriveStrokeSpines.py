@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FONT_DIR = ROOT / "public" / "fonts"
 OUT_DIR = ROOT / "src" / "data" / "strokeSpines"
 NUQTA_TS = ROOT / "src" / "lib" / "nuqta.ts"
+SCHEMA_DIR = ROOT / "src" / "data" / "strokeSchemas"
 
 
 def in_scope_fonts() -> dict[str, float]:
@@ -59,27 +60,20 @@ def sha256(path: Path) -> str:
 RASTER = 512  # px across the em square
 
 
-def glyph_mask(tt, glyph_name, upm):
-    """Binary mask of one glyph, plus the transforms to and from font units.
+def flatten_glyph(tt, glyph_name):
+    """This glyph's contours, flattened to line segments, in font units.
 
-    Rendered into a RASTER x RASTER box sized from the glyph's own outline
-    bounds plus a margin (see below — not a fixed em-relative box), filled
-    by nonzero winding so counters stay holes. Returns (mask, to_font_units,
-    to_px); to_px is exposed too so any other caller that needs to place
-    something in the same pixel space (write_sheet's branch overlay) shares
-    this function's one box derivation instead of re-deriving it — the
-    previous, fixed-box version of this function had exactly two independent
-    copies of that math, and only one of them got updated when the box
-    changed.
+    Extracted so both `glyph_mask` (rasterizing for skeletonization) and
+    `glyph_bbox_font_units` (the real-glyph box `seed_box` maps onto) read
+    the identical outline instead of risking two independent flattens
+    disagreeing at the margin.
     """
-    import numpy as np
-    from PIL import Image, ImageDraw
     from fontTools.pens.recordingPen import DecomposingRecordingPen
     from fontTools.pens.basePen import BasePen
 
     glyph_set = tt.getGlyphSet()
     if glyph_name not in glyph_set:
-        return None, None, None
+        return []
 
     class FlattenPen(BasePen):
         def __init__(self, gs):
@@ -116,7 +110,41 @@ def glyph_mask(tt, glyph_name, upm):
     rec.replay(pen)
     if pen._cur:
         pen.contours.append(pen._cur)
-    if not pen.contours:
+    return pen.contours
+
+
+def glyph_bbox_font_units(tt, glyph_name):
+    """This glyph's own ink bounding box, in font units — the REAL box
+    `seed_box` (see `make_seed_box`) maps a schema stroke's proportional
+    position onto. `None` for an empty/missing glyph."""
+    contours = flatten_glyph(tt, glyph_name)
+    if not contours:
+        return None
+    all_pts = [p for c in contours for p in c]
+    return (
+        min(p[0] for p in all_pts), min(p[1] for p in all_pts),
+        max(p[0] for p in all_pts), max(p[1] for p in all_pts),
+    )
+
+
+def glyph_mask(tt, glyph_name, upm):
+    """Binary mask of one glyph, plus the transforms to and from font units.
+
+    Rendered into a RASTER x RASTER box sized from the glyph's own outline
+    bounds plus a margin (see below — not a fixed em-relative box), filled
+    by nonzero winding so counters stay holes. Returns (mask, to_font_units,
+    to_px); to_px is exposed too so any other caller that needs to place
+    something in the same pixel space (write_sheet's branch overlay) shares
+    this function's one box derivation instead of re-deriving it — the
+    previous, fixed-box version of this function had exactly two independent
+    copies of that math, and only one of them got updated when the box
+    changed.
+    """
+    import numpy as np
+    from PIL import Image, ImageDraw
+
+    contours = flatten_glyph(tt, glyph_name)
+    if not contours:
         return None, None, None
 
     # Font units -> pixels, in a box sized from this glyph's own outline
@@ -129,7 +157,7 @@ def glyph_mask(tt, glyph_name, upm):
     # glyphs (Amiri/uni0615 etc.) sit entirely outside such a box and would
     # silently produce an empty mask. Deriving the box from the actual
     # outline bounds makes that class of bug structurally impossible.
-    all_pts = [p for c in pen.contours for p in c]
+    all_pts = [p for c in contours for p in c]
     minx = min(p[0] for p in all_pts)
     maxx = max(p[0] for p in all_pts)
     miny = min(p[1] for p in all_pts)
@@ -182,7 +210,7 @@ def glyph_mask(tt, glyph_name, upm):
         return sum((c[i][0] * c[(i + 1) % len(c)][1] - c[(i + 1) % len(c)][0] * c[i][1])
                    for i in range(len(c))) / 2
 
-    ordered = sorted(pen.contours, key=lambda c: -abs(signed_area(c)))
+    ordered = sorted(contours, key=lambda c: -abs(signed_area(c)))
     outer_positive = signed_area(ordered[0]) >= 0
     for contour in ordered:
         pts = [to_px(p) for p in contour]
@@ -373,14 +401,328 @@ def glyph_branches(tt, glyph_name, upm, nuqta_units):
     return out
 
 
-def write_sheet(tt, family, upm, nuqta_units, glyph_names):
-    """One PNG per font: each glyph filled grey with its branches drawn on top.
+# ---------------------------------------------------------------------------
+# Schema loading and glyph-name lookup
+# ---------------------------------------------------------------------------
 
-    This is the eyeball pass. The nuqta table was accepted the same way, and
-    two fonts were dropped on the strength of it.
+def load_schemas():
+    """(unicodeHex, joiningForm) -> schema dict, mirroring strokeSchema/registry.ts.
+
+    Ligatures (baseLetterSequence, no unicode) are skipped: matching a fused
+    multi-letter outline is not what this pass is for, and the registry keys
+    them differently.
+    """
+    out = {}
+    for path in sorted(SCHEMA_DIR.glob("*.json")):
+        desc = json.loads(path.read_text(encoding="utf-8"))
+        g = desc.get("glyph", {})
+        if g.get("baseLetterSequence") or not g.get("unicode"):
+            continue
+        out[(g["unicode"].upper(), g["joiningForm"])] = desc
+    return out
+
+
+FORM_SUFFIX = {"isolated": "isol", "initial": "init", "medial": "medi", "final": "fina"}
+
+
+def glyph_name_for(tt, unicode_hex, form):
+    """The font's glyph name for one letter in one joining form.
+
+    Walks the cmap for the base codepoint, then follows GSUB's single
+    substitutions for the matching form feature — which is how the font itself
+    decides, rather than us guessing from naming conventions.
+    """
+    cp = int(unicode_hex, 16)
+    base = tt.getBestCmap().get(cp)
+    if base is None:
+        return None
+    if form == "isolated":
+        return base
+    feature = FORM_SUFFIX.get(form)
+    gsub = tt.get("GSUB")
+    if feature is None or gsub is None:
+        return None
+    for record in gsub.table.FeatureList.FeatureRecord:
+        if record.FeatureTag != feature:
+            continue
+        for idx in record.Feature.LookupListIndex:
+            lookup = gsub.table.LookupList.Lookup[idx]
+            for sub in lookup.SubTable:
+                mapping = getattr(sub, "mapping", None)
+                if mapping and base in mapping:
+                    return mapping[base]
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Matching and zone sampling
+# ---------------------------------------------------------------------------
+
+def polyline_length(pts):
+    return sum(((pts[i + 1][0] - pts[i][0]) ** 2 + (pts[i + 1][1] - pts[i][1]) ** 2) ** 0.5
+               for i in range(len(pts) - 1))
+
+
+def arc_slice(pts, t0, t1):
+    """The sub-polyline between two arc-length proportions of `pts`."""
+    total = polyline_length(pts)
+    if total <= 0:
+        return pts[:1] * 2
+    want0, want1 = t0 * total, t1 * total
+    out, acc = [], 0.0
+    for i in range(len(pts) - 1):
+        seg = ((pts[i + 1][0] - pts[i][0]) ** 2 + (pts[i + 1][1] - pts[i][1]) ** 2) ** 0.5
+        for want in (want0, want1):
+            if acc <= want <= acc + seg and seg > 0:
+                f = (want - acc) / seg
+                out.append(tuple(pts[i][k] + (pts[i + 1][k] - pts[i][k]) * f for k in range(3)))
+        if want0 < acc + seg and acc < want1:
+            out.append(pts[i + 1])
+        acc += seg
+    return out if len(out) >= 2 else [pts[0], pts[-1]]
+
+
+def compute_node_bbox(desc):
+    """Python port of schemaGeometry.ts's `computeNodeBoundingBox`: bounding
+    box of every stroke's authored node coordinates across all components, in
+    the schema's own baseline-up convention."""
+    xs = [n["x"] for c in desc["glyph"]["components"] for s in c["strokes"] for n in s["path"]["nodes"]]
+    ys = [n["y"] for c in desc["glyph"]["components"] for s in c["strokes"] for n in s["path"]["nodes"]]
+    if not xs:
+        return (0.0, 0.0, 1.0, 1.0)
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def make_seed_box(desc, real_bbox):
+    """Builds a `seed_box(nodes) -> (x, y)` function: the Python equivalent of
+    the app's `mapNormToRealBox` (schemaGeometry.ts), applied to a stroke's
+    own node span rather than a single point. Normalizes the span's midpoint
+    against the schema's whole-glyph node bbox (`compute_node_bbox`), then
+    maps that 0-1 proportion onto the REAL glyph's own ink bounding box
+    (`real_bbox`, from `glyph_bbox_font_units`).
+
+    This is a weak hint used only to rank match candidates in `match_strokes`
+    — never a gate — and is deliberately the same proportional mapping this
+    project exists to replace, kept alive here only as a ranking signal; see
+    the module docstring / CLAUDE.md for why it must never leak into shipped
+    geometry.
+
+    Both the schema's node space and `real_bbox` are y-up (baseline-up
+    schema convention; font-unit outline convention), so — unlike
+    `mapNormToRealBox`'s screen-space (y-down) counterpart — no Y flip is
+    applied here. Checked against `glyph_branches`' own y-up output rather
+    than assumed.
+    """
+    sx0, sy0, sx1, sy1 = compute_node_bbox(desc)
+    sw, sh = max(sx1 - sx0, 1e-6), max(sy1 - sy0, 1e-6)
+    rx0, ry0, rx1, ry1 = real_bbox
+    rw, rh = rx1 - rx0, ry1 - ry0
+
+    def seed_box(nodes):
+        mx = (nodes[0]["x"] + nodes[-1]["x"]) / 2
+        my = (nodes[0]["y"] + nodes[-1]["y"]) / 2
+        nx = (mx - sx0) / sw
+        ny = (my - sy0) / sh
+        return (rx0 + nx * rw, ry0 + ny * rh)
+
+    return seed_box
+
+
+def node_t_values(nodes):
+    """Arc-length proportion (0-1) of each node along its own stroke's
+    authored node polyline (schema coordinates) — used to translate a zone's
+    fromNode/toNode indices into arc-length proportions on the *matched real
+    branch*, on the assumption that the schema author's node spacing along a
+    stroke corresponds proportionally to the real glyph's stroke geometry.
+    """
+    pts = [(n["x"], n["y"], 0.0) for n in nodes]
+    total = polyline_length(pts)
+    if total <= 0:
+        return [0.0] * len(nodes)
+    ts, acc = [0.0], 0.0
+    for i in range(len(pts) - 1):
+        acc += ((pts[i + 1][0] - pts[i][0]) ** 2 + (pts[i + 1][1] - pts[i][1]) ** 2) ** 0.5
+        ts.append(acc / total)
+    return ts
+
+
+def match_strokes(desc, branches, nuqta_units, seed_box):
+    """Assign each schema stroke a branch, or None.
+
+    Score: seed distance + orientation disagreement + length disagreement,
+    with a hard component-class rule. Returns (assignment, margins) where
+    margin is the cost gap to the runner-up — the confidence signal the gate
+    uses.
+    """
+    import numpy as np
+    from scipy.optimize import linear_sum_assignment
+
+    strokes = [(c, s) for c in desc["glyph"]["components"] for s in c["strokes"]]
+    if not strokes or not branches:
+        return {}, {}
+
+    # A DOT component may only take a short, isolated branch; a body stroke
+    # may not. This one rule removes most of the plausible-but-wrong matches.
+    def allowed(component, branch):
+        short = polyline_length(branch) < 1.5 * nuqta_units
+        return short if component["type"] == "DOT" else not short
+
+    cost = np.full((len(strokes), len(branches)), 1e6)
+    for i, (component, stroke) in enumerate(strokes):
+        nodes = stroke["path"]["nodes"]
+        seed = seed_box(nodes)
+        want_len = (stroke.get("lengthDots") or 1.0) * nuqta_units
+        for j, branch in enumerate(branches):
+            if not allowed(component, branch):
+                continue
+            mid = branch[len(branch) // 2]
+            dist = ((mid[0] - seed[0]) ** 2 + (mid[1] - seed[1]) ** 2) ** 0.5 / nuqta_units
+            got_len = polyline_length(branch)
+            ratio = max(got_len, 1e-6) / max(want_len, 1e-6)
+            len_cost = abs(np.log(ratio))
+            ang = np.arctan2(branch[-1][1] - branch[0][1], branch[-1][0] - branch[0][0])
+            want_ang = np.arctan2(nodes[-1]["y"] - nodes[0]["y"], nodes[-1]["x"] - nodes[0]["x"])
+            ang_cost = abs(((ang - want_ang + np.pi) % (2 * np.pi)) - np.pi) / np.pi
+            cost[i, j] = dist + 2.0 * len_cost + ang_cost
+
+    rows, cols = linear_sum_assignment(cost)
+    assignment, margins = {}, {}
+    for i, j in zip(rows, cols):
+        if cost[i, j] >= 1e6:
+            continue
+        others = sorted(c for k, c in enumerate(cost[i]) if k != j)
+        assignment[i] = j
+        margins[i] = (others[0] - cost[i, j]) if others else float("inf")
+    return assignment, margins
+
+
+# ---------------------------------------------------------------------------
+# Gates
+# ---------------------------------------------------------------------------
+
+MIN_MARGIN = 0.35        # cost units; below this the runner-up is too close to trust
+LEN_RATIO_BAND = (0.5, 2.0)
+
+
+def gate(stroke, branch, margin, nuqta_units):
+    """Returns None if the entry may ship, else the reason it was dropped."""
+    want = (stroke.get("lengthDots") or 0) * nuqta_units
+    got = polyline_length(branch)
+    if want > 0:
+        ratio = got / want
+        if not (LEN_RATIO_BAND[0] <= ratio <= LEN_RATIO_BAND[1]):
+            return f"length ratio {ratio:.2f}"
+    if margin < MIN_MARGIN:
+        return f"margin {margin:.2f}"
+    if len(branch) < 2:
+        return "degenerate branch"
+    return None
+
+
+MAX_CONNECTIVITY_VIOLATIONS = 2
+
+
+def connectivity_violations(desc, strokes, assignment, branches, nuqta_units):
+    """How many schema-adjacent stroke pairs got non-adjacent branches.
+
+    Two strokes are adjacent when they share a node position; their matched
+    branches should then meet at an endpoint. A glyph with several violations
+    has had its structure misread, not one stroke mismatched, so the caller
+    drops it whole.
+    """
+    def endpoints(i):
+        b = branches[assignment[i]]
+        return (b[0], b[-1])
+
+    near = lambda p, q: ((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2) ** 0.5 < nuqta_units
+
+    violations = 0
+    for i in range(len(strokes)):
+        for j in range(i + 1, len(strokes)):
+            if i not in assignment or j not in assignment:
+                continue
+            ni = strokes[i][1]["path"]["nodes"]
+            nj = strokes[j][1]["path"]["nodes"]
+            shares_node = any(
+                abs(a["x"] - b["x"]) < 1e-6 and abs(a["y"] - b["y"]) < 1e-6
+                for a in ni for b in nj
+            )
+            if not shares_node:
+                continue
+            ei, ej = endpoints(i), endpoints(j)
+            if not any(near(p, q) for p in ei for q in ej):
+                violations += 1
+    return violations
+
+
+CONSENSUS_MIN_FONTS = 4
+CONSENSUS_MAX_DEV_NUQTA = 1.5
+
+
+def drop_cross_font_outliers(tables, ratios):
+    """Drop any font's spine for a stroke that disagrees with the consensus.
+
+    Normalizing by each font's own em and nuqta puts every font's spine in the
+    same unit, so "this font put the seen connector somewhere nobody else did"
+    becomes measurable. Requires CONSENSUS_MIN_FONTS entries: with fewer there
+    is no consensus to be an outlier from, and dropping on that sample is
+    noise, not evidence.
+
+    Returns {family: count} of spines dropped per font (a deviation from the
+    brief's single global int — Step 3's report table needs a per-font
+    column, and this is the natural place to produce it since this function
+    already walks every dropped spine).
+    """
+    import statistics
+    keyed = {}
+    for family, table in tables.items():
+        nuqta_units = ratios[family] * table["unitsPerEm"]
+        for glyph_id, entry in table["glyphs"].items():
+            for spine in entry["spines"]:
+                key = (entry["schemaGlyph"], spine["strokeId"], spine["zoneIndex"])
+                pts = spine["points"]
+                keyed.setdefault(key, []).append((
+                    family, glyph_id, spine,
+                    (pts[0]["x"] / nuqta_units, pts[0]["y"] / nuqta_units),
+                    (pts[-1]["x"] / nuqta_units, pts[-1]["y"] / nuqta_units),
+                ))
+
+    dropped_per_font = {family: 0 for family in tables}
+    for key in sorted(keyed):
+        rows = keyed[key]
+        if len(rows) < CONSENSUS_MIN_FONTS:
+            continue
+        med_start = tuple(statistics.median(r[3][k] for r in rows) for k in (0, 1))
+        med_end = tuple(statistics.median(r[4][k] for r in rows) for k in (0, 1))
+        for family, glyph_id, spine, start, end in rows:
+            dev = max(
+                ((start[0] - med_start[0]) ** 2 + (start[1] - med_start[1]) ** 2) ** 0.5,
+                ((end[0] - med_end[0]) ** 2 + (end[1] - med_end[1]) ** 2) ** 0.5,
+            )
+            if dev > CONSENSUS_MAX_DEV_NUQTA:
+                tables[family]["glyphs"][glyph_id]["spines"].remove(spine)
+                dropped_per_font[family] += 1
+                print(f"    drop {family} {key} : {dev:.2f} nuqta from consensus")
+    # A glyph left with no spines is an empty entry; remove it so the table
+    # never carries a key that resolves to nothing.
+    for table in tables.values():
+        for gid in [g for g, e in table["glyphs"].items() if not e["spines"]]:
+            del table["glyphs"][gid]
+    return dropped_per_font
+
+
+# ---------------------------------------------------------------------------
+# Sheet overlay (eyeball check)
+# ---------------------------------------------------------------------------
+
+def write_sheet(tt, family, upm, nuqta_units, glyph_names, spines_by_glyph):
+    """One PNG per font: each glyph filled grey, raw medial-axis branches in
+    red, and the spines that actually survived matching + every gate drawn
+    over them in green with a short stroke-id label — this is the eyeball
+    pass Step 4 reads: green ink should sit on the stroke its label names.
     """
     from PIL import Image, ImageDraw
-    cols, cell = 8, 128
+    cols, cell = 8, 160
     rows = (len(glyph_names) + cols - 1) // cols
     sheet = Image.new("RGB", (cols * cell, rows * cell), (250, 248, 240))
     draw = ImageDraw.Draw(sheet)
@@ -411,12 +753,35 @@ def write_sheet(tt, family, upm, nuqta_units, glyph_names):
                 px, py = pts[0]
                 r = 1.5
                 draw.ellipse((px - r, py - r, px + r, py + r), fill=(200, 40, 40))
+        for stroke_id, spine_pts in spines_by_glyph.get(name, []):
+            pts = [(cx + px * cell_scale, cy + py * cell_scale)
+                   for x, y, _ in spine_pts
+                   for px, py in [to_px((x, y))]]
+            if len(pts) > 1:
+                draw.line(pts, fill=(30, 160, 60), width=2)
+            mx, my = pts[len(pts) // 2]
+            draw.text((mx + 2, my - 8), stroke_id, fill=(20, 110, 40))
     out = OUT_DIR / f"{family}-sheet.png"
     sheet.save(out)
     print(f"    sheet -> {out.relative_to(ROOT)}")
 
 
-def build_table(family: str, ratio: float, sheets: bool) -> dict:
+# ---------------------------------------------------------------------------
+# Table construction
+# ---------------------------------------------------------------------------
+
+def clamp_index(idx, n):
+    return idx if isinstance(idx, int) and 0 <= idx < n else None
+
+
+def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple[dict, dict]:
+    """Builds one font's SpineTable in memory (nothing is written here — the
+    caller writes only after the cross-font consensus pass, per Step 3).
+
+    Returns (table, drops), drops = {"length", "margin", "connectivity"}
+    counts of spine entries dropped for that reason (consensus is a separate,
+    later pass over every font at once — see drop_cross_font_outliers).
+    """
     from fontTools.ttLib import TTFont
     path = font_path(family)
     tt = TTFont(path, fontNumber=0, lazy=True)
@@ -427,21 +792,115 @@ def build_table(family: str, ratio: float, sheets: bool) -> dict:
         del tt["gvar"]
     upm = tt["head"].unitsPerEm
     nuqta_units = ratio * upm
-    if sheets:
-        # Task 3 will hand write_sheet the glyphs the schema matcher actually
-        # processed; until then, the font's own cmap-encoded Arabic-range
-        # glyphs (base letterforms, no contextual GSUB variants) are the
-        # closest stand-in and are what this task's eyeball check reviewed.
-        cmap = tt.getBestCmap()
-        glyph_names = [name for cp, name in sorted(cmap.items())
-                       if 0x0600 <= cp <= 0x06FF]
-        write_sheet(tt, family, upm, nuqta_units, glyph_names)
-    return {
+
+    table = {
         "font": family,
         "unitsPerEm": upm,
         "fontSha256": sha256(path),
         "glyphs": {},
     }
+    drops = {"length": 0, "margin": 0, "connectivity": 0}
+    sheet_glyph_names = []
+    spines_by_glyph = {}
+    seen_glyph_ids = {}  # glyph_id -> (unicode_hex, form) that claimed it first, for a deterministic collision log
+
+    for unicode_hex, form in sorted(schemas):
+        desc = schemas[(unicode_hex, form)]
+        glyph_name = glyph_name_for(tt, unicode_hex, form)
+        if glyph_name is None:
+            continue
+
+        branches = glyph_branches(tt, glyph_name, upm, nuqta_units)
+        if not branches:
+            continue
+        bbox = glyph_bbox_font_units(tt, glyph_name)
+        if bbox is None:
+            continue
+
+        if glyph_name not in sheet_glyph_names:
+            sheet_glyph_names.append(glyph_name)
+
+        strokes = [(c, s) for c in desc["glyph"]["components"] for s in c["strokes"]]
+        seed_box = make_seed_box(desc, bbox)
+        assignment, margins = match_strokes(desc, branches, nuqta_units, seed_box)
+        if not assignment:
+            continue
+
+        # Connectivity is checked on the *raw* assignment, before any
+        # per-stroke gate runs — a structurally misread glyph is dropped
+        # whole, not stroke by stroke. (Step 3's "before anything is
+        # written".)
+        violations = connectivity_violations(desc, strokes, assignment, branches, nuqta_units)
+        if violations > MAX_CONNECTIVITY_VIOLATIONS:
+            # Every zone that would have been attempted here is the cost of
+            # this drop, whether or not it would individually have passed
+            # the length/margin gate — the whole match is discarded.
+            drops["connectivity"] += sum(
+                len(strokes[i][1]["editBehavior"]["stretchZones"]) for i in assignment
+            )
+            continue
+
+        glyph_id = tt.getGlyphID(glyph_name)  # runtime table is keyed by glyph id, not name
+        gid_key = str(glyph_id)
+        if gid_key in table["glyphs"]:
+            prior = seen_glyph_ids[gid_key]
+            print(f"    {family}: glyph id {glyph_id} ({glyph_name}) already claimed by "
+                  f"{prior}; skipping {(unicode_hex, form)} (deterministic first-wins)")
+            continue
+
+        spines = []
+        sheet_entries = []
+        for i, j in sorted(assignment.items()):
+            branch = branches[j]
+            stroke = strokes[i][1]
+            reason = gate(stroke, branch, margins[i], nuqta_units)
+            if reason is not None:
+                if reason.startswith("length"):
+                    drops["length"] += len(stroke["editBehavior"]["stretchZones"])
+                else:
+                    # "margin ..." and the rare "degenerate branch" case both
+                    # land here: both are per-stroke match-confidence
+                    # failures, and "degenerate branch" is only reachable
+                    # when lengthDots is absent (so the length gate can't
+                    # fire first) and the matched branch has under two
+                    # points — rare enough not to warrant its own report
+                    # column beyond the four Step 3 names.
+                    drops["margin"] += len(stroke["editBehavior"]["stretchZones"])
+                continue
+
+            nodes = stroke["path"]["nodes"]
+            t_values = node_t_values(nodes)
+            n = len(nodes)
+            for zone_index, zone in enumerate(stroke["editBehavior"]["stretchZones"]):
+                from_idx = clamp_index(zone.get("fromNode"), n) or 0
+                to_idx = clamp_index(zone.get("toNode"), n)
+                to_idx = to_idx if to_idx is not None else n - 1
+                t0, t1 = t_values[from_idx], t_values[to_idx]
+                sliced = arc_slice(branch, min(t0, t1), max(t0, t1))
+                if t0 > t1:
+                    sliced = list(reversed(sliced))
+                points = [{"x": x, "y": y, "radius": r} for x, y, r in sliced]
+                spines.append({
+                    "strokeId": stroke["id"],
+                    "zoneIndex": zone_index,
+                    "points": points,
+                })
+                sheet_entries.append((stroke["id"], sliced))
+
+        if not spines:
+            continue
+
+        table["glyphs"][gid_key] = {
+            "schemaGlyph": desc["glyph"]["id"],
+            "spines": spines,
+        }
+        seen_glyph_ids[gid_key] = (unicode_hex, form)
+        spines_by_glyph.setdefault(glyph_name, []).extend(sheet_entries)
+
+    if sheets:
+        write_sheet(tt, family, upm, nuqta_units, sheet_glyph_names, spines_by_glyph)
+
+    return table, drops
 
 
 def main() -> None:
@@ -453,15 +912,38 @@ def main() -> None:
     ratios = in_scope_fonts()
     families = args.fonts or sorted(ratios)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    schemas = load_schemas()
 
+    # Every font's table is built in memory first; nothing is written until
+    # the cross-font consensus pass (the fourth gate) has run over all of
+    # them, since it needs more than one font in hand to have a consensus to
+    # compare against.
+    tables, all_drops = {}, {}
     for family in families:
         if family not in ratios:
             print(f"  skip {family}: no measured nuqta, out of scope")
             continue
-        table = build_table(family, ratios[family], args.sheets)
+        table, drops = build_table(family, ratios[family], args.sheets, schemas)
+        tables[family] = table
+        all_drops[family] = drops
+
+    consensus_drops = drop_cross_font_outliers(tables, ratios) if tables else {}
+
+    print()
+    header = f"{'font':<18} {'glyphs':>7} {'spines':>7} {'length':>8} {'margin':>8} {'connectivity':>13} {'consensus':>10}"
+    print(header)
+    print("-" * len(header))
+    for family in sorted(tables):
+        table = tables[family]
+        drops = all_drops[family]
+        n_glyphs = len(table["glyphs"])
+        n_spines = sum(len(e["spines"]) for e in table["glyphs"].values())
+        print(f"{family:<18} {n_glyphs:>7} {n_spines:>7} {drops['length']:>8} {drops['margin']:>8} "
+              f"{drops['connectivity']:>13} {consensus_drops.get(family, 0):>10}")
+
         out = OUT_DIR / f"{family}.json"
         out.write_text(json.dumps(table, separators=(",", ":")) + "\n", encoding="utf-8")
-        print(f"  {family}: {len(table['glyphs'])} glyphs -> {out.relative_to(ROOT)}")
+        print(f"  {family}: {n_glyphs} glyphs, {n_spines} spines -> {out.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
