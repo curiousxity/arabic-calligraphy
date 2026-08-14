@@ -51,8 +51,22 @@ be checked by automation, but scripted **drags** do not — they land on the
 block underneath — so anything needing a handle *moved* still wants a real
 mouse.
 
-- **Unverified: dragging a per-glyph move/scale or diacritic dot**, for that
-  reason.
+- **Browser pass 2026-08-14, after the removal.** All passing: the app boots
+  with no console errors and no right-hand panel (the canvas now spans the
+  full remaining width); a plain text block renders; the relocated
+  **Move & scale glyph** checkbox sits in Sidebar → Typography under its own
+  "Move & scale" heading and arms the three dots — hovering `ر` in `حرف`
+  shows blue, gold and green exactly as before the move; diacritic handles
+  still arm, `حَرْف` showing the red/blue/gold trio on hovering its fatha.
+  Old-save migration checked end to end: a hand-built v4 payload carrying
+  `glyphEdits`, `glyphRigValues`, `glyphMaskEdit`, `glyphEditTool`,
+  `selectedGlyphIndex`, `kashidaAmount`, `kashidaEditMode` and an embedded
+  `glyphRigs` loaded cleanly, and re-saving wrote version 5 with every one of
+  those fields gone and no `glyphRigs` key.
+- **Unverified: dragging a per-glyph move/scale or diacritic dot.** Attempted
+  and it moved the *block* instead, which is the synthetic-drag artifact
+  above, not a finding about the handle. Unchanged by this work — neither
+  overlay's drag code was touched.
 
 ---
 
