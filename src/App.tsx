@@ -1955,7 +1955,22 @@ const App: React.FC = () => {
   const p1bCanvasProps: Partial<CanvasStageProps> = {};
   // ---- /STREAM-B ----
   // ---- STREAM-C: ornament library — handlers & props ----
-  const p1cSidebarProps: Partial<SidebarProps> = {};
+  // Both actions deliberately delegate to the existing creation paths rather
+  // than building a block themselves: a built-in ornament must land on the
+  // canvas in exactly the state an uploaded SVG or image does, placement
+  // flow and all.
+  const insertOrnamentShapeFill = (pathData: string, w: number, h: number) => {
+    addShapeFillBlock(pathData, w, h);
+  };
+
+  const insertOrnamentFrame = (dataUrl: string, w: number, h: number) => {
+    addImageBlock(dataUrl, w, h);
+  };
+
+  const p1cSidebarProps: Partial<SidebarProps> = {
+    onInsertOrnamentShapeFill: insertOrnamentShapeFill,
+    onInsertOrnamentFrame: insertOrnamentFrame,
+  };
   // ---- /STREAM-C ----
   // ---- STREAM-D: tatweel kashida — handlers & props ----
   // Kashida is an ordinary text edit — `applyKashida` returns a new string

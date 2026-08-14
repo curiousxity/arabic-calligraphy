@@ -75,6 +75,7 @@ import {
   type ArtboardConfig,
   type ArtboardUnit,
 } from "../lib/artboard";
+import { OrnamentPickerButton } from "./OrnamentPicker";
 
 export type SidebarProps = {
   // Phase 1 parallel-stream prop declarations — each stream adds its own
@@ -104,6 +105,8 @@ export type SidebarProps = {
   mirrorSourceLabel?: string;
   // ---- /STREAM-B ----
   // ---- STREAM-C: ornament library — props ----
+  onInsertOrnamentShapeFill?: (pathData: string, w: number, h: number) => void;
+  onInsertOrnamentFrame?: (dataUrl: string, w: number, h: number) => void;
   // ---- /STREAM-C ----
   // ---- STREAM-D: tatweel kashida — props ----
   kashidaSlotOrdinal?: number;
@@ -318,6 +321,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   mirrorSourceLabel,
   // ---- /STREAM-B ----
   // ---- STREAM-C: ornament library — destructure ----
+  onInsertOrnamentShapeFill,
+  onInsertOrnamentFrame,
   // ---- /STREAM-C ----
   // ---- STREAM-D: tatweel kashida — destructure ----
   kashidaSlotOrdinal = 0,
@@ -1633,6 +1638,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
             {/* ---- /STREAM-B ---- */}
             {/* ---- STREAM-C: ornament library — add-block button ---- */}
+            {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
+              <OrnamentPickerButton
+                variant="circle"
+                onInsertShapeFill={onInsertOrnamentShapeFill}
+                onInsertFrame={onInsertOrnamentFrame}
+              />
+            )}
             {/* ---- /STREAM-C ---- */}
           </div>
 
@@ -2061,6 +2073,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="sectionPanel">
                 {/* ---- STREAM-C: ornament library — shape picker button ---- */}
+                {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
+                  <OrnamentPickerButton
+                    variant="wide"
+                    onInsertShapeFill={onInsertOrnamentShapeFill}
+                    onInsertFrame={onInsertOrnamentFrame}
+                  />
+                )}
                 {/* ---- /STREAM-C ---- */}
                   <div>
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>

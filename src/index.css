@@ -369,4 +369,33 @@ html, body, #root { height: 100%; margin: 0; }
 /* ---- /STREAM-A ---- */
 
 /* ---- STREAM-C: ornament library — picker dialog ---- */
+/* Reuses .confirmDialogOverlay for the backdrop; the panel itself is its own
+   class because it is a wide grid rather than a message box. */
+.ornamentPickerDialog { width: min(880px, 94vw); max-height: 86vh; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-panel-floating); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); }
+
+.ornamentPickerHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ornamentPickerHeader > * { min-width: 0; }
+.ornamentPickerTitle { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-primary); }
+.ornamentPickerSubtitle { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+
+.ornamentPickerSwatches { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.ornamentPickerSwatches > * { min-width: 0; }
+.ornamentPickerSwatchLabel { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); margin-right: 2px; }
+.ornamentPickerSwatch { width: 20px; height: 20px; flex-shrink: 0; padding: 0; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.ornamentPickerSwatch--active { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ornamentPickerColorInput { width: 28px; height: 22px; flex-shrink: 0; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; }
+
+.ornamentPickerGrid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 2px; }
+/* Grid children default to min-width:auto and would push the dialog wider
+   than its own max-width on a narrow window. */
+.ornamentPickerGrid > * { min-width: 0; }
+
+.ornamentCard { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--overlay-hover); }
+.ornamentThumb { width: 100%; height: 84px; }
+.ornamentCardName { font-size: 12px; font-weight: 600; color: var(--text-primary); text-align: center; }
+.ornamentCardNameAr { font-size: 12px; color: var(--text-muted); }
+.ornamentCardActions { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 4px; }
+.ornamentCardActions > * { min-width: 0; }
+
+.ornamentPickerOpenWide { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 /* ---- /STREAM-C ---- */
