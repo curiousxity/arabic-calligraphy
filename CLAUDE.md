@@ -33,6 +33,8 @@ npm test          # vitest run (all tests, single pass)
 npx vitest run path/to/file.test.ts   # run a single test file
 npx vitest        # watch mode
 npx tsc --noEmit -p tsconfig.app.json # typecheck only, no build output
+npm run e2e       # playwright test (browser suite — see "End-to-end tests")
+npm run e2e:ui    # playwright's interactive runner
 ```
 
 There is no dedicated test-watch or coverage script beyond the above. Tests live beside the code they cover (`src/lib/*.test.ts`), not in a separate `__tests__` tree.
@@ -828,6 +830,87 @@ matching the local store's existing overwrite-by-name `Record<name, ...>`
 shape) — there's no multi-device conflict resolution beyond that. See
 `docs/superpowers/specs/2026-08-11-cloud-persistence-design.md` for the
 full design and the SQL migration under `supabase/migrations/`.
+
+### End-to-end tests (`e2e/`, `playwright.config.ts`, `src/lib/testBridge.ts`)
+
+`npm run e2e` runs the browser suite; `npm run e2e:ui` opens Playwright's
+interactive runner. Chromium only. The config's `webServer` starts
+`npm run dev` on port 5173 with `--strictPort` (and reuses a server already
+listening there), so a clean checkout needs nothing but
+`npx playwright install chromium`.
+
+Two setup details that are easy to undo by accident:
+
+- **Vitest and Playwright both claim `*.spec.ts`.** `vite.config.ts` carries
+  a `test.exclude` listing `e2e/**` for exactly this reason. Keep e2e specs
+  in `e2e/`, never under `src/`.
+- **Playwright transpiles without typechecking**, so nothing in the normal
+  loop would catch a type error in a spec. `e2e/tsconfig.json` exists for
+  that: `npx tsc --noEmit -p e2e/tsconfig.json`. It is not wired into
+  `tsconfig.json`'s project references because it needs the DOM lib that
+  `tsconfig.node.json` deliberately omits.
+
+**The bridge.** Konva draws everything into one `<canvas>`, so the DOM says
+almost nothing about the artboard. `src/lib/testBridge.ts` publishes
+`window.__HARF__ = { getBlocks, getSelectedIds, getStage }` in **dev builds
+only** — `import.meta.env.DEV` is substituted with `false` in a production
+build, so the assignment is unreachable and dropped (verified: no `__HARF__`
+anywhere in `dist/`). `App.tsx` wires it in one `useEffect` keyed on
+`[blocks, effectiveSelectedIds]`; re-installing on change is cheaper than
+threading refs and keeps the closures fresh.
+
+It is deliberately **read-only**. Tests drive the app the way a user does
+and use the bridge only to check what happened; a setter here would let a
+test pass while the interaction it claims to cover is broken. `getStage` is
+what makes on-screen geometry reachable — `node.getClientRect()` already
+folds in the stage's pan/zoom, so adding the container's own offset lands a
+Konva node in the same page coordinates `page.mouse` speaks.
+
+Appearance is asserted in **pixels, not through the bridge**: `e2e/harf.ts`'s
+`inkPixels` reads `getImageData` off the live stage canvas and counts dark
+pixels. Reading the live canvas rather than a screenshot keeps the
+coordinate space identical to the mouse helpers' and needs no PNG decoder.
+Keep such assertions coarse — "is there ink in this region" — never
+exact-image, or font rasterisation differences across machines will flake.
+
+**Trusted drags reach Konva's hover-mounted handles.** This was the open
+question the harness was built to settle, and the answer is yes: both the
+plain block drag and the diacritic move-handle drag pass. The older
+conclusion that scripted drags "fall through to the block underneath" was an
+artifact of extension-injected synthetic events; Playwright drives real CDP
+input. Two real defects sit behind that headline, and `e2e/harf.ts` works
+around both — **the workarounds are the bug's shape, so delete them when the
+bug goes, not the tests**:
+
+- **A hover-mounted diacritic handle flickers off on alternate mouse
+  moves.** In `DiacriticHoverHandles`, the hover hit `Rect` and the handle
+  `Circle` are siblings, so as soon as the mounted handle covers the
+  pointer, the next mousemove retargets hover to the `Circle` and fires
+  `mouseleave` on the `Rect`, clearing `hoveredKey` and unmounting the
+  handle. Measured: over eight 0.5px moves across a mark, the handle is
+  mounted on exactly every other one, and `stage.getIntersection` alternates
+  `Circle` / `Rect.diacritic-hit` in lockstep. `armDiacriticMoveHandle`
+  re-issues the same move until the pointer sits on a mounted handle, then
+  stops moving.
+- **A drag whose first step is small loses the handle mid-gesture.** Konva
+  suppresses its enter/leave processing only once a drag's status reaches
+  `dragging`, not while it is merely `ready` — so the first mousemove still
+  retargets hover, the overlay unmounts the node the drag is attached to,
+  and the gesture dies attached to an orphan. Measured at the app's default
+  2.75x zoom: first steps of 2px and 10px lose it, 20px and 40px complete
+  normally. `dragFromHere` therefore presses without a preceding move and
+  moves in a single jump. `draggingKey`, the sticky-hover flag meant to
+  prevent this, is set in `onDragStart` — which runs *after* the
+  `mouseleave` that has already unmounted the handle.
+
+`shapeText` also throws on empty text (`JSON.parse` of an empty shaping
+result), logged as a `console.error` when a user clears the Content
+textarea. Caught and non-fatal, but it means the boot test's
+"no console errors" assertion cannot be widened to the whole suite as-is.
+
+Every stream from Phase 1 of the 2026-08-14 program on owns its own
+`e2e/<stream>.spec.ts`, so those files never conflict; the shared helpers
+live in `e2e/harf.ts`.
 
 ## Deferred features
 
