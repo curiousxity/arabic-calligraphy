@@ -25,3 +25,9 @@ dist-ssr
 *.sw?
 
 .worktrees/
+
+# Offline font tooling venv (see scripts/FONTS.md)
+.venv/
+
+# Stroke-spine review sheets: regenerated on demand, not data.
+src/data/strokeSpines/*-sheet.png
