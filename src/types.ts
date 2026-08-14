@@ -1,4 +1,4 @@
-export type BlockType = "text" | "shapeFill" | "image" | "textPath";
+export type BlockType = "text" | "shapeFill" | "image" | "textPath" | "mirror";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 
@@ -129,6 +129,37 @@ export type TextPathBlock = BlockCommon & {
 // ---- STREAM-B: muthanna/radial — MirrorBlock. Stream B is also the sole
 // owner of the `BlockType` union (line 1) and the `Block` union just below
 // this phase, and may edit those two lines directly. ----
+
+/** How a mirror block transforms the content it borrows from its source. */
+export type MirrorMode = "mirrorX" | "mirrorY" | "radial";
+
+/**
+ * A block that draws *another* block's content under a transform — the
+ * classical muthanna (a composition and its reflection reading toward each
+ * other) and radial medallions.
+ *
+ * It has no content of its own: `sourceId` is looked up in `blocks` on every
+ * render, so editing the source re-renders every copy with no sync machinery.
+ * Its position, though, is entirely its own — the transform applies to the
+ * source's content, never to the source's place on the canvas.
+ *
+ * Like every other variant it carries the whole of `BlockCommon`, including
+ * the text/font fields no mirror renderer reads. That is the same deliberate
+ * simplification `ImageBlock` already makes.
+ *
+ * A mirror's source may never itself be a mirror — rejected at creation, and
+ * re-checked when resolving, which is what keeps the renderer from recursing.
+ */
+export type MirrorBlock = BlockCommon & {
+  type: "mirror";
+  /** The block whose content is reflected. Never another mirror. */
+  sourceId: number;
+  mode: MirrorMode;
+  /** Radial only: how many copies around the circle. 2–16, default 6. */
+  radialCount?: number;
+  /** Radial only: how far each copy sits from the mirror block's origin, in px. */
+  radialRadius?: number;
+};
 // ---- /STREAM-B ----
 
-export type Block = TextBlock | ShapeFillBlock | ImageBlock | TextPathBlock;
+export type Block = TextBlock | ShapeFillBlock | ImageBlock | TextPathBlock | MirrorBlock;

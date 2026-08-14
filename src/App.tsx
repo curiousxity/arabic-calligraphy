@@ -52,6 +52,13 @@ import {
 // ---- STREAM-A: artboard — imports ----
 // ---- /STREAM-A ----
 // ---- STREAM-B: muthanna/radial — imports ----
+import {
+  buildMirrorBlock,
+  dropOrphanedMirrors,
+  hasOrphanedMirrors,
+  isMirrorSourceCandidate,
+} from "./lib/mirror";
+import type { MirrorMode } from "./types";
 // ---- /STREAM-B ----
 // ---- STREAM-C: ornament library — imports ----
 // ---- /STREAM-C ----
@@ -1223,11 +1230,15 @@ const App: React.FC = () => {
           .filter((b) => (b as { type?: string }).type !== "shapeWarp")
           .map(stripMorphFields)
       : null;
-    // `let` so a parallel stream's sanitation region below can reassign it.
-    // eslint-disable-next-line prefer-const -- reassigned inside the STREAM-B region once that stream lands
+    // `let` because the STREAM-B sanitation region below reassigns it.
     let blocksToLoad: Block[] | null = parsedBlocks;
     // ---- STREAM-B: muthanna/radial — payload sanitation (reassign
     // blocksToLoad, e.g. dropping mirrors whose sourceId no longer resolves) ----
+    // A mirror renders its source's content, so one whose source is missing
+    // from the payload would occupy the layer list and the selection while
+    // drawing nothing. Dropped on load for the same reason, and by the same
+    // precedent, as the `shapeWarp` filter above.
+    if (blocksToLoad) blocksToLoad = dropOrphanedMirrors(blocksToLoad);
     // ---- /STREAM-B ----
     const loadedBlocks: Block[] = blocksToLoad ?? blocks;
     if (blocksToLoad) setBlocks(blocksToLoad);
@@ -1731,7 +1742,63 @@ const App: React.FC = () => {
   const p1aCanvasProps: Partial<CanvasStageProps> = {};
   // ---- /STREAM-A ----
   // ---- STREAM-B: muthanna/radial — handlers & props ----
-  const p1bSidebarProps: Partial<SidebarProps> = {};
+  /**
+   * A mirror reflects exactly one block, so the add actions need exactly one
+   * block selected — and that block may not itself be a mirror. Rejecting a
+   * mirror here is the whole cycle guard: with one level only, no chain of
+   * sources can close on itself and `MirrorBlockView` can never recurse.
+   */
+  const mirrorSourceCandidate =
+    effectiveSelectedIds.length === 1 && isMirrorSourceCandidate(selectedBlock)
+      ? selectedBlock
+      : null;
+
+  const addMirrorBlock = (mode: MirrorMode) => {
+    if (!mirrorSourceCandidate) return;
+    pushHistory();
+    const newId = createNextId();
+    const block = buildMirrorBlock(newId, mirrorSourceCandidate, mode);
+    setBlocks((prev) => [...prev, block]);
+    setSelectedIds([]);
+    setSelectedId(newId);
+  };
+
+  const selectedMirrorSource =
+    selectedBlock?.type === "mirror"
+      ? blocks.find((b) => b.id === selectedBlock.sourceId)
+      : undefined;
+
+  /**
+   * Deleting a source takes its reflections with it.
+   *
+   * This lives in an effect over `blocks` rather than inside
+   * `deleteSelectedBlock` so that *every* route to a vanished source is
+   * covered — the delete button, the Delete key, the Layers panel's own
+   * delete, a reorder that drops one. It deliberately does not `pushHistory`:
+   * the action that removed the source already pushed, and the snapshot it
+   * took still holds both blocks, so one undo restores the pair.
+   */
+  useEffect(() => {
+    if (!hasOrphanedMirrors(blocks)) return;
+    const kept = dropOrphanedMirrors(blocks);
+    const keptIds = new Set(kept.map((b) => b.id));
+    setBlocks(kept);
+    setSelectedIds((prev) => prev.filter((id) => keptIds.has(id)));
+    setSelectedId((prev) =>
+      prev != null && !keptIds.has(prev) ? kept[kept.length - 1]?.id ?? null : prev
+    );
+  }, [blocks]);
+
+  const p1bSidebarProps: Partial<SidebarProps> = {
+    onAddMirrorBlock: addMirrorBlock,
+    canAddMirrorBlock: mirrorSourceCandidate != null,
+    onSelectMirrorSource: () => {
+      if (selectedMirrorSource) selectBlock(selectedMirrorSource.id);
+    },
+    mirrorSourceLabel: selectedMirrorSource
+      ? selectedMirrorSource.name ?? `Block ${selectedMirrorSource.id}`
+      : undefined,
+  };
   const p1bCanvasProps: Partial<CanvasStageProps> = {};
   // ---- /STREAM-B ----
   // ---- STREAM-C: ornament library — handlers & props ----

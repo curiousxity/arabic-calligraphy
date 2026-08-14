@@ -6,6 +6,11 @@ import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
 import { TextPathEditOverlay } from "./TextPathEditOverlay";
 import { ImageBlockView } from "./ImageBlockView";
+// STREAM-B (muthanna/radial): the file has no anchored import region, so
+// these two sit with the other renderer imports. Used only by the STREAM-B
+// render case further down.
+import { MirrorBlockView } from "./MirrorBlockView";
+import { resolveMirrorSource } from "../lib/mirror";
 import { ZoomInIcon, ZoomOutIcon, FrameIcon, HandIcon } from "./Icons";
 import { isTypingTarget } from "../lib/dom";
 import {
@@ -715,6 +720,28 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
               };
 
               // ---- STREAM-B: muthanna/radial — render case (mirror blocks) ----
+              // A mirror draws another block's content, so its source is
+              // looked up in `blocks` here on every render — that lookup is
+              // the entire "stays live as the source is edited" mechanism.
+              // An unresolvable source renders nothing; App's orphan pass
+              // then removes the block.
+              if (block.type === "mirror") {
+                return (
+                  <MirrorBlockView
+                    key={block.id}
+                    {...commonProps}
+                    source={resolveMirrorSource(blocks, block)}
+                    mode={block.mode}
+                    radialCount={block.radialCount}
+                    radialRadius={block.radialRadius}
+                    x={block.x}
+                    y={block.y}
+                    rotation={block.rotation ?? 0}
+                    opacity={block.opacity ?? 1}
+                    locked={block.locked}
+                  />
+                );
+              }
               // ---- /STREAM-B ----
               if (block.type === "image") {
                 return (

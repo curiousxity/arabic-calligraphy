@@ -97,6 +97,26 @@ defects under Known limitations, and the mechanics in `CLAUDE.md`'s
 <!-- ---- STREAM-A: artboard — add your Shipped entry here ---- -->
 <!-- ---- /STREAM-A ---- -->
 <!-- ---- STREAM-B: muthanna/radial — add your Shipped entry here ---- -->
+
+### 2026-08-14 — Muthanna & radial composition (stream B)
+
+A fifth block type, `mirror`, that re-renders another block's content under a
+reflection or a radial repetition and stays live as the source is edited.
+Added from Block Controls with exactly one non-mirror block selected; a
+`Mirror` type panel carries the mode, the radial count (2–16) and radius, and
+a "Select source" button. How it works and why it is built this way is in
+CLAUDE.md, "Mirror blocks — muthanna and radial".
+
+Covered by `src/lib/mirror.test.ts` (radial angles/offsets, the cycle guard,
+orphan filtering — 25 assertions) and `e2e/mirror.spec.ts` (a mirror draws
+the source's ink *reflected*, editing the source changes it, deleting the
+source removes it, a radial with 8 copies puts ink on all eight spokes).
+
+Known gaps, all deliberate: nesting mirrors, per-copy styling, bending a
+reflection to kiss the source's baseline, and "flatten to independent
+blocks" are all out of scope. The Layers panel shows a mirror with the plain
+text badge, since that file was not this stream's to edit.
+
 <!-- ---- /STREAM-B ---- -->
 <!-- ---- STREAM-C: ornament library — add your Shipped entry here ---- -->
 <!-- ---- /STREAM-C ---- -->
