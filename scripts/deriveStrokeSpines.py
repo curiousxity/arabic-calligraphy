@@ -493,19 +493,19 @@ def compute_node_bbox(desc):
     return (min(xs), min(ys), max(xs), max(ys))
 
 
-def make_seed_box(desc, real_bbox):
-    """Builds a `seed_box(nodes) -> (x, y)` function: the Python equivalent of
-    the app's `mapNormToRealBox` (schemaGeometry.ts), applied to a stroke's
-    own node span rather than a single point. Normalizes the span's midpoint
-    against the schema's whole-glyph node bbox (`compute_node_bbox`), then
-    maps that 0-1 proportion onto the REAL glyph's own ink bounding box
-    (`real_bbox`, from `glyph_bbox_font_units`).
+def make_seed_mapper(desc, real_bbox):
+    """Builds a `map_point(x, y) -> (x, y)` function: the Python equivalent of
+    the app's `mapNormToRealBox` (schemaGeometry.ts) for a single schema-space
+    point. Normalizes against the schema's whole-glyph node bbox
+    (`compute_node_bbox`), then maps that 0-1 proportion onto the REAL
+    glyph's own ink bounding box (`real_bbox`, from `glyph_bbox_font_units`).
 
-    This is a weak hint used only to rank match candidates in `match_strokes`
-    — never a gate — and is deliberately the same proportional mapping this
-    project exists to replace, kept alive here only as a ranking signal; see
-    the module docstring / CLAUDE.md for why it must never leak into shipped
-    geometry.
+    This is a weak hint — used only to rank match candidates in
+    `match_strokes` (via `make_seed_box`, below) and, since fix round 1, to
+    canonicalise which end of a matched branch is which (via
+    `canonicalize_branch_orientation`) — never a gate, and deliberately the
+    same proportional mapping this project exists to replace; see the module
+    docstring / CLAUDE.md for why it must never leak into shipped geometry.
 
     Both the schema's node space and `real_bbox` are y-up (baseline-up
     schema convention; font-unit outline convention), so — unlike
@@ -518,12 +518,25 @@ def make_seed_box(desc, real_bbox):
     rx0, ry0, rx1, ry1 = real_bbox
     rw, rh = rx1 - rx0, ry1 - ry0
 
+    def map_point(x, y):
+        nx = (x - sx0) / sw
+        ny = (y - sy0) / sh
+        return (rx0 + nx * rw, ry0 + ny * rh)
+
+    return map_point
+
+
+def make_seed_box(desc, real_bbox):
+    """Builds a `seed_box(nodes) -> (x, y)` function on top of
+    `make_seed_mapper`, mapping a stroke's own node span's midpoint
+    (`nodes[0]`/`nodes[-1]` averaged) rather than a single point — this is
+    the ranking hint `match_strokes` uses to pick a candidate branch."""
+    map_point = make_seed_mapper(desc, real_bbox)
+
     def seed_box(nodes):
         mx = (nodes[0]["x"] + nodes[-1]["x"]) / 2
         my = (nodes[0]["y"] + nodes[-1]["y"]) / 2
-        nx = (mx - sx0) / sw
-        ny = (my - sy0) / sh
-        return (rx0 + nx * rw, ry0 + ny * rh)
+        return map_point(mx, my)
 
     return seed_box
 
@@ -544,6 +557,61 @@ def node_t_values(nodes):
         acc += ((pts[i + 1][0] - pts[i][0]) ** 2 + (pts[i + 1][1] - pts[i][1]) ** 2) ** 0.5
         ts.append(acc / total)
     return ts
+
+
+# Fix round 1, CRITICAL 1. `glyph_branches`' skeleton walk gives each branch
+# an arbitrary direction — nothing about it is tied to which end corresponds
+# to the schema stroke's fromNode vs toNode. `arc_slice` always slices from a
+# polyline's own start, so a branch matched "backwards" relative to the
+# stroke's authored direction ships a spine that is either reversed in full
+# (a StrokeSpine.points contract violation) or, for a zone that covers only
+# part of the stroke, sliced from the WRONG END entirely (a real geometry
+# error, up to 3+ nuqta off — worse than the mapping this project replaces).
+# The old `if t0 > t1: reverse` handling in build_table only ever keys on
+# schema node index order (never descending in any authored zone) and cannot
+# see this at all. The fix is to canonicalise the BRANCH's orientation once
+# per matched stroke, before any zone slicing, using the same weak
+# proportional seed mapping `make_seed_box` already relies on to rank
+# candidates — here to decide, not to guess geometry.
+ORIENTATION_AMBIGUOUS_NUQTA = 0.5
+
+
+def canonicalize_branch_orientation(branch, stroke, map_point, nuqta_units):
+    """Reorients `branch` so its first point sits nearer the stroke's own
+    fromNode end (`nodes[0]`, mapped through `map_point`) than its last point
+    does — decided from each raw branch endpoint's distance to the fromNode
+    seed *alone*, not a joint two-anchor (fromNode + toNode) sum.
+
+    A joint two-anchor sum was tried first (minimize
+    dist(start,fromSeed)+dist(end,toSeed) vs the swapped pairing) and
+    measured directly against the verification check described in the
+    fix-round-1 report: it produced confidently WRONG orientations on 6 of
+    65 shipped spines, every time because the *toNode* seed's own error (the
+    proportional mapping this project exists to replace is only accurate to
+    a median 0.37 / p90 1.43 nuqta — see spineError.test.ts) was large
+    enough to outweigh a fromNode pairing that was, on its own, clearly
+    correct. Anchoring on one estimate instead of summing two independently
+    noisy ones removes that failure mode and is what the shipped table is
+    actually verified against.
+
+    Returns (oriented_branch, d_start, d_end) — the two raw-endpoint
+    distances to the fromNode seed, in nuqta. `oriented_branch` is `None`
+    when they are within `ORIENTATION_AMBIGUOUS_NUQTA` of each other (no
+    confident way to choose), in which case the caller drops the stroke's
+    spines rather than guess, per "a rejected match ships nothing".
+    """
+    nodes = stroke["path"]["nodes"]
+    seed_from = map_point(nodes[0]["x"], nodes[0]["y"])
+    b_start, b_end = branch[0], branch[-1]
+
+    def dist(p, q):
+        return ((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2) ** 0.5
+
+    d_start = dist(b_start, seed_from) / nuqta_units
+    d_end = dist(b_end, seed_from) / nuqta_units
+    if abs(d_start - d_end) < ORIENTATION_AMBIGUOUS_NUQTA:
+        return None, d_start, d_end
+    return (branch if d_start < d_end else list(reversed(branch))), d_start, d_end
 
 
 def match_strokes(desc, branches, nuqta_units, seed_box):
@@ -590,9 +658,17 @@ def match_strokes(desc, branches, nuqta_units, seed_box):
     for i, j in zip(rows, cols):
         if cost[i, j] >= 1e6:
             continue
-        others = sorted(c for k, c in enumerate(cost[i]) if k != j)
+        # Real competitors only — a 1e6 sentinel (the `allowed()` class rule
+        # ruling out DOT vs body branches) is not a runner-up, it is a
+        # non-candidate. Including it made every stroke with exactly one
+        # allowed branch score a ~1e6 margin and pass the margin gate
+        # unconditionally regardless of fit quality (fix round 1, IMPORTANT
+        # 3). `margins[i] = None` now means "no real competitor to measure
+        # confidence against" — gate() treats that as inapplicable rather
+        # than as a pass, and the caller reports it separately.
+        real_others = sorted(c for k, c in enumerate(cost[i]) if k != j and c < 1e6)
         assignment[i] = j
-        margins[i] = (others[0] - cost[i, j]) if others else float("inf")
+        margins[i] = (real_others[0] - cost[i, j]) if real_others else None
     return assignment, margins
 
 
@@ -605,30 +681,50 @@ LEN_RATIO_BAND = (0.5, 2.0)
 
 
 def gate(stroke, branch, margin, nuqta_units):
-    """Returns None if the entry may ship, else the reason it was dropped."""
+    """Returns None if the entry may ship, else the reason it was dropped.
+
+    `margin=None` means match_strokes found no real competing branch to
+    measure confidence against (see IMPORTANT 3, fix round 1) — the margin
+    check is skipped rather than treated as a pass or a fail; the caller
+    tracks that case separately as "single candidate" so it is visible
+    rather than silently folded into ordinary passes.
+    """
     want = (stroke.get("lengthDots") or 0) * nuqta_units
     got = polyline_length(branch)
     if want > 0:
         ratio = got / want
         if not (LEN_RATIO_BAND[0] <= ratio <= LEN_RATIO_BAND[1]):
             return f"length ratio {ratio:.2f}"
-    if margin < MIN_MARGIN:
+    if margin is not None and margin < MIN_MARGIN:
         return f"margin {margin:.2f}"
     if len(branch) < 2:
         return "degenerate branch"
     return None
 
 
-MAX_CONNECTIVITY_VIOLATIONS = 2
+# Fix round 1, IMPORTANT 2: replaced the absolute MAX_CONNECTIVITY_VIOLATIONS
+# threshold (was 2). Audited against all 104 non-ligature schemas: 31 glyphs
+# assert 0 schema-adjacent stroke pairs, 62 assert 1, 5 assert 2, and only 6
+# assert 3 — so an absolute threshold of "> 2" could arithmetically fire on
+# at most 6 of 104 schemas, regardless of which font or how badly a glyph was
+# misread; it was inert by construction, not because matches were good. A
+# ratio is proportionate to how much adjacency structure the schema actually
+# claims for that glyph, and is reachable on the 73 schemas that assert any
+# adjacency at all.
+MAX_CONNECTIVITY_RATIO = 0.5
 
 
 def connectivity_violations(desc, strokes, assignment, branches, nuqta_units):
-    """How many schema-adjacent stroke pairs got non-adjacent branches.
+    """Returns (violations, adjacent_pairs).
 
-    Two strokes are adjacent when they share a node position; their matched
-    branches should then meet at an endpoint. A glyph with several violations
-    has had its structure misread, not one stroke mismatched, so the caller
-    drops it whole.
+    `adjacent_pairs` is a property of the SCHEMA alone — how many stroke
+    pairs it asserts share a node — counted regardless of whether either
+    side ended up assigned, so it is comparable across glyphs and fonts.
+    `violations` is how many of those pairs got matched branches whose
+    endpoints don't meet (only countable for pairs where both sides were
+    assigned). A glyph with more than MAX_CONNECTIVITY_RATIO of its own
+    asserted adjacencies violated has had its structure misread, not one
+    stroke mismatched, so the caller drops it whole.
     """
     def endpoints(i):
         b = branches[assignment[i]]
@@ -636,11 +732,10 @@ def connectivity_violations(desc, strokes, assignment, branches, nuqta_units):
 
     near = lambda p, q: ((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2) ** 0.5 < nuqta_units
 
+    adjacent_pairs = 0
     violations = 0
     for i in range(len(strokes)):
         for j in range(i + 1, len(strokes)):
-            if i not in assignment or j not in assignment:
-                continue
             ni = strokes[i][1]["path"]["nodes"]
             nj = strokes[j][1]["path"]["nodes"]
             shares_node = any(
@@ -649,10 +744,31 @@ def connectivity_violations(desc, strokes, assignment, branches, nuqta_units):
             )
             if not shares_node:
                 continue
+            adjacent_pairs += 1
+            if i not in assignment or j not in assignment:
+                continue
             ei, ej = endpoints(i), endpoints(j)
             if not any(near(p, q) for p in ei for q in ej):
                 violations += 1
-    return violations
+    return violations, adjacent_pairs
+
+
+def schema_adjacent_pairs(desc):
+    """Same adjacency count as `connectivity_violations`' denominator, but
+    computed straight from the schema with no font/branches/assignment in
+    hand — a purely structural property of the authored data, used to print
+    the adjacency histogram in `main` (fix round 1, IMPORTANT 2: this ceiling
+    is set by the schema, not by any one font, which is why the old absolute
+    threshold was inert across every font, not just this one)."""
+    strokes = [(c, s) for c in desc["glyph"]["components"] for s in c["strokes"]]
+    count = 0
+    for i in range(len(strokes)):
+        for j in range(i + 1, len(strokes)):
+            ni = strokes[i][1]["path"]["nodes"]
+            nj = strokes[j][1]["path"]["nodes"]
+            if any(abs(a["x"] - b["x"]) < 1e-6 and abs(a["y"] - b["y"]) < 1e-6 for a in ni for b in nj):
+                count += 1
+    return count
 
 
 CONSENSUS_MIN_FONTS = 4
@@ -774,13 +890,34 @@ def clamp_index(idx, n):
     return idx if isinstance(idx, int) and 0 <= idx < n else None
 
 
-def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple[dict, dict]:
+def zone_count(desc):
+    """Total authored stretchZones across every stroke of one schema entry —
+    the unit fix round 1's reconciliation accounts every zone in."""
+    return sum(
+        len(s["editBehavior"]["stretchZones"])
+        for c in desc["glyph"]["components"] for s in c["strokes"]
+    )
+
+
+def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple[dict, dict, dict]:
     """Builds one font's SpineTable in memory (nothing is written here — the
     caller writes only after the cross-font consensus pass, per Step 3).
 
-    Returns (table, drops), drops = {"length", "margin", "connectivity"}
-    counts of spine entries dropped for that reason (consensus is a separate,
+    Returns (table, drops, accounting).
+
+    `drops` = {"length", "margin", "orientation", "connectivity"}: authored
+    zones dropped by the four per-match gates (consensus is a separate,
     later pass over every font at once — see drop_cross_font_outliers).
+
+    `accounting` reconciles every authored zone to exactly one bucket (fix
+    round 1's "make the report's numbers total" requirement) — for a given
+    font, `accounting["shipped"] + sum(drops.values()) +
+    accounting["unassigned"] + accounting["no_glyph_name"] +
+    accounting["no_geometry"] + accounting["collision"] +
+    accounting["invalid_zone"]` must equal that font's total authored zone
+    count (`zone_count` summed over `schemas`). `single_candidate` is
+    reported separately and is a *subset* of `shipped`, not an addend of its
+    own — see IMPORTANT 3.
     """
     from fontTools.ttLib import TTFont
     path = font_path(family)
@@ -799,22 +936,27 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
         "fontSha256": sha256(path),
         "glyphs": {},
     }
-    drops = {"length": 0, "margin": 0, "connectivity": 0}
+    drops = {"length": 0, "margin": 0, "orientation": 0, "connectivity": 0}
+    accounting = {
+        "shipped": 0, "unassigned": 0, "no_glyph_name": 0, "no_geometry": 0,
+        "collision": 0, "invalid_zone": 0, "single_candidate": 0,
+    }
     sheet_glyph_names = []
     spines_by_glyph = {}
     seen_glyph_ids = {}  # glyph_id -> (unicode_hex, form) that claimed it first, for a deterministic collision log
 
     for unicode_hex, form in sorted(schemas):
         desc = schemas[(unicode_hex, form)]
+        n_zones = zone_count(desc)
         glyph_name = glyph_name_for(tt, unicode_hex, form)
         if glyph_name is None:
+            accounting["no_glyph_name"] += n_zones
             continue
 
         branches = glyph_branches(tt, glyph_name, upm, nuqta_units)
-        if not branches:
-            continue
-        bbox = glyph_bbox_font_units(tt, glyph_name)
-        if bbox is None:
+        bbox = glyph_bbox_font_units(tt, glyph_name) if branches else None
+        if not branches or bbox is None:
+            accounting["no_geometry"] += n_zones
             continue
 
         if glyph_name not in sheet_glyph_names:
@@ -822,16 +964,24 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
 
         strokes = [(c, s) for c in desc["glyph"]["components"] for s in c["strokes"]]
         seed_box = make_seed_box(desc, bbox)
+        map_point = make_seed_mapper(desc, bbox)
         assignment, margins = match_strokes(desc, branches, nuqta_units, seed_box)
+
+        for i in range(len(strokes)):
+            if i not in assignment:
+                accounting["unassigned"] += len(strokes[i][1]["editBehavior"]["stretchZones"])
         if not assignment:
             continue
 
         # Connectivity is checked on the *raw* assignment, before any
         # per-stroke gate runs — a structurally misread glyph is dropped
         # whole, not stroke by stroke. (Step 3's "before anything is
-        # written".)
-        violations = connectivity_violations(desc, strokes, assignment, branches, nuqta_units)
-        if violations > MAX_CONNECTIVITY_VIOLATIONS:
+        # written".) Fix round 1, IMPORTANT 2: ratio, not absolute count —
+        # see MAX_CONNECTIVITY_RATIO's own comment for why.
+        violations, adjacent_pairs = connectivity_violations(desc, strokes, assignment, branches, nuqta_units)
+        if adjacent_pairs > 0 and violations > MAX_CONNECTIVITY_RATIO * adjacent_pairs:
+            print(f"    {family}: {desc['glyph']['id']} connectivity {violations}/{adjacent_pairs} "
+                  f"violations exceeds ratio {MAX_CONNECTIVITY_RATIO} — dropping glyph whole")
             # Every zone that would have been attempted here is the cost of
             # this drop, whether or not it would individually have passed
             # the length/margin gate — the whole match is discarded.
@@ -839,6 +989,8 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
                 len(strokes[i][1]["editBehavior"]["stretchZones"]) for i in assignment
             )
             continue
+        elif violations > 0:
+            print(f"    {family}: {desc['glyph']['id']} connectivity {violations}/{adjacent_pairs} violations (kept)")
 
         glyph_id = tt.getGlyphID(glyph_name)  # runtime table is keyed by glyph id, not name
         gid_key = str(glyph_id)
@@ -846,6 +998,9 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
             prior = seen_glyph_ids[gid_key]
             print(f"    {family}: glyph id {glyph_id} ({glyph_name}) already claimed by "
                   f"{prior}; skipping {(unicode_hex, form)} (deterministic first-wins)")
+            accounting["collision"] += sum(
+                len(strokes[i][1]["editBehavior"]["stretchZones"]) for i in assignment
+            )
             continue
 
         spines = []
@@ -853,10 +1008,11 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
         for i, j in sorted(assignment.items()):
             branch = branches[j]
             stroke = strokes[i][1]
+            n_stroke_zones = len(stroke["editBehavior"]["stretchZones"])
             reason = gate(stroke, branch, margins[i], nuqta_units)
             if reason is not None:
                 if reason.startswith("length"):
-                    drops["length"] += len(stroke["editBehavior"]["stretchZones"])
+                    drops["length"] += n_stroke_zones
                 else:
                     # "margin ..." and the rare "degenerate branch" case both
                     # land here: both are per-stroke match-confidence
@@ -864,17 +1020,43 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
                     # when lengthDots is absent (so the length gate can't
                     # fire first) and the matched branch has under two
                     # points — rare enough not to warrant its own report
-                    # column beyond the four Step 3 names.
-                    drops["margin"] += len(stroke["editBehavior"]["stretchZones"])
+                    # bucket.
+                    drops["margin"] += n_stroke_zones
                 continue
+
+            # Fix round 1, CRITICAL 1: canonicalise which end of the branch
+            # is which BEFORE any zone slicing — see
+            # canonicalize_branch_orientation's own comment. An ambiguous
+            # orientation drops the whole stroke's spines rather than guess.
+            oriented, fwd, bwd = canonicalize_branch_orientation(branch, stroke, map_point, nuqta_units)
+            if oriented is None:
+                drops["orientation"] += n_stroke_zones
+                continue
+            branch = oriented
+
+            if margins[i] is None:
+                # No real competing branch existed for this stroke (fix
+                # round 1, IMPORTANT 3) — the margin gate could not speak to
+                # confidence here, only the length gate did. Still ships if
+                # it passed, but counted separately so this is visible.
+                accounting["single_candidate"] += n_stroke_zones
 
             nodes = stroke["path"]["nodes"]
             t_values = node_t_values(nodes)
             n = len(nodes)
             for zone_index, zone in enumerate(stroke["editBehavior"]["stretchZones"]):
-                from_idx = clamp_index(zone.get("fromNode"), n) or 0
+                from_idx = clamp_index(zone.get("fromNode"), n)
                 to_idx = clamp_index(zone.get("toNode"), n)
-                to_idx = to_idx if to_idx is not None else n - 1
+                if from_idx is None or to_idx is None:
+                    # Fix round 1, MINOR 4: an out-of-range zone index used to
+                    # silently fall back to 0/n-1, widening the zone to the
+                    # whole stroke — exactly the papering-over fallback the
+                    # global constraints forbid. Drop the zone instead. Latent
+                    # on every authored zone as of this fix (none are
+                    # out-of-range today); counted so a future bad schema file
+                    # doesn't fail this silently either.
+                    accounting["invalid_zone"] += 1
+                    continue
                 t0, t1 = t_values[from_idx], t_values[to_idx]
                 sliced = arc_slice(branch, min(t0, t1), max(t0, t1))
                 if t0 > t1:
@@ -894,13 +1076,14 @@ def build_table(family: str, ratio: float, sheets: bool, schemas: dict) -> tuple
             "schemaGlyph": desc["glyph"]["id"],
             "spines": spines,
         }
+        accounting["shipped"] += len(spines)
         seen_glyph_ids[gid_key] = (unicode_hex, form)
         spines_by_glyph.setdefault(glyph_name, []).extend(sheet_entries)
 
     if sheets:
         write_sheet(tt, family, upm, nuqta_units, sheet_glyph_names, spines_by_glyph)
 
-    return table, drops
+    return table, drops, accounting
 
 
 def main() -> None:
@@ -914,23 +1097,41 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     schemas = load_schemas()
 
+    total_zones = sum(zone_count(desc) for desc in schemas.values())
+    print(f"schemas: {len(schemas)} non-ligature entries, {total_zones} authored zones")
+
+    # Fix round 1, IMPORTANT 2: the connectivity ceiling is a property of the
+    # SCHEMA data alone (how many stroke pairs a glyph's own authoring
+    # asserts share a node), not of any one font — printed once here,
+    # independent of which fonts are processed, so a reader can see why the
+    # old absolute threshold was inert on every font, not just this one.
+    adjacency_hist = {}
+    for desc in schemas.values():
+        n = schema_adjacent_pairs(desc)
+        adjacency_hist[n] = adjacency_hist.get(n, 0) + 1
+    hist_str = ", ".join(f"{n} pairs: {c} glyphs" for n, c in sorted(adjacency_hist.items()))
+    print(f"schema adjacency (structural, font-independent): {hist_str}")
+    print()
+
     # Every font's table is built in memory first; nothing is written until
     # the cross-font consensus pass (the fourth gate) has run over all of
     # them, since it needs more than one font in hand to have a consensus to
     # compare against.
-    tables, all_drops = {}, {}
+    tables, all_drops, all_accounting = {}, {}, {}
     for family in families:
         if family not in ratios:
             print(f"  skip {family}: no measured nuqta, out of scope")
             continue
-        table, drops = build_table(family, ratios[family], args.sheets, schemas)
+        table, drops, accounting = build_table(family, ratios[family], args.sheets, schemas)
         tables[family] = table
         all_drops[family] = drops
+        all_accounting[family] = accounting
 
     consensus_drops = drop_cross_font_outliers(tables, ratios) if tables else {}
 
     print()
-    header = f"{'font':<18} {'glyphs':>7} {'spines':>7} {'length':>8} {'margin':>8} {'connectivity':>13} {'consensus':>10}"
+    header = (f"{'font':<18} {'glyphs':>7} {'spines':>7} {'length':>8} {'margin':>8} "
+              f"{'orient.':>8} {'connect.':>9} {'consensus':>10}")
     print(header)
     print("-" * len(header))
     for family in sorted(tables):
@@ -939,11 +1140,35 @@ def main() -> None:
         n_glyphs = len(table["glyphs"])
         n_spines = sum(len(e["spines"]) for e in table["glyphs"].values())
         print(f"{family:<18} {n_glyphs:>7} {n_spines:>7} {drops['length']:>8} {drops['margin']:>8} "
-              f"{drops['connectivity']:>13} {consensus_drops.get(family, 0):>10}")
+              f"{drops['orientation']:>8} {drops['connectivity']:>9} {consensus_drops.get(family, 0):>10}")
 
         out = OUT_DIR / f"{family}.json"
         out.write_text(json.dumps(table, separators=(",", ":")) + "\n", encoding="utf-8")
         print(f"  {family}: {n_glyphs} glyphs, {n_spines} spines -> {out.relative_to(ROOT)}")
+
+    # Fix round 1: "make the report's numbers total" — reconcile every
+    # authored zone to exactly one bucket. Evaluated against the pre-
+    # consensus `accounting["shipped"]` (consensus is a later, separate pass
+    # over already-shipped spines, not a new attribution of an authored
+    # zone), so this holds regardless of what consensus later removes.
+    print()
+    for family in sorted(all_accounting):
+        acc = all_accounting[family]
+        drops = all_drops[family]
+        accounted = (acc["shipped"] + sum(drops.values()) + acc["unassigned"]
+                     + acc["no_glyph_name"] + acc["no_geometry"] + acc["collision"]
+                     + acc["invalid_zone"])
+        status = "OK" if accounted == total_zones else "MISMATCH"
+        print(f"  {family}: reconcile {accounted}/{total_zones} zones [{status}] "
+              f"(shipped {acc['shipped']}, length {drops['length']}, margin {drops['margin']}, "
+              f"orientation {drops['orientation']}, connectivity {drops['connectivity']}, "
+              f"unassigned {acc['unassigned']}, no_glyph_name {acc['no_glyph_name']}, "
+              f"no_geometry {acc['no_geometry']}, collision {acc['collision']}, "
+              f"invalid_zone {acc['invalid_zone']}; of which single_candidate {acc['single_candidate']})")
+        assert accounted == total_zones, (
+            f"{family}: {accounted} zones accounted for out of {total_zones} authored — "
+            f"some zone was silently dropped without an accounting bucket"
+        )
 
 
 if __name__ == "__main__":
