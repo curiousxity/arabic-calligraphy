@@ -105,6 +105,28 @@ driven by them is unverifiable in CI by design.
   result. Also unverified: whether a spine-derived handle actually stretches
   the stroke it names, and whether the `fontFamily` argument survives at the
   two call sites no test guards (see the trap in `CLAUDE.md`).
+- **Second browser pass 2026-08-14, after the glyph-id fix.** Now confirmed,
+  on Amiri — the font whose spines the fix recovered, and where `حرف`
+  previously produced no handle at all:
+  - The panel tracks the font. Switching from the default to Amiri keeps
+    `ر`'s row live at 1.00, with `ح` and `ف` still reading "no verified
+    stroke in this font". Both `useGlyphSchemaCatalog` call sites still pass
+    `fontFamily`, checked by reading them.
+  - **A spine-derived handle does stretch the stroke it names.** Typing into
+    `ر`'s factor field clamps to its own `maxFactor` (1.80 → 1.30), relabels
+    the row "ra arc · +1 nuqta", and visibly extends the ra's tail. `ح` and
+    `ف` do not move, so the edit does not drag unrelated parts of the word.
+  - One observation, not a new defect: the extension comes out as a thin
+    hairline off the tail's tip rather than the stroke continuing at its
+    designed weight. That is the open "strokes deform instead of extending"
+    limitation above, seen on a correctly anchored stroke.
+  - No console errors throughout.
+
+  **Still needing a human's hand on a real mouse**, unchanged: everything
+  involving the on-canvas dots — the no-jump property, "no dot where there is
+  no spine", and dragging one. A synthetic hover again produced no dot, which
+  is the tooling's limit rather than a result. The `حرف` cleft repro has also
+  not been re-compared since the tables changed.
 - **Covered by automation 2026-08-14, so no longer debt:** that a created
   handle's anchor lands on real ink, on three fonts and three words
   (`strokeSpines/endToEnd.test.ts`), and that every shipped spine is keyed
