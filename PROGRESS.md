@@ -81,15 +81,39 @@ regression, and what it would take to fix.
   straight-bounding-box maths behind those tools assumes away.
 - **Cloud sync has no conflict resolution** beyond overwrite-by-name. Same
   project name saved from two devices: last write wins.
+- **A diacritic handle unmounts while the pointer is on it.** Found
+  2026-08-14 by the Playwright harness and reproduced from measurements, not
+  inferred. The hover hit rect and the handle are sibling Konva nodes, so
+  the moment the mounted handle covers the pointer the next mouse move fires
+  `mouseleave` on the rect and the handle vanishes — it is present on
+  exactly every other move. The same race kills a slow drag outright: a
+  first step under ~20px (at default zoom) leaves the gesture attached to a
+  destroyed node and nothing happens, while 20px+ completes normally. Not a
+  regression — it is almost certainly what earlier passes were seeing when
+  they concluded handle drags "land on the block underneath". Full mechanics
+  and the measured numbers in `CLAUDE.md`'s "End-to-end tests"; unfixed
+  because the fix belongs in `DiacriticHoverHandles`, not in the harness.
+- **Clearing a block's text logs a console error.** `shapeText` calls
+  `JSON.parse` on an empty shaping result and throws `Unexpected end of JSON
+  input`. Caught and non-fatal — the block simply draws nothing, which is
+  correct — but it means an empty textarea is noisy in the console.
 
 ## Verification debt
 
 Things that pass tests but have not been exercised by a human. The line
 here is narrower than it was long assumed to be: scripted **hovers** do
 reach Konva's hover-mounted handles, so whether a dot appears, and where,
-can be checked by automation. Scripted **drags** do not — they land on the
-block underneath — so anything that depends on moving a handle stays
-unverifiable outside a real browser session.
+can be checked by automation.
+
+**Scripted drags reach them too — corrected 2026-08-14 by the Playwright
+harness.** Every earlier entry below that calls drags unverifiable was
+written against extension-injected synthetic events; Playwright drives real
+CDP input, and both a plain block drag and a diacritic move-handle drag now
+pass in CI-able tests. The gestures need shaping to survive the overlay's
+own unmount behaviour — see the two defects under Known limitations, and
+the mechanics in `CLAUDE.md`'s "End-to-end tests" — but they are no longer
+out of reach. The stroke-stretch dot drag specifically is still unwritten,
+not still impossible.
 
 - **Verified by hand 2026-08-13:** the join cleft on the original repro
   (much improved, see above); nuqta snap increments; the Alt bypass; the
@@ -172,6 +196,25 @@ unverifiable outside a real browser session.
 ---
 
 ## Shipped
+
+### 2026-08-14 — Playwright e2e harness (stream P)
+
+Seven browser tests, `npm run e2e`, ~4s wall clock, stable across repeated
+runs. Boot with no console errors; typing puts ink on the stage; a block
+drag moves the block by the drag delta; hovering a diacritic mounts its
+handles; dragging the move handle records an override; undo/redo round
+trips; Export PNG downloads a real file.
+
+The point of the stream was to settle whether automation can reach Konva's
+hover-mounted overlays at all. **It can** — trusted CDP input drives both
+the plain drag and the small-target handle drag. That corrects the standing
+assumption recorded under Verification debt, and it turned up two real
+defects in the diacritic overlay along the way (see Known limitations).
+
+`src/lib/testBridge.ts` is the only production file this added: a dev-only,
+read-only `window.__HARF__`, absent from `dist/`. Design and traps in
+`CLAUDE.md`'s "End-to-end tests"; spec in
+`docs/superpowers/specs/2026-08-14-stream-p-playwright.md`.
 
 ### 2026-08-14 — Spine tables keyed to the glyphs the app draws (Task 10)
 

@@ -14,6 +14,7 @@ import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useDebouncedHistoryPush } from "./hooks/useDebouncedHistoryPush";
 import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
+import { installTestBridge } from "./lib/testBridge";
 import { triggerDownload } from "./lib/download";
 import { STARTER_TEMPLATES, buildBlocksFromTemplate } from "./lib/templates";
 import { FONT_URLS } from "./hooks/useShapedGlyphs";
@@ -439,6 +440,19 @@ const App: React.FC = () => {
   const effectiveSelectedIds = useMemo(
     () => (selectedIds.length > 0 ? selectedIds : selectedId != null ? [selectedId] : []),
     [selectedIds, selectedId]
+  );
+
+  // STREAM-P (e2e test bridge). Dev-only, no-op in production builds — see
+  // lib/testBridge.ts. Re-installed whenever the values it exposes change,
+  // which is cheaper and less error-prone than threading them through refs.
+  useEffect(
+    () =>
+      installTestBridge({
+        getBlocks: () => blocks,
+        getSelectedIds: () => effectiveSelectedIds,
+        getStage: () => stageRef.current,
+      }),
+    [blocks, effectiveSelectedIds]
   );
 
   const selectBlock = useCallback(

@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -23,6 +24,13 @@ export default defineConfig({
         'node_modules/opentype.js/dist/opentype.module.js'
       ),
     },
+  },
+  test: {
+    // Vitest's default include glob matches `e2e/*.spec.ts`, and a
+    // Playwright spec loaded under vitest fails in a way that reads like a
+    // broken test rather than a misrouted one. `e2e/` belongs to
+    // `playwright.config.ts`; everything else stays at vitest's defaults.
+    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
   },
   build: {
     chunkSizeWarningLimit: 1200,

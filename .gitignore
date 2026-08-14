@@ -31,3 +31,9 @@ dist-ssr
 
 # Stroke-spine review sheets: regenerated on demand, not data.
 src/data/strokeSpines/*-sheet.png
+
+# Playwright output
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/

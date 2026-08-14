@@ -1,0 +1,19 @@
+{
+  "//": "Playwright transpiles without typechecking, so nothing else would catch a type error in here. Run `npx tsc --noEmit -p e2e/tsconfig.json`. Needs the DOM lib because page.evaluate() bodies are browser code, and vite/client because the helpers pull in src/lib/testBridge.ts.",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node", "vite/client"],
+    "strict": true,
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force"
+  },
+  "include": ["**/*.ts", "../playwright.config.ts"]
+}
