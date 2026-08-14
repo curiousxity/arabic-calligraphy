@@ -55,6 +55,13 @@ import {
   DistributeHorizontalIcon,
   DistributeVerticalIcon,
 } from "./Icons";
+// ---- STREAM-C: ornament library — import ----
+// The Phase 1 prep commit gave this file props/destructure/JSX anchors but no
+// import anchor, and the picker cannot be mounted without one. Kept as a
+// single labelled line at the end of the import block so the merge is
+// unambiguous — see the stream report.
+import { OrnamentPickerButton } from "./OrnamentPicker";
+// ---- /STREAM-C ----
 
 export type SidebarProps = {
   // Phase 1 parallel-stream prop declarations — each stream adds its own
@@ -64,6 +71,8 @@ export type SidebarProps = {
   // ---- STREAM-B: muthanna/radial — props ----
   // ---- /STREAM-B ----
   // ---- STREAM-C: ornament library — props ----
+  onInsertOrnamentShapeFill?: (pathData: string, w: number, h: number) => void;
+  onInsertOrnamentFrame?: (dataUrl: string, w: number, h: number) => void;
   // ---- /STREAM-C ----
   // ---- STREAM-D: tatweel kashida — props ----
   // ---- /STREAM-D ----
@@ -262,6 +271,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // ---- STREAM-B: muthanna/radial — destructure ----
   // ---- /STREAM-B ----
   // ---- STREAM-C: ornament library — destructure ----
+  onInsertOrnamentShapeFill,
+  onInsertOrnamentFrame,
   // ---- /STREAM-C ----
   // ---- STREAM-D: tatweel kashida — destructure ----
   // ---- /STREAM-D ----
@@ -1343,6 +1354,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* ---- STREAM-B: muthanna/radial — add-block buttons ---- */}
             {/* ---- /STREAM-B ---- */}
             {/* ---- STREAM-C: ornament library — add-block button ---- */}
+            {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
+              <OrnamentPickerButton
+                variant="circle"
+                onInsertShapeFill={onInsertOrnamentShapeFill}
+                onInsertFrame={onInsertOrnamentFrame}
+              />
+            )}
             {/* ---- /STREAM-C ---- */}
           </div>
 
@@ -1677,6 +1695,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="sectionPanel">
                 {/* ---- STREAM-C: ornament library — shape picker button ---- */}
+                {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
+                  <OrnamentPickerButton
+                    variant="wide"
+                    onInsertShapeFill={onInsertOrnamentShapeFill}
+                    onInsertFrame={onInsertOrnamentFrame}
+                  />
+                )}
                 {/* ---- /STREAM-C ---- */}
                   <div>
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>

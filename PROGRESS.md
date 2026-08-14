@@ -99,6 +99,27 @@ defects under Known limitations, and the mechanics in `CLAUDE.md`'s
 <!-- ---- STREAM-B: muthanna/radial — add your Shipped entry here ---- -->
 <!-- ---- /STREAM-B ---- -->
 <!-- ---- STREAM-C: ornament library — add your Shipped entry here ---- -->
+### 2026-08-14 — Ornament & frame library (stream C)
+
+Ten built-in shapes behind a "Shapes & frames" picker, reachable from the
+add-block row and from the Shape Fill panel. Each offers **Fill with text**
+(a Shape Fill block through the existing upload path) or **Insert as frame**
+(an image block from a data-URL SVG). All geometry is constructed from
+primitives, not traced. How it is put together, and the three traps in the
+geometry, are in CLAUDE.md's "Ornament & frame library".
+
+Verified: 30 unit tests (`src/lib/ornaments.test.ts`) — registry loads, every
+ornament survives `pathToPolygon` non-degenerately and stays inside its own
+viewBox, the ring's hole reads as hollow to the same ray cast Shape Fill
+uses, data URLs round-trip through `atob`. Four browser tests
+(`e2e/ornaments.spec.ts`) — thumbnails render, Escape closes without
+touching the canvas, a filled medallion lands square with tiled ink in it,
+a frame lands as an image whose baked colour is on the canvas.
+
+Known limits, both deliberate: a frame's colour cannot be changed after
+insert (it is a rasterized image — recolouring needs a vector-shape block
+type), and there is no way to import ornaments of your own beyond the
+existing "upload an SVG" button.
 <!-- ---- /STREAM-C ---- -->
 <!-- ---- STREAM-D: tatweel kashida — add your Shipped entry here ---- -->
 <!-- ---- /STREAM-D ---- -->
