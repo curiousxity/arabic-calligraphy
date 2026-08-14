@@ -138,11 +138,18 @@ describe("committed stroke spine tables", () => {
     const ratio = nuqtaEmRatio(family)!;
     const nuqtaUnits = ratio * table.unitsPerEm;
     for (const [glyphIdStr, entry] of Object.entries(table.glyphs)) {
-      const glyph = font.glyphs.get(Number(glyphIdStr));
+      const glyphId = Number(glyphIdStr);
       // A glyph id the font doesn't have means the table is stale relative to
       // this binary — exactly what this suite exists to catch, so fail loudly
-      // rather than skip it.
-      expect(glyph, `${family}: table references glyph ${glyphIdStr}, which this font file does not have`).toBeDefined();
+      // rather than skip it. Checked before calling font.glyphs.get(): an
+      // out-of-range id makes opentype.js throw
+      // "this.font._push is not a function" from inside get(), a message
+      // that points nowhere near a stale spine table.
+      expect(
+        glyphId,
+        `${family}: table references glyph ${glyphId}, which this font file does not have (numGlyphs ${font.numGlyphs}) — the table is stale relative to this binary`
+      ).toBeLessThan(font.numGlyphs);
+      const glyph = font.glyphs.get(glyphId);
       // Font units, y-up: getPath at size = unitsPerEm gives y-down, so flip
       // the spine's y to compare in the same space.
       const polygons = contoursToPolygons(
