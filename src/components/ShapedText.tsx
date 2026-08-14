@@ -1011,6 +1011,8 @@ export const ShapedText: React.FC<Props> = ({
           glyphHitBoxes={glyphHitBoxes}
           offsetX={bx + localDrawX}
           offsetY={by + localDrawY}
+          fontSize={fontSize}
+          fontFamily={fontFamily}
           onSetStretchFactor={onSetStretchFactor}
           onDeleteStretchHandle={onDeleteStretchHandle}
         />

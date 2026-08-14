@@ -448,7 +448,25 @@ export const MorphGlyphEditor: React.FC<MorphGlyphEditorProps> = ({
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <div style={{ flex: 1, minWidth: 0 }} title={def.label.ar}>
-                          {selectedBlock.type === "text" ? (
+                          {!def.spine ? (
+                            // No verified spine for this stroke on this font — the
+                            // handle-creation path in App.tsx's setStretchFactor
+                            // (`if (!definition.spine || !box) return;`) can never
+                            // act on it, so a slider here would silently do
+                            // nothing. The row stays (rather than being hidden) so
+                            // the stroke's existence is still legible; the nuqta
+                            // delta is omitted because there is no adjustable
+                            // factor for it to describe.
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ fontSize: 12, flex: 1, minWidth: 0 }}>
+                                {def.label.en ?? def.componentType}
+                                {def.kashidaEligible ? " · kashida" : ""}
+                              </span>
+                              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                                no verified stroke in this font
+                              </span>
+                            </div>
+                          ) : selectedBlock.type === "text" ? (
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                               <span style={{ fontSize: 12, flex: 1, minWidth: 0 }}>
                                 {def.label.en ?? def.componentType}

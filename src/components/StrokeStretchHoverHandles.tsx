@@ -1,7 +1,8 @@
 import React, { useRef, useState } from "react";
 import { Group, Circle, Rect, Line } from "react-konva";
 import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
-import { mapNormToRealBox } from "../lib/strokeSchema/schemaGeometry";
+import { spineToBlockSpace } from "../lib/strokeSpines/anchorFromSpine";
+import { getSpineTableIfLoaded } from "../lib/strokeSpines/registry";
 import {
   dotPositionForFactor,
   factorForPosition,
@@ -20,6 +21,14 @@ export type StrokeStretchHoverHandlesProps = {
   /** Group-local x/y to add to a hit box's own x/y — same offset DiacriticHoverHandles already uses. */
   offsetX: number;
   offsetY: number;
+  /**
+   * Needed to pre-place a not-yet-created handle's dot on the real spine
+   * (spineToBlockSpace's `fontSize`/`unitsPerEm` scale), exactly as
+   * App.tsx's `setStretchFactor` does — so the dot doesn't jump when the
+   * handle is actually created.
+   */
+  fontSize: number;
+  fontFamily: string;
   onSetStretchFactor?: (
     glyphIndex: number,
     definition: StretchDefinition,
@@ -65,6 +74,8 @@ export const StrokeStretchHoverHandles: React.FC<StrokeStretchHoverHandlesProps>
   glyphHitBoxes,
   offsetX,
   offsetY,
+  fontSize,
+  fontFamily,
   onSetStretchFactor,
   onDeleteStretchHandle,
 }) => {
@@ -107,19 +118,42 @@ export const StrokeStretchHoverHandles: React.FC<StrokeStretchHoverHandlesProps>
         // visibleGlyphIndex) before any other glyph can pick up hover again.
         const rectListening = visibleGlyphIndex == null || visibleGlyphIndex === glyphIndex;
 
-        const rows = glyphSchemaCatalog[glyphIndex].map((def) => {
-          const rowKey = `${glyphIndex}:${def.strokeId}:${def.zoneIndex}`;
-          const handle = findHandle(glyphEdits, glyphIndex, def);
-          const anchorLocal: AxisPoint = handle
-            ? { x: handle.anchorX, y: handle.anchorY }
-            : mapNormToRealBox(def.anchorNorm, box);
-          const dragOriginLocal: AxisPoint = handle
-            ? { x: handle.dragOriginX, y: handle.dragOriginY }
-            : mapNormToRealBox(def.dragNorm, box);
-          const factor = handle?.factor ?? 1;
-          const dotLocal = dotPositionForFactor(anchorLocal, dragOriginLocal, factor);
-          return { def, rowKey, handle, anchorLocal, dragOriginLocal, dotLocal };
-        });
+        const rows = glyphSchemaCatalog[glyphIndex]
+          .map((def) => {
+            const rowKey = `${glyphIndex}:${def.strokeId}:${def.zoneIndex}`;
+            const handle = findHandle(glyphEdits, glyphIndex, def);
+            let anchorLocal: AxisPoint;
+            let dragOriginLocal: AxisPoint;
+            if (handle) {
+              anchorLocal = { x: handle.anchorX, y: handle.anchorY };
+              dragOriginLocal = { x: handle.dragOriginX, y: handle.dragOriginY };
+            } else {
+              // No handle yet — a dot can only be shown/dragged for a zone
+              // whose spine App.tsx's setStretchFactor can actually place a
+              // handle from. Deriving the axis the same way (same
+              // spineToBlockSpace call, same gx/gy/fontSize/unitsPerEm
+              // inputs) is what guarantees the dot starts exactly where the
+              // created handle will land — creating the handle must not
+              // move the dot.
+              const upm = getSpineTableIfLoaded(fontFamily)?.unitsPerEm;
+              const placed =
+                def.spine && upm
+                  ? spineToBlockSpace(def.spine, {
+                      gx: box.gx ?? 0,
+                      gy: box.gy ?? 0,
+                      fontSize,
+                      unitsPerEm: upm,
+                    })
+                  : null;
+              if (!placed) return null;
+              anchorLocal = placed.anchor;
+              dragOriginLocal = placed.dragOrigin;
+            }
+            const factor = handle?.factor ?? 1;
+            const dotLocal = dotPositionForFactor(anchorLocal, dragOriginLocal, factor);
+            return { def, rowKey, handle, anchorLocal, dragOriginLocal, dotLocal };
+          })
+          .filter((r): r is NonNullable<typeof r> => r !== null);
 
         // The hover rect must cover not just the glyph's own ink box but
         // wherever this glyph's dots can currently *rest*: a dot sits at

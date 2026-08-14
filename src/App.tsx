@@ -802,6 +802,17 @@ const App: React.FC = () => {
       const upm = getSpineTableIfLoaded(block.fontFamily)?.unitsPerEm;
       if (!upm) return;
 
+      // `?? 0` here is not the forbidden "guess an anchor" fallback — it is
+      // an identity default that never actually fires for a plain text
+      // block. `ShapedText` declares `gx`/`gy` required on its `GlyphHitBox`
+      // and always populates them from the glyph's own pen origin, so
+      // `glyphBoxesByBlock` never contains an undefined `gx`/`gy` for a text
+      // block in the first place. Shape Fill's box payload has no `gx`/`gy`
+      // field at all (its boxes are glyph-local, from `getPath(0, 0,
+      // fontSize)` — see ShapeFillText.tsx:476-477 — whose pen origin *is*
+      // the origin), so 0 is the correct identity value there, not a
+      // default standing in for a real one. `App.tsx:898-899` relies on the
+      // same convention.
       const placed = spineToBlockSpace(definition.spine, {
         gx: box.gx ?? 0,
         gy: box.gy ?? 0,
