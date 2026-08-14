@@ -6,7 +6,10 @@ import {
   URDU,
   PRESETS,
 } from "../lib/presets";
-import type { Block, TextAlign } from "../types";
+import type { Block, MirrorMode, TextAlign } from "../types";
+// STREAM-B (muthanna/radial): the file has no anchored import region, so this
+// sits with the other lib imports. Used only by the STREAM-B regions below.
+import { RADIAL_COUNT_MIN, RADIAL_COUNT_MAX, DEFAULT_RADIAL_COUNT, DEFAULT_RADIAL_RADIUS } from "../lib/mirror";
 import type { NamedProjectMeta } from "../App";
 import { extractSvgPaths } from "../lib/svgImport";
 import { arcPathD, wavePathD, circlePathD } from "../lib/textPath";
@@ -84,6 +87,14 @@ export type SidebarProps = {
   onToggleClipToPage?: (value: boolean) => void;
   // ---- /STREAM-A ----
   // ---- STREAM-B: muthanna/radial — props ----
+  /** Adds a mirror of the selected block. Enabled only while `canAddMirrorBlock`. */
+  onAddMirrorBlock?: (mode: MirrorMode) => void;
+  /** Exactly one block is selected and it is not itself a mirror. */
+  canAddMirrorBlock?: boolean;
+  /** Moves the selection to the selected mirror's source, so it can be edited. */
+  onSelectMirrorSource?: () => void;
+  /** What to call that source in the Mirror panel. */
+  mirrorSourceLabel?: string;
   // ---- /STREAM-B ----
   // ---- STREAM-C: ornament library — props ----
   // ---- /STREAM-C ----
@@ -291,6 +302,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleClipToPage,
   // ---- /STREAM-A ----
   // ---- STREAM-B: muthanna/radial — destructure ----
+  onAddMirrorBlock,
+  canAddMirrorBlock,
+  onSelectMirrorSource,
+  mirrorSourceLabel,
   // ---- /STREAM-B ----
   // ---- STREAM-C: ornament library — destructure ----
   // ---- /STREAM-C ----
@@ -1552,6 +1567,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
             {/* ---- STREAM-B: muthanna/radial — add-block buttons ---- */}
+            {/* Inline SVGs rather than entries in Icons.tsx: that file is not
+                this stream's to edit during the Phase 1 parallel run. */}
+            {onAddMirrorBlock && (
+              <>
+                <button
+                  type="button"
+                  className="sidebarCircleButton"
+                  disabled={!canAddMirrorBlock}
+                  title={
+                    canAddMirrorBlock
+                      ? "Add a mirror (muthanna) of the selected block"
+                      : "Select exactly one non-mirror block to mirror it"
+                  }
+                  aria-label="Add mirror block"
+                  onClick={() => onAddMirrorBlock("mirrorX")}
+                >
+                  <svg width={14} height={14} viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 1v14" stroke="currentColor" strokeWidth={1.2} strokeDasharray="2 2" />
+                    <path d="M6.5 4 2 8l4.5 4z" fill="currentColor" />
+                    <path
+                      d="M9.5 4 14 8l-4.5 4z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.2}
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  className="sidebarCircleButton"
+                  disabled={!canAddMirrorBlock}
+                  title={
+                    canAddMirrorBlock
+                      ? "Add a radial repetition of the selected block"
+                      : "Select exactly one non-mirror block to repeat it radially"
+                  }
+                  aria-label="Add radial block"
+                  onClick={() => onAddMirrorBlock("radial")}
+                >
+                  <svg width={14} height={14} viewBox="0 0 16 16" aria-hidden="true">
+                    <g stroke="currentColor" strokeWidth={1.2} strokeLinecap="round">
+                      <path d="M8 1.5v3.2M8 11.3v3.2M1.5 8h3.2M11.3 8h3.2" />
+                      <path d="M3.4 3.4l2.3 2.3M10.3 10.3l2.3 2.3M12.6 3.4l-2.3 2.3M5.7 10.3l-2.3 2.3" />
+                    </g>
+                    <circle cx={8} cy={8} r={1.6} fill="currentColor" />
+                  </svg>
+                </button>
+              </>
+            )}
             {/* ---- /STREAM-B ---- */}
             {/* ---- STREAM-C: ornament library — add-block button ---- */}
             {/* ---- /STREAM-C ---- */}
@@ -1735,7 +1801,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <SidebarTier label="selected" />
 
-        {selectedBlock && selectedBlock.type !== "image" && (
+        {/* A mirror has no content or typography of its own — both come from
+            its source — so it hides these two panels the way image already
+            does. (STREAM-B edit outside its anchors; see the stream report.) */}
+        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && (
           <div className="sidebarPanel">
             <CollapsibleSection
               title="Content"
@@ -1877,6 +1946,97 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* ---- STREAM-B: muthanna/radial — Mirror type panel ---- */}
+        {selectedBlock && selectedBlock.type === "mirror" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection
+              title="Mirror"
+              isOpen={showText}
+              onToggle={() => setShowText((v) => !v)}
+            >
+              <div className="sectionPanel">
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
+                  This block draws {mirrorSourceLabel ?? "another block"}'s content. Edit the
+                  text and typography on the source — every copy follows.
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onSelectMirrorSource?.()}
+                  className="sidebarSmallAction"
+                  style={{ background: "var(--bg-input)" }}
+                  title="Select the block this mirror reflects"
+                >
+                  Select source
+                </button>
+
+                <SelectRow
+                  id={makeId("mirror-mode", selectedId)}
+                  name={makeId("mirrorMode", selectedId)}
+                  label="Mode"
+                  value={selectedBlock.mode}
+                  onChange={(v) => onUpdateSelectedBlock({ mode: v as MirrorMode })}
+                >
+                  <option value="mirrorX">Mirror across a vertical axis</option>
+                  <option value="mirrorY">Mirror across a horizontal axis</option>
+                  <option value="radial">Radial (around a centre)</option>
+                </SelectRow>
+
+                {selectedBlock.mode === "radial" && (
+                  <>
+                    <RangeRow
+                      id={makeId("radial-count", selectedId)}
+                      name={makeId("radialCount", selectedId)}
+                      label="Copies"
+                      value={selectedBlock.radialCount ?? DEFAULT_RADIAL_COUNT}
+                      min={RADIAL_COUNT_MIN}
+                      max={RADIAL_COUNT_MAX}
+                      step={1}
+                      onChange={(v) => onUpdateSelectedBlock({ radialCount: v })}
+                      suffix={selectedBlock.radialCount ?? DEFAULT_RADIAL_COUNT}
+                    />
+
+                    <RangeRow
+                      id={makeId("radial-radius", selectedId)}
+                      name={makeId("radialRadius", selectedId)}
+                      label="Radius"
+                      value={selectedBlock.radialRadius ?? DEFAULT_RADIAL_RADIUS}
+                      min={0}
+                      max={600}
+                      step={2}
+                      onChange={(v) => onUpdateSelectedBlock({ radialRadius: v })}
+                      suffix={`${Math.round(selectedBlock.radialRadius ?? DEFAULT_RADIAL_RADIUS)}px`}
+                    />
+                  </>
+                )}
+
+                <RangeRow
+                  id={makeId("opacity", selectedId)}
+                  name={makeId("opacity", selectedId)}
+                  label="Opacity"
+                  value={selectedOpacity}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
+                  suffix={`${Math.round(selectedOpacity * 100)}%`}
+                  fieldKey="opacity"
+                />
+
+                <RangeRow
+                  id={makeId("rotation", selectedId)}
+                  name={makeId("rotation", selectedId)}
+                  label="Rotation"
+                  value={selectedRotation}
+                  min={-180}
+                  max={180}
+                  onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
+                  suffix={`${selectedRotation}°`}
+                  fieldKey="rotation"
+                />
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
         {/* ---- /STREAM-B ---- */}
 
         {selectedBlock && selectedBlock.type === "shapeFill" && (
@@ -2081,7 +2241,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {selectedBlock && selectedBlock.type !== "image" && (
+        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && (
           <div className="sidebarPanel">
             <CollapsibleSection title="Typography" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
               <div className="sectionPanel">
