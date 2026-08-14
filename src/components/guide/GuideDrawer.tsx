@@ -15,10 +15,10 @@ export type GuideDrawerProps = {
  * The in-app user guide: a right-side slide-over listing every section the
  * registry found, with a filter over titles and keywords.
  *
- * Portalled to `document.body` for the same reason `MorphGlyphEditor` is —
- * the sidebar is a scrolling, overflow-hidden column, and a slide-over that
- * lives inside it gets clipped. It is deliberately plain DOM and never part
- * of the Konva stage, so it cannot leak into an export.
+ * Portalled to `document.body`: the sidebar is a scrolling, overflow-hidden
+ * column, and a slide-over that lives inside it gets clipped. It is
+ * deliberately plain DOM and never part of the Konva stage, so it cannot
+ * leak into an export.
  *
  * Open/closed state belongs to the caller and is intentionally *not* app
  * state: reading the guide is not an edit, so it must not enter undo history

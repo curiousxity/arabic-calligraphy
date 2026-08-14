@@ -25,7 +25,6 @@ export const section: GuideSection = {
     "harakat",
     "marks",
     "irab",
-    "kashida",
     "warp",
     "outline",
     "shadow",
@@ -94,9 +93,10 @@ export const section: GuideSection = {
           per-letter tools.
         </li>
         <li>
-          <strong>Kashida tool</strong> — for plain text blocks. Tick it, then
-          drag the gold handle that appears between two connected letters on
-          the canvas to lengthen the connector between them (tatweel).
+          <strong>Move &amp; scale glyph</strong> — for plain text blocks. Tick
+          it, then hover a letter on the canvas to move or stretch that one
+          letter without shifting its neighbours. See{" "}
+          <em>Shaping individual letters</em>.
         </li>
       </ul>
       <p>

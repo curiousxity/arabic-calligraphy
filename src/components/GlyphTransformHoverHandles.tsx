@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Group, Circle, Rect } from "react-konva";
-import { projectOntoAxis } from "../lib/strokeSchema/dragAxis";
+import { projectOntoAxis } from "../lib/dragAxis";
 import { scaleFromHandleDrag } from "../lib/glyphTransform";
 import type { GlyphHitBox } from "./ShapedText";
 import type { GlyphTransform } from "../types";
@@ -158,8 +158,7 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
               // stops them stealing hover from each other — gating on
               // hover alone would re-arm every neighbour the moment a
               // drag carries the pointer outside this rect, popping a
-              // neighbour's dots up mid-gesture (StrokeStretchHoverHandles
-              // established this same fix).
+              // neighbour's dots up mid-gesture.
               listening={(hoveredIndex === null && draggingIndex === null) || isActive}
               onMouseEnter={() => setHoveredIndex(box.glyphIndex)}
               onMouseLeave={() =>

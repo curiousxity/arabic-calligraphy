@@ -27,8 +27,7 @@ import {
   type SnapLine,
   type SnapTarget,
 } from "../lib/snapping";
-import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
-import type { Block, GlyphStretchHandle, GlyphRig, DiacriticOverride, GlyphTransform } from "../types";
+import type { Block, DiacriticOverride, GlyphTransform } from "../types";
 
 const GRID_SIZE = 40;
 const SNAP_GUIDE_PX = 6;
@@ -70,37 +69,6 @@ export type CanvasStageProps = {
   onUpdateBlockPosition: (id: number, x: number, y: number) => void;
   onSelectBlock: (id: number, additive?: boolean) => void;
   onEditBlock: (id: number) => void;
-  onSelectGlyph: (blockId: number, glyphIndex: number | null) => void;
-  onUpdateStretchHandle: (
-    blockId: number,
-    glyphIndex: number,
-    handleId: string,
-    patch: Partial<GlyphStretchHandle>
-  ) => void;
-  onSetStretchFactor: (
-    blockId: number,
-    glyphIndex: number,
-    definition: StretchDefinition,
-    factor: number,
-    opts?: { snap?: boolean }
-  ) => void;
-  onDeleteStretchHandle: (blockId: number, glyphIndex: number, handleId: string) => void;
-  glyphRigs: GlyphRig[];
-  onGlyphBoxesChange: (
-    blockId: number,
-    boxes: {
-      glyphIndex: number;
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      glyphId?: number;
-      gx?: number;
-      gy?: number;
-    }[]
-  ) => void;
-  onGlyphSchemaChange: (blockId: number, catalog: Record<number, StretchDefinition[]>) => void;
-  onKashidaTextChange: (blockId: number, text: string) => void;
   onUpdateTextPathD: (blockId: number, d: string) => void;
   onDragDiacriticOverride: (
     blockId: number,
@@ -152,14 +120,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onUpdateBlockPosition,
   onSelectBlock,
   onEditBlock,
-  onSelectGlyph,
-  onUpdateStretchHandle,
-  onSetStretchFactor,
-  onDeleteStretchHandle,
-  glyphRigs,
-  onGlyphBoxesChange,
-  onGlyphSchemaChange,
-  onKashidaTextChange,
   onUpdateTextPathD,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
@@ -799,21 +759,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     locked={block.locked}
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
-                    glyphEditTool={block.glyphEditTool ?? null}
-                    selectedGlyphIndex={block.selectedGlyphIndex ?? null}
-                    glyphEdits={block.glyphEdits ?? []}
-                    glyphRigs={glyphRigs}
-                    glyphRigValues={block.glyphRigValues ?? []}
-                    onGlyphSelect={(glyphIndex) => onSelectGlyph(block.id, glyphIndex)}
-                    onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
-                      onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
-                    }
-                    onGlyphBoxesChange={(boxes) =>
-                      onGlyphBoxesChange(block.id, boxes)
-                    }
-                    onGlyphSchemaChange={(catalog) =>
-                      onGlyphSchemaChange(block.id, catalog)
-                    }
                     diacriticEditMode={block.diacriticEditMode ?? false}
                     diacriticOverrides={block.diacriticOverrides ?? []}
                     onDragDiacriticOverride={(glyphIndex, patch) =>
@@ -852,24 +797,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     rotation={block.rotation ?? 0}
                     warpX={block.warpX ?? 0}
                     warpY={block.warpY ?? 0}
-                    kashidaEditMode={block.kashidaEditMode ?? false}
-                    onKashidaTextChange={(text) => onKashidaTextChange(block.id, text)}
-                    selectedGlyphIndex={block.selectedGlyphIndex ?? null}
-                    glyphEdits={block.glyphEdits ?? []}
-                    glyphMaskEdit={block.glyphMaskEdit ?? null}
-                    glyphRigs={glyphRigs}
-                    glyphRigValues={block.glyphRigValues ?? []}
-                    onUpdateStretchHandle={(glyphIndex, handleId, patch) =>
-                      onUpdateStretchHandle(block.id, glyphIndex, handleId, patch)
-                    }
-                    onSetStretchFactor={(glyphIndex, definition, factor, opts) =>
-                      onSetStretchFactor(block.id, glyphIndex, definition, factor, opts)
-                    }
-                    onDeleteStretchHandle={(glyphIndex, handleId) =>
-                      onDeleteStretchHandle(block.id, glyphIndex, handleId)
-                    }
-                    onGlyphBoxesChange={(boxes) => onGlyphBoxesChange(block.id, boxes)}
-                    onGlyphSchemaChange={(catalog) => onGlyphSchemaChange(block.id, catalog)}
                     isSelected={block.id === selectedId}
                     diacriticOverrides={block.diacriticOverrides ?? []}
                     glyphTransforms={block.glyphTransforms ?? NO_GLYPH_TRANSFORMS}

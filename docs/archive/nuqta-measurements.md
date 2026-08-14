@@ -13,8 +13,7 @@ contains the complete subsystem — `src/lib/strokeSchema/`,
 `src/lib/nuqta.ts`, `src/lib/justify.ts`, all 105 stroke-schema JSONs, all
 30 spine tables, and their tests — is recorded here by the removal commit:
 
-- **Pre-removal SHA:** `<filled in by the removal stream — the parent of the
-  removal commit>`
+- **Pre-removal SHA:** `fbe942cadec8c82596948309248a99a1fbb21f90`
 
 The offline tooling (`scripts/measureNuqta.py`, `scripts/deriveStrokeSpines.py`,
 `scripts/auditSpineOrientation.py`) is deliberately **kept in the repo** —

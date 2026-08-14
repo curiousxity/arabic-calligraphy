@@ -8,7 +8,6 @@ import React, {
 import type Konva from "konva";
 import { Sidebar, type SidebarProps } from "./components/Sidebar";
 import { CanvasStage, type CanvasStageProps } from "./components/CanvasStage";
-import { MorphGlyphEditor } from "./components/MorphGlyphEditor";
 import { ConfirmDialog, type ConfirmDialogRequest } from "./components/ConfirmDialog";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useDebouncedHistoryPush } from "./hooks/useDebouncedHistoryPush";
@@ -25,21 +24,8 @@ import {
   computeFitToBox,
   DEFAULT_EMPTY_BOUNDS,
 } from "./lib/canvasBounds";
-import type { StretchDefinition } from "./lib/strokeSchema/deriveCatalog";
-import { snapStretchFactor } from "./lib/strokeSchema/quantize";
-import { spineToBlockSpace } from "./lib/strokeSpines/anchorFromSpine";
-import { getSpineTableIfLoaded } from "./lib/strokeSpines/registry";
-import { kashidaFactorForHandle } from "./lib/kashidaFactor";
 import { arcPathD } from "./lib/textPath";
-import type {
-  Block,
-  GlyphEdit,
-  GlyphStretchHandle,
-  GlyphRig,
-  GlyphRigAxis,
-  DiacriticOverride,
-  GlyphTransform,
-} from "./types";
+import type { Block, DiacriticOverride, GlyphTransform } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
   isCloudConfigured,
@@ -112,41 +98,6 @@ type PendingPlacement = {
 export type NamedProjectMeta = { name: string; savedAt: number; source: "local" | "cloud" };
 type NamedProjectsStore = Record<string, { savedAt: number; payload: unknown }>;
 
-type GlyphBox = {
-  glyphIndex: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  /** HarfBuzz glyph id within this block's font — stable per font binary, used to key reusable glyph rigs. */
-  glyphId?: number;
-  /** Pen offset baked into x/y; 0/omitted where the box is already in glyph-local space (ShapeFillText). */
-  gx?: number;
-  gy?: number;
-};
-
-const glyphBoxesEqual = (a: GlyphBox[] | undefined, b: GlyphBox[]): boolean => {
-  if (!a) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const aa = a[i];
-    const bb = b[i];
-    if (
-      aa.glyphIndex !== bb.glyphIndex ||
-      aa.x !== bb.x ||
-      aa.y !== bb.y ||
-      aa.width !== bb.width ||
-      aa.height !== bb.height ||
-      aa.glyphId !== bb.glyphId ||
-      aa.gx !== bb.gx ||
-      aa.gy !== bb.gy
-    ) {
-      return false;
-    }
-  }
-  return true;
-};
-
 /**
  * The three block types whose renderers mount DiacriticHoverHandles. Image
  * and textPath blocks inherit `diacriticOverrides` from BlockCommon but have
@@ -158,8 +109,8 @@ const supportsDiacriticOverrides = (
   b.type === "text" || b.type === "shapeFill";
 
 /**
- * Plain text blocks only for v1 — Shape Fill and Shape Warp carry the
- * `glyphTransforms`/`glyphTransformMode` fields via BlockCommon but neither
+ * Plain text blocks only for v1 — the other block types carry the
+ * `glyphTransforms`/`glyphTransformMode` fields via BlockCommon but no other
  * renderer reads them, so accepting an edit there would silently discard it.
  */
 const supportsGlyphTransforms = (b: Block): b is Extract<Block, { type: "text" }> =>
@@ -167,11 +118,9 @@ const supportsGlyphTransforms = (b: Block): b is Extract<Block, { type: "text" }
 
 const STORAGE_KEY = "calligraphy-layout-v2";
 const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
-const GLYPH_RIGS_KEY = "harfcanvas-glyph-rigs-v1";
 const SIDEBAR_COLLAPSED_WIDTH = 28;
 /** Zoom level for the very first paint of the default starter content (a fresh session, no saved layout). */
 const INITIAL_VIEW_SCALE = 2.75;
-const RIGHT_PANEL_WIDTH = 280;
 const DEFAULT_TEXT_FONT_SIZE = 53;
 const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
 
@@ -207,24 +156,27 @@ const isBrowser = typeof window !== "undefined";
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
-const makeHandleId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `gh-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+/**
+ * Fields the removed Morph Glyph Editor wrote onto blocks. A project saved
+ * before 2026-08-14 still carries them; nothing reads them any more, so they
+ * are stripped on load rather than left to ride along in every subsequent
+ * save — same treatment, and the same reasoning, as the `shapeWarp` filter
+ * in `applyParsedLayoutPayload`.
+ */
+const MORPH_BLOCK_FIELDS = [
+  "glyphEdits",
+  "glyphRigValues",
+  "glyphMaskEdit",
+  "glyphEditTool",
+  "selectedGlyphIndex",
+  "kashidaAmount",
+  "kashidaEditMode",
+] as const;
 
-const removeStretchHandle = (
-  glyphEdits: GlyphEdit[],
-  glyphIndex: number,
-  handleId: string
-): GlyphEdit[] => {
-  const existing = glyphEdits.find((g) => g.glyphIndex === glyphIndex);
-  if (!existing) return glyphEdits;
-  const nextStretches = existing.stretches.filter((h) => h.id !== handleId);
-  return nextStretches.length > 0
-    ? glyphEdits.map((g) =>
-        g.glyphIndex === glyphIndex ? { ...g, stretches: nextStretches } : g
-      )
-    : glyphEdits.filter((g) => g.glyphIndex !== glyphIndex);
+const stripMorphFields = (block: Block): Block => {
+  const next = { ...block } as Block & Record<string, unknown>;
+  for (const field of MORPH_BLOCK_FIELDS) delete next[field];
+  return next;
 };
 
 const App: React.FC = () => {
@@ -249,18 +201,6 @@ const App: React.FC = () => {
   // Session-only, like the grid toggle beside it — deliberately not persisted.
   const [snapToBlockEdges, setSnapToBlockEdges] = useState(true);
   // ---- /STREAM-A ----
-  // Advisory, like grid snapping: on by default, bypassed per-drag by holding
-  // Alt, and applied only when a factor is *edited* — a value already stored
-  // off-grid is never re-snapped, so deliberate off-grid work survives a
-  // save/load round trip. Deliberately not persisted, matching snapToBlockEdges.
-  const [snapStrokesToNuqta, setSnapStrokesToNuqta] = useState(true);
-  // ---- STREAM-B: kashida auto-justify — state ----
-  // Margin used by "Fit to composition", in canvas px per side. Editor state,
-  // deliberately not on the block and not persisted.
-  const [justifyMarginPx, setJustifyMarginPx] = useState(24);
-  // One quiet line of feedback under the fit buttons — no alert, no toast.
-  const [justifyStatus, setJustifyStatus] = useState<string | null>(null);
-  // ---- /STREAM-B ----
   // ---- STREAM-C: export presets — state ----
   // Presets are read once at mount; they live in this browser only, never in
   // a saved project or the cloud store.
@@ -344,40 +284,15 @@ const App: React.FC = () => {
     () => [...localProjects, ...cloudProjects].sort((a, b) => b.savedAt - a.savedAt),
     [localProjects, cloudProjects]
   );
-  const [glyphRigs, setGlyphRigs] = useState<GlyphRig[]>(() => {
-    if (!isBrowser) return [];
-    try {
-      const raw = localStorage.getItem(GLYPH_RIGS_KEY);
-      return raw ? (JSON.parse(raw) as GlyphRig[]) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    if (!isBrowser) return;
-    try {
-      localStorage.setItem(GLYPH_RIGS_KEY, JSON.stringify(glyphRigs));
-    } catch {
-      // Ignore quota-exceeded / privacy-mode storage errors — best-effort, same as other localStorage writes here.
-    }
-  }, [glyphRigs]);
 
   const [isMobile, setIsMobile] = useState(isBrowser ? window.innerWidth <= 768 : false);
   const [backgroundColor, setBackgroundColor] = useState<string>("#ffffff");
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(true);
-  const [showMorphEditorMobile, setShowMorphEditorMobile] = useState(false);
   const [panMode, setPanMode] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(isBrowser ? window.innerWidth : 1200);
   const [viewportHeight, setViewportHeight] = useState(isBrowser ? window.innerHeight : 800);
-
-  const [glyphBoxesByBlock, setGlyphBoxesByBlock] = useState<Record<number, GlyphBox[]>>({});
-  const [glyphSchemaByBlock, setGlyphSchemaByBlock] = useState<
-    Record<number, Record<number, StretchDefinition[]>>
-  >({});
 
   const effectiveSidebarWidth = isMobile
     ? viewportWidth
@@ -424,17 +339,9 @@ const App: React.FC = () => {
     [blocks, selectedId]
   );
 
-  const rightPanelVisible =
-    !isMobile &&
-    !!selectedBlock &&
-    selectedBlock.type !== "image" &&
-    selectedBlock.type !== "textPath";
-  const effectiveRightPanelWidth =
-    !rightPanelVisible || rightPanelCollapsed ? 0 : RIGHT_PANEL_WIDTH;
-
   const canvasWidth = isMobile
     ? viewportWidth
-    : Math.max(0, viewportWidth - effectiveSidebarWidth - effectiveRightPanelWidth);
+    : Math.max(0, viewportWidth - effectiveSidebarWidth);
 
   const effectiveSelectedIds = useMemo(
     () => (selectedIds.length > 0 ? selectedIds : selectedId != null ? [selectedId] : []),
@@ -484,172 +391,9 @@ const App: React.FC = () => {
     useUndoRedo(getSnapshot, applySnapshot, captureHistoryThumbnail);
 
   const scheduleMoveHistoryPush = useDebouncedHistoryPush(pushHistory);
-  const scheduleKashidaHistoryPush = useDebouncedHistoryPush(pushHistory);
-  const scheduleGlyphEditHistoryPush = useDebouncedHistoryPush(pushHistory);
-  const scheduleGlyphRigHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleTextPathHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleDiacriticHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleGlyphTransformHistoryPush = useDebouncedHistoryPush(pushHistory);
-
-  const upsertGlyphEditRaw = useCallback(
-    (
-      blockId: number,
-      glyphIndex: number,
-      updater: (prev: GlyphEdit | undefined) => GlyphEdit
-    ) => {
-      setBlocks((prev) =>
-        prev.map((b) => {
-          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
-          const glyphEdits = b.glyphEdits ?? [];
-          const existing = glyphEdits.find((g) => g.glyphIndex === glyphIndex);
-          const next = updater(existing);
-          return {
-            ...b,
-            glyphEdits: [
-              ...glyphEdits.filter((g) => g.glyphIndex !== glyphIndex),
-              next,
-            ].sort((a, b) => a.glyphIndex - b.glyphIndex),
-          };
-        })
-      );
-    },
-    []
-  );
-
-  const upsertGlyphEdit = useCallback(
-    (
-      blockId: number,
-      glyphIndex: number,
-      updater: (prev: GlyphEdit | undefined) => GlyphEdit
-    ) => {
-      pushHistory();
-      upsertGlyphEditRaw(blockId, glyphIndex, updater);
-    },
-    [pushHistory, upsertGlyphEditRaw]
-  );
-
-  // Live-drag version: updates immediately but only pushes one history entry
-  // 300ms after the gesture settles, same debounce pattern as block dragging.
-  const upsertGlyphEditDebounced = useCallback(
-    (
-      blockId: number,
-      glyphIndex: number,
-      updater: (prev: GlyphEdit | undefined) => GlyphEdit
-    ) => {
-      upsertGlyphEditRaw(blockId, glyphIndex, updater);
-      scheduleGlyphEditHistoryPush();
-    },
-    [scheduleGlyphEditHistoryPush, upsertGlyphEditRaw]
-  );
-
-  const selectGlyphForBlock = useCallback((blockId: number, glyphIndex: number | null) => {
-    setBlocks((prev) =>
-      prev.map((b) =>
-        b.id === blockId && b.type !== "image" && b.type !== "textPath"
-          ? { ...b, selectedGlyphIndex: glyphIndex, glyphMaskEdit: null }
-          : b
-      )
-    );
-  }, []);
-
-  // Arming a mask edit from the Morph panel's per-stroke rows also selects
-  // that glyph on the canvas — the canvas contour/lasso overlays render for
-  // the selected glyph while a mask edit is armed. Shape Fill/Shape Warp
-  // still gate their overlay on the Stretch tool being turned on, so those
-  // block types still need `glyphEditTool` forced on here; plain text
-  // blocks dropped that gate entirely (ShapedText.tsx's overlay now checks
-  // only `glyphMaskEdit`/`selectedGlyphIndex`), so leave their
-  // `glyphEditTool` untouched.
-  const setGlyphMaskEditMode = useCallback(
-    (blockId: number, glyphIndex: number, handleId: string, mode: "contours" | "lasso" | null) => {
-      setBlocks((prev) =>
-        prev.map((b) => {
-          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
-          if (!mode) return { ...b, glyphMaskEdit: null };
-          return {
-            ...b,
-            glyphEditTool: b.type === "text" ? b.glyphEditTool : ("stretch" as const),
-            selectedGlyphIndex: glyphIndex,
-            glyphMaskEdit: { handleId, mode },
-          };
-        })
-      );
-    },
-    []
-  );
-
-  const updateGlyphBoxes = useCallback((blockId: number, boxes: GlyphBox[]) => {
-    setGlyphBoxesByBlock((prev) => {
-		const prevBoxes = prev[blockId];
-		if (glyphBoxesEqual(prevBoxes, boxes)) {
-			return prev;
-		}
-		return {
-			...prev,
-			[blockId]: boxes,
-		};
-		});
-  }, []);
-
-  const updateGlyphSchema = useCallback(
-    (blockId: number, catalog: Record<number, StretchDefinition[]>) => {
-      setGlyphSchemaByBlock((prev) =>
-        prev[blockId] === catalog ? prev : { ...prev, [blockId]: catalog }
-      );
-    },
-    []
-  );
-
-  // Distributes a block-level "Kashida" 0-100 dial across every kashida-eligible,
-  // schema-backed stretch handle in the block, weighted by each handle's own
-  // `priority` (1-10, from the stroke schema) — a higher-priority stroke ramps
-  // toward its own maxFactor faster than a lower-priority one at the same dial
-  // position. Handles without a maxFactor (plain freehand handles) are untouched.
-  const setBlockKashidaAmount = useCallback(
-    (blockId: number, amount: number) => {
-      const clampedAmount = Math.max(0, Math.min(100, amount));
-
-      setBlocks((prev) =>
-        prev.map((b) => {
-          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
-
-          return {
-            ...b,
-            kashidaAmount: clampedAmount,
-            glyphEdits: (b.glyphEdits ?? []).map((edit) => ({
-              ...edit,
-              stretches: edit.stretches.map((h) => {
-                const factor = kashidaFactorForHandle(h, clampedAmount, {
-                  fontFamily: b.fontFamily,
-                  enabled: snapStrokesToNuqta,
-                });
-                return factor == null ? h : { ...h, factor };
-              }),
-            })),
-          };
-        })
-      );
-      scheduleGlyphEditHistoryPush();
-    },
-    [scheduleGlyphEditHistoryPush, snapStrokesToNuqta]
-  );
-
-  const updateStretchHandle = useCallback(
-    (
-      blockId: number,
-      glyphIndex: number,
-      handleId: string,
-      patch: Partial<GlyphStretchHandle>
-    ) => {
-      upsertGlyphEditDebounced(blockId, glyphIndex, (prev) => ({
-        glyphIndex,
-        stretches: (prev?.stretches ?? []).map((h) =>
-          h.id === handleId ? { ...h, ...patch } : h
-        ),
-      }));
-    },
-    [upsertGlyphEditDebounced]
-  );
 
   const dragDiacriticOverride = useCallback(
     (blockId: number, glyphIndex: number, patch: Partial<DiacriticOverride>) => {
@@ -705,7 +449,7 @@ const App: React.FC = () => {
         })
       );
       // Debounced: one continuous drag collapses to a single undo entry,
-      // the same treatment diacritic drags and the Kashida dial get.
+      // the same treatment a diacritic drag gets.
       scheduleGlyphTransformHistoryPush();
     },
     [scheduleGlyphTransformHistoryPush]
@@ -737,270 +481,6 @@ const App: React.FC = () => {
     [pushHistory]
   );
 
-  // Kaleam-style slider flow: every stroke slider in the Morph panel is live
-  // for every glyph with an authored schema — the first movement of a slider
-  // creates its schema-backed handle on the spot (one undo step, via
-  // upsertGlyphEdit's pushHistory), and subsequent movements just retune
-  // `factor` through the debounced update path. No canvas glyph selection or
-  // explicit "add handle" step exists anymore.
-  const setStretchFactor = useCallback(
-    (
-      blockId: number,
-      glyphIndex: number,
-      definition: StretchDefinition,
-      factor: number,
-      // `snap: false` is the deliberate off-grid escape — the typed precision
-      // field in the Morph panel, and an Alt-held canvas drag, both pass it.
-      opts?: { snap?: boolean }
-    ) => {
-      const block = blocks.find((b) => b.id === blockId);
-      if (!block || block.type === "image" || block.type === "textPath") return;
-
-      // Snap before clamping: the snap can only move a value by less than one
-      // half-nuqta step, and quantizeFactor already keeps its own result
-      // inside [minFactor, maxFactor], so clamping afterwards is a no-op
-      // safety net rather than something the snap has to work around.
-      const snapped = snapStretchFactor({
-        factor,
-        lengthDots: definition.lengthDots,
-        fontFamily: block.fontFamily,
-        minFactor: definition.minFactor,
-        maxFactor: definition.maxFactor,
-        enabled: snapStrokesToNuqta && opts?.snap !== false,
-      });
-      const clamped = Math.max(definition.minFactor, Math.min(definition.maxFactor, snapped));
-      const existing = block.glyphEdits
-        ?.find((g) => g.glyphIndex === glyphIndex)
-        ?.stretches.find(
-          (h) =>
-            h.schemaStrokeId === definition.strokeId &&
-            (h.schemaZoneIndex ?? 0) === definition.zoneIndex
-        );
-
-      if (existing) {
-        updateStretchHandle(blockId, glyphIndex, existing.id, { factor: clamped });
-        return;
-      }
-
-      const box = (glyphBoxesByBlock[blockId] ?? []).find((b) => b.glyphIndex === glyphIndex);
-
-      // The axis comes from this font's real glyph, not from a proportion of
-      // its bounding box. Phase C measured that proportion at median 0.37
-      // nuqta / p90 1.43 from the ink it claimed to describe; the spine is
-      // sampled off the glyph's own medial axis. See
-      // docs/superpowers/specs/2026-08-13-stroke-spine-reanchoring-design.md.
-      //
-      // No spine means the offline matcher could not verify a match for this
-      // stroke on this font, and we create nothing — deliberately, rather than
-      // falling back to the mapping this replaced. Absence is the out-of-scope
-      // mechanism, the same one nuqtaEmRatio's null already is.
-      if (!definition.spine || !box) return;
-
-      // unitsPerEm comes from the spine table rather than from shaping state,
-      // which App.tsx does not hold. Safe because a definition.spine only
-      // exists if that table was loaded to produce it.
-      const upm = getSpineTableIfLoaded(block.fontFamily)?.unitsPerEm;
-      if (!upm) return;
-
-      // `?? 0` here is not the forbidden "guess an anchor" fallback — it is
-      // an identity default that never actually fires for a plain text
-      // block. `ShapedText` declares `gx`/`gy` required on its `GlyphHitBox`
-      // and always populates them from the glyph's own pen origin, so
-      // `glyphBoxesByBlock` never contains an undefined `gx`/`gy` for a text
-      // block in the first place. Shape Fill's box payload has no `gx`/`gy`
-      // field at all (its boxes are glyph-local, from `getPath(0, 0,
-      // fontSize)` — see ShapeFillText.tsx:476-477 — whose pen origin *is*
-      // the origin), so 0 is the correct identity value there, not a
-      // default standing in for a real one. `App.tsx:898-899` relies on the
-      // same convention.
-      const placed = spineToBlockSpace(definition.spine, {
-        gx: box.gx ?? 0,
-        gy: box.gy ?? 0,
-        fontSize: block.fontSize,
-        unitsPerEm: upm,
-      });
-      if (!placed) return;
-
-      const anchorPoint = placed.anchor;
-      const dragOriginPoint = placed.dragOrigin;
-      const dragPoint = {
-        x: anchorPoint.x + (dragOriginPoint.x - anchorPoint.x) * definition.maxFactor,
-        y: anchorPoint.y + (dragOriginPoint.y - anchorPoint.y) * definition.maxFactor,
-      };
-      const bandWidth = placed.bandWidth;
-
-      upsertGlyphEdit(blockId, glyphIndex, (prev) => {
-        // Re-check inside the updater — a second slider event can land before
-        // the render that would have found the handle via `blocks` above.
-        const already = prev?.stretches.find(
-          (h) =>
-            h.schemaStrokeId === definition.strokeId &&
-            (h.schemaZoneIndex ?? 0) === definition.zoneIndex
-        );
-        if (already) {
-          return {
-            glyphIndex,
-            stretches: (prev?.stretches ?? []).map((h) =>
-              h.id === already.id ? { ...h, factor: clamped } : h
-            ),
-          };
-        }
-        return {
-          glyphIndex,
-          stretches: [
-            ...(prev?.stretches ?? []),
-            {
-              id: makeHandleId(),
-              anchorX: anchorPoint.x,
-              anchorY: anchorPoint.y,
-              dragOriginX: dragOriginPoint.x,
-              dragOriginY: dragOriginPoint.y,
-              dragX: dragPoint.x,
-              dragY: dragPoint.y,
-              bandWidth,
-              maskAuto: true,
-              schemaStrokeId: definition.strokeId,
-              schemaZoneIndex: definition.zoneIndex,
-              factor: clamped,
-              minFactor: definition.minFactor,
-              maxFactor: definition.maxFactor,
-              kashidaEligible: definition.kashidaEligible,
-              priority: definition.priority,
-              lengthDots: definition.lengthDots,
-              spine: placed.points,
-            },
-          ],
-        };
-      });
-    },
-    [blocks, glyphBoxesByBlock, snapStrokesToNuqta, updateStretchHandle, upsertGlyphEdit]
-  );
-
-  const deleteStretchHandle = useCallback(
-    (blockId: number, glyphIndex: number, handleId: string) => {
-      pushHistory();
-      setBlocks((prev) =>
-        prev.map((b) => {
-          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
-          return {
-            ...b,
-            glyphEdits: removeStretchHandle(b.glyphEdits ?? [], glyphIndex, handleId),
-            glyphMaskEdit: b.glyphMaskEdit?.handleId === handleId ? null : b.glyphMaskEdit,
-          };
-        })
-      );
-    },
-    [pushHistory]
-  );
-
-  const saveStretchHandleAsRig = useCallback(
-    (blockId: number, glyphIndex: number, handleId: string, name: string) => {
-      const trimmed = name.trim();
-      const block = blocks.find((b) => b.id === blockId);
-      if (!block || block.type === "image" || block.type === "textPath" || !trimmed) return;
-
-      const handle = block.glyphEdits
-        ?.find((g) => g.glyphIndex === glyphIndex)
-        ?.stretches.find((h) => h.id === handleId);
-      const box = (glyphBoxesByBlock[blockId] ?? []).find((b) => b.glyphIndex === glyphIndex);
-      if (!handle || !box || box.glyphId == null) return;
-
-      const fontSize = block.fontSize;
-      const gx = box.gx ?? 0;
-      const gy = box.gy ?? 0;
-      const glyphId = box.glyphId;
-      const fontFamily = block.fontFamily;
-      const newAxis: GlyphRigAxis = {
-        id: makeHandleId(),
-        name: trimmed,
-        anchorX: (handle.anchorX - gx) / fontSize,
-        anchorY: (handle.anchorY - gy) / fontSize,
-        dragOriginX: (handle.dragOriginX - gx) / fontSize,
-        dragOriginY: (handle.dragOriginY - gy) / fontSize,
-        dragX: (handle.dragX - gx) / fontSize,
-        dragY: (handle.dragY - gy) / fontSize,
-        bandWidth: handle.bandWidth / fontSize,
-        mask:
-          handle.mask == null
-            ? undefined
-            : handle.mask.mode === "contours"
-              ? handle.mask
-              : {
-                  mode: "lasso",
-                  points: handle.mask.points.map((p) => ({
-                    x: (p.x - gx) / fontSize,
-                    y: (p.y - gy) / fontSize,
-                  })),
-                },
-      };
-
-      // Library mutation — deliberately not wrapped in pushHistory(); see
-      // the "Undo/redo" design decision in the glyph-rigs plan.
-      setGlyphRigs((prev) => {
-        const idx = prev.findIndex((r) => r.fontFamily === fontFamily && r.glyphId === glyphId);
-        if (idx === -1) {
-          return [...prev, { fontFamily, glyphId, axes: [newAxis] }];
-        }
-        const next = [...prev];
-        next[idx] = { ...next[idx], axes: [...next[idx].axes, newAxis] };
-        return next;
-      });
-
-      // Block mutation — one undo step, removes the raw handle and seeds the
-      // rig value to 1 so the deformation doesn't visually jump.
-      pushHistory();
-      setBlocks((prev) =>
-        prev.map((b) => {
-          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
-          const nextGlyphEdits = removeStretchHandle(b.glyphEdits ?? [], glyphIndex, handleId);
-          const values = (b.glyphRigValues ?? []).filter((v) => v.axisId !== newAxis.id);
-          return {
-            ...b,
-            glyphEdits: nextGlyphEdits,
-            glyphRigValues: [...values, { axisId: newAxis.id, value: 1 }],
-          };
-        })
-      );
-    },
-    [blocks, glyphBoxesByBlock, pushHistory]
-  );
-
-  const deleteGlyphRigAxis = useCallback(
-    (fontFamily: string, glyphId: number, axisId: string) => {
-      setGlyphRigs((prev) =>
-        prev
-          .map((r) =>
-            r.fontFamily === fontFamily && r.glyphId === glyphId
-              ? { ...r, axes: r.axes.filter((a) => a.id !== axisId) }
-              : r
-          )
-          .filter((r) => r.axes.length > 0)
-      );
-    },
-    []
-  );
-
-  const setGlyphRigValue = useCallback(
-    (blockId: number, axisId: string, value: number) => {
-      const clamped = Math.max(-1, Math.min(1, value));
-      setBlocks((prev) =>
-        prev.map((b) => {
-          if (b.id !== blockId || b.type === "image" || b.type === "textPath") return b;
-          const values = b.glyphRigValues ?? [];
-          const existing = values.find((v) => v.axisId === axisId);
-          return {
-            ...b,
-            glyphRigValues: existing
-              ? values.map((v) => (v.axisId === axisId ? { ...v, value: clamped } : v))
-              : [...values, { axisId, value: clamped }],
-          };
-        })
-      );
-      scheduleGlyphRigHistoryPush();
-    },
-    [scheduleGlyphRigHistoryPush]
-  );
-
   const fitShapeFillSpacing = useCallback(
     (blockId: number) => {
       pushHistory();
@@ -1027,14 +507,6 @@ const App: React.FC = () => {
       scheduleMoveHistoryPush();
     },
     [scheduleMoveHistoryPush]
-  );
-
-  const updateKashidaText = useCallback(
-    (id: number, text: string) => {
-      setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, text } : b)));
-      scheduleKashidaHistoryPush();
-    },
-    [scheduleKashidaHistoryPush]
   );
 
   const updateTextPathD = useCallback(
@@ -1131,10 +603,7 @@ const App: React.FC = () => {
           return;
         }
 
-        // Initial mount hydration intentionally doesn't merge embedded
-        // glyphRigs — they're already loaded independently from their own
-        // localStorage key at state-init time (see glyphRigs useState above).
-        applyParsedLayoutPayload(JSON.parse(raw), { mergeRigs: false });
+        applyParsedLayoutPayload(JSON.parse(raw));
       } catch {
         resetView();
       }
@@ -1687,55 +1156,17 @@ const App: React.FC = () => {
     blocks
   );
 
-  const buildLayoutPayload = () => {
-    const referencedAxisIds = new Set(
-      blocks.flatMap((b) =>
-        b.type === "image" ? [] : (b.glyphRigValues ?? []).map((v) => v.axisId)
-      )
-    );
-    const embeddedGlyphRigs = glyphRigs.filter((r) =>
-      r.axes.some((a) => referencedAxisIds.has(a.id))
-    );
-
-    return {
-      blocks,
-      selectedId,
-      backgroundColor,
-      stageScale,
-      stagePosition,
-      panMode,
-      viewportWidth,
-      viewportHeight,
-      glyphRigs: embeddedGlyphRigs,
-      version: 4,
-    };
-  };
-
-  // Merges rigs embedded in a loaded/imported project into the local rig
-  // library — local axes win on id conflict (importing someone else's
-  // project can't clobber a locally-retuned axis), any axis id not already
-  // present locally gets added.
-  const mergeGlyphRigs = (embedded: GlyphRig[] | undefined) => {
-    if (!embedded?.length) return;
-    setGlyphRigs((prev) => {
-      let next = prev;
-      for (const incoming of embedded) {
-        const idx = next.findIndex(
-          (r) => r.fontFamily === incoming.fontFamily && r.glyphId === incoming.glyphId
-        );
-        if (idx === -1) {
-          next = [...next, incoming];
-          continue;
-        }
-        const localIds = new Set(next[idx].axes.map((a) => a.id));
-        const missing = incoming.axes.filter((a) => !localIds.has(a.id));
-        if (missing.length) {
-          next = next.map((r, i) => (i === idx ? { ...r, axes: [...r.axes, ...missing] } : r));
-        }
-      }
-      return next;
-    });
-  };
+  const buildLayoutPayload = () => ({
+    blocks,
+    selectedId,
+    backgroundColor,
+    stageScale,
+    stagePosition,
+    panMode,
+    viewportWidth,
+    viewportHeight,
+    version: 5,
+  });
 
   const saveLayout = () => {
     if (!isBrowser) return;
@@ -1750,18 +1181,19 @@ const App: React.FC = () => {
   // a named project, or an uploaded file) to editor state. Callers wrap this
   // in their own try/catch since they differ in failure behavior (silent
   // resetView vs. an alert).
-  const applyParsedLayoutPayload = (
-    parsed: Record<string, unknown>,
-    opts: { mergeRigs?: boolean } = {}
-  ) => {
+  const applyParsedLayoutPayload = (parsed: Record<string, unknown>) => {
     // Projects saved before the Shape Warp block type was removed can still
     // carry blocks of that type. Nothing renders them any more, so drop them
     // rather than letting CanvasStage's exhaustive type switch fall through to
     // an unrendered block that still occupies the layer list and selection.
+    //
+    // The same goes for the Morph Glyph Editor's per-block fields: a save from
+    // before its removal still carries them, and stripping them here is what
+    // keeps an old project loading cleanly instead of half-rendered.
     const parsedBlocks = Array.isArray(parsed.blocks)
-      ? (parsed.blocks as Block[]).filter(
-          (b) => (b as { type?: string }).type !== "shapeWarp"
-        )
+      ? (parsed.blocks as Block[])
+          .filter((b) => (b as { type?: string }).type !== "shapeWarp")
+          .map(stripMorphFields)
       : null;
     const loadedBlocks: Block[] = parsedBlocks ?? blocks;
     if (parsedBlocks) setBlocks(parsedBlocks);
@@ -1771,9 +1203,6 @@ const App: React.FC = () => {
     }
     if (typeof parsed.backgroundColor === "string") setBackgroundColor(parsed.backgroundColor);
     if (typeof parsed.panMode === "boolean") setPanMode(parsed.panMode);
-    if (opts.mergeRigs !== false && Array.isArray(parsed.glyphRigs)) {
-      mergeGlyphRigs(parsed.glyphRigs as GlyphRig[]);
-    }
 
     const savedViewportWidth =
       typeof parsed.viewportWidth === "number" ? parsed.viewportWidth : null;
@@ -2156,118 +1585,6 @@ const App: React.FC = () => {
   };
   const streamACanvasProps: Partial<CanvasStageProps> = { snapToBlockEdges };
   // ---- /STREAM-A ----
-  // ---- STREAM-B: kashida auto-justify — handlers ----
-  /**
-   * Solves for the kashida dial position that stretches a block to a target
-   * width, then applies it through the existing `setBlockKashidaAmount` — that
-   * one call already carries the factor distribution, the debounced history
-   * push, and the re-render, so nothing else here mutates a block.
-   *
-   * The solving itself lives in `lib/justify.ts` (and is reached by a dynamic
-   * `import()`) because this file's import block sits outside this stream's
-   * merge anchors — see docs/superpowers/specs/PARALLEL.md.
-   */
-  const justifyBlock = useCallback(
-    async (
-      blockId: number,
-      target: { kind: "composition"; marginPx: number } | { kind: "block"; otherId: number }
-    ) => {
-      const block = blocks.find((b) => b.id === blockId);
-      // The same gate `setBlockKashidaAmount` applies — it is a no-op on these
-      // two types, so solving for them would report a fit that never lands.
-      if (!block || block.type === "image" || block.type === "textPath") return;
-
-      const stage = stageRef.current;
-      if (!stage) return;
-
-      let targetWidth: number;
-
-      if (target.kind === "composition") {
-        // Every *other* block's bounding width, less a margin per side. The
-        // block being justified is excluded deliberately: this app has no
-        // fixed artboard (the canvas box is derived from the blocks' own
-        // extent), so including it would make the target grow with the answer.
-        const others = blocks.filter((b) => b.id !== blockId);
-        const box = others.length > 0 ? getBlocksBoundingBox(stage, others) : null;
-        if (!box) {
-          setJustifyStatus("Nothing else on the canvas to fit to.");
-          return;
-        }
-        targetWidth = box.width - 2 * target.marginPx;
-      } else {
-        const other = blocks.find((b) => b.id === target.otherId);
-        const box = other ? getBlocksBoundingBox(stage, [other]) : null;
-        if (!box) {
-          setJustifyStatus("Could not measure the other block.");
-          return;
-        }
-        targetWidth = box.width;
-      }
-
-      if (!(targetWidth > 0)) {
-        setJustifyStatus("That target is too narrow to fit to.");
-        return;
-      }
-
-      const { solveJustifyForBlock, hasKashidaEligibleHandles } = await import("./lib/justify");
-
-      const glyphEdits = block.glyphEdits ?? [];
-      if (!hasKashidaEligibleHandles(glyphEdits)) {
-        setJustifyStatus(
-          "No stretchable strokes yet — add a kashida-eligible stretch in the Morph Glyph Editor first."
-        );
-        return;
-      }
-
-      const solution = await solveJustifyForBlock({
-        text: block.text,
-        fontFamily: block.fontFamily,
-        fontSize: block.fontSize,
-        glyphEdits,
-        targetWidth,
-        snapToNuqta: snapStrokesToNuqta,
-      });
-
-      if (!solution) {
-        setJustifyStatus("Could not shape this block's text.");
-        return;
-      }
-
-      setBlockKashidaAmount(blockId, solution.amount);
-      setJustifyStatus(
-        solution.reachable
-          ? `Fitted to ${Math.round(solution.achievedWidth)}px.`
-          : `Reached maximum stretch at ${Math.round(solution.achievedWidth)}px of ${Math.round(
-              targetWidth
-            )}px.`
-      );
-    },
-    [blocks, setBlockKashidaAmount, snapStrokesToNuqta]
-  );
-
-  const justifyOtherSelectedId =
-    selectedIds.length === 2 && selectedId != null
-      ? (selectedIds.find((id) => id !== selectedId) ?? null)
-      : null;
-
-  const streamBSidebarProps: Partial<SidebarProps> = {
-    justifyMarginPx,
-    onChangeJustifyMarginPx: (value: number) => {
-      setJustifyMarginPx(value);
-      setJustifyStatus(null);
-    },
-    justifyStatus,
-    canFitToComposition: blocks.length > 1,
-    canMatchBlock: justifyOtherSelectedId != null,
-    onFitToComposition: (blockId: number) => {
-      void justifyBlock(blockId, { kind: "composition", marginPx: justifyMarginPx });
-    },
-    onMatchBlockWidth: (blockId: number) => {
-      if (justifyOtherSelectedId == null) return;
-      void justifyBlock(blockId, { kind: "block", otherId: justifyOtherSelectedId });
-    },
-  };
-  // ---- /STREAM-B ----
   // ---- STREAM-C: export presets — handlers ----
   // A second `useExport(...)` call rather than extending the destructure at
   // the original call site: that line sits outside every stream's anchors.
@@ -2395,8 +1712,6 @@ const App: React.FC = () => {
         selectedIds={selectedIds}
         showGrid={showGrid}
         snapToGrid={snapToGrid}
-        snapStrokesToNuqta={snapStrokesToNuqta}
-        onToggleSnapStrokesToNuqta={setSnapStrokesToNuqta}
         isMobile={isMobile}
         width={effectiveSidebarWidth}
         isCollapsed={sidebarCollapsed}
@@ -2456,26 +1771,19 @@ const App: React.FC = () => {
         historyEntries={historyEntries}
         onJumpToHistory={jumpBy}
         onCaptureCurrentThumbnail={captureHistoryThumbnail}
-        onToggleKashidaEditMode={() => {
-          if (!selectedBlock || selectedBlock.type !== "text") return;
-          updateSelectedBlock({
-            kashidaEditMode: !selectedBlock.kashidaEditMode,
-          });
-        }}
         onToggleDiacriticEditMode={() => {
           if (!selectedBlock || selectedBlock.type !== "shapeFill") return;
           updateSelectedBlock({
             diacriticEditMode: !selectedBlock.diacriticEditMode,
           });
         }}
-        showMorphEditorMobile={showMorphEditorMobile}
-        onToggleMorphEditorMobile={() => setShowMorphEditorMobile((v) => !v)}
+        onToggleGlyphTransformMode={toggleGlyphTransformMode}
+        onResetGlyphTransforms={resetGlyphTransforms}
         onFitShapeFillSpacing={fitShapeFillSpacing}
         onAlignSelected={alignSelectedBlocks}
         onDistributeSelected={distributeSelectedBlocks}
         onGroupSelected={groupSelectedBlocks}
         {...streamASidebarProps}
-        {...streamBSidebarProps}
         {...streamCSidebarProps}
         {...streamDSidebarProps}
       />
@@ -2528,14 +1836,6 @@ const App: React.FC = () => {
           onUpdateBlockPosition={updateBlockPositionWithHistory}
           onSelectBlock={selectBlock}
           onEditBlock={requestTextEdit}
-          onSelectGlyph={selectGlyphForBlock}
-          onUpdateStretchHandle={updateStretchHandle}
-          onSetStretchFactor={setStretchFactor}
-          onDeleteStretchHandle={deleteStretchHandle}
-          glyphRigs={glyphRigs}
-          onGlyphBoxesChange={updateGlyphBoxes}
-          onGlyphSchemaChange={updateGlyphSchema}
-          onKashidaTextChange={updateKashidaText}
           onUpdateTextPathD={updateTextPathD}
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
@@ -2555,33 +1855,6 @@ const App: React.FC = () => {
           }
         />
       </div>
-
-      <MorphGlyphEditor
-        selectedBlock={selectedBlock}
-        selectedGlyphBoxes={glyphBoxesByBlock[selectedBlock?.id ?? -1] ?? []}
-        glyphCatalog={glyphSchemaByBlock[selectedBlock?.id ?? -1] ?? {}}
-        glyphRigs={glyphRigs}
-        onSetGlyphEditTool={(tool) => {
-          if (!selectedBlock || selectedBlock.type === "image") return;
-          updateSelectedBlock({ glyphEditTool: tool, glyphMaskEdit: null });
-        }}
-        onSetStretchFactor={setStretchFactor}
-        onUpdateStretchHandle={updateStretchHandle}
-        onDeleteStretchHandle={deleteStretchHandle}
-        onSetGlyphMaskEditMode={setGlyphMaskEditMode}
-        onSaveStretchHandleAsRig={saveStretchHandleAsRig}
-        onSetGlyphRigValue={setGlyphRigValue}
-        onDeleteGlyphRigAxis={deleteGlyphRigAxis}
-        onSetBlockKashidaAmount={setBlockKashidaAmount}
-        onToggleGlyphTransformMode={toggleGlyphTransformMode}
-        onResetGlyphTransforms={resetGlyphTransforms}
-        isMobile={isMobile}
-        width={RIGHT_PANEL_WIDTH}
-        isCollapsed={rightPanelCollapsed}
-        onToggleCollapse={() => setRightPanelCollapsed((v) => !v)}
-        mobileOpen={showMorphEditorMobile}
-        onCloseMobile={() => setShowMorphEditorMobile(false)}
-      />
 
       <ConfirmDialog request={confirmRequest} onCancel={() => setConfirmRequest(null)} />
     </div>

@@ -14,10 +14,9 @@
  *  - shapeScale, stroke all preserved.
  */
 
-import React, { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import { Group, Shape, Rect, Circle } from "react-konva";
 import type Konva from "konva";
-import type { PathCommand } from "opentype.js";
 import {
   parseSvgPath,
   pathToPolygon,
@@ -26,23 +25,13 @@ import {
   type SvgCmd,
 } from "../lib/svgPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
-import { applyGlyphEdit, prepareGlyphRig, applyPreparedGlyphRig } from "../lib/glyphEdits";
-import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
-import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
-import { deriveContourMask } from "../lib/glyphContours";
 import { findDiacriticGlyphIndices } from "../lib/diacritics";
 import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
 import {
   makeShapeFillInstanceAdapter,
   type DiacriticPlacement,
 } from "../lib/diacriticPlacement";
-import type {
-  GlyphEdit,
-  GlyphStretchHandle,
-  GlyphRig,
-  GlyphRigValue,
-  DiacriticOverride,
-} from "../types";
+import type { DiacriticOverride } from "../types";
 
 export type ShapeFillTextProps = {
   id?: string;
@@ -70,28 +59,6 @@ export type ShapeFillTextProps = {
   shadowOffsetY?: number;
   shadowOpacity?: number;
   rotation?: number;
-  glyphEditTool?: "stretch" | null;
-  selectedGlyphIndex?: number | null;
-  glyphEdits?: GlyphEdit[];
-  glyphRigs?: GlyphRig[];
-  glyphRigValues?: GlyphRigValue[];
-  onGlyphSelect?: (glyphIndex: number | null) => void;
-  onGlyphBoxesChange?: (
-    boxes: {
-      glyphIndex: number;
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      glyphId: number;
-    }[]
-  ) => void;
-  onGlyphSchemaChange?: (catalog: Record<number, StretchDefinition[]>) => void;
-  onUpdateStretchHandle?: (
-    glyphIndex: number,
-    handleId: string,
-    patch: Partial<GlyphStretchHandle>
-  ) => void;
   diacriticEditMode?: boolean;
   diacriticOverrides?: DiacriticOverride[];
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
@@ -115,42 +82,6 @@ type GlyphInstance = {
   scY: number;
 };
 
-// ─── SVG path parser ──────────────────────────────────────────────────────────
-
-/**
- * Applies a point-transform to a glyph's raw outline commands (in the
- * glyph's own local coordinate space, same frame the tile-loop's own
- * translate/rotate/scale positions afterward) — this is what lets a single
- * edit or rig axis affect every tiled repetition of that letter identically.
- */
-function warpSvgCommands(
-  commands: SvgCmd[],
-  transform: (x: number, y: number) => { x: number; y: number }
-): SvgCmd[] {
-  return commands.map((c): SvgCmd => {
-    switch (c.type) {
-      case "M":
-      case "L": {
-        const p = transform(c.x, c.y);
-        return { type: c.type, x: p.x, y: p.y };
-      }
-      case "C": {
-        const p1 = transform(c.x1, c.y1);
-        const p2 = transform(c.x2, c.y2);
-        const p = transform(c.x, c.y);
-        return { type: "C", x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, x: p.x, y: p.y };
-      }
-      case "Q": {
-        const p1 = transform(c.x1, c.y1);
-        const p = transform(c.x, c.y);
-        return { type: "Q", x1: p1.x, y1: p1.y, x: p.x, y: p.y };
-      }
-      case "Z":
-        return c;
-    }
-  });
-}
-
 type ShapeFillLine = {
   lineY: number;
   scX: number;
@@ -163,9 +94,10 @@ type ShapeFillLine = {
  * Scanline-tiles the glyph run across the shape's silhouette: for each row,
  * finds the shape's left/right edges via ray-casting samples, then works out
  * how many repetitions of the glyph run fit and the x-scale that makes them
- * span the row exactly. Shared by the actual drawing pass and by glyph-edit
- * hit-testing, which both need the exact same per-line layout — computing it
- * twice risked the two silently drifting out of sync.
+ * span the row exactly. Shared by the actual drawing pass and by the
+ * diacritic overlay's instance layout, which both need the exact same
+ * per-line layout — computing it twice risked the two silently drifting out
+ * of sync.
  */
 function computeShapeFillLines(params: {
   fontSize: number;
@@ -261,14 +193,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   shadowOffsetY = 0,
   shadowOpacity = 0.35,
   rotation = 0,
-  glyphEditTool = null,
-  glyphEdits = [],
-  glyphRigs = [],
-  glyphRigValues = [],
-  onGlyphSelect,
-  onGlyphBoxesChange,
-  onGlyphSchemaChange,
-  onUpdateStretchHandle,
   diacriticEditMode = false,
   diacriticOverrides = [],
   onDragDiacriticOverride,
@@ -280,12 +204,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   onResizeScale,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
-  const glyphSchemaCatalog = useGlyphSchemaCatalog(
-    shapeData.shapableText,
-    shapeData.glyphs,
-    shapeData.font,
-    fontFamily
-  );
 
   // Parse SVG path once
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
@@ -320,8 +238,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   const scaledW = shapeWidth * shapeScale;
   const scaledH = shapeHeight * shapeScale;
 
-  // Per-glyph outline bounds (glyph-local space) — reported so "Add handle"
-  // can size/center a new handle on whichever glyph is selected.
+  // Per-glyph outline bounds, in glyph-local space.
   const glyphLocalBoxes = useMemo(() => {
     const boxes: {
       glyphIndex: number;
@@ -363,20 +280,12 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     [diacriticOverrides, diacriticGlyphIndices]
   );
 
-  useEffect(() => {
-    onGlyphBoxesChange?.(glyphLocalBoxes);
-  }, [glyphLocalBoxes, onGlyphBoxesChange]);
-
-  useEffect(() => {
-    onGlyphSchemaChange?.(glyphSchemaCatalog);
-  }, [glyphSchemaCatalog, onGlyphSchemaChange]);
-
   // Mirrors the sceneFunc's own scanline-tiling loop in plain JS (no canvas
-  // needed — `pointInPolygon` is pure) so glyph-edit click hit-testing and
-  // handle placement can know where every tiled repetition actually lands.
-  // Only computed while glyph edit mode is on (it's a real amount of work).
+  // needed — `pointInPolygon` is pure) so the diacritic overlay can know
+  // where every tiled repetition actually lands. Only computed while that
+  // tool is armed (it's a real amount of work).
   const glyphInstances = useMemo<GlyphInstance[]>(() => {
-    if (!glyphEditTool && !diacriticEditMode) return [];
+    if (!diacriticEditMode) return [];
     if (!shapeSvgPath || parsedCmds.length === 0) return [];
     if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) return [];
 
@@ -411,7 +320,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
     return instances;
   }, [
-    glyphEditTool,
     diacriticEditMode,
     shapeSvgPath,
     parsedCmds,
@@ -428,8 +336,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   ]);
 
   // One placement per tiled repetition of each diacritic. They all edit the
-  // same single override (keyed by glyph index), matching how glyphEdits
-  // already behaves on this block type.
+  // same single override, keyed by glyph index — one adjustment therefore
+  // applies to every repetition of that mark.
   const diacriticPlacements = useMemo<DiacriticPlacement[]>(() => {
     if (!diacriticEditMode) return [];
 
@@ -467,33 +375,6 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     shapeScale,
   ]);
 
-  // Handles no longer get their axis from dragging — it's auto-computed once
-  // at creation (App.tsx's setStretchFactor). The mask still needs the real
-  // glyph outline, which only this component has, so it's derived here, once,
-  // the first time a new maskAuto handle with no mask yet shows up — for
-  // every glyph with pending handles, not just the canvas-selected one, since
-  // the Morph panel's sliders create handles without any canvas selection.
-  // Anchor/drag here are already glyph-local (no gx/gy offset — see the
-  // per-instance <Group> transform below), matching glyphCache's own commands.
-  useEffect(() => {
-    if (!onUpdateStretchHandle) return;
-    for (const edit of glyphEdits) {
-      const pending = edit.stretches.filter((h) => h.maskAuto && h.mask == null);
-      if (pending.length === 0) continue;
-
-      const commands = glyphCache[edit.glyphIndex]?.commands;
-      if (!commands || commands.length === 0) continue;
-
-      for (const h of pending) {
-        const mask = deriveContourMask(commands as unknown as PathCommand[], [
-          { x: h.anchorX, y: h.anchorY },
-          { x: h.dragOriginX, y: h.dragOriginY },
-        ]);
-        if (mask) onUpdateStretchHandle(edit.glyphIndex, h.id, { mask });
-      }
-    }
-  }, [glyphEdits, glyphCache, onUpdateStretchHandle]);
-
   return (
     <Group
       id={id}
@@ -501,34 +382,13 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       rotation={rotation}
       opacity={opacity}
       draggable={draggable && !locked}
-      dragBoundFunc={
-        glyphEditTool != null || diacriticEditMode ? () => ({ x, y }) : undefined
-      }
-      onClick={(e) => {
-        onClick?.();
-
-        if (glyphEditTool == null) return;
-
-        const group = e.currentTarget;
-        const pos = group.getRelativePointerPosition();
-        if (!pos) return;
-
-        const localX = pos.x / Math.max(shapeScale, 0.0001);
-        const localY = pos.y / Math.max(shapeScale, 0.0001);
-
-        let best: GlyphInstance | null = null;
-        let bestDist = fontSize * 0.7;
-        for (const inst of glyphInstances) {
-          const d = Math.hypot(inst.gx - localX, inst.gy - localY);
-          if (d < bestDist) {
-            bestDist = d;
-            best = inst;
-          }
-        }
-
-        onGlyphSelect?.(best?.glyphIndex ?? null);
-      }}
-      onTap={onTap} onDblClick={onDblClick} onDblTap={onDblClick} onDragMove={glyphEditTool == null ? onDragMove : undefined} onDragEnd={glyphEditTool == null ? onDragEnd : undefined}
+      dragBoundFunc={diacriticEditMode ? () => ({ x, y }) : undefined}
+      onClick={onClick}
+      onTap={onTap}
+      onDblClick={onDblClick}
+      onDblTap={onDblClick}
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
       listening
     >
       <Rect x={0} y={0} width={scaledW} height={scaledH} fill="transparent" strokeEnabled={false} listening />
@@ -589,15 +449,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 if (diacriticOverride?.hidden) continue;
                 const gx = startPenX + g.penX * scX + g.dx * scX;
                 const gy = sy + g.dy * scY;
-                const edit = glyphEdits.find((w) => w.glyphIndex === gi);
-                const preparedRig = prepareGlyphRig(fontFamily, g.glyphId, fontSize, glyphRigs, glyphRigValues);
-                const commands =
-                  edit || glyphRigValues.length > 0
-                    ? warpSvgCommands(g.commands, (px, py) => {
-                        const edited = applyGlyphEdit(px, py, edit);
-                        return applyPreparedGlyphRig(edited.x, edited.y, preparedRig);
-                      })
-                    : g.commands;
+                const commands = g.commands;
 
                 targetCtx.save();
                 targetCtx.translate(gx, gy);

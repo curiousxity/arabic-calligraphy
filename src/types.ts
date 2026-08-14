@@ -3,107 +3,10 @@ export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 
 /**
- * Restricts a stretch handle to a subset of a glyph's outline points, for
- * letter pairs a font's ligature table has fused into one glyph/contour
- * (band-falloff alone can't tell "the haa's tail" from "the ra" apart in
- * that case). Absent = today's whole-glyph band falloff, unchanged.
- *  - "contours": only points in these closed sub-paths of the glyph outline
- *    (0-indexed in path-command order) are eligible for displacement.
- *  - "lasso": only points inside this freehand polygon (same coordinate
- *    space as anchorX/dragX above) are eligible.
- */
-export type GlyphStretchMask =
-  | { mode: "contours"; contourIndices: number[] }
-  | { mode: "lasso"; points: { x: number; y: number }[] };
-
-export type GlyphStretchHandle = {
-  id: string;
-  anchorX: number;
-  anchorY: number;
-  /** Captured once at creation — the reference axis length/direction the drag delta is measured against. */
-  dragOriginX: number;
-  dragOriginY: number;
-  /** Live, draggable position. */
-  dragX: number;
-  dragY: number;
-  bandWidth: number;
-  mask?: GlyphStretchMask;
-  /** True while `mask` is auto-derived from the anchor/drag points' current position on the real glyph outline (see lib/glyphContours.ts) — recomputed on every drag. Set to false the moment the user manually authors a mask via By-stroke/Lasso, so their choice is never overwritten. Absent (pre-existing handles) = leave alone. */
-  maskAuto?: boolean;
-
-  // Stroke-schema linkage (lib/strokeSchema) — set only when this handle was
-  // created from a schema-driven catalog entry (see MorphGlyphEditor's "add
-  // named stretch" buttons). Absent = a plain freehand handle, behaving
-  // exactly as before this feature existed.
-  /** The schema Stroke.id this handle represents, for display/bookkeeping only. */
-  schemaStrokeId?: string;
-  /** Which of that stroke's stretchZones (see strokeSchema/deriveCatalog.ts's StretchDefinition.zoneIndex) this handle represents — a stroke can have more than one independently named zone (e.g. Height vs Length). Absent = zone 0 (every pre-existing handle, from single-zone strokes). */
-  schemaZoneIndex?: number;
-  /** Multiplier applied on top of the anchor->drag axis (same role as a rig axis's [-1,1] value), driven by the "Kashida amount" slider. Absent/1 = today's un-scaled behavior. */
-  factor?: number;
-  minFactor?: number;
-  maxFactor?: number;
-  kashidaEligible?: boolean;
-  priority?: number;
-  /** The schema stroke's natural length in nuqta, copied from StretchDefinition at handle creation — the divisor for the half-nuqta snap step. Absent on handles created before nuqta quantization existed, which simply do not snap. */
-  lengthDots?: number;
-  /**
-   * The stroke's spine in this block's text units, captured at creation from
-   * the generated tables (src/data/strokeSpines/). Nothing reads it yet —
-   * displacement still uses the anchor->drag axis, which is this polyline's
-   * two ends. It is stored so change 2 (spine displacement, `axis: "path"`)
-   * has its input without a second migration, and so a handle stays
-   * self-describing across save/load. Absent on every handle created before
-   * re-anchoring, and on any created for a stroke with no verified match.
-   */
-  spine?: { x: number; y: number }[];
-};
-
-export type GlyphEdit = {
-  glyphIndex: number;
-  stretches: GlyphStretchHandle[];
-};
-
-/**
- * A named, reusable deformation axis for one specific letterform in one
- * specific font (keyed by fontFamily + HarfBuzz glyph id elsewhere) — the
- * "rig" a user authors once and reuses across every occurrence of that
- * letterform, in any block, forever. Geometry is em-relative (raw pixel
- * value divided by the authoring block's fontSize) so the same axis
- * reapplies at the correct visual proportion on a block using a different
- * fontSize.
- */
-export type GlyphRigAxis = {
-  id: string;
-  name: string;
-  anchorX: number;
-  anchorY: number;
-  dragOriginX: number;
-  dragOriginY: number;
-  dragX: number;
-  dragY: number;
-  bandWidth: number;
-  /** Same meaning as GlyphStretchHandle.mask; "lasso" points are em-relative like the rest of this axis's geometry. */
-  mask?: GlyphStretchMask;
-};
-
-export type GlyphRig = {
-  fontFamily: string;
-  glyphId: number;
-  axes: GlyphRigAxis[];
-};
-
-/** Per-block live control value for one rig axis, in [-1, 1]. */
-export type GlyphRigValue = {
-  axisId: string;
-  value: number;
-};
-
-/**
  * A per-instance manual adjustment to one shaped diacritic glyph — keyed
- * by glyphIndex, the same scheme GlyphStretchHandle already uses (and
- * shares its known fragility: a text edit before this glyph in the string
- * can shift which glyph index the override lands on after re-shaping).
+ * by glyphIndex, the same scheme GlyphTransform also uses (and shares its
+ * known fragility: a text edit before this glyph in the string can shift
+ * which glyph index the override lands on after re-shaping).
  */
 export type DiacriticOverride = {
   glyphIndex: number;
@@ -117,16 +20,14 @@ export type DiacriticOverride = {
 
 /**
  * A rigid whole-glyph transform — move and independent x/y scale — keyed
- * by glyphIndex. Distinct from GlyphEdit (which displaces individual
- * outline points) and DiacriticOverride (uniform scale + vertical offset,
- * marks only): this moves and scales the finished glyph as a unit.
+ * by glyphIndex. Distinct from DiacriticOverride (uniform scale + vertical
+ * offset, marks only): this moves and scales the finished glyph as a unit.
  *
- * Shares glyphIndex keying with both, including its known fragility: a
- * text edit before this glyph shifts which index the transform lands on
- * after re-shaping. Unlike DiacriticOverride there is no identity signal
- * to re-check against at render time (every glyph is a legitimate
- * target), so a stale transform simply applies to whatever glyph now
- * holds that index — the same behaviour GlyphEdit already has.
+ * Shares glyphIndex keying with it, including its known fragility: a text
+ * edit before this glyph shifts which index the transform lands on after
+ * re-shaping. Unlike DiacriticOverride there is no identity signal to
+ * re-check against at render time (every glyph is a legitimate target), so
+ * a stale transform simply applies to whatever glyph now holds that index.
  */
 export type GlyphTransform = {
   glyphIndex: number;
@@ -163,32 +64,21 @@ type BlockCommon = {
   ornamental?: boolean;
   groupId?: number;
 
-  // Per-glyph editing (Stretch Line tool) — shared across text, shapeFill,
-  // blocks; not meaningful on image blocks.
-  glyphEditTool?: "stretch" | null;
-  selectedGlyphIndex?: number | null;
-  glyphEdits?: GlyphEdit[];
-  glyphRigValues?: GlyphRigValue[];
-  /** Which stretch handle (if any) is currently having its point mask authored, and how — text blocks only for now. */
-  glyphMaskEdit?: { handleId: string; mode: "contours" | "lasso" } | null;
-  /** Block-level "Kashida" slider (0-100) — proportionally scales every kashida-eligible, schema-backed stretch handle's `factor` toward its `maxFactor`, weighted by each handle's `priority`. */
-  kashidaAmount?: number;
   /**
    * Per-instance diacritic adjustments. Lives on BlockCommon rather than
-   * TextBlock because plain text and shapeFill blocks all
-   * support the on-canvas diacritic handles; image and textPath blocks
-   * inherit it unused, the same intentional simplification glyphEdits
-   * already makes.
+   * TextBlock because plain text and shapeFill blocks both support the
+   * on-canvas diacritic handles; image and textPath blocks inherit it
+   * unused, an intentional simplification BlockCommon makes throughout.
    */
   diacriticOverrides?: DiacriticOverride[];
 
   /**
    * Per-glyph rigid move/scale. Plain text blocks only for v1 — the other
    * block types inherit the field unused, the same intentional
-   * simplification BlockCommon already makes for glyphEdits.
+   * simplification BlockCommon already makes for diacriticOverrides.
    */
   glyphTransforms?: GlyphTransform[];
-  /** Arms the on-canvas move/scale handles. While on, ShapedText does not mount the stroke-stretch dots. */
+  /** Arms the on-canvas move/scale handles. */
   glyphTransformMode?: boolean;
 
   // Shape-import fields, carried by shapeFill blocks. They live on
@@ -205,7 +95,6 @@ export type TextBlock = BlockCommon & {
   lineHeight?: number;
   warpX?: number;
   warpY?: number;
-  kashidaEditMode?: boolean;
 };
 
 export type ShapeFillBlock = BlockCommon & {

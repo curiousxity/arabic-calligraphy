@@ -23,155 +23,84 @@ Current: **0.1.x**, pre-1.0, actively developed.
 Real, reproducible, and currently unfixed. Each says whether it is a
 regression, and what it would take to fix.
 
-### Stroke stretching
-
-- **Strokes deform instead of extending.** A stretch zone that the schema
-  describes as following a curve is collapsed to a straight chord, so a
-  feh's eye loop shears sideways and its counter pinches shut instead of
-  growing around its curve. Separately, `ra-final`'s protected terminal is
-  where displacement is *greatest* — the protection is inverted.
-  **Blocked**, not merely unbuilt: both fixes need the schema's node
-  coordinates mapped accurately onto real glyphs, and that mapping was
-  measured on 2026-08-13 and is not accurate enough (median 0.37 nuqta, p90
-  1.43, only 14.5% of mapped nodes landing inside the ink at all). See
-  "Blocked on a design" below.
-- **A trace of the join cleft remains.** Pinning joins made this much better
-  — "almost imperceptible" on the original repro — but not zero. The pin is
-  a point at the centre of the overlap while a seam is a region, so ink
-  toward the edges still moves slightly. `PIN_RADIUS_NUQTA` is the dial;
-  widening it also makes strokes unresponsive near their own joins, and no
-  test can see that tradeoff. Accepted at its current setting.
-- **Some letter pairs get no join protection at all.** Detection needs the
-  two glyphs' outlines to physically overlap. Measured across 7 fonts × 6
-  words, 5 pairs abut without overlapping and go unpinned, keeping the older
-  tearing behaviour. Not a regression. Widening detection is new design work
-  — a dilation radius large enough to catch abutting letters starts
-  inventing joins between letters that merely pass near each other.
-- **Thuluth gets no join protection on vocalized text.** It encodes its
-  marks in the Private Use Area with no positioning offsets, defeating both
-  signals the mark detector uses, so its marks read as base letters. The
-  same blind spot stops the per-mark diacritic overlay arming on that font.
-  One fix — reading the font's GDEF glyph classes — would solve both, but it
-  touches a detector several features share.
-- **Only plain text blocks get join pins.** Shape Fill tiles its run through
-  a per-tile affine transform; pins in that space are separate work.
-- **The kashida dial does not widen a run, so "Fit width" can never fit.**
-  Verified in a browser 2026-08-13 on `بسم` in two fonts: cranking every
-  stretch to its maximum leaves the ink's horizontal extent unchanged to
-  within a pixel, and the app's own measurement has it *shrinking* slightly
-  (60.505px at dial 0 → 60.105px at 100). Fit width therefore always reports
-  "Reached maximum stretch", and applying its answer makes the block
-  marginally narrower. The solver is not at fault — it measures what the
-  renderer draws. The derived stretch axes point inward, and the run's
-  outermost ink belongs to glyphs no interior stroke handle touches, since
-  `penX += advance` never moves. Same root cause as the two blocked changes
-  below: the schema→glyph mapping. Note this also falsifies
-  `solveKashidaAmount`'s stated invariant that width is monotonically
-  non-decreasing in the dial.
-
-### Elsewhere
-
-- **Glyph edits are keyed by glyph index**, so editing text *before* an
+- **Per-glyph edits are keyed by glyph index**, so editing text *before* an
   edited letter can shift which letter the edit lands on after re-shaping.
-  Affects stretch handles, per-glyph transforms and diacritic overrides
-  alike. Diacritic overrides are re-validated each render and silently
-  dropped if they land on a base letter; the others are not.
-- **Stretch, glyph transforms and glyph rigs do not apply to text-on-path
-  blocks.** Their glyphs are rotated to a curve tangent, which the
-  straight-bounding-box maths behind those tools assumes away.
+  Affects per-glyph transforms and diacritic overrides alike. Diacritic
+  overrides are re-validated each render and silently dropped if they land on
+  a base letter; glyph transforms are not.
+- **Per-glyph tools do not apply to text-on-path blocks.** Their glyphs are
+  rotated to a curve tangent, which the straight-bounding-box maths behind
+  those tools assumes away.
+- **Thuluth gets no per-mark diacritic handles.** It encodes its marks in the
+  Private Use Area with no positioning offsets, defeating both signals
+  `findDiacriticGlyphIndices` uses, so its marks read as base letters. Reading
+  the font's GDEF glyph classes would fix it, but that detector is shared by
+  every diacritic feature.
 - **Cloud sync has no conflict resolution** beyond overwrite-by-name. Same
   project name saved from two devices: last write wins.
 
 ## Verification debt
 
-Things that pass tests but have not been exercised by a human. The line
-here is narrower than it was long assumed to be: scripted **hovers** do
-reach Konva's hover-mounted handles, so whether a dot appears, and where,
-can be checked by automation. Scripted **drags** do not — they land on the
-block underneath — so anything that depends on moving a handle stays
-unverifiable outside a real browser session.
+Things that pass tests but have not been exercised by a human.
 
-- **Verified by hand 2026-08-13:** the join cleft on the original repro
-  (much improved, see above); nuqta snap increments; the Alt bypass; the
-  typed-precision field.
-- **Stroke-spine re-anchoring, partially checked 2026-08-14.** Passing in a
-  browser: the app loads with no console errors, and the Morph panel reads
-  as intended — in the default font, `حرف` shows `ر`'s stroke with a live
-  1.00 input while `ح`'s and `ف`'s show "no verified stroke in this font".
-  That is one of three zones, matching the predicted quarter-to-a-third.
-  **Still unverified, and needing a human's hand on a real mouse:** the
-  on-canvas dots. Konva's hover-mounted overlays do not respond reliably to
-  synthetic mouse events, so neither the no-jump property (a dot must not
-  move when its handle is created) nor "no dot where there is no spine"
-  could be confirmed by automation — hovering produced no dot on either a
-  spine-bearing or a spine-less letter, which is inconclusive rather than a
-  result. Also unverified: whether a spine-derived handle actually stretches
-  the stroke it names, and whether the `fontFamily` argument survives at the
-  two call sites no test guards (see the trap in `CLAUDE.md`).
-- **Second browser pass 2026-08-14, after the glyph-id fix.** Now confirmed,
-  on Amiri — the font whose spines the fix recovered, and where `حرف`
-  previously produced no handle at all:
-  - The panel tracks the font. Switching from the default to Amiri keeps
-    `ر`'s row live at 1.00, with `ح` and `ف` still reading "no verified
-    stroke in this font". Both `useGlyphSchemaCatalog` call sites still pass
-    `fontFamily`, checked by reading them.
-  - **A spine-derived handle does stretch the stroke it names.** Typing into
-    `ر`'s factor field clamps to its own `maxFactor` (1.80 → 1.30), relabels
-    the row "ra arc · +1 nuqta", and visibly extends the ra's tail. `ح` and
-    `ف` do not move, so the edit does not drag unrelated parts of the word.
-  - One observation, not a new defect: the extension comes out as a thin
-    hairline off the tail's tip rather than the stroke continuing at its
-    designed weight. That is the open "strokes deform instead of extending"
-    limitation above, seen on a correctly anchored stroke.
-  - No console errors throughout.
+Everything this section used to list belonged to the stroke-stretch
+subsystem and went with it on 2026-08-14 (see Shipped). What survives is a
+fact about the tooling rather than about any feature: scripted **hovers** do
+reach Konva's hover-mounted overlays, so whether a dot appears and where can
+be checked by automation, but scripted **drags** do not — they land on the
+block underneath — so anything needing a handle *moved* still wants a real
+mouse.
 
-- **Third browser pass 2026-08-14 — the on-canvas dots, mostly cleared.**
-  The earlier passes concluded synthetic hovers do not reach Konva's
-  hover-mounted overlays. That is **too pessimistic**: hovers land fine, and
-  three of the four checks that were waiting on a human are now done. Only
-  *drags* miss.
-  - **A dot appears only where there is a verified spine.** Hovering `ر`
-    shows exactly one dot, at the tip of its tail — which is where
-    `dragOrigin` belongs at factor 1.00. Hovering `ح` or `ف` shows none,
-    matching what their Morph rows say.
-  - **No jump when the handle is created.** The pre-creation dot's position
-    was fixed inside a 40x40px box; a handle was then created and its factor
-    returned to 1.00, and the dot re-rendered pixel-identically in that same
-    box. Checked non-vacuously — the row still showed its remove button and
-    Options, so a handle really did exist rather than having been deleted
-    back to the pre-creation state.
-  - **No cleft opens at the `ح`/`ر` join** in Amiri between factor 1.00 and
-    the maximum, compared at 604% canvas zoom on the same screen region. At
-    least as good as the "almost imperceptible" standard the pin work was
-    accepted at.
-  - **Still needs a real mouse: dragging a dot.** Two attempts, both landing
-    dead-centre on a ~21px target with the dot confirmed mounted, and both
-    dragged the *block* instead — the pointer reaches the block group rather
-    than the handle. Whether that is purely a synthetic-event artifact or
-    something a user would also feel is not established either way here.
-- **A handle created under one font does not act after switching fonts.**
-  Found during the pass above and reproduced deliberately. A handle stores
-  its axis in block space, captured against the glyph it was created on, so
-  after a font change the Morph row still reports a factor and a nuqta
-  delta while the ink does not move at all. Removing the handle and
-  re-creating it on the new font works immediately. This is the dead-control
-  problem the Task 9 follow-up removed for spine-less zones, reappearing by
-  a different route; it is not a regression from the glyph-id fix, and it is
-  not yet designed away.
-- **Covered by automation 2026-08-14, so no longer debt:** that a created
-  handle's anchor lands on real ink, on three fonts and three words
-  (`strokeSpines/endToEnd.test.ts`), and that every shipped spine is keyed
-  to a glyph real shaping produces. The browser checks below are unaffected
-  by this — a test can see the anchor, not the dot.
-- **Verified by hand 2026-08-13, second pass:** nuqta snapping on Shape Fill
-  blocks — passes, snapping to the correct half-nuqta grid off `lengthDots`
-  (1.13 → 1.11, 1.27 → 1.22, 1.41 → 1.44). The auto-justify "fit to
-  composition" round trip — **fails**, see the kashida entry under Known
-  limitations. Quantization was not the cause; the two formulas are in step.
+- **Unverified: dragging a per-glyph move/scale or diacritic dot**, for that
+  reason.
 
 ---
 
 ## Shipped
+
+### 2026-08-14 — The Morph Glyph Editor subsystem removed
+
+The Morph panel and its whole engine are gone: the Stretch tool, the stroke
+schemas (105 JSONs), the per-font stroke spines (30 tables), glyph rigs, join
+pins, the per-font nuqta table and nuqta snapping, the block-level Kashida
+dial, the tatweel-gap Kashida tool, Fit width / auto-justify, and
+By-stroke/Lasso mask editing. The suite drops from ~350 tests to 195; that is
+the point, not a regression.
+
+The reason is that the stack's central promise was measured inert. Everything
+under "Stroke stretching" in Known limitations is therefore **resolved by
+removal**, not by repair — recorded here so the measurements are not lost:
+
+- The kashida dial did not widen a run. Verified in a browser 2026-08-13 on
+  `بسم` in two fonts: cranking every stretch to maximum left the ink's
+  horizontal extent unchanged to within a pixel, and the app's own
+  measurement had it *shrinking* (60.505px at dial 0 → 60.105px at 100). Fit
+  width could therefore never fit. Root cause: displacing outline points
+  never moves `penX += advance`, so neighbouring letters never separate.
+- Strokes deformed instead of extending — a curved zone was collapsed to a
+  straight chord, and `ra-final`'s protected terminal was where displacement
+  was greatest.
+- Coverage was thin. Taking a letter as a given font actually draws it, only
+  ~14% of the 145 authored stretch zones had a verified spine and therefore a
+  handle (3% ThuluthDeco to 28% Kufi, over 3,775 zone × drawn-glyph
+  combinations).
+- The join cleft was improved by pinning but never eliminated, 5 of 42
+  measured letter pairs got no pin at all, and a handle created under one
+  font silently stopped acting after a font change.
+
+What survives: per-glyph move & scale (its arming checkbox relocated from the
+Morph panel to Sidebar → Typography), diacritic overrides, warp,
+`lib/arabicJoining.ts` (kept deliberately consumer-less for the tatweel
+stream), and `projectOntoAxis`, moved to `src/lib/dragAxis.ts`. The offline
+Python tooling stays in `scripts/`.
+
+Recovery: `docs/archive/nuqta-measurements.md` holds the per-font nuqta table
+and the pre-removal SHA `fbe942cadec8c82596948309248a99a1fbb21f90`. See
+`CLAUDE.md`'s "Removed subsystems" for the mechanics, including how an old
+saved project is migrated.
+
+Tatweel-based elongation (Phase 1 stream D) replaces the elongation story
+with one that works.
 
 ### 2026-08-14 — Spine tables keyed to the glyphs the app draws (Task 10)
 
@@ -335,36 +264,16 @@ Canvas, HarfBuzz shaping, block model, PNG/PDF export.
 
 ## Blocked on a design
 
-Not "unbuilt" — these have a known blocker and a known prerequisite.
-
-- **Enforcing protected zones, and `axis: "path"` spine displacement**
-  (changes 2 and 4). These were blocked on the Phase C measurement above.
-  The prerequisite — re-anchoring — is now **built and merged as far as
-  Task 9 of 11**, see the 2026-08-14 entry under Shipped: the schema's
-  proportional guess is replaced by a real per-font spine measured off each
-  glyph's own medial axis, and 99.8% of shipped spine points lie inside real
-  ink against 14.5% for the mapping they replace. Changes 2 and 4 themselves
-  are still unbuilt, but they are no longer blocked on accuracy — they are
-  now blocked only on their own design work, plus the two open items in the
-  2026-08-14 entry.
-- **Advance-level kashida elongation**, which is what the dial would need to
-  widen a run at all (see the kashida entry under Known limitations).
-  Re-anchoring does **not** fix it: displacing outline points never moves
-  `penX += advance`, so neighbouring letters never separate. Not yet designed.
+Nothing currently. The two entries that lived here — enforcing the schema's
+protected zones, and advance-level kashida elongation — went with the stroke
+subsystem on 2026-08-14. Tatweel-based elongation replaces the second.
 
 ## Not built yet
 
 Identified as valuable, deliberately deferred. `CLAUDE.md`'s "Deferred
 features" section carries the reasoning for each; the short list:
 
-- Join pins, per-glyph move/scale, and stretch handles on Shape Fill and
-  text-on-path blocks
+- Per-glyph move/scale on Shape Fill and text-on-path blocks
 - Per-glyph rotation
-- Join detection for letters that abut without overlapping
 - Mark detection via GDEF glyph classes, for fonts using PUA-encoded marks
-- Diwani and Ruq'ah support for per-stroke editing, and the per-style schema
-  override layer that would come with it
-- Parametric letterform rendering — examined and rejected, because the
-  schemas carry no joining geometry and drawing from skeletons would forfeit
-  the seamless joining this tool exists to protect
 - Image trace, removed along with the Shape Warp block type

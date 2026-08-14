@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Group, Circle, Rect } from "react-konva";
-import { projectOntoAxis } from "../lib/strokeSchema/dragAxis";
+import { projectOntoAxis } from "../lib/dragAxis";
 import type { DiacriticPlacement } from "../lib/diacriticPlacement";
 import type { DiacriticOverride } from "../types";
 

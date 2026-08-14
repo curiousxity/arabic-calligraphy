@@ -8,28 +8,10 @@ export const section: GuideSection = {
     "glyph",
     "letter",
     "letterform",
-    "morph",
-    "stretch",
-    "stroke",
-    "kashida",
-    "tatweel",
-    "elongate",
     "move",
     "scale",
-    "rig",
-    "mask",
-    "lasso",
-    "band",
-    "nuqta",
-    "dot",
-    "measure",
-    "proportion",
-    "snap",
-    "join",
-    "joining",
-    "connect",
-    "gap",
-    "split",
+    "stretch",
+    "overlap",
     "diacritic",
     "tashkeel",
     "harakat",
@@ -39,128 +21,26 @@ export const section: GuideSection = {
   Body: () => (
     <>
       <p>
-        The <strong>Morph Glyph Editor</strong> is where a composition stops
-        being typesetting and starts being calligraphy: it reshapes individual
-        letters rather than the block as a whole. It appears as a panel beside
-        the canvas whenever a text or Shape Fill block is selected, and tucks away to a tab you can click to bring it back. Its
-        own <strong>?</strong> button opens a shorter reference of the same
-        controls.
-      </p>
-
-      <h4>Stroke controls</h4>
-      <p>
-        Each letter is described by its anatomy — the body, an eye or loop, a
-        tooth, a tail, a dot — and each of those strokes can be lengthened or
-        shortened within a range the letterform can actually take.{" "}
-        <strong>1.00 always means the letter's natural shape</strong>, so
-        returning to it is never guesswork, and the <strong>×</strong> beside
-        an active stroke resets it outright.
-      </p>
-      <ul>
-        <li>
-          On a <strong>plain text block</strong>, hover a letter on the canvas
-          and drag the dot that appears. Each dot slides along that stroke's
-          own direction, so you cannot drag it somewhere the letterform would
-          not go. The panel keeps a number field beside each stroke for typing
-          an exact value.
-        </li>
-        <li>
-          On <strong>Shape Fill</strong> blocks, use the sliders in the panel
-          instead.
-        </li>
-      </ul>
-      <p>
-        Only letters whose shapes have been described in advance offer these
-        controls. A letter that shows nothing simply has not been described
-        yet — that is expected, not a fault.
-      </p>
-
-      <h4>Measured in nuqta, not decimals</h4>
-      <p>
-        Lengths are read in <strong>nuqta</strong> — the rhombic dot the nib
-        makes, which is how stroke length has been measured in this craft for
-        centuries. As you drag, the stroke reports{" "}
-        <strong>+½ nuqta</strong>, <strong>+1 nuqta</strong>, and so on, and
-        it steps in half-nuqta increments rather than sliding freely, so a
-        line's proportions stay in whole units instead of drifting into
-        arbitrary decimals.
-      </p>
-      <ul>
-        <li>
-          <strong>Hold Alt while dragging</strong> for a stroke that needs to
-          sit between the steps.
-        </li>
-        <li>
-          Typing a number into the field beside a stroke is always taken
-          exactly as typed — the field is there precisely for values the steps
-          will not give you.
-        </li>
-        <li>
-          To turn the stepping off altogether, untick{" "}
-          <strong>Snap strokes to nuqta</strong> in the Background &amp; Grid
-          panel. It sits beside the block-snapping tick-boxes but is unrelated
-          to them: it governs letters, not layout.
-        </li>
-      </ul>
-      <p>
-        The nuqta is a property of each typeface, measured from its own dot,
-        so the same "+1 nuqta" means the right thing in Naskh and in Thuluth.
-        A few faces have not been measured — on those, stretching simply moves
-        freely and no nuqta reading appears.
-      </p>
-
-      <h4>Joins hold while you stretch</h4>
-      <p>
-        Lengthening a letter used to drag it away from its neighbour and open
-        a hairline split at the join. The point where two letters actually
-        meet is now held still while the rest of the stroke moves, so you can
-        draw a letter out without breaking the word.
-      </p>
-      <p>
-        This is worth knowing about rather than trusting blindly. On most
-        typefaces it holds. On a few it cannot: where a typeface fuses letters
-        into a single form, or sets them so they touch without quite
-        overlapping, there is no seam to hold and stretching behaves as it did
-        before. If you see a join open up, that is the case you are in —
-        shorten the stretch, or set that word in another face.
-      </p>
-      <p>
-        <strong>Options…</strong> under an active stroke reveals{" "}
-        <strong>Band width</strong>, which widens or narrows the swath of the
-        letter that moves with the stroke, and <strong>Masking</strong>, for
-        the occasions when the editor grabbed the wrong part of a letter: with{" "}
-        <strong>By stroke</strong> you click the outlines to include or exclude
-        and press Done; with <strong>Lasso</strong> you draw a loop around the
-        region by hand.
-      </p>
-
-      <h4>Kashida</h4>
-      <p>
-        When a block contains letters that can carry an elongation, the panel
-        shows an <strong>Extend by</strong> dial from 0 to 100%. It is a single
-        control spread across every eligible letter at once, each stretching in
-        proportion to how much elongation that letterform is meant to bear —
-        useful for loosening or tightening a whole line in one movement.
+        Two tools work on a single letter rather than the block as a whole:
+        one moves and scales a letter, the other adjusts a mark sitting above
+        or below it. Both live on the canvas — you hover the letter and small
+        handles appear.
       </p>
 
       <h4>Move &amp; scale a letter</h4>
       <p>
-        Tick <strong>Move &amp; scale glyph</strong>, then hover a letter on a
-        plain text block. Three dots appear: one moves the letter bodily, one
-        stretches it sideways, one stretches it vertically. Its neighbours
-        never shift to make room, so you can overlap letters deliberately —
-        which is exactly what a calligrapher wants and a word processor
-        refuses. <strong>Reset glyph transforms</strong> undoes all of them for
+        On a plain text block, open <strong>Typography</strong> and tick{" "}
+        <strong>Move &amp; scale glyph</strong>, then hover a letter. Three
+        dots appear: one moves the letter bodily, one stretches it sideways,
+        one stretches it vertically. Its neighbours never shift to make room,
+        so you can overlap letters deliberately — which is exactly what a
+        calligrapher wants and a word processor refuses.{" "}
+        <strong>Reset glyph moves &amp; scales</strong> undoes all of them for
         the block.
       </p>
-
-      <h4>Rigs</h4>
       <p>
-        Give a stretch a name and press <strong>Save as Rig…</strong> to turn
-        it into a slider under <strong>Rigged Parameters</strong> that runs
-        from −1 to 1 and applies to <em>every</em> occurrence of that same
-        letter in the block — a way to keep repeated letters consistent
-        instead of adjusting each one by hand.
+        This is for plain text blocks only. Shape Fill and curve blocks lay
+        their letters out by their own rules, so the dots do not appear there.
       </p>
 
       <h4>Adjusting marks</h4>
@@ -181,8 +61,8 @@ export const section: GuideSection = {
         belongs to the letter, not to the copy.
       </p>
       <p>
-        Letters on a curve cannot be reshaped this way yet: once a letter is
-        rotated to follow a curve, these tools do not apply to it.
+        Letters on a curve cannot be adjusted this way: once a letter is
+        rotated to follow a curve, neither tool applies to it.
       </p>
 
       <h4>One thing to know before you start</h4>

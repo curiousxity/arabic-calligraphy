@@ -129,10 +129,10 @@ export type SidebarProps = {
   onJumpToHistory: (steps: number) => void;
   onCaptureCurrentThumbnail: () => string;
 
-  onToggleKashidaEditMode?: () => void;
   onToggleDiacriticEditMode?: () => void;
-  showMorphEditorMobile?: boolean;
-  onToggleMorphEditorMobile?: () => void;
+  /** Arms the on-canvas per-glyph move/scale dots. Plain text blocks only. */
+  onToggleGlyphTransformMode?: (blockId: number) => void;
+  onResetGlyphTransforms?: (blockId: number) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
   onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
   onDistributeSelected?: (axis: "x" | "y") => void;
@@ -145,21 +145,6 @@ export type SidebarProps = {
   snapToBlockEdges?: boolean;
   onToggleSnapToBlockEdges?: (checked: boolean) => void;
   // ---- /STREAM-A ----
-  snapStrokesToNuqta?: boolean;
-  onToggleSnapStrokesToNuqta?: (checked: boolean) => void;
-  // ---- STREAM-B: kashida auto-justify ----
-  /** Margin per side, in canvas px, subtracted from the "Fit to composition" target. */
-  justifyMarginPx?: number;
-  onChangeJustifyMarginPx?: (value: number) => void;
-  /** One quiet line reporting the last fit's outcome, or null. */
-  justifyStatus?: string | null;
-  /** False when the canvas holds no other block to measure against. */
-  canFitToComposition?: boolean;
-  /** True only at exactly two selected blocks. */
-  canMatchBlock?: boolean;
-  onFitToComposition?: (blockId: number) => void;
-  onMatchBlockWidth?: (blockId: number) => void;
-  // ---- /STREAM-B ----
   // ---- STREAM-C: export presets ----
   // The preset shape is spelled out structurally rather than imported from
   // `lib/exportPresets`, so this stream adds no line to the import block —
@@ -328,10 +313,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   historyEntries,
   onJumpToHistory,
   onCaptureCurrentThumbnail,
-  onToggleKashidaEditMode,
   onToggleDiacriticEditMode,
-  showMorphEditorMobile,
-  onToggleMorphEditorMobile,
+  onToggleGlyphTransformMode,
+  onResetGlyphTransforms,
   onFitShapeFillSpacing,
   onAlignSelected,
   onDistributeSelected,
@@ -341,17 +325,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   snapToBlockEdges,
   onToggleSnapToBlockEdges,
   // ---- /STREAM-A ----
-  snapStrokesToNuqta,
-  onToggleSnapStrokesToNuqta,
-  // ---- STREAM-B: kashida auto-justify ----
-  justifyMarginPx = 24,
-  onChangeJustifyMarginPx,
-  justifyStatus,
-  canFitToComposition,
-  canMatchBlock,
-  onFitToComposition,
-  onMatchBlockWidth,
-  // ---- /STREAM-B ----
   // ---- STREAM-C: export presets ----
   onCopyPNG,
   onExportAll,
@@ -741,13 +714,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onChange={(checked) => onToggleSnapToBlockEdges?.(checked)}
                 />
                 {/* ---- /STREAM-A ---- */}
-
-                <CheckboxRow
-                  id="snap-strokes-to-nuqta"
-                  label="Snap strokes to nuqta"
-                  checked={snapStrokesToNuqta ?? true}
-                  onChange={(checked) => onToggleSnapStrokesToNuqta?.(checked)}
-                />
 
                 <CheckboxRow
                   id="show-rulers"
@@ -1976,106 +1942,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 )}
 
+                {/* Relocated here when the Morph Glyph Editor panel was
+                    removed. Plain text only — no other renderer reads
+                    `glyphTransforms`, so arming it elsewhere would show dots
+                    that move nothing. */}
                 {selectedBlock.type === "text" && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Kashida</div>
+                    <div className="sidebarSectionTitle">Move &amp; scale</div>
 
                     <CheckboxRow
-                      id={makeId("kashida-edit-mode", selectedId)}
-                      label="Kashida tool"
-                      checked={!!selectedBlock.kashidaEditMode}
-                      onChange={() => onToggleKashidaEditMode?.()}
+                      id={makeId("glyph-transform-mode", selectedId)}
+                      label="Move &amp; scale glyph"
+                      checked={!!selectedBlock.glyphTransformMode}
+                      onChange={() => onToggleGlyphTransformMode?.(selectedBlock.id)}
                     />
 
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                      Drag a gold handle between two connected letters on the canvas to
-                      elongate the connector (tatweel).
-                    </div>
-                  </div>
-                )}
-
-                {/* The same set `setBlockKashidaAmount` accepts — everything but
-                    `image` and `textPath`. The enclosing panel already excludes
-                    image blocks, so only textPath needs excluding here. */}
-                {selectedBlock.type !== "textPath" && (
-                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Fit width</div>
-
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
-                      Solves the Kashida dial for you, elongating this block's strokes until
-                      it reaches the width you name.
+                      Hover a letter on the canvas to move it, or stretch it in x or y.
+                      Neighbouring letters never shift.
                     </div>
 
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        marginBottom: 8,
-                        minWidth: 0,
-                      }}
-                    >
-                      <label
-                        htmlFor={makeId("justify-margin", selectedId)}
-                        style={{ fontSize: 12, color: "var(--text-secondary)", minWidth: 0 }}
-                      >
-                        Margin
-                      </label>
-                      <input
-                        id={makeId("justify-margin", selectedId)}
-                        type="number"
-                        min={0}
-                        max={400}
-                        step={1}
-                        value={justifyMarginPx}
-                        onChange={(e) => {
-                          const parsed = parseFloat(e.target.value);
-                          if (Number.isNaN(parsed)) return;
-                          onChangeJustifyMarginPx?.(Math.max(0, Math.min(400, parsed)));
-                        }}
-                        className="hexInput"
-                        style={{ width: 72, flex: "0 0 auto" }}
-                      />
-                      <span style={{ fontSize: 11, color: "var(--text-muted)", minWidth: 0 }}>
-                        px per side
-                      </span>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 8, minWidth: 0 }}>
+                    {(selectedBlock.glyphTransforms?.length ?? 0) > 0 && (
                       <button
                         type="button"
+                        onClick={() => onResetGlyphTransforms?.(selectedBlock.id)}
                         className="sidebarSmallAction"
-                        style={{ minWidth: 0 }}
-                        disabled={!canFitToComposition}
-                        title={
-                          canFitToComposition
-                            ? "Stretch this block to span the rest of the composition."
-                            : "Add another block to the canvas to fit to."
-                        }
-                        onClick={() => onFitToComposition?.(selectedBlock.id)}
+                        style={{ background: "var(--bg-input)", marginTop: 8 }}
                       >
-                        Fit to composition
+                        Reset glyph moves &amp; scales
                       </button>
-                      <button
-                        type="button"
-                        className="sidebarSmallAction"
-                        style={{ minWidth: 0 }}
-                        disabled={!canMatchBlock}
-                        title={
-                          canMatchBlock
-                            ? "Stretch this block to the other selected block's width."
-                            : "Select exactly two blocks to match one to the other."
-                        }
-                        onClick={() => onMatchBlockWidth?.(selectedBlock.id)}
-                      >
-                        Match block
-                      </button>
-                    </div>
-
-                    {justifyStatus && (
-                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
-                        {justifyStatus}
-                      </div>
                     )}
                   </div>
                 )}
@@ -2267,21 +2162,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-
-        {isMobile && selectedBlock && selectedBlock.type !== "image" && (
-          <div className="sidebarPanel">
-            <button
-              type="button"
-              onClick={onToggleMorphEditorMobile}
-              className="sidebarSectionButton"
-              aria-expanded={showMorphEditorMobile}
-              aria-pressed={showMorphEditorMobile}
-            >
-              <span>Morph Glyph Editor</span>
-              <span>{showMorphEditorMobile ? "Hide" : "Show"}</span>
-            </button>
-          </div>
-        )}
 
         <div className="sidebarPanel">
           <CollapsibleSection

@@ -92,38 +92,35 @@ Because `Partial<Block>` patches spread onto a `Block` union member don't type-c
 
 - **`ShapedText.tsx`** — a normal text block; single shaped run, optional per-glyph `warpX`/`warpY` distortion via `src/lib/warp.ts`.
 - **`ShapeFillText.tsx`** — *tiles* the shaped text in repeating rows to fill an uploaded SVG shape's silhouette (scanline + ray-casting against a sampled polygon), auto-scaling each row to span the shape width exactly.
-
-  `ShapedText.tsx` and `ShapeFillText.tsx` both additionally support the "Stretch" tool (`glyphEdits`/`GlyphStretchHandle` in `types.ts`, math in `lib/glyphEdits.ts`) — see the "Stroke-schema-driven glyph editor" section below.
 - **`ImageBlockView.tsx`** — loads a data-URL image and draws it via Konva `Image`.
 
 `ShapedText.tsx`, `ShapeFillText.tsx`, and `TextOnPathText.tsx` each reimplement their own SVG-path-replay-to-canvas-context helper (`replayPath`/`tracePath`) because Konva's context wrapper doesn't support `Path2D` — this duplication is known and intentional, not an oversight to "fix" by extracting a shared helper (their fill/clip logic differs enough that past attempts kept them separate).
 
 All three draw a block's **outline before its fill**, not after. A canvas stroke straddles the path it follows, so stroking after the fill lays half the outline's width back over the letter, thickening every stem and closing counters as the width rises; filling over the stroke hides that inner half and leaves the letterform at its designed weight. `strokeWidth` therefore reads as the visible outline, and reversing the order in any one renderer would silently make that block type's outlines twice as heavy as the others'.
 
-Selected/grouped/multi-selected blocks currently have **no persistent on-canvas outline** (a dashed selection-box `Transformer` was tried and explicitly removed per user feedback) — the two exceptions are: a small drag-to-resize corner handle shown only on the *selected* `shapeFill`/`image` block, and colored glyph-edit handles on the selected block. Don't reintroduce a general selection bounding box without checking this history.
+Selected/grouped/multi-selected blocks currently have **no persistent on-canvas outline** (a dashed selection-box `Transformer` was tried and explicitly removed per user feedback) — the two exceptions are: a small drag-to-resize corner handle shown only on the *selected* `shapeFill`/`image` block, and the coloured per-glyph hover handles (move/scale, diacritics) on the selected block. Don't reintroduce a general selection bounding box without checking this history.
 
 ### Arabic text shaping pipeline (`src/lib/harfbuzz.ts` + `src/hooks/useShapedGlyphs.ts`)
 
 Text is shaped with real HarfBuzz compiled to WASM (`harfbuzzjs` npm package, loaded async), not a JS approximation. `shapeText(text, fontUrl)` loads the font bytes, shapes via HarfBuzz (`rtl` direction, `arab` script), and returns glyph IDs/advances plus the font parsed by `opentype.js` (used afterward to fetch actual glyph outlines for Konva drawing). Results are cached by `text|fontUrl` in-memory (`shapeCache`); call `clearShapeCache()` if a font file changes at the same URL. `FONT_URLS` (in `useShapedGlyphs.ts`) maps font-family keys to `/fonts/*.ttf|otf` — this is the single place new fonts get registered for the app to shape with.
 
-Most of `src/lib/` now has real test coverage — 27 `*.test.ts` files beside
-the modules they cover. Two conventions in there are worth knowing before
-adding another:
+Most of `src/lib/` has real test coverage — `*.test.ts` files beside the
+modules they cover. One convention in there is worth knowing before adding
+another:
 
 - **Anything that needs real shaping must use real harfbuzzjs and real fonts
   from `public/fonts/`**, never hand-written `{ g, cl }` fixtures.
-  `diacritics.test.ts` is the precedent and `justify.test.ts`,
-  `joinPins.fonts.test.ts` and `strokeSchema/spineError.test.ts` all follow
-  it. This is not a style preference: a fabricated-fixture suite is exactly
-  what let the cluster-lookup bug ship unnoticed once. Copy the `shapeReal`
-  helper rather than inventing a second loading mechanism — harfbuzzjs must
-  be pulled in via `createRequire`, because a static ESM import of it throws
-  under Vitest's Node ESM loader before any test code runs.
-- **Some suites are characterizations, not guards** — they pin measured
-  reality so a change becomes visible, and a *failure* can be good news.
-  `joinPins.fonts.test.ts`'s `EXPECTED_COVERAGE` and
-  `strokeSchema/spineError.test.ts` are both this. Read their header
-  comments before "fixing" one.
+  `diacritics.test.ts` is the precedent. This is not a style preference: a
+  fabricated-fixture suite is exactly what let the cluster-lookup bug ship
+  unnoticed once. Copy its `shapeReal` helper rather than inventing a second
+  loading mechanism — harfbuzzjs must be pulled in via `createRequire`,
+  because a static ESM import of it throws under Vitest's Node ESM loader
+  before any test code runs.
+
+(A second convention used to live here: some suites were *characterizations*
+rather than guards, pinning measured reality so a change became visible.
+Every one of them belonged to the removed stroke subsystem and went with it.
+The idea is still a good one if a future measurement wants pinning.)
 
 ### Per-instance diacritic control (`src/lib/diacritics.ts`, `DiacriticHoverHandles.tsx`)
 
@@ -144,9 +141,8 @@ HarfBuzz's default cluster level (`MONOTONE_GRAPHEMES`) merges a base
 letter with every combining mark following it into one cluster whose
 value is the *base letter's* character offset, so a mark glyph's own
 `glyph.cl` never points at the mark's own character — cluster-to-source
-lookup (what an earlier version of this function did, and what
-`strokeSchema/glyphLookup.ts` still does for its own, different, purpose)
-silently detects nothing on real shaped text. The working detection is
+lookup (what an earlier version of this function did) silently detects
+nothing on real shaped text. The working detection is
 two signals: (1) primary — the glyph's own Unicode codepoint(s), from
 `font.glyphs.get(g.g).unicodes` (opentype.js's cmap-derived metadata),
 tested against `ARABIC_DIACRITIC_RE`; (2) fallback, for contextual mark
@@ -166,8 +162,8 @@ exactly what let the cluster-lookup bug ship unnoticed once before).
 
 Overrides (`DiacriticOverride` in `types.ts`: `scale`/`offsetY`/`hidden`,
 default no-op) are keyed by glyph index — the same scheme
-`GlyphStretchHandle` already uses for the Stretch tool, including that
-scheme's known fragility (a text edit before a diacritic in the string can
+`GlyphTransform` also uses, including that scheme's known fragility (a text
+edit before a diacritic in the string can
 shift which glyph index its override lands on after re-shaping). Because
 of that fragility, `ShapedText.tsx` recomputes `findDiacriticGlyphIndices`
 for its own current glyph run each render and filters `diacriticOverrides`
@@ -185,8 +181,7 @@ a mark never reflows surrounding letters.
 
 `DiacriticHoverHandles.tsx` is a separate component (not folded into
 `ShapedText.tsx` itself) reusing `ShapedText`'s existing per-glyph
-`glyphHitBoxes` (already computed for the Stretch tool's hit-testing) —
-only the currently-hovered diacritic ever shows handles, which is what
+`glyphHitBoxes` — only the currently-hovered diacritic ever shows handles, which is what
 keeps text with many marks from becoming visual clutter. The move
 handle's `dragBoundFunc` captures the handle's absolute (stage-space) x
 at `onDragStart` and holds it fixed for the drag's duration, rather than
@@ -200,7 +195,7 @@ overridden mark's hoverable area tracks where it's actually drawn instead
 of drifting away from it as `offsetY`/`scale` grow. It's active only
 when the block is selected, matching every other interactive on-canvas
 overlay in this app. Live handle drags follow the same debounced-history
-pattern (`useDebouncedHistoryPush`) the Kashida tool already established;
+pattern (`useDebouncedHistoryPush`) block dragging already established;
 the hide-button click is a discrete, immediate `pushHistory()` mutation.
 
 This feature covers plain text and Shape Fill blocks.
@@ -221,11 +216,9 @@ of the block type, and an override applied after would detach the mark from
 its letter. **Arming:** plain text shows handles on selection, but Shape
 Fill requires an explicit "Diacritic tool" checkbox (`diacriticEditMode` on `ShapeFillBlock`), because a fill
 tiles its run across the whole silhouette and two marks can become 200+
-instances — that checkbox also widens `glyphInstances`'s memo guard and
-the block's `dragBoundFunc` pin, both of which were previously
-`glyphEditTool`-only. Because overrides are keyed by glyph index, one
-adjustment applies to every tiled repetition, exactly as `glyphEdits`
-already does there.
+instances — that checkbox is also what gates `glyphInstances`'s memo and the
+block's `dragBoundFunc` pin. Because overrides are keyed by glyph index, one
+adjustment applies to every tiled repetition.
 
 `App.tsx`'s `dragDiacriticOverride`/`toggleDiacriticHidden` gate on
 `supportsDiacriticOverrides(b)` rather than `b.type === "text"`. Widening
@@ -239,21 +232,18 @@ curve tangent, which is separate design work.
 ### Per-glyph move & scale (`src/lib/glyphTransform.ts`, `GlyphTransformHoverHandles.tsx`)
 
 Plain text blocks support rigidly moving a single shaped glyph and
-stretching or shrinking it as a whole in x or y — a third per-glyph system
-alongside `glyphEdits` (which displaces individual *outline points* with
-band falloff) and `diacriticOverrides` (uniform scale plus vertical offset,
-marks only). Ticking "Move & scale glyph" in the Morph Glyph Editor arms it;
-hovering a letter then shows three dots — blue to move, gold to scale x,
-green to scale y.
+stretching or shrinking it as a whole in x or y — a second per-glyph system
+alongside `diacriticOverrides` (uniform scale plus vertical offset, marks
+only). Ticking "Move & scale glyph" in Sidebar → Typography arms it; hovering
+a letter then shows three dots — blue to move, gold to scale x, green to
+scale y.
 
 `GlyphTransform` (`types.ts`: `offsetX`/`offsetY`/`scaleX`/`scaleY`, all
 defaulting to the identity) is applied in `ShapedText.tsx`'s
 `drawWarpedGlyphRun` as a `ctx.translate`/`ctx.scale` pair placed inside the
 existing `ctx.translate(gx, gy)` — which is what makes the pivot the glyph's
 **pen origin** (on the baseline, at the start of its advance) with no pivot
-arithmetic, so a scaled letter keeps sitting on the baseline. It composes
-*after* `applyGlyphEdit` and the glyph rig: stretch handles reshape the
-outline, then this moves and scales the result as a unit. It is likewise the
+arithmetic, so a scaled letter keeps sitting on the baseline. It is the
 **outermost** transform relative to a diacritic override: a mark carrying
 both is first placed by its override in the glyph's own pre-transform space
 and then moved/scaled by the transform, never the reverse. That ordering is
@@ -270,13 +260,12 @@ Two consumers need the glyph's box in *different* spaces, so
 `ShapedText.tsx`'s metrics memo emits both from one font walk.
 `glyphHitBoxes` stays **raw** and `glyphTransformedHitBoxes` carries the
 transform (via `transformedBox`). Only `GlyphTransformHoverHandles` gets the
-transformed variant; `onGlyphBoxesChange`, the mask-derivation effect,
-`selectedGlyphContours`, the diacritic placements, and
-`StrokeStretchHoverHandles` all get the raw one, because every one of them
-reasons in raw outline space — `applyGlyphEdit` displaces raw outline points,
-so feeding it a transformed box lands the stretch band on the wrong part of
-the letter and silently degrades `deriveContourMask` to a whole-glyph mask.
-The block-level `bounds` in that same loop are deliberately raw too: they
+transformed variant; the diacritic placements get the raw one, because they
+reason in raw outline space and a folded-in transform would misalign them.
+(Before the Morph subsystem was removed this raw/transformed split had
+several more consumers on the raw side; keep it even now that it has one, or
+the placements silently drift.) The block-level `bounds` in that same loop
+are deliberately raw too: they
 must stay based on the untransformed run, or transforming one glyph would
 resize the block and shift every other glyph on canvas.
 
@@ -291,17 +280,17 @@ Scales are clamped to 0.2–4 in `glyphTransform.ts`, both when reading a drag
 and when resolving a stored value, so a corrupted project file cannot
 produce a glyph too small to grab and fix.
 
-Arming is exclusive: while `glyphTransformMode` is on, `ShapedText` does not
-mount `StrokeStretchHoverHandles` at all, so a dot is never ambiguous.
-`DiacriticHoverHandles` still mounts last and stays topmost, keeping its
-smaller targets winning on marks.
+`GlyphTransformHoverHandles` mounts **before** `DiacriticHoverHandles` in
+`ShapedText`'s JSX: Konva routes a pointer to the topmost listening shape,
+these rects are glyph-sized, and a mark's hit target is smaller and sits
+inside one. Mounted later they would steal hover from every mark.
 
 Transforms are keyed by glyph index and share that scheme's fragility, with
 one difference worth knowing: `diacriticOverrides` are re-filtered each
 render against `findDiacriticGlyphIndices`, so a stale override landing on a
 base letter is dropped, but a glyph transform has no such signal — every
 glyph is a legitimate target — so a stale transform applies to whatever glyph
-now holds that index, exactly as `glyphEdits` already does.
+now holds that index.
 
 A scale-handle drag snapshots the dot's starting distance from the pivot at
 `onDragStart` rather than reading it from the live hit box: the box already
@@ -326,383 +315,58 @@ Plain text only. Shape Fill carries the fields via
 `supportsGlyphTransforms` gate rejects edits there rather than accepting
 and silently discarding them.
 
-### Stroke-schema-driven glyph editor (`src/lib/strokeSchema/`, `MorphGlyphEditor.tsx`)
+### Removed subsystems — the Morph Glyph Editor and everything under it
 
-The "Morph Glyph Editor" panel's Stretch tool lets a user click a shaped glyph and add anchor→drag "stretch handles" that displace real font-outline points (`lib/glyphEdits.ts`'s `applyGlyphEdit`/`applyAxisDisplacement`, band-falloff + optional contour/lasso masking). **Handle creation is schema-only** — there is no generic/freeform "Add stretch line" button anymore (removed once enough letters had authored schema data); every handle traces back to a `StretchDefinition` from an externally-authored Arabic calligraphy stroke schema (anatomical decomposition of a letterform into HEAD/BODY/EYE/TOOTH/DOT/etc. strokes, each with a safe stretch-factor range, kashida eligibility, protected zones, and a priority weight). A letter/joining-form combination with no authored schema entry simply cannot have a stretch handle added yet — that's expected, not a bug, until more schema files are supplied.
+Removed wholesale on **2026-08-14**. What went: the Morph Glyph Editor panel
+and its Stretch tool, the stroke schemas (`src/lib/strokeSchema/`, 105 JSONs),
+the per-font stroke spines (`src/lib/strokeSpines/`, 30 tables), glyph rigs,
+join pins, the per-font nuqta table and nuqta snapping, the block-level Kashida
+dial, the tatweel-gap Kashida tool, Fit width / auto-justify
+(`src/lib/justify.ts`), and By-stroke/Lasso mask editing
+(`src/lib/glyphContours.ts`).
 
-- `src/lib/strokeSchema/types.ts` is a straight TS port of the externally-supplied schema (`GlyphDescription`/`Component`/`Stroke`/`StretchZone`/`ProtectedZone`) — JSON files must match this shape field-for-field.
-- `src/data/strokeSchemas/*.json` holds one file per authored (baseLetter, joiningForm) combination — e.g. `seen-medial.json`, `beh-isolated.json`. **Dropping a new file in this folder is the entire integration step** — `src/lib/strokeSchema/registry.ts` auto-loads every file via `import.meta.glob` and indexes by the JSON's own `glyph.unicode`+`glyph.joiningForm` fields (not filename), so nothing else needs to change to add a letter. As of this writing the full 28-letter alphabet + hamza is authored across all their valid contextual forms (dual-joining letters get isolated/initial/medial/final; right-joining-only letters — alif, dal, dhal, ra, zay, waw — get only isolated/final, per standard Arabic connection rules) — 104 files from one generation batch, keyed by filename convention `<letter>-<form>.json` (note: the source files use `ha`/`ya` for the letters this app calls `heh`/`yeh`, to avoid colliding with `hah`/`yeh`-adjacent names already in use — rename on import if handed more files using that convention). Per the batch's own caveat: many contextual forms still reuse the same base stroke skeleton rather than fully redesigned per-form outline geometry — the `formMetadata` block (`connectsRight`/`connectsLeft`/`derivedFrom`/`rulesNote`) records the connection rules each form was generated under, but isn't yet consumed by any rendering/editor logic.
-- `src/lib/arabicJoining.ts`'s `classifyJoiningForms` determines each character's isolated/initial/medial/final cursive-joining form from Unicode letter-joining rules alone (dual-joining vs right-joining vs transparent combining marks) — independent of HarfBuzz and of any specific font, since harfbuzzjs doesn't expose which GSUB feature it picked internally.
-- `src/lib/strokeSchema/glyphLookup.ts`'s `useGlyphSchemaCatalog(shapableText, glyphs)` hook maps each shaped glyph's HarfBuzz cluster (`glyph.cl`) back to a source character + joining form, looks up the registry, and (via `deriveCatalog.ts`'s `deriveStretchCatalog`) flattens any match into labeled `StretchDefinition`s. **Important:** `glyph.cl` indexes into `shapableText` (the text *after* `stripUnsupportedDiacritics()` in `harfbuzz.ts`), not the block's raw `text` — `ShapedTextResult`/`useShapedGlyphs` expose `shapableText` specifically so this mapping stays correct.
-- **This intentionally does NOT become a parametric bezier rendering engine.** The schema's own `path`/`fromNode`/`toNode` coordinates describe *its own* idealized geometry, which cannot be mapped onto an arbitrary font's actual outline points — real fonts and HarfBuzz shaping remain the source of truth for letterform shape. The schema only supplies metadata (labels, kashida eligibility, min/maxFactor bounds, protected-zone advisories, priority) plus its own authored geometry (used only to *derive* an axis — see below). If asked to make the schema "actually render" the letterforms, that's a much larger, different feature (an entire custom letterform library replacing per-font glyph outlines) — confirm scope before attempting it.
-- **No manual dragging — the axis comes from a measured spine, sliders and on-canvas dots are the only controls.** Every handle used to require the user to drag a red anchor dot and a green drag dot onto the real glyph before its slider did anything; this was removed entirely (not kept as a fallback) in favor of a Kaleam-style slider-only flow. What replaced it was, briefly, a *proportional* mapping of the schema's own node coordinates onto the real glyph's bounding box (`schemaGeometry.ts`'s `computeNodeBoundingBox`/`normalizePoint`/`mapNormToRealBox`, attached to each `StretchDefinition` as `anchorNorm`/`dragNorm`); Phase C measured that mapping landing inside real ink only 14.5% of the time, and it is now replaced in turn by the per-font stroke spines described in their own section below. `App.tsx`'s `setStretchFactor` builds a handle from `StretchDefinition.spine` via `spineToBlockSpace`, taking `anchorX/Y` from the spine's first point and `dragOriginX/Y` from its last, then extrapolating `dragX/Y = anchor + (dragOrigin - anchor) * maxFactor` — the "full stretch" reference point the displacement math needs. **A zone with no spine for the current font gets no handle at all**, rather than falling back to the proportional guess. `anchorNorm`/`dragNorm` survive only as the offline matcher's seed; nothing at runtime maps them any more.
-- **Plain text blocks moved back to on-canvas dragging (Shape Fill did not).** `StrokeStretchHoverHandles.tsx` (modeled directly on `DiacriticHoverHandles.tsx`) is a second reversal, layered on top of the schema-derived axis the previous bullet describes: hovering a letter on a *selected plain text block* reveals one draggable dot per authored stroke zone, replacing that stroke's Morph-panel slider with direct on-canvas dragging (the panel keeps a small numeric input for typed precision instead). A dot's rest position for a given `factor` is `anchor + factor · (dragOrigin - anchor)` (`lib/strokeSchema/dragAxis.ts`) — since `dragOrigin` is already the schema-derived `factor=1` point and `dragX` the `factor=maxFactor` point (both established at handle-creation time, unchanged from before), `factor` itself doubles as the axis-interpolation parameter, with no new "manual anchor/drag positioning" reintroduced. Dragging is rail-constrained (Konva `dragBoundFunc` via `dragAxis.ts`'s `projectOntoAxis`, absolute-space, same technique `DiacriticHoverHandles.tsx`'s move handle already established) rather than free 2D movement. This is **plain text only** — same reasoning that kept the diacritic hover handles (see below) text-only: Shape Fill's tiled-row coordinate space is real, separate work. `ShapedText.tsx` also dropped the `glyphEditTool` ("Off"/"Stretch") gate entirely for its own click-to-select-glyph and mask-overlay-rendering logic — mask editing ("By stroke"/"Lasso") now arms directly via `selectedGlyphIndex` regardless of any tool state. `ShapeFillText.tsx` still uses `glyphEditTool` exactly as before. Hit-testing footgun worth remembering: because Konva routes a pointer only to the *topmost listening* shape and neighbouring Arabic letters (nearly all of which now have authored schemas) sit close together, each glyph's hover hit-`Rect` is sized to the union of the glyph's own box and the current rest position of every one of its dots — a stretched dot travels far outside the glyph box, and a rect that didn't follow it would fire `onMouseLeave` and unmount the dot before the cursor could reach it — while a `listening` toggle switches every *other* glyph's rect off as soon as one glyph is hovered or dragging, so those deliberately-wide rects can't steal hover from each other. For the same topmost-wins reason, `StrokeStretchHoverHandles` mounts *before* `DiacriticHoverHandles` in `ShapedText.tsx`'s JSX, so the smaller, more precise diacritic hit targets win wherever the two overlap.
-- **`factor` is now absolute, not drag-relative.** The old `applyAxisDisplacement` formula treated `factor=0` as "no displacement" and scaled whatever distance the user's manual drag established — meaningless with no drag to scale. `lib/glyphEdits.ts`'s `resolveValueMultiplier(h)` remaps `factor` to `(factor - 1) / (maxFactor - 1)` for any handle with `minFactor`/`maxFactor` set (i.e. every schema-backed handle), so `factor=1` now means exactly zero displacement (the real font's own natural rendering) and `factor=maxFactor` means the full extrapolated stretch to `dragX/Y` — this also finally matches what `setBlockKashidaAmount`'s formula below already assumed. Handles without `minFactor`/`maxFactor` (none are created anymore, but old saved projects may have them) keep using `factor ?? 1` directly, unchanged. `GlyphStretchHandle` (`types.ts`) still declares all schema fields as optional purely for this old-save backward compatibility.
-- The block-level "Kashida" 0–100 slider (`kashidaAmount` on `BlockCommon`, `setBlockKashidaAmount` in `App.tsx`) distributes one dial across every kashida-eligible schema-backed handle in a block, weighting each by its own `priority`: `factor = 1 + (maxFactor - 1) * (amount/100) * (priority/10)`. This is a manual dial, not automatic line-justification — the app has no "fit text to width" infrastructure to hook into.
-- **Multi-letter ligatures and multiple named sliders per stroke:** a `Stroke.editBehavior.stretchZones[]` entry can carry its own `label` (`types.ts`) — `deriveStretchCatalog` emits one `StretchDefinition` per **zone**, not per stroke, so a single stroke can expose several independently named/bounded sliders (e.g. Height vs Length) instead of collapsing to one range; every pre-existing file (one zone per stroke, no zone-level label) still produces exactly one entry each, unchanged. `GlyphStretchHandle`/`StretchDefinition` carry `schemaZoneIndex`/`zoneIndex` to track which zone a handle represents. Separately, `GlyphDescription.glyph` supports `role: "ligature"` entries keyed by `baseLetterSequence` (bare-codepoint array, e.g. `["0627","0644","0644","0647"]` for "الله") instead of a single `unicode` — `registry.ts`'s `getLigatureSchema` looks these up, and `glyphLookup.ts`'s `computeClusterSpans` detects when a shaped glyph's HarfBuzz cluster spans more than one source character (several letters fused by the font's own GSUB ligature rules — confirmed real via `fonttools`: `Wessam.ttf` fuses "الله" into exactly one glyph) and routes it through the ligature lookup instead of the normal single-letter path. `src/data/strokeSchemas/allah-ligature.json` is the first (and so far only) authored ligature — confirmed working end-to-end live in the browser (Wessam font, typed "الله", Stretch tool shows 6 labeled buttons: Alif/First lam/Second lam height, Second lam shoulder, Heh loop/tail). It was hand-adapted from a richer source file that required shadda+dagger-alif marks to trigger (per that file's own `triggerRules`/`testCases`) — `fonttools` inspection confirmed no font in `public/fonts/` actually has a GSUB rule fusing the marked sequence (only the plain 4-letter one), so the marks-required trigger and its `MARKS_1` sub-component were dropped rather than imported as dead data. If handed another ligature file with a similar "requires marks/context our fonts don't actually implement" mismatch, verify against real GSUB tables (`fontTools.ttLib`) before assuming it'll work, same as this one.
-- **A schema stroke's `protectedZones` are advisory text only** — they're never read by `applyGlyphEdit`/`applyAxisDisplacement`, so they don't by themselves stop a handle from displacing the whole glyph (its `fromNode`/`toNode` indices reference the schema's own idealized path, which has no correspondence to the real font's actual outline point indices — same mismatch as above). What actually scopes a handle is its own `mask` field. To avoid every schema handle defaulting to "affects the whole glyph," `src/lib/glyphContours.ts`'s `deriveContourMask` auto-derives a contour mask from wherever the handle's anchor/drag points sit on the real outline (point-in-polygon against the glyph's contours, reusing `lib/svgPath.ts`'s bezier-subdivision + point-in-polygon) — it samples several points along the whole anchor→drag segment rather than just the two endpoints, so a point landing in empty space between contours (e.g. between a letter's body and its dots) doesn't spuriously fall back to "whole glyph" when the segment as a whole clearly crosses the intended stroke's ink. That sampling was originally there because the anchor/drag mapping was only proportional; the endpoints now come from a measured spine and sit inside real ink 99.8% of the time, but the segment *between* two spine points is still a straight chord across a curved stroke, so it is kept. Each of `ShapedText.tsx`/`ShapeFillText.tsx` computes this **once, in a `useEffect` keyed off the handle's creation** (not on every drag — there is no more dragging) whenever `GlyphStretchHandle.maskAuto` is `true` and `mask` is still unset (every newly created handle starts this way, per `App.tsx`'s `setStretchFactor`). It can still legitimately land on "whole glyph" for a complex multi-letter ligature glyph where the per-letter schema proportions don't correspond well to the fused real outline — the block-level band width still limits which points move in that case, so this isn't unsafe, just less precisely scoped. Manually invoking "By stroke"/Lasso (`ShapedText.tsx` only) sets `maskAuto: false` so the user's explicit override is never clobbered.
+**Why.** The stack's core promise — strokes that extend — was measured inert.
+The kashida dial did not widen a run at all (the rendered extent was unchanged
+across the dial's whole travel, so Fit width could never fit); taking a letter
+as a given font actually draws it, only ~14% of authored stretch zones had a
+verified spine and therefore a handle; and the strokes that did move deformed
+rather than extended. The user chose removal over continued repair. Phase 1's
+tatweel stream replaces the elongation story with one that works.
 
-#### Known defects in the stretch math, and the schema data nobody reads
+**Where it lives if it is ever wanted back.** `docs/archive/nuqta-measurements.md`
+carries the expensive, human-verified part — the per-font nuqta table, measured
+two independent ways — plus the pre-removal SHA
+(`fbe942cadec8c82596948309248a99a1fbb21f90`) that every deleted file can be
+recovered from. The offline Python tooling (`scripts/measureNuqta.py`,
+`deriveStrokeSpines.py`, `auditSpineOrientation.py`) is deliberately **kept**:
+scripts are inert, and they are the other half of "don't redo the work." Read
+that archive file before resurrecting anything from git history, exactly as the
+`shapeWarp` note above asks.
 
-Investigated 2026-08-12 and reproduced live in the browser. **Read this
-before changing `lib/glyphEdits.ts` or the catalog derivation.** Full
-write-up, including the proposed fix and its open questions, is in
-`docs/superpowers/specs/2026-08-12-per-stroke-editing-design.md`.
+**What survived, and why it is where it is:**
 
-**Three layers of authored schema data are consumed by nothing.** Verified
-by grep across `src/`:
+- **Per-glyph move & scale** (`lib/glyphTransform.ts`,
+  `GlyphTransformHoverHandles.tsx`) — its own section above. Its arming
+  checkbox used to live in the Morph panel and now sits in Sidebar →
+  Typography, plain-text-only, matching the arming rule it always had.
+- **Diacritic overrides** — untouched, including the Shape Fill "Diacritic
+  tool" checkbox.
+- **`projectOntoAxis`** — was `lib/strokeSchema/dragAxis.ts`, now
+  `src/lib/dragAxis.ts`, because the two surviving hover-handle overlays use it
+  as their Konva `dragBoundFunc` rail. Its siblings `dotPositionForFactor` and
+  `factorForPosition` went with the stretch tool.
+- **`lib/arabicJoining.ts`** — deliberately kept **consumer-less**. Its only
+  caller was the deleted `strokeSchema/glyphLookup.ts`; the tatweel stream
+  needs it next. Don't delete it as dead code.
 
-- `protectedZones` survives only as `protectedReasons`, a string list used
-  for display. The zones themselves never scope an edit.
-- `preserveCurvature`, `preserveThickness`, and each zone's own `axis`
-  field (`"x"` / `"path"`) are read **nowhere**.
-- `styleProfile.measurementSystem.dotUnit` and `verticalLevels` appear
-  **only in test fixtures** — never in real code.
-
-`lengthDots` no longer belongs on this list — see below, it is now the
-divisor behind half-nuqta quantization.
-
-This is why stretching misbehaves. The engine is not missing information;
-it has it and discards it — for the pieces still listed above.
-
-**Symptom 1 — a cleft opens at a join — fixed 2026-08-13.** Reproduce (on
-`main` before that date): default `حرف`, stretch the ra down-left; a
-hairline gap appeared at the hah/ra junction, on the side dragged
-*toward*. Two causes compounded, and both halves were fixed:
-
-- `applyAxisDisplacement`'s `tAlong = along / axisLen` was **unbounded and
-  signed**, with falloff only *perpendicular* to the axis and none along
-  it — points past the drag origin travelled further than the drag itself,
-  points behind the anchor travelled backwards. `tAlong` is now clamped to
-  `[0, 1]` and eased with smoothstep (`lib/glyphEdits.ts`).
-
-  **That clamp is shared with the glyph-rig path, and quietly changed how
-  old projects render.** `applyPreparedGlyphRig` calls the same
-  `applyAxisDisplacement`, and unlike a schema handle it has no `factor = 1`
-  neutral — a rig axis's slider value *is* the multiplier, so any saved
-  project with a nonzero rig value draws slightly differently after this
-  branch than before it: outline points beyond the axis tip no longer
-  overshoot, and points behind the anchor no longer move the wrong way.
-  This was deliberate and is kept. It is the identical overshoot bug in the
-  identical function, a rig axis tears a join exactly as a stretch handle
-  does, and giving the rig its own unclamped copy of the math would mean
-  maintaining two displacement engines that differ only in a bug. Recorded
-  here because the visual change is small enough to be rediscovered later
-  as a mystery.
-- The anchor is still only a *proportional guess* — `anchorNorm` mapped
-  from the schema's idealized bounding box onto the real font glyph's box
-  — and still never lands exactly on the true connection point. Rather
-  than trust it, `lib/joinPins.ts`'s `computeJoinPins` finds joins a
-  different way: wherever two adjacent shaped glyphs' real outlines
-  physically overlap, by construction correct per font, assuming nothing
-  about baselines or letterform style. `applyGlyphEdit` takes the result
-  as an optional 5th `pins` parameter and applies it as a guard on the
-  **net** displacement (after the handle loop, not per handle — guarding
-  each handle separately would let two of them each individually respect
-  a pin while still summing to a net movement there), evaluated at the
-  point's *original* position so a point can't escape its own guard by
-  being displaced out of the pin radius first. **Plain text only.**
-  `ShapeFillText` tiles its run through a per-tile affine transform, so
-  computing pins in that space is separate, deliberately-deferred work —
-  it passes no pins and keeps the pre-existing tearing behaviour there.
-
-**Verified by eye 2026-08-13, and the honest result is "much better, not
-gone."** On the repro above in Naskh, the cleft is now almost imperceptible
-rather than absent — reviewed and accepted by the user at that standard.
-The residue is structural, not a leftover bug: the pin sits at the
-*centroid* of the overlap region and `joinGuard` ramps back to full
-displacement across `PIN_RADIUS_NUQTA` (0.5 nuqta), so the centre of the
-seam is nailed to exactly 0px — which is what `joinPins.fonts.test.ts`
-asserts, and it holds at any radius — while ink toward the edges of the
-overlap still moves a little. A seam is a region; a pin is a point.
-Widening the radius shrinks the residue at the cost of making the stroke
-unresponsive near its own join. **No test can see that tradeoff**, so
-retune it against the repro by eye or not at all; see the constant's own
-comment in `lib/joinPins.ts`.
-- **Marks are skipped when pairing, and that is load-bearing.** Adjacency
-  in a shaped run is not adjacency between letters: HarfBuzz emits every
-  tashkeel mark as its own glyph *between* the base letters it sits on, so
-  the original `i`/`i+1` pairing found no join at all the moment a word was
-  vocalized — measured, `حَرْف` in Amiri went 2 pins → 0, `مُحَمَّد` 4 → 0,
-  purely because of the harakat. With an إعراب keyboard, a diacritics
-  subsystem and a per-mark canvas overlay in this app, that switched the
-  whole feature off for a core use case. `computeJoinPins` therefore pairs
-  each base glyph with the *next base glyph*; a mark never receives a pin
-  of its own, which is right — a mark floats above the baseline and is not
-  what tears. Marks are identified with `lib/diacritics.ts`'s
-  `findDiacriticGlyphIndices`, this app's one detector for the job — do not
-  hand-roll a second one here, and in particular do not reach for
-  cluster-to-character lookup, which that module's header explains detects
-  nothing on real shaped text. Being a heuristic, it inherits that
-  detector's blind spots (see the Thuluth case below), where the behaviour
-  degrades to exactly what it was before this fix rather than misbehaving.
-- **Detection has a real, documented gap — not every abutting join is
-  found.** `joinPins.fonts.test.ts` measured 7 fonts × 6 words (42 pairs)
-  against real harfbuzzjs shaping. The 0px displacement-at-a-pinned-join
-  invariance held for *every* join that was detected — no regressions, no
-  partial credit. But 9 of the 42 pairs detect **no join at all**, in three
-  distinct categories, all confirmed by independently re-shaping and
-  counting glyphs:
-  - **Correct-by-design:** `Urdu/بسم` and `Urdu/كتب` each shape to a
-    single glyph — the font fuses the letters via GSUB. There is no glyph
-    boundary, therefore no seam to tear, so "no pin" is the right answer.
-  - **A real, currently-inert gap:** `Urdu/حرف`, `Urdu/سلام`, and
-    `Thuluth/سلام` shape to multiple glyphs whose ink genuinely does not
-    overlap — those letters abut rather than overlap, so
-    `overlapCentroid` correctly returns null and the join goes unpinned.
-    This is not a regression: it is exactly the pre-existing tearing
-    behaviour, just not yet fixed for this geometry. Extending detection
-    to abutting-but-not-overlapping glyphs is deliberately **not**
-    improvised here — see "Deferred features" below. Urdu's two vocalized
-    words land here too, for the same reason: its base glyphs abut once
-    the marks are set aside.
-  - **The mark detector can't see the font's marks:** `Thuluth/حَرْف` and
-    `Thuluth/مُحَمَّد`. `Thuluth.ttf` maps its shaped mark glyphs to
-    *Private Use Area* codepoints (U+E012, U+E016 observed for fatha and
-    sukun) instead of U+064B–U+065F, and positions them by advance with
-    `dx === dy === 0` rather than by GPOS — which defeats both signals
-    `findDiacriticGlyphIndices` uses, so those marks read as base letters
-    and break the pairing exactly as before. Its *unvocalized* words are
-    unaffected. This is the same blind spot that already stops the
-    per-mark diacritic overlay working on that font: the fix belongs in
-    the one detector, which several features share, not in a second copy
-    inside `joinPins.ts`.
-  - **The mark detector flags a real letter** — the mirror image of the
-    case above, found and fixed 2026-08-13, so it produces no `false`
-    entry today. It is why `computeJoinPins` treats a glyph as a mark only
-    when the detector flags it **and** `ax === 0`. `FatemiMaqala.ttf`
-    emits `dx` of 1–4 units out of an upem of 2048 — shaper rounding
-    noise — on ordinary letters, and the detector's
-    cluster-plus-nonzero-`dx` fallback reads that as mark attachment: its
-    unvocalized `كتب` lost the pins on glyphs 2 and 3, and `مُحَمَّد` lost
-    every pin it had. A genuine mark takes no horizontal space and cannot
-    participate in a join; a letter always advances the pen, which is the
-    signal that separates them. **The guard is local to join pairing on
-    purpose** — `lib/diacritics.ts` is shared with the per-mark canvas
-    overlay and other features, and changing it needs its own verification
-    pass across every consumer.
-
-  `FatemiMaqala` and `Kufi2` were added to that matrix in the same pass and
-  detect a join on all six words. `Kufi2` also confirms a *gain* from
-  base-letter pairing outside the original five: it decomposes its nuqat
-  into separately positioned GPOS mark glyphs, so a dot glyph severs two
-  letters' adjacency under raw-neighbour pairing — `Kufi2/بسم` goes from 2
-  pinned glyphs to 3 and `Kufi2/كتب` from 2 to 3 once marks are skipped.
-
-**Symptom 2 — strokes deform rather than extend — still open, unchanged.** `fa-medial.json`'s eye
-loop asks for `axis: "path"` and `preserveCurvature: true`; the catalog
-collapses it to a straight chord, so the loop shears sideways and its
-counter pinches shut instead of growing around its curve. Separately,
-`ra-final.json` protects nodes 1→2 (`terminal-shape`,
-`left-tail-terminal`) while the axis runs 0→2 — displacement is **maximum
-exactly where the schema says do not deform.** The protection is inverted.
-
-**Both fixes for this are blocked on a measurement that already came back
-negative, so don't start them.** They are changes 2 and 4 of the design, and
-both are built on mapping the schema's own node coordinates onto the real
-glyph's bounding box. `src/lib/strokeSchema/spineError.test.ts` measured how
-far that mapping actually lands from real ink — all 105 schemas × 5 fonts,
-using the app's own `mapNormToRealBox`, error in nuqta since a stroke feature
-is about one nuqta thick:
-
-    landed inside ink   14.5%
-    median 0.37 nuqta   p90 1.43   max 4.68
-
-A p90 of 1.43 means the node routinely sits more than a whole stroke-width
-off the stroke it is supposed to describe. Enforcing `protectedZones` on top
-of that would freeze the wrong part of the letter most of the time — a new
-failure mode, not a fixed one. Three explanations are ruled out by the data,
-so don't re-derive them: it is **not** distance from Naskh (the two Naskh
-faces are no better than Kufi, which has the best median), **not** per-form
-skeleton reuse (all four joining forms sit in one band), and **not** only
-compound letters (single-component glyphs still land outside the ink 90% of
-the time, though the tail does worsen with component count). The mechanism
-itself is what is inaccurate. Re-anchoring — snapping the spine to nearest
-ink, or fitting it to a medial axis derived from the real outline — is the
-prerequisite, and it needs its own design pass. Full breakdown in
-`docs/superpowers/specs/2026-08-12-per-stroke-editing-design.md`.
-
-That test is a **characterization**, not a guard: it asserts the error is
-still this large, so if you improve the mapping it will fail and tell you to
-re-run the numbers and reconsider. A failure there is good news.
-
-**Do not "fix" this by reaching for parametric rendering.** The stroke
-schemas contain no joining geometry whatsoever (`formMetadata`'s
-`connectsRight`/`connectsLeft` are prose and are consumed by nothing), so
-drawing letters from skeletons would forfeit the seamless joining that
-HarfBuzz plus real contextual forms currently provide for free. That
-tradeoff was examined explicitly and rejected for now.
-
-#### The nuqta is per-font and must be measured, not derived
-
-Traditional Arabic calligraphy measures stroke length in whole and half
-nuqta (the rhombic dot the nib makes), and the schemas are authored that
-way — hence `lengthDots` on every stroke. Quantizing stretch to nuqta
-increments needs no new schema data: a stroke's stretched length is
-`lengthDots × factor`, so half-nuqta steps mean snapping the factor to
-multiples of `0.5 / lengthDots`.
-
-What it *does* need is the nuqta's size in each font, and **there is no
-formula for it.** The natural guess — the alif's stem is one nuqta wide —
-was measured across all fonts and **fails**: `alif ÷ dot` ranges from 0.53
-(Urdu) to 1.68 (Kufi2), a 3.2× spread, where the rule predicts ~1.00.
-`dot/em` itself varies ~2× across the library (0.0762 Wessam → 0.1538
-Urdu), so no global constant can serve either.
-
-The measured per-font table lives in the spec above. Two independent
-methods were cross-checked and agree within ~2% on 14 of 17 fonts: the
-beh (U+0628) dot contour, and a **modal-contour sweep** (scan every glyph,
-keep small compact contours, take the mode — dots recur across many
-letters). The modal method needs no cmap, GSUB walk, or naming convention,
-and was the only one able to read `Qahiri.ttf`, whose base-codepoint
-glyphs are all empty. Ruqaa and Yekan remain unresolved and need a human
-eye. Quantization is to be **advisory, not compulsory** — snap by default
-with a modifier to override, mirroring the existing grid snapping, and
-off-grid values must round-trip through save/load unchanged.
-
-Gotcha for any offline font analysis: `Kufi2.ttf` and `NotoSans.ttf` are
-variable fonts whose `gvar` glyph count disagrees with `maxp` (825 vs 815;
-1718 vs 1708). fontTools throws on `getGlyphSet()` until the `gvar` table
-is dropped. Harmless to the app's own rendering path.
-
-**The measured table now lives in code, `src/lib/nuqta.ts`**, as dot/em
-ratios (`NUQTA_EM_RATIO`) rather than only in the spec — `nuqtaEmRatio`/
-`nuqtaPx` look a font up and return `null` for any font not in the table.
-`Ruqaa` and `HarfCanvasDiwani` are absent **deliberately**: every stroke
-schema declares `calligraphicModel: "naskh"`, which fits Diwani's sloped
-letterforms worst, and Ruq'ah merges dot pairs into strokes, making its
-nuqta the least reliable figure measured. That `null` is the out-of-scope
-mechanism for both fonts — it disables nuqta snapping *and* join pins
-(`lib/joinPins.ts` needs a pin radius sized from the nuqta and gets none),
-not an oversight to fill in with a guess.
-
-Quantization (`src/lib/strokeSchema/quantize.ts`) snaps the stroke's
-**added** length, not its absolute length: `factor = 1 +
-round((factor - 1) / step) * step`, where `step = 0.5 / lengthDots`. A
-stroke's natural `lengthDots` is generally not itself a half-nuqta
-multiple (beh's body is 4.2), so snapping the *absolute* length to a
-half-nuqta grid would move `factor = 1` off the font's own natural
-rendering — silently breaking the rule that factor 1 renders exactly as
-it does today. The added-length formula maps `factor = 1` to itself
-exactly at every step size, which is what keeps that rule intact.
-Wired into `App.tsx`'s `setStretchFactor` — the single funnel every
-stretch path (drag, typed field, kashida dial) goes through — behind a
-"Snap strokes to nuqta" checkbox (default on), with Alt bypassing it
-mid-drag and the typed precision field passing `{ snap: false }`.
-Snapping happens at edit time only, never on load and never in a
-renderer, so an off-grid value a user saved deliberately round-trips
-through save/load unchanged.
-
-### Stroke spines — the real anchor, replacing the proportional guess (`src/lib/strokeSpines/`, `scripts/deriveStrokeSpines.py`)
-
-The section above ends by explaining that the schema's node coordinates
-cannot be mapped onto a real font's outline accurately — median 0.37 nuqta,
-p90 1.43, only **14.5%** of mapped nodes landing inside the ink at all. This
-subsystem is the fix, built 2026-08-14 (Tasks 1–9 of an 11-task plan; see
-`PROGRESS.md` for what is still open and unverified).
-
-An **offline** Python generator (`scripts/deriveStrokeSpines.py`, needs the
-repo-local `.venv`) skeletonizes each glyph with `skimage.morphology.medial_axis`,
-prunes spurs, matches the schema's strokes onto the resulting branches, and
-writes one committed table per font to `src/data/strokeSpines/`. **99.82% of
-shipped spine points lie inside real ink**, and every shipped spine is keyed
-to a glyph real shaping actually produces. The app never runs the generator;
-it reads the tables.
-
-- **Absence is the mechanism, everywhere in here.** A match the gates cannot
-  verify ships **nothing** — no spine, therefore no handle. This is the same
-  convention as `nuqtaEmRatio` returning `null` for an out-of-scope font, and
-  it is deliberate: a guessed anchor freezes or stretches the wrong part of
-  the letter, which is the defect this subsystem exists to remove. Never add
-  a fallback to `mapNormToRealBox`, never interpolate a missing anchor.
-  `schemaGeometry.ts` still exists and must stay — `deriveStretchCatalog`
-  uses `normalizePoint`, and `spineError.test.ts` still measures
-  `mapNormToRealBox` as a deliberate characterization of what was replaced.
-- **The cost is coverage, and it is large.** 145 stretch zones are authored
-  across the non-ligature schemas, and taking a letter *as a given font
-  actually draws it in a given joining context*, about **14%** of its
-  authored zones offer a handle — 3% (ThuluthDeco) to 28% (Kufi) by font,
-  measured over all 3,775 (zone × drawn glyph) combinations. So most strokes
-  are not adjustable at all. Note this denominator is stricter than the
-  "quarter to a third" figure this feature originally shipped with: that one
-  counted one canonical glyph per joining form, whereas a Naskh face draws
-  several contextual variants of the same form and each needs its own spine.
-  The absolute number of working spines went **up** when that was corrected,
-  from 355 reachable to 486.
-  That is the trade, not a bug — and the UI is built to *say* so rather than
-  no-op silently: `MorphGlyphEditor` keeps a spine-less zone's row but shows
-  its label plus a muted "no verified stroke in this font" instead of the
-  factor input, and `StrokeStretchHoverHandles` renders no dot for it. The
-  row is deliberately **not** hidden; hiding it would make the panel differ
-  from font to font with nothing to explain why. A handle saved *before*
-  this feature, on a zone with no spine in the current font, still gets its
-  dot so it remains adjustable and removable.
-- **`StrokeStretchHoverHandles` must keep using the same
-  `spineToBlockSpace` call as `setStretchFactor`** — same `gx`/`gy`/
-  `fontSize`, and `unitsPerEm` from `getSpineTableIfLoaded(fontFamily)`.
-  That identity is the only thing guaranteeing a dot does not visibly jump
-  the moment its handle is created. Do not compute the pre-creation dot
-  position a second, independent way.
-- **Which glyph a table entry belongs to is decided by shaping, never by
-  reading GSUB.** `scripts/deriveStrokeSpines.py`'s `shaped_glyph_names`
-  shapes the letter in every joining context with uharfbuzz — the same
-  settings `lib/harfbuzz.ts` uses — and takes the glyph ids that come back.
-  Its predecessor walked the cmap and the `isol`/`init`/`medi`/`fina`
-  feature by hand and diverged from HarfBuzz two ways, leaving 46 of 401
-  shipped spines filed under ids no shaping ever emits: it stopped at the
-  form feature, missing the chained contextual substitution Amiri applies
-  afterwards (`fina` gives ra glyph 1830, which becomes 3455 on screen),
-  and it never applied `isol` at all, which killed every one of Kufi2's ten
-  entries. **A reimplementation of the shaper's choice will drift from it.**
-  Two consequences worth keeping in mind:
-  - **One joining form is not one glyph.** Amiri draws seven distinct
-    ra-finals depending on the preceding letter, each a different outline.
-    Each gets its own measured spine, which is why the table is keyed by
-    glyph id and not by (letter, form) — and why a font's glyph-entry count
-    can exceed its authored-schema count.
-  - Within the target cluster, the base glyph is the one with a **nonzero
-    advance**; zero-advance glyphs are the font's separately positioned
-    marks and nuqat (Kufi2 decomposes its dots this way). Same test, for the
-    same reason, as the one in `lib/joinPins.ts`. Zero or several such
-    glyphs means the font fused the context into a ligature or is otherwise
-    ambiguous, and the context is skipped rather than guessed at.
-- **Orientation is load-bearing and was the hardest thing here.** A spine's
-  points run from its zone's `fromNode` end to its `toNode` end
-  (`types.ts:26`), and `anchorFromSpine.ts` reads `anchor` off the first
-  point and `dragOrigin` off the last. Reverse a spine and the stretch pulls
-  the wrong way; slice a partial zone off a reversed branch and the window
-  lands on the wrong end of the stroke. Two separate review rounds were
-  spent on this. **Do not "normalise" or re-sort spine points.**
-- **A verification trap that already bit once.** Orientation was audited
-  three times against the *stroke's* first node, which for a full-stroke zone
-  is the same as the *zone's* `fromNode` — so the audit structurally could
-  not see partial zones, and 35 reversed partial spines shipped through a
-  review that had declared orientation clean. More generally: **checks built
-  out of the generator's own logic keep coming back near-tautological.** The
-  full-stroke length assertion in `spineTable.test.ts` is another instance
-  and says so in its own comment. Prefer a signal the generator never
-  consults.
-- **`ORIENTATION_VOTE_MIN_TAU = 0.0` oversells itself.** The "vote" it gates
-  is a bare sign test with no confidence floor. The rule it belongs to can
-  only ever *subtract* candidate spines, never orient one, so it is safe —
-  but read the constant's name sceptically.
-- **Nothing guards the two call sites that switch this feature on.**
-  `useGlyphSchemaCatalog`'s fourth parameter (`fontFamily`) is optional, and
-  it is what triggers the table load. Drop it at `ShapedText.tsx:425` or
-  `ShapeFillText.tsx:283` and every spine silently becomes `undefined`, every
-  handle stops being created, and **tsc, lint, the whole test suite and the
-  build all stay green** — the feature simply does nothing. This exact
-  regression was introduced once during development, by instruction, and
-  caught only by reading Task 9's brief. No automated test covers it, because
-  the repo has no component-test infrastructure (Konva needs a real canvas).
-  If you touch either call site, check the result in a browser.
-- Contract conformance and staleness are covered by
-  `src/lib/strokeSpines/spineTable.test.ts`, whose highest-value assertion is
-  the **SHA-256** one: a font regenerated or replaced without re-running the
-  generator leaves a table anchored to outlines that no longer exist, and
-  nothing else would notice. That test is also why adding a font is now a
-  *six*-place edit — the five in the font section above, plus regenerating
-  its spine table.
+**Old saves.** `App.tsx`'s `stripMorphFields` deletes `glyphEdits`,
+`glyphRigValues`, `glyphMaskEdit`, `glyphEditTool`, `selectedGlyphIndex`,
+`kashidaAmount` and `kashidaEditMode` off every block in
+`applyParsedLayoutPayload` — same mechanism and same reasoning as the
+`shapeWarp` filter beside it. A project saved before the removal loads with
+those edits dropped rather than half-rendered. The layout payload's `version`
+moved 4 → 5 and no longer embeds `glyphRigs`. The `harfcanvas-glyph-rigs-v1`
+localStorage key is simply orphaned; nothing reads or clears it.
 
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
@@ -744,11 +408,11 @@ selected and has `textPathEditMode` set, and is hidden during export
 `text-path-edit-layer-`, alongside the grid and artboard background it
 already hides).
 
-Stretch-tool glyph handles and glyph rigs do not apply to `textPath`
-blocks — `App.tsx`'s `rightPanelVisible` and every internal glyph-edit
-mutator guard exclude `"textPath"` the same way they've always excluded
-`"image"`. The anchor/drag math those tools use assumes a straight glyph
-bounding box; making it work once a glyph is rotated to a curve tangent
+Per-glyph tools (move & scale, diacritic overrides) do not apply to
+`textPath` blocks — every internal per-glyph mutator guard excludes
+`"textPath"` the same way it has always excluded `"image"`. Those tools'
+hit-testing assumes a straight glyph bounding box; making it work once a
+glyph is rotated to a curve tangent
 is a real design problem, deliberately left for a future spec rather than
 half-supported here.
 
@@ -771,7 +435,7 @@ range.**
 
 **Adding a new font is a five-place edit plus a glyph merge, not a file
 copy.** There is no single font registry — a font must be added to *all
-five* of these or it half-works in a way that is easy to misdiagnose:
+four* of these or it half-works in a way that is easy to misdiagnose:
 
 1. the file itself in `public/fonts/`;
 2. an `@font-face` rule at the top of `src/index.css` — this is what the
@@ -781,13 +445,11 @@ five* of these or it half-works in a way that is easy to misdiagnose:
    a font appears in the picker at all**;
 4. `FONT_URLS` in `src/hooks/useShapedGlyphs.ts` — what HarfBuzz actually
    shapes with.
-5. `NUQTA_EM_RATIO` in `src/lib/nuqta.ts` — the font's **measured** nuqta as
-   a dot/em ratio. This one is different from the other four: it must be
-   *measured*, not chosen (`scripts/measureNuqta.py`, cross-checked by eye —
-   see "The nuqta is per-font and must be measured" above), and omitting it
-   is a *legitimate* choice rather than a mistake, because absence is how a
-   font is declared out of scope for per-stroke editing. `nuqta.ts`'s own
-   comment explains which fonts are deliberately absent and why.
+
+(There used to be a fifth: a measured per-font nuqta in `src/lib/nuqta.ts`.
+It went with the stroke subsystem — see "Removed subsystems" above. The
+measurements themselves survive in `docs/archive/nuqta-measurements.md`, so
+anything that needs a nuqta again starts from there rather than re-measuring.)
 
 Then merge the ten honorific glyphs into the file (see above).
 
@@ -795,11 +457,7 @@ Each omission fails differently, and none of them fails loudly:
 registering in `FONT_URLS` alone shapes correctly but leaves the font
 invisible in the UI; adding to `FONT_OPTIONS` alone makes it selectable but
 `FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans` silently falls back to Noto
-Sans, so the picker shows a name that renders as a different font; and
-leaving it out of `NUQTA_EM_RATIO` gives a font that looks completely
-normal but silently has **no nuqta snapping and no join pinning** — stroke
-stretch reverts to free decimals and tears at letter joins, with nothing in
-the UI saying so.
+Sans, so the picker shows a name that renders as a different font.
 
 `HarfCanvasDiwani.ttf` is the worked example of all of this, added
 2026-08-12. It is a **modified version of Layla Diwani** (OFL, Mohammed
@@ -899,13 +557,6 @@ The "Snap to block edges" checkbox (Background & Grid panel) is
 `snapToBlockEdges` in `App.tsx`, defaulting **on** and deliberately not
 persisted. Off restores exactly the previous origin-only behaviour.
 
-The panel's other checkbox, **"Snap strokes to nuqta"** (`snapStrokesToNuqta`),
-looks like a sibling but governs something unrelated — it quantizes *stroke
-stretch* to half-nuqta increments, not block position. It shares this panel
-only because both are snapping toggles, and it follows the same two
-conventions: defaulting **on**, and deliberately not persisted. See the
-stroke-schema section for what it actually does.
-
 Note that the "artboard" targets come from `contentBox`, which is unioned
 with the current viewport — so at a zoom level where the viewport is
 larger than the content, those edges sit at the viewport's edge rather
@@ -955,9 +606,8 @@ whole reason for the format: they can use the app's own CSS custom
 properties and stay in the repo beside the code they describe.
 
 - `types.ts` declares `GuideSection` (`id`/`title`/`order`/`keywords`/`Body`).
-  `registry.ts` auto-loads every `./sections/*.tsx` via `import.meta.glob`,
-  exactly as `src/lib/strokeSchema/registry.ts` does for stroke schemas, and
-  sorts by `order` then `title`. **Dropping a file in `sections/` is the
+  `registry.ts` auto-loads every `./sections/*.tsx` via `import.meta.glob`
+  and sorts by `order` then `title`. **Dropping a file in `sections/` is the
   entire integration step** — there is no index to edit, so nothing ever has
   to be registered. Don't replace the glob with an explicit list.
 - `registry.ts` also exports `filterGuideSections(sections, query)`, matching
@@ -969,9 +619,8 @@ properties and stay in the repo beside the code they describe.
   element from `Sidebar.tsx`'s header panel. Open/closed state is local to
   that component **by design** — reading the guide is not an edit, so it must
   never reach `App.tsx`'s state, the undo stack, or the saved-layout payload.
-- `GuideDrawer.tsx` portals to `document.body` (same reason
-  `MorphGlyphEditor` does — the sidebar is an overflow-hidden scrolling
-  column that would clip a slide-over). It is deliberately mounted from
+- `GuideDrawer.tsx` portals to `document.body` (the sidebar is an
+  overflow-hidden scrolling column that would clip a slide-over). It is deliberately mounted from
   `Sidebar.tsx` and **not** from `CanvasStage.tsx`: anything inside the Konva
   stage risks being baked into an export.
 - The active section is *derived* (`filtered.find(id) ?? filtered[0]`) rather
@@ -1016,8 +665,8 @@ panel there:
   most. A plain text block has no type panel; its controls are the shared
   ones.
 - **`Typography` is the shared styling panel** (font family, size,
-  colour, alignment, line height, plus the text-only Warp and Kashida
-  sections). It is *not* called "Text" precisely because it renders for
+  colour, alignment, line height, plus the text-only Warp and
+  Move & scale sections). It is *not* called "Text" precisely because it renders for
   shape and curve blocks too, where a panel named "Text" sitting beside
   one named "Shape Fill" reads as two competing type panels.
 
@@ -1048,87 +697,6 @@ friction.
 CSS is one global stylesheet (`src/index.css`) using CSS custom properties for theming — navy+gold is the unconditional default (`:root`), with an ivory/parchment palette under `@media (prefers-color-scheme: light)` (inverted from the usual light-default/dark-override convention — check this file's structure before assuming which block is "the default").
 
 Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default to `min-width: auto`**, which refuses to shrink below content size and causes silent overflow/clipping at narrow sidebar widths. When adding a new multi-item row (grid or flex), give items `min-width: 0` explicitly or the row will overflow at the sidebar's minimum width instead of degrading gracefully.
-
-<!-- ---- STREAM-B: kashida auto-justify — document this feature here (see docs/superpowers/specs/PARALLEL.md) ---- -->
-
-### Kashida auto-justify (`src/lib/justify.ts`)
-
-The block-level Kashida dial described above stays exactly as it was — this
-feature only decides *which* dial value to pass it. Sidebar → Typography →
-**Fit width** offers "Fit to composition" and "Match block"; both reduce to a
-single target width, which `App.tsx`'s `justifyBlock` solves for and applies
-through the **existing** `setBlockKashidaAmount`. That one call already carries
-the factor distribution, the debounced history push, and the re-render, so no
-renderer, no type, and no other handler changes.
-
-**The trap this feature is built around: nothing else in the app knows how wide
-a *stretched* run is.** `ShapedText.tsx`'s glyph-metrics memo takes each glyph's
-box from the raw font outline and never applies `glyphEdits`, and
-`penX += advance` is deliberately untouched by stretching — so the block's
-bounds, its hit boxes, and its Konva client rect are all the *unstretched* width
-and do not move when the dial does. A solver reading any of them converges
-silently to nonsense. `measureStretchedRunWidth` therefore replays
-`ShapedText`'s *drawing* loop (pen advance, `dx`/`dy`, `fontSize / unitsPerEm`
-scale, per-contour index) and pushes every outline coordinate through
-`applyGlyphEdit` before taking the extent. That function is **imported, never
-reimplemented** — a divergence there would optimise a width the user never sees,
-and nothing would fail loudly. Glyph rigs, per-glyph transforms, diacritic
-overrides, and warp are deliberately excluded: the dial doesn't move them, so
-they are a constant offset the solver cannot see anyway. `measureStretchedRunWidth`
-must also be handed the **same `joinPins`** `ShapedText` is rendering with (both
-come from `lib/joinPins.ts`'s `computeJoinPins`) — for exactly the same reason it
-imports rather than reimplements `applyGlyphEdit`: measuring unpinned ink while
-the renderer pins it would optimise a width the render never actually produces.
-
-`applyKashidaAmountToEdits` used to duplicate `setBlockKashidaAmount`'s
-`factor = 1 + (maxFactor - 1) * (amount/100) * (priority/10)` formula by hand,
-because the solver has to evaluate dozens of candidate dial positions without
-touching state. That duplication is gone: the formula now lives once, in
-`src/lib/kashidaFactor.ts`'s `kashidaFactorForHandle`, and both
-`setBlockKashidaAmount` and `applyKashidaAmountToEdits` call it. **The two
-call sites must stay fed the same inputs**; if they ever diverged again the
-solver would report a width that applying its own answer would not produce —
-nuqta quantization (see above) is exactly the kind of change that would have
-silently split them apart if the formula still lived twice.
-
-**The feature is currently inert, and not because of anything in this file.**
-Measured in a browser 2026-08-13: the dial does not widen a run — the rendered
-extent is unchanged to within a pixel across the dial's whole travel, and the
-solver's own measurement *decreases* slightly. So the monotonicity assumption
-below is false in practice (it is non-*increasing*), and Fit width always
-reports "Reached maximum stretch". The solver is faithful to the renderer;
-the fault is upstream, in the schema-derived stretch axes. Details and the
-measured numbers are in `PROGRESS.md`'s Known limitations — don't debug
-`justify.ts` looking for it.
-
-`solveKashidaAmount` bisects `[0, 100]` (width is monotonically non-decreasing
-in the dial, which is what makes that safe), default tolerance 0.5px. Both ends
-are special-cased rather than bisected into: already wide enough at 0 returns 0,
-so a fit never *adds* stretch that wasn't asked for; still short at 100 returns
-`{ amount: 100, reachable: false }` and the sidebar reports the shortfall in one
-quiet line rather than throwing or doing nothing.
-
-**"Fit to composition" targets the other blocks, not an artboard.** This app has
-no fixed artboard — `CanvasStage` derives its content box from the blocks' own
-bounding box — so "fit to the canvas" is circular: widening the block widens the
-canvas. The target is `getBlocksBoundingBox` over every block *except* the one
-being justified, less the margin per side (editor state in `App.tsx`, not on the
-block, not persisted). "Match block" needs exactly two selected blocks and uses
-the other one's client rect.
-
-`App.tsx` reaches `lib/justify.ts` through a dynamic `import()`, and `justify.ts`
-reaches `shapeText`/`FONT_URLS` the same way. That is not stylistic: a static
-`harfbuzzjs` import in this module's graph throws under Vitest's Node ESM loader
-the moment `justify.test.ts` evaluates it — the same constraint that keeps
-`diacritics.ts` harfbuzz-free, and what lets `justify.test.ts` shape real text
-with real harfbuzzjs against real fonts instead of hand-written glyph fixtures.
-
-Gated to the block types `setBlockKashidaAmount` already accepts (everything but
-`image` and `textPath`). Note that `measureStretchedRunWidth` measures the
-straight shaped run, so on a Shape Fill block it is the *underlying run's*
-ink width, which that renderer then tiles — the fit is exact only for plain
-text blocks.
-<!-- ---- /STREAM-B ---- -->
 
 ### Undo/redo and grouping
 
@@ -1183,7 +751,7 @@ cheaper than adding a zip dependency.
 `src/lib/exportPresets.ts` holds `ExportPreset` (id/name/scale/transparent/
 formats) plus `loadPresets`/`savePresets` (best-effort `localStorage` under
 `harfcanvas-export-presets-v1`, same try/catch-and-fall-back-to-defaults
-pattern as the named-project and glyph-rig stores) and the pure
+pattern as the named-project store) and the pure
 `upsertPreset`/`removePreset` list functions, which is where the test coverage
 is — jsdom can't rasterize, so the canvas-touching handlers aren't unit
 testable. `loadPresets` filters out malformed entries and falls back to
@@ -1241,8 +809,8 @@ the undo stack's existing behavior.
 
 Named saves (`namedProjects` in `App.tsx`) can optionally live in a
 Supabase-backed cloud account instead of (or alongside) the existing
-per-browser `localStorage` named-projects store — autosave and glyph rigs
-remain local-only, untouched. `supabaseClient.ts`'s `supabase` export is
+per-browser `localStorage` named-projects store — autosave remains
+local-only, untouched. `supabaseClient.ts`'s `supabase` export is
 `null` whenever `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` aren't set
 (no `.env` configured, e.g. most dev/CI environments) — every function in
 `cloudProjects.ts` checks for this and degrades to a no-op/empty-result
@@ -1269,19 +837,7 @@ These are capabilities that have been explicitly identified as valuable but deli
 
 - **Per-glyph rotation** — The move/scale handles cover translation and axis-aligned scale only. Rotation needs a fourth handle and its own pivot decision.
 
-- **Stretch tool and glyph-edit handles on text-on-path blocks** — The axis-derivation and per-glyph drag mathematics assume glyphs sit in a straight bounding box. Making them work once glyphs are rotated to follow a curve's tangent is a real design problem, not a trivial extension of the existing system.
-
-- **Parametric bezier schema rendering** — The stroke schema currently supplies only metadata (labels, kashida eligibility, protected-zone advisories) plus its own authored geometry (used only to derive stretch axes). It does not render letterforms itself — real fonts and HarfBuzz shaping remain the source of truth. Building a full parametric rendering engine that replaces per-font glyph outlines would be a much larger, separate feature; confirm scope before attempting it. **Scoped and deferred again 2026-08-12:** it was considered as the route to Kaleam-style stroke editing and rejected for now, because the schemas carry no joining geometry — drawing from skeletons would forfeit seamless letter joining, which is the property the request was actually about. Repairing the existing displacement engine to honour the schema comes first; see the "Known defects" section above and `docs/superpowers/specs/2026-08-12-per-stroke-editing-design.md`. Note also that `public/fonts/` already ships `Thuluth.ttf`, `ThuluthDeco.ttf` and `Ruqaa.ttf`, so those proportions do **not** require a parametric engine. **Update 2026-08-13:** that repair is itself now blocked on re-anchoring (see the entry above), so "do the repair first" is no longer a short path to this — but the reason for rejecting parametric rendering is unchanged and unaffected by the measurement, since it was about forfeiting joining geometry, not about mapping accuracy.
-
-- **Schema-driven stroke spines and `protectedZones` enforcement — BLOCKED, not merely deferred.** These are changes 2 and 4 of the per-stroke editing design: replacing a stretch zone's straight chord with a real polyline spine (`axis: "path"` actually implemented), and zeroing displacement for outline points inside a protected node span. Both would be built on mapping the schema's own node coordinates onto the real glyph's bounding box, and **that mapping was measured on 2026-08-13 and is not accurate enough** — median 0.37 nuqta, p90 1.43, with only 14.5% of mapped nodes landing inside the ink at all (`src/lib/strokeSchema/spineError.test.ts`). Enforcing protected zones on top of it would freeze the wrong part of the letter most of the time, which is a *new* failure mode rather than a fixed one. The prerequisite is a re-anchoring design, and it now **exists** — `docs/superpowers/specs/2026-08-13-stroke-spine-reanchoring-design.md`: match the schema's stroke skeleton against the real glyph's medial axis in an offline script, ship the result as a committed per-font table keyed by glyph id, and omit any match the gate cannot verify rather than guessing. It is designed and unbuilt. Build it before starting changes 2 or 4; the measurement already ruled out the three obvious cheaper explanations (style distance, per-form skeleton reuse, compound letters), so there is no quick win hiding here.
-
-- **Join-pin detection for abutting-but-not-overlapping glyphs** — `lib/joinPins.ts`'s `overlapCentroid` finds a join only where two adjacent glyphs' real outlines physically overlap; measured 2026-08-13 (`joinPins.fonts.test.ts`, 7 fonts × 6 words), 5 of 42 pairs (`Urdu/حرف`, `Urdu/سلام`, `Urdu/حَرْف`, `Urdu/مُحَمَّد`, `Thuluth/سلام`) shape to multiple glyphs that merely abut, so no pin is placed and those joins keep the pre-existing tearing behaviour. Deliberately **not** improvised with a dilation radius: dilate enough to catch abutting letters and false joins start getting manufactured between letters that merely pass near each other without connecting, and the spec already rejected a baseline-scan heuristic for assuming Naskh-shaped geometry. Extending detection to this case is new design work, not a tuning knob on the existing one.
-
-- **Mark detection for fonts that encode marks in the Private Use Area** — `lib/diacritics.ts`'s `findDiacriticGlyphIndices` keys on a mark's own cmap codepoint, with a nonzero-GPOS-offset fallback. `Thuluth.ttf` defeats both (PUA codepoints, marks positioned by advance), so on that font the per-mark diacritic overlay does not arm and, since 2026-08-13, join pins on vocalized text find nothing either. A third signal — e.g. reading the font's own GDEF glyph classes, which mark up mark glyphs directly — would fix both features at once, but it touches the detector every diacritic feature depends on and deserves its own real-font verification pass rather than being bolted on beside a join fix.
-
-- **Join pins on Shape Fill and text-on-path blocks** — Plain text only, per the 2026-08-13 decision. `ShapeFillText` tiles its run through a per-tile affine transform; computing pins in that space is separate work, deliberately deferred rather than attempted alongside the plain-text fix.
-
-- **Automatic line-justification via Kashida** — The Kashida block-level dial (0–100) is manual only; it distributes one slider across every kashida-eligible stroke in a block. The app currently has no "fit text to width" infrastructure to hook automatic justification into.
+- **Mark detection for fonts that encode marks in the Private Use Area** — `lib/diacritics.ts`'s `findDiacriticGlyphIndices` keys on a mark's own cmap codepoint, with a nonzero-GPOS-offset fallback. `Thuluth.ttf` defeats both (PUA codepoints, marks positioned by advance), so on that font the per-mark diacritic overlay does not arm. A third signal — e.g. reading the font's own GDEF glyph classes, which mark up mark glyphs directly — would fix it, but it touches the detector every diacritic feature depends on and deserves its own real-font verification pass.
 
 - **Image trace** — Auto-tracing a raster image into a silhouette shape existed on Shape Warp blocks and was removed with that block type. Rebuilding it for Shape Fill means restoring `lib/imageTrace.ts`, `ImageTraceDialog.tsx`, and the `imagetracerjs` dependency from git history; the tracing itself was block-type agnostic, producing the same `{ pathData, w, h }` shape `extractSvgPaths` returns.
 

@@ -2,9 +2,8 @@ import type { GuideSection } from "./types";
 
 // Every .tsx file dropped into src/components/guide/sections/ is picked up
 // automatically — adding a guide page is just adding a file there, with no
-// index to edit. Same pattern (and same reason) as
-// src/lib/strokeSchema/registry.ts: an auto-loaded folder means independent
-// contributors never collide over a shared registration list.
+// index to edit. An auto-loaded folder means independent contributors never
+// collide over a shared registration list.
 const modules = import.meta.glob<unknown>("./sections/*.tsx", { eager: true });
 
 function extractSection(mod: unknown): GuideSection | null {

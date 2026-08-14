@@ -1,39 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Group, Shape, Rect, Arc, Circle, Path, Line } from "react-konva";
+import { Group, Shape, Rect, Arc } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import type { HarfBuzzGlyph, ShapedTextResult } from "../lib/harfbuzz";
 import { warpPoint, type GlyphBounds } from "../lib/warp";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { useOverrideGlyph } from "../hooks/useOverrideGlyph";
-import {
-  applyGlyphEdit,
-  prepareGlyphRig,
-  applyPreparedGlyphRig,
-  MASK_CONTOUR_ON_COLOR,
-  MASK_CONTOUR_OFF_COLOR,
-  MASK_LASSO_COLOR,
-} from "../lib/glyphEdits";
-import { useGlyphSchemaCatalog } from "../lib/strokeSchema/glyphLookup";
-import type { StretchDefinition } from "../lib/strokeSchema/deriveCatalog";
-import { splitContours, deriveContourMask } from "../lib/glyphContours";
-import { computeJoinPins, PIN_RADIUS_NUQTA, type JoinPin } from "../lib/joinPins";
-import { nuqtaPx } from "../lib/nuqta";
 import { findDiacriticGlyphIndices } from "../lib/diacritics";
 import {
   makeGlyphTransformAdapter,
   makeOffsetAdapter,
   type DiacriticPlacement,
 } from "../lib/diacriticPlacement";
-import type {
-  GlyphEdit,
-  GlyphStretchHandle,
-  GlyphRig,
-  GlyphRigValue,
-  GlyphStretchMask,
-  DiacriticOverride,
-  GlyphTransform,
-} from "../types";
+import type { DiacriticOverride, GlyphTransform } from "../types";
 import { resolveGlyphTransform, transformedBox } from "../lib/glyphTransform";
 import {
   isOverrideGlyphChar,
@@ -42,7 +21,6 @@ import {
   type OverrideGlyph,
 } from "../lib/glyphOverrides";
 import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
-import { StrokeStretchHoverHandles } from "./StrokeStretchHoverHandles";
 import { GlyphTransformHoverHandles } from "./GlyphTransformHoverHandles";
 
 type Props = {
@@ -67,13 +45,6 @@ type Props = {
   rotation?: number;
   warpX?: number;
   warpY?: number;
-  kashidaEditMode?: boolean;
-  onKashidaTextChange?: (text: string) => void;
-  selectedGlyphIndex?: number | null;
-  glyphEdits?: GlyphEdit[];
-  glyphMaskEdit?: { handleId: string; mode: "contours" | "lasso" } | null;
-  glyphRigs?: GlyphRig[];
-  glyphRigValues?: GlyphRigValue[];
   diacriticOverrides?: DiacriticOverride[];
   glyphTransforms?: GlyphTransform[];
   glyphTransformMode?: boolean;
@@ -81,20 +52,6 @@ type Props = {
   isSelected?: boolean;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
-  onGlyphBoxesChange?: (boxes: GlyphHitBox[]) => void;
-  onGlyphSchemaChange?: (catalog: Record<number, StretchDefinition[]>) => void;
-  onUpdateStretchHandle?: (
-    glyphIndex: number,
-    handleId: string,
-    patch: Partial<GlyphStretchHandle>
-  ) => void;
-  onSetStretchFactor?: (
-    glyphIndex: number,
-    definition: StretchDefinition,
-    factor: number,
-    opts?: { snap?: boolean }
-  ) => void;
-  onDeleteStretchHandle?: (glyphIndex: number, handleId: string) => void;
   locked?: boolean;
   draggable?: boolean;
   onClick?: () => void;
@@ -118,44 +75,6 @@ export type GlyphHitBox = {
   gx: number;
   gy: number;
 };
-
-/** A draggable kashīda handle sitting between two shaped glyphs. */
-type KashidaGap = {
-  x: number;
-  y: number;
-  /** String index (into the block's un-elongated text) to splice tatweel characters at. */
-  insertIndex: number;
-  /** The block's text with this gap's existing tatweel run (if any) removed. */
-  baseText: string;
-  existingCount: number;
-};
-
-/** Renders path commands (offset by dx/dy) as an SVG path `d` string, for Konva's <Path>. */
-function commandsToSvgPath(commands: PathCommand[], dx: number, dy: number): string {
-  const parts: string[] = [];
-  for (const cmd of commands) {
-    switch (cmd.type) {
-      case "M":
-        parts.push(`M${cmd.x + dx},${cmd.y + dy}`);
-        break;
-      case "L":
-        parts.push(`L${cmd.x + dx},${cmd.y + dy}`);
-        break;
-      case "C":
-        parts.push(
-          `C${cmd.x1 + dx},${cmd.y1 + dy} ${cmd.x2 + dx},${cmd.y2 + dy} ${cmd.x + dx},${cmd.y + dy}`
-        );
-        break;
-      case "Q":
-        parts.push(`Q${cmd.x1 + dx},${cmd.y1 + dy} ${cmd.x + dx},${cmd.y + dy}`);
-        break;
-      case "Z":
-        parts.push("Z");
-        break;
-    }
-  }
-  return parts.join(" ");
-}
 
 function tracePath(ctx: CanvasRenderingContext2D, commands: PathCommand[]) {
   ctx.beginPath();
@@ -199,13 +118,8 @@ function drawWarpedGlyphRun(
   strokeWidth: number,
   fauxBoldWidth = 0,
   overrideGlyph: OverrideGlyph | null = null,
-  glyphEdits: GlyphEdit[] = [],
-  fontFamily = "",
-  glyphRigs: GlyphRig[] = [],
-  glyphRigValues: GlyphRigValue[] = [],
   diacriticOverrides: DiacriticOverride[] = [],
-  glyphTransforms: GlyphTransform[] = [],
-  joinPins: Map<number, JoinPin[]> = new Map()
+  glyphTransforms: GlyphTransform[] = []
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -231,9 +145,6 @@ function drawWarpedGlyphRun(
 
     const gx = (penX + (g.dx ?? 0)) * scale;
     const gy = -(g.dy ?? 0) * scale;
-    const edit = glyphEdits.find((w) => w.glyphIndex === glyphIndex);
-    const pins = joinPins.get(glyphIndex);
-    const preparedRig = prepareGlyphRig(fontFamily, g.g, fontSize, glyphRigs, glyphRigValues, gx, gy);
 
     ctx.save();
     ctx.translate(gx, gy);
@@ -276,7 +187,6 @@ function drawWarpedGlyphRun(
       tracePath(ctx, overrideGlyph.commands as unknown as PathCommand[]);
     } else {
       const opPath = glyphObj.getPath(0, 0, fontSize);
-      let contourIndex = -1;
       const cmds: PathCommand[] = opPath.commands.map((cmd) => {
         type MutableCmd = {
           type: PathCommand["type"];
@@ -290,52 +200,20 @@ function drawWarpedGlyphRun(
         const c = cmd as MutableCmd;
         const out: MutableCmd = { ...c };
 
-        if (c.type === "M") contourIndex++;
-
         if (typeof c.x === "number" && typeof c.y === "number") {
-          const handled = applyGlyphEdit(c.x + gx, c.y + gy, edit, contourIndex, pins);
-          const rigged = applyPreparedGlyphRig(handled.x, handled.y, preparedRig, contourIndex);
-          const p = warpPoint(
-            rigged.x,
-            rigged.y,
-            bounds,
-            width,
-            height,
-            warpX,
-            warpY
-          );
+          const p = warpPoint(c.x + gx, c.y + gy, bounds, width, height, warpX, warpY);
           out.x = p.x - gx;
           out.y = p.y - gy;
         }
 
         if (typeof c.x1 === "number" && typeof c.y1 === "number") {
-          const handled1 = applyGlyphEdit(c.x1 + gx, c.y1 + gy, edit, contourIndex, pins);
-          const rigged1 = applyPreparedGlyphRig(handled1.x, handled1.y, preparedRig, contourIndex);
-          const p1 = warpPoint(
-            rigged1.x,
-            rigged1.y,
-            bounds,
-            width,
-            height,
-            warpX,
-            warpY
-          );
+          const p1 = warpPoint(c.x1 + gx, c.y1 + gy, bounds, width, height, warpX, warpY);
           out.x1 = p1.x - gx;
           out.y1 = p1.y - gy;
         }
 
         if (typeof c.x2 === "number" && typeof c.y2 === "number") {
-          const handled2 = applyGlyphEdit(c.x2 + gx, c.y2 + gy, edit, contourIndex, pins);
-          const rigged2 = applyPreparedGlyphRig(handled2.x, handled2.y, preparedRig, contourIndex);
-          const p2 = warpPoint(
-            rigged2.x,
-            rigged2.y,
-            bounds,
-            width,
-            height,
-            warpX,
-            warpY
-          );
+          const p2 = warpPoint(c.x2 + gx, c.y2 + gy, bounds, width, height, warpX, warpY);
           out.x2 = p2.x - gx;
           out.y2 = p2.y - gy;
         }
@@ -391,24 +269,12 @@ export const ShapedText: React.FC<Props> = ({
   rotation = 0,
   warpX = 0,
   warpY = 0,
-  kashidaEditMode = false,
-  onKashidaTextChange,
-  selectedGlyphIndex = null,
-  glyphEdits = [],
-  glyphMaskEdit = null,
-  glyphRigs = [],
-  glyphRigValues = [],
   diacriticOverrides = [],
   glyphTransforms = [],
   glyphTransformMode = false,
   isSelected = false,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
-  onGlyphBoxesChange,
-  onGlyphSchemaChange,
-  onUpdateStretchHandle,
-  onSetStretchFactor,
-  onDeleteStretchHandle,
   onUpdateGlyphTransform,
   locked,
   draggable = true,
@@ -422,12 +288,6 @@ export const ShapedText: React.FC<Props> = ({
   const shapeData = useShapedGlyphs(text, fontFamily);
   const { hbLoaded } = shapeData;
   const overrideGlyph = useOverrideGlyph();
-  const glyphSchemaCatalog = useGlyphSchemaCatalog(
-    shapeData.shapableText,
-    shapeData.glyphs,
-    shapeData.font,
-    fontFamily
-  );
 
   // The set of glyph indices this render pass actually considers a
   // diacritic — used to guard `diacriticOverrides` at draw time so a
@@ -465,8 +325,8 @@ export const ShapedText: React.FC<Props> = ({
 
   // Computes glyph bounding-box extents (glyphBounds) and per-glyph hit boxes
   // — both the RAW (untransformed) boxes every outline-space consumer needs
-  // (stretch handles, mask derivation, diacritic placements, glyph picking)
-  // and the transform-folded boxes only `GlyphTransformHoverHandles` reads —
+  // (diacritic placements, the reported box list) and the transform-folded
+  // boxes only `GlyphTransformHoverHandles` reads —
   // in one pass over the glyph run, since both variants need the same
   // (expensive) glyphObj.getPath(...).getBoundingBox() call per glyph, so
   // walking the font twice to get each independently would do that work twice.
@@ -527,9 +387,9 @@ export const ShapedText: React.FC<Props> = ({
 
         if (isFinite(box.x1) && isFinite(box.x2) && isFinite(box.y1) && isFinite(box.y2)) {
           // `hitBoxes` stays in raw outline space — every consumer besides
-          // the move/scale overlay (stretch handles, mask derivation,
-          // diacritic placements, glyph picking) reasons about real font
-          // outline points, which a folded-in transform would misalign.
+          // the move/scale overlay (the diacritic placements, and whatever
+          // `onGlyphBoxesChange` feeds) reasons about real font outline
+          // points, which a folded-in transform would misalign.
           // `transformedHitBoxes` tracks where each glyph is actually
           // drawn, for the move/scale overlay's own hover targets. The
           // block bounds above deliberately follow neither — those must
@@ -601,29 +461,6 @@ export const ShapedText: React.FC<Props> = ({
   const glyphHitBoxes = glyphMetrics.hitBoxes;
   const glyphTransformedHitBoxes = glyphMetrics.transformedHitBoxes;
 
-  /**
-   * Where this run's letters actually connect, so a stroke stretch cannot
-   * tear a seam. Memoized per shaped run because it flattens every glyph's
-   * outline to polygons and grid-samples each adjacent pair — far too much
-   * to redo per drawn point.
-   *
-   * A font with no measured nuqta (Ruq'ah, Diwani — deliberately out of
-   * scope for per-stroke editing) yields no pins at all, which is exactly
-   * today's behaviour for them.
-   */
-  const joinPins = useMemo<Map<number, JoinPin[]>>(() => {
-    const { font, glyphs, unitsPerEm } = shapeData;
-    const nuqta = nuqtaPx(fontFamily, fontSize);
-    if (!font || glyphs.length < 2 || nuqta == null) return new Map();
-    return computeJoinPins({
-      glyphs,
-      font,
-      fontSize,
-      unitsPerEm,
-      pinRadius: nuqta * PIN_RADIUS_NUQTA,
-    });
-  }, [shapeData, fontFamily, fontSize]);
-
   const isBold = fontStyle === "bold" || fontStyle === "bold italic";
   const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
   const fauxBoldWidth = isBold ? Math.max(fontSize * 0.035, 0.6) : 0;
@@ -648,8 +485,8 @@ export const ShapedText: React.FC<Props> = ({
       .map((b) => {
         // A mark that also carries a glyph transform needs that transform
         // in its adapter, or its handles sit where the mark *would* be
-        // undistorted. `glyphHitBoxes` are raw (the stretch-handle
-        // pipeline needs them that way), so the adapter is what applies it.
+        // undistorted. `glyphHitBoxes` are raw, so the adapter is what
+        // applies it.
         const transform = glyphTransforms.find((t) => t.glyphIndex === b.glyphIndex);
         let adapter = plain;
 
@@ -683,178 +520,6 @@ export const ShapedText: React.FC<Props> = ({
     localDrawX,
     localDrawY,
   ]);
-
-  useEffect(() => {
-    onGlyphBoxesChange?.(glyphHitBoxes);
-  }, [glyphHitBoxes, onGlyphBoxesChange]);
-
-  useEffect(() => {
-    onGlyphSchemaChange?.(glyphSchemaCatalog);
-  }, [glyphSchemaCatalog, onGlyphSchemaChange]);
-
-  /** The selected glyph's outline split into contours, in the same text-space coords as stretch anchor/drag points — used by the "by stroke" mask-editing overlay. */
-  const selectedGlyphContours = useMemo(() => {
-    if (selectedGlyphIndex == null) return [];
-    const { font, glyphs } = shapeData;
-    const g = font ? glyphs[selectedGlyphIndex] : undefined;
-    const glyphObj = g ? font!.glyphs.get(g.g) : undefined;
-    if (!glyphObj) return [];
-
-    const box = glyphHitBoxes.find((b) => b.glyphIndex === selectedGlyphIndex);
-    const gx = box?.gx ?? 0;
-    const gy = box?.gy ?? 0;
-    const commands = glyphObj.getPath(0, 0, fontSize).commands as PathCommand[];
-
-    return splitContours(commands).map((cmds, contourIndex) => ({
-      contourIndex,
-      data: commandsToSvgPath(cmds, gx, gy),
-    }));
-  }, [shapeData, selectedGlyphIndex, glyphHitBoxes, fontSize]);
-
-  const selectedEdit =
-    selectedGlyphIndex != null
-      ? glyphEdits.find((w) => w.glyphIndex === selectedGlyphIndex)
-      : undefined;
-  const selectedStretches = selectedEdit?.stretches ?? [];
-
-  // Handles no longer get their axis from dragging — it's auto-computed once
-  // at creation (App.tsx's setStretchFactor). The mask still needs the real
-  // glyph outline, which only this component has, so it's derived here, once,
-  // the first time a new maskAuto handle with no mask yet shows up — for
-  // every glyph with pending handles, not just the canvas-selected one, since
-  // the Morph panel's sliders create handles without any canvas selection.
-  useEffect(() => {
-    if (!onUpdateStretchHandle) return;
-    const { font, glyphs } = shapeData;
-    if (!font) return;
-
-    for (const edit of glyphEdits) {
-      const pending = edit.stretches.filter((h) => h.maskAuto && h.mask == null);
-      if (pending.length === 0) continue;
-
-      const g = glyphs[edit.glyphIndex];
-      const glyphObj = g ? font.glyphs.get(g.g) : undefined;
-      if (!glyphObj) continue;
-
-      const box = glyphHitBoxes.find((b) => b.glyphIndex === edit.glyphIndex);
-      const gx = box?.gx ?? 0;
-      const gy = box?.gy ?? 0;
-      const commands = glyphObj.getPath(0, 0, fontSize).commands as PathCommand[];
-
-      for (const h of pending) {
-        const mask = deriveContourMask(commands, [
-          { x: h.anchorX - gx, y: h.anchorY - gy },
-          { x: h.dragOriginX - gx, y: h.dragOriginY - gy },
-        ]);
-        if (mask) onUpdateStretchHandle(edit.glyphIndex, h.id, { mask });
-      }
-    }
-  }, [glyphEdits, shapeData, glyphHitBoxes, fontSize, onUpdateStretchHandle]);
-
-  const activeMaskHandle =
-    glyphMaskEdit != null
-      ? selectedStretches.find((h) => h.id === glyphMaskEdit.handleId)
-      : undefined;
-
-  const kashidaGaps = useMemo<KashidaGap[]>(() => {
-    const { font, glyphs, unitsPerEm } = shapeData;
-    if (!kashidaEditMode || !font || glyphs.length < 2) return [];
-
-    const upm = Math.max(unitsPerEm || 1000, 1);
-    const scale = fontSize / upm;
-    const localDrawX = -glyphBounds.minX + (bw - glyphBounds.rawWidth) / 2;
-    const centerY = by + bh / 2;
-
-    const gaps: KashidaGap[] = [];
-    let penX = 0;
-
-    for (let i = 0; i < glyphs.length - 1; i++) {
-      penX += glyphs[i].ax ?? 0;
-      const boundaryX = bx + localDrawX + penX * scale;
-      const insertIndex = glyphs[i].cl ?? 0;
-
-      const before = text[insertIndex - 1];
-      if (before === undefined || /\s/.test(before)) continue;
-
-      let existingCount = 0;
-      while (text[insertIndex + existingCount] === "ـ") existingCount++;
-
-      const after = text[insertIndex + existingCount];
-      if (after === undefined || /\s/.test(after)) continue;
-
-      const baseText =
-        text.slice(0, insertIndex) + text.slice(insertIndex + existingCount);
-
-      gaps.push({ x: boundaryX, y: centerY, insertIndex, baseText, existingCount });
-    }
-
-    return gaps;
-  }, [shapeData, text, fontSize, kashidaEditMode, bx, by, bw, bh, glyphBounds]);
-
-  const tatweelWidth = useMemo(() => {
-    const font = shapeData.font;
-    if (font) {
-      try {
-        const glyph = font.charToGlyph("ـ");
-        if (glyph && typeof glyph.advanceWidth === "number" && glyph.advanceWidth > 0) {
-          const upm = Math.max(shapeData.unitsPerEm || 1000, 1);
-          return (glyph.advanceWidth / upm) * fontSize;
-        }
-      } catch {
-        // fall through to the estimate below
-      }
-    }
-    return fontSize * 0.5;
-  }, [shapeData.font, shapeData.unitsPerEm, fontSize]);
-
-  const [frozenGaps, setFrozenGaps] = useState<KashidaGap[] | null>(null);
-  const dragStateRef = useRef<{ originX: number; insertIndex: number; baseText: string } | null>(
-    null
-  );
-  const lassoActiveRef = useRef(false);
-  const [lassoDrawPoints, setLassoDrawPoints] = useState<{ x: number; y: number }[]>([]);
-
-  const displayedGaps = frozenGaps ?? kashidaGaps;
-
-  const commitKashida = (
-    insertIndex: number,
-    baseText: string,
-    deltaX: number
-  ) => {
-    const count = Math.max(0, Math.min(40, Math.round(deltaX / Math.max(tatweelWidth, 1))));
-    const newText =
-      baseText.slice(0, insertIndex) + "ـ".repeat(count) + baseText.slice(insertIndex);
-    onKashidaTextChange?.(newText);
-  };
-
-  const toggleMaskContour = (contourIndex: number) => {
-    if (!onUpdateStretchHandle || !activeMaskHandle || selectedGlyphIndex == null) return;
-    const current: number[] =
-      activeMaskHandle.mask?.mode === "contours" ? activeMaskHandle.mask.contourIndices : [];
-    const next = current.includes(contourIndex)
-      ? current.filter((i) => i !== contourIndex)
-      : [...current, contourIndex];
-    const mask: GlyphStretchMask = { mode: "contours", contourIndices: next };
-    onUpdateStretchHandle(selectedGlyphIndex, activeMaskHandle.id, { mask, maskAuto: false });
-  };
-
-  const commitLasso = () => {
-    if (
-      !onUpdateStretchHandle ||
-      !activeMaskHandle ||
-      selectedGlyphIndex == null ||
-      lassoDrawPoints.length < 3
-    ) {
-      setLassoDrawPoints([]);
-      return;
-    }
-    const mask: GlyphStretchMask = {
-      mode: "lasso",
-      points: lassoDrawPoints.map((p) => ({ x: p.x - bx - localDrawX, y: p.y - by - localDrawY })),
-    };
-    onUpdateStretchHandle(selectedGlyphIndex, activeMaskHandle.id, { mask, maskAuto: false });
-    setLassoDrawPoints([]);
-  };
 
   return (
     <Group
@@ -953,13 +618,8 @@ export const ShapedText: React.FC<Props> = ({
             strokeWidth,
             fauxBoldWidth,
             overrideGlyph,
-            glyphEdits,
-            fontFamily,
-            glyphRigs,
-            glyphRigValues,
             activeDiacriticOverrides,
-            glyphTransforms,
-            joinPins
+            glyphTransforms
           );
           ctx.restore();
 
@@ -981,13 +641,8 @@ export const ShapedText: React.FC<Props> = ({
               strokeWidth,
               0,
               overrideGlyph,
-              glyphEdits,
-              fontFamily,
-              glyphRigs,
-              glyphRigValues,
               activeDiacriticOverrides,
-              glyphTransforms,
-              joinPins
+              glyphTransforms
             );
             ctx.restore();
           }
@@ -995,35 +650,9 @@ export const ShapedText: React.FC<Props> = ({
       />
 
       {/*
-        Stroke-stretch overlay mounts BEFORE the diacritic overlay: Konva
-        routes a pointer to the topmost listening shape, and this overlay's
-        per-glyph hover rects are large (they cover a whole letter plus
-        wherever its dots can rest), while a diacritic's hit rect is small
-        and sits inside that same area. Mounted later, the stroke rects
-        would paint on top and steal hover from every mark above a letter
-        that has an authored schema.
-      */}
-      {!glyphTransformMode && (
-        <StrokeStretchHoverHandles
-          isSelected={isSelected}
-          glyphSchemaCatalog={glyphSchemaCatalog}
-          glyphEdits={glyphEdits}
-          glyphHitBoxes={glyphHitBoxes}
-          offsetX={bx + localDrawX}
-          offsetY={by + localDrawY}
-          fontSize={fontSize}
-          fontFamily={fontFamily}
-          onSetStretchFactor={onSetStretchFactor}
-          onDeleteStretchHandle={onDeleteStretchHandle}
-        />
-      )}
-
-      {/*
-        Mounted between the stroke-stretch dots and the diacritic handles
-        for the same topmost-wins reason the comment above describes: these
-        rects are glyph-sized, so they must not paint over a mark's smaller,
-        more precise target. The stroke dots stand down entirely while this
-        tool is armed — one tool at a time, so a dot is never ambiguous.
+        Mounted BEFORE the diacritic overlay: Konva routes a pointer to the
+        topmost listening shape, and these rects are glyph-sized, so they
+        must not paint over a mark's smaller, more precise target.
       */}
       <GlyphTransformHoverHandles
         isSelected={isSelected}
@@ -1043,168 +672,6 @@ export const ShapedText: React.FC<Props> = ({
         onDragDiacriticOverride={onDragDiacriticOverride}
         onToggleDiacriticHidden={onToggleDiacriticHidden}
       />
-
-      {kashidaEditMode &&
-        displayedGaps.map((gap, i) => (
-          <Circle
-            key={i}
-            x={gap.x}
-            y={gap.y}
-            radius={6}
-            fill="#d4af37"
-            stroke="#ffffff"
-            strokeWidth={1.5}
-            draggable
-            dragBoundFunc={(pos) => ({ x: pos.x, y: gap.y })}
-            onMouseDown={(e) => {
-              e.cancelBubble = true;
-            }}
-            onTouchStart={(e) => {
-              e.cancelBubble = true;
-            }}
-            onDragStart={(e) => {
-              e.cancelBubble = true;
-              dragStateRef.current = {
-                originX: gap.x,
-                insertIndex: gap.insertIndex,
-                baseText: gap.baseText,
-              };
-              setFrozenGaps(kashidaGaps);
-            }}
-            onDragMove={(e) => {
-              e.cancelBubble = true;
-              const state = dragStateRef.current;
-              if (!state) return;
-              const deltaX = Math.abs(e.target.x() - state.originX);
-              commitKashida(state.insertIndex, state.baseText, deltaX);
-            }}
-            onDragEnd={(e) => {
-              e.cancelBubble = true;
-              const state = dragStateRef.current;
-              if (state) {
-                const deltaX = Math.abs(e.target.x() - state.originX);
-                commitKashida(state.insertIndex, state.baseText, deltaX);
-              }
-              dragStateRef.current = null;
-              setFrozenGaps(null);
-            }}
-          />
-        ))}
-
-      {glyphMaskEdit?.mode === "contours" &&
-        activeMaskHandle &&
-        selectedGlyphContours.map((c) => {
-          const included =
-            activeMaskHandle.mask?.mode === "contours" &&
-            activeMaskHandle.mask.contourIndices.includes(c.contourIndex);
-          return (
-            <Path
-              key={c.contourIndex}
-              x={bx + localDrawX}
-              y={by + localDrawY}
-              data={c.data}
-              fill={included ? MASK_CONTOUR_ON_COLOR : MASK_CONTOUR_OFF_COLOR}
-              opacity={included ? 0.45 : 0.25}
-              stroke={included ? MASK_CONTOUR_ON_COLOR : MASK_CONTOUR_OFF_COLOR}
-              strokeWidth={1}
-              onClick={(e) => {
-                e.cancelBubble = true;
-                toggleMaskContour(c.contourIndex);
-              }}
-              onTap={(e) => {
-                e.cancelBubble = true;
-                toggleMaskContour(c.contourIndex);
-              }}
-              onMouseDown={(e) => {
-                e.cancelBubble = true;
-              }}
-            />
-          );
-        })}
-
-      {glyphMaskEdit?.mode === "lasso" && activeMaskHandle && (
-        <>
-          <Rect
-            x={bx}
-            y={by}
-            width={bw}
-            height={bh}
-            fill="transparent"
-            listening
-            onMouseDown={(e) => {
-              e.cancelBubble = true;
-              const group = e.currentTarget.getParent() as Konva.Group;
-              const pos = group.getRelativePointerPosition();
-              if (!pos) return;
-              lassoActiveRef.current = true;
-              setLassoDrawPoints([pos]);
-            }}
-            onMouseMove={(e) => {
-              if (!lassoActiveRef.current) return;
-              e.cancelBubble = true;
-              const group = e.currentTarget.getParent() as Konva.Group;
-              const pos = group.getRelativePointerPosition();
-              if (!pos) return;
-              setLassoDrawPoints((prev) => [...prev, pos]);
-            }}
-            onMouseUp={(e) => {
-              if (!lassoActiveRef.current) return;
-              e.cancelBubble = true;
-              lassoActiveRef.current = false;
-              commitLasso();
-            }}
-            onTouchStart={(e) => {
-              e.cancelBubble = true;
-              const group = e.currentTarget.getParent() as Konva.Group;
-              const pos = group.getRelativePointerPosition();
-              if (!pos) return;
-              lassoActiveRef.current = true;
-              setLassoDrawPoints([pos]);
-            }}
-            onTouchMove={(e) => {
-              if (!lassoActiveRef.current) return;
-              e.cancelBubble = true;
-              const group = e.currentTarget.getParent() as Konva.Group;
-              const pos = group.getRelativePointerPosition();
-              if (!pos) return;
-              setLassoDrawPoints((prev) => [...prev, pos]);
-            }}
-            onTouchEnd={(e) => {
-              if (!lassoActiveRef.current) return;
-              e.cancelBubble = true;
-              lassoActiveRef.current = false;
-              commitLasso();
-            }}
-            onClick={(e) => {
-              e.cancelBubble = true;
-            }}
-          />
-          {activeMaskHandle.mask?.mode === "lasso" && (
-            <Line
-              points={activeMaskHandle.mask.points.flatMap((p) => [
-                bx + localDrawX + p.x,
-                by + localDrawY + p.y,
-              ])}
-              closed
-              fill="rgba(34, 197, 94, 0.2)"
-              stroke={MASK_LASSO_COLOR}
-              strokeWidth={2}
-              listening={false}
-            />
-          )}
-          {lassoDrawPoints.length > 1 && (
-            <Line
-              points={lassoDrawPoints.flatMap((p) => [p.x, p.y])}
-              closed
-              fill="rgba(34, 197, 94, 0.15)"
-              stroke={MASK_LASSO_COLOR}
-              strokeWidth={2}
-              dash={[6, 4]}
-              listening={false}
-            />
-          )}
-        </>
-      )}
 
     </Group>
   );

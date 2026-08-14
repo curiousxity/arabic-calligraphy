@@ -15,9 +15,8 @@ export type PlacementAdapter = {
 /**
  * One hoverable diacritic instance on canvas. `glyphIndex` says which
  * override it edits (Shape Fill draws the same glyph index many times, and
- * every one of those instances edits the same single override — matching
- * how `glyphEdits` already behaves there); `key` is unique per instance so
- * React can tell the repetitions apart.
+ * every one of those instances edits the same single override); `key` is
+ * unique per instance so React can tell the repetitions apart.
  */
 export type DiacriticPlacement = {
   glyphIndex: number;
