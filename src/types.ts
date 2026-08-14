@@ -47,6 +47,16 @@ export type GlyphStretchHandle = {
   priority?: number;
   /** The schema stroke's natural length in nuqta, copied from StretchDefinition at handle creation — the divisor for the half-nuqta snap step. Absent on handles created before nuqta quantization existed, which simply do not snap. */
   lengthDots?: number;
+  /**
+   * The stroke's spine in this block's text units, captured at creation from
+   * the generated tables (src/data/strokeSpines/). Nothing reads it yet —
+   * displacement still uses the anchor->drag axis, which is this polyline's
+   * two ends. It is stored so change 2 (spine displacement, `axis: "path"`)
+   * has its input without a second migration, and so a handle stays
+   * self-describing across save/load. Absent on every handle created before
+   * re-anchoring, and on any created for a stroke with no verified match.
+   */
+  spine?: { x: number; y: number }[];
 };
 
 export type GlyphEdit = {

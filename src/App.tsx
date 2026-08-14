@@ -26,8 +26,9 @@ import {
   DEFAULT_EMPTY_BOUNDS,
 } from "./lib/canvasBounds";
 import type { StretchDefinition } from "./lib/strokeSchema/deriveCatalog";
-import { mapNormToRealBox } from "./lib/strokeSchema/schemaGeometry";
 import { snapStretchFactor } from "./lib/strokeSchema/quantize";
+import { spineToBlockSpace } from "./lib/strokeSpines/anchorFromSpine";
+import { getSpineTableIfLoaded } from "./lib/strokeSpines/registry";
 import { kashidaFactorForHandle } from "./lib/kashidaFactor";
 import { arcPathD } from "./lib/textPath";
 import type {
@@ -783,23 +784,39 @@ const App: React.FC = () => {
 
       const box = (glyphBoxesByBlock[blockId] ?? []).find((b) => b.glyphIndex === glyphIndex);
 
-      // No dragging anymore — the axis is derived entirely from the schema's
-      // own authored geometry (definition.anchorNorm/dragNorm, computed in
-      // deriveStretchCatalog) mapped onto this glyph's real bounding box.
-      // dragOrigin = the schema's natural (factor=1) endpoint; drag = that
-      // same axis extrapolated out to maxFactor, which lib/glyphEdits.ts's
-      // resolveValueMultiplier uses as the "full stretch" reference.
-      const anchorPoint = box
-        ? mapNormToRealBox(definition.anchorNorm, box)
-        : { x: block.x, y: block.y };
-      const dragOriginPoint = box
-        ? mapNormToRealBox(definition.dragNorm, box)
-        : { x: block.x + 80, y: block.y };
+      // The axis comes from this font's real glyph, not from a proportion of
+      // its bounding box. Phase C measured that proportion at median 0.37
+      // nuqta / p90 1.43 from the ink it claimed to describe; the spine is
+      // sampled off the glyph's own medial axis. See
+      // docs/superpowers/specs/2026-08-13-stroke-spine-reanchoring-design.md.
+      //
+      // No spine means the offline matcher could not verify a match for this
+      // stroke on this font, and we create nothing — deliberately, rather than
+      // falling back to the mapping this replaced. Absence is the out-of-scope
+      // mechanism, the same one nuqtaEmRatio's null already is.
+      if (!definition.spine || !box) return;
+
+      // unitsPerEm comes from the spine table rather than from shaping state,
+      // which App.tsx does not hold. Safe because a definition.spine only
+      // exists if that table was loaded to produce it.
+      const upm = getSpineTableIfLoaded(block.fontFamily)?.unitsPerEm;
+      if (!upm) return;
+
+      const placed = spineToBlockSpace(definition.spine, {
+        gx: box.gx ?? 0,
+        gy: box.gy ?? 0,
+        fontSize: block.fontSize,
+        unitsPerEm: upm,
+      });
+      if (!placed) return;
+
+      const anchorPoint = placed.anchor;
+      const dragOriginPoint = placed.dragOrigin;
       const dragPoint = {
         x: anchorPoint.x + (dragOriginPoint.x - anchorPoint.x) * definition.maxFactor,
         y: anchorPoint.y + (dragOriginPoint.y - anchorPoint.y) * definition.maxFactor,
       };
-      const bandWidth = box ? Math.max(20, Math.min(box.width, box.height) * 0.5) : 40;
+      const bandWidth = placed.bandWidth;
 
       upsertGlyphEdit(blockId, glyphIndex, (prev) => {
         // Re-check inside the updater — a second slider event can land before
@@ -839,6 +856,7 @@ const App: React.FC = () => {
               kashidaEligible: definition.kashidaEligible,
               priority: definition.priority,
               lengthDots: definition.lengthDots,
+              spine: placed.points,
             },
           ],
         };
