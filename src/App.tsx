@@ -54,6 +54,15 @@ import {
 // ---- STREAM-F: ink & surface — imports ----
 // ---- /STREAM-F ----
 // ---- STREAM-G: font upload — imports ----
+import {
+  addCustomFont,
+  describeFontKey,
+  isFontUnavailable,
+  listCustomFonts,
+  primeCustomFonts,
+  removeCustomFont,
+  type CustomFont,
+} from "./lib/customFonts";
 // ---- /STREAM-G ----
 import {
   DEFAULT_CUSTOM_ARTBOARD,
@@ -230,6 +239,14 @@ const App: React.FC = () => {
   // ---- STREAM-F: ink & surface — state ----
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — state ----
+  // The user's uploaded fonts. Not part of the document: a project references
+  // a font by key and the bytes live in this browser, so this is neither
+  // saved nor undoable — it is a property of the installation, like the
+  // export presets.
+  const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
+  // Whether the shared status row is currently showing *this* stream's
+  // unavailable-font notice, so clearing it can never wipe an export result.
+  const fontNoticeShownRef = useRef(false);
   // ---- /STREAM-G ----
   // `null` is freeform — no page, exactly the behaviour that predates this
   // feature, and what every save written before it loads as. Part of the
@@ -1994,7 +2011,81 @@ const App: React.FC = () => {
   const p2fCanvasProps: Partial<CanvasStageProps> = {};
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — handlers & props ----
-  const p2gSidebarProps: Partial<SidebarProps> = {};
+  // Loads every stored font, creates its object URL and registers its
+  // FontFace. Until this resolves `resolveFontUrl` answers Noto Sans for a
+  // custom family; settling this state is what re-renders the blocks onto
+  // their real bytes (the shaping hook keys on the URL it computes).
+  useEffect(() => {
+    let alive = true;
+    primeCustomFonts()
+      .then((fonts) => {
+        if (alive) setCustomFonts(fonts);
+      })
+      .catch(() => {
+        // Storage unavailable — the app runs with the bundled fonts only.
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const handleAddCustomFont = useCallback(async (file: File, label?: string) => {
+    const result = await addCustomFont(file, label);
+    if (!("error" in result)) setCustomFonts(await listCustomFonts());
+    return result;
+  }, []);
+
+  const handleRemoveCustomFont = useCallback(async (key: string) => {
+    await removeCustomFont(key);
+    setCustomFonts(await listCustomFonts());
+  }, []);
+
+  // A block keeps its font key even when nothing can resolve it — deleting an
+  // upload, or opening a project saved in another browser. The render falls
+  // back to Noto Sans on its own; this is what makes that fallback *visible*,
+  // since a silently substituted font is the exact misdiagnosis trap CLAUDE.md
+  // records for a missing FONT_URLS entry. In an effect over `blocks` rather
+  // than inside the load handlers, so every route is covered (load, project
+  // open, undo, deleting a font a live block uses) — the `dropOrphanedMirrors`
+  // effect above is the same shape and the same reasoning.
+  useEffect(() => {
+    const missing = [
+      ...new Set(
+        blocks
+          .filter((b) => b.type !== "image" && b.type !== "mirror")
+          .map((b) => b.fontFamily)
+          .filter((key) => key && isFontUnavailable(key, FONT_URLS))
+      ),
+    ];
+    if (missing.length === 0) {
+      // Only ever clears a message this effect wrote — an export result
+      // sharing the row must not be wiped by an unrelated block edit.
+      if (fontNoticeShownRef.current) {
+        fontNoticeShownRef.current = false;
+        setExportStatus(null);
+      }
+      return;
+    }
+    const named = missing.map((key) => `'${describeFontKey(key)}'`).join(", ");
+    fontNoticeShownRef.current = true;
+    setExportStatus(
+      `${missing.length > 1 ? "Fonts" : "Font"} ${named} ${
+        missing.length > 1 ? "aren't" : "isn't"
+      } available in this browser — using Noto Sans.`
+    );
+  }, [blocks, customFonts]);
+
+  const selectedFontUnavailable =
+    !!selectedBlock &&
+    selectedBlock.type !== "image" &&
+    isFontUnavailable(selectedBlock.fontFamily, FONT_URLS);
+
+  const p2gSidebarProps: Partial<SidebarProps> = {
+    customFonts,
+    onAddCustomFont: handleAddCustomFont,
+    onRemoveCustomFont: handleRemoveCustomFont,
+    missingFontKey: selectedFontUnavailable ? selectedBlock.fontFamily : null,
+  };
   // ---- /STREAM-G ----
 
   return (
