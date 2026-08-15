@@ -77,6 +77,9 @@ import {
 } from "../lib/artboard";
 import { OrnamentPickerButton } from "./OrnamentPicker";
 // ---- STREAM-E: styles & palettes — imports ----
+import { PaletteSwatches } from "./PaletteSwatches";
+import type { TextStyle } from "../lib/textStyles";
+import type { Palette } from "../lib/palettes";
 // ---- /STREAM-E ----
 // ---- STREAM-F: ink & surface — imports ----
 import { fillToCss, resolveFill, type BlockFill, type FillStop } from "../lib/blockFill";
@@ -91,6 +94,24 @@ export type SidebarProps = {
   // Phase 2 parallel-stream prop declarations — each stream adds its own
   // (all optional, arriving via App.tsx's p2* bundles). See PARALLEL-PHASE-2.md.
   // ---- STREAM-E: styles & palettes — props ----
+  /** Saved text styles, local-only (never part of a project). */
+  textStyles?: TextStyle[];
+  selectedTextStyleId?: string;
+  onSelectTextStyle?: (id: string) => void;
+  /** Applies the selected style to every selected block, as one undo step. */
+  onApplyTextStyle?: () => void;
+  newTextStyleName?: string;
+  onChangeNewTextStyleName?: (name: string) => void;
+  onSaveTextStyle?: () => void;
+  onDeleteTextStyle?: () => void;
+  /** Shipped palettes first, then the user's own. */
+  palettes?: Palette[];
+  selectedPaletteId?: string;
+  onSelectPalette?: (id: string) => void;
+  onPickPaletteColor?: (color: string) => void;
+  onSavePaletteFromCanvas?: () => void;
+  onDeletePalette?: () => void;
+  canDeletePalette?: boolean;
   // ---- /STREAM-E ----
   // ---- STREAM-F: ink & surface — props ----
   /** The selected block's gradient, if it has one. Undefined = flat `blockColor`. */
@@ -329,6 +350,21 @@ const SidebarTier: React.FC<{ label: string }> = ({ label }) => (
 
 export const Sidebar: React.FC<SidebarProps> = ({
   // ---- STREAM-E: styles & palettes — destructure ----
+  textStyles = [],
+  selectedTextStyleId = "",
+  onSelectTextStyle,
+  onApplyTextStyle,
+  newTextStyleName = "",
+  onChangeNewTextStyleName,
+  onSaveTextStyle,
+  onDeleteTextStyle,
+  palettes = [],
+  selectedPaletteId = "",
+  onSelectPalette,
+  onPickPaletteColor,
+  onSavePaletteFromCanvas,
+  onDeletePalette,
+  canDeletePalette = false,
   // ---- /STREAM-E ----
   // ---- STREAM-F: ink & surface — destructure ----
   blockFill,
@@ -2338,6 +2374,94 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <CollapsibleSection title="Typography" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
               <div className="sectionPanel">
                 {/* ---- STREAM-E: styles & palettes — Styles row ---- */}
+                {/* Written inline rather than as a helper component because
+                    this stream owns only the region between these anchors —
+                    the same constraint the Kashida IIFE below records. It holds
+                    no state: the list, the selection and the name draft all
+                    live in App.tsx beside the other local stores. */}
+                <div className="field">
+                  <span className="fieldTitle">Style</span>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <select
+                      value={selectedTextStyleId}
+                      onChange={(e) => onSelectTextStyle?.(e.target.value)}
+                      className="select"
+                      aria-label="Text style"
+                      style={{ minWidth: 0, flex: 1 }}
+                    >
+                      <option value="">
+                        {textStyles.length === 0 ? "No saved styles" : "Style…"}
+                      </option>
+                      {textStyles.map((style) => (
+                        <option key={style.id} value={style.id}>
+                          {style.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={onApplyTextStyle}
+                      disabled={!selectedTextStyleId}
+                      className="sidebarPillButton"
+                      style={{ flex: "0 0 auto", padding: "0 10px" }}
+                      title="Apply this style to every selected block"
+                    >
+                      Apply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onDeleteTextStyle}
+                      disabled={!selectedTextStyleId}
+                      className="layerIconBtn"
+                      title="Delete this style"
+                      aria-label="Delete this style"
+                      style={{ color: "var(--danger)", flex: "0 0 auto" }}
+                    >
+                      <CloseIcon size={13} />
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <input
+                      type="text"
+                      value={newTextStyleName}
+                      onChange={(e) => onChangeNewTextStyleName?.(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newTextStyleName.trim()) onSaveTextStyle?.();
+                      }}
+                      placeholder="Style name…"
+                      aria-label="New text style name"
+                      className="hexInput"
+                      style={{ minWidth: 0, fontFamily: "inherit", letterSpacing: 0 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={onSaveTextStyle}
+                      disabled={!newTextStyleName.trim()}
+                      className="sidebarPillButton"
+                      style={{ flex: "0 0 auto" }}
+                      title="Save this block's font, colour, outline and shadow as a style"
+                    >
+                      Save style
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                    A style carries font, colour, outline and shadow — never the
+                    text or where the block sits. Styles stay in this browser.
+                  </div>
+                </div>
+
+                {palettes.length > 0 && (
+                  <PaletteSwatches
+                    palettes={palettes}
+                    selectedId={selectedPaletteId}
+                    onSelect={(id) => onSelectPalette?.(id)}
+                    value={selectedBlock.color}
+                    onPick={(color) => onPickPaletteColor?.(color)}
+                    onSaveFromCanvas={onSavePaletteFromCanvas}
+                    onDelete={onDeletePalette}
+                    canDelete={canDeletePalette}
+                  />
+                )}
                 {/* ---- /STREAM-E ---- */}
                 {/* Everything this section needs is derived from the block's
                     own text, so it holds no state of its own beyond the
