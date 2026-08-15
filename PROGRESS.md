@@ -124,6 +124,32 @@ that the Phase 2 ownership table did not allocate to anyone.
 
 <!-- ---- /STREAM-F ---- -->
 <!-- ---- STREAM-G: font upload — add your Shipped entry here ---- -->
+### 2026-08-14 — User font upload (stream G)
+
+The font list is no longer fixed. **Typography → Upload a font…** takes a
+`.ttf`/`.otf` from the user's machine, validates it with the already-vendored
+opentype.js, stores the bytes in IndexedDB, and registers both a shaping URL
+and a runtime `FontFace` — so the font appears in the picker (marked
+*uploaded*, previewed in itself), shapes through HarfBuzz like any bundled
+font, and survives a reload. Uploads are listed under the picker and
+removable.
+
+Fonts stay in the browser: a project saves the font *key*, never the bytes. A
+key nothing can resolve renders in Noto Sans and says so, in the status row
+and beside the picker, rather than substituting silently. The dialog prints
+the two honest caveats — the Presets honorifics exist only in bundled fonts,
+and licensing is the user's responsibility.
+
+Mechanism, precedence rules and the "don't index `FONT_URLS` directly" trap
+are in CLAUDE.md → *User-uploaded fonts*. Covered by
+`src/lib/customFonts.test.ts` (23 tests against real fonts from
+`public/fonts/`, including a truncated copy) and `e2e/font-upload.spec.ts`
+(upload → pick → re-render, save/reload round-trip, delete → notice,
+non-font rejected).
+
+Known limits, all deliberate: no WOFF/WOFF2 (harfbuzzjs wants uncompressed
+bytes), no font bytes in cloud saves, no Google-Fonts browsing, and no PUA
+honorific injection into an upload.
 <!-- ---- /STREAM-G ---- -->
 
 ### 2026-08-14 — Artboard (stream A)

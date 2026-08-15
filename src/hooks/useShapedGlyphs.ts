@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import {
+  clearShapeCache,
   shapeText,
   type HarfBuzzGlyph,
   type ShapedTextResult,
 } from "../lib/harfbuzz";
+import { pickFontUrl, setShapeCacheInvalidator } from "../lib/customFonts";
 
 export const FONT_URLS: Record<string, string> = {
   TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
@@ -28,6 +30,30 @@ export const FONT_URLS: Record<string, string> = {
   HarfCanvasDiwani: "/fonts/HarfCanvasDiwani.ttf",
 };
 
+/** The family a block falls back to when its own font cannot be resolved. */
+const FALLBACK_FONT_KEY = "NotoSans";
+
+// `customFonts.ts` must not import `./harfbuzz` — that module statically
+// imports harfbuzzjs, which throws under Vitest's Node loader and would take
+// the custom-font unit suite with it. This file already owns both halves, so
+// it is where the two are joined: replacing an uploaded font's bytes revokes
+// its old object URL, and shaped results are cached against that URL.
+setShapeCacheInvalidator(clearShapeCache);
+
+/**
+ * Where a family's bytes come from: a bundled font first, then the
+ * user-uploaded registry, then Noto Sans. Every consumer must go through
+ * this rather than indexing `FONT_URLS` directly — an uploaded font has no
+ * entry there, and a direct lookup would silently render it as Noto Sans.
+ *
+ * Synchronous on purpose: the shaping hook computes a URL during render.
+ * Until `primeCustomFonts()` resolves at boot, a custom family answers the
+ * fallback and re-renders to its own bytes a frame later.
+ */
+export function resolveFontUrl(fontFamily: string): string {
+  return pickFontUrl(fontFamily, FONT_URLS, FALLBACK_FONT_KEY);
+}
+
 const DEBUG_LOG = import.meta.env.DEV;
 
 export type ShapedGlyphsState = {
@@ -48,7 +74,7 @@ export type ShapedGlyphsState = {
  * TextOnPathText, which all need the same glyph data.
  */
 export function useShapedGlyphs(text: string, fontFamily: string): ShapedGlyphsState {
-  const fontUrl = FONT_URLS[fontFamily] ?? FONT_URLS.NotoSans;
+  const fontUrl = resolveFontUrl(fontFamily);
 
   const [hbLoaded, setHbLoaded] = useState(false);
   const [shapeData, setShapeData] = useState<{

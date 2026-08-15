@@ -83,6 +83,8 @@ import { fillToCss, resolveFill, type BlockFill, type FillStop } from "../lib/bl
 import type { ArtboardSurface, TextureDef } from "../data/textures";
 // ---- /STREAM-F ----
 // ---- STREAM-G: font upload — imports ----
+import { FontUploadButton } from "./FontUploadDialog";
+import { describeFontKey, type CustomFont } from "../lib/customFonts";
 // ---- /STREAM-G ----
 
 export type SidebarProps = {
@@ -103,6 +105,12 @@ export type SidebarProps = {
   onChangeArtboardSurface?: (patch: Partial<ArtboardSurface>) => void;
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — props ----
+  /** The user's uploaded fonts, appended to the built-in picker list. */
+  customFonts?: CustomFont[];
+  onAddCustomFont?: (file: File, label?: string) => Promise<CustomFont | { error: string }>;
+  onRemoveCustomFont?: (key: string) => void;
+  /** Set when the selected block names a font this browser cannot resolve. */
+  missingFontKey?: string | null;
   // ---- /STREAM-G ----
   // Phase 1 parallel-stream prop declarations — each stream adds its own
   // (all optional, arriving via App.tsx's p1* bundles). See PARALLEL-PHASE-1.md.
@@ -332,6 +340,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onChangeArtboardSurface,
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — destructure ----
+  customFonts = [],
+  onAddCustomFont,
+  onRemoveCustomFont,
+  missingFontKey = null,
   // ---- /STREAM-G ----
   blocks,
   artboard = null,
@@ -2429,16 +2441,60 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </>
                   );
                 })()}
-                {/* ---- STREAM-G: font upload — upload entry + custom font list ---- */}
+                {/* ---- STREAM-G: font upload — unavailable-font notice ---- */}
+                {missingFontKey && (
+                  <div className="fontMissingNotice" role="status">
+                    Font '{describeFontKey(missingFontKey)}' isn't available in this
+                    browser — using Noto Sans. Upload the font file to get it back,
+                    or pick another font below.
+                  </div>
+                )}
                 {/* ---- /STREAM-G ---- */}
                 <FontSelectRow
                   id={makeId("font-family", selectedId)}
                   label="Font family"
                   value={selectedBlock.fontFamily}
-                  options={FONT_OPTIONS}
+                  // Built-ins stay the static hand-ordered list; uploads are
+                  // appended so the trigger can show the family a block is
+                  // actually on. A key the picker doesn't know falls back to
+                  // showing the *first* option, which is why an uploaded font
+                  // has to reach this list rather than only the shaping seam.
+                  options={[
+                    ...FONT_OPTIONS,
+                    ...customFonts.map((f) => ({
+                      value: f.key,
+                      label: `${f.label} (uploaded)`,
+                      cssFamily: `'${f.key}'`,
+                    })),
+                  ]}
                   onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
                   previewSuffix="— أبجد"
                 />
+
+                {/* ---- STREAM-G: font upload — upload entry + custom font list ---- */}
+                <div className="customFontRow">
+                  <FontUploadButton onAdd={onAddCustomFont} />
+                  {customFonts.length > 0 && (
+                    <ul className="customFontList">
+                      {customFonts.map((f) => (
+                        <li className="customFontItem" key={f.key} data-font-key={f.key}>
+                          <span className="customFontName" style={{ fontFamily: `'${f.key}'` }}>
+                            {f.label}
+                          </span>
+                          <button
+                            type="button"
+                            className="sidebarCircleButton"
+                            aria-label={`Remove uploaded font ${f.label}`}
+                            onClick={() => onRemoveCustomFont?.(f.key)}
+                          >
+                            <TrashIcon size={12} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {/* ---- /STREAM-G ---- */}
 
                 {selectedBlock.type === "textPath" ? (
                   <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
