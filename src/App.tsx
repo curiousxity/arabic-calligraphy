@@ -52,6 +52,14 @@ import {
 // ---- STREAM-E: styles & palettes — imports ----
 // ---- /STREAM-E ----
 // ---- STREAM-F: ink & surface — imports ----
+import { GOLD_PRESETS, type BlockFill } from "./lib/blockFill";
+import {
+  TEXTURES,
+  getTexture,
+  readArtboardSurface,
+  textureTileUrl,
+  type ArtboardSurface,
+} from "./data/textures";
 // ---- /STREAM-F ----
 // ---- STREAM-G: font upload — imports ----
 // ---- /STREAM-G ----
@@ -228,6 +236,13 @@ const App: React.FC = () => {
   // ---- STREAM-E: styles & palettes — state ----
   // ---- /STREAM-E ----
   // ---- STREAM-F: ink & surface — state ----
+  // The page's paper. Kept *out* of ArtboardConfig deliberately: a surface is
+  // a look, and `null` freeform pages get one too, so it is not a property of
+  // "there is a page". Saved with the document; not in the undo snapshot,
+  // which this stream's anchors do not reach.
+  const [artboardSurface, setArtboardSurface] = useState<ArtboardSurface>({
+    textureId: null,
+  });
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — state ----
   // ---- /STREAM-G ----
@@ -1228,6 +1243,7 @@ const App: React.FC = () => {
     viewportHeight,
     artboard,
     // ---- STREAM-F: ink & surface — payload fields ----
+    artboardSurface,
     // ---- /STREAM-F ----
     version: 5,
   });
@@ -1281,6 +1297,10 @@ const App: React.FC = () => {
     // key is missing, or an old project would inherit the current page.
     setArtboard(isArtboardConfig(parsed.artboard) ? parsed.artboard : null);
     // ---- STREAM-F: ink & surface — payload read ----
+    // Absent (every project written before surfaces existed) loads as bare
+    // paper, and loading replaces the document — so this runs even when the
+    // key is missing, exactly as the artboard read above does.
+    setArtboardSurface(readArtboardSurface(parsed.artboardSurface));
     // ---- /STREAM-F ----
 
     const savedViewportWidth =
@@ -1990,8 +2010,71 @@ const App: React.FC = () => {
   const p2eSidebarProps: Partial<SidebarProps> = {};
   // ---- /STREAM-E ----
   // ---- STREAM-F: ink & surface — handlers & props ----
-  const p2fSidebarProps: Partial<SidebarProps> = {};
-  const p2fCanvasProps: Partial<CanvasStageProps> = {};
+  // A solid fill keeps writing the block's own `color` and clears `fill`, so
+  // a block only ever carries the new field while it is actually a gradient.
+  // That is what makes every pre-existing block and save render unchanged,
+  // and it keeps `color` meaningful for everything else that reads it.
+  const setBlockFill = useCallback(
+    (fill: BlockFill | undefined) => {
+      pushHistory();
+      if (!fill || fill.type === "solid") {
+        updateSelectedBlock({ fill: undefined, ...(fill ? { color: fill.color } : {}) });
+      } else {
+        updateSelectedBlock({ fill });
+      }
+    },
+    [pushHistory, updateSelectedBlock]
+  );
+
+  const changeArtboardSurface = useCallback((patch: Partial<ArtboardSurface>) => {
+    setArtboardSurface((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const surfaceTexture = getTexture(artboardSurface.textureId);
+  const surfaceTint = artboardSurface.tint ?? surfaceTexture?.defaultTint ?? backgroundColor;
+
+  // The tile is rasterized once per (texture, tint) and handed to Konva as an
+  // <img>. `textureTileUrl` caches the data URL, so this only regenerates
+  // when the paper actually changes — not on every render or every drag.
+  const [surfaceImage, setSurfaceImage] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!surfaceTexture) {
+      setSurfaceImage(null);
+      return;
+    }
+    let live = true;
+    const img = new Image();
+    img.onload = () => {
+      if (live) setSurfaceImage(img);
+    };
+    img.src = textureTileUrl(surfaceTexture, surfaceTint);
+    return () => {
+      live = false;
+    };
+  }, [surfaceTexture, surfaceTint]);
+
+  const p2fSidebarProps: Partial<SidebarProps> = {
+    blockFill: selectedBlock?.fill,
+    blockColor: selectedBlock?.color,
+    onSetBlockFill: setBlockFill,
+    fillPresets: GOLD_PRESETS,
+    textures: TEXTURES,
+    artboardSurface,
+    onChangeArtboardSurface: changeArtboardSurface,
+  };
+  const p2fCanvasProps: Partial<CanvasStageProps> = {
+    // Spread last into the page rect, so these win over its flat `fill`.
+    // Nothing else about the rect changes — which is also why the export
+    // path's existing "hide #artboard-background when transparent" already
+    // suppresses the texture, with no export-side change at all.
+    surfaceRectProps: surfaceImage
+      ? {
+          fillPriority: "pattern",
+          fillPatternImage: surfaceImage,
+          fillPatternRepeat: "repeat",
+        }
+      : undefined,
+  };
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — handlers & props ----
   const p2gSidebarProps: Partial<SidebarProps> = {};

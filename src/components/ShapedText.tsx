@@ -13,6 +13,11 @@ import {
   type DiacriticPlacement,
 } from "../lib/diacriticPlacement";
 import type { DiacriticOverride, GlyphTransform } from "../types";
+import {
+  createBlockFillPainter,
+  type BlockFill,
+  type BlockFillPainter,
+} from "../lib/blockFill";
 import { resolveGlyphTransform, transformedBox } from "../lib/glyphTransform";
 import {
   isOverrideGlyphChar,
@@ -30,6 +35,8 @@ type Props = {
   y: number;
   fontSize: number;
   color: string;
+  /** Gradient ink. Absent renders the flat `color`, exactly as before. */
+  fill?: BlockFill;
   fontFamily: string;
   fontStyle?: "normal" | "bold" | "italic" | "bold italic";
   align?: "left" | "center" | "right";
@@ -119,7 +126,13 @@ function drawWarpedGlyphRun(
   fauxBoldWidth = 0,
   overrideGlyph: OverrideGlyph | null = null,
   diacriticOverrides: DiacriticOverride[] = [],
-  glyphTransforms: GlyphTransform[] = []
+  glyphTransforms: GlyphTransform[] = [],
+  /**
+   * How the glyph interiors get painted. Built by the caller while the ctx
+   * still sits in the block's own space, so a gradient spans the whole run
+   * rather than restarting inside every letter — see `lib/blockFill.ts`.
+   */
+  painter: BlockFillPainter | null = null
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -149,6 +162,11 @@ function drawWarpedGlyphRun(
     ctx.save();
     ctx.translate(gx, gy);
 
+    // How much this glyph's own space is scaled relative to the block's, so a
+    // line width chosen here can be restated in block space for the gradient
+    // painter (which strokes with the transform reset).
+    let localScale = 1;
+
     const transform = glyphTransforms.find((t) => t.glyphIndex === glyphIndex);
     if (transform) {
       // The context is already translated to this glyph's pen origin, so
@@ -159,6 +177,7 @@ function drawWarpedGlyphRun(
       const { offsetX, offsetY, scaleX, scaleY } = resolveGlyphTransform(transform);
       ctx.translate(offsetX, offsetY);
       ctx.scale(scaleX, scaleY);
+      localScale *= (scaleX + scaleY) / 2;
     }
 
     // Applied *inside* the glyph transform: the transform is the outermost
@@ -172,6 +191,7 @@ function drawWarpedGlyphRun(
       ctx.translate(0, diacriticOverride.offsetY ?? 0);
       const diacScale = diacriticOverride.scale ?? 1;
       ctx.scale(diacScale, diacScale);
+      localScale *= diacScale;
     }
 
     if (
@@ -235,11 +255,19 @@ function drawWarpedGlyphRun(
       ctx.stroke();
     }
 
-    ctx.fill();
+    if (painter) painter.fill(ctx);
+    else ctx.fill();
     if (fauxBoldWidth > 0 && !drawStroke) {
-      ctx.strokeStyle = ctx.fillStyle as string;
-      ctx.lineWidth = fauxBoldWidth;
-      ctx.stroke();
+      if (painter)
+        painter.strokeWithFill(ctx, {
+          local: fauxBoldWidth,
+          block: fauxBoldWidth * localScale,
+        });
+      else {
+        ctx.strokeStyle = ctx.fillStyle as string;
+        ctx.lineWidth = fauxBoldWidth;
+        ctx.stroke();
+      }
     }
 
     ctx.restore();
@@ -254,6 +282,7 @@ export const ShapedText: React.FC<Props> = ({
   y,
   fontSize,
   color,
+  fill,
   fontFamily,
   fontStyle = "normal",
   align = "center",
@@ -603,7 +632,16 @@ export const ShapedText: React.FC<Props> = ({
           ctx.translate(localDrawX, localDrawY);
           if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
 
-          ctx.fillStyle = color;
+          // Built here, with the ctx already in the block's own space (the
+          // run-centring translate and the italic shear applied), so the
+          // gradient spans the whole word and shears with it.
+          const painter = createBlockFillPainter(ctx, fill, color, {
+            x: glyphBounds.minX,
+            y: glyphBounds.minY,
+            width: glyphBounds.rawWidth,
+            height: glyphBounds.rawHeight,
+          });
+          ctx.fillStyle = painter.style;
           drawWarpedGlyphRun(
             ctx as unknown as CanvasRenderingContext2D,
             shapeData.glyphs,
@@ -619,7 +657,8 @@ export const ShapedText: React.FC<Props> = ({
             fauxBoldWidth,
             overrideGlyph,
             activeDiacriticOverrides,
-            glyphTransforms
+            glyphTransforms,
+            painter
           );
           ctx.restore();
 
@@ -627,6 +666,12 @@ export const ShapedText: React.FC<Props> = ({
             ctx.save();
             ctx.translate(localDrawX, localDrawY);
             if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
+            // This pass fills as well as strokes (the outline-before-fill
+            // ordering is per glyph), and `ctx.restore()` above popped the
+            // fill style the first pass set — so it has to be re-applied, or
+            // the run is repainted in whatever style the context happened to
+            // be carrying.
+            ctx.fillStyle = painter.style;
             drawWarpedGlyphRun(
               ctx as unknown as CanvasRenderingContext2D,
               shapeData.glyphs,
@@ -642,7 +687,11 @@ export const ShapedText: React.FC<Props> = ({
               0,
               overrideGlyph,
               activeDiacriticOverrides,
-              glyphTransforms
+              glyphTransforms,
+              // The outline pass fills too (outline-before-fill is per glyph),
+              // and its transform is the same block space the painter was
+              // built in, so it reuses the same one.
+              painter
             );
             ctx.restore();
           }

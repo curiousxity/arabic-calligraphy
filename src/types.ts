@@ -42,6 +42,11 @@ export type GlyphTransform = {
 };
 
 // ---- STREAM-F: ink & surface — BlockFill type ----
+// Re-exported from the pure module that owns it, so `types.ts` stays the one
+// import site for a block's field types while the gradient maths (and its
+// tests) live in `lib/blockFill.ts`.
+export type { BlockFill, FillStop } from "./lib/blockFill";
+import type { BlockFill } from "./lib/blockFill";
 // ---- /STREAM-F ----
 
 type BlockCommon = {
@@ -86,6 +91,15 @@ type BlockCommon = {
 
   // ---- STREAM-F: ink & surface — `fill` field on BlockCommon. Absent
   // means the existing flat `color` renders exactly as today. ----
+  /**
+   * Gradient (or explicit solid) fill for the block's ink.
+   *
+   * `color` is **not** migrated or removed: a solid fill keeps writing
+   * `color` and leaves this undefined, so every block and every saved
+   * project that predates this field renders identically. Only a gradient
+   * sets it.
+   */
+  fill?: BlockFill;
   // ---- /STREAM-F ----
 
   // Shape-import fields, carried by shapeFill blocks. They live on

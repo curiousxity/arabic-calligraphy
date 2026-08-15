@@ -4,6 +4,7 @@ import type Konva from "konva";
 import { parseSvgPath, replayPath } from "../lib/svgPath";
 import { pathLength, pathBoundingBox, buildArcTable, pointAtArcLengthFromTable } from "../lib/textPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
+import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
 
 export type TextOnPathTextProps = {
   id?: string;
@@ -12,6 +13,8 @@ export type TextOnPathTextProps = {
   y: number;
   fontSize: number;
   color: string;
+  /** Gradient ink. Absent renders the flat `color`, exactly as before. */
+  fill?: BlockFill;
   fontFamily: string;
   fontStyle?: "normal" | "bold" | "italic" | "bold italic";
   opacity?: number;
@@ -51,6 +54,7 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   y,
   fontSize,
   color,
+  fill,
   fontFamily,
   fontStyle = "normal",
   opacity = 1,
@@ -148,6 +152,18 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
           const fitScale = curveLen / naturalAdvance;
           const c2d = ctx as unknown as CanvasRenderingContext2D;
 
+          // Built before the glyph loop, while the ctx is still in the
+          // Shape's own space, so one gradient spans the whole curve. Each
+          // glyph below is drawn under its own translate+rotate to the
+          // tangent, and the painter is what keeps the gradient from
+          // rotating with it.
+          const painter = createBlockFillPainter(c2d, fill, color, {
+            x: curveBox.x - hitX,
+            y: curveBox.y - hitY,
+            width: curveBox.width,
+            height: curveBox.height,
+          });
+
           let cursor = 0;
           for (const g of glyphs) {
             const glyphObj = font.glyphs.get(g.g);
@@ -170,7 +186,7 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
             c2d.translate(0, textPathBaselineOffset);
             if (isItalic) c2d.transform(1, 0, -0.25, 1, 0, 0);
 
-            c2d.fillStyle = color;
+            c2d.fillStyle = painter.style;
             replayPath(c2d, opPath.commands);
 
             // Outline before fill — see the same ordering in ShapedText.tsx.
@@ -179,7 +195,7 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
               c2d.lineWidth = strokeWidth;
               c2d.stroke();
             }
-            c2d.fill();
+            painter.fill(c2d);
 
             c2d.restore();
             cursor += advance;

@@ -97,6 +97,31 @@ defects under Known limitations, and the mechanics in `CLAUDE.md`'s
 <!-- ---- STREAM-E: styles & palettes — add your Shipped entry here ---- -->
 <!-- ---- /STREAM-E ---- -->
 <!-- ---- STREAM-F: ink & surface — add your Shipped entry here ---- -->
+
+### 2026-08-14 — Ink & surface (stream F)
+
+Gradient block fills, including gold/silver/copper/lapis metallic presets,
+and generated paper textures for the page.
+
+- `src/lib/blockFill.ts` (pure, unit-tested) owns `BlockFill`, the gradient
+  geometry, the presets, and `createBlockFillPainter` — the piece that keeps
+  one gradient spanning a whole block while the renderers keep filling inside
+  per-glyph transforms.
+- All three text renderers resolve their fill through it. Solid fills take an
+  unchanged code path, and `fill` is only ever written for a gradient, so
+  older saves render identically.
+- SVG export keeps gradients as real vector gradients — see the coordinate-
+  space note in CLAUDE.md's "Ink & surface" section; nothing rasterizes.
+- Four generated, seamless paper textures (`src/data/textures/`) reach the
+  page through the prep commit's `surfaceRectProps` seam.
+- Covered by `src/lib/blockFill.test.ts`, `src/data/textures/textures.test.ts`
+  and `e2e/ink-surface.spec.ts`.
+
+**Known gaps.** The page surface is saved with the document but is *not* in
+the undo snapshot (`EditorSnapshot` was outside this stream's anchors), and
+`CanvasStage.tsx` / `MirrorBlockView.tsx` needed a one-line `fill` pass-through
+that the Phase 2 ownership table did not allocate to anyone.
+
 <!-- ---- /STREAM-F ---- -->
 <!-- ---- STREAM-G: font upload — add your Shipped entry here ---- -->
 <!-- ---- /STREAM-G ---- -->

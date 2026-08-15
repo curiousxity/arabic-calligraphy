@@ -118,6 +118,7 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
       text: source.text,
       fontSize: source.fontSize,
       color: source.color,
+      fill: source.fill,
       fontFamily: source.fontFamily,
       fontStyle: source.fontStyle ?? ("normal" as const),
       stroke: source.stroke,

@@ -79,6 +79,8 @@ import { OrnamentPickerButton } from "./OrnamentPicker";
 // ---- STREAM-E: styles & palettes — imports ----
 // ---- /STREAM-E ----
 // ---- STREAM-F: ink & surface — imports ----
+import { fillToCss, resolveFill, type BlockFill, type FillStop } from "../lib/blockFill";
+import type { ArtboardSurface, TextureDef } from "../data/textures";
 // ---- /STREAM-F ----
 // ---- STREAM-G: font upload — imports ----
 // ---- /STREAM-G ----
@@ -89,6 +91,16 @@ export type SidebarProps = {
   // ---- STREAM-E: styles & palettes — props ----
   // ---- /STREAM-E ----
   // ---- STREAM-F: ink & surface — props ----
+  /** The selected block's gradient, if it has one. Undefined = flat `blockColor`. */
+  blockFill?: BlockFill;
+  /** The selected block's flat colour — what a solid fill reads and writes. */
+  blockColor?: string;
+  /** Undefined or a solid fill clears `fill` and writes `color` instead. */
+  onSetBlockFill?: (fill: BlockFill | undefined) => void;
+  fillPresets?: { id: string; name: string; fill: BlockFill }[];
+  textures?: TextureDef[];
+  artboardSurface?: ArtboardSurface;
+  onChangeArtboardSurface?: (patch: Partial<ArtboardSurface>) => void;
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — props ----
   // ---- /STREAM-G ----
@@ -311,6 +323,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // ---- STREAM-E: styles & palettes — destructure ----
   // ---- /STREAM-E ----
   // ---- STREAM-F: ink & surface — destructure ----
+  blockFill,
+  blockColor,
+  onSetBlockFill,
+  fillPresets = [],
+  textures = [],
+  artboardSurface,
+  onChangeArtboardSurface,
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — destructure ----
   // ---- /STREAM-G ----
@@ -932,6 +951,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onChange={onChangeBackgroundColor}
               />
               {/* ---- STREAM-F: ink & surface — Surface row ---- */}
+              {(() => {
+                if (!artboardSurface) return null;
+                const active = textures.find((t) => t.id === artboardSurface.textureId);
+                return (
+                  <>
+                    <SelectRow
+                      id="artboard-surface"
+                      name="artboardSurface"
+                      label="Paper surface"
+                      value={artboardSurface.textureId ?? ""}
+                      onChange={(v) =>
+                        onChangeArtboardSurface?.({ textureId: v === "" ? null : v })
+                      }
+                    >
+                      <option value="">None (flat colour)</option>
+                      {textures.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </SelectRow>
+                    {active && (
+                      <ColorRow
+                        id="artboard-surface-tint"
+                        name="artboardSurfaceTint"
+                        label="Paper tint"
+                        value={artboardSurface.tint ?? active.defaultTint}
+                        onChange={(v) => onChangeArtboardSurface?.({ tint: v })}
+                      />
+                    )}
+                  </>
+                );
+              })()}
               {/* ---- /STREAM-F ---- */}
             </div>
           </CollapsibleSection>
@@ -2559,6 +2611,181 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <CollapsibleSection title="Effects" isOpen={showEffects} onToggle={() => setShowEffects((v) => !v)}>
               <div className="sectionPanel">
                 {/* ---- STREAM-F: ink & surface — Fill section ---- */}
+                {/*
+                  An IIFE rather than a component: this stream owns no file to
+                  put one in, and the same shape the Kashida controls already
+                  use. It holds no state — the editor reads the block's own
+                  fill and writes a whole new one on every change.
+                */}
+                {(() => {
+                  const flat = blockColor ?? "#000000";
+                  const current = resolveFill(blockFill, flat);
+                  const stops: FillStop[] =
+                    current.type === "solid"
+                      ? [
+                          { offset: 0, color: flat },
+                          { offset: 1, color: "#ffffff" },
+                        ]
+                      : current.stops;
+                  const angle = current.type === "linear" ? current.angle : 90;
+
+                  const write = (next: BlockFill) => onSetBlockFill?.(next);
+                  const writeStops = (nextStops: FillStop[]) =>
+                    write(
+                      current.type === "radial"
+                        ? { type: "radial", stops: nextStops }
+                        : { type: "linear", angle, stops: nextStops }
+                    );
+
+                  return (
+                    <>
+                      <SelectRow
+                        id="block-fill-type"
+                        name="blockFillType"
+                        label="Fill"
+                        value={current.type}
+                        onChange={(v) => {
+                          if (v === "solid") write({ type: "solid", color: flat });
+                          else if (v === "radial") write({ type: "radial", stops });
+                          else write({ type: "linear", angle, stops });
+                        }}
+                      >
+                        <option value="solid">Flat colour</option>
+                        <option value="linear">Linear gradient</option>
+                        <option value="radial">Radial gradient</option>
+                      </SelectRow>
+
+                      <div className="field">
+                        <span className="fieldTitle">Metallics</span>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 6,
+                            flexWrap: "wrap",
+                            // Grid/flex children default to min-width:auto and
+                            // refuse to shrink — see CLAUDE.md's note on the
+                            // sidebar's narrow width.
+                            minWidth: 0,
+                          }}
+                        >
+                          {fillPresets.map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              title={preset.name}
+                              aria-label={preset.name}
+                              style={{
+                                background: fillToCss(preset.fill),
+                                width: 34,
+                                height: 22,
+                                minWidth: 0,
+                                borderRadius: 4,
+                                border: "1px solid var(--border-soft)",
+                                cursor: "pointer",
+                                padding: 0,
+                              }}
+                              onClick={() => write(preset.fill)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {current.type === "solid" ? (
+                        <div style={{ fontSize: 12, opacity: 0.7 }}>
+                          Flat ink uses the block's colour, set under Typography.
+                        </div>
+                      ) : (
+                        <>
+                          {current.type === "linear" && (
+                            <RangeRow
+                              id="block-fill-angle"
+                              name="blockFillAngle"
+                              label="Gradient angle"
+                              value={angle}
+                              min={0}
+                              max={360}
+                              step={1}
+                              onChange={(v) => write({ type: "linear", angle: v, stops })}
+                              suffix={`${angle}°`}
+                            />
+                          )}
+
+                          <div className="field">
+                            <span className="fieldTitle">Stops</span>
+                            {stops.map((stop, i) => (
+                              <div
+                                key={i}
+                                style={{
+                                  display: "flex",
+                                  gap: 6,
+                                  alignItems: "center",
+                                  minWidth: 0,
+                                }}
+                              >
+                                <input
+                                  type="color"
+                                  aria-label={`Stop ${i + 1} colour`}
+                                  value={stop.color}
+                                  onChange={(e) =>
+                                    writeStops(
+                                      stops.map((s, j) =>
+                                        j === i ? { ...s, color: e.target.value } : s
+                                      )
+                                    )
+                                  }
+                                />
+                                <input
+                                  type="range"
+                                  aria-label={`Stop ${i + 1} position`}
+                                  style={{ flex: 1, minWidth: 0 }}
+                                  min={0}
+                                  max={100}
+                                  value={Math.round(stop.offset * 100)}
+                                  onChange={(e) =>
+                                    writeStops(
+                                      stops.map((s, j) =>
+                                        j === i
+                                          ? { ...s, offset: Number(e.target.value) / 100 }
+                                          : s
+                                      )
+                                    )
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  className="sidebarPillButton"
+                                  aria-label={`Remove stop ${i + 1}`}
+                                  disabled={stops.length <= 2}
+                                  onClick={() =>
+                                    writeStops(stops.filter((_, j) => j !== i))
+                                  }
+                                >
+                                  −
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              className="sidebarPillButton"
+                              disabled={stops.length >= 4}
+                              onClick={() =>
+                                writeStops([
+                                  ...stops,
+                                  {
+                                    offset: 1,
+                                    color: stops[stops.length - 1]?.color ?? flat,
+                                  },
+                                ])
+                              }
+                            >
+                              Add stop
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
                 {/* ---- /STREAM-F ---- */}
                 <div style={{ display: "flex", gap: 6 }}>
                   {(

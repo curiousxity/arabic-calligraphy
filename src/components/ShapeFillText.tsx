@@ -32,6 +32,7 @@ import {
   type DiacriticPlacement,
 } from "../lib/diacriticPlacement";
 import type { DiacriticOverride } from "../types";
+import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
 
 export type ShapeFillTextProps = {
   id?: string;
@@ -40,6 +41,8 @@ export type ShapeFillTextProps = {
   y: number;
   fontSize: number;
   color: string;
+  /** Gradient ink. Absent renders the flat `color`, exactly as before. */
+  fill?: BlockFill;
   fontFamily: string;
   fontStyle?: "normal" | "bold" | "italic" | "bold italic";
   shapeSvgPath: string;
@@ -174,6 +177,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   x, y,
   fontSize,
   color,
+  fill,
   fontFamily,
   fontStyle = "normal",
   shapeSvgPath,
@@ -434,7 +438,18 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
             replayPath(targetCtx, parsedCmds);
             targetCtx.clip();
 
-            targetCtx.fillStyle = fillColor;
+            // Built here, in the silhouette's own (pre-tile) space, so one
+            // gradient spans the whole shape. A per-glyph gradient would be
+            // meaningless on this block type: the run is tiled across the
+            // silhouette, so hundreds of instances would each get a full
+            // sweep and the result would read as noise.
+            const painter = createBlockFillPainter(targetCtx, fill, fillColor, {
+              x: 0,
+              y: 0,
+              width: shapeWidth,
+              height: shapeHeight,
+            });
+            targetCtx.fillStyle = painter.style;
 
             const drawGlyphRow = (startPenX: number, sy: number, scX: number, scY: number) => {
               for (let gi = 0; gi < glyphCache.length; gi++) {
@@ -474,11 +489,15 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                   targetCtx.lineWidth = strokeWidth / scX;
                   targetCtx.stroke();
                 }
-                targetCtx.fill();
+                painter.fill(targetCtx);
                 if (includeExtras && fauxBoldWidth > 0) {
-                  targetCtx.strokeStyle = fillColor;
-                  targetCtx.lineWidth = fauxBoldWidth / scX;
-                  targetCtx.stroke();
+                  // `local` keeps the existing per-row compensation; `block`
+                  // is the same visible weight measured in the silhouette's
+                  // space, where a gradient stroke is issued.
+                  painter.strokeWithFill(targetCtx, {
+                    local: fauxBoldWidth / scX,
+                    block: fauxBoldWidth * (diacriticOverride?.scale ?? 1),
+                  });
                 }
                 targetCtx.restore();
               }
