@@ -50,6 +50,25 @@ import {
   type ExportFormat,
 } from "./lib/exportPresets";
 // ---- STREAM-E: styles & palettes — imports ----
+import {
+  captureStyle,
+  styleToPatch,
+  loadStyles,
+  saveStyles,
+  upsertStyle,
+  removeStyle,
+  type TextStyle,
+} from "./lib/textStyles";
+import {
+  allPalettes,
+  loadPalettes,
+  savePalettes,
+  upsertPalette,
+  removePalette,
+  DEFAULT_PALETTES,
+  MAX_PALETTE_COLORS,
+  type Palette,
+} from "./lib/palettes";
 // ---- /STREAM-E ----
 // ---- STREAM-F: ink & surface — imports ----
 // ---- /STREAM-F ----
@@ -226,6 +245,15 @@ const App: React.FC = () => {
   // anchors, so independent branches merge into this file without
   // overlapping hunks.
   // ---- STREAM-E: styles & palettes — state ----
+  // Both stores are local-only and are *not* document state: they never enter
+  // the layout payload, the undo snapshot, or the Supabase project store —
+  // exactly the choice `exportPresets` already makes. Applying a style is
+  // undoable (it edits blocks); managing the lists is not.
+  const [textStyles, setTextStyles] = useState<TextStyle[]>(() => loadStyles());
+  const [selectedTextStyleId, setSelectedTextStyleId] = useState("");
+  const [newTextStyleName, setNewTextStyleName] = useState("");
+  const [userPalettes, setUserPalettes] = useState<Palette[]>(() => loadPalettes());
+  const [selectedPaletteId, setSelectedPaletteId] = useState(DEFAULT_PALETTES[0].id);
   // ---- /STREAM-E ----
   // ---- STREAM-F: ink & surface — state ----
   // ---- /STREAM-F ----
@@ -1987,7 +2015,114 @@ const App: React.FC = () => {
   // own; all are already spread at the call sites. F's canvas bundle is how
   // the page surface reaches CanvasStage's `surfaceRectProps` seam.
   // ---- STREAM-E: styles & palettes — handlers & props ----
-  const p2eSidebarProps: Partial<SidebarProps> = {};
+  // The one mutating primitive this stream needs. `updateSelectedBlock` patches
+  // the single selected block; a style is meant to bring a whole selection into
+  // line, so this walks `effectiveSelectedIds` instead — with **one**
+  // `pushHistory()` for the gesture, so applying a style to six blocks is one
+  // undo rather than six.
+  const patchSelectedBlocks = useCallback(
+    (patch: Partial<Block>) => {
+      if (effectiveSelectedIds.length === 0) return;
+      const ids = new Set(effectiveSelectedIds);
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => (ids.has(b.id) ? ({ ...b, ...patch } as Block) : b))
+      );
+    },
+    [effectiveSelectedIds, pushHistory]
+  );
+
+  const palettes = useMemo(() => allPalettes(userPalettes), [userPalettes]);
+
+  // Selecting a style loads its name into the save field, so overwriting the
+  // style you just applied is one click — the same affordance `selectExportPreset`
+  // offers for presets.
+  const selectTextStyle = (id: string) => {
+    setSelectedTextStyleId(id);
+    const style = textStyles.find((s) => s.id === id);
+    if (style) setNewTextStyleName(style.name);
+  };
+
+  const applyTextStyle = () => {
+    const style = textStyles.find((s) => s.id === selectedTextStyleId);
+    if (!style) return;
+    patchSelectedBlocks(styleToPatch(style));
+  };
+
+  const saveTextStyleFromBlock = () => {
+    const name = newTextStyleName.trim();
+    if (!name || !selectedBlock) return;
+    // Overwrite by name, matching the export-preset and named-project stores.
+    const existing = textStyles.find((s) => s.name === name);
+    const style = captureStyle(selectedBlock, name);
+    const next = upsertStyle(textStyles, existing ? { ...style, id: existing.id } : style);
+    setTextStyles(next);
+    saveStyles(next);
+    setSelectedTextStyleId(existing?.id ?? style.id);
+  };
+
+  const deleteTextStyle = () => {
+    if (!selectedTextStyleId) return;
+    const next = removeStyle(textStyles, selectedTextStyleId);
+    setTextStyles(next);
+    saveStyles(next);
+    setSelectedTextStyleId("");
+  };
+
+  // A palette built from what is already on the canvas: every block's ink and
+  // outline colour, de-duplicated in the order they are met, capped by the
+  // store's own limit. Named rather than prompted-for, and overwritten by that
+  // name, so re-running it after a colour change refreshes the palette in place.
+  const savePaletteFromCanvas = () => {
+    const seen: string[] = [];
+    for (const b of blocks) {
+      for (const c of [b.color, b.stroke]) {
+        if (typeof c !== "string" || !c) continue;
+        const key = c.toLowerCase();
+        if (!seen.some((s) => s.toLowerCase() === key)) seen.push(c);
+      }
+    }
+    if (seen.length === 0) return;
+    const name = "From canvas";
+    const existing = userPalettes.find((p) => p.name === name);
+    const palette: Palette = {
+      id: existing?.id ?? `palette-${Date.now().toString(36)}`,
+      name,
+      colors: seen.slice(0, MAX_PALETTE_COLORS),
+    };
+    const next = upsertPalette(userPalettes, palette);
+    setUserPalettes(next);
+    savePalettes(next);
+    setSelectedPaletteId(palette.id);
+  };
+
+  const deletePalette = () => {
+    // The shipped palettes live in code, so there is nothing to delete for them
+    // — `removePalette` is a no-op on a default id, and the button is disabled.
+    const next = removePalette(userPalettes, selectedPaletteId);
+    if (next.length === userPalettes.length) return;
+    setUserPalettes(next);
+    savePalettes(next);
+    setSelectedPaletteId(DEFAULT_PALETTES[0].id);
+  };
+
+  const p2eSidebarProps: Partial<SidebarProps> = {
+    textStyles,
+    selectedTextStyleId,
+    onSelectTextStyle: selectTextStyle,
+    onApplyTextStyle: applyTextStyle,
+    newTextStyleName,
+    onChangeNewTextStyleName: setNewTextStyleName,
+    onSaveTextStyle: saveTextStyleFromBlock,
+    onDeleteTextStyle: deleteTextStyle,
+    palettes,
+    selectedPaletteId,
+    onSelectPalette: setSelectedPaletteId,
+    onPickPaletteColor: (color: string) => patchSelectedBlocks({ color }),
+    onSavePaletteFromCanvas: savePaletteFromCanvas,
+    onDeletePalette: deletePalette,
+    canDeletePalette: userPalettes.some((p) => p.id === selectedPaletteId),
+  };
   // ---- /STREAM-E ----
   // ---- STREAM-F: ink & surface — handlers & props ----
   const p2fSidebarProps: Partial<SidebarProps> = {};

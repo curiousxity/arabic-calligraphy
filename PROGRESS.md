@@ -94,7 +94,35 @@ defects under Known limitations, and the mechanics in `CLAUDE.md`'s
 
 ## Shipped
 
-<!-- ---- STREAM-E: styles & palettes — add your Shipped entry here ---- -->
+<!-- ---- STREAM-E: styles & palettes ---- -->
+### 2026-08-14 — Saveable styles & palettes (stream E)
+
+A look built on one block can now be saved under a name and dropped onto
+others. The Typography panel opens with a **Style** row — a dropdown of saved
+styles, Apply, a name field and Save style, and a delete — plus a **Palette**
+row underneath: a strip of clickable swatches with four palettes shipped
+(Manuscript, Rubrication, Aged page, Neutral) and a "From canvas" button that
+builds one from the colours already in the piece.
+
+A style carries font, size, colour, opacity, outline and shadow, and
+deliberately nothing else — never the text, the position, or any per-glyph
+adjustment. Apply patches every selected block as a **single** undo step.
+Both stores are local to the browser: not in a saved project, not in the
+cloud store, matching export presets. See CLAUDE.md, "Saveable text styles &
+palettes", for the design and its two spec deviations (`stroke` rather than
+`strokeColor`; no `letterSpacing` field exists in this codebase).
+
+Known v1 limit: swatches drive the *text* colour only. The stroke, shadow and
+page colour rows are `FormControls.tsx`'s `ColorRow`, which no stream owns
+this phase — reported as the spec anticipated rather than worked around.
+
+Verified: 22 unit tests across `src/lib/textStyles.test.ts` and
+`src/lib/palettes.test.ts` (capture→patch never touches content or position,
+corrupt-JSON fallback, overwrite-by-name, defaults always present and never
+written to storage), four browser tests in `e2e/styles.spec.ts` (a saved
+style restyles a second block while its text and position hold; apply is one
+undo; a style survives a reload; a swatch recolours the selection), plus the
+full typecheck/lint/test/build loop.
 <!-- ---- /STREAM-E ---- -->
 <!-- ---- STREAM-F: ink & surface — add your Shipped entry here ---- -->
 <!-- ---- /STREAM-F ---- -->
