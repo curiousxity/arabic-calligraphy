@@ -44,6 +44,31 @@ export const section: GuideSection = {
         something the script does.
       </p>
 
+      <h4>Fitting a line to a width</h4>
+      <p>
+        Under the stepper, <strong>Fit to width</strong> does the same job
+        automatically: give it a target width and it spreads kashida evenly
+        across every join in the block until the line spans it. If you have set
+        a page size, the target starts out as your page's margin box — the area
+        your text is meant to fill — and <strong>Use page margin box</strong>{" "}
+        puts it back if you have typed something else. With no page set, just
+        type the width you want.
+      </p>
+      <p>
+        It always stops <em>short</em> of the target rather than spilling past
+        it, and it spreads the stretch across all the joins rather than pulling
+        one of them out of shape. Running it twice with the same target changes
+        nothing the second time — it works out the whole line from scratch each
+        time rather than piling more on — and the whole fit is a single Undo.
+      </p>
+      <p>
+        If your text is already wider than the target, kashida cannot help:
+        elongation only ever adds width. The status line will say so, and a
+        smaller font size is the fix. This is for plain text blocks — text
+        inside a shape or along a curve is already scaled to fit what it sits
+        in.
+      </p>
+
       <h4>It changes your text</h4>
       <p>
         Lengthening a join inserts the elongation character (ـ) into the block's

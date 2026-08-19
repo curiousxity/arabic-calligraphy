@@ -25,12 +25,22 @@ export type DiacriticOverride = {
  *
  * Shares glyphIndex keying with it, including its known fragility: a text
  * edit before this glyph shifts which index the transform lands on after
- * re-shaping. Unlike DiacriticOverride there is no identity signal to
- * re-check against at render time (every glyph is a legitimate target), so
- * a stale transform simply applies to whatever glyph now holds that index.
+ * re-shaping. Every glyph is a legitimate target, so unlike DiacriticOverride
+ * there is no *inherent* signal to re-check against — which is why the
+ * `glyphId` below is recorded and checked instead.
  */
 export type GlyphTransform = {
   glyphIndex: number;
+  /**
+   * The shaped glyph id this transform was created for, used to notice when
+   * a text edit has shifted `glyphIndex` onto a different letter — see
+   * `ShapedText`'s `activeGlyphTransforms`.
+   *
+   * Optional on purpose: a transform saved before this field existed cannot
+   * be validated, so it keeps the original behaviour of applying to whatever
+   * glyph now holds its index rather than being silently discarded.
+   */
+  glyphId?: number;
   /** Horizontal shift in local (unscaled) units. Default 0. */
   offsetX?: number;
   /** Vertical shift in local (unscaled) units. Default 0. */

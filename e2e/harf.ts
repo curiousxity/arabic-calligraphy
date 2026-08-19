@@ -226,49 +226,53 @@ export async function armDiacriticMoveHandle(page: Page): Promise<Point> {
 
   for (const mark of marks) {
     let target = mark;
-    for (let attempt = 0; attempt < 8; attempt++) {
+    // The remaining loop is *only* for overlapping hit rects: hovering one
+    // mark's centre can mount a neighbouring mark's handle, so chase the
+    // nearest one. It converges in a step or two. The flicker compensation
+    // that used to live here — re-issuing the same move until the handle
+    // happened to be mounted — is gone with the defect it worked around.
+    for (let attempt = 0; attempt < 4; attempt++) {
       await page.mouse.move(target.x, target.y);
       await settleFrames(page);
 
       const handles = await dotCentersWithFill(page, DIACRITIC_MOVE_HANDLE_FILL);
-      // Unmounted by the move we just made — the same move re-mounts it.
-      if (handles.length === 0) continue;
+      if (handles.length === 0) break;
 
       const nearest = handles.reduce((best, h) =>
         distance(h, target) < distance(best, target) ? h : best
       );
       if (distance(nearest, target) > 3) {
-        // The hit rects overlap, so hovering one mark's centre can mount a
-        // different mark's handle. Chase it; this converges in one step.
         target = nearest;
         continue;
       }
       if ((await hitTargetAt(page, target))?.startsWith("Circle")) return target;
+      break;
     }
   }
   throw new Error("could not park the pointer on a mounted diacritic move handle");
 }
 
 /**
- * Drags from wherever the pointer already is, in a single jump.
+ * Drags from wherever the pointer already is, in interpolated steps.
  *
- * Both details are load-bearing for a hover-mounted handle, and both are
- * compensating for the same defect as `armDiacriticMoveHandle`:
+ * The steps are the point. A hover-mounted handle used to die on any drag
+ * whose first step was small: Konva runs its enter/leave processing while a
+ * drag is merely `ready` rather than `dragging`, so the first small move
+ * retargeted hover from the hit rect to the handle, fired `mouseleave` on
+ * the rect, and the overlay unmounted the very node the drag was attached
+ * to. Measured at the app's default 2.75x zoom, 2px and 10px first steps
+ * lost the gesture while 20px and 40px completed — so this helper used to
+ * be pinned to a single jump.
  *
- * - No initial `move` to the start point — that would retarget hover and
- *   unmount the handle before the press.
- * - **One** move rather than interpolated steps. Konva still runs its
- *   enter/leave processing while a drag is merely `ready` (it suppresses it
- *   only once the status reaches `dragging`), so a small first step leaves
- *   the pointer on the handle, retargets hover from the hit rect to the
- *   handle, fires `mouseleave` on the rect, and the overlay unmounts the
- *   node the drag is attached to. Measured on the diacritic move handle at
- *   the app's default 2.75x zoom: 2px and 10px first steps lose the
- *   gesture, 20px and 40px complete it. One jump clears it with margin.
+ * `DiacriticHoverHandles` now hangs its hover handlers on the Group that
+ * owns both the hit rect and the handles, which makes that retarget an
+ * internal move Konva fires no leave for. Dragging in many small steps is
+ * therefore the honest gesture *and* the regression test: if the overlay
+ * ever goes back to sibling handlers, these drags stop moving anything.
  */
 export async function dragFromHere(page: Page, to: Point): Promise<void> {
   await page.mouse.down();
-  await page.mouse.move(to.x, to.y);
+  await page.mouse.move(to.x, to.y, { steps: 24 });
   await page.mouse.up();
 }
 

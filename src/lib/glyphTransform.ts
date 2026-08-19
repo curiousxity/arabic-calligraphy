@@ -101,3 +101,34 @@ export function transformedBox(
     height: box.height * scaleY,
   };
 }
+
+/**
+ * Folds a patch into the transform already stored at a glyph index.
+ *
+ * The reason this is not a plain spread: transforms are keyed by glyph index,
+ * and a text edit can leave a stale entry sitting on an index that now holds a
+ * different letter. `ShapedText` stops *rendering* such an entry (its recorded
+ * `glyphId` no longer matches), but it is still in the block. Spreading a new
+ * patch over it would revive the old glyph's `scaleX`/`scaleY` under the new
+ * glyph's id — grab a letter's move dot after an edit and it would jump to a
+ * scale set on some other letter. A definite mismatch therefore replaces the
+ * entry outright.
+ *
+ * "Definite" is doing real work: an entry with no `glyphId` predates that
+ * field and *is* still being applied, so patching it is correct and must not
+ * be mistaken for staleness.
+ */
+export function mergeGlyphTransform(
+  existing: GlyphTransform | undefined,
+  glyphIndex: number,
+  patch: Partial<GlyphTransform>
+): GlyphTransform {
+  const isStale =
+    existing !== undefined &&
+    existing.glyphId !== undefined &&
+    patch.glyphId !== undefined &&
+    existing.glyphId !== patch.glyphId;
+
+  if (!existing || isStale) return { glyphIndex, ...patch };
+  return { ...existing, ...patch };
+}

@@ -61,3 +61,57 @@ test("dragging a diacritic move handle records an override", async ({ page }) =>
   // to rule out.
   expect(block.y).toBe(0);
 });
+
+/**
+ * The overlay used to unmount its own handle the instant the pointer landed
+ * on it: the hover hit `Rect` and the handle `Circle` were sibling Konva
+ * nodes, so moving between them fired `mouseleave` on the rect and cleared
+ * the hover state. Measured before the fix, the handle was mounted on
+ * exactly every other mousemove. It now stays put, because the hover
+ * handlers sit on the Group that owns both nodes.
+ */
+test("a handle stays mounted while the pointer sits on it", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator("textarea.sidebarTextarea").fill(VOCALIZED);
+  await expect.poll(() => diacriticHitCenters(page).then((m) => m.length)).toBeGreaterThan(0);
+
+  const handle = await armDiacriticMoveHandle(page);
+
+  // Nudge back and forth across the handle. Every one of these moves used
+  // to toggle the handle out of existence on alternate frames.
+  for (let i = 0; i < 8; i++) {
+    await page.mouse.move(handle.x + (i % 2 === 0 ? 0.5 : -0.5), handle.y);
+    await settleFrames(page);
+    expect(
+      (await dotCentersWithFill(page, DIACRITIC_MOVE_HANDLE_FILL)).length,
+      `handle vanished on move ${i}`
+    ).toBeGreaterThan(0);
+  }
+});
+
+/**
+ * The same race killed slow drags outright. Konva suppresses its enter/leave
+ * processing only once a drag reaches `dragging`, not while it is merely
+ * `ready`, so a first step under ~20px (at the app's default 2.75x zoom)
+ * retargeted hover and destroyed the node the gesture was attached to.
+ * A deliberately tiny first step is the sharpest regression test there is.
+ */
+test("a drag with a small first step still moves the mark", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator("textarea.sidebarTextarea").fill(VOCALIZED);
+  await expect.poll(() => diacriticHitCenters(page).then((m) => m.length)).toBeGreaterThan(0);
+
+  const handle = await armDiacriticMoveHandle(page);
+
+  await page.mouse.down();
+  // 2px first — measured as a losing step before the fix.
+  await page.mouse.move(handle.x, handle.y + 2);
+  await page.mouse.move(handle.x, handle.y + 40, { steps: 20 });
+  await page.mouse.up();
+
+  const block = (await getBlocks(page))[0];
+  const overrides = block.diacriticOverrides ?? [];
+  expect(overrides.length).toBeGreaterThan(0);
+  expect(overrides[0].offsetY ?? 0).toBeGreaterThan(5);
+  expect(block.y).toBe(0);
+});

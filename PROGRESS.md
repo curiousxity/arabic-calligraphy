@@ -25,9 +25,11 @@ regression, and what it would take to fix.
 
 - **Per-glyph edits are keyed by glyph index**, so editing text *before* an
   edited letter can shift which letter the edit lands on after re-shaping.
-  Affects per-glyph transforms and diacritic overrides alike. Diacritic
-  overrides are re-validated each render and silently dropped if they land on
-  a base letter; glyph transforms are not.
+  Affects per-glyph transforms and diacritic overrides alike. Both are now
+  re-validated each render and dropped rather than misapplied — overrides
+  against whether the glyph is still a mark, transforms against the `glyphId`
+  they were made for. A transform saved before 2026-08-19 carries no
+  `glyphId` and cannot be checked, so it keeps the old behaviour.
 - **Per-glyph tools do not apply to text-on-path blocks.** Their glyphs are
   rotated to a curve tangent, which the straight-bounding-box maths behind
   those tools assumes away.
@@ -38,22 +40,6 @@ regression, and what it would take to fix.
   every diacritic feature.
 - **Cloud sync has no conflict resolution** beyond overwrite-by-name. Same
   project name saved from two devices: last write wins.
-- **A diacritic handle unmounts while the pointer is on it.** Found
-  2026-08-14 by the Playwright harness and reproduced from measurements, not
-  inferred. The hover hit rect and the handle are sibling Konva nodes, so
-  the moment the mounted handle covers the pointer the next mouse move fires
-  `mouseleave` on the rect and the handle vanishes — it is present on
-  exactly every other move. The same race kills a slow drag outright: a
-  first step under ~20px (at default zoom) leaves the gesture attached to a
-  destroyed node and nothing happens, while 20px+ completes normally. Not a
-  regression — it is almost certainly what earlier passes were seeing when
-  they concluded handle drags "land on the block underneath". Full mechanics
-  and the measured numbers in `CLAUDE.md`'s "End-to-end tests"; unfixed
-  because the fix belongs in `DiacriticHoverHandles`, not in the harness.
-- **Clearing a block's text logs a console error.** `shapeText` calls
-  `JSON.parse` on an empty shaping result and throws `Unexpected end of JSON
-  input`. Caught and non-fatal — the block simply draws nothing, which is
-  correct — but it means an empty textarea is noisy in the console.
 
 ## Verification debt
 
@@ -66,10 +52,10 @@ overlays, and — **corrected 2026-08-14 by the Playwright harness** —
 scripted **drags** reach them too. Every earlier claim that drags were
 unverifiable was written against extension-injected synthetic events;
 Playwright drives real CDP input, and both a plain block drag and a
-diacritic move-handle drag now pass in CI-able tests. The gestures need
-shaping to survive the overlay's own unmount behaviour — see the two
-defects under Known limitations, and the mechanics in `CLAUDE.md`'s
-"End-to-end tests" — but they are no longer out of reach.
+diacritic move-handle drag now pass in CI-able tests. The two overlay
+defects that once forced those gestures into an unnatural shape were fixed
+on 2026-08-19 (see Shipped), so the harness now drags in ordinary
+interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 - **Browser pass 2026-08-14, after the removal.** All passing: the app boots
   with no console errors and no right-hand panel (the canvas now spans the
@@ -86,13 +72,88 @@ defects under Known limitations, and the mechanics in `CLAUDE.md`'s
 - **The dot drags, revisited.** That pass attempted them with
   extension-injected synthetic events and they moved the *block* instead —
   which the Playwright work then showed is an artifact of those events, not
-  of the handles. The diacritic move-handle drag is now covered by
-  `e2e/diacritics.spec.ts`; a per-glyph move/scale dot drag test is still
-  unwritten.
+  of the handles. Both drags are now covered: the diacritic move handle by
+  `e2e/diacritics.spec.ts` and the per-glyph move dot by
+  `e2e/glyph-transform.spec.ts`.
 
 ---
 
 ## Shipped
+
+### 2026-08-19 — Fit to width, and three overlay/shaping fixes
+
+**Fit to width.** Typography's Kashida section gains a target field and a
+**Fit** button: give it a width and it spreads tatweel kashida evenly across
+every legal join until the line spans it. With a page set, the target starts
+as the page's margin box; freeform documents type a number. It never
+overshoots, never piles the whole total onto one join, is idempotent, and is
+a single undo. Plain text only — a Shape Fill run already scales to its
+silhouette and a Curve run to its curve.
+
+This closes the elongation story the Morph removal left open. `lib/justify.ts`
+was deleted with that subsystem because it could not work — the dial it drove
+never moved the run's width, so there was nothing to converge on. The new
+`src/lib/fitToWidth.ts` is pure with measurement injected, which is what lets
+it be tested against real harfbuzzjs and real fonts; `lib/measureShapedText.ts`
+is the async half. See CLAUDE.md, "Fit to width".
+
+**Three fixes**, all previously listed under Known limitations:
+
+- **A diacritic handle no longer unmounts under the pointer.** The hover
+  handlers moved from the hit `Rect` to the `Group` that owns both it and the
+  handles, so Konva — which suppresses `mouseleave` at any ancestor of the
+  newly-entered shape — fires no leave for a Rect→Circle move. This kills the
+  every-other-frame flicker *and* the death of any drag whose first step was
+  under ~20px. The two workarounds in `e2e/harf.ts` went with it, as that
+  file always said they should: `dragFromHere` now drags in 24 interpolated
+  steps, which is both the honest gesture and the regression test.
+- **Clearing a block's text is silent.** `shapeText` returns the empty result
+  before building any HarfBuzz objects rather than letting `buffer.json()`
+  parse an empty string. A "no console errors" assertion is no longer pinned
+  to the boot test.
+- **A stale glyph transform is dropped rather than misapplied.** Transforms
+  now record the `glyphId` they were made for, and `ShapedText` re-validates
+  them each render the way it already did diacritic overrides. The field is
+  optional, so transforms in older saves keep their existing behaviour.
+
+A code review then found seven issues, all fixed in the same branch and each
+now covered by a test:
+
+- The solver's estimate-and-walk search could exhaust its step budget while
+  still over the target and return that text as a successful fit. Replaced
+  with a binary search whose answer was always *measured* to fit, which also
+  removes the divide-by-delta hole when a tatweel decomposes a ligature.
+- Measurement ignored the italic shear, faux bold, the outline and `warpX`,
+  so those blocks overshot the width they were fitted to. `styledRunWidth`
+  adds all four, and `ShapedText` now imports the shear and bold constants
+  from the fitter so they cannot drift.
+- Patching a stale glyph transform revived the previous glyph's scale under
+  the new glyph's id. Now a pure, tested `mergeGlyphTransform` replaces a
+  definitely-mismatched entry instead of spreading over it.
+- `GlyphTransformHoverHandles` still had the *same* sibling-hover defect just
+  fixed next door; it now hangs its handlers on the Group too.
+- The fit target field could not be cleared when a page was set.
+- The `already-wider` branch strips existing kashida; the status message now
+  says so instead of implying nothing happened.
+- `types.ts`'s comment still denied the existence of the `glyphId` beneath it.
+
+Verified: 47 unit tests across `fitToWidth.test.ts` and `glyphTransform.test.ts`
+(even distribution, right-to-left application, never-overshoot under
+non-monotonic and zero-delta measures, style widening, stale-transform
+replacement, and real-font fits in Amiri, Scheherazade and Lateef), plus
+`e2e/fit-to-width.spec.ts`, `e2e/glyph-transform.spec.ts` and new regression
+tests in `e2e/diacritics.spec.ts` and `e2e/core.spec.ts`. The two
+hover-overlay e2e tests were checked against a deliberate revert of the fix
+and fail without it. Whole suite: **422 unit tests and 48 e2e** passing, plus
+typecheck, lint and build.
+
+This also closes the "per-glyph move/scale dot drag test is still unwritten"
+item under Verification debt.
+
+**Known gaps.** Fit to width inherits the glyph-index fragility every text
+edit has — the guide says to fit before fine-tuning marks. There is no
+fit-to-*height*, no multi-block fit, and no live re-fit as text is edited;
+all three are deliberate.
 
 <!-- ---- STREAM-E: styles & palettes ---- -->
 ### 2026-08-14 — Saveable styles & palettes (stream E)

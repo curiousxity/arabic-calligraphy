@@ -16,7 +16,7 @@ import { isTypingTarget } from "./lib/dom";
 import { installTestBridge } from "./lib/testBridge";
 import { triggerDownload } from "./lib/download";
 import { STARTER_TEMPLATES, buildBlocksFromTemplate } from "./lib/templates";
-import { FONT_URLS } from "./hooks/useShapedGlyphs";
+import { FONT_URLS, resolveFontUrl } from "./hooks/useShapedGlyphs";
 import {
   MIN_SCALE,
   MAX_SCALE,
@@ -95,6 +95,7 @@ import {
   DEFAULT_CUSTOM_ARTBOARD,
   artboardRect,
   clampMargin,
+  marginRect,
   configFromPreset,
   findArtboardPreset,
   isArtboardConfig,
@@ -112,6 +113,40 @@ import {
 } from "./lib/mirror";
 import type { MirrorMode } from "./types";
 import { applyKashida, type KashidaSlot } from "./lib/tatweel";
+import { solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
+import { mergeGlyphTransform } from "./lib/glyphTransform";
+import { measureShapedWidth } from "./lib/measureShapedText";
+
+/**
+ * The status-row line for a finished fit. Each outcome says what actually
+ * happened rather than a bare "done" — "already-wider" in particular is not
+ * a failure, and the user needs to know the run cannot be narrowed by
+ * kashida alone.
+ */
+function describeFitResult(
+  result: FitToWidthResult,
+  target: number,
+  originalText: string
+): string {
+  const width = Math.round(result.width);
+  const goal = Math.round(target);
+  switch (result.reason) {
+    case "no-slots":
+      return "No stretchable joins in this text — a kashida needs two letters that join.";
+    case "already-wider":
+      // This branch does return the run with every kashida stripped, which is
+      // the narrowest it can be made — but that silently discards kashida the
+      // user set by hand, so when it happens the message has to say so rather
+      // than reading as "nothing was done".
+      return result.text !== originalText
+        ? `Removed the existing kashida, but the text is still ${width}px — fitting into ${goal}px needs a smaller font size.`
+        : `Already ${width}px with no kashida — fitting into ${goal}px needs a smaller font size.`;
+    case "capped":
+      return `Every join stretched to its limit — ${width}px of ${goal}px.`;
+    default:
+      return `Fitted to ${width}px of ${goal}px using ${result.total} kashida.`;
+  }
+}
 
 const hslToHex = (h: number, s: number, l: number): string => {
   const sat = s / 100;
@@ -561,11 +596,13 @@ const App: React.FC = () => {
         prev.map((b) => {
           if (b.id !== blockId || !supportsGlyphTransforms(b)) return b;
           const existing = (b.glyphTransforms ?? []).find((t) => t.glyphIndex === glyphIndex);
+          // `mergeGlyphTransform` owns the stale-entry rule — see its comment.
+          const merged = mergeGlyphTransform(existing, glyphIndex, patch);
           const nextTransforms = existing
             ? (b.glyphTransforms ?? []).map((t) =>
-                t.glyphIndex === glyphIndex ? { ...t, ...patch } : t
+                t.glyphIndex === glyphIndex ? merged : t
               )
-            : [...(b.glyphTransforms ?? []), { glyphIndex, ...patch }];
+            : [...(b.glyphTransforms ?? []), merged];
           return { ...b, glyphTransforms: nextTransforms };
         })
       );
@@ -2041,10 +2078,79 @@ const App: React.FC = () => {
     [selectedBlock, updateSelectedBlock]
   );
 
+  // Fit to width. The target defaults to the page's margin box — the content
+  // area is what a line of text is actually meant to span — falling back to
+  // the page edges when there is no margin. `fitTargetWidth` holds only a
+  // user's *override* of that, so `null` means "track the page", and a
+  // freeform document (which has no page at all) simply requires a typed
+  // number. Not part of the document: it is a control setting, like the
+  // export scale, so it is neither saved nor undoable.
+  const [fitTargetWidth, setFitTargetWidth] = useState<number | null>(null);
+  const [isFittingWidth, setIsFittingWidth] = useState(false);
+
+  const fitTargetDefault = useMemo(() => {
+    if (!artboard) return null;
+    const box = marginRect(artboard) ?? artboardRect(artboard);
+    return Math.round(box.width);
+  }, [artboard]);
+
+  const fitSelectedBlockToWidth = useCallback(
+    async (target: number) => {
+      if (!selectedBlock || selectedBlock.type !== "text") return;
+      if (!Number.isFinite(target) || target <= 0) {
+        setExportStatus("Enter a target width first.");
+        return;
+      }
+
+      // The block is captured by id rather than by reference: solving is
+      // async (it shapes several candidate strings), and the selection can
+      // change while it runs — patching "the selected block" on the way out
+      // would then rewrite whatever the user selected in the meantime.
+      const { id, text, fontFamily, fontSize, fontStyle, strokeWidth, warpX } =
+        selectedBlock;
+      const fontUrl = resolveFontUrl(fontFamily);
+      // The italic shear, the faux-bold stroke, the outline and the horizontal
+      // warp all widen what is drawn beyond the glyph outlines. Measuring
+      // without them would let the fit promise a width an italic, outlined or
+      // warped block then overshot.
+      const runStyle = {
+        italic: fontStyle === "italic" || fontStyle === "bold italic",
+        bold: fontStyle === "bold" || fontStyle === "bold italic",
+        strokeWidth,
+        warpX,
+      };
+
+      setIsFittingWidth(true);
+      try {
+        const result = await solveFitToWidth({
+          text,
+          target,
+          measure: (candidate) =>
+            measureShapedWidth(candidate, fontUrl, fontSize, runStyle),
+        });
+        // A no-op result must not push history — clicking Fit on an
+        // already-fitted run should not cost an undo step.
+        if (result.text !== text) updateBlock(id, { text: result.text });
+        setExportStatus(describeFitResult(result, target, text));
+      } catch (err) {
+        console.error("fit to width failed", err);
+        setExportStatus("Could not fit this text to width.");
+      } finally {
+        setIsFittingWidth(false);
+      }
+    },
+    [selectedBlock, updateBlock]
+  );
+
   const p1dSidebarProps: Partial<SidebarProps> = {
     kashidaSlotOrdinal,
     onSelectKashidaSlot: setKashidaSlotOrdinal,
     onSetKashidaAtSlot: setKashidaAtSlot,
+    fitTargetOverride: fitTargetWidth,
+    fitTargetPageDefault: fitTargetDefault,
+    isFittingWidth,
+    onChangeFitTargetWidth: setFitTargetWidth,
+    onFitToWidth: fitSelectedBlockToWidth,
   };
 
   // Phase 2 (2026-08-14 run) prop bundles — same mechanism as the p1* set
