@@ -4,3 +4,10 @@ compatibility_date = "2026-08-19"
 [assets]
 directory = "./dist"
 not_found_handling = "single-page-application"
+
+# Declared here rather than set in the dashboard so the production domain is
+# version-controlled and recreated by any deploy. hash.immo is already on
+# Cloudflare DNS, so the record is provisioned automatically.
+[[routes]]
+pattern = "harf.hash.immo"
+custom_domain = true
