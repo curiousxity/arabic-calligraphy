@@ -156,7 +156,22 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
         };
 
         return (
-          <Group key={box.glyphIndex}>
+          // The hover handlers belong on this Group, not on the Rect below —
+          // the identical placement `DiacriticHoverHandles` depends on, and
+          // for the identical reason. Konva suppresses `mouseleave` at any
+          // ancestor of the newly-entered shape, so with the handlers here a
+          // Rect->Circle move fires no leave; with them on the Rect, the
+          // moment a dot mounted under the pointer the next mousemove cleared
+          // `hoveredIndex` and unmounted the dot, giving both the
+          // every-other-frame flicker and the death of any drag whose first
+          // step was small.
+          <Group
+            key={box.glyphIndex}
+            onMouseEnter={() => setHoveredIndex(box.glyphIndex)}
+            onMouseLeave={() =>
+              setHoveredIndex((v) => (v === box.glyphIndex ? null : v))
+            }
+          >
             <Rect
               x={rx1 + offsetX}
               y={ry1 + offsetY}
@@ -171,10 +186,6 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
               // drag carries the pointer outside this rect, popping a
               // neighbour's dots up mid-gesture.
               listening={(hoveredIndex === null && draggingIndex === null) || isActive}
-              onMouseEnter={() => setHoveredIndex(box.glyphIndex)}
-              onMouseLeave={() =>
-                setHoveredIndex((v) => (v === box.glyphIndex ? null : v))
-              }
             />
 
             {isActive && (

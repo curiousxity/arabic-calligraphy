@@ -114,6 +114,7 @@ import {
 import type { MirrorMode } from "./types";
 import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 import { solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
+import { mergeGlyphTransform } from "./lib/glyphTransform";
 import { measureShapedWidth } from "./lib/measureShapedText";
 
 /**
@@ -122,14 +123,24 @@ import { measureShapedWidth } from "./lib/measureShapedText";
  * a failure, and the user needs to know the run cannot be narrowed by
  * kashida alone.
  */
-function describeFitResult(result: FitToWidthResult, target: number): string {
+function describeFitResult(
+  result: FitToWidthResult,
+  target: number,
+  originalText: string
+): string {
   const width = Math.round(result.width);
   const goal = Math.round(target);
   switch (result.reason) {
     case "no-slots":
       return "No stretchable joins in this text — a kashida needs two letters that join.";
     case "already-wider":
-      return `Already ${width}px with no kashida — fitting into ${goal}px needs a smaller font size.`;
+      // This branch does return the run with every kashida stripped, which is
+      // the narrowest it can be made — but that silently discards kashida the
+      // user set by hand, so when it happens the message has to say so rather
+      // than reading as "nothing was done".
+      return result.text !== originalText
+        ? `Removed the existing kashida, but the text is still ${width}px — fitting into ${goal}px needs a smaller font size.`
+        : `Already ${width}px with no kashida — fitting into ${goal}px needs a smaller font size.`;
     case "capped":
       return `Every join stretched to its limit — ${width}px of ${goal}px.`;
     default:
@@ -585,11 +596,13 @@ const App: React.FC = () => {
         prev.map((b) => {
           if (b.id !== blockId || !supportsGlyphTransforms(b)) return b;
           const existing = (b.glyphTransforms ?? []).find((t) => t.glyphIndex === glyphIndex);
+          // `mergeGlyphTransform` owns the stale-entry rule — see its comment.
+          const merged = mergeGlyphTransform(existing, glyphIndex, patch);
           const nextTransforms = existing
             ? (b.glyphTransforms ?? []).map((t) =>
-                t.glyphIndex === glyphIndex ? { ...t, ...patch } : t
+                t.glyphIndex === glyphIndex ? merged : t
               )
-            : [...(b.glyphTransforms ?? []), { glyphIndex, ...patch }];
+            : [...(b.glyphTransforms ?? []), merged];
           return { ...b, glyphTransforms: nextTransforms };
         })
       );
@@ -2081,8 +2094,6 @@ const App: React.FC = () => {
     return Math.round(box.width);
   }, [artboard]);
 
-  const effectiveFitTarget = fitTargetWidth ?? fitTargetDefault;
-
   const fitSelectedBlockToWidth = useCallback(
     async (target: number) => {
       if (!selectedBlock || selectedBlock.type !== "text") return;
@@ -2095,20 +2106,32 @@ const App: React.FC = () => {
       // async (it shapes several candidate strings), and the selection can
       // change while it runs — patching "the selected block" on the way out
       // would then rewrite whatever the user selected in the meantime.
-      const { id, text, fontFamily, fontSize } = selectedBlock;
+      const { id, text, fontFamily, fontSize, fontStyle, strokeWidth, warpX } =
+        selectedBlock;
       const fontUrl = resolveFontUrl(fontFamily);
+      // The italic shear, the faux-bold stroke, the outline and the horizontal
+      // warp all widen what is drawn beyond the glyph outlines. Measuring
+      // without them would let the fit promise a width an italic, outlined or
+      // warped block then overshot.
+      const runStyle = {
+        italic: fontStyle === "italic" || fontStyle === "bold italic",
+        bold: fontStyle === "bold" || fontStyle === "bold italic",
+        strokeWidth,
+        warpX,
+      };
 
       setIsFittingWidth(true);
       try {
         const result = await solveFitToWidth({
           text,
           target,
-          measure: (candidate) => measureShapedWidth(candidate, fontUrl, fontSize),
+          measure: (candidate) =>
+            measureShapedWidth(candidate, fontUrl, fontSize, runStyle),
         });
         // A no-op result must not push history — clicking Fit on an
         // already-fitted run should not cost an undo step.
         if (result.text !== text) updateBlock(id, { text: result.text });
-        setExportStatus(describeFitResult(result, target));
+        setExportStatus(describeFitResult(result, target, text));
       } catch (err) {
         console.error("fit to width failed", err);
         setExportStatus("Could not fit this text to width.");
@@ -2123,9 +2146,8 @@ const App: React.FC = () => {
     kashidaSlotOrdinal,
     onSelectKashidaSlot: setKashidaSlotOrdinal,
     onSetKashidaAtSlot: setKashidaAtSlot,
-    fitTargetWidth: effectiveFitTarget,
-    fitTargetIsFromPage: fitTargetWidth === null && fitTargetDefault !== null,
-    canUsePageFitTarget: fitTargetDefault !== null,
+    fitTargetOverride: fitTargetWidth,
+    fitTargetPageDefault: fitTargetDefault,
     isFittingWidth,
     onChangeFitTargetWidth: setFitTargetWidth,
     onFitToWidth: fitSelectedBlockToWidth,

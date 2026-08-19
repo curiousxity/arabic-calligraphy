@@ -1,5 +1,5 @@
 import { shapeText } from "./harfbuzz";
-import { inkExtentWidth } from "./fitToWidth";
+import { inkExtentBox, styledRunWidth, type RunStyle } from "./fitToWidth";
 
 /**
  * How wide a run of text draws on canvas, in block space.
@@ -11,13 +11,24 @@ import { inkExtentWidth } from "./fitToWidth";
  * font loading here is what lets the solver be tested against real fonts.
  *
  * Repeated calls are cheap: `shapeText` caches by `text|fontUrl`, and the
- * fit-to-width solver measures the same candidates more than once.
+ * fit-to-width solver measures several candidates.
+ *
+ * `style` matters more than it looks. The glyph outlines are not the whole of
+ * what gets drawn — an italic block is sheared, a bold one is stroked, and any
+ * block may carry an outline — so measuring outlines alone would let a fit
+ * promise a width the block then visibly exceeded. `styledRunWidth` adds those
+ * back from constants `ShapedText` shares.
  */
 export async function measureShapedWidth(
   text: string,
   fontUrl: string,
-  fontSize: number
+  fontSize: number,
+  style: RunStyle = {}
 ): Promise<number> {
   const { glyphs, font, unitsPerEm } = await shapeText(text, fontUrl);
-  return inkExtentWidth(glyphs, font, fontSize, unitsPerEm);
+  return styledRunWidth(
+    inkExtentBox(glyphs, font, fontSize, unitsPerEm),
+    fontSize,
+    style
+  );
 }

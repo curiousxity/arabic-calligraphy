@@ -19,6 +19,7 @@ import {
   type BlockFillPainter,
 } from "../lib/blockFill";
 import { resolveGlyphTransform, transformedBox } from "../lib/glyphTransform";
+import { ITALIC_SHEAR, fauxBoldStrokeWidth } from "../lib/fitToWidth";
 import {
   isOverrideGlyphChar,
   OVERRIDE_SCALE,
@@ -507,7 +508,7 @@ export const ShapedText: React.FC<Props> = ({
 
   const isBold = fontStyle === "bold" || fontStyle === "bold italic";
   const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
-  const fauxBoldWidth = isBold ? Math.max(fontSize * 0.035, 0.6) : 0;
+  const fauxBoldWidth = isBold ? fauxBoldStrokeWidth(fontSize) : 0;
 
   const bw = Math.max(glyphBounds.rawWidth, 20);
   const bh = Math.max(fontSize * lineHeight, glyphBounds.rawHeight, 24);
@@ -645,7 +646,7 @@ export const ShapedText: React.FC<Props> = ({
 
           ctx.save();
           ctx.translate(localDrawX, localDrawY);
-          if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
+          if (isItalic) ctx.transform(1, 0, -ITALIC_SHEAR, 1, 0, 0);
 
           // Built here, with the ctx already in the block's own space (the
           // run-centring translate and the italic shear applied), so the
@@ -680,7 +681,7 @@ export const ShapedText: React.FC<Props> = ({
           if (strokeWidth > 0) {
             ctx.save();
             ctx.translate(localDrawX, localDrawY);
-            if (isItalic) ctx.transform(1, 0, -0.25, 1, 0, 0);
+            if (isItalic) ctx.transform(1, 0, -ITALIC_SHEAR, 1, 0, 0);
             // This pass fills as well as strokes (the outline-before-fill
             // ordering is per glyph), and `ctx.restore()` above popped the
             // fill style the first pass set — so it has to be re-applied, or

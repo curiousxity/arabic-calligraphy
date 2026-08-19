@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   GLYPH_SCALE_MAX,
   GLYPH_SCALE_MIN,
+  mergeGlyphTransform,
   resolveGlyphTransform,
   scaleFromDrag,
   scaleFromHandleDrag,
@@ -180,5 +181,63 @@ describe("transformedBox", () => {
       scaleX: 2,
     });
     expect(r).toEqual({ x: 110, y: -50, width: 80, height: 60 });
+  });
+});
+
+describe("mergeGlyphTransform", () => {
+  it("creates a fresh entry when nothing is stored", () => {
+    expect(mergeGlyphTransform(undefined, 3, { glyphId: 10, offsetX: 5 })).toEqual({
+      glyphIndex: 3,
+      glyphId: 10,
+      offsetX: 5,
+    });
+  });
+
+  it("patches an entry whose glyph still matches", () => {
+    const existing = { glyphIndex: 3, glyphId: 10, scaleX: 2, offsetX: 4 };
+    expect(mergeGlyphTransform(existing, 3, { glyphId: 10, offsetX: 9 })).toEqual({
+      glyphIndex: 3,
+      glyphId: 10,
+      scaleX: 2,
+      offsetX: 9,
+    });
+  });
+
+  it("replaces a stale entry rather than reviving its scale", () => {
+    // The letter at index 3 changed under a text edit. ShapedText has already
+    // stopped rendering this transform; a plain spread would bring its
+    // scaleX: 3 back under the new glyph's id and jump the letter to 3x on
+    // the first drag frame.
+    const stale = { glyphIndex: 3, glyphId: 10, scaleX: 3, scaleY: 3 };
+    const merged = mergeGlyphTransform(stale, 3, {
+      glyphId: 77,
+      offsetX: 5,
+      offsetY: 0,
+    });
+    expect(merged).toEqual({ glyphIndex: 3, glyphId: 77, offsetX: 5, offsetY: 0 });
+    expect(merged.scaleX).toBeUndefined();
+    expect(merged.scaleY).toBeUndefined();
+  });
+
+  it("patches an entry that predates glyphId instead of treating it as stale", () => {
+    // No recorded id means it cannot be checked, so it is still being applied
+    // — dropping its scale here would silently discard a real edit.
+    const legacy = { glyphIndex: 3, scaleX: 2 };
+    expect(mergeGlyphTransform(legacy, 3, { glyphId: 77, offsetX: 5 })).toEqual({
+      glyphIndex: 3,
+      glyphId: 77,
+      scaleX: 2,
+      offsetX: 5,
+    });
+  });
+
+  it("patches when the incoming patch carries no glyphId", () => {
+    const existing = { glyphIndex: 3, glyphId: 10, scaleX: 2 };
+    expect(mergeGlyphTransform(existing, 3, { offsetX: 1 })).toEqual({
+      glyphIndex: 3,
+      glyphId: 10,
+      scaleX: 2,
+      offsetX: 1,
+    });
   });
 });

@@ -25,9 +25,9 @@ export type DiacriticOverride = {
  *
  * Shares glyphIndex keying with it, including its known fragility: a text
  * edit before this glyph shifts which index the transform lands on after
- * re-shaping. Unlike DiacriticOverride there is no identity signal to
- * re-check against at render time (every glyph is a legitimate target), so
- * a stale transform simply applies to whatever glyph now holds that index.
+ * re-shaping. Every glyph is a legitimate target, so unlike DiacriticOverride
+ * there is no *inherent* signal to re-check against — which is why the
+ * `glyphId` below is recorded and checked instead.
  */
 export type GlyphTransform = {
   glyphIndex: number;

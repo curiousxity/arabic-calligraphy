@@ -83,13 +83,13 @@ export function applyDistribution(
  * thing: advances include the run's trailing side bearing and miss ink that
  * overhangs its own advance, both of which move as a join is stretched.
  */
-export function inkExtentWidth(
+export function inkExtentBox(
   glyphs: HarfBuzzGlyph[],
   font: opentype.Font | null | undefined,
   fontSize: number,
   unitsPerEm: number
-): number {
-  if (!font || glyphs.length === 0) return 0;
+): { width: number; height: number } {
+  if (!font || glyphs.length === 0) return { width: 0, height: 0 };
 
   const upm = Math.max(unitsPerEm || 1000, 1);
   const scale = fontSize / upm;
@@ -97,6 +97,8 @@ export function inkExtentWidth(
   let penX = 0;
   let minX = Infinity;
   let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
 
   for (const g of glyphs) {
     const glyphObj = font.glyphs.get(g.g);
@@ -108,12 +110,30 @@ export function inkExtentWidth(
         minX = Math.min(minX, box.x1);
         maxX = Math.max(maxX, box.x2);
       }
+      // The height is not decoration: the italic shear widens a run by a
+      // fraction of it, so `styledRunWidth` cannot do its job without it.
+      if (Number.isFinite(box.y1) && Number.isFinite(box.y2)) {
+        minY = Math.min(minY, box.y1);
+        maxY = Math.max(maxY, box.y2);
+      }
     }
     penX += g.ax ?? 0;
   }
 
-  if (!Number.isFinite(minX) || !Number.isFinite(maxX)) return 0;
-  return Math.max(maxX - minX, 0);
+  return {
+    width: Number.isFinite(minX) && Number.isFinite(maxX) ? Math.max(maxX - minX, 0) : 0,
+    height: Number.isFinite(minY) && Number.isFinite(maxY) ? Math.max(maxY - minY, 0) : 0,
+  };
+}
+
+/** The horizontal half of `inkExtentBox`, for callers with no style to apply. */
+export function inkExtentWidth(
+  glyphs: HarfBuzzGlyph[],
+  font: opentype.Font | null | undefined,
+  fontSize: number,
+  unitsPerEm: number
+): number {
+  return inkExtentBox(glyphs, font, fontSize, unitsPerEm).width;
 }
 
 export type FitToWidthOptions = {
@@ -147,8 +167,63 @@ export type FitToWidthResult = {
   reason: FitToWidthReason;
 };
 
-/** How many measurement steps the refinement may take before giving up. */
-const MAX_REFINE_STEPS = 64;
+/**
+ * Extra width the renderer adds on top of the glyph outlines.
+ *
+ * These mirror `ShapedText` exactly and it imports them from here, so the two
+ * cannot drift — a fit that measured only the outlines would promise a width
+ * it then overshot for every italic, bold or outlined block.
+ */
+export const ITALIC_SHEAR = 0.25;
+export const fauxBoldStrokeWidth = (fontSize: number) =>
+  Math.max(fontSize * 0.035, 0.6);
+
+/**
+ * How far a full-strength `warpX` can spread a run, as a fraction of its own
+ * width. `lib/warp.ts` displaces each point by `(warpX / 100) * ny * width *
+ * 0.25` with `ny` clamped to [-1, 1], so the extent grows by twice that
+ * quarter-width at most — hence 0.5, not 0.25.
+ */
+export const WARP_X_SPREAD = 0.5;
+
+/** Style that widens a drawn run beyond its raw outline extent. */
+export type RunStyle = {
+  italic?: boolean;
+  bold?: boolean;
+  /** The block's outline width, which straddles the path. */
+  strokeWidth?: number;
+  /** The block's horizontal warp, in the slider's own -100..100 units. */
+  warpX?: number;
+};
+
+/**
+ * The drawn width of a run whose raw outline extent is `box`.
+ *
+ * A canvas stroke straddles the path it follows, so half of it falls outside
+ * the outline on each side and the full width is added once. The italic shear
+ * maps `x' = x - ITALIC_SHEAR·y`, widening the extent by that fraction of the
+ * run's *height*. `warpX` slides points sideways by a fraction of the run's
+ * own width. All four are summed independently rather than composed, which
+ * slightly over-estimates — the safe direction for a promise never to
+ * overshoot.
+ *
+ * The warp term is the only deliberately loose one: it is the widest the
+ * distortion *can* push the extent, whereas the actual spread depends on
+ * where the ink sits vertically. A block with no warp — every block, until
+ * the slider is touched — pays nothing for it.
+ */
+export function styledRunWidth(
+  box: { width: number; height: number },
+  fontSize: number,
+  style: RunStyle = {}
+): number {
+  const shear = style.italic ? ITALIC_SHEAR * box.height : 0;
+  const bold = style.bold ? fauxBoldStrokeWidth(fontSize) : 0;
+  const outline = Math.max(style.strokeWidth ?? 0, 0);
+  const warp =
+    (Math.abs(style.warpX ?? 0) / 100) * Math.max(box.width, 1) * WARP_X_SPREAD;
+  return box.width + shear + bold + outline + warp;
+}
 
 /**
  * Chooses the largest tatweel count whose run still fits within `target`.
@@ -157,12 +232,11 @@ const MAX_REFINE_STEPS = 64;
  * a worse answer than text a few pixels short of it, so the search always
  * settles on the last count that fits.
  *
- * The search starts from an estimate rather than counting up from zero: one
- * measurement at 0 tatweels and one at 1 gives the per-tatweel delta, and
- * `(target - width0) / delta` lands within a step or two. Refinement then
- * walks against real measurements, because that delta is only *near*
- * constant — a font may substitute different glyphs across a stretched join,
- * so the width is not perfectly linear in the count.
+ * The search is a binary search over the count, so it costs about
+ * log2(slots x maxPerSlot) measurements — a handful — and is bounded by
+ * construction rather than by a step budget. It assumes width rises with the
+ * count, which is what `tatweel.test.ts` measures in real fonts, but it does
+ * not *depend* on that: the answer it returns was always measured to fit.
  *
  * Every candidate is built from the caller's original text with **absolute**
  * counts, so an existing kashida is replaced rather than added to. That is
@@ -214,30 +288,39 @@ export async function solveFitToWidth({
     };
   }
 
-  const width1 = await widthFor(1);
-  const delta = width1 - width0;
+  // Binary search for the largest count that still fits.
+  //
+  // This replaces an estimate-then-walk scheme (measure at 0 and 1, divide
+  // the gap by the per-tatweel delta, then step to the answer). That was
+  // fine in the common case but had two holes a bounded search does not: a
+  // font whose 1-tatweel candidate is not wider — real, since a tatweel can
+  // decompose a ligature — gave a delta of zero or less and no usable
+  // estimate, and the step budget that guarded the resulting long walk could
+  // run out *while still over the target*, returning overshooting text
+  // reported as a successful fit.
+  //
+  // `best` only ever advances to a count whose width was actually measured
+  // at or under the target, so the returned width cannot exceed it no matter
+  // how non-monotonic the font makes the sequence. Count 0 is known to fit
+  // (checked above), which is what makes that guarantee total.
+  let lo = 1;
+  let hi = cap;
+  let best = 0;
+  let width = width0;
 
-  // delta <= 0 means this font does not widen on a tatweel at all, which
-  // the real-font tests say does not happen — but dividing by it would give
-  // Infinity or a negative count, so fall back to probing from the cap.
-  const estimate =
-    delta > 0 ? Math.floor((target - width0) / delta) : cap;
-
-  let total = Math.max(0, Math.min(cap, estimate));
-  let width = await widthFor(total);
-  let steps = 0;
-
-  while (width > target && total > 0 && steps++ < MAX_REFINE_STEPS) {
-    total -= 1;
-    width = await widthFor(total);
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const midWidth = await widthFor(mid);
+    if (midWidth <= target) {
+      best = mid;
+      width = midWidth;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
   }
 
-  while (total < cap && steps++ < MAX_REFINE_STEPS) {
-    const nextWidth = await widthFor(total + 1);
-    if (nextWidth > target) break;
-    total += 1;
-    width = nextWidth;
-  }
+  const total = best;
 
   return {
     text: textFor(total),

@@ -160,12 +160,14 @@ export type SidebarProps = {
   kashidaSlotOrdinal?: number;
   onSelectKashidaSlot?: (ordinal: number) => void;
   onSetKashidaAtSlot?: (slot: KashidaSlot, count: number) => void;
-  /** Effective fit target: the user's override, else the page's margin box. */
-  fitTargetWidth?: number | null;
-  /** True when the target shown is the page's rather than a typed override. */
-  fitTargetIsFromPage?: boolean;
-  /** Whether there is a page to take a target from at all. */
-  canUsePageFitTarget?: boolean;
+  /**
+   * Only what the user typed. Deliberately *not* the effective target: the
+   * input shows this, so clearing the field leaves it cleared instead of
+   * snapping the page's value straight back into the box.
+   */
+  fitTargetOverride?: number | null;
+  /** The page's margin-box width, shown as the placeholder. Null in freeform. */
+  fitTargetPageDefault?: number | null;
   isFittingWidth?: boolean;
   onChangeFitTargetWidth?: (width: number | null) => void;
   onFitToWidth?: (target: number) => void;
@@ -409,9 +411,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   kashidaSlotOrdinal = 0,
   onSelectKashidaSlot,
   onSetKashidaAtSlot,
-  fitTargetWidth = null,
-  fitTargetIsFromPage = false,
-  canUsePageFitTarget = false,
+  fitTargetOverride = null,
+  fitTargetPageDefault = null,
   isFittingWidth = false,
   onChangeFitTargetWidth,
   onFitToWidth,
@@ -2583,7 +2584,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           curve, so on those types a width target has nothing
                           to act on — the same reason `fontSize` is hidden for
                           a curve. */}
-                      {selectedBlock.type === "text" && (
+                      {selectedBlock.type === "text" && (() => {
+                        // The effective target is derived here rather than
+                        // threaded in, so "what the box shows" and "what Fit
+                        // uses" cannot disagree.
+                        const effectiveTarget =
+                          fitTargetOverride ?? fitTargetPageDefault;
+                        const isFromPage =
+                          fitTargetOverride === null && fitTargetPageDefault !== null;
+                        return (
                         <div className="field">
                           <span className="fieldTitle">Fit to width</span>
                           <div
@@ -2601,27 +2610,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               step={1}
                               className="hexInput artboardNumberInput"
                               aria-label="Target width in pixels"
-                              placeholder="width in px"
-                              value={fitTargetWidth ?? ""}
+                              placeholder={
+                                fitTargetPageDefault !== null
+                                  ? String(fitTargetPageDefault)
+                                  : "width in px"
+                              }
+                              value={fitTargetOverride ?? ""}
                               onChange={(e) => {
-                                const raw = e.target.value.trim();
-                                onChangeFitTargetWidth?.(raw === "" ? null : Number(raw));
+                                // A number input reports "" for most partial
+                                // entries, but a paste can still produce
+                                // something `Number` reads as NaN — which
+                                // `??` would carry straight through to the
+                                // value, stranding the field. Anything not a
+                                // real number means "track the page" instead.
+                                const value = Number(e.target.value.trim());
+                                onChangeFitTargetWidth?.(
+                                  Number.isFinite(value) && value > 0 ? value : null
+                                );
                               }}
                               style={{ flex: 1, minWidth: 0 }}
                             />
                             <button
                               type="button"
                               className="sidebarPillButton"
-                              disabled={isFittingWidth || !fitTargetWidth}
+                              disabled={isFittingWidth || !effectiveTarget}
                               onClick={() => {
-                                if (fitTargetWidth) onFitToWidth?.(fitTargetWidth);
+                                if (effectiveTarget) onFitToWidth?.(effectiveTarget);
                               }}
                             >
                               {isFittingWidth ? "Fitting…" : "Fit"}
                             </button>
                           </div>
 
-                          {canUsePageFitTarget && !fitTargetIsFromPage && (
+                          {fitTargetPageDefault !== null && !isFromPage && (
                             <button
                               type="button"
                               className="sidebarSectionButton"
@@ -2639,9 +2660,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               marginTop: 4,
                             }}
                           >
-                            {fitTargetIsFromPage
+                            {isFromPage
                               ? "Tracking the page's margin box. "
-                              : canUsePageFitTarget
+                              : fitTargetPageDefault !== null
                                 ? ""
                                 : "No page is set, so type a target. "}
                             Spreads kashida evenly across every join above until the
@@ -2649,7 +2670,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             kashida already set.
                           </div>
                         </div>
-                      )}
+                        );
+                      })()}
                     </>
                   );
                 })()}

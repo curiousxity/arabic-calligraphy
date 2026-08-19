@@ -17,8 +17,13 @@ import { findKashidaSlots, TATWEEL } from "./tatweel";
 import {
   distributeKashida,
   applyDistribution,
+  inkExtentBox,
   inkExtentWidth,
   solveFitToWidth,
+  styledRunWidth,
+  WARP_X_SPREAD,
+  ITALIC_SHEAR,
+  fauxBoldStrokeWidth,
 } from "./fitToWidth";
 
 type HbModule = {
@@ -362,4 +367,148 @@ describe("solveFitToWidth (real fonts)", () => {
       expect(oneMore).toBeGreaterThan(target);
     });
   }
+});
+
+describe("styledRunWidth", () => {
+  const box = { width: 100, height: 40 };
+
+  it("returns the raw extent for an unstyled run", () => {
+    expect(styledRunWidth(box, 50)).toBe(100);
+  });
+
+  it("adds the italic shear as a fraction of the run's height", () => {
+    // The shear maps x' = x - 0.25y, so the extent grows by 0.25 * height —
+    // which is why inkExtentBox has to report height at all.
+    expect(styledRunWidth(box, 50, { italic: true })).toBeCloseTo(
+      100 + ITALIC_SHEAR * 40
+    );
+  });
+
+  it("adds the faux-bold stroke once, not twice", () => {
+    // A stroke straddles the path: half of it falls outside each edge, so the
+    // total added is one stroke width.
+    expect(styledRunWidth(box, 50, { bold: true })).toBeCloseTo(
+      100 + fauxBoldStrokeWidth(50)
+    );
+  });
+
+  it("adds an outline stroke", () => {
+    expect(styledRunWidth(box, 50, { strokeWidth: 6 })).toBe(106);
+  });
+
+  it("ignores a negative outline width", () => {
+    expect(styledRunWidth(box, 50, { strokeWidth: -4 })).toBe(100);
+  });
+
+  it("adds the horizontal warp's spread, in either direction", () => {
+    // warp.ts shifts a point by (warpX / 100) * ny * width * 0.25 with ny in
+    // [-1, 1], so the extent grows by twice that quarter-width. The sign of
+    // the slider only picks which way the run leans; it always widens.
+    const expected = 100 + 100 * WARP_X_SPREAD;
+    expect(styledRunWidth(box, 50, { warpX: 100 })).toBeCloseTo(expected);
+    expect(styledRunWidth(box, 50, { warpX: -100 })).toBeCloseTo(expected);
+  });
+
+  it("costs nothing for an unwarped run", () => {
+    expect(styledRunWidth(box, 50, { warpX: 0 })).toBe(100);
+  });
+
+  it("sums every contribution rather than picking one", () => {
+    expect(
+      styledRunWidth(box, 50, {
+        italic: true,
+        bold: true,
+        strokeWidth: 6,
+        warpX: 50,
+      })
+    ).toBeCloseTo(
+      100 + ITALIC_SHEAR * 40 + fauxBoldStrokeWidth(50) + 6 + 100 * 0.5 * WARP_X_SPREAD
+    );
+  });
+});
+
+describe("solveFitToWidth never returns text wider than the target", () => {
+  // These pin the guarantee against measures a real font can produce but the
+  // happy path does not: the estimate-and-walk scheme this replaced could
+  // exhaust its step budget while still over the target and return that text
+  // reported as a successful fit.
+
+  it("copes with a measure that does not widen on the first tatweel", async () => {
+    // A tatweel can decompose a ligature, leaving the 1-tatweel candidate no
+    // wider than none at all — which gave the old scheme a delta of zero and
+    // no usable estimate.
+    const measure = async (t: string) => {
+      const n = countTatweels(t);
+      return n === 0 || n === 1 ? 100 : 100 + n * 10;
+    };
+    const result = await solveFitToWidth({ text: "بسم", target: 165, measure });
+    expect(result.width).toBeLessThanOrEqual(165);
+    expect(await measure(result.text)).toBeLessThanOrEqual(165);
+  });
+
+  it("copes with a width that does not rise monotonically", async () => {
+    // Non-monotonic on purpose: a few tatweels make it far too wide, more of
+    // them bring it back. A binary search can land anywhere on a sequence
+    // like this — what must hold is that wherever it lands was measured to
+    // fit.
+    const measure = async (t: string) => {
+      const n = countTatweels(t);
+      if (n === 0) return 100;
+      return n < 5 ? 200 : 130;
+    };
+    const result = await solveFitToWidth({ text: "بسم", target: 150, measure });
+    expect(result.reason).not.toBe("already-wider");
+    expect(result.width).toBeLessThanOrEqual(150);
+    expect(await measure(result.text)).toBeLessThanOrEqual(150);
+  });
+
+  it("reports already-wider rather than pretending to fit", async () => {
+    // The one case where the returned width legitimately exceeds the target:
+    // the run is over it with no kashida at all, so elongation — which only
+    // ever adds width — cannot help. Saying so is the honest answer, and the
+    // caller's status message depends on this reason being distinct.
+    const result = await solveFitToWidth({
+      text: "بسم",
+      target: 50,
+      measure: linearMeasure(100, 10),
+    });
+    expect(result.reason).toBe("already-wider");
+    expect(result.width).toBeGreaterThan(50);
+    expect(result.total).toBe(0);
+  });
+
+  it("stays within the target across many slots and a wide cap", async () => {
+    // Nine joins at 8 each is a 72-wide search space — past the 64-step
+    // budget the previous implementation relied on.
+    const text = "بسمبسمبسملل";
+    const measure = linearMeasure(100, 7);
+    const target = 411; // 100 + 44*7 = 408 fits; 45 would be 415.
+    const result = await solveFitToWidth({ text, target, measure });
+    expect(result.width).toBeLessThanOrEqual(target);
+    expect(await measure(result.text)).toBeLessThanOrEqual(target);
+  });
+
+  it("returns a measured width that matches its own returned text", async () => {
+    const measure = linearMeasure(100, 10);
+    const result = await solveFitToWidth({ text: "بسم", target: 165, measure });
+    expect(await measure(result.text)).toBe(result.width);
+  });
+});
+
+describe("inkExtentBox (real fonts)", () => {
+  it("reports a positive height, which the italic shear needs", async () => {
+    const { glyphs, font, unitsPerEm } = await shapeReal("بسم", "Amiri.ttf");
+    const box = inkExtentBox(glyphs, font, 100, unitsPerEm);
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.height).toBeGreaterThan(0);
+    expect(inkExtentWidth(glyphs, font, 100, unitsPerEm)).toBe(box.width);
+  });
+
+  it("is zero in both axes for an empty run", async () => {
+    const { glyphs, font, unitsPerEm } = await shapeReal("", "Amiri.ttf");
+    expect(inkExtentBox(glyphs, font, 100, unitsPerEm)).toEqual({
+      width: 0,
+      height: 0,
+    });
+  });
 });

@@ -274,12 +274,23 @@ Three things are load-bearing:
   `lib/measureShapedText.ts`, which is a five-line wrapper over `shapeText`
   plus the pure `inkExtentWidth`. **That split is why the solver's real-font
   tests exist at all**; fold the two together and the suite cannot import it.
-- **`inkExtentWidth` mirrors `ShapedText`'s own metrics loop** — same pen
-  walk, same `getPath(gx, gy, fontSize)` bounding boxes, same
+- **`inkExtentBox` mirrors `ShapedText`'s own metrics loop** — same pen walk,
+  same `getPath(gx, gy, fontSize)` bounding boxes, same
   `fontSize / unitsPerEm` scale — so the number being optimised is the number
   the canvas draws. Summing advances would be cheaper and would measure a
   different thing: advances carry the run's trailing side bearing and miss ink
   overhanging its own advance, and both move as a join is stretched.
+- **Outlines are not the whole of what is drawn.** `styledRunWidth` adds the
+  italic shear (`ITALIC_SHEAR × run height` — which is why `inkExtentBox`
+  reports height at all), the faux-bold stroke, the block's outline
+  `strokeWidth`, and `warpX`'s sideways spread. Without them a fit promised a
+  width that an italic, bold, outlined or warped block then visibly exceeded.
+  `ShapedText` **imports `ITALIC_SHEAR` and `fauxBoldStrokeWidth` from this
+  module** rather than keeping its own copies, so renderer and fitter cannot
+  drift. The four terms are summed rather than composed, and the warp term is
+  the widest the distortion *can* reach rather than what it does reach — both
+  over-estimate slightly, which is the safe direction for a never-overshoot
+  promise.
 - **Candidates are always built from the caller's original text with
   absolute counts**, never added to the current state. That is what makes the
   operation idempotent — fitting an already-fitted run returns it unchanged
@@ -292,14 +303,23 @@ right-to-left leaves every lower offset valid; left-to-right would shift each
 later slot by whatever the earlier insertion added, and every slot after the
 first would land in the wrong place.
 
-The search does not count up from zero: one measurement at 0 tatweels and one
-at 1 gives the per-tatweel delta, and `(target - width0) / delta` lands within
-a step or two, after which it refines against real measurements. The
-refinement is not ceremony — the delta is only *near* constant, because a font
-may substitute different glyphs across a stretched join. **It never
-overshoots**: text that spills past the width it was fitted to is a worse
-answer than text a few pixels short, so the search settles on the last count
-that fits. `MAX_REFINE_STEPS` bounds it either way.
+The search is a **binary search over the count**, costing about
+log2(slots × maxPerSlot) measurements. It replaced an estimate-then-walk
+scheme (measure at 0 and 1, divide the gap by the per-tatweel delta, step to
+the answer) that had two holes worth remembering, since both look like corner
+cases and neither is: a font whose 1-tatweel candidate is *not* wider — real,
+because a tatweel can decompose a ligature — gave a delta of zero and no
+usable estimate; and the step budget guarding the resulting long walk could
+run out **while still over the target**, returning overshooting text reported
+as a successful fit.
+
+**It never overshoots**, and now structurally rather than by luck: the
+running `best` only ever advances to a count whose width was actually
+*measured* at or under the target, so no amount of non-monotonicity can
+produce an over-target answer. Count 0 is checked first, which is what makes
+that guarantee total. The one case where the returned width legitimately
+exceeds the target is `already-wider`, which reports that elongation — which
+only ever adds width — cannot help.
 
 **Distribution is even across every legal join** (`distributeKashida`,
 remainder to the earliest slots). Piling the total onto one join reads as a
@@ -312,6 +332,12 @@ margin is 0. `fitTargetWidth` in `App.tsx` holds only a user's *override*, so
 `null` means "track the page" and a freeform document (no page at all) simply
 requires a typed number. It is a control setting, not document state: neither
 saved nor undoable, like the export scale beside it.
+The Sidebar keeps the **typed override** and the page default apart
+(`fitTargetOverride` / `fitTargetPageDefault`), deriving the effective target
+in one place. Passing the effective value as the input's `value` instead made
+the field impossible to clear: backspacing wrote `null`, which immediately
+re-rendered the page default back into the box.
+
 `fitSelectedBlockToWidth` **captures the block by id, not by reference** —
 solving is async and the selection can change while it runs, so patching "the
 selected block" on the way out would rewrite whatever the user selected in the

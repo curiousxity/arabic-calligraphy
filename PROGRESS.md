@@ -72,9 +72,9 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 - **The dot drags, revisited.** That pass attempted them with
   extension-injected synthetic events and they moved the *block* instead —
   which the Playwright work then showed is an artifact of those events, not
-  of the handles. The diacritic move-handle drag is now covered by
-  `e2e/diacritics.spec.ts`; a per-glyph move/scale dot drag test is still
-  unwritten.
+  of the handles. Both drags are now covered: the diacritic move handle by
+  `e2e/diacritics.spec.ts` and the per-glyph move dot by
+  `e2e/glyph-transform.spec.ts`.
 
 ---
 
@@ -116,12 +116,39 @@ is the async half. See CLAUDE.md, "Fit to width".
   them each render the way it already did diacritic overrides. The field is
   optional, so transforms in older saves keep their existing behaviour.
 
-Verified: 27 new unit tests in `src/lib/fitToWidth.test.ts` (even
-distribution, right-to-left application, never-overshoot, idempotence, and
-real-font fits in Amiri, Scheherazade and Lateef), four browser tests in
-`e2e/fit-to-width.spec.ts`, three new regression tests in
-`e2e/diacritics.spec.ts` and `e2e/core.spec.ts`. Whole suite: 402 unit tests
-and 46 e2e tests passing, plus typecheck, lint and build.
+A code review then found seven issues, all fixed in the same branch and each
+now covered by a test:
+
+- The solver's estimate-and-walk search could exhaust its step budget while
+  still over the target and return that text as a successful fit. Replaced
+  with a binary search whose answer was always *measured* to fit, which also
+  removes the divide-by-delta hole when a tatweel decomposes a ligature.
+- Measurement ignored the italic shear, faux bold, the outline and `warpX`,
+  so those blocks overshot the width they were fitted to. `styledRunWidth`
+  adds all four, and `ShapedText` now imports the shear and bold constants
+  from the fitter so they cannot drift.
+- Patching a stale glyph transform revived the previous glyph's scale under
+  the new glyph's id. Now a pure, tested `mergeGlyphTransform` replaces a
+  definitely-mismatched entry instead of spreading over it.
+- `GlyphTransformHoverHandles` still had the *same* sibling-hover defect just
+  fixed next door; it now hangs its handlers on the Group too.
+- The fit target field could not be cleared when a page was set.
+- The `already-wider` branch strips existing kashida; the status message now
+  says so instead of implying nothing happened.
+- `types.ts`'s comment still denied the existence of the `glyphId` beneath it.
+
+Verified: 47 unit tests across `fitToWidth.test.ts` and `glyphTransform.test.ts`
+(even distribution, right-to-left application, never-overshoot under
+non-monotonic and zero-delta measures, style widening, stale-transform
+replacement, and real-font fits in Amiri, Scheherazade and Lateef), plus
+`e2e/fit-to-width.spec.ts`, `e2e/glyph-transform.spec.ts` and new regression
+tests in `e2e/diacritics.spec.ts` and `e2e/core.spec.ts`. The two
+hover-overlay e2e tests were checked against a deliberate revert of the fix
+and fail without it. Whole suite: **422 unit tests and 48 e2e** passing, plus
+typecheck, lint and build.
+
+This also closes the "per-glyph move/scale dot drag test is still unwritten"
+item under Verification debt.
 
 **Known gaps.** Fit to width inherits the glyph-index fragility every text
 edit has — the guide says to fit before fine-tuning marks. There is no
