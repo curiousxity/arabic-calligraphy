@@ -94,3 +94,23 @@ test("Export PNG downloads a non-trivial file", async ({ page }) => {
   // orders of magnitude larger. Coarse on purpose.
   expect(bytes).toBeGreaterThan(5_000);
 });
+
+/**
+ * `shapeText` used to hand an empty buffer to `buffer.json()`, whose parse
+ * threw "Unexpected end of JSON input" — caught, so the block correctly drew
+ * nothing, but every clear of the Content textarea logged a console error.
+ * It is also why this file's boot test was the only place a "no console
+ * errors" assertion could stand.
+ */
+test("clearing a block's text logs no console error", async ({ page }) => {
+  const errors = collectConsoleErrors(page);
+
+  await gotoApp(page);
+  await setBlockText(page, "");
+  // Re-typing shapes again from the cleared state, which is where a stale
+  // empty cache entry would surface.
+  await setBlockText(page, "بسم");
+  await setBlockText(page, "");
+
+  expect(errors).toEqual([]);
+});

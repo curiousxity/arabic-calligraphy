@@ -31,6 +31,16 @@ export type DiacriticOverride = {
  */
 export type GlyphTransform = {
   glyphIndex: number;
+  /**
+   * The shaped glyph id this transform was created for, used to notice when
+   * a text edit has shifted `glyphIndex` onto a different letter — see
+   * `ShapedText`'s `activeGlyphTransforms`.
+   *
+   * Optional on purpose: a transform saved before this field existed cannot
+   * be validated, so it keeps the original behaviour of applying to whatever
+   * glyph now holds its index rather than being silently discarded.
+   */
+  glyphId?: number;
   /** Horizontal shift in local (unscaled) units. Default 0. */
   offsetX?: number;
   /** Vertical shift in local (unscaled) units. Default 0. */

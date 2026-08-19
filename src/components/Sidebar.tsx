@@ -160,6 +160,15 @@ export type SidebarProps = {
   kashidaSlotOrdinal?: number;
   onSelectKashidaSlot?: (ordinal: number) => void;
   onSetKashidaAtSlot?: (slot: KashidaSlot, count: number) => void;
+  /** Effective fit target: the user's override, else the page's margin box. */
+  fitTargetWidth?: number | null;
+  /** True when the target shown is the page's rather than a typed override. */
+  fitTargetIsFromPage?: boolean;
+  /** Whether there is a page to take a target from at all. */
+  canUsePageFitTarget?: boolean;
+  isFittingWidth?: boolean;
+  onChangeFitTargetWidth?: (width: number | null) => void;
+  onFitToWidth?: (target: number) => void;
   blocks: Block[];
   selectedBlock?: Block;
   showGrid: boolean;
@@ -400,6 +409,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   kashidaSlotOrdinal = 0,
   onSelectKashidaSlot,
   onSetKashidaAtSlot,
+  fitTargetWidth = null,
+  fitTargetIsFromPage = false,
+  canUsePageFitTarget = false,
+  isFittingWidth = false,
+  onChangeFitTargetWidth,
+  onFitToWidth,
   selectedBlock,
   selectedIds = [],
   showGrid,
@@ -2562,6 +2577,79 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           really connect. Apply kashida before fine-tuning marks.
                         </div>
                       </div>
+
+                      {/* Plain text only. A Shape Fill run is auto-scaled to
+                          span its silhouette and a Curve run to span its
+                          curve, so on those types a width target has nothing
+                          to act on — the same reason `fontSize` is hidden for
+                          a curve. */}
+                      {selectedBlock.type === "text" && (
+                        <div className="field">
+                          <span className="fieldTitle">Fit to width</span>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              minWidth: 0,
+                            }}
+                          >
+                            <input
+                              id={makeId("fit-target", selectedId)}
+                              type="number"
+                              min={1}
+                              step={1}
+                              className="hexInput artboardNumberInput"
+                              aria-label="Target width in pixels"
+                              placeholder="width in px"
+                              value={fitTargetWidth ?? ""}
+                              onChange={(e) => {
+                                const raw = e.target.value.trim();
+                                onChangeFitTargetWidth?.(raw === "" ? null : Number(raw));
+                              }}
+                              style={{ flex: 1, minWidth: 0 }}
+                            />
+                            <button
+                              type="button"
+                              className="sidebarPillButton"
+                              disabled={isFittingWidth || !fitTargetWidth}
+                              onClick={() => {
+                                if (fitTargetWidth) onFitToWidth?.(fitTargetWidth);
+                              }}
+                            >
+                              {isFittingWidth ? "Fitting…" : "Fit"}
+                            </button>
+                          </div>
+
+                          {canUsePageFitTarget && !fitTargetIsFromPage && (
+                            <button
+                              type="button"
+                              className="sidebarSectionButton"
+                              style={{ marginTop: 6 }}
+                              onClick={() => onChangeFitTargetWidth?.(null)}
+                            >
+                              Use page margin box
+                            </button>
+                          )}
+
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "var(--text-muted)",
+                              marginTop: 4,
+                            }}
+                          >
+                            {fitTargetIsFromPage
+                              ? "Tracking the page's margin box. "
+                              : canUsePageFitTarget
+                                ? ""
+                                : "No page is set, so type a target. "}
+                            Spreads kashida evenly across every join above until the
+                            text spans the target — never past it. Replaces any
+                            kashida already set.
+                          </div>
+                        </div>
+                      )}
                     </>
                   );
                 })()}

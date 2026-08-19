@@ -333,6 +333,21 @@ export const ShapedText: React.FC<Props> = ({
     [diacriticOverrides, diacriticGlyphIndices]
   );
 
+  // The same staleness guard for glyph transforms. Overrides can be
+  // re-validated by asking whether the glyph at that index is still a
+  // diacritic at all; a transform has no such signal, because every glyph is
+  // a legitimate target — so it carries the glyph id it was made for and we
+  // check that instead. A transform written before `glyphId` existed has
+  // nothing to check against and is kept, preserving the old behaviour for
+  // saved projects rather than dropping their edits.
+  const activeGlyphTransforms = useMemo(
+    () =>
+      glyphTransforms.filter(
+        (t) => t.glyphId === undefined || shapeData.glyphs[t.glyphIndex]?.g === t.glyphId
+      ),
+    [glyphTransforms, shapeData.glyphs]
+  );
+
   const [spinnerAngle, setSpinnerAngle] = useState(0);
   const spinnerFrameRef = useRef<number | null>(null);
 
@@ -445,7 +460,7 @@ export const ShapedText: React.FC<Props> = ({
             raw,
             gx,
             gy,
-            glyphTransforms.find((gt) => gt.glyphIndex === i)
+            activeGlyphTransforms.find((gt) => gt.glyphIndex === i)
           );
           transformedHitBoxes.push({
             glyphIndex: i,
@@ -484,7 +499,7 @@ export const ShapedText: React.FC<Props> = ({
       hitBoxes,
       transformedHitBoxes,
     };
-  }, [shapeData, text, fontSize, glyphTransforms]);
+  }, [shapeData, text, fontSize, activeGlyphTransforms]);
 
   const glyphBounds = glyphMetrics.bounds;
   const glyphHitBoxes = glyphMetrics.hitBoxes;
@@ -516,7 +531,7 @@ export const ShapedText: React.FC<Props> = ({
         // in its adapter, or its handles sit where the mark *would* be
         // undistorted. `glyphHitBoxes` are raw, so the adapter is what
         // applies it.
-        const transform = glyphTransforms.find((t) => t.glyphIndex === b.glyphIndex);
+        const transform = activeGlyphTransforms.find((t) => t.glyphIndex === b.glyphIndex);
         let adapter = plain;
 
         if (transform) {
@@ -542,7 +557,7 @@ export const ShapedText: React.FC<Props> = ({
       });
   }, [
     glyphHitBoxes,
-    glyphTransforms,
+    activeGlyphTransforms,
     diacriticGlyphIndices,
     bx,
     by,
@@ -657,7 +672,7 @@ export const ShapedText: React.FC<Props> = ({
             fauxBoldWidth,
             overrideGlyph,
             activeDiacriticOverrides,
-            glyphTransforms,
+            activeGlyphTransforms,
             painter
           );
           ctx.restore();
@@ -687,7 +702,7 @@ export const ShapedText: React.FC<Props> = ({
               0,
               overrideGlyph,
               activeDiacriticOverrides,
-              glyphTransforms,
+              activeGlyphTransforms,
               // The outline pass fills too (outline-before-fill is per glyph),
               // and its transform is the same block space the painter was
               // built in, so it reuses the same one.
@@ -707,7 +722,7 @@ export const ShapedText: React.FC<Props> = ({
         isSelected={isSelected}
         enabled={glyphTransformMode}
         glyphHitBoxes={glyphTransformedHitBoxes}
-        glyphTransforms={glyphTransforms}
+        glyphTransforms={activeGlyphTransforms}
         offsetX={bx + localDrawX}
         offsetY={by + localDrawY}
         onUpdateGlyphTransform={onUpdateGlyphTransform}

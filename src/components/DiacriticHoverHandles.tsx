@@ -122,7 +122,28 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
         }
 
         return (
-          <Group key={placement.key}>
+          // The hover handlers live on this Group rather than on the hit
+          // Rect below, and that placement is the whole reason the handles
+          // stay put. Konva fires `mouseleave` on the old target passing the
+          // newly-entered shape as `compareShape`, and suppresses it at any
+          // node that is an *ancestor* of that new shape (Node's
+          // `_fireAndBubble`; Stage passes the compare shape on every
+          // retarget). With the handlers on the Rect — a *sibling* of the
+          // handle Circles — the moment a mounted handle covered the pointer
+          // the next mousemove was a real Rect->Circle leave: hover cleared,
+          // the handle unmounted, and it was present on exactly every other
+          // move. The same race killed a slow drag outright, because Konva
+          // only suppresses hover processing once a drag reaches `dragging`
+          // rather than while it is merely `ready`, so a small first step
+          // left the gesture attached to a destroyed node. Hanging the
+          // handlers on the common ancestor makes Rect->Circle an internal
+          // move that fires no leave at all, while leaving the whole overlay
+          // still fires one normally.
+          <Group
+            key={placement.key}
+            onMouseEnter={() => setHoveredKey(placement.key)}
+            onMouseLeave={() => setHoveredKey((v) => (v === placement.key ? null : v))}
+          >
             <Rect
               name="diacritic-hit"
               x={Math.min(...xs)}
@@ -130,8 +151,6 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
               width={Math.max(...xs) - Math.min(...xs)}
               height={Math.max(...ys) - Math.min(...ys)}
               fill="transparent"
-              onMouseEnter={() => setHoveredKey(placement.key)}
-              onMouseLeave={() => setHoveredKey((v) => (v === placement.key ? null : v))}
             />
 
             {isHovered && (

@@ -264,6 +264,25 @@ export async function shapeText(
   const upm = parsedFont.unitsPerEm || 1000;
   const shapableText = stripUnsupportedDiacritics(text, parsedFont);
 
+  // An empty buffer has no shaping result to serialize: `buffer.json()`
+  // returns an empty string and the JSON parse behind it throws
+  // "Unexpected end of JSON input". Both the primary and the fallback call
+  // throw, so it used to reach the outer catch and log a console error
+  // every time a user cleared the Content textarea — noisy, and it kept the
+  // e2e "no console errors" assertion pinned to the boot test. Empty text
+  // has no glyphs by definition, so answer that directly and never build
+  // the HarfBuzz objects at all.
+  if (shapableText.length === 0) {
+    const empty: ShapedTextResult = {
+      glyphs: [],
+      font: parsedFont,
+      unitsPerEm: upm,
+      shapableText,
+    };
+    shapeCache.set(cacheKey, empty);
+    return empty;
+  }
+
   const blob = hb.createBlob(new Uint8Array(fontData));
   const face = hb.createFace(blob, 0);
   const font = hb.createFont(face);
