@@ -115,7 +115,14 @@ import type { MirrorMode } from "./types";
 import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 import { solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { mergeGlyphTransform } from "./lib/glyphTransform";
-import { measureShapedWidth } from "./lib/measureShapedText";
+import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
+import {
+  buildNameDesign,
+  describeNameDesign,
+  estimateRunBox,
+  normalizeRunBox,
+} from "./lib/nameDesign";
+import type { NameDesignSelection } from "./components/NameDesignDialog";
 
 /**
  * The status-row line for a finished fit. Each outcome says what actually
@@ -2087,6 +2094,7 @@ const App: React.FC = () => {
   // export scale, so it is neither saved nor undoable.
   const [fitTargetWidth, setFitTargetWidth] = useState<number | null>(null);
   const [isFittingWidth, setIsFittingWidth] = useState(false);
+  const [isBuildingNameDesign, setIsBuildingNameDesign] = useState(false);
 
   const fitTargetDefault = useMemo(() => {
     if (!artboard) return null;
@@ -2141,6 +2149,93 @@ const App: React.FC = () => {
     },
     [selectedBlock, updateBlock]
   );
+
+  /**
+   * "Name designs": write the selected name in the style picked from the
+   * gallery, and add whatever companion blocks the chosen layout needs.
+   *
+   * Modeled on `fitSelectedBlockToWidth` directly above, for the same reason:
+   * it has to shape the text to find out how wide the name draws, so it is
+   * async, and the selection can change while it runs. The block is therefore
+   * **captured by id** — patching "the selected block" on the way out would
+   * rewrite whatever the user selected in the meantime.
+   *
+   * The measurement is taken in the *new* font, not the current one: every
+   * layout spaces itself by how wide the name draws, and that is a property
+   * of the style just chosen. When shaping fails the composition still
+   * happens, on a rough estimate — a loose arrangement the user can drag into
+   * place beats no arrangement at all.
+   *
+   * One `pushHistory()` covers the style change and the added blocks
+   * together, so a whole design is a single undo.
+   */
+  const applyNameDesign = async (selection: NameDesignSelection) => {
+    const source = selectedBlock;
+    if (!source || source.type !== "text") return;
+    if (source.text.trim() === "") {
+      setExportStatus("Type a name into this block first.");
+      return;
+    }
+
+    const { id, text, fontSize, fontStyle, strokeWidth, warpX, lineHeight } = source;
+    // The same four terms `fitSelectedBlockToWidth` measures with: the
+    // outlines are not the whole of what is drawn, and a composition spaced
+    // by outlines alone sets an italic or outlined name too close.
+    const runStyle = {
+      italic: fontStyle === "italic" || fontStyle === "bold italic",
+      bold: fontStyle === "bold" || fontStyle === "bold italic",
+      strokeWidth,
+      warpX,
+    };
+
+    setIsBuildingNameDesign(true);
+    try {
+      let run;
+      try {
+        const measured = await measureShapedRun(
+          text,
+          resolveFontUrl(selection.fontFamily),
+          fontSize,
+          runStyle
+        );
+        run = normalizeRunBox(measured, fontSize, lineHeight);
+      } catch (err) {
+        console.error("name design measurement failed", err);
+        run = estimateRunBox(text, fontSize);
+      }
+
+      const plan = buildNameDesign(
+        {
+          source,
+          layout: selection.layout,
+          fontFamily: selection.fontFamily,
+          run,
+          radialCount: selection.radialCount,
+          frameId: selection.frameId,
+          frameColor: selection.frameColor,
+        },
+        createNextId
+      );
+
+      pushHistory();
+      setBlocks((prev) => {
+        const index = prev.findIndex((b) => b.id === id);
+        // The block was deleted while we were measuring; there is nothing to
+        // build the design around any more.
+        if (index < 0) return prev;
+        const patched = prev.map((b) => (b.id === id ? ({ ...b, ...plan.patch } as Block) : b));
+        if (plan.added.length === 0) return patched;
+        // A frame must be drawn before the name or it covers it; a reflection
+        // is a peer and goes on top, where every new block goes.
+        return plan.placement === "behind"
+          ? [...patched.slice(0, index), ...plan.added, ...patched.slice(index)]
+          : [...patched, ...plan.added];
+      });
+      setExportStatus(describeNameDesign(plan, selection.layout));
+    } finally {
+      setIsBuildingNameDesign(false);
+    }
+  };
 
   const p1dSidebarProps: Partial<SidebarProps> = {
     kashidaSlotOrdinal,
@@ -2512,6 +2607,8 @@ const App: React.FC = () => {
         {...p2eSidebarProps}
         {...p2fSidebarProps}
         {...p2gSidebarProps}
+        onApplyNameDesign={applyNameDesign}
+        isBuildingNameDesign={isBuildingNameDesign}
       />
 
       {!isMobile && !sidebarCollapsed && (

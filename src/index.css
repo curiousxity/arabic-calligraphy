@@ -419,3 +419,58 @@ html, body, #root { height: 100%; margin: 0; }
 .customFontName { flex: 1; min-width: 0; font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fontMissingNotice { margin-bottom: 8px; padding: 8px 10px; border-radius: 8px; font-size: 11px; line-height: 1.5; background: var(--danger-soft); color: var(--danger); }
 /* ---- /STREAM-G ---- */
+
+/* ---- Name designs — style gallery + composition wizard ---- */
+/* Reuses .confirmDialogOverlay and the ornament picker's swatch controls;
+   only the gallery and the composition previews are new. */
+.nameDesignDialog { width: min(920px, 94vw); max-height: 88vh; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-panel-floating); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); }
+.nameDesignHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.nameDesignHeader > * { min-width: 0; }
+.nameDesignTitle { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--text-primary); }
+.nameDesignSubtitle { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+.nameDesignEmpty { padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; background: var(--overlay-hover); color: var(--text-muted); }
+
+.nameDesignGrid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; padding: 2px; }
+/* Grid children default to min-width:auto and would push the dialog wider
+   than its own max-width on a narrow window. */
+.nameDesignGrid > * { min-width: 0; }
+.nameDesignGrid--layouts { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+.nameStyleCard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 8px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--overlay-hover); cursor: pointer; }
+.nameStyleCard--active { border-color: var(--accent); outline: 1px solid var(--accent); }
+.nameStyleSample { display: block; width: 100%; min-width: 0; font-size: 30px; line-height: 1.6; color: var(--text-primary); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nameStyleLabel { font-size: 11px; color: var(--text-muted); }
+
+.nameLayoutCard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 10px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--overlay-hover); cursor: pointer; text-align: center; }
+.nameLayoutCard--active { border-color: var(--accent); outline: 1px solid var(--accent); }
+.nameLayoutName { display: flex; align-items: baseline; justify-content: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.nameLayoutNameAr { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.nameLayoutDescription { font-size: 11px; line-height: 1.5; color: var(--text-muted); }
+
+/* Schematic previews. Overflow is hidden rather than scaled to fit: a long
+   name is clipped by the card instead of shrinking the whole arrangement to
+   illegibility. */
+.namePreview { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 96px; overflow: hidden; }
+.namePreview--row { gap: 6px; }
+.namePreviewText { font-size: 20px; line-height: 1.4; color: var(--text-primary); white-space: nowrap; }
+.namePreviewMirror { display: inline-flex; transform: scaleX(-1); }
+.namePreviewSpoke { position: absolute; display: inline-flex; font-size: 9px; }
+.namePreviewSpoke .namePreviewText { font-size: 11px; }
+.namePreviewFrame { width: auto; height: 100%; max-width: 100%; }
+.namePreviewOverlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.namePreviewOverlay .namePreviewText { font-size: 15px; }
+
+.nameDesignOptionRow { display: flex; align-items: center; gap: 8px; padding-top: 2px; }
+.nameDesignOptionRow > * { min-width: 0; }
+.nameDesignOptionRow--wrap { flex-wrap: wrap; }
+.nameDesignOptionRow label { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.nameDesignNumber { width: 68px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); color: var(--text-primary); font-size: 12px; }
+.nameDesignSelect { padding: 5px 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); color: var(--text-primary); font-size: 12px; }
+.nameDesignSwatches { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.nameDesignSwatches > * { min-width: 0; }
+.nameDesignHint { flex: 1; min-width: 0; font-size: 11px; line-height: 1.5; color: var(--text-muted); }
+
+.nameDesignActions { display: flex; align-items: center; gap: 8px; }
+.nameDesignActions > * { min-width: 0; }
+.nameDesignSpacer { flex: 1; }
+/* ---- /Name designs ---- */

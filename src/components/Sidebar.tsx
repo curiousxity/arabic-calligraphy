@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   DIACRITICS,
   SPECIALS,
@@ -17,6 +17,7 @@ import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
+import { NameDesignButton, type FontChoice, type NameDesignSelection } from "./NameDesignDialog";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { HistoryPopover, type HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
@@ -133,6 +134,10 @@ export type SidebarProps = {
   /** Set when the selected block names a font this browser cannot resolve. */
   missingFontKey?: string | null;
   // ---- /STREAM-G ----
+  /** Name designs: apply a style from the gallery and compose the chosen layout. */
+  onApplyNameDesign?: (selection: NameDesignSelection) => void;
+  /** True while a composition is being measured and built. */
+  isBuildingNameDesign?: boolean;
   // Phase 1 parallel-stream prop declarations — each stream adds its own
   // (all optional, arriving via App.tsx's p1* bundles). See PARALLEL-PHASE-1.md.
   /** The document's page, or null for freeform. */
@@ -392,6 +397,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRemoveCustomFont,
   missingFontKey = null,
   // ---- /STREAM-G ----
+  onApplyNameDesign,
+  isBuildingNameDesign = false,
   blocks,
   artboard = null,
   onChooseArtboardPreset,
@@ -507,6 +514,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showEffects, setShowEffects] = useState(false);
   const [effectsTab, setEffectsTab] = useState<"outline" | "shadow">("outline");
   const [showContent, setShowContent] = useState(true);
+
+  /**
+   * The font list both the Typography picker and the name-design gallery
+   * show. Hoisted so the two cannot drift: a family missing from either
+   * renders under a name that is not the one being previewed.
+   */
+  const fontChoices = useMemo<FontChoice[]>(
+    () => [
+      ...FONT_OPTIONS,
+      ...customFonts.map((f) => ({
+        value: f.key,
+        label: `${f.label} (uploaded)`,
+        cssFamily: `'${f.key}'`,
+      })),
+    ],
+    [customFonts]
+  );
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(!isMobile);
   const [showAlign, setShowAlign] = useState(false);
@@ -1983,6 +2007,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span>{showKeyboard ? "Hide" : "Show"}</span>
                 </button>
 
+                {/* Name designs: see this block's text in every style, then
+                    compose it. Plain text only — a Shape Fill run is scaled to
+                    its silhouette and a Curve run to its curve, so the measured
+                    run these layouts space themselves by is meaningless there,
+                    the same reason Fit to width is text-only. */}
+                {selectedBlock?.type === "text" && onApplyNameDesign && (
+                  <NameDesignButton
+                    text={selectedText}
+                    fontFamily={selectedBlock.fontFamily}
+                    fonts={fontChoices}
+                    busy={isBuildingNameDesign}
+                    onApply={onApplyNameDesign}
+                  />
+                )}
+
 
                 <PresetKeyboard
                   title="إِعْرَاب"
@@ -2693,14 +2732,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   // actually on. A key the picker doesn't know falls back to
                   // showing the *first* option, which is why an uploaded font
                   // has to reach this list rather than only the shaping seam.
-                  options={[
-                    ...FONT_OPTIONS,
-                    ...customFonts.map((f) => ({
-                      value: f.key,
-                      label: `${f.label} (uploaded)`,
-                      cssFamily: `'${f.key}'`,
-                    })),
-                  ]}
+                  options={fontChoices}
                   onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
                   previewSuffix="— أبجد"
                 />

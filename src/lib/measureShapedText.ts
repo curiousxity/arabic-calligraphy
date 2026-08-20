@@ -25,10 +25,30 @@ export async function measureShapedWidth(
   fontSize: number,
   style: RunStyle = {}
 ): Promise<number> {
+  return (await measureShapedRun(text, fontUrl, fontSize, style)).width;
+}
+
+/**
+ * The same measurement, keeping the height as well.
+ *
+ * The fit-to-width solver only ever needed a width, but a composition has to
+ * space blocks apart in *both* axes — how far a muthanna's reflection sits
+ * from its source, how much room a medallion's copies need around a circle.
+ * The height comes from the ink box untouched by `styledRunWidth`, which
+ * folds the italic shear and the outline into the width alone; callers that
+ * want the line height a block is actually drawn on run it through
+ * `normalizeRunBox` in `lib/nameDesign.ts`.
+ *
+ * Repeated calls stay cheap for the same reason `measureShapedWidth`'s do:
+ * `shapeText` caches by `text|fontUrl`.
+ */
+export async function measureShapedRun(
+  text: string,
+  fontUrl: string,
+  fontSize: number,
+  style: RunStyle = {}
+): Promise<{ width: number; height: number }> {
   const { glyphs, font, unitsPerEm } = await shapeText(text, fontUrl);
-  return styledRunWidth(
-    inkExtentBox(glyphs, font, fontSize, unitsPerEm),
-    fontSize,
-    style
-  );
+  const box = inkExtentBox(glyphs, font, fontSize, unitsPerEm);
+  return { width: styledRunWidth(box, fontSize, style), height: box.height };
 }

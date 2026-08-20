@@ -80,6 +80,38 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-08-20 — Name designs
+
+Content → **Name designs**: see the selected block's text written in every
+calligraphic style at once, pick one, and set it into a composition — a
+muthanna pair, a medallion of N copies, or a decorative frame. The style
+gallery previews in CSS (no shaping, no rasterization) and the layouts are
+built from parts that already existed: a muthanna and a medallion are
+`buildMirrorBlock`, a frame is the ornament library's own SVG in an image
+block.
+
+The new part is the arithmetic — `src/lib/nameDesign.ts` turns the name's
+*measured* run into placements that do not collide, which is the difference
+between adding a mirror and composing a design. Pure with measurement
+injected, so it is unit-testable; `measureShapedRun` is the async half.
+The non-obvious rule, and the one to keep in view: a medallion's radius is
+set by the run's **height**, because radial copies lie along their own spokes
+and crowd each other tangentially. See CLAUDE.md, "Name designs".
+
+Plain text blocks only, for the reason Fit to width is: a Shape Fill run is
+already scaled to its silhouette and a Curve run to its curve. A whole design
+is one undo, style included.
+
+Verified: 28 unit tests in `nameDesign.test.ts`, 6 Playwright tests in
+`e2e/name-design.spec.ts` (gallery contents, each layout's blocks and
+z-order, and the single-undo guarantee), plus the full loop — typecheck,
+lint, 450 unit tests, build.
+
+Deliberately not built, and worth recording because it is what the reference
+sites lead with: **Latin→Arabic transliteration** and a curated name
+dictionary. Typing the Arabic is this app's input model, and guessing at
+"Mohammed" phonetically is a different product with its own failure modes.
+
 ### 2026-08-19 — Fit to width, and three overlay/shaping fixes
 
 **Fit to width.** Typography's Kashida section gains a target field and a
