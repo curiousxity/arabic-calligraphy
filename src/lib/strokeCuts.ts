@@ -159,3 +159,59 @@ export function legalCutAt(
   for (let i = 0; i + 1 < cs.length; i += 2) thickness += cs[i + 1].y - cs[i].y;
   return { legal: thickness > 0, thickness };
 }
+
+/** A contiguous run of legal cut positions: one extendable stroke, one handle. */
+export type CutZone = {
+  glyphIndex: number;
+  cluster: number;
+  /** Glyph-local x range, font units. */
+  fromX: number;
+  toX: number;
+  /** Ink thickness through the zone — for weight checks and for the UI. */
+  thickness: number;
+};
+
+export function findCutZones(
+  contours: Contour[],
+  meta: { glyphIndex: number; cluster: number },
+  opts: DetectOpts = DEFAULT_DETECT_OPTS
+): CutZone[] {
+  let minX = Infinity, maxX = -Infinity;
+  for (const c of contours) for (const [x] of c) {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+  }
+  if (!isFinite(minX) || maxX <= minX) return [];
+
+  const zones: CutZone[] = [];
+  let runStart: number | null = null;
+  let runThickness: number[] = [];
+
+  const flush = (endX: number) => {
+    if (runStart === null) return;
+    const width = endX - runStart;
+    if (width >= opts.minZoneWidth && runThickness.length > 0) {
+      const mean = runThickness.reduce((a, b) => a + b, 0) / runThickness.length;
+      const spread = Math.max(...runThickness) - Math.min(...runThickness);
+      // A zone must hold its weight: a momentary flat on a curve does not
+      // count as a straight stroke.
+      if (mean > 0 && spread / mean <= opts.thicknessTolerance) {
+        zones.push({ ...meta, fromX: runStart, toX: endX, thickness: mean });
+      }
+    }
+    runStart = null;
+    runThickness = [];
+  };
+
+  for (let x = minX; x <= maxX; x += opts.step) {
+    const { legal, thickness } = legalCutAt(contours, x, opts);
+    if (legal) {
+      if (runStart === null) runStart = x;
+      runThickness.push(thickness);
+    } else {
+      flush(x - opts.step);
+    }
+  }
+  flush(maxX);
+  return zones;
+}

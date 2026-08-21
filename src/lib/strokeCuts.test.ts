@@ -66,3 +66,39 @@ describe("legalCutAt", () => {
     expect(legalCutAt(flattenContours(wedge), 50).legal).toBe(false);
   });
 });
+
+import { findCutZones, DEFAULT_DETECT_OPTS } from "./strokeCuts";
+
+describe("findCutZones", () => {
+  const meta = { glyphIndex: 3, cluster: 1 };
+
+  it("finds one zone spanning a flat bar", () => {
+    const zones = findCutZones(flattenContours(BAR), meta, {
+      ...DEFAULT_DETECT_OPTS, step: 5, minZoneWidth: 10,
+    });
+    expect(zones).toHaveLength(1);
+    expect(zones[0].glyphIndex).toBe(3);
+    expect(zones[0].cluster).toBe(1);
+    expect(zones[0].thickness).toBeCloseTo(20, 1);
+    expect(zones[0].toX - zones[0].fromX).toBeGreaterThan(50);
+  });
+
+  it("finds no zone on a circle", () => {
+    // Every cut through a circle crosses steeply sloped segments.
+    const r = 50;
+    const pts: SvgCmd[] = [{ type: "M", x: r, y: 0 }];
+    for (let i = 1; i <= 64; i++) {
+      const a = (i / 64) * Math.PI * 2;
+      pts.push({ type: "L", x: r * Math.cos(a), y: r * Math.sin(a) });
+    }
+    pts.push({ type: "Z" });
+    expect(findCutZones(flattenContours(pts), meta)).toHaveLength(0);
+  });
+
+  it("rejects a zone narrower than minZoneWidth", () => {
+    const zones = findCutZones(flattenContours(BAR), meta, {
+      ...DEFAULT_DETECT_OPTS, step: 5, minZoneWidth: 500,
+    });
+    expect(zones).toHaveLength(0);
+  });
+});
