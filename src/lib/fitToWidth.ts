@@ -194,6 +194,14 @@ export type RunStyle = {
   strokeWidth?: number;
   /** The block's horizontal warp, in the slider's own -100..100 units. */
   warpX?: number;
+  /**
+   * Width added by straight-stroke cuts, from
+   * `cutAdvanceTotal(block.strokeCuts, nuqtaUnits(...))`. Passed in already
+   * summed rather than as the cuts themselves, so this module stays free of
+   * nuqta and glyph geometry; the shared helper is what keeps the number the
+   * same one the renderer lays out with.
+   */
+  cutWidth?: number;
 };
 
 /**
@@ -222,7 +230,12 @@ export function styledRunWidth(
   const outline = Math.max(style.strokeWidth ?? 0, 0);
   const warp =
     (Math.abs(style.warpX ?? 0) / 100) * Math.max(box.width, 1) * WARP_X_SPREAD;
-  return box.width + shear + bold + outline + warp;
+  // Cuts add width the shaping measurement cannot see — they are geometry,
+  // not characters. Without this term a fit promises a width a stretched
+  // block then visibly exceeds, which is the exact bug this term list exists
+  // to prevent.
+  const cuts = Math.max(style.cutWidth ?? 0, 0);
+  return box.width + shear + bold + outline + warp + cuts;
 }
 
 /**

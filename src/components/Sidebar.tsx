@@ -252,6 +252,8 @@ export type SidebarProps = {
   /** Arms the on-canvas per-glyph move/scale dots. Plain text blocks only. */
   onToggleGlyphTransformMode?: (blockId: number) => void;
   onResetGlyphTransforms?: (blockId: number) => void;
+  onToggleStrokeCutMode?: (blockId: number) => void;
+  onClearStrokeCuts?: (blockId: number) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
   onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
   onDistributeSelected?: (axis: "x" | "y") => void;
@@ -486,6 +488,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleDiacriticEditMode,
   onToggleGlyphTransformMode,
   onResetGlyphTransforms,
+  onToggleStrokeCutMode,
+  onClearStrokeCuts,
   onFitShapeFillSpacing,
   onAlignSelected,
   onDistributeSelected,
@@ -2880,6 +2884,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         style={{ background: "var(--bg-input)", marginTop: 8 }}
                       >
                         Reset glyph moves &amp; scales
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Plain text only, matching the Move & scale row above and
+                    for the same reason: only ShapedText performs the outline
+                    surgery, so arming it elsewhere would show handles that
+                    stretch nothing. */}
+                {selectedBlock.type === "text" && (
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
+                    <div className="sidebarSectionTitle">Stretch strokes</div>
+
+                    <CheckboxRow
+                      id={makeId("stroke-cut-mode", selectedId)}
+                      label="Stretch strokes"
+                      checked={!!selectedBlock.strokeCutEditMode}
+                      onChange={() => onToggleStrokeCutMode?.(selectedBlock.id)}
+                    />
+
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                      Hover a letter to find a straight stroke, then drag along it to
+                      lengthen the letter itself. Hold Alt to drag off the half-nuqta
+                      steps. Not every letter has one — it depends on how the font
+                      draws it.
+                    </div>
+
+                    {(selectedBlock.strokeCuts?.length ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => onClearStrokeCuts?.(selectedBlock.id)}
+                        className="sidebarSmallAction"
+                        style={{ background: "var(--bg-input)", marginTop: 8 }}
+                      >
+                        Reset stroke stretches
                       </button>
                     )}
                   </div>

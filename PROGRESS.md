@@ -80,19 +80,38 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
-### 2026-08-21 — Straight-stroke extension: stopped at the measurement gate
+### 2026-08-21 — Straight-stroke extension: shipped
 
 A ten-task plan to let a calligrapher lengthen a letter's own straight
 strokes by cutting the outline and bridging the gap reached Task 3, its own
-go/no-go coverage measurement, placed deliberately before any UI work. **The
-gate required all four fonts to clear simultaneously; no tested setting
-cleared them all, and the human stopped the work there.** Tasks 1–3 are committed and kept (the pure detector, its
-tests, the offline sweep, and the measured record); Tasks 4–10 were never
-built. Numbers, the two rejected tunings, and the reasoning (the connector
-half mostly worked and duplicates the app's existing tatweel kashida; the
-letterform-internal half — the genuinely new part — is what failed):
-`docs/archive/stroke-zone-coverage.md` and CLAUDE.md, "Straight-stroke cut
-detection (kept, unused)".
+go/no-go coverage measurement, placed deliberately before any UI work, and
+**stopped there** — no tested `maxSlope` cleared all four gate fonts.
+
+**Resumed the same day.** The predicate was diagnosed as conflating two
+opposite defects behind one knob (inclined stems rejected, curve vertices
+accepted) and was replaced rather than retuned: detection now sweeps the
+stroke's own axis, and straightness is measured as per-edge bow away from a
+chord. Re-measured, **isolated-letter coverage clears 60% on all four gate
+fonts (75–86%)** — the half that structurally failed before, and the
+capability tatweel cannot provide. Amiri's join coverage remains the one
+gate failure and is accepted as a known per-font limitation, that half being
+the one tatweel kashida already covers everywhere.
+
+**Tasks 4–10 then built the feature.** Typography → **Stretch strokes** arms
+an on-canvas handle on every detected stroke; dragging it along the stroke
+lengthens the letter itself, in half-nuqta steps (Alt for free amounts). The
+outline is cut and bridged at the stroke's own weight, the run's advance grows
+with it, and Fit to width accounts for it. Kashida steps remap cuts rather
+than dropping them. `e2e/stroke-cuts.spec.ts` asserts the thing that matters —
+the drawn ink and the measured box both get wider — which is exactly what the
+removed Morph kashida dial never did.
+
+**Known limits, all deliberate:** plain text blocks only (shape fill and
+curved text are excluded the way every per-glyph tool excludes them); Amiri's
+joins are below the gate's bar; and one short false-positive zone survives in
+NotoSans seen. Numbers and the reproducible spot-check:
+`docs/archive/stroke-zone-coverage.md`, "Second pass"; the design argument,
+the mechanism and its traps: CLAUDE.md, "Straight-stroke cut detection".
 
 ### 2026-08-21 — New documents open on bare paper again
 

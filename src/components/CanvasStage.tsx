@@ -33,7 +33,7 @@ import {
   type SnapTarget,
 } from "../lib/snapping";
 import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
-import type { Block, DiacriticOverride, GlyphTransform } from "../types";
+import type { Block, DiacriticOverride, GlyphTransform, StrokeCut } from "../types";
 
 const GRID_SIZE = 40;
 const SNAP_GUIDE_PX = 6;
@@ -47,6 +47,9 @@ const RULER_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 25
 // inline would hand it a fresh array identity every render and defeat the
 // memo on every drag/pan/zoom frame.
 const NO_GLYPH_TRANSFORMS: GlyphTransform[] = [];
+/** Stable empty array, so a block with no cuts does not re-run
+ *  ShapedText's cut-plan memo on every render. */
+const NO_STROKE_CUTS: StrokeCut[] = [];
 
 /**
  * `buildSnapTargets` folds the ruler guides in with the artboard's own lines.
@@ -92,6 +95,7 @@ export type CanvasStageProps = {
     patch: Partial<DiacriticOverride>
   ) => void;
   onToggleDiacriticHidden: (blockId: number, glyphIndex: number) => void;
+  onSetStrokeCut: (blockId: number, cut: StrokeCut) => void;
   onUpdateGlyphTransform: (
     blockId: number,
     glyphIndex: number,
@@ -154,6 +158,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
   onUpdateGlyphTransform,
+  onSetStrokeCut,
   onResizeShapeFillBlock,
   onResizeImageBlock,
   showRulers,
@@ -914,6 +919,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     diacriticOverrides={block.diacriticOverrides ?? []}
                     glyphTransforms={block.glyphTransforms ?? NO_GLYPH_TRANSFORMS}
                     glyphTransformMode={block.glyphTransformMode ?? false}
+                    strokeCuts={block.strokeCuts ?? NO_STROKE_CUTS}
+                    strokeCutEditMode={block.strokeCutEditMode ?? false}
+                    onSetStrokeCut={(cut) => onSetStrokeCut(block.id, cut)}
                     onUpdateGlyphTransform={(glyphIndex, patch) =>
                       onUpdateGlyphTransform(block.id, glyphIndex, patch)
                     }

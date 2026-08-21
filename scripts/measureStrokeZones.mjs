@@ -70,8 +70,10 @@ const GATE_FONTS = ["Amiri.ttf", "Scheherazade.ttf", "NotoSans.ttf", "Kufi.ttf"]
 const SPOT_CHECK_LETTERS = ["ن", "ح", "س"];
 
 // tsx runs the TS module directly.
-const { toSvgCmds, flattenContours, findCutZones, crossingsAt, DEFAULT_DETECT_OPTS } =
-  await import("../src/lib/strokeCuts.ts");
+const {
+  toSvgCmds, flattenContours, findCutZones, findCutZonesSwept, zoneExtentX,
+  crossingsAt, DEFAULT_DETECT_OPTS,
+} = await import("../src/lib/strokeCuts.ts");
 // The gate (design doc) defines join coverage over "positions where a
 // tatweel is currently legal," not over every adjacent glyph pair — those
 // are different populations (see docs/archive/stroke-zone-coverage.md).
@@ -85,6 +87,26 @@ const argMaxSlope = argv
   ?.split("=")[1];
 const maxSlopeOverride = argMaxSlope !== undefined ? Number(argMaxSlope) : undefined;
 const spotCheckMode = argv.includes("--spotCheck");
+// Detect only cuts perpendicular to the baseline, i.e. the predicate as it
+// stood before the axis-relative amendment. Kept so the two readings can be
+// put side by side in the coverage record rather than compared from memory.
+const baselineOnly = argv.includes("--baselineOnly");
+const numArg = (name) => {
+  const raw = argv.find((a) => a.startsWith(`--${name}=`));
+  return raw === undefined ? undefined : Number(raw.split("=")[1]);
+};
+// Overrides for the axis-relative amendment's own knobs, so their effect on
+// coverage is measured rather than assumed. Angles are given in DEGREES on
+// the command line and converted here; DetectOpts stores radians.
+const bowOverride = numArg("maxEdgeBow");
+const maxAngleDeg = numArg("maxAngleDeg");
+const angleStepDeg = numArg("angleStepDeg");
+const amendedOpts = {
+  ...(bowOverride !== undefined ? { maxEdgeBow: bowOverride } : {}),
+  ...(maxAngleDeg !== undefined ? { maxAngle: (maxAngleDeg * Math.PI) / 180 } : {}),
+  ...(angleStepDeg !== undefined ? { angleStep: (angleStepDeg * Math.PI) / 180 } : {}),
+};
+const detect = baselineOnly ? findCutZones : findCutZonesSwept;
 
 // The join-proximity window: how close a zone has to sit to the shared pen
 // edge between two adjacent glyphs to count as covering that join, in font
@@ -131,13 +153,19 @@ function zonesForGlyph(parsed, upm, opts, g, fontFile) {
     throw new Error(`${fontFile}: opentype.js could not resolve glyph id ${g.g}`);
   }
   const cmds = toSvgCmds(glyphObj.getPath(0, 0, upm).commands);
-  return findCutZones(flattenContours(cmds), { glyphIndex: 0, cluster: 0 }, opts);
+  return detect(flattenContours(cmds), { glyphIndex: 0, cluster: 0 }, opts);
 }
 
 /** Does any zone in `zones` (glyph-local font units) overlap the window
  *  [edgeX - window, edgeX + window]? */
 function zoneNearEdge(zones, edgeX, window) {
-  return zones.some((z) => z.fromX <= edgeX + window && z.toX >= edgeX - window);
+  // Via zoneExtentX, never the raw fromX/toX: a tilted zone's own frame is
+  // displaced from glyph space by centreY * sin(angle), which at a typical
+  // stroke height is wider than this window.
+  return zones.some((z) => {
+    const [from, to] = zoneExtentX(z);
+    return from <= edgeX + window && to >= edgeX - window;
+  });
 }
 
 const hb = await resolveHb(hbjs);
@@ -151,7 +179,7 @@ async function runSpotCheck() {
       const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
       const parsed = opentype.parse(ab);
       const upm = parsed.unitsPerEm || 1000;
-      const opts = { ...DEFAULT_DETECT_OPTS, maxSlope, step: upm / 100, minZoneWidth: upm / 40 };
+      const opts = { ...DEFAULT_DETECT_OPTS, ...amendedOpts, maxSlope, step: upm / 100, minZoneWidth: upm / 40 };
       for (const ch of SPOT_CHECK_LETTERS) {
         const glyphs = await shape(hb, bytes, upm, ch);
         for (const g of glyphs) {
@@ -194,6 +222,7 @@ async function runSweep() {
     const upm = parsed.unitsPerEm || 1000;
     const opts = {
       ...DEFAULT_DETECT_OPTS,
+      ...amendedOpts,
       step: upm / 100,
       minZoneWidth: upm / 40,
       ...(maxSlopeOverride !== undefined ? { maxSlope: maxSlopeOverride } : {}),
@@ -279,7 +308,14 @@ async function runSweep() {
     });
   }
 
+  const deg = (r) => Math.round((r * 180) / Math.PI);
+  const eff = { ...DEFAULT_DETECT_OPTS, ...amendedOpts };
   console.log(`maxSlope=${maxSlopeOverride ?? DEFAULT_DETECT_OPTS.maxSlope} joinWindow=${JOIN_WINDOW_STEPS} steps (upm/${Math.round(100 / JOIN_WINDOW_STEPS)})`);
+  console.log(
+    `detector=${baselineOnly ? "baseline-only (vertical cuts)" : "axis-relative sweep"}` +
+    ` maxEdgeBow=${eff.maxEdgeBow}` +
+    (baselineOnly ? "" : ` maxAngle=${deg(eff.maxAngle)}deg angleStep=${deg(eff.angleStep)}deg`)
+  );
   console.log("| Font | isolated letters | zones | median zone (em) | contextual | join (all adjacent pairs) | join (tatweel-legal slots) |");
   console.log("|---|---|---|---|---|---|---|");
   for (const r of rows) {
