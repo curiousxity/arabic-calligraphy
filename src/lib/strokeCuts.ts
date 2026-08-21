@@ -186,6 +186,7 @@ export function findCutZones(
   const zones: CutZone[] = [];
   let runStart: number | null = null;
   let runThickness: number[] = [];
+  let lastX = minX - opts.step;
 
   const flush = (endX: number) => {
     if (runStart === null) return;
@@ -204,6 +205,7 @@ export function findCutZones(
   };
 
   for (let x = minX; x <= maxX; x += opts.step) {
+    lastX = x;
     const { legal, thickness } = legalCutAt(contours, x, opts);
     if (legal) {
       if (runStart === null) runStart = x;
@@ -212,6 +214,6 @@ export function findCutZones(
       flush(x - opts.step);
     }
   }
-  flush(maxX);
+  flush(lastX);
   return zones;
 }

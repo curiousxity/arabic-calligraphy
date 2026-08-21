@@ -83,16 +83,28 @@ describe("findCutZones", () => {
     expect(zones[0].toX - zones[0].fromX).toBeGreaterThan(50);
   });
 
-  it("finds no zone on a circle", () => {
-    // Every cut through a circle crosses steeply sloped segments.
-    const r = 50;
-    const pts: SvgCmd[] = [{ type: "M", x: r, y: 0 }];
-    for (let i = 1; i <= 64; i++) {
-      const a = (i / 64) * Math.PI * 2;
-      pts.push({ type: "L", x: r * Math.cos(a), y: r * Math.sin(a) });
-    }
-    pts.push({ type: "Z" });
-    expect(findCutZones(flattenContours(pts), meta)).toHaveLength(0);
+  it("does not claim unsampled geometry: zone toX respects last tested sample", () => {
+    // With step=7 over BAR's 0-100 range, the last sample is at x=98.
+    // The zone should NOT extend to x=100 (unsampled). Regression test for the
+    // trailing flush(maxX) bug.
+    const zones = findCutZones(flattenContours(BAR), meta, {
+      ...DEFAULT_DETECT_OPTS, step: 7, minZoneWidth: 10,
+    });
+    expect(zones).toHaveLength(1);
+    expect(zones[0].toX).toBeLessThanOrEqual(98);
+  });
+
+  it("rejects zones where maxSlope filter blocks all cuts (steep V-shape)", () => {
+    // A V-shape with both edges steep: (0,0) -> (50,100) -> (100,0).
+    // Every vertical cut at 0 < x < 100 crosses two edges with slope ±2,
+    // exceeding maxSlope: 0.18, so no zones form.
+    const steepV: SvgCmd[] = [
+      { type: "M", x: 0, y: 0 },
+      { type: "L", x: 50, y: 100 },
+      { type: "L", x: 100, y: 0 },
+      { type: "Z" },
+    ];
+    expect(findCutZones(flattenContours(steepV), meta, DEFAULT_DETECT_OPTS)).toHaveLength(0);
   });
 
   it("rejects a zone narrower than minZoneWidth", () => {
