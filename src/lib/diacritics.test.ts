@@ -146,7 +146,7 @@ describe("findDiacriticGlyphIndices (real HarfBuzz shaping)", () => {
     const { glyphs, font } = await shapeReal("بَ", "Amiri.ttf");
     expect(glyphs.length).toBe(2);
 
-    const indices = findDiacriticGlyphIndices(glyphs, font);
+    const indices = findDiacriticGlyphIndices(glyphs, font, "بَ");
 
     const fathaIndex = glyphs.findIndex((g) => {
       const unicodes = font.glyphs.get(g.g)?.unicodes ?? [];
@@ -169,7 +169,7 @@ describe("findDiacriticGlyphIndices (real HarfBuzz shaping)", () => {
 
   it("identifies the fatha as a diacritic and the beh as a base letter (FatemiMaqala)", async () => {
     const { glyphs, font } = await shapeReal("بَ", "FatemiMaqala.ttf");
-    const indices = findDiacriticGlyphIndices(glyphs, font);
+    const indices = findDiacriticGlyphIndices(glyphs, font, "بَ");
 
     const fathaIndex = glyphs.findIndex((g) => {
       const unicodes = font.glyphs.get(g.g)?.unicodes ?? [];
@@ -191,7 +191,7 @@ describe("findDiacriticGlyphIndices (real HarfBuzz shaping)", () => {
     const { glyphs, font } = await shapeReal("مَحَّمَد", "Amiri.ttf");
     expect(glyphs.length).toBe(8);
 
-    const indices = findDiacriticGlyphIndices(glyphs, font);
+    const indices = findDiacriticGlyphIndices(glyphs, font, "مَحَّمَد");
 
     // Exactly 4 base letters (meem, hah, meem, dal) and 4 marks
     // (fatha, shadda, fatha, fatha) — verified against real shaping
@@ -222,18 +222,89 @@ describe("findDiacriticGlyphIndices (real HarfBuzz shaping)", () => {
     }
   });
 
+  // A font may encode its marks in the Private Use Area and position them
+  // by their own outlines rather than by GPOS, defeating both of the
+  // signals above: the cmap says the glyph is U+E824, and dx/dy are 0.
+  // What such a mark still has is a zero advance inside a cluster whose
+  // source text really does hold a combining mark.
+  it("identifies PUA-encoded marks positioned without GPOS (Thuluth)", async () => {
+    const text = "حَرْفٌ";
+    const { glyphs, font } = await shapeReal(text, "Thuluth.ttf");
+    expect(glyphs.length).toBe(6);
+
+    const indices = findDiacriticGlyphIndices(glyphs, font, text);
+
+    // Three marks in the source (fatha, sukun, dammatan), three mark
+    // glyphs — each drawn as its own PUA glyph with no advance.
+    expect(indices.size).toBe(3);
+    for (let i = 0; i < glyphs.length; i++) {
+      expect(indices.has(i)).toBe((glyphs[i].ax ?? 0) === 0);
+    }
+  });
+
+  it("identifies PUA-encoded marks positioned without GPOS (Yekan)", async () => {
+    const text = "حَرْفٌ";
+    const { glyphs, font } = await shapeReal(text, "Yekan.ttf");
+
+    const indices = findDiacriticGlyphIndices(glyphs, font, text);
+
+    expect(indices.size).toBe(3);
+    for (let i = 0; i < glyphs.length; i++) {
+      expect(indices.has(i)).toBe((glyphs[i].ax ?? 0) === 0);
+    }
+  });
+
+  // A letter's own dots are a separate GPOS-attached glyph in some fonts,
+  // sharing the base letter's cluster with a nonzero attachment offset —
+  // the exact shape the dx/dy fallback reads as a mark. The source text is
+  // what tells them apart: an unmarked word has no combining character to
+  // spend on them.
+  it("does not flag a letter's dots on unmarked text (NotoSans)", async () => {
+    const text = "حرف";
+    const { glyphs, font } = await shapeReal(text, "NotoSans.ttf");
+
+    // The feh's dot really is present as its own zero-advance glyph with a
+    // nonzero attachment offset — otherwise this test proves nothing.
+    const dotIndex = glyphs.findIndex(
+      (g) =>
+        (font.glyphs.get(g.g)?.unicodes ?? []).length === 0 &&
+        (g.ax ?? 0) === 0 &&
+        ((g.dx ?? 0) !== 0 || (g.dy ?? 0) !== 0)
+    );
+    expect(dotIndex).toBeGreaterThanOrEqual(0);
+
+    expect(findDiacriticGlyphIndices(glyphs, font, text).size).toBe(0);
+  });
+
+  it("flags the marks but neither the dots nor a GPOS-shifted base (NotoSans)", async () => {
+    const text = "حَرْفٌ";
+    const { glyphs, font } = await shapeReal(text, "NotoSans.ttf");
+
+    const indices = findDiacriticGlyphIndices(glyphs, font, text);
+
+    // Exactly the three cmap-identified marks.
+    expect(indices.size).toBe(3);
+    for (let i = 0; i < glyphs.length; i++) {
+      const unicodes = font.glyphs.get(glyphs[i].g)?.unicodes ?? [];
+      const isMark = unicodes.some(
+        (u) => u === 0x064c || u === 0x0652 || u === 0x064e
+      );
+      expect(indices.has(i)).toBe(isMark);
+    }
+  });
+
   it("returns an empty set for plain text with no diacritics", async () => {
     const { glyphs, font } = await shapeReal("بت", "Amiri.ttf");
-    expect(findDiacriticGlyphIndices(glyphs, font).size).toBe(0);
+    expect(findDiacriticGlyphIndices(glyphs, font, "بت").size).toBe(0);
   });
 
   it("returns an empty set for an empty glyph array", async () => {
     const { font } = await shapeReal("ب", "Amiri.ttf");
-    expect(findDiacriticGlyphIndices([], font).size).toBe(0);
+    expect(findDiacriticGlyphIndices([], font, "ب").size).toBe(0);
   });
 
   it("returns an empty set when no font is available", () => {
-    expect(findDiacriticGlyphIndices([{ g: 1, cl: 0 }], null).size).toBe(0);
-    expect(findDiacriticGlyphIndices([{ g: 1, cl: 0 }], undefined).size).toBe(0);
+    expect(findDiacriticGlyphIndices([{ g: 1, cl: 0 }], null, "ب").size).toBe(0);
+    expect(findDiacriticGlyphIndices([{ g: 1, cl: 0 }], undefined, "ب").size).toBe(0);
   });
 });

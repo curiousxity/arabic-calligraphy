@@ -371,8 +371,13 @@ export const ShapedText: React.FC<Props> = ({
   // lands on) degrades to a no-op instead of hiding/scaling a base
   // letter.
   const diacriticGlyphIndices = useMemo(
-    () => findDiacriticGlyphIndices(shapeData.glyphs, shapeData.font),
-    [shapeData.glyphs, shapeData.font]
+    () =>
+      findDiacriticGlyphIndices(
+        shapeData.glyphs,
+        shapeData.font,
+        shapeData.shapableText
+      ),
+    [shapeData.glyphs, shapeData.font, shapeData.shapableText]
   );
 
   const activeDiacriticOverrides = useMemo(

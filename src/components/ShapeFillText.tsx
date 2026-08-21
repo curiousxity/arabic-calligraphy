@@ -275,8 +275,13 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   // shift indices) is ignored rather than hiding or ballooning that letter —
   // the same guard ShapedText.tsx already applies.
   const diacriticGlyphIndices = useMemo(
-    () => findDiacriticGlyphIndices(shapeData.glyphs, shapeData.font),
-    [shapeData.glyphs, shapeData.font]
+    () =>
+      findDiacriticGlyphIndices(
+        shapeData.glyphs,
+        shapeData.font,
+        shapeData.shapableText
+      ),
+    [shapeData.glyphs, shapeData.font, shapeData.shapableText]
   );
 
   const activeDiacriticOverrides = useMemo(
