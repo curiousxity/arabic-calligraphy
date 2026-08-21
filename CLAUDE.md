@@ -1425,24 +1425,33 @@ bytes of assets. Two things about it:
   asserts `grain(0, v) === grain(1, v)` on every texture, which is what caught
   `Math.sign` flipping on floating-point dust at linen's tile edge.
 
-**A new document opens on `washi`, not on bare paper.** The first screen is
-the app's whole claim, and flat white under a 40px grid reads as graph paper.
-The choice of texture is not decorative: a surface is drawn in *document*
-space, so the stage's scale magnifies its grain along with everything else,
-and a fresh canvas opens at **275%**. At that zoom parchment's mottling and
-laid-paper's chain lines both smear into blotches that read as staining;
-washi's fibres are fine enough to survive it. Compared on screen at that
-zoom rather than chosen from the names — if a new texture is ever made the
-default, compare it the same way.
+**A new document opens on bare paper** — the flat background colour, no
+texture. A surface is a choice the user makes, not something a fresh canvas
+arrives already wearing.
 
-Only the *default* moved. `readArtboardSurface` still answers bare for a
-payload with no surface key, so every project saved before this keeps its
-look. The one place it bites is **pixel assertions in `e2e/`**: paper grain
+This reversed on 2026-08-21. The 2026-08-20 interface pass had opened new
+documents on `washi`, arguing that flat white under a 40px grid reads as graph
+paper — but that argument was about the *grid*, and the same pass fixed the
+grid directly by drawing it as a one-device-pixel hairline at any zoom instead
+of ~2.75px at the default 275%. With the grid no longer shouting, a texture
+was no longer needed to drown it out.
+
+**The zoom caveat survives the reversal and still governs picking a texture.**
+A surface is drawn in *document* space, so the stage's scale magnifies its
+grain along with everything else, and a fresh canvas opens at **275%**. At
+that zoom parchment's mottling and laid-paper's chain lines both smear into
+blotches that read as staining; washi's fibres are fine enough to survive it.
+Compare on screen at that zoom rather than choosing from the names — and if a
+texture is ever made the default again, compare it the same way.
+
+`readArtboardSurface` was not touched by either change, so a saved project
+keeps whatever surface it holds, washi included. The related trap in `e2e/` is
+still live and is about textures generally, not about the default: paper grain
 lands inside a block's own bounding box and inflates any colour count taken
-there, so the three tests in `ink-surface.spec.ts` that measure ink now ask
-for `chooseSurface(page, "")` first. A test that measures a *delta* against a
-baseline is the fragile kind — a textured baseline can be high enough that a
-real gradient no longer clears it.
+there, so the three tests in `ink-surface.spec.ts` that measure ink ask for
+`chooseSurface(page, "")` explicitly rather than trusting the default. A test
+that measures a *delta* against a baseline is the fragile kind — a textured
+baseline can be high enough that a real gradient no longer clears it.
 
 The surface is App state (`artboardSurface: { textureId, tint }`), **not**
 part of `ArtboardConfig` — a freeform canvas gets paper too. It is saved with

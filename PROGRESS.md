@@ -80,6 +80,20 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-08-21 — New documents open on bare paper again
+
+Reverses one of the seven changes in the 2026-08-20 interface pass. That pass
+opened a new document on `washi` because flat white under a 40px grid read as
+graph paper — but the argument was about the grid, and the same pass fixed the
+grid directly by drawing it as a one-device-pixel hairline at any zoom instead
+of ~2.75px at the default 275%. With the grid no longer shouting, a texture is
+not needed to drown it out, and a surface goes back to being a choice the user
+makes.
+
+Only the default moved. `readArtboardSurface` is untouched, so a saved project
+keeps whatever surface it holds. The zoom caveat that picked washi over the
+other textures still governs choosing one — see CLAUDE.md, "Ink & surface".
+
 ### 2026-08-21 — CI deploy reaches production
 
 The GitHub Actions deploy had never once succeeded. Every run since it was

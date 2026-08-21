@@ -73,6 +73,7 @@ import {
 // ---- STREAM-F: ink & surface — imports ----
 import { GOLD_PRESETS, type BlockFill } from "./lib/blockFill";
 import {
+  NO_SURFACE,
   TEXTURES,
   getTexture,
   readArtboardSurface,
@@ -319,23 +320,25 @@ const App: React.FC = () => {
   // a look, and `null` freeform pages get one too, so it is not a property of
   // "there is a page". Saved with the document; not in the undo snapshot,
   // which this stream's anchors do not reach.
-  // A new document opens on paper rather than flat white. The first screen is
-  // the app's whole claim, and bare white under a 40px grid reads as graph
-  // paper — the opposite of what this tool is for.
+  // A new document opens on bare paper — the flat background colour, no
+  // texture. A surface is a deliberate choice the user makes, not something
+  // a fresh canvas arrives already wearing.
   //
-  // Washi, specifically, and the reason is the *default zoom*. A surface is
-  // drawn in document space, so the stage's scale magnifies its grain along
-  // with everything else; at the 275% a fresh canvas opens at, parchment's
-  // mottling and laid-paper's chain lines both smear into blotches that read
-  // as staining. Washi's fibres are fine enough to survive the magnification.
-  // Compared on screen at that zoom, not chosen from the names.
+  // This reverses the 2026-08-20 interface pass, which opened on washi so the
+  // first screen would not read as graph paper. That argument was about the
+  // grid, and the same pass fixed the grid directly: it now draws as a
+  // one-device-pixel hairline at any zoom instead of ~2.75px at the default
+  // 275%. With the grid no longer shouting, the texture is not needed to
+  // drown it out.
   //
-  // Only the *default* moves: `readArtboardSurface` still answers bare for a
-  // payload with no surface key, so every project saved before this keeps its
-  // look.
-  const [artboardSurface, setArtboardSurface] = useState<ArtboardSurface>({
-    textureId: "washi",
-  });
+  // The zoom caveat that picked washi over the others still holds and still
+  // matters when choosing one: a surface is drawn in document space, so the
+  // stage's scale magnifies its grain, and at 275% parchment's mottling and
+  // laid-paper's chain lines smear into blotches that read as staining.
+  //
+  // Only the *default* moves. `readArtboardSurface` is unchanged, so a saved
+  // project keeps whatever surface it was saved with — including washi.
+  const [artboardSurface, setArtboardSurface] = useState<ArtboardSurface>(NO_SURFACE);
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — state ----
   // The user's uploaded fonts. Not part of the document: a project references

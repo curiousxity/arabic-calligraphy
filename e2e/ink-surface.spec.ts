@@ -142,10 +142,10 @@ test("a paper surface textures the page, and a tint recolours it", async ({ page
   await gotoApp(page);
   const corner = await paperCorner(page);
 
-  // A new document now opens on washi, so bare paper has to be asked
-  // for before it can be the baseline. Chosen explicitly rather than
-  // assumed: that it is *reachable* is the half of this the default change
-  // could break.
+  // Bare paper is asked for rather than assumed. It is the default again as
+  // of 2026-08-21, but this test must not depend on that: that bare is
+  // *reachable* is the half a default change could break, and pinning it
+  // explicitly is what keeps this test honest whichever way the default goes.
   await chooseSurface(page, "");
   await expect.poll(() => distinctColors(page, corner)).toBeLessThanOrEqual(2);
 
@@ -201,8 +201,10 @@ test("a PNG export with a surface differs from one without", async ({ page }) =>
   await openPanel(page, /Project & Export/);
   await page.getByLabel(/Transparent background/).uncheck();
 
-  // "Plain" has to be asked for now that a new document opens on washi —
-  // otherwise this compares washi against washi and reports no difference.
+  // Both sides are asked for explicitly. The default is bare as of
+  // 2026-08-21, but relying on that would make this compare the default
+  // against a texture rather than bare against a texture — and it would
+  // silently become washi-against-washi if the default ever moves back.
   await chooseSurface(page, "");
   const plain = await exportAndRead(page, "Export PNG");
   await chooseSurface(page, "washi");
