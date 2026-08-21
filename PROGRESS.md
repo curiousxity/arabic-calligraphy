@@ -80,6 +80,22 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-08-21 — CI deploy reaches production
+
+The GitHub Actions deploy had never once succeeded. Every run since it was
+added on 2026-08-19 passed lint, the unit suite and the build, then failed at
+the `wrangler-action` step with `it's necessary to set a CLOUDFLARE_API_TOKEN`.
+The breakage was invisible from outside: the live site was current throughout,
+because it was being published by hand with `npm run build && npx wrangler
+deploy`.
+
+Only `CLOUDFLARE_API_TOKEN` existed as a repository secret —
+`CLOUDFLARE_ACCOUNT_ID` had never been added at all. Adding it and re-pasting
+the token cleared it, and run `32486702539` both uploaded and attached
+`harf.hash.immo` as a custom domain. Which of the two changes was the actual
+fix is not known; both moved before the first green run. See CLAUDE.md,
+"Deployment".
+
 ### 2026-08-20 — Interface pass: contrast, focus, targets, and paper
 
 A design review of the running app, measured in the browser rather than

@@ -86,6 +86,17 @@ edit, plus Workers Routes edit on the `hash.immo` zone — without the zone
 permission the Worker publishes but the custom domain is never attached) and
 `CLOUDFLARE_ACCOUNT_ID`.
 
+**Both must be present, and the error message does not tell you which one is
+missing.** From 2026-08-19 to 2026-08-21 only the token was set, and every run
+failed with wrangler's `it's necessary to set a CLOUDFLARE_API_TOKEN` — naming
+the secret that *was* configured. Adding the account ID and re-pasting the
+token together fixed it, so it is not established which of the two the message
+was really about; treat it as "check both" rather than as evidence about the
+token. A green run's own log is the thing to read, and the line worth finding
+is `Deployed harf triggers` followed by `harf.hash.immo (custom domain)` —
+that, not the checkmark, is what says the zone permission was sufficient and
+the domain is attached.
+
 `wrangler.toml` holds the whole configuration, with nothing set dashboard-only:
 `dist` as the asset directory, `not_found_handling = "single-page-application"`
 for the SPA fallback, and a `[[routes]]` block declaring `harf.hash.immo` as a
