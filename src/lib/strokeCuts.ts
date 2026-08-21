@@ -21,12 +21,14 @@
  * three of the four fonts (Scheherazade, NotoSans, Kufi). NotoSans clears
  * both bars at every tested setting including baseline; Kufi clears both
  * only at the two loosened settings, missing on isolated coverage at
- * baseline. What actually fails is the letterform-internal half: Amiri's
- * join score is the one outlier (0% at baseline, still only 56% at the
- * loosened ceiling — a genuine property of where its zones sit, not a metric
- * artifact) and Scheherazade's isolated-letter coverage never reaches the
- * 60% bar at any tested setting, getting worse as the tolerance loosens (54%
- * → 46% → 32%). Because the gate requires all four fonts to clear at once,
+ * baseline. What actually fails is the letterform-internal half:
+ * Scheherazade's isolated-letter coverage never reaches the 60% bar at any
+ * tested setting, getting worse as the tolerance loosens (54% → 46% → 32%),
+ * and Kufi's isolated score fails at baseline. Additionally, Amiri also
+ * fails the join half (0% at baseline, still only 56% at the loosened
+ * ceiling — a genuine property of where its zones sit, not a metric
+ * artifact), which is why the join half could not carry the gate on its own
+ * despite strong join coverage in the other three fonts. Because the gate requires all four fonts to clear at once,
  * it is never met. The reason is structural — Arabic strokes as these fonts
  * actually draw them are subtly inclined nearly everywhere, so the tolerance
  * that admits a real stroke also admits a curve. Full measurement:

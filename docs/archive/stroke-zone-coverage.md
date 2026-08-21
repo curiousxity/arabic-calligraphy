@@ -356,7 +356,7 @@ the font's own geometry supports it. So the join half of this feature is not
 the reason the gate fails for three of the four fonts — the letterform-
 internal half (isolated coverage) is: Scheherazade never clears its own bar,
 Kufi clears it only at the two loosened settings the spot-check disqualifies
-below, and Amiri's isolated score, while it clears 60% at baseline, is not
+above, and Amiri's isolated score, while it clears 60% at baseline, is not
 what carries the font through the *whole* four-way gate since its own join
 score is what fails there instead. No single setting clears isolated *and*
 join on all four gate fonts at once.
@@ -381,7 +381,7 @@ join numbers do not change this choice, for two independent reasons: first,
 Scheherazade's isolated coverage — the metric actually blocking the gate for
 that font — never reaches 60% in the brief's authorized tuning range
 regardless of which join denominator is used; second, the curved-letter
-spot-check below shows *why* 0.25/0.35 should not be trusted even where they
+spot-check above shows *why* 0.25/0.35 should not be trusted even where they
 numerically help (Kufi's isolated score, NotoSans's), independent of the
 join numbers entirely. At every tested value, the four-way gate is not met.
 Diwani, Ruqaa, and Thuluth score low across all three runs as expected and

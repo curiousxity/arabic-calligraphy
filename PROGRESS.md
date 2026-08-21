@@ -85,8 +85,8 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 A ten-task plan to let a calligrapher lengthen a letter's own straight
 strokes by cutting the outline and bridging the gap reached Task 3, its own
 go/no-go coverage measurement, placed deliberately before any UI work. **The
-gate failed on all four required fonts at once and the human stopped the
-work there.** Tasks 1–3 are committed and kept (the pure detector, its
+gate required all four fonts to clear simultaneously; no tested setting
+cleared them all, and the human stopped the work there.** Tasks 1–3 are committed and kept (the pure detector, its
 tests, the offline sweep, and the measured record); Tasks 4–10 were never
 built. Numbers, the two rejected tunings, and the reasoning (the connector
 half mostly worked and duplicates the app's existing tatweel kashida; the
