@@ -666,6 +666,82 @@ those edits dropped rather than half-rendered. The layout payload's `version`
 moved 4 → 5 and no longer embeds `glyphRigs`. The `harfcanvas-glyph-rigs-v1`
 localStorage key is simply orphaned; nothing reads or clears it.
 
+### Straight-stroke cut detection (`src/lib/strokeCuts.ts`) — kept, unused
+
+Same lineage as "Removed subsystems" above, one tier down: a 2026-08-21
+attempt to give letterform strokes and letter-to-letter connectors a second
+elongation mechanism, this time by cutting a glyph's own outline and
+bridging the gap — avoiding both the per-font authored data that killed the
+Morph Glyph Editor and the character-insertion tatweel kashida already uses.
+`findCutZones` sweeps a flattened outline for x-ranges where a vertical cut
+is legal: crossed an even number of times, at least twice; every crossed
+segment within `maxSlope` of parallel to the baseline; steady thickness
+across the run. Full design: `docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`.
+
+**It has no application consumer.** The plan that specified it
+(`docs/superpowers/plans/2026-08-21-straight-stroke-extension.md`) stopped
+at Task 3 — its own go/no-go coverage gate — and the human decided not to
+continue: Tasks 4–10 (outline surgery, `ShapedText` integration, storage, the
+on-canvas drag handle, kashida coexistence, e2e) were never written. The
+module is reachable from exactly one place, `scripts/measureStrokeZones.mjs`,
+the offline sweep that produced the gate's numbers. It is kept rather than
+deleted for the same reason the stroke-schema Python tooling was kept when
+the Morph Editor was removed: it is inert, and it is the other half of
+"don't redo the work" should the underlying font geometry ever be worth
+re-measuring. **Don't delete this as an unused 200-line module** — nothing
+else in the app imports it, and that absence is the intended end state, not
+an oversight.
+
+**What the measurement established, so it is not re-derived.** The gate
+needed the four naskh/kufi faces (Amiri, Scheherazade, NotoSans, Kufi) to
+clear isolated-letter coverage ≥60% *and* join coverage ≥80% **at once**. At
+the shipped `maxSlope: 0.18`, and at both looser values the design
+authorized trying (0.25, 0.35 — its hard ceiling), no setting ever cleared
+both bars on all four fonts simultaneously — but the numbers behind that
+failure are not what an earlier draft of this section said, and the shape
+of the failure matters for what to conclude from it. Full tables, both a
+join reading over every adjacent glyph pair and the design doc's own reading
+over positions where a tatweel is actually legal, and the reproducible
+spot-check all live in `docs/archive/stroke-zone-coverage.md`, which this
+section only summarizes.
+
+**The join half works.** Measured the way the design doc's gate actually
+specifies it — coverage of positions where a tatweel is currently legal, not
+of every adjacent glyph pair — join coverage reaches roughly 90–100% in
+three of the four gate fonts (Scheherazade, NotoSans, Kufi) at the shipped
+`maxSlope`, and stays there across the whole tuning range. Amiri is the one
+real outlier on join, a property of where its own zones sit relative to its
+joins, checked directly and confirmed genuine rather than a metric artifact.
+
+**The letterform-internal half is what actually failed.** Isolated-letter
+coverage is what keeps the gate from passing: Scheherazade's isolated score
+never reaches the 60% bar at any tested setting, and gets *worse*, not
+better, as the tolerance loosens. The reason is structural, not a tuning
+miss — the legality predicate requires every outline segment a cut crosses
+to run within `maxSlope` of parallel to the baseline, and Arabic strokes as
+these fonts actually draw them are subtly inclined nearly everywhere, so a
+tolerance loose enough to admit a real stem or bar also admits a curve. The
+spot-check names it directly: at `maxSlope: 0.35`, Kufi's ن reports a zone
+whose two crossings each sweep through zero across the zone's width — one
+running roughly −0.34 to +0.23, the other +0.34 to −0.23 — the false-flat at
+a curve's own vertex, not a straight run; Amiri's س and Scheherazade's ن show
+the same failure at their own hook and tail curl.
+
+**Why the working half doesn't make this worth building anyway.** The join
+case competes with tatweel kashida (see "Kashida elongation" above), which
+applies to every bundled font by inserting a real character the font shapes
+at its own designed weight — verified directly in three real fonts
+(`tatweel.test.ts`), and known to be font-dependent in its own right (a
+tatweel can decompose a ligature like الله, which the font is doing
+correctly, not a bug). A straight-stroke connector mechanism reaching
+~90–100% join coverage on three fonts would be a second, more complex way to
+do something the app can already do everywhere. The letterform-internal
+case — stretching a stroke *inside* a letterform, which tatweel structurally
+cannot touch — is the genuinely new capability this plan would have added,
+and it is the half whose own coverage number is what keeps the gate from
+passing. That is why stopping here is the right call, not merely the
+measured one.
+
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
 A fourth block type, `textPath`, flows shaped text along an arbitrary curve

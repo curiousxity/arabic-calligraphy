@@ -10,6 +10,28 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`
 
+## Status: stopped at the Task 3 gate — do not resume
+
+**Execution stopped after Task 3.** Task 3 was this plan's own go/no-go
+coverage measurement, placed deliberately before any UI work. It failed: at
+the shipped `maxSlope` and at both looser values this plan authorizes trying,
+no setting cleared both the isolated-letter and join thresholds on all four
+gate fonts (Amiri, Scheherazade, NotoSans, Kufi) **at once** — three of the
+four clear the join bar on the design doc's own denominator, but the
+letterform-internal (isolated-letter) half is what failed, and the reason is
+structural rather than a tuning miss — see `docs/archive/stroke-zone-coverage.md`
+for the measurement (the single home for these numbers) and CLAUDE.md,
+"Straight-stroke cut detection (kept, unused)" for what it established. A
+human reviewed that record and decided not to proceed.
+
+**Tasks 4–10 below were never started.** This plan did not run out of time
+or get interrupted mid-flight — it reached the stopping point it was
+designed to reach, and stopped there. Tasks 1–3 are committed and kept: the
+detector (`src/lib/strokeCuts.ts`), its tests, the offline measurement script,
+and the coverage record. Do not resume this plan from Task 4 without a new
+measurement that clears the gate; the numbers in the archive file are why it
+does not.
+
 ## Global Constraints
 
 - **`src/lib/strokeCuts.ts` must not import `./harfbuzz`.** That module statically imports harfbuzzjs, whose CJS/ESM shape throws under Vitest's Node loader before any test code runs. Callers pass geometry in. Same rule `tatweel.ts`, `fitToWidth.ts` and `diacritics.ts` follow.
@@ -55,7 +77,7 @@ Task 1 therefore adds a contour-preserving `flattenContours` returning `Pt[][]`,
 - Consumes: `SvgCmd` from `src/lib/svgPath.ts`.
 - Produces: `Pt`, `Contour`, `toSvgCmds`, `flattenContours`, `crossingsAt`, `legalCutAt`, `DetectOpts`, `DEFAULT_DETECT_OPTS`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // src/lib/strokeCuts.test.ts
@@ -129,12 +151,12 @@ describe("legalCutAt", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/lib/strokeCuts.test.ts`
 Expected: FAIL — "Failed to resolve import ./strokeCuts".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // src/lib/strokeCuts.ts
@@ -301,17 +323,17 @@ export function legalCutAt(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/lib/strokeCuts.test.ts`
 Expected: PASS, 6 tests.
 
-- [ ] **Step 5: Run the full verification loop**
+- [x] **Step 5: Run the full verification loop**
 
 Run: `npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build`
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/strokeCuts.ts src/lib/strokeCuts.test.ts
@@ -330,7 +352,7 @@ git commit -m "Add stroke-cut geometry: contour flattening and cut legality"
 - Consumes: `flattenContours`, `legalCutAt`, `DetectOpts` from Task 1.
 - Produces: `CutZone`, `findCutZones(contours, meta, opts?) => CutZone[]`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // append to src/lib/strokeCuts.test.ts
@@ -371,12 +393,12 @@ describe("findCutZones", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/lib/strokeCuts.test.ts -t findCutZones`
 Expected: FAIL — `findCutZones is not a function`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // append to src/lib/strokeCuts.ts
@@ -438,16 +460,16 @@ export function findCutZones(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/lib/strokeCuts.test.ts`
 Expected: PASS, 9 tests.
 
-- [ ] **Step 5: Run the full verification loop**
+- [x] **Step 5: Run the full verification loop**
 
 Run: `npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/strokeCuts.ts src/lib/strokeCuts.test.ts
@@ -468,7 +490,16 @@ git commit -m "Add stroke-cut zone discovery"
 - Consumes: `toSvgCmds`, `flattenContours`, `findCutZones`, `DEFAULT_DETECT_OPTS`.
 - Produces: the measured table, and tuned `DEFAULT_DETECT_OPTS` values if the sweep shows the starting ones are wrong.
 
-- [ ] **Step 1: Write the script**
+- [x] **Step 1: Write the script**
+
+**The sketch below is what Step 1 originally wrote, kept for the historical
+record of how this task was planned. It is not what shipped.** Its
+`connectorPct`/join computation was found to score the wrong population
+(every adjacent glyph pair rather than the positions where a tatweel is
+actually legal, which is what the gate in this task's own header specifies)
+and was rewritten twice more after that — see `docs/archive/stroke-zone-coverage.md`'s
+own revision history for what changed and why, and read that file rather
+than this code block for the script's actual current behaviour.
 
 ```js
 // scripts/measureStrokeZones.mjs
@@ -575,7 +606,7 @@ for (const r of rows) {
 }
 ```
 
-- [ ] **Step 2: Run the sweep**
+- [x] **Step 2: Run the sweep**
 
 Run: `npx tsx scripts/measureStrokeZones.mjs`
 
@@ -583,22 +614,22 @@ Run: `npx tsx scripts/measureStrokeZones.mjs`
 
 Expected: a markdown table, 17 rows, no exceptions.
 
-- [ ] **Step 3: Tune the detector if the sweep says to**
+- [x] **Step 3: Tune the detector if the sweep says to**
 
 If Amiri/Scheherazade/NotoSans/Kufi come in far below the gate, try `maxSlope` at 0.25 and 0.35 and re-run before concluding anything. Record which value produced the table you report. **Do not tune past the point where zones appear on obviously curved letters** (ن، س tails) — that is the detector lying, and it is exactly the failure the old subsystem shipped.
 
-- [ ] **Step 4: Write the coverage record**
+- [x] **Step 4: Write the coverage record**
 
 Create `docs/archive/stroke-zone-coverage.md` containing: the date, the `DetectOpts` used, the full table, and a one-paragraph verdict against the gate.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/measureStrokeZones.mjs docs/archive/stroke-zone-coverage.md
 git commit -m "Measure straight-stroke coverage across the font library"
 ```
 
-- [ ] **Step 6: STOP and report**
+- [x] **Step 6: STOP and report**
 
 Report the table against the gate: **≥60%** of base letters on Amiri, Scheherazade, NotoSans and Kufi, and **≥80%** of connector positions. Wait for a human go/no-go.
 

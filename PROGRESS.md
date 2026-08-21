@@ -80,6 +80,20 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-08-21 — Straight-stroke extension: stopped at the measurement gate
+
+A ten-task plan to let a calligrapher lengthen a letter's own straight
+strokes by cutting the outline and bridging the gap reached Task 3, its own
+go/no-go coverage measurement, placed deliberately before any UI work. **The
+gate required all four fonts to clear simultaneously; no tested setting
+cleared them all, and the human stopped the work there.** Tasks 1–3 are committed and kept (the pure detector, its
+tests, the offline sweep, and the measured record); Tasks 4–10 were never
+built. Numbers, the two rejected tunings, and the reasoning (the connector
+half mostly worked and duplicates the app's existing tatweel kashida; the
+letterform-internal half — the genuinely new part — is what failed):
+`docs/archive/stroke-zone-coverage.md` and CLAUDE.md, "Straight-stroke cut
+detection (kept, unused)".
+
 ### 2026-08-21 — New documents open on bare paper again
 
 Reverses one of the seven changes in the 2026-08-20 interface pass. That pass

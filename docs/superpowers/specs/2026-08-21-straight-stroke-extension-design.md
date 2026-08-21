@@ -3,6 +3,25 @@
 Lengthening a letter's own straight strokes by cutting the outline and
 bridging the gap, rather than by inserting characters.
 
+## Status: measured and stopped — read this before the rest of the doc
+
+**This design was built through Task 3 of its own plan, measured against
+the go/no-go gate below, and the gate failed.** A human reviewed the
+measurement and decided not to build Tasks 4–10 (the rendering, storage and
+on-canvas UI this document argues for). The argument below is the case
+*for* attempting this — it is preserved as-written because it is still an
+accurate account of why the attempt seemed worth making, not because the
+attempt succeeded. Do not read past this block and start implementing.
+
+The measurement, the two rejected tunings, and the reasoning for stopping:
+`docs/archive/stroke-zone-coverage.md`. The short version: the connector
+(join) half of what this doc proposes mostly works, but it duplicates
+coverage the app's existing tatweel kashida already provides in every
+bundled font; the letterform-internal half — the genuinely new capability —
+is what failed to clear its own coverage bar. See also CLAUDE.md,
+"Straight-stroke cut detection (kept, unused)", and the plan file's own
+Status block: `docs/superpowers/plans/2026-08-21-straight-stroke-extension.md`.
+
 ## Why this is being attempted again
 
 The Morph Glyph Editor and everything under it were removed on 2026-08-14
