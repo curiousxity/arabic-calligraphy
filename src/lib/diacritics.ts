@@ -44,38 +44,56 @@ export const ARABIC_DIACRITIC_RE =
  * value is the *base letter's* character offset — a mark glyph's own
  * `glyph.cl` therefore never points at the mark's own character, so
  * cluster-to-source-character lookup (indexing into `shapableText` with
- * `glyph.cl`) cannot identify marks. Instead this identifies marks by
- * glyph identity plus GPOS attachment shape, verified against real
- * HarfBuzz output for Amiri/FatemiMaqala (see diacritics.test.ts):
+ * `glyph.cl`) cannot identify marks one for one. What a cluster's source
+ * span *can* say is **how many** marks were typed there, and that count
+ * is what this function spends. Verified against real HarfBuzz output for
+ * seven fonts (see diacritics.test.ts):
  *
- * 1. Primary signal: the glyph's own Unicode codepoint(s) (from
- *    `font.glyphs.get(g.g).unicodes`, opentype.js's cmap-derived glyph
- *    metadata) match `ARABIC_DIACRITIC_RE`. Covers ordinary marks.
- * 2. Fallback signal: some contextual mark variants (e.g. a font's own
- *    fused/ligated mark glyph) have no cmap entry at all
- *    (`unicodes: []`), so they can't be identified directly. Within a
- *    merged cluster (more than one glyph sharing the same `cl`), a base
- *    letter is drawn at its own designed origin (`dx`/`dy` both 0),
- *    while every mark stacked onto it carries a nonzero GPOS
- *    mark-attachment offset (`dx`/`dy`) positioning it relative to the
- *    base — that's true of every base/mark pair observed in real
- *    shaping output, including ones the direct cmap check misses.
- *    A cluster-sharing glyph with a nonzero `dx`/`dy` is therefore
- *    treated as a mark too. A cluster-sharing glyph with `dx === 0 &&
- *    dy === 0` is left alone even without a direct cmap hit, since that
- *    shape (rendered in place, no repositioning) matches every base
- *    letter observed, not marks — this is what keeps the base letter of
- *    a single-diacritic cluster (e.g. "بَ", where beh and fatha share one
- *    cluster) from being misidentified as a diacritic itself.
+ * 1. Primary signal, unconditional: the glyph's own Unicode codepoint(s)
+ *    (from `font.glyphs.get(g.g).unicodes`, opentype.js's cmap-derived
+ *    glyph metadata) match `ARABIC_DIACRITIC_RE`. Covers ordinary marks
+ *    in fonts that encode them at their real codepoints.
+ * 2. Secondary signals, gated by the cluster's remaining allowance: a
+ *    glyph sharing its cluster with another and looking like a mark,
+ *    meaning either a **zero advance** (a mark takes no width of its own)
+ *    or a **nonzero GPOS attachment offset** (`dx`/`dy`, positioning it
+ *    relative to its base). Zero-advance candidates are taken first — a
+ *    glyph that carries the run's advance is a base letter by definition,
+ *    so it is the last thing that should be read as a mark.
  *
- * This is a heuristic grounded in real shaping output, not a spec
- * guarantee — an unusual font could in principle break the "marks always
- * carry a nonzero attachment offset" assumption. If that ever surfaces,
- * revisit the fallback signal rather than trusting cluster-sharing alone.
+ * The allowance is the number of characters matching
+ * `ARABIC_DIACRITIC_RE` in the cluster's own source span — from its
+ * offset to the next cluster's — minus whatever the primary signal
+ * already took there. It exists because both secondary signals also
+ * describe things that are not diacritics:
+ *
+ * - **A letter's own dots.** NotoSans, Ruqaa, Kufi2 and Qahiri draw them
+ *   as a separate zero-advance glyph GPOS-attached to the base, which is
+ *   indistinguishable in shape from an attached mark. Typing `حرف` in
+ *   NotoSans used to flag the ف's dot as a diacritic, so the per-mark
+ *   overlay armed on it and its hide button would have erased the dot.
+ * - **A base letter carrying a GPOS adjustment.** In NotoSans's `حَرْفٌ`
+ *   the reh's final form has `dx = -30` and shares the sukun's cluster.
+ *
+ * Neither has a combining character behind it, so neither survives the
+ * allowance. Conversely a PUA-encoded mark positioned by its own outline
+ * rather than by GPOS — Thuluth, ThuluthDeco and Yekan all do this, and
+ * defeat both the cmap check and the `dx`/`dy` fallback — is admitted on
+ * its zero advance, because the source really does hold a mark there.
+ *
+ * When a cluster offers more mark-shaped glyphs than its source has
+ * marks, the excess is dropped rather than guessed at. That is the safe
+ * direction: a mark left without handles is an inconvenience, a base
+ * letter or a dot given a hide button is destructive.
+ *
+ * `shapableText` must be the string that was actually shaped — i.e.
+ * `shapeText`'s `shapableText`, after `stripUnsupportedDiacritics`, not
+ * the block's own text — since that is what `glyph.cl` indexes into.
  */
 export function findDiacriticGlyphIndices(
   glyphs: HarfBuzzGlyph[],
-  font: opentype.Font | null | undefined
+  font: opentype.Font | null | undefined,
+  shapableText: string
 ): Set<number> {
   const result = new Set<number>();
   if (!font) return result;
@@ -86,32 +104,61 @@ export function findDiacriticGlyphIndices(
     clusterCounts.set(cluster, (clusterCounts.get(cluster) ?? 0) + 1);
   }
 
-  for (let i = 0; i < glyphs.length; i++) {
-    const g = glyphs[i];
-
-    let glyphObj: ReturnType<opentype.Font["glyphs"]["get"]> | undefined;
-    try {
-      glyphObj = font.glyphs.get(g.g);
-    } catch {
-      glyphObj = undefined;
+  // How many marks the source text spends on each cluster. A cluster's
+  // span runs from its own offset to the next cluster's; characters
+  // before the first cluster belong to no cluster and are ignored.
+  const clusterStarts = [...clusterCounts.keys()].sort((a, b) => a - b);
+  const remaining = new Map<number, number>();
+  for (let i = 0; i < clusterStarts.length; i++) {
+    const from = clusterStarts[i];
+    const to =
+      i + 1 < clusterStarts.length ? clusterStarts[i + 1] : shapableText.length;
+    let marks = 0;
+    for (let c = Math.max(0, from); c < Math.min(to, shapableText.length); c++) {
+      if (ARABIC_DIACRITIC_RE.test(shapableText[c])) marks++;
     }
+    remaining.set(from, marks);
+  }
 
-    const unicodes = glyphObj?.unicodes ?? [];
-    const isDirectMark = unicodes.some((u) =>
+  const glyphUnicodes = (g: HarfBuzzGlyph): number[] => {
+    try {
+      return font.glyphs.get(g.g)?.unicodes ?? [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Pass 1 — the primary signal, which never needs the allowance's
+  // permission but does consume it, so a cluster's marks cannot be
+  // counted twice.
+  for (let i = 0; i < glyphs.length; i++) {
+    const isDirectMark = glyphUnicodes(glyphs[i]).some((u) =>
       ARABIC_DIACRITIC_RE.test(String.fromCodePoint(u))
     );
-    if (isDirectMark) {
-      result.add(i);
-      continue;
-    }
-
-    const cluster = g.cl ?? 0;
-    const sharesCluster = (clusterCounts.get(cluster) ?? 0) > 1;
-    const hasAttachmentOffset = (g.dx ?? 0) !== 0 || (g.dy ?? 0) !== 0;
-    if (sharesCluster && hasAttachmentOffset) {
-      result.add(i);
-    }
+    if (!isDirectMark) continue;
+    result.add(i);
+    const cluster = glyphs[i].cl ?? 0;
+    remaining.set(cluster, Math.max(0, (remaining.get(cluster) ?? 0) - 1));
   }
+
+  // Pass 2 — the secondary signals, spending what the source allows.
+  // Zero-advance candidates first, across the whole run, so a cluster's
+  // allowance is never spent on an advance-carrying glyph while a
+  // weightless one in the same cluster goes unflagged.
+  const takeIf = (predicate: (g: HarfBuzzGlyph) => boolean) => {
+    for (let i = 0; i < glyphs.length; i++) {
+      if (result.has(i)) continue;
+      const g = glyphs[i];
+      const cluster = g.cl ?? 0;
+      if ((clusterCounts.get(cluster) ?? 0) <= 1) continue;
+      if ((remaining.get(cluster) ?? 0) <= 0) continue;
+      if (!predicate(g)) continue;
+      result.add(i);
+      remaining.set(cluster, (remaining.get(cluster) ?? 0) - 1);
+    }
+  };
+  takeIf((g) => (g.ax ?? 0) === 0 && (g.ay ?? 0) === 0);
+  takeIf((g) => (g.dx ?? 0) !== 0 || (g.dy ?? 0) !== 0);
 
   return result;
 }

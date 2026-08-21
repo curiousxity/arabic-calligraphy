@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   DIACRITIC_MOVE_HANDLE_FILL,
   armDiacriticMoveHandle,
+  chooseFont,
   diacriticHitCenters,
   dotCentersWithFill,
   dragFromHere,
@@ -114,4 +115,36 @@ test("a drag with a small first step still moves the mark", async ({ page }) => 
   expect(overrides.length).toBeGreaterThan(0);
   expect(overrides[0].offsetY ?? 0).toBeGreaterThan(5);
   expect(block.y).toBe(0);
+});
+
+/**
+ * Whether the overlay arms at all is a property of mark *detection*, and
+ * detection reads three signals that different fonts satisfy differently.
+ * These two fonts are the ends of that range, and both were wrong before
+ * the source-text allowance was added to `findDiacriticGlyphIndices`.
+ */
+test("a font whose marks are PUA-encoded still arms the overlay (Thuluth)", async ({ page }) => {
+  await gotoApp(page);
+  await chooseFont(page, "Thuluth");
+  await page.locator("textarea.sidebarTextarea").fill(VOCALIZED);
+
+  // Thuluth draws every mark as its own Private Use Area glyph with no
+  // GPOS offset, so neither the cmap check nor the attachment-offset
+  // fallback sees it. Its zero advance is what identifies it.
+  await expect
+    .poll(() => diacriticHitCenters(page).then((m) => m.length))
+    .toBeGreaterThan(0);
+});
+
+test("a letter's own dots never arm the overlay (Noto Sans)", async ({ page }) => {
+  await gotoApp(page);
+  await chooseFont(page, "Noto Sans");
+  // No combining marks at all — every hoverable mark here would be a
+  // false positive. Noto Sans draws the feh's dot as a separate
+  // zero-advance glyph attached to its base, which is the shape the
+  // attachment-offset signal reads as a mark.
+  await page.locator("textarea.sidebarTextarea").fill("حرف");
+
+  await settleFrames(page);
+  expect(await diacriticHitCenters(page)).toHaveLength(0);
 });

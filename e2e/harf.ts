@@ -161,6 +161,28 @@ export async function dotCentersWithFill(page: Page, fill: string): Promise<Poin
   }, fill);
 }
 
+/**
+ * Picks a font by its label in Typography's font picker.
+ *
+ * Typography starts collapsed, and the picker is a custom listbox rather
+ * than a native `<select>` (it previews each family in itself), so this is
+ * three clicks: the section header, the trigger, then the option.
+ */
+export async function chooseFont(page: Page, label: string): Promise<void> {
+  const section = page.getByRole("button", { name: /^Typography/ });
+  if ((await section.getAttribute("aria-expanded")) === "false") {
+    await section.click();
+  }
+  await page.getByRole("button", { name: /^Font family$/ }).click();
+  // Each option's accessible name is its label plus the picker's preview
+  // suffix ("Noto Sans — أبجد"), so match the label followed by that
+  // suffix's own dash rather than matching exactly: a bare prefix match
+  // on "Thuluth" also matches "Thuluth Deco".
+  await page
+    .getByRole("option", { name: new RegExp(`^${label} —`) })
+    .click();
+}
+
 /** Page-space centres of the hover hit rects `DiacriticHoverHandles` mounts, one per mark. */
 export async function diacriticHitCenters(page: Page): Promise<Point[]> {
   return page.evaluate(() => {

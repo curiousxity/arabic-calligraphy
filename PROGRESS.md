@@ -33,11 +33,11 @@ regression, and what it would take to fix.
 - **Per-glyph tools do not apply to text-on-path blocks.** Their glyphs are
   rotated to a curve tangent, which the straight-bounding-box maths behind
   those tools assumes away.
-- **Thuluth gets no per-mark diacritic handles.** It encodes its marks in the
-  Private Use Area with no positioning offsets, defeating both signals
-  `findDiacriticGlyphIndices` uses, so its marks read as base letters. Reading
-  the font's GDEF glyph classes would fix it, but that detector is shared by
-  every diacritic feature.
+- **Qahiri renders no tashkeel at all.** The font has no glyph for fatha,
+  sukun or dammatan (its cmap answers 0 for each), so
+  `stripUnsupportedDiacritics` drops them before shaping and typed marks
+  simply disappear. Not a detection failure and not fixable here — the
+  glyphs would have to be added to the font.
 - **Cloud sync has no conflict resolution** beyond overwrite-by-name. Same
   project name saved from two devices: last write wins.
 
@@ -79,6 +79,37 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 ---
 
 ## Shipped
+
+### 2026-08-21 — Diacritic detection: two more fonts, and the dots it was flagging
+
+`findDiacriticGlyphIndices` gains the shaped text as a third argument and
+spends it as a per-cluster allowance: the number of combining marks actually
+typed in a cluster's source span caps how many of that cluster's glyphs the
+weaker signals may claim. Full mechanism and the traps: CLAUDE.md,
+"Per-instance diacritic control".
+
+**It went in to fix Thuluth and found three more defects on the way.** The
+plan of record was to read the font's GDEF glyph classes; measuring first
+killed that — **Thuluth has no GDEF table at all** (nor does ThuluthDeco, nor
+HarfCanvasDiwani), and where GDEF does exist it classes a letter's dots as
+marks exactly like tashkeel, so it answers neither half of the problem. What
+Thuluth's marks do have is a zero advance, which is now the third signal.
+
+- **Yekan was broken the same way** and had never been recorded: 0 of 3 marks
+  detected on `حَرْفٌ`. ThuluthDeco likewise.
+- **Letter dots were being flagged as diacritics.** NotoSans, Ruqaa, Kufi2 and
+  Qahiri draw a letter's dots as a separate zero-advance GPOS-attached glyph,
+  which the old fallback read as a mark. Typing the unmarked word `حرف` in
+  NotoSans armed the per-mark overlay on the ف's dot — and its hide button
+  would have erased the dot.
+- **A base letter could be flagged too**: NotoSans's reh final form carries a
+  nonzero `dx` and shares the sukun's cluster in `حَرْفٌ`.
+
+Measured across all 17 bundled fonts before and after. `diacritics.test.ts`
+covers all four cases against real harfbuzzjs and real fonts, and
+`e2e/diacritics.spec.ts` pins the two user-visible ends — the overlay arms on
+Thuluth, and never arms on an unmarked word in Noto Sans. Both new e2e tests
+were confirmed to fail against the previous detector.
 
 ### 2026-08-21 — Straight-stroke extension: shipped
 

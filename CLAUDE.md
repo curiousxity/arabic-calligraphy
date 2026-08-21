@@ -412,23 +412,57 @@ block's text — overrides only change how a diacritic *renders*, never the
 underlying text, and a "Reset diacritic overrides" button clears them
 without touching the text either.
 
-`lib/diacritics.ts`'s `findDiacriticGlyphIndices(glyphs, font)` identifies
-which shaped glyphs are diacritics by glyph identity, **not** by cluster:
+`lib/diacritics.ts`'s
+`findDiacriticGlyphIndices(glyphs, font, shapableText)` identifies which
+shaped glyphs are diacritics by glyph identity, **not** by cluster lookup:
 HarfBuzz's default cluster level (`MONOTONE_GRAPHEMES`) merges a base
 letter with every combining mark following it into one cluster whose
 value is the *base letter's* character offset, so a mark glyph's own
-`glyph.cl` never points at the mark's own character — cluster-to-source
-lookup (what an earlier version of this function did) silently detects
-nothing on real shaped text. The working detection is
-two signals: (1) primary — the glyph's own Unicode codepoint(s), from
-`font.glyphs.get(g.g).unicodes` (opentype.js's cmap-derived metadata),
-tested against `ARABIC_DIACRITIC_RE`; (2) fallback, for contextual mark
-variants with no cmap entry at all (e.g. a font's own fused mark-ligature
-glyph) — within a cluster shared by more than one glyph, a base letter is
-drawn at its own designed origin (HarfBuzz position `dx`/`dy` both 0)
-while every mark stacked onto it carries a nonzero GPOS mark-attachment
-offset, so a cluster-sharing glyph with nonzero `dx`/`dy` is treated as a
-mark too. `ARABIC_DIACRITIC_RE` itself now lives in `diacritics.ts` (not
+`glyph.cl` never points at the mark's own character — asking the source
+text *which* glyph is a mark (what an earlier version of this function
+did) silently detects nothing on real shaped text.
+
+What a cluster's source span can still answer is **how many** marks were
+typed there, and that count is the budget the detection spends:
+
+1. **Primary, unconditional** — the glyph's own Unicode codepoint(s), from
+   `font.glyphs.get(g.g).unicodes` (opentype.js's cmap-derived metadata),
+   tested against `ARABIC_DIACRITIC_RE`.
+2. **Secondary, allowance-gated** — a glyph sharing its cluster with
+   another and shaped like a mark: either a **zero advance** (a mark takes
+   no width of its own) or a nonzero GPOS attachment offset (`dx`/`dy`).
+   Zero-advance candidates are taken first, since a glyph carrying the
+   run's advance is a base letter by definition.
+
+The allowance is the count of `ARABIC_DIACRITIC_RE` characters in the
+cluster's own source span, minus what the primary signal already took
+there — which is why the third argument must be the **shaped** string
+(`shapeText`'s `shapableText`, after `stripUnsupportedDiacritics`), the
+one `glyph.cl` indexes into, and not the block's own text.
+
+**Both secondary signals also describe things that are not diacritics,
+and the allowance is the only thing separating them.** A letter's own
+dots are a separate zero-advance GPOS-attached glyph in NotoSans, Ruqaa,
+Kufi2 and Qahiri — before the gate, typing `حرف` in NotoSans armed the
+overlay on the ف's dot, whose hide button would then have erased it — and
+in that same font's `حَرْفٌ` the reh's final form carries `dx = -30` and
+shares the sukun's cluster, so the *base letter* was flagged too. Neither
+has a combining character behind it, so neither survives. Conversely
+Thuluth, ThuluthDeco and Yekan encode their marks in the Private Use Area
+and position them by their own outlines, defeating both the cmap check
+and the `dx`/`dy` fallback; they are admitted on the zero advance,
+because the source really does hold a mark there. Where a cluster offers
+more mark-shaped glyphs than the source has marks, the excess is dropped
+rather than guessed at — a mark without handles is an inconvenience, a
+dot with a hide button is destructive.
+
+**GDEF was evaluated for this and rejected**: `Thuluth.ttf`,
+`ThuluthDeco.ttf` and `HarfCanvasDiwani.ttf` carry no GDEF table at all,
+so glyph classes cannot arm the fonts that need arming — and where GDEF
+does exist it classes a letter's dots as marks exactly like tashkeel, so
+it cannot answer the false-positive half either.
+
+`ARABIC_DIACRITIC_RE` itself now lives in `diacritics.ts` (not
 `harfbuzz.ts`, which re-exports it for compatibility) specifically so
 this module has no runtime dependency on harfbuzzjs, which lets
 `diacritics.test.ts` shape real text with real harfbuzzjs directly rather
@@ -1811,8 +1845,6 @@ These are capabilities that have been explicitly identified as valuable but deli
   be evaluated together with that one rather than separately.
 
 - **Per-glyph rotation** — The move/scale handles cover translation and axis-aligned scale only. Rotation needs a fourth handle and its own pivot decision.
-
-- **Mark detection for fonts that encode marks in the Private Use Area** — `lib/diacritics.ts`'s `findDiacriticGlyphIndices` keys on a mark's own cmap codepoint, with a nonzero-GPOS-offset fallback. `Thuluth.ttf` defeats both (PUA codepoints, marks positioned by advance), so on that font the per-mark diacritic overlay does not arm. A third signal — e.g. reading the font's own GDEF glyph classes, which mark up mark glyphs directly — would fix it, but it touches the detector every diacritic feature depends on and deserves its own real-font verification pass.
 
 - **Image trace** — Auto-tracing a raster image into a silhouette shape existed on Shape Warp blocks and was removed with that block type. Rebuilding it for Shape Fill means restoring `lib/imageTrace.ts`, `ImageTraceDialog.tsx`, and the `imagetracerjs` dependency from git history; the tracing itself was block-type agnostic, producing the same `{ pathData, w, h }` shape `extractSvgPaths` returns.
 
