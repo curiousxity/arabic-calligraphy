@@ -18,12 +18,30 @@
 //                    can differ in a word vs. isolation), and not a
 //                    connector/join metric either — a zone in the middle of
 //                    a bowl counts here just as much as one at a join.
-//   - join%       — the real connector metric: for each adjacent glyph pair
-//                    in a shaped word, whether a zone sits near the shared
-//                    join edge (the earlier glyph's trailing pen-edge, or
-//                    the later glyph's leading pen-edge), divided by
-//                    glyphs.length - 1 pairs. This is the number that
-//                    actually speaks to elongating a join.
+//   - join%       — the real connector metric: for each adjacent LETTER
+//                    pair in a shaped word (zero-advance glyphs — i'jam dot
+//                    components and other mark attachments, ax === 0 — are
+//                    skipped when pairing, so a letter is paired with its
+//                    next non-zero-advance neighbour rather than with a
+//                    mark sitting between them), whether a zone sits near
+//                    the shared join edge (the earlier letter's trailing
+//                    pen-edge, or the later letter's leading pen-edge),
+//                    divided by the number of letter-to-letter pairs. A
+//                    zero-advance glyph's own local edge arithmetic would be
+//                    meaningless anyway (ax = 0 collapses its trailing and
+//                    leading edges onto the same point, while its real
+//                    offset lives in dx, which this metric does not read),
+//                    so excluding it from pairing is not just a labeling
+//                    fix — a base<->mark pair was never a letter join.
+//
+// Corpus size note: five short test words yield only 10-13 letter-join
+// slots per font once zero-advance glyphs are excluded from pairing
+// (Urdu.ttf yields just 3, its heavy ligation collapsing five words to 8
+// glyphs total). A single slot flipping moves a font's join% by roughly
+// 8-10 points (Urdu's 3 slots move it by 33 points each), so differences of
+// a few points between fonts are noise, not signal — read join% as
+// "clearly clears 80%," "clearly doesn't," or "unclear," not as a
+// fine-grained ranking.
 //
 // Flags:
 //   --maxSlope=0.25   override DetectOpts.maxSlope for the whole sweep
@@ -97,9 +115,15 @@ async function shape(hb, fontData, upm, text) {
   }
 }
 
-function zonesForGlyph(parsed, upm, opts, g) {
+function zonesForGlyph(parsed, upm, opts, g, fontFile) {
   const glyphObj = parsed.glyphs.get(g.g);
-  if (!glyphObj) return [];
+  if (!glyphObj) {
+    // A measurement script should fail loudly on a glyph it cannot resolve
+    // rather than silently counting it as zone-free — that quietly depresses
+    // every coverage number derived from it. Does not fire on any of the 17
+    // bundled fonts as of this writing.
+    throw new Error(`${fontFile}: opentype.js could not resolve glyph id ${g.g}`);
+  }
   const cmds = toSvgCmds(glyphObj.getPath(0, 0, upm).commands);
   return findCutZones(flattenContours(cmds), { glyphIndex: 0, cluster: 0 }, opts);
 }
@@ -177,7 +201,7 @@ async function runSweep() {
       const glyphs = await shape(hb, bytes, upm, ch);
       let has = false;
       for (const g of glyphs) {
-        const zones = zonesForGlyph(parsed, upm, opts, g);
+        const zones = zonesForGlyph(parsed, upm, opts, g, file);
         if (zones.length) { has = true; totalZones += zones.length; }
         for (const z of zones) widths.push((z.toX - z.fromX) / upm);
       }
@@ -189,18 +213,29 @@ async function runSweep() {
     let joinSlots = 0, joinsCovered = 0;
     for (const w of WORDS) {
       const glyphs = await shape(hb, bytes, upm, w);
-      const zonesPerGlyph = glyphs.map((g) => zonesForGlyph(parsed, upm, opts, g));
+      const zonesPerGlyph = glyphs.map((g) => zonesForGlyph(parsed, upm, opts, g, file));
 
       for (const zones of zonesPerGlyph) {
         contextualTotal++;
         if (zones.length) contextualWithZone++;
       }
 
-      for (let i = 0; i + 1 < glyphs.length; i++) {
+      // A join slot is a pair of LETTERS, not a pair of output glyphs: a
+      // zero-advance glyph (ax === 0 — an i'jam dot component or other mark
+      // attachment) is not a joining letter, so it is skipped when pairing.
+      // Each letter is paired with its next non-zero-advance neighbour,
+      // which may or may not be the immediately adjacent array entry.
+      const letterIdx = [];
+      for (let i = 0; i < glyphs.length; i++) {
+        if ((glyphs[i].ax ?? 0) !== 0) letterIdx.push(i);
+      }
+      for (let k = 0; k + 1 < letterIdx.length; k++) {
         joinSlots++;
+        const i = letterIdx[k];
+        const next = letterIdx[k + 1];
         const advI = glyphs[i].ax ?? 0;
         const nearTrailingEdgeOfI = zoneNearEdge(zonesPerGlyph[i], advI, joinWindow);
-        const nearLeadingEdgeOfNext = zoneNearEdge(zonesPerGlyph[i + 1], 0, joinWindow);
+        const nearLeadingEdgeOfNext = zoneNearEdge(zonesPerGlyph[next], 0, joinWindow);
         if (nearTrailingEdgeOfI || nearLeadingEdgeOfNext) joinsCovered++;
       }
     }
