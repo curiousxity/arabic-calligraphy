@@ -666,81 +666,119 @@ those edits dropped rather than half-rendered. The layout payload's `version`
 moved 4 → 5 and no longer embeds `glyphRigs`. The `harfcanvas-glyph-rigs-v1`
 localStorage key is simply orphaned; nothing reads or clears it.
 
-### Straight-stroke cut detection (`src/lib/strokeCuts.ts`) — kept, unused
+### Straight-stroke cut detection (`src/lib/strokeCuts.ts`)
 
-Same lineage as "Removed subsystems" above, one tier down: a 2026-08-21
-attempt to give letterform strokes and letter-to-letter connectors a second
-elongation mechanism, this time by cutting a glyph's own outline and
-bridging the gap — avoiding both the per-font authored data that killed the
-Morph Glyph Editor and the character-insertion tatweel kashida already uses.
-`findCutZones` sweeps a flattened outline for x-ranges where a vertical cut
-is legal: crossed an even number of times, at least twice; every crossed
-segment within `maxSlope` of parallel to the baseline; steady thickness
-across the run. Full design: `docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`.
+Lengthening a letter's own straight strokes by cutting the outline and
+bridging the gap — the one elongation mechanism that can stretch a stroke
+*inside* a letterform, which tatweel kashida structurally cannot. Design:
+`docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`;
+plan: `docs/superpowers/plans/2026-08-21-straight-stroke-extension.md`.
 
-**It has no application consumer.** The plan that specified it
-(`docs/superpowers/plans/2026-08-21-straight-stroke-extension.md`) stopped
-at Task 3 — its own go/no-go coverage gate — and the human decided not to
-continue: Tasks 4–10 (outline surgery, `ShapedText` integration, storage, the
-on-canvas drag handle, kashida coexistence, e2e) were never written. The
-module is reachable from exactly one place, `scripts/measureStrokeZones.mjs`,
-the offline sweep that produced the gate's numbers. It is kept rather than
-deleted for the same reason the stroke-schema Python tooling was kept when
-the Morph Editor was removed: it is inert, and it is the other half of
-"don't redo the work" should the underlying font geometry ever be worth
-re-measuring. **Don't delete this as an unused 200-line module** — nothing
-else in the app imports it, and that absence is the intended end state, not
-an oversight.
+**This was stopped once, at its own coverage gate, and then resumed after
+the predicate was replaced.** That history is the useful part of this
+section, because the first predicate looked reasonable and was not:
 
-**What the measurement established, so it is not re-derived.** The gate
-needed the four naskh/kufi faces (Amiri, Scheherazade, NotoSans, Kufi) to
-clear isolated-letter coverage ≥60% *and* join coverage ≥80% **at once**. At
-the shipped `maxSlope: 0.18`, and at both looser values the design
-authorized trying (0.25, 0.35 — its hard ceiling), no setting ever cleared
-both bars on all four fonts simultaneously — but the numbers behind that
-failure are not what an earlier draft of this section said, and the shape
-of the failure matters for what to conclude from it. Full tables, both a
-join reading over every adjacent glyph pair and the design doc's own reading
-over positions where a tatweel is actually legal, and the reproducible
-spot-check all live in `docs/archive/stroke-zone-coverage.md`, which this
-section only summarizes.
+- **A cut line is perpendicular to the *stroke*, not to the baseline.** The
+  original predicate measured every crossed segment's slope against the
+  baseline and rejected anything steeper than `maxSlope`. Arabic strokes as
+  these fonts actually draw them are subtly inclined nearly everywhere, so a
+  straight, perfectly extendable stem at 12 degrees (edge slope ~0.21)
+  failed a 0.18 bar. `findCutZonesSwept` rotates the outline through a range
+  of candidate angles and runs the same legality code in each frame, so a
+  stem is horizontal in its own frame and passes with nothing loosened.
+- **Loosening `maxSlope` could never fix that**, because the same tolerance
+  that admits an inclined stem also admits the tangent point of any curve,
+  where the edge slope passes through zero. One knob, two populations moving
+  in opposite directions. That is why the first tuning pass made
+  Scheherazade's coverage *worse* as it loosened.
+- **Straightness is bow away from a chord, measured per edge**
+  (`maxEdgeBow`, as a fraction of the stroke's thickness) — not drift in
+  per-segment slope. `flattenContours` turns every curve into 8 straight
+  segments, so consecutive samples land on segments whose slopes differ
+  discretely; a slope-drift test reads that quantization as curvature and
+  throws real strokes away. Crossing *positions* carry the signal without
+  the quantization. **Per edge, never averaged**: a stroke that bows
+  symmetrically moves its two edges in opposite directions, so a mean stays
+  put the whole way through. `strokeCuts.test.ts` pins both of these with
+  synthetic outlines, and both tests were verified to fail against the
+  variant they rule out.
+- **Zone coordinates are in the zone's own rotated frame.** `fromX`/`toX`
+  are displaced from glyph space by `centreY * sin(angle)`, which at a
+  typical stroke height exceeds the join window the coverage sweep uses.
+  Anything asking *where on the glyph* a zone sits must go through
+  `zoneExtentX`, never read the raw fields.
 
-**The join half works.** Measured the way the design doc's gate actually
-specifies it — coverage of positions where a tatweel is currently legal, not
-of every adjacent glyph pair — join coverage reaches roughly 90–100% in
-three of the four gate fonts (Scheherazade, NotoSans, Kufi) at the shipped
-`maxSlope`, and stays there across the whole tuning range. Amiri is the one
-real outlier on join, a property of where its own zones sit relative to its
-joins, checked directly and confirmed genuine rather than a metric artifact.
+**Extension runs along the stroke axis**, which is what keeps the bridged
+span a clean rectangle of the stroke's own weight. So a cut of distance `d`
+at angle `t` grows the run's advance by `d * cos t`, and shifts everything
+past the cut vertically by `d * sin t`. The assertion the feature rests on is
+that the advance grows *monotonically* with `d`, not that it grows by exactly
+`d`.
 
-**The letterform-internal half is what actually failed.** Isolated-letter
-coverage is what keeps the gate from passing: Scheherazade's isolated score
-never reaches the 60% bar at any tested setting, and gets *worse*, not
-better, as the tolerance loosens. The reason is structural, not a tuning
-miss — the legality predicate requires every outline segment a cut crosses
-to run within `maxSlope` of parallel to the baseline, and Arabic strokes as
-these fonts actually draw them are subtly inclined nearly everywhere, so a
-tolerance loose enough to admit a real stem or bar also admits a curve. The
-spot-check names it directly: at `maxSlope: 0.35`, Kufi's ن reports a zone
-whose two crossings each sweep through zero across the zone's width — one
-running roughly −0.34 to +0.23, the other +0.34 to −0.23 — the false-flat at
-a curve's own vertex, not a straight run; Amiri's س and Scheherazade's ن show
-the same failure at their own hook and tail curl.
+**Coverage, and the gate that was accepted rather than met.** The gate asked
+four naskh/kufi faces to clear isolated-letter coverage >=60% and join
+coverage >=80% at once. After the amendment, isolated clears on all four
+(Amiri 86%, Kufi 82%, NotoSans 79%, Scheherazade 75%) — that is the half
+that structurally failed before, and the genuinely new capability. Join
+clears on three; **Amiri's joins do not, and that is accepted as a known
+per-font limitation** rather than fixed, because the join case duplicates
+tatweel kashida, which already covers connectors in every bundled font. A
+known false-positive residue is recorded too (NotoSans seen, one short zone
+at a tooth's vertex). All numbers, the sensitivity table and the
+reproducible spot-check live in `docs/archive/stroke-zone-coverage.md` —
+**the single home for them**; this section only summarizes.
 
-**Why the working half doesn't make this worth building anyway.** The join
-case competes with tatweel kashida (see "Kashida elongation" above), which
-applies to every bundled font by inserting a real character the font shapes
-at its own designed weight — verified directly in three real fonts
-(`tatweel.test.ts`), and known to be font-dependent in its own right (a
-tatweel can decompose a ligature like الله, which the font is doing
-correctly, not a bug). A straight-stroke connector mechanism reaching
-~90–100% join coverage on three fonts would be a second, more complex way to
-do something the app can already do everywhere. The letterform-internal
-case — stretching a stroke *inside* a letterform, which tatweel structurally
-cannot touch — is the genuinely new capability this plan would have added,
-and it is the half whose own coverage number is what keeps the gate from
-passing. That is why stopping here is the right call, not merely the
-measured one.
+`scripts/measureStrokeZones.mjs` is the offline sweep that produces those
+numbers. It imports the real detector rather than reimplementing it, and
+`--baselineOnly` restores the original vertical-only predicate so the two
+readings can be compared directly rather than from memory.
+
+**The pieces, and the two that are easy to get wrong.**
+`src/lib/strokeCuts.ts` holds all of it and stays pure — no React, no Konva,
+and **no `./harfbuzz` import**, whose static harfbuzzjs import throws under
+Vitest's Node loader before any test code runs (`normalizeGlyphs` is imported
+type-only, and imports nothing itself). `findCutZonesSwept` detects,
+`applyCutsToCommands` performs the surgery, `buildCutPlan` resolves stored
+cuts against a shaped run, `nuqta.ts` holds the measured per-font dot table
+restored from `docs/archive/nuqta-measurements.md`.
+
+- **Two spaces, and cuts are stored in the font's.** `StrokeCut.localX` and
+  `CutPlan.shift` are in font units, so a cut survives a font-size change and
+  `shift` can be added straight to `penX`. `ShapedText` scales them by
+  `fontSize / upm` at the one point they meet a path opentype.js has already
+  drawn at `fontSize` (`scaleCuts`). Mixing the two silently mis-places every
+  cut in proportion to the size.
+- **A cluster can hold several glyphs.** Resolving a cut by cluster and *then*
+  checksumming `glyphId` against whichever glyph came first drops valid cuts
+  on any letter carrying a mark — `buildCutPlan` matches on both together.
+
+`ShapedText` builds one `cutPlan` memo and uses it in **both** glyph loops:
+the draw loop, and the metrics loop, which boxes the surgically modified
+outline via `outlineBounds` rather than asking opentype.js for the original
+glyph's box. A stretched letter has to report its real ink, or snapping,
+alignment and Fit to width all keep measuring the un-stretched run.
+`fitToWidth`'s `styledRunWidth` gains a fifth term for the same reason, fed by
+`cutAdvanceTotal` — **shared with `buildCutPlan` rather than restated**, the
+same discipline that has `ShapedText` import `ITALIC_SHEAR` from `fitToWidth`
+instead of keeping a copy.
+
+The zone sweep in `ShapedText` runs **only while the tool is armed**: it
+rotates every glyph outline through fifteen candidate angles, which is far too
+much to run on every text block on the canvas all the time.
+
+`StrokeCutHoverHandles.tsx` is the on-canvas overlay, mounted **between**
+`GlyphTransformHoverHandles` and `DiacriticHoverHandles` — Konva routes to the
+topmost listening shape and later siblings sit on top, so the order is
+largest → smallest (glyph rect, stroke rail, mark). Its hover handlers sit on
+the per-zone `Group`, never on the hit `Rect`, for the reason recorded under
+"End-to-end tests"; `e2e/stroke-cuts.spec.ts` pins that with the same
+every-other-frame check the other two overlays have.
+
+**Kashida coexistence.** Cuts are keyed by source-text offset, so stepping a
+kashida moves every cut after it. `setKashidaAtSlot` remaps them
+(`remapCutsAfterInsert`) inside the same `updateSelectedBlock` patch, so one
+`pushHistory()` still covers the edit and a stretch is not silently dropped by
+the `glyphId` checksum because an unrelated join was widened.
 
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
@@ -1764,6 +1802,13 @@ live in `e2e/harf.ts`.
 These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
 
 - **Per-glyph move & scale on Shape Fill and text-on-path blocks** — Implemented for plain text only. `src/lib/diacriticPlacement.ts`'s adapters are the nearest existing precedent for expressing another renderer's coordinate space, but they were authored for placing *diacritic marks*, not for a general per-glyph transform — treat them as a starting point to evaluate, not as a drop-in that makes this cheap. Each renderer's coordinate space needs its own design and verification pass. Text-on-path is excluded for the same reason every other per-glyph tool is, its glyphs being rotated to a curve tangent.
+
+- **Straight-stroke stretching on Shape Fill and text-on-path blocks** —
+  Implemented for plain text only. The detector and the surgery are both
+  block-type agnostic (they take an outline and return one), so the work is
+  entirely in each renderer's coordinate space and in where the handle
+  mounts — the same reason per-glyph move & scale is text-only, and it should
+  be evaluated together with that one rather than separately.
 
 - **Per-glyph rotation** — The move/scale handles cover translation and axis-aligned scale only. Rotation needs a fourth handle and its own pivot decision.
 

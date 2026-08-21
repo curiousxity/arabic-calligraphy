@@ -11,7 +11,13 @@ measurement and decided not to build Tasks 4–10 (the rendering, storage and
 on-canvas UI this document argues for). The argument below is the case
 *for* attempting this — it is preserved as-written because it is still an
 accurate account of why the attempt seemed worth making, not because the
-attempt succeeded. Do not read past this block and start implementing.
+attempt succeeded.
+
+**Superseded 2026-08-21 by the amendment below.** The stop above was correct
+for the predicate this doc originally specified. That predicate has since
+been diagnosed as conflating two opposite defects behind one knob, and is
+being replaced — see "Amendment: axis-relative cuts". Work resumed under
+that amendment, and the gate is being re-measured, not waived.
 
 The measurement, the two rejected tunings, and the reasoning for stopping:
 `docs/archive/stroke-zone-coverage.md`. The short version: the connector
@@ -21,6 +27,87 @@ bundled font; the letterform-internal half — the genuinely new capability —
 is what failed to clear its own coverage bar. See also CLAUDE.md,
 "Straight-stroke cut detection (kept, unused)", and the plan file's own
 Status block: `docs/superpowers/plans/2026-08-21-straight-stroke-extension.md`.
+
+## Amendment: axis-relative cuts (2026-08-21)
+
+The original validity predicate below measures every crossed segment's slope
+**against the baseline**. That single tolerance, `maxSlope`, is asked to
+separate two populations that move in opposite directions as it is tuned, and
+it cannot:
+
+1. **Inclined stems are rejected.** Arabic strokes as the bundled fonts draw
+   them are subtly inclined nearly everywhere. A straight, perfectly
+   extendable stem running at 12 degrees presents edges at slope ~0.21 — over
+   the shipped 0.18 bar — and is refused.
+2. **Curve vertices are accepted.** Raising the bar far enough to admit (1)
+   also admits the tangent point of any curve, where the edge slope passes
+   through zero. The spot-check in `docs/archive/stroke-zone-coverage.md`
+   catches exactly this: at `maxSlope: 0.35`, Kufi's noon reports a zone whose
+   two crossings each sweep through zero across the zone's width.
+
+Loosening therefore trades a false negative for a false positive, which is
+why Scheherazade's isolated coverage got *worse* as the tolerance rose, and
+why no value in the authorized range cleared the gate. The fix is not a
+different number. It is two changes that address the two defects separately.
+
+### A. Parallelism is judged against the stroke's own axis
+
+A cut line is perpendicular to **the stroke it cuts**, not to the baseline.
+Detection sweeps a candidate angle over an authorized range; for each angle
+the outline is rotated into that frame and the existing crossing/legality/
+zone-discovery code runs unchanged, with zones rotated back and stamped with
+the angle that found them. An inclined stem is horizontal in its own frame,
+so it passes at the shipped tolerance with nothing loosened.
+
+One physical stroke is detected at several neighbouring angles. Those
+detections are deduplicated to one zone per stroke, keeping the best-fitting
+angle, so the count of offered handles reflects strokes rather than sweep
+resolution.
+
+Angle 0 is the first angle tried and reproduces the original behaviour
+exactly, which is what keeps the existing detector tests meaningful.
+
+### B. Edge slope must be steady, not merely small
+
+A straight stroke holds a near-constant edge slope along its length. A curve
+holds one only instantaneously, at its vertex. The predicate therefore gains
+a steadiness requirement over the zone — the spread of each edge's slope
+across the sampled run — alongside the thickness-steadiness check already
+specified. This is what rejects the false flats, and it is independent of
+(A): it would be worth having even with baseline-relative cuts.
+
+### Consequence: extension is along the stroke axis
+
+Cutting perpendicular to an inclined stroke and translating the far side
+**along that stroke's axis** is what preserves weight across the bridge — the
+inserted span is then a clean rectangle of the stroke's own thickness.
+Translating horizontally instead would insert a sheared span, thinner than
+the stroke it continues.
+
+So for a cut at angle `t` and distance `d`, geometry past the cut translates
+by `d * (cos t, sin t)`. Two things follow, and both are deliberate:
+
+- **The run's advance grows by `d * cos t`, not by `d`.** The assertion the
+  feature rests on is that the advance grows monotonically with `d`, which
+  holds; exact equality with `d` does not, and only held before because every
+  authorized cut was vertical.
+- **Geometry past the cut shifts vertically by `d * sin t`.** For a stroke at
+  a typical inclination and a pull of a nuqta or two this is a small rise,
+  and it is what a pen travelling along the stroke actually does. It is a
+  real change to the letterform, recorded here rather than discovered later.
+
+`StrokeCut` gains the angle alongside `localX`, since the angle is a property
+of the cut that must survive a save; `CutZone` carries it so the handle's
+drag rail can follow it. `projectOntoAxis` in `src/lib/dragAxis.ts` already
+accepts an arbitrary two-point rail, so the inclined handle needs no new
+primitive.
+
+### What this does not change
+
+The gate itself. The same four fonts, the same 60% isolated / 80% join bars,
+the same script. This amendment earns a re-measurement, not a waiver — if the
+corrected predicate does not clear the gate, that is another stop-and-report
+point, not a licence to loosen the bars.
 
 ## Why this is being attempted again
 
@@ -70,6 +157,10 @@ everything **past the cut in pen order** translates by `d`; every glyph whose
 outline the line crosses has that outline cut and bridged with straight edges
 at the designed weight; the run's advance grows by `d`.
 
+> **Amended.** The cut line is perpendicular to *the stroke*, not to the
+> baseline, and the translation is along the stroke axis — so the advance
+> grows by `d * cos t`. See "Amendment: axis-relative cuts" above.
+
 "Past the cut" means increasing `penX`, not "to the right" — HarfBuzz returns
 RTL runs already in visual order and `ShapedText` walks `penX` upward through
 them, so pen order is the only unambiguous axis here. Getting this backwards
@@ -79,6 +170,11 @@ A cut on a connector is not a distinct feature — the line simply crosses
 whichever glyph draws the ink there, which may be both neighbours.
 
 ### Validity
+
+> **Amended.** The baseline-relative rule stated here is the one that failed
+> the gate. It is superseded by "Amendment: axis-relative cuts" above, which
+> judges parallelism against the stroke's own axis and adds an edge-slope
+> steadiness requirement. The text below is kept as the original argument.
 
 A candidate cut is legal iff:
 

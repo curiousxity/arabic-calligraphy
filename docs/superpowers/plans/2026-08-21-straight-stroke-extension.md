@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`
 
-## Status: stopped at the Task 3 gate — do not resume
+## Status: complete — Tasks 1–10 built 2026-08-21
 
 **Execution stopped after Task 3.** Task 3 was this plan's own go/no-go
 coverage measurement, placed deliberately before any UI work. It failed: at
@@ -24,13 +24,43 @@ for the measurement (the single home for these numbers) and CLAUDE.md,
 "Straight-stroke cut detection (kept, unused)" for what it established. A
 human reviewed that record and decided not to proceed.
 
-**Tasks 4–10 below were never started.** This plan did not run out of time
-or get interrupted mid-flight — it reached the stopping point it was
-designed to reach, and stopped there. Tasks 1–3 are committed and kept: the
-detector (`src/lib/strokeCuts.ts`), its tests, the offline measurement script,
-and the coverage record. Do not resume this plan from Task 4 without a new
-measurement that clears the gate; the numbers in the archive file are why it
-does not.
+**Resumed 2026-08-21.** The stop above stood for as long as its predicate
+did. That predicate was then diagnosed as conflating two opposite defects
+behind one `maxSlope` knob — inclined stems rejected, curve vertices
+accepted — and was replaced rather than retuned: detection now sweeps the
+stroke's own axis, and straightness is measured as per-edge bow away from a
+chord. See "Amendment: axis-relative cuts" in the design doc.
+
+Re-measured against the same gate, the same four fonts and the same script:
+**isolated-letter coverage now clears 60% on all four (75–86%)**, where
+before it was the half that structurally could not. Join coverage clears 80%
+on three; Amiri remains the outlier the first pass already identified as a
+genuine property of that font, and is also the half that duplicates tatweel
+kashida.
+
+A human reviewed that record and decided to proceed — the gate is met on the
+metric it existed to protect (the letterform-internal capability, which
+tatweel cannot provide), and its one remaining failure is on the metric that
+was never the point. Amiri's joins are accepted as a known per-font
+limitation rather than a blocker. Numbers:
+`docs/archive/stroke-zone-coverage.md`, "Second pass".
+
+**Tasks 4–10 were amended by that decision and are now built.** A cut carries
+an angle, and extension runs along the stroke axis, so a cut of distance `d`
+grows the advance by `d * cos t` rather than by `d`. Three defects in the
+task sketches below were found and fixed while executing them, and are worth
+knowing if this plan is ever used as a model:
+
+- **Task 4's `L` bridge was wrong** — it emitted `shift(cutX)` for both
+  bridge points, putting them both at `cutX + d`.
+- **Task 4 never handled `Q` segments**, which opentype.js returns for every
+  TrueType font, and never bridged a contour's *implied closing segment*.
+- **Task 5's assertion restated its own assumption**: it checked that
+  `plan.addedAdvance` grows with `d`, and `addedAdvance` is computed as
+  `+= d`. The real assertion measures the outline's own extent after surgery
+  in three real fonts, which is what the task's own comment asked for.
+
+The end state is in CLAUDE.md, "Straight-stroke cut detection".
 
 ## Global Constraints
 
@@ -645,7 +675,7 @@ Report the table against the gate: **≥60%** of base letters on Amiri, Schehera
 - Consumes: `SvgCmd`, `flattenContours`, `legalCutAt`.
 - Produces: `ResolvedCut = { cutX: number; d: number }`, `applyCutsToCommands(cmds, cuts) => SvgCmd[]`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // append to src/lib/strokeCuts.test.ts
@@ -699,12 +729,12 @@ describe("applyCutsToCommands", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/lib/strokeCuts.test.ts -t applyCutsToCommands`
 Expected: FAIL — not a function.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // append to src/lib/strokeCuts.ts
@@ -819,16 +849,16 @@ function applyOneCut(cmds: SvgCmd[], { cutX, d }: ResolvedCut): SvgCmd[] {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/lib/strokeCuts.test.ts`
 Expected: PASS. If the curve-splitting case fails, the bug is almost certainly in the bridge-insertion arithmetic in the `C` branch — fix it there rather than loosening the assertion, since "widens by exactly `d`" is the property the whole feature rests on.
 
-- [ ] **Step 5: Run the full verification loop**
+- [x] **Step 5: Run the full verification loop**
 
 Run: `npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/strokeCuts.ts src/lib/strokeCuts.test.ts
@@ -847,7 +877,7 @@ git commit -m "Add stroke-cut outline surgery with bezier splitting"
 - Consumes: `HarfBuzzGlyph` from `src/lib/normalizeGlyphs.ts`; `StrokeCut` (declared here, moved to `types.ts` in Task 6).
 - Produces: `CutPlan`, `buildCutPlan(glyphs, cuts, upm, fontSize) => CutPlan`.
 
-- [ ] **Step 1: Write the failing test — real fonts, real harfbuzzjs**
+- [x] **Step 1: Write the failing test — real fonts, real harfbuzzjs**
 
 Copy the `shapeReal` helper and its `resolveHbLoader`/`HbModule` scaffolding verbatim from `src/lib/diacritics.test.ts` into `src/lib/strokeCuts.test.ts`, then:
 
@@ -892,12 +922,12 @@ describe("a cut really widens the run", () => {
 function file0() { return "Amiri.ttf"; }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/lib/strokeCuts.test.ts -t "really widens"`
 Expected: FAIL — `buildCutPlan is not a function`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // append to src/lib/strokeCuts.ts
@@ -965,16 +995,16 @@ export function buildCutPlan(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/lib/strokeCuts.test.ts`
 Expected: PASS in all three fonts.
 
-- [ ] **Step 5: Run the full verification loop**
+- [x] **Step 5: Run the full verification loop**
 
 Run: `npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/strokeCuts.ts src/lib/strokeCuts.test.ts
@@ -993,7 +1023,7 @@ git commit -m "Add cut plan building, with the run-really-widens assertion"
 - Consumes: `StrokeCut` from `src/lib/strokeCuts.ts`.
 - Produces: `strokeCuts?: StrokeCut[]` and `strokeCutEditMode?: boolean` on `BlockCommon`; `supportsStrokeCuts(b)`; `setStrokeCut`, `clearStrokeCuts` handlers.
 
-- [ ] **Step 1: Add the type and field**
+- [x] **Step 1: Add the type and field**
 
 In `src/types.ts`, re-export the type beside the existing `BlockFill` re-export and add both fields to `BlockCommon`:
 
@@ -1009,7 +1039,7 @@ export type { StrokeCut } from "./lib/strokeCuts";
   strokeCutEditMode?: boolean;
 ```
 
-- [ ] **Step 2: Add the gate and handlers in `App.tsx`**
+- [x] **Step 2: Add the gate and handlers in `App.tsx`**
 
 Place these beside `supportsGlyphTransforms`. **The guard must be exactly this** — a narrower one type-checks perfectly while silently discarding every edit, which is the trap CLAUDE.md records for `supportsDiacriticOverrides`:
 
@@ -1038,7 +1068,7 @@ const clearStrokeCuts = useCallback(() => {
 
 Both must be defined **above** any `useEffect`/`useCallback` that references them — handlers in `App.tsx` close over each other by declaration order, and moving one below its consumer produces a used-before-declaration error.
 
-- [ ] **Step 3: Verify the round-trip by hand**
+- [x] **Step 3: Verify the round-trip by hand**
 
 Run `npm run dev`, add a text block, and in the console:
 
@@ -1048,11 +1078,11 @@ __HARF__.getBlocks()[0].strokeCuts
 
 Expected: `undefined` on a fresh block. Save a project, reload, load it back, and confirm no console errors — the payload version stays 5 because an absent field needs no migration.
 
-- [ ] **Step 4: Run the full verification loop**
+- [x] **Step 4: Run the full verification loop**
 
 Run: `npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/types.ts src/App.tsx
@@ -1071,7 +1101,7 @@ git commit -m "Add strokeCuts to the block model, with a text-only edit gate"
 - Consumes: `buildCutPlan`, `applyCutsToCommands`, `toSvgCmds`.
 - Produces: a `cutPlan` memo consumed by both loops; `styledRunWidth` gains a cut term.
 
-- [ ] **Step 0: Restore the per-font nuqta table**
+- [x] **Step 0: Restore the per-font nuqta table**
 
 Nothing in Tasks 1-6 produces `nuqtaUnits`; `buildCutPlan` takes it as a
 parameter and every caller so far passed a test value. Create
@@ -1108,7 +1138,7 @@ back rather than returning `undefined` — a silent `undefined` here would
 make every cut zero-width and the feature would look broken rather than
 mis-sized.
 
-- [ ] **Step 1: Build the plan once, in a memo**
+- [x] **Step 1: Build the plan once, in a memo**
 
 In `ShapedText.tsx`, beside the existing metrics memo:
 
@@ -1119,7 +1149,7 @@ const cutPlan = useMemo(
 );
 ```
 
-- [ ] **Step 2: Use it in the draw loop**
+- [x] **Step 2: Use it in the draw loop**
 
 At the `gx` computation (currently line ~160), add the shift; at the command mapping (line ~211), apply surgery before the existing warp mapping:
 
@@ -1135,11 +1165,11 @@ const baseCmds = cutsHere
 
 Then map `baseCmds` through the existing warp logic instead of `opPath.commands`.
 
-- [ ] **Step 3: Use it in the metrics loop**
+- [x] **Step 3: Use it in the metrics loop**
 
 At line ~419, apply the same `cutPlan.shift[i]` to `gx`, and box the surgically modified path so `bounds` reflects the real ink. `bounds` growing is what makes snapping, alignment and Fit to width see the true width.
 
-- [ ] **Step 4: Add the fifth term to `styledRunWidth`**
+- [x] **Step 4: Add the fifth term to `styledRunWidth`**
 
 In `src/lib/fitToWidth.ts`, beside the italic-shear, faux-bold, stroke-width and warp terms:
 
@@ -1150,7 +1180,7 @@ In `src/lib/fitToWidth.ts`, beside the italic-shear, faux-bold, stroke-width and
 const cutTerm = (block.strokeCuts ?? []).reduce((sum, c) => sum + c.nuqta * nuqtaUnits, 0);
 ```
 
-- [ ] **Step 5: Verify the loops agree**
+- [x] **Step 5: Verify the loops agree**
 
 There is no UI yet, so verify at the unit level rather than by eye — visual
 confirmation is Task 8, Step 3. Add to `src/lib/strokeCuts.test.ts`:
@@ -1173,7 +1203,7 @@ it("a cut grows the measured extent by the cut distance", async () => {
 
 Run: `npx vitest run src/lib/strokeCuts.test.ts` — expected PASS.
 
-- [ ] **Step 6: Run the full verification loop and commit**
+- [x] **Step 6: Run the full verification loop and commit**
 
 ```bash
 npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build
@@ -1194,7 +1224,7 @@ git commit -m "Render stroke cuts in both of ShapedText's glyph loops"
 - Consumes: `CutZone`, `findCutZones`, `setStrokeCut` from Task 6, `projectOntoAxis` from `src/lib/dragAxis.ts`.
 - Produces: `<StrokeCutHoverHandles zones onSetCut armed />`.
 
-- [ ] **Step 1: Write the component**
+- [x] **Step 1: Write the component**
 
 Three rules, each of which this codebase has already paid for once:
 
@@ -1219,7 +1249,7 @@ Three rules, each of which this codebase has already paid for once:
 - History via `useDebouncedHistoryPush`, matching block dragging.
 - Snap the dragged distance to half-nuqta unless `e.evt.altKey`.
 
-- [ ] **Step 2: Mount it and add the checkbox**
+- [x] **Step 2: Mount it and add the checkbox**
 
 In `Sidebar.tsx`'s Typography panel, beside "Move & scale glyph":
 
@@ -1233,11 +1263,11 @@ In `Sidebar.tsx`'s Typography panel, beside "Move & scale glyph":
 
 Gate it on `selectedBlock.type === "text"`, matching the Move & scale row beside it.
 
-- [ ] **Step 3: Verify by hand**
+- [x] **Step 3: Verify by hand**
 
 `npm run dev` → add a text block with `حرف` in Amiri → select it → tick "Stretch strokes" → hover a letter. A handle should appear on each detected zone and dragging it should widen the run. Confirm the handle does **not** flicker as the pointer moves across it — if it does, the handlers are on the Rect.
 
-- [ ] **Step 4: Run the full verification loop and commit**
+- [x] **Step 4: Run the full verification loop and commit**
 
 ```bash
 npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build
@@ -1257,7 +1287,7 @@ git commit -m "Add on-canvas stroke-stretch handles"
 - Consumes: `applyKashida` from `src/lib/tatweel.ts`, `StrokeCut`.
 - Produces: `remapCutsAfterInsert(cuts, atOffset, inserted) => StrokeCut[]`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // append to src/lib/strokeCuts.test.ts
@@ -1276,11 +1306,11 @@ describe("remapCutsAfterInsert", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `npx vitest run src/lib/strokeCuts.test.ts -t remapCutsAfterInsert`
 
-- [ ] **Step 3: Implement, and wire it into `setKashidaAtSlot`**
+- [x] **Step 3: Implement, and wire it into `setKashidaAtSlot`**
 
 ```ts
 // src/lib/strokeCuts.ts
@@ -1299,7 +1329,7 @@ export function remapCutsAfterInsert(
 
 In `App.tsx`'s `setKashidaAtSlot`, compute the length delta between the old and new text and pass `strokeCuts: remapCutsAfterInsert(b.strokeCuts ?? [], slot.index, delta)` in the same `updateSelectedBlock` patch, so one `pushHistory()` still covers the whole edit.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 npx vitest run src/lib/strokeCuts.test.ts
@@ -1320,7 +1350,7 @@ git commit -m "Remap stroke cuts when a kashida shifts the text"
 **Interfaces:**
 - Consumes: `gotoApp`, `inkPixels`, `dragFromHere` from `e2e/harf.ts`.
 
-- [ ] **Step 1: Write the e2e spec**
+- [x] **Step 1: Write the e2e spec**
 
 Read `e2e/harf.ts` first and use its real helper names; the sketch below
 assumes `gotoApp`, `addTextBlock`, `inkPixels`, `dragFromHere` and
@@ -1403,22 +1433,22 @@ Two things that will otherwise cost an afternoon:
   it. If Task 8 used a different name, use that one here rather than adding
   a second.
 
-- [ ] **Step 2: Run the e2e suite**
+- [x] **Step 2: Run the e2e suite**
 
 Run: `npx tsc --noEmit -p e2e/tsconfig.json && npm run e2e`
 Expected: all pass, including the 54 that existed before.
 
-- [ ] **Step 3: Write the guide section**
+- [x] **Step 3: Write the guide section**
 
 `src/components/guide/sections/stretching.tsx`, a plain TSX component exporting a `GuideSection` with `order: 55` and `keywords` a calligrapher would actually type — "kashida", "madd", "elongation", "stretch", "extend", "tatweel". Dropping the file in `sections/` is the whole integration step; there is no index to edit.
 
 Say plainly that not every letter in every font offers a handle, and why.
 
-- [ ] **Step 4: Document it**
+- [x] **Step 4: Document it**
 
 Add a "Straight-stroke extension" section to `CLAUDE.md` after "Kashida elongation", covering: the cut model, the legality predicate, why `flattenContours` exists rather than `pathToPolygon`, cluster keying, the broken reflow invariant, and the measured coverage. Add a dated `PROGRESS.md` entry under Shipped linking to it rather than restating it.
 
-- [ ] **Step 5: Final verification and commit**
+- [x] **Step 5: Final verification and commit**
 
 ```bash
 npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build

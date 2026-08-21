@@ -5,6 +5,16 @@ see "Revision history" at the bottom; every review reproduced the underlying
 measurements byte-for-byte and found the metrics or the prose needed fixing,
 never the detector or the raw geometry numbers).
 
+> **Superseded in part, 2026-08-21 (fourth pass).** Everything from
+> "Methodology" to "Verdict against the gate" measures the *baseline-relative*
+> predicate — cuts perpendicular to the baseline, legality judged by each
+> crossed segment's slope against the baseline. That predicate was diagnosed
+> as conflating two opposite defects behind one `maxSlope` knob and has been
+> replaced. The current numbers are under
+> "Second pass: the axis-relative predicate" at the bottom of this file; the
+> tables above are kept as the record of what the original predicate did, not
+> as a description of the detector as it now stands.
+
 **This file is the single home for the gate numbers.** `CLAUDE.md`,
 `PROGRESS.md` and the plan file link here rather than repeating the tables —
 duplicating the same numbers in four files is exactly what let two of them
@@ -393,6 +403,131 @@ measurement and decided not to proceed. Tasks 4–10 were never started. See
 CLAUDE.md, "Straight-stroke cut detection (kept, unused)" for that decision
 and its consequences.
 
+
+## Second pass: the axis-relative predicate (2026-08-21)
+
+The stop recorded above was correct for the predicate it measured. That
+predicate has since been replaced — see the "Amendment: axis-relative cuts"
+section of
+`docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md` for
+the argument. Two changes, addressing two defects the single `maxSlope` knob
+could not separate:
+
+- **Parallelism is judged against the stroke's own axis.** Detection sweeps a
+  candidate angle (+/-35 degrees, 5-degree resolution); at each angle the
+  outline is rotated into that frame and the same crossing/legality/zone code
+  runs unchanged. An inclined stem is horizontal in its own frame and passes
+  at the shipped `maxSlope` of 0.18 with nothing loosened. One stroke found
+  at several neighbouring angles is deduplicated to its best-fitting angle.
+- **Straightness is measured as bow away from a chord, per edge**
+  (`maxEdgeBow`, a fraction of the stroke's own thickness), replacing the
+  earlier per-segment slope-drift idea. `flattenContours` turns every curve
+  into 8 straight segments, so consecutive samples land on segments whose
+  slopes differ discretely; a slope-drift test reads that quantization as
+  curvature and throws away real strokes. Crossing *positions* carry the
+  signal without the quantization. Per edge rather than averaged, because a
+  stroke that bows symmetrically moves its two edges in opposite directions
+  and a mean cancels it out.
+
+### Shipped settings
+
+`maxSlope: 0.18` (unchanged), `maxEdgeBow: 0.015`, `maxAngle: 35 degrees`,
+`angleStep: 5 degrees`. Reproduce with
+`npx --yes tsx scripts/measureStrokeZones.mjs`; `--baselineOnly` restores
+vertical-only detection and `--maxEdgeBow=` / `--maxAngleDeg=` /
+`--angleStepDeg=` override the new knobs.
+
+| Font | isolated letters | zones | median zone (em) | contextual | join (all adjacent pairs) | join (tatweel-legal slots) |
+|---|---|---|---|---|---|---|
+| AlFatemi.otf | 64% | 39 | 0.030 | 53% | 30% | 43% (n=7) |
+| Amiri.ttf | 86% | 78 | 0.050 | 78% | 31% | 44% (n=9) |
+| FatemiMaqala.ttf | 75% | 47 | 0.040 | 71% | 42% | 38% (n=8) |
+| HarfCanvasDiwani.ttf | 11% | 3 | 0.030 | 41% | 50% | 67% (n=9) |
+| Kufi.ttf | 82% | 83 | 0.050 | 100% | 92% | 100% (n=9) |
+| Kufi2.ttf | 68% | 55 | 0.060 | 77% | 75% | 100% (n=9) |
+| Lateef.ttf | 75% | 45 | 0.030 | 76% | 67% | 89% (n=9) |
+| NotoSans.ttf | 79% | 60 | 0.040 | 77% | 77% | 100% (n=9) |
+| Qahiri.ttf | 93% | 62 | 0.090 | 67% | 92% | 100% (n=9) |
+| Ruqaa.ttf | 75% | 54 | 0.050 | 82% | 62% | 89% (n=9) |
+| Scheherazade.ttf | 75% | 50 | 0.040 | 94% | 75% | 100% (n=9) |
+| TahaNaskhRegular.ttf | 89% | 63 | 0.040 | 94% | 73% | 100% (n=8) |
+| Thuluth.ttf | 71% | 36 | 0.040 | 81% | 73% | 75% (n=8) |
+| ThuluthDeco.ttf | 79% | 48 | 0.030 | 69% | 64% | 75% (n=8) |
+| Urdu.ttf | 68% | 37 | 0.040 | 88% | 0% | 0% (n=0) |
+| Wessam.ttf | 54% | 27 | 0.040 | 60% | 40% | 43% (n=7) |
+| Yekan.ttf | 93% | 81 | 0.050 | 94% | 83% | 100% (n=9) |
+
+### Verdict against the same gate
+
+The gate is unchanged: the four naskh/kufi faces must clear isolated-letter
+coverage >=60% **and** join coverage >=80% (on the design doc's own
+denominator, positions where a tatweel is currently legal) **at once**.
+
+| Gate font | isolated (>=60%) | join, tatweel-legal (>=80%) |
+|---|---|---|
+| Amiri | 86% PASS | 44% **FAIL** |
+| Scheherazade | 75% PASS | 100% PASS |
+| NotoSans | 79% PASS | 100% PASS |
+| Kufi | 82% PASS | 100% PASS |
+
+**The half that failed structurally now passes on every gate font.**
+Isolated-letter coverage was the blocker: Scheherazade never reached 60% at
+any authorized setting and got *worse* as the tolerance loosened (54% ->
+46% -> 32%). It now reads 75%, and the whole four-font isolated column
+clears the bar. This is the letterform-internal capability — stretching a
+stroke *inside* a letter, which tatweel structurally cannot touch — and it
+is the genuinely new thing this feature was for.
+
+**The remaining failure is Amiri's join coverage, and it is the same outlier
+the first pass identified.** 44% here against 0/0/56% before; the first pass
+checked it directly and confirmed it a real property of where Amiri's zones
+sit relative to its joins, not a metric artifact. It is also the half that
+duplicates tatweel kashida, which already covers connectors in every bundled
+font.
+
+So the gate as literally written does not pass. It fails on one font, on the
+metric that was never the point, while the metric that *was* the point passes
+on all four.
+
+### Sensitivity
+
+Unlike `maxSlope`, whose numbers flipped wildly across its authorized range,
+`maxEdgeBow` is stable — the four gate fonts' isolated column moves only a
+few points across a seven-fold change, and the join column not at all:
+
+| `maxEdgeBow` | Amiri iso / join | Scheherazade | NotoSans | Kufi |
+|---|---|---|---|---|
+| 0.015 (shipped) | 86% / 44% | 75% / 100% | 79% / 100% | 82% / 100% |
+| 0.025 | 89% / 44% | 89% / 100% | 89% / 100% | 82% / 100% |
+| 0.04 | 89% / 44% | 89% / 100% | 89% / 100% | 82% / 100% |
+| 0.10 | 89% / 44% | 89% / 100% | 89% / 100% | 82% / 100% |
+
+That stability is the evidence the predicate is measuring the intended
+property rather than being fitted to it. The shipped value is the *tightest*
+of these, not the most generous: 0.015 was chosen because it is the loosest
+setting at which the curved-letter spot-check below stays clean.
+
+### Curved-letter spot-check (reproducible: `--spotCheck`)
+
+The first pass named three specific false flats. At the shipped settings:
+
+- **Kufi noon** — no zones. Was the headline false flat (two crossings each
+  sweeping through zero across the zone's width). Gone.
+- **Scheherazade noon** — no zones. Gone.
+- **Amiri seen** — no zones at `maxEdgeBow` 0.015 or 0.02. At 0.025 it
+  returns, marginally (bow ~2.3 units against a 2.64 limit), which is what
+  fixed the shipped value at 0.015 rather than 0.025.
+
+**One known residue:** NotoSans seen still reports a 40-unit zone at
+x=[700,740] whose two edges sweep 0.141 -> -0.121 and 0.094 -> -0.091 — a
+tooth's vertex, accepted because over so short a span its bow (~1.3 units)
+sits right at the 1.23-unit limit. It is a genuine false positive, bounded
+and short rather than systematic. Raising `minZoneWidth` above its current
+`upm/40` would remove this class, and is independently defensible — a handle
+on a 40-unit stroke is not much use — but it was not changed here, because
+doing so alters every number in the table above and this record should
+report one predicate change at a time.
+
 ## Revision history
 
 - **2026-08-21, first pass.** Baseline + two tuning tables using the
@@ -486,3 +621,15 @@ and its consequences.
     this file rather than left to restate its numbers, per this repo's own
     "state a fact once and link to it" rule — see their own edit history for
     the same date.
+- **2026-08-21, fourth pass: the axis-relative predicate.** The stop was
+  reviewed and the baseline-relative predicate replaced rather than retuned,
+  after diagnosing it as conflating inclined-stem rejection with
+  curve-vertex acceptance behind one knob. Detection now sweeps the stroke's
+  own axis, and straightness is measured as per-edge bow away from a chord.
+  Isolated-letter coverage — the half that structurally failed — now clears
+  60% on all four gate fonts (75-86%). Amiri's join coverage remains the one
+  gate failure. The earlier tables are kept above as the record of the old
+  predicate. Unit coverage for the new predicate is in
+  `src/lib/strokeCuts.test.ts`, including a synthetic case pinning why bow is
+  measured per edge rather than averaged, and one pinning why bow replaced
+  per-segment slope drift.

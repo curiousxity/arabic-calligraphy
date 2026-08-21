@@ -56,6 +56,8 @@ export type GlyphTransform = {
 // import site for a block's field types while the gradient maths (and its
 // tests) live in `lib/blockFill.ts`.
 export type { BlockFill, FillStop } from "./lib/blockFill";
+export type { StrokeCut } from "./lib/strokeCuts";
+import type { StrokeCut } from "./lib/strokeCuts";
 import type { BlockFill } from "./lib/blockFill";
 // ---- /STREAM-F ----
 
@@ -98,6 +100,17 @@ type BlockCommon = {
   glyphTransforms?: GlyphTransform[];
   /** Arms the on-canvas move/scale handles. */
   glyphTransformMode?: boolean;
+
+  /**
+   * Straight-stroke extensions: a letter's own stroke lengthened by cutting
+   * its outline and bridging the gap. Absent means none, so a project saved
+   * before this feature renders byte-identically and the payload version
+   * needs no bump. Plain text blocks only, the same intentional
+   * simplification BlockCommon already makes for glyphTransforms.
+   */
+  strokeCuts?: StrokeCut[];
+  /** Arms the on-canvas stretch handles. */
+  strokeCutEditMode?: boolean;
 
   // ---- STREAM-F: ink & surface — `fill` field on BlockCommon. Absent
   // means the existing flat `color` renders exactly as today. ----

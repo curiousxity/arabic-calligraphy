@@ -26,7 +26,7 @@ import {
   DEFAULT_EMPTY_BOUNDS,
 } from "./lib/canvasBounds";
 import { arcPathD } from "./lib/textPath";
-import type { Block, DiacriticOverride, GlyphTransform } from "./types";
+import type { Block, DiacriticOverride, GlyphTransform, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
   isCloudConfigured,
@@ -117,6 +117,8 @@ import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 import { solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { mergeGlyphTransform } from "./lib/glyphTransform";
 import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
+import { cutAdvanceTotal, remapCutsAfterInsert } from "./lib/strokeCuts";
+import { nuqtaUnits } from "./lib/nuqta";
 import {
   buildNameDesign,
   describeNameDesign,
@@ -221,6 +223,16 @@ const supportsDiacriticOverrides = (
  * renderer reads them, so accepting an edit there would silently discard it.
  */
 const supportsGlyphTransforms = (b: Block): b is Extract<Block, { type: "text" }> =>
+  b.type === "text";
+
+/**
+ * Plain text blocks only, for the same reason as `supportsGlyphTransforms`
+ * above: every block type carries `strokeCuts` via BlockCommon, but only
+ * `ShapedText` performs the outline surgery, so a wider guard would accept
+ * edits here and silently discard them — the trap CLAUDE.md records against
+ * `supportsDiacriticOverrides`.
+ */
+const supportsStrokeCuts = (b: Block): b is Extract<Block, { type: "text" }> =>
   b.type === "text";
 
 const STORAGE_KEY = "calligraphy-layout-v2";
@@ -657,6 +669,55 @@ const App: React.FC = () => {
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === blockId && supportsGlyphTransforms(b) ? { ...b, glyphTransforms: [] } : b
+        )
+      );
+    },
+    [pushHistory]
+  );
+
+  /**
+   * Write one stroke cut, replacing any cut already at the same place on the
+   * same letter. A cut of zero nuqta is a removal rather than a stored
+   * no-op, so dragging a handle back to rest leaves the block clean.
+   */
+  const setStrokeCut = useCallback(
+    (blockId: number, cut: StrokeCut) => {
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || !supportsStrokeCuts(b)) return b;
+          const rest = (b.strokeCuts ?? []).filter(
+            (c) => !(c.cluster === cut.cluster && c.localX === cut.localX)
+          );
+          return { ...b, strokeCuts: cut.nuqta > 0 ? [...rest, cut] : rest };
+        })
+      );
+      // Debounced, so one continuous drag is a single undo entry — the same
+      // treatment a glyph-transform or diacritic drag gets.
+      scheduleGlyphTransformHistoryPush();
+    },
+    [scheduleGlyphTransformHistoryPush]
+  );
+
+  const toggleStrokeCutMode = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && supportsStrokeCuts(b)
+            ? { ...b, strokeCutEditMode: !b.strokeCutEditMode }
+            : b
+        )
+      );
+    },
+    [pushHistory]
+  );
+
+  const clearStrokeCuts = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && supportsStrokeCuts(b) ? { ...b, strokeCuts: [] } : b
         )
       );
     },
@@ -2097,7 +2158,18 @@ const App: React.FC = () => {
       if (!selectedBlock) return;
       const next = applyKashida(selectedBlock.text, slot, count);
       if (next === selectedBlock.text) return;
-      updateSelectedBlock({ text: next });
+      // Stroke cuts are keyed by source-text offset, so inserting or removing
+      // tatweels here moves every cut after the slot. `applyKashida` knows
+      // exactly where it edited, so remap in the same patch — one
+      // `pushHistory()` still covers the whole edit, and a stretch is not
+      // silently dropped because an unrelated join was widened.
+      const delta = next.length - selectedBlock.text.length;
+      const cuts = selectedBlock.strokeCuts ?? [];
+      updateSelectedBlock(
+        cuts.length > 0
+          ? { text: next, strokeCuts: remapCutsAfterInsert(cuts, slot.index, delta) }
+          : { text: next }
+      );
     },
     [selectedBlock, updateSelectedBlock]
   );
@@ -2131,7 +2203,7 @@ const App: React.FC = () => {
       // async (it shapes several candidate strings), and the selection can
       // change while it runs — patching "the selected block" on the way out
       // would then rewrite whatever the user selected in the meantime.
-      const { id, text, fontFamily, fontSize, fontStyle, strokeWidth, warpX } =
+      const { id, text, fontFamily, fontSize, fontStyle, strokeWidth, warpX, strokeCuts } =
         selectedBlock;
       const fontUrl = resolveFontUrl(fontFamily);
       // The italic shear, the faux-bold stroke, the outline and the horizontal
@@ -2143,6 +2215,11 @@ const App: React.FC = () => {
         bold: fontStyle === "bold" || fontStyle === "bold italic",
         strokeWidth,
         warpX,
+        // Straight-stroke cuts widen the drawn run too, and shaping cannot
+        // see them — they are geometry rather than characters. One nuqta at
+        // `fontSize` is the px-space unit, matching the space `inkExtentBox`
+        // reports in.
+        cutWidth: cutAdvanceTotal(strokeCuts ?? [], nuqtaUnits(fontFamily, fontSize)),
       };
 
       setIsFittingWidth(true);
@@ -2610,6 +2687,8 @@ const App: React.FC = () => {
         }}
         onToggleGlyphTransformMode={toggleGlyphTransformMode}
         onResetGlyphTransforms={resetGlyphTransforms}
+        onToggleStrokeCutMode={toggleStrokeCutMode}
+        onClearStrokeCuts={clearStrokeCuts}
         onFitShapeFillSpacing={fitShapeFillSpacing}
         onAlignSelected={alignSelectedBlocks}
         onDistributeSelected={distributeSelectedBlocks}
@@ -2683,6 +2762,7 @@ const App: React.FC = () => {
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
           onUpdateGlyphTransform={updateGlyphTransform}
+          onSetStrokeCut={setStrokeCut}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           onResizeImageBlock={resizeImageBlock}
           ghostBlock={

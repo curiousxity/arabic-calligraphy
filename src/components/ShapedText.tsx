@@ -12,7 +12,7 @@ import {
   makeOffsetAdapter,
   type DiacriticPlacement,
 } from "../lib/diacriticPlacement";
-import type { DiacriticOverride, GlyphTransform } from "../types";
+import type { DiacriticOverride, GlyphTransform, StrokeCut } from "../types";
 import {
   createBlockFillPainter,
   type BlockFill,
@@ -20,6 +20,22 @@ import {
 } from "../lib/blockFill";
 import { resolveGlyphTransform, transformedBox } from "../lib/glyphTransform";
 import { ITALIC_SHEAR, fauxBoldStrokeWidth } from "../lib/fitToWidth";
+import {
+  applyCutsToCommands,
+  buildCutPlan,
+  findCutZonesSwept,
+  flattenContours,
+  outlineBounds,
+  toSvgCmds,
+  DEFAULT_DETECT_OPTS,
+  type CutPlan,
+  type ResolvedCut,
+} from "../lib/strokeCuts";
+import {
+  StrokeCutHoverHandles,
+  type StrokeCutZone,
+} from "./StrokeCutHoverHandles";
+import { nuqtaUnits } from "../lib/nuqta";
 import {
   isOverrideGlyphChar,
   OVERRIDE_SCALE,
@@ -56,6 +72,9 @@ type Props = {
   diacriticOverrides?: DiacriticOverride[];
   glyphTransforms?: GlyphTransform[];
   glyphTransformMode?: boolean;
+  strokeCuts?: StrokeCut[];
+  strokeCutEditMode?: boolean;
+  onSetStrokeCut?: (cut: StrokeCut) => void;
   onUpdateGlyphTransform?: (glyphIndex: number, patch: Partial<GlyphTransform>) => void;
   isSelected?: boolean;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
@@ -112,6 +131,13 @@ function tracePath(ctx: CanvasRenderingContext2D, commands: PathCommand[]) {
  * in that local frame using warpX / warpY. This is the same
  * block-level warp you’ve been using.
  */
+/** Cuts are stored in font units; a path opentype.js drew at `fontSize` is
+ *  already scaled, so the cut positions and distances must be too. The angle
+ *  is unaffected — the scaling is uniform. */
+function scaleCuts(cuts: ResolvedCut[], scale: number): ResolvedCut[] {
+  return cuts.map((c) => ({ cutX: c.cutX * scale, d: c.d * scale, angle: c.angle }));
+}
+
 function drawWarpedGlyphRun(
   ctx: CanvasRenderingContext2D,
   glyphs: HarfBuzzGlyph[],
@@ -133,7 +159,14 @@ function drawWarpedGlyphRun(
    * still sits in the block's own space, so a gradient spans the whole run
    * rather than restarting inside every letter — see `lib/blockFill.ts`.
    */
-  painter: BlockFillPainter | null = null
+  painter: BlockFillPainter | null = null,
+  /**
+   * Straight-stroke extensions, resolved against this run. Its `shift` is in
+   * font units (the same space as `penX`); its `surgery` cuts are too, so
+   * they are scaled by `scale` before being applied to a path opentype.js
+   * has already drawn at `fontSize`.
+   */
+  cutPlan: CutPlan | null = null
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -157,7 +190,7 @@ function drawWarpedGlyphRun(
       continue;
     }
 
-    const gx = (penX + (g.dx ?? 0)) * scale;
+    const gx = (penX + (g.dx ?? 0) + (cutPlan?.shift[glyphIndex] ?? 0)) * scale;
     const gy = -(g.dy ?? 0) * scale;
 
     ctx.save();
@@ -208,7 +241,17 @@ function drawWarpedGlyphRun(
       tracePath(ctx, overrideGlyph.commands as unknown as PathCommand[]);
     } else {
       const opPath = glyphObj.getPath(0, 0, fontSize);
-      const cmds: PathCommand[] = opPath.commands.map((cmd) => {
+      const cutsHere = cutPlan?.surgery.get(glyphIndex);
+      // SvgCmd and PathCommand are structurally identical; `toSvgCmds` is the
+      // one checked conversion, and the cast back mirrors how the override
+      // glyph's own commands are handled a few lines above.
+      const sourceCmds: PathCommand[] = cutsHere?.length
+        ? (applyCutsToCommands(
+            toSvgCmds(opPath.commands),
+            scaleCuts(cutsHere, scale)
+          ) as unknown as PathCommand[])
+        : opPath.commands;
+      const cmds: PathCommand[] = sourceCmds.map((cmd) => {
         type MutableCmd = {
           type: PathCommand["type"];
           x?: number;
@@ -302,6 +345,9 @@ export const ShapedText: React.FC<Props> = ({
   diacriticOverrides = [],
   glyphTransforms = [],
   glyphTransformMode = false,
+  strokeCuts = [],
+  strokeCutEditMode = false,
+  onSetStrokeCut,
   isSelected = false,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
@@ -348,6 +394,67 @@ export const ShapedText: React.FC<Props> = ({
       ),
     [glyphTransforms, shapeData.glyphs]
   );
+
+  /**
+   * Cuts resolved against this run, built once and used by both glyph loops
+   * so the ink drawn and the ink measured can never disagree.
+   *
+   * Built in **font units**, not px: `nuqtaUnits` is asked for one nuqta at
+   * `upm`, which puts `shift` in the same space as `penX` and leaves the
+   * surgery cuts to be scaled at the point they meet a path opentype.js has
+   * drawn at `fontSize`.
+   */
+  const cutPlan = useMemo(
+    () =>
+      buildCutPlan(
+        shapeData.glyphs,
+        strokeCuts,
+        nuqtaUnits(fontFamily, Math.max(shapeData.font?.unitsPerEm || 1000, 1))
+      ),
+    [shapeData.glyphs, shapeData.font, strokeCuts, fontFamily]
+  );
+
+  /**
+   * Detected stretchable strokes, one entry per zone.
+   *
+   * Only computed while the tool is armed — the sweep rotates each outline
+   * through fifteen candidate angles, which is far too much to run on every
+   * text block on the canvas all the time. Zones come back in font units,
+   * matching where `StrokeCut.localX` is stored, so a cut survives a
+   * font-size change.
+   */
+  const strokeCutZones = useMemo<StrokeCutZone[]>(() => {
+    const font = shapeData.font;
+    if (!strokeCutEditMode || !font) return [];
+    const upm = Math.max(shapeData.unitsPerEm || 1000, 1);
+    const scale = fontSize / upm;
+    const opts = {
+      ...DEFAULT_DETECT_OPTS,
+      step: upm / 100,
+      minZoneWidth: upm / 40,
+    };
+
+    const out: StrokeCutZone[] = [];
+    let penX = 0;
+    for (let i = 0; i < shapeData.glyphs.length; i++) {
+      const g = shapeData.glyphs[i];
+      const glyphObj = font.glyphs.get(g.g);
+      if (!glyphObj) {
+        penX += g.ax ?? 0;
+        continue;
+      }
+      const gx = (penX + (g.dx ?? 0) + (cutPlan.shift[i] ?? 0)) * scale;
+      const gy = -(g.dy ?? 0) * scale;
+      const zones = findCutZonesSwept(
+        flattenContours(toSvgCmds(glyphObj.getPath(0, 0, upm).commands)),
+        { glyphIndex: i, cluster: g.cl ?? 0 },
+        opts
+      );
+      for (const zone of zones) out.push({ ...zone, gx, gy, glyphId: g.g });
+      penX += g.ax ?? 0;
+    }
+    return out;
+  }, [strokeCutEditMode, shapeData, fontSize, cutPlan]);
 
   const [spinnerAngle, setSpinnerAngle] = useState(0);
   const spinnerFrameRef = useRef<number | null>(null);
@@ -416,9 +523,22 @@ export const ShapedText: React.FC<Props> = ({
       const advance = g.ax ?? 0;
 
       if (glyphObj) {
-        const gx = (penX + (g.dx ?? 0)) * scale;
+        const gx = (penX + (g.dx ?? 0) + (cutPlan.shift[i] ?? 0)) * scale;
         const gy = -(g.dy ?? 0) * scale;
-        const box = glyphObj.getPath(gx, gy, fontSize).getBoundingBox();
+        // A cut letter must report the ink it actually draws, or snapping,
+        // alignment and Fit to width all keep measuring the un-stretched run.
+        const cutsHere = cutPlan.surgery.get(i);
+        const box = cutsHere?.length
+          ? (() => {
+              const b = outlineBounds(
+                applyCutsToCommands(
+                  toSvgCmds(glyphObj.getPath(0, 0, fontSize).commands),
+                  scaleCuts(cutsHere, scale)
+                )
+              );
+              return { x1: b.x1 + gx, y1: b.y1 + gy, x2: b.x2 + gx, y2: b.y2 + gy };
+            })()
+          : glyphObj.getPath(gx, gy, fontSize).getBoundingBox();
 
         if (isFinite(box.x1) && isFinite(box.x2)) {
           minX = Math.min(minX, box.x1);
@@ -500,7 +620,7 @@ export const ShapedText: React.FC<Props> = ({
       hitBoxes,
       transformedHitBoxes,
     };
-  }, [shapeData, text, fontSize, activeGlyphTransforms]);
+  }, [shapeData, text, fontSize, activeGlyphTransforms, cutPlan]);
 
   const glyphBounds = glyphMetrics.bounds;
   const glyphHitBoxes = glyphMetrics.hitBoxes;
@@ -674,7 +794,8 @@ export const ShapedText: React.FC<Props> = ({
             overrideGlyph,
             activeDiacriticOverrides,
             activeGlyphTransforms,
-            painter
+            painter,
+            cutPlan
           );
           ctx.restore();
 
@@ -707,7 +828,8 @@ export const ShapedText: React.FC<Props> = ({
               // The outline pass fills too (outline-before-fill is per glyph),
               // and its transform is the same block space the painter was
               // built in, so it reuses the same one.
-              painter
+              painter,
+              cutPlan
             );
             ctx.restore();
           }
@@ -727,6 +849,24 @@ export const ShapedText: React.FC<Props> = ({
         offsetX={bx + localDrawX}
         offsetY={by + localDrawY}
         onUpdateGlyphTransform={onUpdateGlyphTransform}
+      />
+
+      {/*
+        Between the two: the move/scale rects are glyph-sized, a stretch rail
+        runs along one stroke inside a glyph, and a mark's target is smaller
+        still. Konva routes to the topmost listening shape and later siblings
+        sit on top, so this is largest -> smallest.
+      */}
+      <StrokeCutHoverHandles
+        isSelected={isSelected}
+        enabled={strokeCutEditMode}
+        zones={strokeCutZones}
+        cuts={strokeCuts}
+        scale={fontSize / Math.max(shapeData.unitsPerEm || 1000, 1)}
+        nuqtaPx={nuqtaUnits(fontFamily, fontSize)}
+        offsetX={bx + localDrawX}
+        offsetY={by + localDrawY}
+        onSetCut={onSetStrokeCut}
       />
 
       <DiacriticHoverHandles
