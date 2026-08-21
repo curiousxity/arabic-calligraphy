@@ -30,7 +30,15 @@ export default defineConfig({
     // Playwright spec loaded under vitest fails in a way that reads like a
     // broken test rather than a misrouted one. `e2e/` belongs to
     // `playwright.config.ts`; everything else stays at vitest's defaults.
-    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
+    //
+    // The leading `**/` is load-bearing: a bare `e2e/**` only matches the
+    // suite at the project root, so a git worktree inside the repo — and
+    // `.claude/worktrees/` is where Claude Code puts them by default — has
+    // its *copy* of the suite collected too. That reads as 12 failing test
+    // files and roughly double the test count, which looks like the merge
+    // you just made broke something rather than like a second checkout
+    // being scanned. Hit and fixed on 2026-08-21.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
   },
   build: {
     chunkSizeWarningLimit: 1200,
