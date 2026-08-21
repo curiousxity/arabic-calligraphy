@@ -100,11 +100,22 @@ async function chooseSurface(page: Page, textureId: string) {
 
 test("a metallic preset turns flat ink into a gradient", async ({ page }) => {
   await gotoApp(page);
+  // This measures colours inside the block's own box, and a new document now
+  // opens on textured paper — whose grain lands in that box and swamps the
+  // count. Bare paper is the baseline this test wants: it is about ink.
+  // Polled rather than read once: clearing the surface is a React state
+  // change the canvas repaints a frame or more later.
   const [block] = await getBlocks(page);
   const box = await blockClientBox(page, block.id);
+  await chooseSurface(page, "");
+  // 30, not 20: the alignment grid draws as a one-device-pixel hairline at
+  // any zoom, and a sub-pixel line antialiases into a few blend buckets that
+  // a crisp 2.75px line at this zoom did not produce. The assertion that
+  // carries the meaning is the +10 delta below; this only pins that the
+  // baseline really is flat ink on flat paper.
+  await expect.poll(() => distinctColors(page, box)).toBeLessThan(30);
 
   const before = await distinctColors(page, box);
-  expect(before).toBeLessThan(20);
 
   await openPanel(page, /Effects/);
   await page.getByRole("button", { name: "Gold leaf" }).click();
@@ -131,8 +142,12 @@ test("a paper surface textures the page, and a tint recolours it", async ({ page
   await gotoApp(page);
   const corner = await paperCorner(page);
 
-  // Bare paper is one flat colour.
-  expect(await distinctColors(page, corner)).toBeLessThanOrEqual(2);
+  // A new document now opens on washi, so bare paper has to be asked
+  // for before it can be the baseline. Chosen explicitly rather than
+  // assumed: that it is *reachable* is the half of this the default change
+  // could break.
+  await chooseSurface(page, "");
+  await expect.poll(() => distinctColors(page, corner)).toBeLessThanOrEqual(2);
 
   await chooseSurface(page, "parchment");
   await expect.poll(() => distinctColors(page, corner)).toBeGreaterThan(3);
@@ -186,6 +201,9 @@ test("a PNG export with a surface differs from one without", async ({ page }) =>
   await openPanel(page, /Project & Export/);
   await page.getByLabel(/Transparent background/).uncheck();
 
+  // "Plain" has to be asked for now that a new document opens on washi —
+  // otherwise this compares washi against washi and reports no difference.
+  await chooseSurface(page, "");
   const plain = await exportAndRead(page, "Export PNG");
   await chooseSurface(page, "washi");
   const textured = await exportAndRead(page, "Export PNG");
@@ -245,9 +263,12 @@ test("an SVG export keeps a gradient as a real gradient", async ({ page }) => {
  */
 test("a gradient reaches a Shape Fill block", async ({ page }) => {
   await gotoApp(page);
+  // Flat paper: this asserts a *delta* in colour count, and a textured
+  // surface inflates the baseline until the gradient can no longer clear it.
+  await chooseSurface(page, "");
 
   // The ornament picker builds a shapeFill block with no file dialog.
-  await page.getByRole("button", { name: "Shapes and frames" }).click();
+  await page.getByRole("button", { name: "Add ornament" }).click();
   await page.getByRole("button", { name: /^Fill with text: / }).first().click();
   await placeAtCanvas(page, 0.5, 0.62);
   await expect
@@ -268,8 +289,11 @@ test("a gradient reaches a Shape Fill block", async ({ page }) => {
 
 test("a gradient reaches a Curve block", async ({ page }) => {
   await gotoApp(page);
+  // Flat paper: this asserts a *delta* in colour count, and a textured
+  // surface inflates the baseline until the gradient can no longer clear it.
+  await chooseSurface(page, "");
 
-  await page.getByRole("button", { name: "Add Text on Path" }).click();
+  await page.getByRole("button", { name: "Add curved text" }).click();
   await placeAtCanvas(page, 0.5, 0.75);
   await expect
     .poll(async () => (await getBlocks(page)).some((b) => b.type === "textPath"))

@@ -15,7 +15,7 @@ async function placeAtCanvasCentre(page: Page): Promise<void> {
 }
 
 async function openPicker(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Shapes and frames" }).click();
+  await page.getByRole("button", { name: "Add ornament" }).click();
   await expect(page.getByRole("dialog", { name: "Shapes & frames" })).toBeVisible();
 }
 

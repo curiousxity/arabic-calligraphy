@@ -31,8 +31,8 @@ export const section: GuideSection = {
       <h4>Your first piece</h4>
       <ol>
         <li>
-          Press the <strong>+</strong> button in <strong>Block Controls</strong>{" "}
-          to add a text block, or pick something from{" "}
+          Press <strong>Add text</strong> under{" "}
+          <strong>Block Controls &rarr; Add</strong>, or pick something from{" "}
           <strong>Start from a Template</strong> at the top of the sidebar.
         </li>
         <li>

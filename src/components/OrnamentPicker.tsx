@@ -212,8 +212,8 @@ export const OrnamentPickerButton: React.FC<OrnamentPickerButtonProps> = ({
         <button
           type="button"
           className="sidebarCircleButton"
-          title="Shapes & frames"
-          aria-label="Shapes and frames"
+          title="Add an ornament or frame…"
+          aria-label="Add ornament"
           onClick={() => setOpen(true)}
         >
           {/* Not ShapesIcon: the button right beside this one in the

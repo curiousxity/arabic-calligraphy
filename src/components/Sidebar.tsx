@@ -1655,169 +1655,185 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="sidebarPanel">
           <div className="sidebarSectionTitle">Block Controls</div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 10,
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              type="button"
-              onClick={onDeleteBlock}
-              disabled={!selectedBlock || blocks.length === 0}
-              className="sidebarCircleButton sidebarCircleButton--danger"
-              title="Delete selected block"
-              aria-label="Delete block"
-            >
-              <TrashIcon size={14} />
-            </button>
 
-            <button
-              type="button"
-              onClick={onDuplicateBlock}
-              disabled={!selectedBlock}
-              className="sidebarCircleButton"
-              title="Duplicate selected block"
-              aria-label="Duplicate block"
-            >
-              <CopyIcon size={14} />
-            </button>
-
-            <button
-              type="button"
-              onClick={onAddBlock}
-              className="sidebarCircleButton"
-              title="Add text block"
-              aria-label="Add text block"
-            >
-              <PlusIcon size={14} />
-            </button>
-
-            {onAddShapeFillBlock && (
+          {/* Three labelled groups rather than one wrapping row of identical
+              chips. The old row let flex-wrap choose the shape, and at the
+              sidebar's width it broke 8 / 1 / 3 — leaving the ornament button
+              stranded alone on a line of its own, which reads as a bug rather
+              than a layout. A fixed four-column grid cannot orphan anything.
+              Splitting Add from the destructive pair also moves Delete out of
+              the leading position, where it sat immediately beside Duplicate. */}
+          <div className="blockControlGroup">
+            <div className="blockControlGroupLabel">Add</div>
+            <div className="blockControlGrid">
               <button
                 type="button"
+                onClick={onAddBlock}
                 className="sidebarCircleButton"
-                title="Upload SVG for Shape Fill"
-                onClick={() => handleSvgUpload()}
+                title="Add a text block"
+                aria-label="Add text"
               >
-                <ShapesIcon size={14} />
+                <PlusIcon size={15} />
               </button>
-            )}
 
-
-            {onAddTextPathBlock && (
-              <button
-                type="button"
-                className="sidebarCircleButton"
-                title="Add Text on Path"
-                onClick={onAddTextPathBlock}
-              >
-                <PathTextIcon size={14} />
-              </button>
-            )}
-
-            {onAddImageBlock && (
-              <button
-                type="button"
-                className="sidebarCircleButton"
-                title="Upload image (PNG/JPG)"
-                onClick={onAddImageBlock}
-              >
-                <ImageIcon size={14} />
-              </button>
-            )}
-            {/* Inline SVGs rather than entries in Icons.tsx: that file is not
-                this stream's to edit during the Phase 1 parallel run. */}
-            {onAddMirrorBlock && (
-              <>
+              {onAddShapeFillBlock && (
                 <button
                   type="button"
                   className="sidebarCircleButton"
-                  disabled={!canAddMirrorBlock}
-                  title={
-                    canAddMirrorBlock
-                      ? "Add a mirror (muthanna) of the selected block"
-                      : "Select exactly one non-mirror block to mirror it"
-                  }
-                  aria-label="Add mirror block"
-                  onClick={() => onAddMirrorBlock("mirrorX")}
+                  title="Add a shape filled with text, from an SVG…"
+                  aria-label="Add shape fill"
+                  onClick={() => handleSvgUpload()}
                 >
-                  <svg width={14} height={14} viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M8 1v14" stroke="currentColor" strokeWidth={1.2} strokeDasharray="2 2" />
-                    <path d="M6.5 4 2 8l4.5 4z" fill="currentColor" />
-                    <path
-                      d="M9.5 4 14 8l-4.5 4z"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.2}
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                  <ShapesIcon size={15} />
                 </button>
+              )}
 
+              {onAddTextPathBlock && (
                 <button
                   type="button"
                   className="sidebarCircleButton"
-                  disabled={!canAddMirrorBlock}
-                  title={
-                    canAddMirrorBlock
-                      ? "Add a radial repetition of the selected block"
-                      : "Select exactly one non-mirror block to repeat it radially"
-                  }
-                  aria-label="Add radial block"
-                  onClick={() => onAddMirrorBlock("radial")}
+                  title="Add text on a curve"
+                  aria-label="Add curved text"
+                  onClick={onAddTextPathBlock}
                 >
-                  <svg width={14} height={14} viewBox="0 0 16 16" aria-hidden="true">
-                    <g stroke="currentColor" strokeWidth={1.2} strokeLinecap="round">
-                      <path d="M8 1.5v3.2M8 11.3v3.2M1.5 8h3.2M11.3 8h3.2" />
-                      <path d="M3.4 3.4l2.3 2.3M10.3 10.3l2.3 2.3M12.6 3.4l-2.3 2.3M5.7 10.3l-2.3 2.3" />
-                    </g>
-                    <circle cx={8} cy={8} r={1.6} fill="currentColor" />
-                  </svg>
+                  <PathTextIcon size={15} />
                 </button>
-              </>
-            )}
-            {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
-              <OrnamentPickerButton
-                variant="circle"
-                onInsertShapeFill={onInsertOrnamentShapeFill}
-                onInsertFrame={onInsertOrnamentFrame}
-              />
-            )}
+              )}
+
+              {onAddImageBlock && (
+                <button
+                  type="button"
+                  className="sidebarCircleButton"
+                  title="Add an image…"
+                  aria-label="Add image"
+                  onClick={onAddImageBlock}
+                >
+                  <ImageIcon size={15} />
+                </button>
+              )}
+
+              {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
+                <OrnamentPickerButton
+                  variant="circle"
+                  onInsertShapeFill={onInsertOrnamentShapeFill}
+                  onInsertFrame={onInsertOrnamentFrame}
+                />
+              )}
+
+              {/* Inline SVGs rather than entries in Icons.tsx: that file is not
+                  this stream's to edit during the Phase 1 parallel run. */}
+              {onAddMirrorBlock && (
+                <>
+                  <button
+                    type="button"
+                    className="sidebarCircleButton"
+                    disabled={!canAddMirrorBlock}
+                    title={
+                      canAddMirrorBlock
+                        ? "Add a mirror (muthanna) of the selected block"
+                        : "Select exactly one non-mirror block to mirror it"
+                    }
+                    aria-label="Add mirror"
+                    onClick={() => onAddMirrorBlock("mirrorX")}
+                  >
+                    <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M8 1v14" stroke="currentColor" strokeWidth={1.2} strokeDasharray="2 2" />
+                      <path d="M6.5 4 2 8l4.5 4z" fill="currentColor" />
+                      <path
+                        d="M9.5 4 14 8l-4.5 4z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.2}
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="sidebarCircleButton"
+                    disabled={!canAddMirrorBlock}
+                    title={
+                      canAddMirrorBlock
+                        ? "Add a medallion: radial copies of the selected block"
+                        : "Select exactly one non-mirror block to repeat it radially"
+                    }
+                    aria-label="Add medallion"
+                    onClick={() => onAddMirrorBlock("radial")}
+                  >
+                    <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
+                      <g stroke="currentColor" strokeWidth={1.2} strokeLinecap="round">
+                        <path d="M8 1.5v3.2M8 11.3v3.2M1.5 8h3.2M11.3 8h3.2" />
+                        <path d="M3.4 3.4l2.3 2.3M10.3 10.3l2.3 2.3M12.6 3.4l-2.3 2.3M5.7 10.3l-2.3 2.3" />
+                      </g>
+                      <circle cx={8} cy={8} r={1.6} fill="currentColor" />
+                    </svg>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
-          <div style={{ height: 8 }} />
+          <div className="blockControlSplit">
+            <div className="blockControlGroup">
+              <div className="blockControlGroupLabel">Selected</div>
+              <div className="blockControlGrid blockControlGrid--inline">
+                <button
+                  type="button"
+                  onClick={onDuplicateBlock}
+                  disabled={!selectedBlock}
+                  className="sidebarCircleButton"
+                  title="Duplicate selected block"
+                  aria-label="Duplicate block"
+                >
+                  <CopyIcon size={15} />
+                </button>
 
-          <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
-            <button
-              type="button"
-              onClick={onUndo}
-              disabled={!canUndo}
-              className="sidebarCircleButton"
-              title="Undo (Ctrl+Z)"
-              aria-label="Undo"
-            >
-              <UndoIcon size={14} />
-            </button>
+                <button
+                  type="button"
+                  onClick={onDeleteBlock}
+                  disabled={!selectedBlock || blocks.length === 0}
+                  className="sidebarCircleButton sidebarCircleButton--danger"
+                  title="Delete selected block"
+                  aria-label="Delete block"
+                >
+                  <TrashIcon size={15} />
+                </button>
+              </div>
+            </div>
 
-            <button
-              type="button"
-              onClick={onRedo}
-              disabled={!canRedo}
-              className="sidebarCircleButton"
-              title="Redo (Ctrl+Y)"
-              aria-label="Redo"
-            >
-              <RedoIcon size={14} />
-            </button>
+            <div className="blockControlGroup">
+              <div className="blockControlGroupLabel">History</div>
+              <div className="blockControlGrid blockControlGrid--inline">
+                <button
+                  type="button"
+                  onClick={onUndo}
+                  disabled={!canUndo}
+                  className="sidebarCircleButton"
+                  title="Undo (Ctrl+Z)"
+                  aria-label="Undo"
+                >
+                  <UndoIcon size={15} />
+                </button>
 
-            <HistoryPopover
-              historyEntries={historyEntries}
-              onJumpTo={onJumpToHistory}
-              onCaptureCurrentThumbnail={onCaptureCurrentThumbnail}
-            />
+                <button
+                  type="button"
+                  onClick={onRedo}
+                  disabled={!canRedo}
+                  className="sidebarCircleButton"
+                  title="Redo (Ctrl+Y)"
+                  aria-label="Redo"
+                >
+                  <RedoIcon size={15} />
+                </button>
+
+                <HistoryPopover
+                  historyEntries={historyEntries}
+                  onJumpTo={onJumpToHistory}
+                  onCaptureCurrentThumbnail={onCaptureCurrentThumbnail}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2057,18 +2073,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   rows={[PRESETS]}
                   onPick={handleKeyboardKey}
                   fontFamily={selectedBlock?.fontFamily ?? "FatemiMaqala"}
+                  collapsible
                 />
 
                 <PresetKeyboard
                   title="Specials"
                   rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]}
                   onPick={handleKeyboardKey}
+                  collapsible
                 />
 
                 <PresetKeyboard
                   title="Urdu-Farsi Characters"
                   rows={[PERSIAN, URDU]}
                   onPick={handleKeyboardKey}
+                  collapsible
                 />
               </div>
             </CollapsibleSection>

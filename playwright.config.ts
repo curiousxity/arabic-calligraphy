@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 5173;
+// Overridable so the suite can still run when another project already holds
+// 5173. `reuseExistingServer` is the reason this matters: with a *foreign*
+// dev server on the port, Playwright happily reuses it and every test times
+// out against someone else's app rather than failing loudly.
+const PORT = Number(process.env.HARF_E2E_PORT ?? 5173);
 const BASE_URL = `http://localhost:${PORT}`;
 
 /**

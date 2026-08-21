@@ -359,15 +359,24 @@ export const PresetKeyboard = ({
   onPick,
   fontFamily,
   large,
+  collapsible,
+  defaultOpen,
 }: {
   title: string;
   rows: string[][];
   onPick: (v: string) => void;
   fontFamily?: string;
   large?: boolean;
-}) => (
-  <div className="sidebarPresetKeyboard">
-    <div className="sidebarPresetKeyboardTitle">{title}</div>
+  /**
+   * Render as a `<details>` the reader can fold away. Four of these open at
+   * once are most of why the sidebar runs four screens tall, and only the
+   * harakat row is wanted on every edit. Native `<details>` rather than
+   * component state: it needs no owner, and it is keyboard-operable for free.
+   */
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+}) => {
+  const keys = (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {rows.map((row, ri) => (
         <div key={ri} className="sidebarPresetKeyboardRow">
@@ -391,8 +400,26 @@ export const PresetKeyboard = ({
         </div>
       ))}
     </div>
-  </div>
-);
+  );
+
+  if (collapsible) {
+    return (
+      <details className="sidebarPresetKeyboard" open={defaultOpen}>
+        <summary className="sidebarPresetKeyboardTitle sidebarPresetKeyboardSummary">
+          {title}
+        </summary>
+        {keys}
+      </details>
+    );
+  }
+
+  return (
+    <div className="sidebarPresetKeyboard">
+      <div className="sidebarPresetKeyboardTitle">{title}</div>
+      {keys}
+    </div>
+  );
+};
 
 /** Shared +/− collapsible header used throughout the sidebar; renders `children` only while open. */
 export const CollapsibleSection = ({

@@ -80,6 +80,47 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-08-20 — Interface pass: contrast, focus, targets, and paper
+
+A design review of the running app, measured in the browser rather than
+eyeballed, and the seven fixes it produced. The numbers below are before →
+after, taken the same way both times.
+
+- **Block Controls** was one centred `flex-wrap` of twelve identical icon
+  chips that wrapped **8 / 1 / 3** at the sidebar's own width, stranding the
+  ornament button alone on a line. Now three labelled groups on fixed grids —
+  Add · Selected · History — which cannot orphan, and which put the
+  destructive Delete somewhere other than first. See CLAUDE.md, "Sidebar
+  structure".
+- **Light-theme icon contrast: 2.95:1 → 4.0:1.** The gold on the chip
+  background sat just under the 3:1 WCAG asks for meaningful non-text UI.
+  `--accent` moves to `#8f6415` in the light palette only; the dark theme was
+  already at 4.94:1.
+- **Keyboard focus** was Chrome's default blue 1px ring on every control but
+  two text inputs. One `:focus-visible` rule now paints it in the app's own
+  gold.
+- **Controls below the 24×24 target floor: 34 → 0.**
+- **Sidebar height: 3786px → 2183px** (4.0 → 2.3 screens at 950px). Three of
+  the four character keyboards are collapsible and start closed; إعراب stays
+  open.
+- **Labels** name the outcome in sentence case — "Add shape fill", not
+  "Upload SVG for Shape Fill".
+- **The canvas reads as paper, not graph paper.** The grid draws as a
+  one-device-pixel hairline at any zoom instead of ~2.75px at the default
+  275%, and a new document opens on washi. Washi specifically, because a
+  surface magnifies with the stage and it is the one whose grain survives
+  that zoom — compared on screen, not chosen from the names.
+
+Verified: typecheck, lint, 450 unit tests, build, and the full 54-test
+Playwright suite. Five e2e tests needed updating and the reason is worth
+keeping: paper grain lands inside a block's bounding box, so every pixel
+assertion that measures ink now asks for bare paper first.
+
+Also: `playwright.config.ts` takes `HARF_E2E_PORT`. With `reuseExistingServer`
+on and a *foreign* dev server holding 5173, Playwright silently reuses it and
+all 54 tests time out against someone else's app — which is exactly what
+happened during this work.
+
 ### 2026-08-20 — Name designs
 
 Content → **Name designs**: see the selected block's text written in every

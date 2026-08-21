@@ -93,8 +93,8 @@
     --border: #d8c9a0;
     --border-soft: #e6dab8;
 
-    --accent: #a8791a;
-    --accent-hover: #8f6a12;
+    --accent: #8f6415;
+    --accent-hover: #75520e;
     --accent-soft: #f0e0b0;
     --accent-soft-hover: #e6d090;
 
@@ -115,15 +115,15 @@
     --key-shadow-active: rgba(90, 70, 20, 0.2);
 
     --overlay-hover: rgba(26, 35, 64, 0.05);
-    --overlay-accent-hover: rgba(168, 121, 26, 0.1);
+    --overlay-accent-hover: rgba(143, 100, 21, 0.1);
     --toolbar-bg: rgba(250, 245, 232, 0.9);
     --bg-panel-floating: #fffdf6;
 
-    --info-text: #8f6a12;
+    --info-text: #75520e;
     --info-bg: #f0e0b0;
     --row-bg: #f5eeda;
     --selection-bg: #ecdfb0;
-    --selection-border: #a8791a;
+    --selection-border: #8f6415;
     --merge-bg: #f5e6a8;
     --merge-border: #b8901c;
     --input-bg-solid: #ffffff;
@@ -186,7 +186,7 @@ html, body, #root { height: 100%; margin: 0; }
 .hexInput { flex: 1 1 0; min-width: 64px; height: 36px; padding: 0 10px; border: none; border-radius: 8px; background: var(--input-bg-solid); color: var(--text-primary); font-size: 13px; letter-spacing: 0.02em; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
 .hexInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
-.paletteSwatch { width: 20px; height: 20px; border-radius: 999px; border: 1px solid var(--border); padding: 0; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s; }
+.paletteSwatch { width: 24px; height: 24px; border-radius: 999px; border: 1px solid var(--border); padding: 0; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s; }
 .paletteSwatch:hover { transform: scale(1.18); }
 .textArea, .sidebarTextarea { width: 100%; max-width: 100%; min-height: 120px; padding: 12px; font-size: 18px; line-height: 1.5; direction: rtl; box-sizing: border-box; border: none; border-radius: 10px; resize: vertical; background: var(--bg-input); color: var(--text-primary); }
 
@@ -226,7 +226,7 @@ html, body, #root { height: 100%; margin: 0; }
 .rangeResetBtn { flex-shrink: 0; border: none; background: transparent; color: var(--text-muted); font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: 4px; cursor: pointer; }
 .rangeResetBtn:hover { color: var(--accent); background: var(--overlay-accent-hover); }
 
-.sidebarCircleButton { width: 30px; height: 30px; border-radius: 999px; border: none; background: var(--accent-soft); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; transition: background 0.12s; }
+.sidebarCircleButton { width: 34px; height: 34px; border-radius: 999px; border: none; background: var(--accent-soft); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; transition: background 0.12s; }
 .sidebarCircleButton:hover:not(:disabled) { background: var(--accent-soft-hover); color: var(--text-on-accent); }
 .sidebarCircleButton--light { font-weight: 400; font-size: 12px; }
 .sidebarCircleButton:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -255,7 +255,7 @@ html, body, #root { height: 100%; margin: 0; }
 .sidebarPresetKeyboardKeyHint { position: absolute; top: 3px; right: 5px; font-size: 9px; line-height: 1; color: var(--text-faint); pointer-events: none; }
 
 /* Layers */
-.layerIconBtn { display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; font-size: 12px; padding: 2px 3px; flex-shrink: 0; opacity: 0.65; border-radius: 4px; transition: background 0.1s, opacity 0.1s; color: var(--text-secondary); }
+.layerIconBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; border: none; background: transparent; cursor: pointer; font-size: 12px; padding: 2px 3px; flex-shrink: 0; opacity: 0.65; border-radius: 4px; transition: background 0.1s, opacity 0.1s; color: var(--text-secondary); }
 .layerIconBtn:hover { opacity: 1; background: var(--overlay-hover); }
 
 .smallButton { width: 100%; padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
@@ -378,7 +378,7 @@ html, body, #root { height: 100%; margin: 0; }
 .ornamentPickerSwatches { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
 .ornamentPickerSwatches > * { min-width: 0; }
 .ornamentPickerSwatchLabel { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); margin-right: 2px; }
-.ornamentPickerSwatch { width: 20px; height: 20px; flex-shrink: 0; padding: 0; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.ornamentPickerSwatch { width: 24px; height: 24px; flex-shrink: 0; padding: 0; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
 .ornamentPickerSwatch--active { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ornamentPickerColorInput { width: 28px; height: 22px; flex-shrink: 0; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; }
 
@@ -474,3 +474,60 @@ html, body, #root { height: 100%; margin: 0; }
 .nameDesignActions > * { min-width: 0; }
 .nameDesignSpacer { flex: 1; }
 /* ---- /Name designs ---- */
+
+/* Keyboard focus, in the app's own gold rather than the browser's blue.
+   Nothing but two text inputs defined a :focus style before this, so every
+   other control fell back to the UA ring — light blue, 1px, and close to
+   invisible against the navy panels. `:where()` keeps the specificity at
+   zero so any component's own focus treatment still wins. */
+:where(button, select, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Block Controls: labelled groups on a fixed grid.
+   The row this replaced was a centred flex-wrap of twelve identical chips,
+   which at the sidebar's width wrapped 8 / 1 / 3 and stranded one button
+   alone on its own line. Columns are fixed so the shape is chosen rather
+   than emergent, and the tracks are sized to the chip so a partly-filled
+   last row stays left-aligned under the one above it. */
+.blockControlGroup { margin-top: 10px; }
+.blockControlGroupLabel {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.blockControlGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 34px);
+  gap: 8px;
+  justify-content: start;
+}
+.blockControlGrid--inline { grid-template-columns: repeat(3, 34px); }
+/* Selected and History sit side by side: two short groups stacked would
+   cost a third of a screen in a sidebar that is already four screens tall. */
+.blockControlSplit { display: flex; gap: 20px; flex-wrap: wrap; }
+.blockControlSplit .blockControlGroup { min-width: 0; }
+
+/* A collapsible keyboard's title doubles as its toggle. The marker is
+   suppressed and replaced with a chevron on the right so the title itself
+   stays centred, matching the three that are not collapsible. */
+.sidebarPresetKeyboardSummary { cursor: pointer; list-style: none; position: relative; }
+.sidebarPresetKeyboardSummary::-webkit-details-marker { display: none; }
+.sidebarPresetKeyboardSummary::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: 4px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--accent);
+  border-bottom: 1.5px solid var(--accent);
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+details[open] > .sidebarPresetKeyboardSummary::after { transform: rotate(-135deg); }
+details:not([open]) > .sidebarPresetKeyboardSummary { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }

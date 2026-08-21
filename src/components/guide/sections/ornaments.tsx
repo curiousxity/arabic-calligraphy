@@ -29,8 +29,8 @@ export const section: GuideSection = {
         The app comes with a small library of ready-made shapes — arches,
         stars, medallions, a cartouche, a crescent, a border — so you can
         start a shaped piece without drawing or finding an SVG of your own.
-        Open it from the <strong>Shapes &amp; frames</strong> button in{" "}
-        <strong>Block Controls</strong>, or from the top of the{" "}
+        Open it from the <strong>Add ornament</strong> button under{" "}
+        <strong>Block Controls &rarr; Add</strong>, or from the top of the{" "}
         <strong>Shape Fill</strong> panel when a shaped block is selected.
       </p>
 

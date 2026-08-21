@@ -991,6 +991,14 @@ overhang on canvas, and clipping during editing.
 
 ### Canvas pan and zoom (`CanvasStage.tsx`, `lib/canvasBounds.ts`)
 
+**The alignment grid draws at `1 / stageScale`**, i.e. one device pixel at
+any zoom, the same idiom the snap guides use. `strokeWidth` is in stage
+units, so the fixed `1` it used to carry became ~2.75px at the default 275%
+and the grid out-weighed the ink it exists to measure. Worth knowing when
+reading `e2e/` failures: a sub-pixel line antialiases into a few extra colour
+buckets, which is why `ink-surface.spec.ts`'s flat-baseline guard is 30
+rather than 20.
+
 A wheel event zooms only when `ctrlKey`/`metaKey` is set — which is how
 browsers report a trackpad pinch as well as an explicit ctrl+wheel; a
 plain wheel or two-finger scroll pans instead.
@@ -1109,7 +1117,42 @@ text serves that purpose now, since filling out a form is already a
 deliberate action and a second confirmation on top was redundant
 friction.
 
+**Block Controls is three labelled groups on fixed grids**, not one
+wrapping row. `Add` (text, shape fill, curved text, image, ornament, mirror,
+medallion) sits on a 4-column grid; `Selected` (duplicate, delete) and
+`History` (undo, redo, history) share a line below it. The row this replaced
+was a centred `flex-wrap` of twelve identical chips, which at the sidebar's
+own width wrapped **8 / 1 / 3** — stranding the ornament button alone on a
+line, which reads as a bug rather than a layout. Columns are fixed so the
+shape is chosen rather than emergent. The split also moves the destructive
+`Delete` out of the leading position, where it sat immediately beside
+`Duplicate`.
+
+Icon-button labels follow **sentence case and name the outcome**, not the
+mechanism: `Add shape fill`, not "Upload SVG for Shape Fill". The `title`
+tooltip carries a trailing `…` when the button opens a picker or a file
+dialog; the `aria-label` stays clean, which is also what keeps the e2e
+selectors plain. Renaming one means updating `e2e/` in the same commit —
+`mirror.spec.ts`, `ornaments.spec.ts` and `ink-surface.spec.ts` all address
+these buttons by accessible name.
+
+`PresetKeyboard` takes a `collapsible` flag and renders as a native
+`<details>` when set — no owning state, and keyboard-operable for free.
+Presets, Specials and Urdu-Farsi use it and start closed; the إعراب harakat
+row stays open, being the one wanted on nearly every edit. Four open at once
+was most of why the sidebar ran four screens tall.
+
 CSS is one global stylesheet (`src/index.css`) using CSS custom properties for theming — navy+gold is the unconditional default (`:root`), with an ivory/parchment palette under `@media (prefers-color-scheme: light)` (inverted from the usual light-default/dark-override convention — check this file's structure before assuming which block is "the default").
+
+**Keyboard focus is defined once, at the bottom of `index.css`**, as a
+2px `var(--accent)` outline on `:where(button, select, input, textarea,
+[tabindex]):focus-visible`. Before it, the only `:focus` rules in the file
+were on two text inputs, so every other control fell back to the UA ring —
+Chrome's light blue, 1px, close to invisible on the navy panels and foreign
+to the palette. `:where()` holds the specificity at zero so any component's
+own focus treatment still wins, and the rule deliberately sets no
+`border-radius`: an outline already follows the element's own, and forcing
+one flattens the circular buttons while they are focused.
 
 Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default to `min-width: auto`**, which refuses to shrink below content size and causes silent overflow/clipping at narrow sidebar widths. When adding a new multi-item row (grid or flex), give items `min-width: 0` explicitly or the row will overflow at the sidebar's minimum width instead of degrading gracefully.
 
@@ -1370,6 +1413,25 @@ bytes of assets. Two things about it:
   instead throws the lattice out of phase with the tile. `textures.test.ts`
   asserts `grain(0, v) === grain(1, v)` on every texture, which is what caught
   `Math.sign` flipping on floating-point dust at linen's tile edge.
+
+**A new document opens on `washi`, not on bare paper.** The first screen is
+the app's whole claim, and flat white under a 40px grid reads as graph paper.
+The choice of texture is not decorative: a surface is drawn in *document*
+space, so the stage's scale magnifies its grain along with everything else,
+and a fresh canvas opens at **275%**. At that zoom parchment's mottling and
+laid-paper's chain lines both smear into blotches that read as staining;
+washi's fibres are fine enough to survive it. Compared on screen at that
+zoom rather than chosen from the names — if a new texture is ever made the
+default, compare it the same way.
+
+Only the *default* moved. `readArtboardSurface` still answers bare for a
+payload with no surface key, so every project saved before this keeps its
+look. The one place it bites is **pixel assertions in `e2e/`**: paper grain
+lands inside a block's own bounding box and inflates any colour count taken
+there, so the three tests in `ink-surface.spec.ts` that measure ink now ask
+for `chooseSurface(page, "")` first. A test that measures a *delta* against a
+baseline is the fragile kind — a textured baseline can be high enough that a
+real gradient no longer clears it.
 
 The surface is App state (`artboardSurface: { textureId, tint }`), **not**
 part of `ArtboardConfig` — a freeform canvas gets paper too. It is saved with

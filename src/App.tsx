@@ -319,8 +319,22 @@ const App: React.FC = () => {
   // a look, and `null` freeform pages get one too, so it is not a property of
   // "there is a page". Saved with the document; not in the undo snapshot,
   // which this stream's anchors do not reach.
+  // A new document opens on paper rather than flat white. The first screen is
+  // the app's whole claim, and bare white under a 40px grid reads as graph
+  // paper — the opposite of what this tool is for.
+  //
+  // Washi, specifically, and the reason is the *default zoom*. A surface is
+  // drawn in document space, so the stage's scale magnifies its grain along
+  // with everything else; at the 275% a fresh canvas opens at, parchment's
+  // mottling and laid-paper's chain lines both smear into blotches that read
+  // as staining. Washi's fibres are fine enough to survive the magnification.
+  // Compared on screen at that zoom, not chosen from the names.
+  //
+  // Only the *default* moves: `readArtboardSurface` still answers bare for a
+  // payload with no surface key, so every project saved before this keeps its
+  // look.
   const [artboardSurface, setArtboardSurface] = useState<ArtboardSurface>({
-    textureId: null,
+    textureId: "washi",
   });
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — state ----

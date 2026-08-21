@@ -420,6 +420,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
   const renderGridLines = () => {
     const lines: React.ReactNode[] = [];
+    // A hairline at every zoom, the way the snap guides already do it.
+    // `strokeWidth` is in stage units, so a fixed 1 became ~2.75 device px at
+    // the default 275% zoom — the grid then out-weighed the ink it exists to
+    // measure. The paler stroke is the other half of the same intent.
+    const gridStrokeWidth = 1 / stageScale;
 
     const startX = Math.floor(paperBox.x / GRID_SIZE) * GRID_SIZE;
     const endX = Math.ceil((paperBox.x + paperBox.width) / GRID_SIZE) * GRID_SIZE;
@@ -431,8 +436,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         <Line
           key={`v-${x}`}
           points={[x, startY, x, endY]}
-          stroke="#ddd"
-          strokeWidth={1}
+          stroke="#e4e0d6"
+          strokeWidth={gridStrokeWidth}
           listening={false}
         />
       );
@@ -443,8 +448,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         <Line
           key={`h-${y}`}
           points={[startX, y, endX, y]}
-          stroke="#ddd"
-          strokeWidth={1}
+          stroke="#e4e0d6"
+          strokeWidth={gridStrokeWidth}
           listening={false}
         />
       );

@@ -95,7 +95,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
           onClick={() => selectedId != null && onDelete(selectedId)}
           disabled={selectedId == null}
           className="sidebarCircleButton sidebarCircleButton--light sidebarCircleButton--danger"
-          style={{ width: 22, height: 22 }}
+          style={{ width: 24, height: 24 }}
           title="Delete selected layer"
           aria-label="Delete selected layer"
         >
@@ -106,7 +106,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
           type="button"
           onClick={onAddBlock}
           className="sidebarCircleButton sidebarCircleButton--light"
-          style={{ width: 22, height: 22 }}
+          style={{ width: 24, height: 24 }}
           title="Add text layer"
           aria-label="Add text layer"
         >

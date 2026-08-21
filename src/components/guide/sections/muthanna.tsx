@@ -31,9 +31,9 @@ export const section: GuideSection = {
         centre, the way a medallion or <em>shamsa</em> is built.
       </p>
       <p>
-        Both are made the same way here. Select a block, then press the{" "}
-        <strong>mirror</strong> or <strong>radial</strong> button in{" "}
-        <strong>Block Controls</strong>. A new block appears that draws the
+        Both are made the same way here. Select a block, then press{" "}
+        <strong>Add mirror</strong> or <strong>Add medallion</strong> under{" "}
+        <strong>Block Controls &rarr; Add</strong>. A new block appears that draws the
         selected block's writing again, reflected or repeated around a circle.
       </p>
 

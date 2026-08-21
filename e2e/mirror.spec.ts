@@ -7,8 +7,8 @@ import { gotoApp, getBlocks, blockClientBox, inkPixels, setBlockText, type Box }
  * live stage canvas, per the harness's rules in CLAUDE.md.
  */
 
-const ADD_MIRROR = 'button[aria-label="Add mirror block"]';
-const ADD_RADIAL = 'button[aria-label="Add radial block"]';
+const ADD_MIRROR = 'button[aria-label="Add mirror"]';
+const ADD_RADIAL = 'button[aria-label="Add medallion"]';
 
 /** The one block a fresh session starts with, and the mirror added next to it. */
 const SOURCE_ID = 1;
