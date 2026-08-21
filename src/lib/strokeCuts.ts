@@ -13,12 +13,23 @@
  * **This module has no application consumer.** The plan that specified it
  * (`docs/superpowers/plans/2026-08-21-straight-stroke-extension.md`) stopped
  * at Task 3, its own go/no-go coverage gate, and the gate failed: at the
- * shipped `maxSlope` and at both looser values the plan authorized trying,
- * zero of the four gate fonts (Amiri, Scheherazade, NotoSans, Kufi) cleared
- * both the isolated-letter and join coverage thresholds at once, and the
- * reason is structural — Arabic strokes as these fonts actually draw them
- * are subtly inclined nearly everywhere, so the tolerance that admits a real
- * stroke also admits a curve. Full measurement:
+ * shipped `maxSlope` and at both looser values the plan authorized trying, no
+ * setting ever cleared the gate on all four gate fonts (Amiri, Scheherazade,
+ * NotoSans, Kufi) at once. That is not a join-coverage failure — measured
+ * against the gate's own denominator (positions where a tatweel is actually
+ * legal, not every adjacent glyph pair), join coverage reaches 89–100% in
+ * three of the four fonts (Scheherazade, NotoSans, Kufi). NotoSans clears
+ * both bars at every tested setting including baseline; Kufi clears both
+ * only at the two loosened settings, missing on isolated coverage at
+ * baseline. What actually fails is the letterform-internal half: Amiri's
+ * join score is the one outlier (0% at baseline, still only 56% at the
+ * loosened ceiling — a genuine property of where its zones sit, not a metric
+ * artifact) and Scheherazade's isolated-letter coverage never reaches the
+ * 60% bar at any tested setting, getting worse as the tolerance loosens (54%
+ * → 46% → 32%). Because the gate requires all four fonts to clear at once,
+ * it is never met. The reason is structural — Arabic strokes as these fonts
+ * actually draw them are subtly inclined nearly everywhere, so the tolerance
+ * that admits a real stroke also admits a curve. Full measurement:
  * `docs/archive/stroke-zone-coverage.md`. See also CLAUDE.md,
  * "Straight-stroke cut detection (kept, unused)".
  *
@@ -167,7 +178,9 @@ export type DetectOpts = {
   minZoneWidth: number;
 };
 
-/** Starting values only. Task 3's coverage sweep is what sets these for real. */
+/** Task 3's coverage sweep measured against these starting values and found
+ *  no tested change clears the gate, so they were deliberately left as
+ *  shipped — see `docs/archive/stroke-zone-coverage.md`. */
 export const DEFAULT_DETECT_OPTS: DetectOpts = {
   maxSlope: 0.18,
   step: 10,

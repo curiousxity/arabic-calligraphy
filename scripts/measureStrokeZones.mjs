@@ -72,6 +72,12 @@ const SPOT_CHECK_LETTERS = ["ن", "ح", "س"];
 // tsx runs the TS module directly.
 const { toSvgCmds, flattenContours, findCutZones, crossingsAt, DEFAULT_DETECT_OPTS } =
   await import("../src/lib/strokeCuts.ts");
+// The gate (design doc) defines join coverage over "positions where a
+// tatweel is currently legal," not over every adjacent glyph pair — those
+// are different populations (see docs/archive/stroke-zone-coverage.md).
+// findKashidaSlots is the app's own authority on which letter-pairs are
+// legal joins, so it is imported directly rather than reimplemented here.
+const { findKashidaSlots } = await import("../src/lib/tatweel.ts");
 
 const argv = process.argv.slice(2);
 const argMaxSlope = argv
@@ -210,7 +216,14 @@ async function runSweep() {
 
     // Contextual + join: five shaped words.
     let contextualTotal = 0, contextualWithZone = 0;
+    // joinSlots/joinsCovered: every adjacent letter pair (the population this
+    // script has always used). legalJoinSlots/legalJoinsCovered: the subset
+    // of those pairs where a tatweel is actually legal per findKashidaSlots
+    // — the population the design doc's gate (>=80% of "positions where a
+    // tatweel is currently legal") actually specifies. Both are reported;
+    // they are not the same number and must not be conflated.
     let joinSlots = 0, joinsCovered = 0;
+    let legalJoinSlots = 0, legalJoinsCovered = 0;
     for (const w of WORDS) {
       const glyphs = await shape(hb, bytes, upm, w);
       const zonesPerGlyph = glyphs.map((g) => zonesForGlyph(parsed, upm, opts, g, file));
@@ -229,6 +242,14 @@ async function runSweep() {
       for (let i = 0; i < glyphs.length; i++) {
         if ((glyphs[i].ax ?? 0) !== 0) letterIdx.push(i);
       }
+      // findKashidaSlots works in logical text order and reports, for each
+      // legal join, the text index (cluster) of the LATER (in logical text)
+      // of the two letters. HarfBuzz's RTL glyph array runs in the opposite
+      // (visual) order, so within an adjacent glyph pair (i, next) here, `i`
+      // is always the later-in-text letter — its own `cl` is what a legal
+      // slot's `index` would match. Verified against every word/font in this
+      // corpus before relying on it (see the archive's Finding 1 write-up).
+      const legalTextIdx = new Set(findKashidaSlots(w).map((s) => s.index));
       for (let k = 0; k + 1 < letterIdx.length; k++) {
         joinSlots++;
         const i = letterIdx[k];
@@ -236,7 +257,12 @@ async function runSweep() {
         const advI = glyphs[i].ax ?? 0;
         const nearTrailingEdgeOfI = zoneNearEdge(zonesPerGlyph[i], advI, joinWindow);
         const nearLeadingEdgeOfNext = zoneNearEdge(zonesPerGlyph[next], 0, joinWindow);
-        if (nearTrailingEdgeOfI || nearLeadingEdgeOfNext) joinsCovered++;
+        const covered = nearTrailingEdgeOfI || nearLeadingEdgeOfNext;
+        if (covered) joinsCovered++;
+        if (legalTextIdx.has(glyphs[i].cl ?? 0)) {
+          legalJoinSlots++;
+          if (covered) legalJoinsCovered++;
+        }
       }
     }
 
@@ -248,14 +274,16 @@ async function runSweep() {
       medianEm: widths.length ? widths[Math.floor(widths.length / 2)].toFixed(3) : "-",
       contextualPct: contextualTotal ? Math.round((contextualWithZone / contextualTotal) * 100) : 0,
       joinPct: joinSlots ? Math.round((joinsCovered / joinSlots) * 100) : 0,
+      legalJoinSlots,
+      legalJoinPct: legalJoinSlots ? Math.round((legalJoinsCovered / legalJoinSlots) * 100) : 0,
     });
   }
 
   console.log(`maxSlope=${maxSlopeOverride ?? DEFAULT_DETECT_OPTS.maxSlope} joinWindow=${JOIN_WINDOW_STEPS} steps (upm/${Math.round(100 / JOIN_WINDOW_STEPS)})`);
-  console.log("| Font | isolated letters | zones | median zone (em) | contextual | join |");
-  console.log("|---|---|---|---|---|---|");
+  console.log("| Font | isolated letters | zones | median zone (em) | contextual | join (all adjacent pairs) | join (tatweel-legal slots) |");
+  console.log("|---|---|---|---|---|---|---|");
   for (const r of rows) {
-    console.log(`| ${r.font} | ${r.letterPct}% | ${r.totalZones} | ${r.medianEm} | ${r.contextualPct}% | ${r.joinPct}% |`);
+    console.log(`| ${r.font} | ${r.letterPct}% | ${r.totalZones} | ${r.medianEm} | ${r.contextualPct}% | ${r.joinPct}% | ${r.legalJoinPct}% (n=${r.legalJoinSlots}) |`);
   }
 }
 

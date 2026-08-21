@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { flattenContours, crossingsAt, legalCutAt } from "./strokeCuts";
+import { flattenContours, crossingsAt, legalCutAt, findCutZones, DEFAULT_DETECT_OPTS } from "./strokeCuts";
 import type { SvgCmd } from "./svgPath";
 
 /** A 100x20 horizontal bar — the model of an extendable straight stroke. */
@@ -66,8 +66,6 @@ describe("legalCutAt", () => {
     expect(legalCutAt(flattenContours(wedge), 50).legal).toBe(false);
   });
 });
-
-import { findCutZones, DEFAULT_DETECT_OPTS } from "./strokeCuts";
 
 describe("findCutZones", () => {
   const meta = { glyphIndex: 3, cluster: 1 };

@@ -694,32 +694,53 @@ an oversight.
 
 **What the measurement established, so it is not re-derived.** The gate
 needed the four naskh/kufi faces (Amiri, Scheherazade, NotoSans, Kufi) to
-clear isolated-letter coverage ≥60% and join coverage ≥80%. At the shipped
-`maxSlope: 0.18`, and at both looser values the design authorized trying
-(0.25, 0.35 — its hard ceiling), zero of the four ever cleared both
-thresholds at once. Loosening did not help: Scheherazade's isolated coverage
-gets *worse* as the tolerance relaxes (54% → 46% → 32%), and only Kufi ever
-clears both bars, only at the two rejected settings. The reason is
-structural, not a tuning miss — the legality predicate requires every
-outline segment a cut crosses to run within `maxSlope` of parallel to the
-baseline, and Arabic strokes as these fonts actually draw them are subtly
-inclined nearly everywhere, so a tolerance loose enough to admit a real stem
-or bar also admits a curve. The spot-check names it directly: at
-`maxSlope: 0.35`, Kufi's ن reports a zone whose sampled slope swings from
-−0.342 through zero to +0.342 across a single "zone" — the false-flat at a
-curve's own vertex, not a straight run — and Amiri's س and Scheherazade's ن
-show the same failure at their own hook and tail curl. Full tables and the
-reproducible spot-check: `docs/archive/stroke-zone-coverage.md`.
+clear isolated-letter coverage ≥60% *and* join coverage ≥80% **at once**. At
+the shipped `maxSlope: 0.18`, and at both looser values the design
+authorized trying (0.25, 0.35 — its hard ceiling), no setting ever cleared
+both bars on all four fonts simultaneously — but the numbers behind that
+failure are not what an earlier draft of this section said, and the shape
+of the failure matters for what to conclude from it. Full tables, both a
+join reading over every adjacent glyph pair and the design doc's own reading
+over positions where a tatweel is actually legal, and the reproducible
+spot-check all live in `docs/archive/stroke-zone-coverage.md`, which this
+section only summarizes.
 
-**Why this doesn't just retry the join half.** The join case competes with
-tatweel kashida (see "Kashida elongation" above), which already works in all
-17 bundled fonts by inserting a real character the font shapes. The
-measurement's best join result — Kufi at 83% — is one font out of four, and
-only at a rejected setting; a mechanism reaching one font in four cannot
-replace one already reaching seventeen. The letterform-stroke half (a bar or
-a flat inside a single glyph, no join involved) has no such existing
-alternative and is what failed to clear its own bar independently:
-Scheherazade's isolated coverage never reaches 60% at any tested setting.
+**The join half works.** Measured the way the design doc's gate actually
+specifies it — coverage of positions where a tatweel is currently legal, not
+of every adjacent glyph pair — join coverage reaches roughly 90–100% in
+three of the four gate fonts (Scheherazade, NotoSans, Kufi) at the shipped
+`maxSlope`, and stays there across the whole tuning range. Amiri is the one
+real outlier on join, a property of where its own zones sit relative to its
+joins, checked directly and confirmed genuine rather than a metric artifact.
+
+**The letterform-internal half is what actually failed.** Isolated-letter
+coverage is what keeps the gate from passing: Scheherazade's isolated score
+never reaches the 60% bar at any tested setting, and gets *worse*, not
+better, as the tolerance loosens. The reason is structural, not a tuning
+miss — the legality predicate requires every outline segment a cut crosses
+to run within `maxSlope` of parallel to the baseline, and Arabic strokes as
+these fonts actually draw them are subtly inclined nearly everywhere, so a
+tolerance loose enough to admit a real stem or bar also admits a curve. The
+spot-check names it directly: at `maxSlope: 0.35`, Kufi's ن reports a zone
+whose two crossings each sweep through zero across the zone's width — one
+running roughly −0.34 to +0.23, the other +0.34 to −0.23 — the false-flat at
+a curve's own vertex, not a straight run; Amiri's س and Scheherazade's ن show
+the same failure at their own hook and tail curl.
+
+**Why the working half doesn't make this worth building anyway.** The join
+case competes with tatweel kashida (see "Kashida elongation" above), which
+applies to every bundled font by inserting a real character the font shapes
+at its own designed weight — verified directly in three real fonts
+(`tatweel.test.ts`), and known to be font-dependent in its own right (a
+tatweel can decompose a ligature like الله, which the font is doing
+correctly, not a bug). A straight-stroke connector mechanism reaching
+~90–100% join coverage on three fonts would be a second, more complex way to
+do something the app can already do everywhere. The letterform-internal
+case — stretching a stroke *inside* a letterform, which tatweel structurally
+cannot touch — is the genuinely new capability this plan would have added,
+and it is the half whose own coverage number is what keeps the gate from
+passing. That is why stopping here is the right call, not merely the
+measured one.
 
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 

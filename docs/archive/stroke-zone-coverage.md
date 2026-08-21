@@ -1,9 +1,14 @@
 # Straight-stroke cut-zone coverage sweep
 
-Date: 2026-08-21 (revised same day after independent review — see "Revision
-history" at the bottom; the review reproduced the underlying measurements
-byte-for-byte and found the metrics themselves needed fixing, not the
-detector or the raw numbers).
+Date: 2026-08-21 (revised same day, three times, after independent review —
+see "Revision history" at the bottom; every review reproduced the underlying
+measurements byte-for-byte and found the metrics or the prose needed fixing,
+never the detector or the raw geometry numbers).
+
+**This file is the single home for the gate numbers.** `CLAUDE.md`,
+`PROGRESS.md` and the plan file link here rather than repeating the tables —
+duplicating the same numbers in four files is exactly what let two of them
+go stale (see the third revision below).
 
 This is Task 3 of the straight-stroke-extension plan — the go/no-go gate.
 `src/lib/strokeCuts.ts` (Tasks 1–2) is a pure geometric detector that walks a
@@ -20,8 +25,27 @@ reimplementation.
 `محمد`, `بسم`, `سلام`, `كتاب`) shaped together, none of which carry tashkeel.
 Per-font `DetectOpts` scale `step` and `minZoneWidth` to each font's own
 `unitsPerEm` (`step = upm/100`, `minZoneWidth = upm/40`), so the sweep is
-resolution-independent; `maxSlope` and `thicknessTolerance` are the same
+resolution-independent; `maxSlope` and `thicknessTolerance` (fixed at 0.12
+across every run in this document — the brief authorizes tuning `maxSlope`
+only, and this value was never changed to chase a number) are the same
 across fonts.
+
+Outline curves are flattened by `flattenContours` at a **fixed 8 subdivision
+steps per bezier command, regardless of a font's `unitsPerEm`** — the same
+subdivision `pathToPolygon` already uses elsewhere in this codebase. This is
+worth stating plainly because it is the first objection a future reader will
+raise against a negative result: could coarse flattening on a high-upm font
+(Scheherazade ships at 2048 upm) be manufacturing false slope readings on a
+curve, rather than the curve genuinely defeating `maxSlope`? The bias runs
+the other way — a chord across one subdivision of a bezier segment reports
+that segment's *average* slope, which for a smooth curve is generally
+shallower than the curve's own steepest instantaneous slope somewhere inside
+that segment. Coarser flattening therefore tends to make a curve read
+*flatter*, not steeper, so 8-step flattening is biased toward *finding* more
+zones on curved letters than a finer subdivision would, not fewer. The
+spot-check's rejections (below) are read directly off these same 8-step
+samples, so they are not an artifact of the flattening being too coarse to
+see the curve — if anything, a finer flattening would reject more.
 
 Three coverage numbers are reported per font, and they are kept separate
 because they measure different populations and none of them predicts the
@@ -36,8 +60,10 @@ others:
   forms, ligatures) differs from its isolated form — and **not** a
   connector/join metric either: a zone in the middle of a bowl counts here
   exactly as much as one sitting at a join.
-- **join%** — the real connector metric. For each adjacent **letter** pair
-  in a shaped word, checks whether a zone sits near the *shared join edge*:
+- **join%** — the real connector metric, and reported as **two columns**
+  because they score against two different populations, and the difference
+  matters. For each adjacent **letter** pair in a shaped word, both columns
+  check the same thing — whether a zone sits near the *shared join edge*:
   the earlier letter's trailing pen-edge (its own local x at its advance
   width) or the later letter's leading pen-edge (its own local x at 0),
   within a fixed **join window** of 5 sample steps (`JOIN_WINDOW_STEPS = 5`,
@@ -50,129 +76,176 @@ others:
   onto the same point and make the edge arithmetic meaningless (a mark's
   real offset lives in `dx`, which this metric never reads) — so each
   letter is paired with its next non-zero-advance neighbour, skipping over
-  any mark glyphs sitting between them. This was a real fix, not just a
-  relabeling: a base↔mark pair was never a letter join, and counting it as
-  a "join slot" both inflated the denominator with non-joins and asked
-  meaningless edge questions about the mark. Divided by that letter-pair
-  count, so the denominator genuinely is "number of letter-to-letter
-  joins."
+  any mark glyphs sitting between them.
+
+  The two columns differ only in their **denominator**:
+  - **join (all adjacent pairs)** divides by every such letter-pair the
+    corpus produces — 10–13 per font. This is the population the script has
+    always used, kept here for continuity.
+  - **join (tatweel-legal)** — what the design doc's gate actually
+    specifies ("connector zones at ≥80% of the positions where a tatweel is
+    currently legal") — restricts the denominator to the subset of those
+    pairs where `findKashidaSlots` (`src/lib/tatweel.ts`, the app's own
+    authority on where a tatweel may legally be inserted) reports a legal
+    join. These are not the same population: of the corpus's 10–13 adjacent
+    pairs, only 7–9 per font are tatweel-legal joins. A pair like ر-ف in
+    حرف, ل-ا or ا-م in سلام, or ا-ب in كتاب is an adjacent glyph pair with no
+    connector a tatweel could ever occupy — ا and ل are not letters a
+    straight-stroke connector mechanism could act on either, since nothing
+    joins across them — so counting them as "uncovered joins" understates
+    real coverage against what the gate is actually asking about. The two
+    populations were conflated in an earlier draft of this document; see the
+    third revision below for how that was found and fixed, and why the
+    conclusion did not change.
 
 **Corpus size.** Five short test words yield only 10–13 letter-join slots
 per font once zero-advance glyphs are excluded (`Urdu.ttf` yields just 3,
-its heavy ligation collapsing five words to 8 glyphs total). A single slot
-flipping moves most fonts' join% by roughly 8–10 points, and Urdu's by 33
-— so differences of a few points between fonts are noise, not signal. Read
-join% as "clearly clears 80%," "clearly doesn't," or "unclear," never as a
-fine-grained ranking between two nearby fonts.
+its heavy ligation collapsing five words to 8 glyphs total), and 7–9 of
+those are tatweel-legal joins per font (`Urdu.ttf` has 0 — none of its 3
+adjacent pairs is a legal tatweel slot). A single slot flipping moves most
+fonts' join% by roughly 8–14 points on either denominator, and Urdu's by 33
+on the all-pairs one — so differences of a few points between fonts are
+noise, not signal. Read join% as "clearly clears 80%," "clearly doesn't," or
+"unclear," never as a fine-grained ranking between two nearby fonts.
 
 ## Baseline: `DEFAULT_DETECT_OPTS` as shipped (`maxSlope = 0.18`)
 
-| Font | isolated | zones | median zone (em) | contextual | join |
-|---|---|---|---|---|---|
-| AlFatemi.otf | 36% | 10 | 0.050 | 7% | 0% |
-| Amiri.ttf | 64% | 20 | 0.080 | 22% | 0% |
-| FatemiMaqala.ttf | 32% | 9 | 0.060 | 29% | 33% |
-| HarfCanvasDiwani.ttf | 0% | 0 | - | 18% | 25% |
-| Kufi.ttf | 54% | 19 | 0.070 | 94% | 83% |
-| Kufi2.ttf | 68% | 29 | 0.090 | 77% | 75% |
-| Lateef.ttf | 43% | 12 | 0.050 | 41% | 33% |
-| NotoSans.ttf | 71% | 29 | 0.120 | 55% | 62% |
-| Qahiri.ttf | 75% | 27 | 0.140 | 48% | 42% |
-| Ruqaa.ttf | 46% | 13 | 0.050 | 18% | 8% |
-| Scheherazade.ttf | 54% | 15 | 0.090 | 94% | 75% |
-| TahaNaskhRegular.ttf | 50% | 15 | 0.060 | 81% | 73% |
-| Thuluth.ttf | 61% | 17 | 0.060 | 44% | 36% |
-| ThuluthDeco.ttf | 29% | 8 | 0.030 | 38% | 27% |
-| Urdu.ttf | 32% | 13 | 0.180 | 13% | 0% |
-| Wessam.ttf | 54% | 18 | 0.120 | 47% | 50% |
-| Yekan.ttf | 57% | 21 | 0.090 | 94% | 83% |
+Reproduce with: `npx --yes tsx scripts/measureStrokeZones.mjs`
 
-(Four fonts move on the `join` column relative to an earlier draft of this
-sweep, once zero-advance glyphs are excluded from join pairing:
-NotoSans 59%→62%, Kufi2 65%→75%, Qahiri 31%→42%, Ruqaa 6%→8%. The other
-thirteen fonts — Amiri, Scheherazade and Kufi among them — carry no
+| Font | isolated | zones | median zone (em) | contextual | join (all pairs) | join (tatweel-legal) |
+|---|---|---|---|---|---|---|
+| AlFatemi.otf | 36% | 10 | 0.050 | 7% | 0% | 0% (n=7) |
+| Amiri.ttf | 64% | 20 | 0.080 | 22% | 0% | 0% (n=9) |
+| FatemiMaqala.ttf | 32% | 9 | 0.060 | 29% | 33% | 25% (n=8) |
+| HarfCanvasDiwani.ttf | 0% | 0 | - | 18% | 25% | 33% (n=9) |
+| Kufi.ttf | 54% | 19 | 0.070 | 94% | 83% | 100% (n=9) |
+| Kufi2.ttf | 68% | 29 | 0.090 | 77% | 75% | 100% (n=9) |
+| Lateef.ttf | 43% | 12 | 0.050 | 41% | 33% | 44% (n=9) |
+| NotoSans.ttf | 71% | 29 | 0.120 | 55% | 62% | 89% (n=9) |
+| Qahiri.ttf | 75% | 27 | 0.140 | 48% | 42% | 56% (n=9) |
+| Ruqaa.ttf | 46% | 13 | 0.050 | 18% | 8% | 11% (n=9) |
+| Scheherazade.ttf | 54% | 15 | 0.090 | 94% | 75% | 100% (n=9) |
+| TahaNaskhRegular.ttf | 50% | 15 | 0.060 | 81% | 73% | 100% (n=8) |
+| Thuluth.ttf | 61% | 17 | 0.060 | 44% | 36% | 38% (n=8) |
+| ThuluthDeco.ttf | 29% | 8 | 0.030 | 38% | 27% | 38% (n=8) |
+| Urdu.ttf | 32% | 13 | 0.180 | 13% | 0% | 0% (n=0) |
+| Wessam.ttf | 54% | 18 | 0.120 | 47% | 50% | 57% (n=7) |
+| Yekan.ttf | 57% | 21 | 0.090 | 94% | 83% | 100% (n=9) |
+
+(Four fonts move on the `join (all pairs)` column relative to an earlier
+draft of this sweep, once zero-advance glyphs are excluded from join
+pairing: NotoSans 59%→62%, Kufi2 65%→75%, Qahiri 31%→42%, Ruqaa 6%→8%. The
+other thirteen fonts — Amiri, Scheherazade and Kufi among them — carry no
 zero-advance glyphs in this corpus and are unaffected. No gate cell flips.)
 
 **Gate fonts** (Amiri, Scheherazade, NotoSans, Kufi — `Kufi.ttf`, the font
 registered as `"Kufi"` in `FONT_URLS`/`FONT_OPTIONS`; `Kufi2.ttf` is a
 separate second font and not the one named in the gate), against the actual
-requirements (isolated ≥ 60%, join ≥ 80%):
+requirements (isolated ≥ 60%, join ≥ 80%) and against **the design doc's own
+denominator** — join coverage over tatweel-legal positions, not every
+adjacent pair:
 
-| Font | isolated (need ≥60%) | join (need ≥80%) |
-|---|---|---|
-| Amiri | 64% ✅ | 0% ❌ |
-| Scheherazade | 54% ❌ | 75% ❌ |
-| NotoSans | 71% ✅ | 62% ❌ |
-| Kufi | 54% ❌ | 83% ✅ |
+| Font | isolated (need ≥60%) | join, all pairs (need ≥80%) | join, tatweel-legal (need ≥80%) |
+|---|---|---|---|
+| Amiri | 64% ✅ | 0% ❌ | 0% ❌ (n=9) |
+| Scheherazade | 54% ❌ | 75% ❌ | 100% ✅ (n=9) |
+| NotoSans | 71% ✅ | 62% ❌ | 89% ✅ (n=9) |
+| Kufi | 54% ❌ | 83% ✅ | 100% ✅ (n=9) |
 
-**Zero of four gate fonts clear both thresholds at baseline.** Per the
-brief, this is grounds to try `maxSlope` at 0.25 and then 0.35 before
-concluding.
+**Against the gate's own denominator, NotoSans clears both thresholds
+already at baseline.** Three of the four gate fonts (Scheherazade, NotoSans,
+Kufi) clear the join bar outright once it is measured over tatweel-legal
+positions rather than every adjacent pair — Amiri is the one font whose join
+score is genuinely low by either measure. Scheherazade and Kufi still miss
+on isolated coverage at baseline, so the four-way gate is not met here, but
+the shape of the failure is different from what an all-pairs join reading
+suggests: this is not a join problem for three of the four fonts. Per the
+brief, a failed gate is grounds to try `maxSlope` at 0.25 and then 0.35
+before concluding either way.
 
 ## Tuning attempt 1: `maxSlope = 0.25`
 
-| Font | isolated | zones | median zone (em) | contextual | join |
-|---|---|---|---|---|---|
-| AlFatemi.otf | 46% | 14 | 0.050 | 20% | 10% |
-| Amiri.ttf | 57% | 22 | 0.090 | 28% | 0% |
-| FatemiMaqala.ttf | 43% | 12 | 0.090 | 29% | 25% |
-| HarfCanvasDiwani.ttf | 4% | 1 | 0.050 | 24% | 25% |
-| Kufi.ttf | 71% | 28 | 0.070 | 94% | 83% |
-| Kufi2.ttf | 61% | 28 | 0.090 | 59% | 58% |
-| Lateef.ttf | 39% | 13 | 0.060 | 53% | 58% |
-| NotoSans.ttf | 89% | 34 | 0.140 | 64% | 69% |
-| Qahiri.ttf | 46% | 17 | 0.100 | 43% | 50% |
-| Ruqaa.ttf | 46% | 15 | 0.120 | 36% | 31% |
-| Scheherazade.ttf | 46% | 16 | 0.090 | 88% | 75% |
-| TahaNaskhRegular.ttf | 57% | 21 | 0.070 | 81% | 73% |
-| Thuluth.ttf | 54% | 16 | 0.090 | 50% | 36% |
-| ThuluthDeco.ttf | 29% | 8 | 0.060 | 44% | 27% |
-| Urdu.ttf | 32% | 13 | 0.180 | 13% | 0% |
-| Wessam.ttf | 54% | 16 | 0.340 | 53% | 50% |
-| Yekan.ttf | 64% | 28 | 0.080 | 100% | 83% |
+Reproduce with: `npx --yes tsx scripts/measureStrokeZones.mjs --maxSlope=0.25`
 
-Gate cells: Amiri **57% ❌ / 0% ❌**, Scheherazade **46% ❌ / 75% ❌**,
-NotoSans **89% ✅ / 69% ❌**, Kufi **71% ✅ / 83% ✅**. Only Kufi clears both —
-one of four.
+| Font | isolated | zones | median zone (em) | contextual | join (all pairs) | join (tatweel-legal) |
+|---|---|---|---|---|---|---|
+| AlFatemi.otf | 46% | 14 | 0.050 | 20% | 10% | 14% (n=7) |
+| Amiri.ttf | 57% | 22 | 0.090 | 28% | 0% | 0% (n=9) |
+| FatemiMaqala.ttf | 43% | 12 | 0.090 | 29% | 25% | 25% (n=8) |
+| HarfCanvasDiwani.ttf | 4% | 1 | 0.050 | 24% | 25% | 33% (n=9) |
+| Kufi.ttf | 71% | 28 | 0.070 | 94% | 83% | 100% (n=9) |
+| Kufi2.ttf | 61% | 28 | 0.090 | 59% | 58% | 78% (n=9) |
+| Lateef.ttf | 39% | 13 | 0.060 | 53% | 58% | 78% (n=9) |
+| NotoSans.ttf | 89% | 34 | 0.140 | 64% | 69% | 100% (n=9) |
+| Qahiri.ttf | 46% | 17 | 0.100 | 43% | 50% | 56% (n=9) |
+| Ruqaa.ttf | 46% | 15 | 0.120 | 36% | 31% | 44% (n=9) |
+| Scheherazade.ttf | 46% | 16 | 0.090 | 88% | 75% | 100% (n=9) |
+| TahaNaskhRegular.ttf | 57% | 21 | 0.070 | 81% | 73% | 100% (n=8) |
+| Thuluth.ttf | 54% | 16 | 0.090 | 50% | 36% | 38% (n=8) |
+| ThuluthDeco.ttf | 29% | 8 | 0.060 | 44% | 27% | 38% (n=8) |
+| Urdu.ttf | 32% | 13 | 0.180 | 13% | 0% | 0% (n=0) |
+| Wessam.ttf | 54% | 16 | 0.340 | 53% | 50% | 71% (n=7) |
+| Yekan.ttf | 64% | 28 | 0.080 | 100% | 83% | 100% (n=9) |
+
+Gate cells (isolated / join all-pairs / join tatweel-legal): Amiri
+**57% ❌ / 0% ❌ / 0% ❌**, Scheherazade **46% ❌ / 75% ❌ / 100% ✅**,
+NotoSans **89% ✅ / 69% ❌ / 100% ✅**, Kufi **71% ✅ / 83% ✅ / 100% ✅**. On
+the all-pairs reading only Kufi clears both — one of four. On the design
+doc's own tatweel-legal denominator, **both NotoSans and Kufi clear both** —
+two of four — and Scheherazade's join score alone (100%) is no longer what
+is holding it back; its isolated score (46%) still is.
 
 ## Tuning attempt 2: `maxSlope = 0.35` (the brief's hard ceiling)
 
-| Font | isolated | zones | median zone (em) | contextual | join |
-|---|---|---|---|---|---|
-| AlFatemi.otf | 29% | 10 | 0.080 | 40% | 10% |
-| Amiri.ttf | 57% | 23 | 0.120 | 44% | 38% |
-| FatemiMaqala.ttf | 50% | 16 | 0.050 | 59% | 42% |
-| HarfCanvasDiwani.ttf | 11% | 3 | 0.050 | 29% | 33% |
-| Kufi.ttf | 86% | 34 | 0.060 | 94% | 83% |
-| Kufi2.ttf | 64% | 30 | 0.100 | 59% | 67% |
-| Lateef.ttf | 32% | 12 | 0.070 | 65% | 67% |
-| NotoSans.ttf | 79% | 37 | 0.120 | 73% | 69% |
-| Qahiri.ttf | 46% | 17 | 0.110 | 43% | 50% |
-| Ruqaa.ttf | 46% | 15 | 0.090 | 27% | 31% |
-| Scheherazade.ttf | 32% | 13 | 0.130 | 88% | 75% |
-| TahaNaskhRegular.ttf | 57% | 23 | 0.080 | 81% | 73% |
-| Thuluth.ttf | 61% | 23 | 0.080 | 56% | 36% |
-| ThuluthDeco.ttf | 36% | 11 | 0.050 | 50% | 27% |
-| Urdu.ttf | 21% | 7 | 0.110 | 13% | 0% |
-| Wessam.ttf | 46% | 21 | 0.130 | 73% | 60% |
-| Yekan.ttf | 71% | 34 | 0.060 | 100% | 83% |
+Reproduce with: `npx --yes tsx scripts/measureStrokeZones.mjs --maxSlope=0.35`
 
-Gate cells: Amiri **57% ❌ / 38% ❌**, Scheherazade **32% ❌ / 75% ❌**,
-NotoSans **79% ✅ / 69% ❌**, Kufi **86% ✅ / 83% ✅**. Again only Kufi clears
-both. `maxSlope: 0.35` is the brief's stated ceiling, so tuning stops here.
+| Font | isolated | zones | median zone (em) | contextual | join (all pairs) | join (tatweel-legal) |
+|---|---|---|---|---|---|---|
+| AlFatemi.otf | 29% | 10 | 0.080 | 40% | 10% | 14% (n=7) |
+| Amiri.ttf | 57% | 23 | 0.120 | 44% | 38% | 56% (n=9) |
+| FatemiMaqala.ttf | 50% | 16 | 0.050 | 59% | 42% | 50% (n=8) |
+| HarfCanvasDiwani.ttf | 11% | 3 | 0.050 | 29% | 33% | 44% (n=9) |
+| Kufi.ttf | 86% | 34 | 0.060 | 94% | 83% | 100% (n=9) |
+| Kufi2.ttf | 64% | 30 | 0.100 | 59% | 67% | 78% (n=9) |
+| Lateef.ttf | 32% | 12 | 0.070 | 65% | 67% | 89% (n=9) |
+| NotoSans.ttf | 79% | 37 | 0.120 | 73% | 69% | 100% (n=9) |
+| Qahiri.ttf | 46% | 17 | 0.110 | 43% | 50% | 56% (n=9) |
+| Ruqaa.ttf | 46% | 15 | 0.090 | 27% | 31% | 44% (n=9) |
+| Scheherazade.ttf | 32% | 13 | 0.130 | 88% | 75% | 100% (n=9) |
+| TahaNaskhRegular.ttf | 57% | 23 | 0.080 | 81% | 73% | 100% (n=8) |
+| Thuluth.ttf | 61% | 23 | 0.080 | 56% | 36% | 38% (n=8) |
+| ThuluthDeco.ttf | 36% | 11 | 0.050 | 50% | 27% | 38% (n=8) |
+| Urdu.ttf | 21% | 7 | 0.110 | 13% | 0% | 0% (n=0) |
+| Wessam.ttf | 46% | 21 | 0.130 | 73% | 60% | 86% (n=7) |
+| Yekan.ttf | 71% | 34 | 0.060 | 100% | 83% | 100% (n=9) |
 
-**Across all three tested values, at most one of the four gate fonts
-(Kufi, and only at 0.25/0.35, not at baseline) ever clears both
-thresholds at once.** Amiri and NotoSans never clear the join threshold at
-any tested value (NotoSans tops out at 69%). Scheherazade never clears the
-isolated threshold at any tested value, and its isolated score gets
-*worse*, not better, as `maxSlope` loosens (54% → 46% → 32%) — see the
-curved-letter spot-check below for why:
-a looser slope threshold lets crossings inside a shallow curve pass, which
-can bridge two previously-separate straight runs across a curved dip
-between them; the merged run's thickness then varies more than
-`thicknessTolerance` allows and the whole merged run is rejected, losing
-zones a tighter tolerance had kept.
+Gate cells (isolated / join all-pairs / join tatweel-legal): Amiri
+**57% ❌ / 38% ❌ / 56% ❌**, Scheherazade **32% ❌ / 75% ❌ / 100% ✅**,
+NotoSans **79% ✅ / 69% ❌ / 100% ✅**, Kufi **86% ✅ / 83% ✅ / 100% ✅**. Same
+pattern as 0.25: on the all-pairs reading only Kufi clears both; on the
+tatweel-legal reading both NotoSans and Kufi do. `maxSlope: 0.35` is the
+brief's stated ceiling, so tuning stops here.
+
+**Across all three tested values, measured against the design doc's own
+tatweel-legal denominator, NotoSans clears both thresholds at every tested
+value including baseline, and Kufi clears both at the two loosened settings
+(not at baseline, where its isolated score is 54%). Amiri and Scheherazade
+never both clear at any tested value — but not for the same reason.**
+Scheherazade's join score is 100% at every tested value; what keeps it out
+is its isolated score, which never reaches the 60% bar and gets *worse*, not
+better, as `maxSlope` loosens (54% → 46% → 32%) — see the curved-letter
+spot-check below for why: a looser slope threshold lets crossings inside a
+shallow curve pass, which can bridge two previously-separate straight runs
+across a curved dip between them; the merged run's thickness then varies
+more than `thicknessTolerance` allows and the whole merged run is rejected,
+losing zones a tighter tolerance had kept. Amiri is the opposite case: its
+isolated score is fine at baseline (64%) but its join score is the one
+genuinely low join reading in this whole sweep (0% / 0% / 56% across the
+three settings, on the tatweel-legal denominator) — checked directly below
+and confirmed a real property of the font, not a measurement artifact.
+Because the gate requires all four fonts to clear at once, it is not met at
+any tested value — but the reason is now clearly the letterform-internal
+half (isolated coverage), not the join half, for three of the four fonts.
 
 ## Curved-letter spot-check (reproducible: `--spotCheck`)
 
@@ -194,8 +267,9 @@ actual sampled `crossingsAt` slopes at five points inside it.
   ±0.05–0.17, i.e. within or close to the 0.18 cap by construction — mostly
   consistent with a genuinely near-vertical segment (a tooth or stem), not a
   curve apex. Kufi `ح`'s zone (rel. x 0.43–0.49) has the widest swing among
-  these (four simultaneous crossings, i.e. a glyph with an inner counter),
-  the least clean of the baseline examples but still bounded by the cap.
+  these — the spot-check prints **six** simultaneous crossings at each
+  sample point there (three ink spans rather than one), the least clean of
+  the baseline examples but still bounded by the cap.
 
 **At `maxSlope = 0.35` (ceiling), the same letters look different:**
 - Amiri `س` now reports *three* zones, one at rel. x 0.89–0.94 — the tail
@@ -207,10 +281,12 @@ actual sampled `crossingsAt` slopes at five points inside it.
   exactly where the letter's hook departs from the bowl.
 - NotoSans `س` now reports zones with slopes sweeping as wide as +0.35 →
   -0.30 within a single zone (rel. x 0.17–0.35).
-- Kufi `ن` now reports a zone at rel. x 0.46–0.53 where one pair of
-  crossings swings from -0.342 to +0.342 across the zone — the slope passes
-  through zero at the bottom of a curve (a classic false-flat at a curve's
-  vertex) rather than staying near zero throughout.
+- Kufi `ن` now reports a zone at rel. x 0.46–0.53 where two of its crossings
+  each sweep through zero across the zone's width — one runs -0.342 → +0.228
+  from the zone's start to its end, the other +0.342 → -0.228 — rather than
+  either one holding steady near zero throughout. That is the slope passing
+  through zero at a curve's own vertex, a classic false-flat, not a flat run
+  read at two different points.
 
 This is a real, structural failure mode, not a coincidence of these three
 letters: loosening `maxSlope` measurably buys zones on ن's hook and س's tail
@@ -261,34 +337,61 @@ not better, the more the slope tolerance is loosened. No value in the
 brief's authorized tuning range fixes this; going past the 0.35 ceiling is
 out of scope.
 
-**The join number confirms it independently.** Even setting Scheherazade
-aside, Amiri's join coverage is 0% at baseline and only 38% at the ceiling —
-nowhere near 80% at any tested value — and NotoSans's join coverage tops out
-at 69%, also never reaching 80%. Amiri's 0% was checked directly and is a
-genuine property of the font at baseline, not a measurement artifact: its
-four detected zones at `maxSlope = 0.18` sit at least 128 font units from
-the nearest join edge, more than 2.6× the `upm/20` join window — and the
-same code gives Amiri 38% at `maxSlope = 0.35`, so the metric does respond
-when the font's own geometry supports it. Only Kufi clears both thresholds,
-and only at the two loosened settings this report declines to adopt,
-because the same settings are shown by the spot-check to accept curved
-regions of ن and س as flat — the exact failure mode this sweep exists to
-catch before it ships as a UI feature.
+**The join half, measured against the design doc's own denominator, mostly
+works — and that is precisely why it does not save the gate.** An earlier
+draft of this record measured join coverage over *every adjacent glyph
+pair*, which is not what the gate specifies ("connector zones at ≥80% of the
+positions where a tatweel is currently legal") and is a strictly harder
+population — a pair like ر-ف in حرف has no connector for this feature to act
+on at all, since no tatweel could ever legally sit there. Restricted to the
+right denominator, join coverage reaches **100% for Scheherazade, 89–100%
+for NotoSans, and 100% for Kufi** at baseline, and stays at or near 100% for
+all three across the whole tuning range. **Amiri is the one genuine outlier**
+— 0% at baseline, 0% at 0.25, 56% at the ceiling — checked directly and
+confirmed a real property of the font, not a measurement artifact: its four
+detected zones at `maxSlope = 0.18` sit at least 128 font units from the
+nearest join edge, more than 2.6× the `upm/20` join window, and the same
+code gives Amiri 56% at `maxSlope = 0.35`, so the metric does respond when
+the font's own geometry supports it. So the join half of this feature is not
+the reason the gate fails for three of the four fonts — the letterform-
+internal half (isolated coverage) is: Scheherazade never clears its own bar,
+Kufi clears it only at the two loosened settings the spot-check disqualifies
+below, and Amiri's isolated score, while it clears 60% at baseline, is not
+what carries the font through the *whole* four-way gate since its own join
+score is what fails there instead. No single setting clears isolated *and*
+join on all four gate fonts at once.
+
+**This also means the join half would not have been the valuable part to
+ship anyway, even if the gate had passed on it alone.** Kashida elongation
+already covers the connector case in every bundled font today, by inserting
+a tatweel — a real character the font shapes at its own designed weight (see
+CLAUDE.md, "Kashida elongation"). A straight-stroke connector mechanism
+reaching 89–100% coverage on three fonts would be a second, more complex way
+to do something the app can already do everywhere. The half that would have
+been genuinely new — stretching a stroke *inside* a letterform, which
+tatweel cannot touch — is the half whose own coverage number is what
+actually keeps the gate from passing. That is a cleaner reason to stop than
+"the join case doesn't work": the join case mostly does work, and duplicates
+existing coverage; the letterform case would have been new, and does not
+work.
 
 **`DEFAULT_DETECT_OPTS` is left unchanged** (`maxSlope: 0.18`, already in
 `src/lib/strokeCuts.ts`) — no edit was made to that file. The corrected
-contextual/join numbers do not change this choice: they make the case
-against 0.25/0.35 stronger, not weaker (NotoSans's real join% is *lower*
-than its old, mislabeled connector reading at every tested value, and stays
-well under 80% even after excluding zero-advance glyphs from join pairing —
-59%→62% at baseline, 65%→69% at both 0.25 and 0.35), and the curved-letter
-evidence against those settings was never in question. At every tested
-value, the gate is not met. Diwani, Ruqaa, and Thuluth score low across all
-three runs as expected and are not part of the gate.
+join numbers do not change this choice, for two independent reasons: first,
+Scheherazade's isolated coverage — the metric actually blocking the gate for
+that font — never reaches 60% in the brief's authorized tuning range
+regardless of which join denominator is used; second, the curved-letter
+spot-check below shows *why* 0.25/0.35 should not be trusted even where they
+numerically help (Kufi's isolated score, NotoSans's), independent of the
+join numbers entirely. At every tested value, the four-way gate is not met.
+Diwani, Ruqaa, and Thuluth score low across all three runs as expected and
+are not part of the gate.
 
-Per the plan, this remains a stop-and-report point: a human should decide
-whether the remaining seven tasks proceed, are rescoped, or are shelved, on
-this measurement.
+Per the plan, this was a stop-and-report point: a human reviewed this
+measurement and decided not to proceed. Tasks 4–10 were never started. See
+`docs/superpowers/plans/2026-08-21-straight-stroke-extension.md` and
+CLAUDE.md, "Straight-stroke cut detection (kept, unused)" for that decision
+and its consequences.
 
 ## Revision history
 
@@ -333,3 +436,53 @@ this measurement.
   stated explicitly so a future reader does not mistake small differences
   between fonts for signal. The conclusion did not change and remains
   better supported.
+- **2026-08-21, third revision, after a final whole-branch review.** This
+  review found the code, tooling and reproducibility sound — every sweep and
+  the `--spotCheck` still reproduce byte-for-byte — but found the *prose*
+  had drifted from what the numbers actually say, in one critical and
+  several important ways, all fixed here:
+  - **The critical finding: `join%` was scored against the wrong
+    population.** The design doc's gate specifies join coverage "at the
+    positions where a tatweel is currently legal," and this record's own
+    script instead denominated over every adjacent glyph pair — a strictly
+    larger and different population (10–13 pairs vs. 7–9 tatweel-legal
+    slots per font). `scripts/measureStrokeZones.mjs` now imports
+    `findKashidaSlots` from `src/lib/tatweel.ts` directly and reports both
+    denominators side by side, rather than reimplementing the join-legality
+    logic. Restricted to the right denominator, join coverage turns out to
+    be **89–100% in three of the four gate fonts** (Scheherazade, NotoSans,
+    Kufi) — not the 62–83% the all-pairs reading showed. This does not
+    reopen the stop decision (the gate still requires all four fonts to
+    clear at once, and Amiri's join score and Scheherazade's isolated score
+    still never both clear), but it inverts *why* the gate fails: the join
+    half of the feature mostly works and duplicates coverage tatweel kashida
+    already provides everywhere; the letterform-internal half is the one
+    that does not work, and is the half that would have been genuinely new.
+    The "Baseline"/"Tuning attempt" tables and gate cells, the Methodology's
+    `join%` bullet, and the Verdict section were all rewritten around this;
+    see the Verdict section for the corrected argument.
+  - **A repeated false claim.** "Zero of the four gate fonts cleared both
+    thresholds" was asserted in four files including this one; it was false
+    even before the denominator fix — Kufi cleared both at 0.25 and 0.35
+    under the *old* all-pairs reading too. Corrected to "at most one of four
+    (Kufi) at 0.25/0.35, none at baseline" for the all-pairs reading, and
+    the new tatweel-legal reading is now reported alongside it (up to two of
+    four — NotoSans and Kufi — at the loosened settings, and NotoSans alone
+    at baseline).
+  - **Two numeric slips in the curved-letter spot-check**, both now fixed
+    against the script's own literal output: Kufi ح's baseline zone prints
+    six simultaneous crossings (three ink spans), not four; and Kufi ن's
+    0.35 zone does not have "one pair of crossings swinging from -0.342 to
+    +0.342" — it has two separate crossings, one running -0.342 → +0.228 and
+    the other +0.342 → -0.228 across the zone's width.
+  - **The Methodology section now states `thicknessTolerance = 0.12`
+    explicitly** (previously implied but never written down) and explains
+    that `flattenContours` subdivides at a fixed 8 steps per bezier
+    regardless of a font's `unitsPerEm` — and why that biases *toward*
+    finding zones on curves, not away, so it cannot explain the negative
+    isolated-letter result.
+  - The companion documents (`CLAUDE.md`, `PROGRESS.md`, the plan file, and
+    `src/lib/strokeCuts.ts`'s own header) were brought into agreement with
+    this file rather than left to restate its numbers, per this repo's own
+    "state a fact once and link to it" rule — see their own edit history for
+    the same date.
