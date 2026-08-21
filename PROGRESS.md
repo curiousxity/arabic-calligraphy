@@ -80,6 +80,28 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-08-21 — Straight-stroke extension: stopped at the measurement gate
+
+A ten-task plan to let a calligrapher lengthen a letter's own straight
+strokes by cutting the outline and bridging the gap — covering both a stroke
+inside a letterform and the connector between two joined letters — reached
+Task 3, its own go/no-go coverage measurement, placed deliberately before any
+UI work. **The gate failed and the human stopped the work there.** Tasks 1–3
+are committed and kept: the pure detector (`src/lib/strokeCuts.ts`), its
+tests, the offline sweep (`scripts/measureStrokeZones.mjs`), and the measured
+record. Tasks 4–10 — outline surgery, `ShapedText` integration, storage, the
+on-canvas drag handle, kashida coexistence, e2e coverage, and docs — were
+never built.
+
+Representative number: at the shipped `maxSlope: 0.18`, against a gate of
+isolated ≥60% / join ≥80% on the four naskh/kufi gate fonts, Amiri reached
+64% isolated but 0% join, and no font cleared both at any of the three tested
+slope values. Full tables, the two rejected tunings, and the curved-letter
+evidence: `docs/archive/stroke-zone-coverage.md`. Design:
+`docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`. Why
+the detector stays in the tree with no consumer: CLAUDE.md, "Straight-stroke
+cut detection (kept, unused)".
+
 ### 2026-08-21 — New documents open on bare paper again
 
 Reverses one of the seven changes in the 2026-08-20 interface pass. That pass

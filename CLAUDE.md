@@ -666,6 +666,61 @@ those edits dropped rather than half-rendered. The layout payload's `version`
 moved 4 → 5 and no longer embeds `glyphRigs`. The `harfcanvas-glyph-rigs-v1`
 localStorage key is simply orphaned; nothing reads or clears it.
 
+### Straight-stroke cut detection (`src/lib/strokeCuts.ts`) — kept, unused
+
+Same lineage as "Removed subsystems" above, one tier down: a 2026-08-21
+attempt to give letterform strokes and letter-to-letter connectors a second
+elongation mechanism, this time by cutting a glyph's own outline and
+bridging the gap — avoiding both the per-font authored data that killed the
+Morph Glyph Editor and the character-insertion tatweel kashida already uses.
+`findCutZones` sweeps a flattened outline for x-ranges where a vertical cut
+is legal: crossed an even number of times, at least twice; every crossed
+segment within `maxSlope` of parallel to the baseline; steady thickness
+across the run. Full design: `docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`.
+
+**It has no application consumer.** The plan that specified it
+(`docs/superpowers/plans/2026-08-21-straight-stroke-extension.md`) stopped
+at Task 3 — its own go/no-go coverage gate — and the human decided not to
+continue: Tasks 4–10 (outline surgery, `ShapedText` integration, storage, the
+on-canvas drag handle, kashida coexistence, e2e) were never written. The
+module is reachable from exactly one place, `scripts/measureStrokeZones.mjs`,
+the offline sweep that produced the gate's numbers. It is kept rather than
+deleted for the same reason the stroke-schema Python tooling was kept when
+the Morph Editor was removed: it is inert, and it is the other half of
+"don't redo the work" should the underlying font geometry ever be worth
+re-measuring. **Don't delete this as an unused 200-line module** — nothing
+else in the app imports it, and that absence is the intended end state, not
+an oversight.
+
+**What the measurement established, so it is not re-derived.** The gate
+needed the four naskh/kufi faces (Amiri, Scheherazade, NotoSans, Kufi) to
+clear isolated-letter coverage ≥60% and join coverage ≥80%. At the shipped
+`maxSlope: 0.18`, and at both looser values the design authorized trying
+(0.25, 0.35 — its hard ceiling), zero of the four ever cleared both
+thresholds at once. Loosening did not help: Scheherazade's isolated coverage
+gets *worse* as the tolerance relaxes (54% → 46% → 32%), and only Kufi ever
+clears both bars, only at the two rejected settings. The reason is
+structural, not a tuning miss — the legality predicate requires every
+outline segment a cut crosses to run within `maxSlope` of parallel to the
+baseline, and Arabic strokes as these fonts actually draw them are subtly
+inclined nearly everywhere, so a tolerance loose enough to admit a real stem
+or bar also admits a curve. The spot-check names it directly: at
+`maxSlope: 0.35`, Kufi's ن reports a zone whose sampled slope swings from
+−0.342 through zero to +0.342 across a single "zone" — the false-flat at a
+curve's own vertex, not a straight run — and Amiri's س and Scheherazade's ن
+show the same failure at their own hook and tail curl. Full tables and the
+reproducible spot-check: `docs/archive/stroke-zone-coverage.md`.
+
+**Why this doesn't just retry the join half.** The join case competes with
+tatweel kashida (see "Kashida elongation" above), which already works in all
+17 bundled fonts by inserting a real character the font shapes. The
+measurement's best join result — Kufi at 83% — is one font out of four, and
+only at a rejected setting; a mechanism reaching one font in four cannot
+replace one already reaching seventeen. The letterform-stroke half (a bar or
+a flat inside a single glyph, no join involved) has no such existing
+alternative and is what failed to clear its own bar independently:
+Scheherazade's isolated coverage never reaches 60% at any tested setting.
+
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
 A fourth block type, `textPath`, flows shaped text along an arbitrary curve

@@ -1,3 +1,35 @@
+/**
+ * Straight-stroke cut detection — geometry only, pure, no `./harfbuzz` and
+ * no `opentype.js` import (see `docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`).
+ *
+ * `findCutZones` walks a flattened glyph outline and reports x-ranges where
+ * a vertical cut is "legal": crossed an even number of times, at least
+ * twice; every crossed segment within `maxSlope` of parallel to the
+ * baseline; steady thickness across the run. It was meant to let a
+ * calligrapher lengthen a letter's own straight strokes — and the connector
+ * between two joined letters — by cutting the outline and bridging the gap,
+ * as a second elongation mechanism alongside the tatweel kashida.
+ *
+ * **This module has no application consumer.** The plan that specified it
+ * (`docs/superpowers/plans/2026-08-21-straight-stroke-extension.md`) stopped
+ * at Task 3, its own go/no-go coverage gate, and the gate failed: at the
+ * shipped `maxSlope` and at both looser values the plan authorized trying,
+ * zero of the four gate fonts (Amiri, Scheherazade, NotoSans, Kufi) cleared
+ * both the isolated-letter and join coverage thresholds at once, and the
+ * reason is structural — Arabic strokes as these fonts actually draw them
+ * are subtly inclined nearly everywhere, so the tolerance that admits a real
+ * stroke also admits a curve. Full measurement:
+ * `docs/archive/stroke-zone-coverage.md`. See also CLAUDE.md,
+ * "Straight-stroke cut detection (kept, unused)".
+ *
+ * The only caller is `scripts/measureStrokeZones.mjs`, the offline sweep
+ * that produced those numbers. This module is kept rather than deleted for
+ * the same reason the removed Morph Glyph Editor's Python tooling was kept:
+ * it is inert, and it is the other half of "don't redo the work" should the
+ * underlying font geometry ever be worth re-measuring. Do not delete it as
+ * an unused module — the absence of an application consumer is the intended
+ * end state of this work, not an oversight.
+ */
 import type { SvgCmd } from "./svgPath";
 
 export type Pt = [number, number];

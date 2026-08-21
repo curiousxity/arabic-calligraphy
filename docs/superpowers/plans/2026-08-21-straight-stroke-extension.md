@@ -10,6 +10,26 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`
 
+## Status: stopped at the Task 3 gate — do not resume
+
+**Execution stopped after Task 3.** Task 3 was this plan's own go/no-go
+coverage measurement, placed deliberately before any UI work. It failed: at
+the shipped `maxSlope` and at both looser values this plan authorizes trying,
+zero of the four gate fonts (Amiri, Scheherazade, NotoSans, Kufi) cleared
+both the isolated-letter and join thresholds at once, and the reason is
+structural rather than a tuning miss — see
+`docs/archive/stroke-zone-coverage.md` for the measurement and CLAUDE.md,
+"Straight-stroke cut detection (kept, unused)" for what it established. A
+human reviewed that record and decided not to proceed.
+
+**Tasks 4–10 below were never started.** This plan did not run out of time
+or get interrupted mid-flight — it reached the stopping point it was
+designed to reach, and stopped there. Tasks 1–3 are committed and kept: the
+detector (`src/lib/strokeCuts.ts`), its tests, the offline measurement script,
+and the coverage record. Do not resume this plan from Task 4 without a new
+measurement that clears the gate; the numbers in the archive file are why it
+does not.
+
 ## Global Constraints
 
 - **`src/lib/strokeCuts.ts` must not import `./harfbuzz`.** That module statically imports harfbuzzjs, whose CJS/ESM shape throws under Vitest's Node loader before any test code runs. Callers pass geometry in. Same rule `tatweel.ts`, `fitToWidth.ts` and `diacritics.ts` follow.
