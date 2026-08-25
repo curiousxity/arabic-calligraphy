@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getBlocks, gotoApp, inkPixels } from "./harf";
+import { chooseFont, getBlocks, gotoApp, inkPixels, openPanel } from "./harf";
 
 /**
  * A real font from `public/fonts/` is the upload fixture: the whole feature
@@ -18,10 +18,7 @@ const UPLOAD_LABEL = "E2E Naskh";
 
 async function openTypography(page: Page): Promise<void> {
   // Typography starts collapsed, and the font picker lives inside it.
-  const heading = page.getByRole("button", { name: "Typography" });
-  if ((await page.getByRole("button", { name: "Font family" }).count()) === 0) {
-    await heading.click();
-  }
+  await openPanel(page, "Typography");
   await expect(page.getByRole("button", { name: "Font family" })).toBeVisible();
 }
 
@@ -42,12 +39,6 @@ async function uploadFixtureFont(page: Page, label = UPLOAD_LABEL): Promise<void
   await expect(dialog).toHaveCount(0);
 }
 
-/** Chooses a font by its label in the picker's own listbox. */
-async function pickFont(page: Page, optionName: RegExp): Promise<void> {
-  await page.getByRole("button", { name: "Font family" }).click();
-  await page.getByRole("listbox", { name: "Font family" }).getByRole("button", { name: optionName }).click();
-}
-
 test("an uploaded font joins the picker and re-renders the block", async ({ page }) => {
   await gotoApp(page);
   await openTypography(page);
@@ -61,7 +52,7 @@ test("an uploaded font joins the picker and re-renders the block", async ({ page
   await expect(page.locator(".customFontItem")).toHaveCount(1);
   await expect(page.locator(".customFontName")).toHaveText(UPLOAD_LABEL);
 
-  await pickFont(page, new RegExp(`^${UPLOAD_LABEL} \\(uploaded\\)`));
+  await chooseFont(page, new RegExp(`^${UPLOAD_LABEL} \\(uploaded\\)`));
 
   const block = (await getBlocks(page))[0];
   expect(block.fontFamily.startsWith("custom-")).toBe(true);
@@ -77,7 +68,7 @@ test("a saved project on an uploaded font reopens on it after a reload", async (
   await gotoApp(page);
   await openTypography(page);
   await uploadFixtureFont(page);
-  await pickFont(page, new RegExp(`^${UPLOAD_LABEL} \\(uploaded\\)`));
+  await chooseFont(page, new RegExp(`^${UPLOAD_LABEL} \\(uploaded\\)`));
   const key = (await getBlocks(page))[0].fontFamily;
 
   // Saving is manual (there is no autosave), and the quick-save button lives
@@ -109,7 +100,7 @@ test("deleting a font a block uses says so instead of silently substituting", as
   await gotoApp(page);
   await openTypography(page);
   await uploadFixtureFont(page);
-  await pickFont(page, new RegExp(`^${UPLOAD_LABEL} \\(uploaded\\)`));
+  await chooseFont(page, new RegExp(`^${UPLOAD_LABEL} \\(uploaded\\)`));
   const key = (await getBlocks(page))[0].fontFamily;
 
   await page.getByRole("button", { name: `Remove uploaded font ${UPLOAD_LABEL}` }).click();

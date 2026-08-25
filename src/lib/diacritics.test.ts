@@ -227,32 +227,23 @@ describe("findDiacriticGlyphIndices (real HarfBuzz shaping)", () => {
   // signals above: the cmap says the glyph is U+E824, and dx/dy are 0.
   // What such a mark still has is a zero advance inside a cluster whose
   // source text really does hold a combining mark.
-  it("identifies PUA-encoded marks positioned without GPOS (Thuluth)", async () => {
-    const text = "حَرْفٌ";
-    const { glyphs, font } = await shapeReal(text, "Thuluth.ttf");
-    expect(glyphs.length).toBe(6);
+  it.each(["Thuluth.ttf", "Yekan.ttf"])(
+    "identifies PUA-encoded marks positioned without GPOS (%s)",
+    async (file) => {
+      const text = "حَرْفٌ";
+      const { glyphs, font } = await shapeReal(text, file);
 
-    const indices = findDiacriticGlyphIndices(glyphs, font, text);
+      const indices = findDiacriticGlyphIndices(glyphs, font, text);
 
-    // Three marks in the source (fatha, sukun, dammatan), three mark
-    // glyphs — each drawn as its own PUA glyph with no advance.
-    expect(indices.size).toBe(3);
-    for (let i = 0; i < glyphs.length; i++) {
-      expect(indices.has(i)).toBe((glyphs[i].ax ?? 0) === 0);
+      // Three marks in the source (fatha, sukun, dammatan), three mark
+      // glyphs — each drawn as its own PUA glyph with no advance, so the
+      // mark set is exactly the zero-advance glyphs.
+      expect(indices.size).toBe(3);
+      for (let i = 0; i < glyphs.length; i++) {
+        expect(indices.has(i)).toBe((glyphs[i].ax ?? 0) === 0);
+      }
     }
-  });
-
-  it("identifies PUA-encoded marks positioned without GPOS (Yekan)", async () => {
-    const text = "حَرْفٌ";
-    const { glyphs, font } = await shapeReal(text, "Yekan.ttf");
-
-    const indices = findDiacriticGlyphIndices(glyphs, font, text);
-
-    expect(indices.size).toBe(3);
-    for (let i = 0; i < glyphs.length; i++) {
-      expect(indices.has(i)).toBe((glyphs[i].ax ?? 0) === 0);
-    }
-  });
+  );
 
   // A letter's own dots are a separate GPOS-attached glyph in some fonts,
   // sharing the base letter's cluster with a nonzero attachment offset —

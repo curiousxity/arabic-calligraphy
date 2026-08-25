@@ -9,6 +9,7 @@ import {
   getBlocks,
   gotoApp,
   hitTargetAt,
+  setBlockText,
   settleFrames,
 } from "./harf";
 
@@ -126,7 +127,7 @@ test("a drag with a small first step still moves the mark", async ({ page }) => 
 test("a font whose marks are PUA-encoded still arms the overlay (Thuluth)", async ({ page }) => {
   await gotoApp(page);
   await chooseFont(page, "Thuluth");
-  await page.locator("textarea.sidebarTextarea").fill(VOCALIZED);
+  await setBlockText(page, VOCALIZED);
 
   // Thuluth draws every mark as its own Private Use Area glyph with no
   // GPOS offset, so neither the cmap check nor the attachment-offset
@@ -143,7 +144,7 @@ test("a letter's own dots never arm the overlay (Noto Sans)", async ({ page }) =
   // false positive. Noto Sans draws the feh's dot as a separate
   // zero-advance glyph attached to its base, which is the shape the
   // attachment-offset signal reads as a mark.
-  await page.locator("textarea.sidebarTextarea").fill("حرف");
+  await setBlockText(page, "حرف");
 
   await settleFrames(page);
   expect(await diacriticHitCenters(page)).toHaveLength(0);
