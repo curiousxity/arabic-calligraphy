@@ -98,67 +98,63 @@ export function findDiacriticGlyphIndices(
   const result = new Set<number>();
   if (!font) return result;
 
-  const clusterCounts = new Map<number, number>();
+  // One record per cluster: how many glyphs it holds, and how many marks
+  // the source text spends on it. A cluster's span runs from its own
+  // offset to the next cluster's; characters before the first cluster
+  // belong to no cluster and are ignored.
+  const clusters = new Map<number, { glyphs: number; allowance: number }>();
   for (const g of glyphs) {
     const cluster = g.cl ?? 0;
-    clusterCounts.set(cluster, (clusterCounts.get(cluster) ?? 0) + 1);
+    const entry = clusters.get(cluster) ?? { glyphs: 0, allowance: 0 };
+    entry.glyphs++;
+    clusters.set(cluster, entry);
   }
+  const starts = [...clusters.keys()].sort((a, b) => a - b);
+  starts.forEach((from, i) => {
+    const span = shapableText.slice(from, starts[i + 1] ?? shapableText.length);
+    clusters.get(from)!.allowance = [...span].filter((ch) =>
+      ARABIC_DIACRITIC_RE.test(ch)
+    ).length;
+  });
 
-  // How many marks the source text spends on each cluster. A cluster's
-  // span runs from its own offset to the next cluster's; characters
-  // before the first cluster belong to no cluster and are ignored.
-  const clusterStarts = [...clusterCounts.keys()].sort((a, b) => a - b);
-  const remaining = new Map<number, number>();
-  for (let i = 0; i < clusterStarts.length; i++) {
-    const from = clusterStarts[i];
-    const to =
-      i + 1 < clusterStarts.length ? clusterStarts[i + 1] : shapableText.length;
-    let marks = 0;
-    for (let c = Math.max(0, from); c < Math.min(to, shapableText.length); c++) {
-      if (ARABIC_DIACRITIC_RE.test(shapableText[c])) marks++;
-    }
-    remaining.set(from, marks);
-  }
-
-  const glyphUnicodes = (g: HarfBuzzGlyph): number[] => {
-    try {
-      return font.glyphs.get(g.g)?.unicodes ?? [];
-    } catch {
-      return [];
-    }
+  /** Flag glyph `i` as a mark and debit its cluster's allowance. */
+  const take = (i: number) => {
+    result.add(i);
+    const entry = clusters.get(glyphs[i].cl ?? 0);
+    if (entry) entry.allowance = Math.max(0, entry.allowance - 1);
   };
 
   // Pass 1 — the primary signal, which never needs the allowance's
   // permission but does consume it, so a cluster's marks cannot be
   // counted twice.
   for (let i = 0; i < glyphs.length; i++) {
-    const isDirectMark = glyphUnicodes(glyphs[i]).some((u) =>
-      ARABIC_DIACRITIC_RE.test(String.fromCodePoint(u))
-    );
-    if (!isDirectMark) continue;
-    result.add(i);
-    const cluster = glyphs[i].cl ?? 0;
-    remaining.set(cluster, Math.max(0, (remaining.get(cluster) ?? 0) - 1));
+    let unicodes: number[] = [];
+    try {
+      unicodes = font.glyphs.get(glyphs[i].g)?.unicodes ?? [];
+    } catch {
+      unicodes = [];
+    }
+    if (unicodes.some((u) => ARABIC_DIACRITIC_RE.test(String.fromCodePoint(u)))) {
+      take(i);
+    }
   }
 
   // Pass 2 — the secondary signals, spending what the source allows.
   // Zero-advance candidates first, across the whole run, so a cluster's
   // allowance is never spent on an advance-carrying glyph while a
   // weightless one in the same cluster goes unflagged.
-  const takeIf = (predicate: (g: HarfBuzzGlyph) => boolean) => {
+  const secondarySignals: Array<(g: HarfBuzzGlyph) => boolean> = [
+    (g) => (g.ax ?? 0) === 0 && (g.ay ?? 0) === 0,
+    (g) => (g.dx ?? 0) !== 0 || (g.dy ?? 0) !== 0,
+  ];
+  for (const isMarkShaped of secondarySignals) {
     for (let i = 0; i < glyphs.length; i++) {
       if (result.has(i)) continue;
-      const g = glyphs[i];
-      const cluster = g.cl ?? 0;
-      if ((clusterCounts.get(cluster) ?? 0) <= 1) continue;
-      if ((remaining.get(cluster) ?? 0) <= 0) continue;
-      if (!predicate(g)) continue;
-      result.add(i);
-      remaining.set(cluster, (remaining.get(cluster) ?? 0) - 1);
+      const entry = clusters.get(glyphs[i].cl ?? 0);
+      if (!entry || entry.glyphs <= 1 || entry.allowance <= 0) continue;
+      if (isMarkShaped(glyphs[i])) take(i);
     }
-  };
-  takeIf((g) => (g.ax ?? 0) === 0 && (g.ay ?? 0) === 0);
-  takeIf((g) => (g.dx ?? 0) !== 0 || (g.dy ?? 0) !== 0);
+  }
 
   return result;
 }

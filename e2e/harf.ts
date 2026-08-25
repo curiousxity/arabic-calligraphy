@@ -162,25 +162,46 @@ export async function dotCentersWithFill(page: Page, fill: string): Promise<Poin
 }
 
 /**
+ * Opens a collapsed sidebar panel by its header's accessible name, and
+ * leaves an already-open one alone — an unconditional click would collapse
+ * it.
+ */
+export async function openPanel(page: Page, name: string | RegExp): Promise<void> {
+  const header = page.getByRole("button", { name });
+  if ((await header.getAttribute("aria-expanded")) !== "true") {
+    await header.click();
+  }
+  await expect(header).toHaveAttribute("aria-expanded", "true");
+}
+
+/**
  * Picks a font by its label in Typography's font picker.
  *
  * Typography starts collapsed, and the picker is a custom listbox rather
  * than a native `<select>` (it previews each family in itself), so this is
  * three clicks: the section header, the trigger, then the option.
  */
-export async function chooseFont(page: Page, label: string): Promise<void> {
-  const section = page.getByRole("button", { name: /^Typography/ });
-  if ((await section.getAttribute("aria-expanded")) === "false") {
-    await section.click();
-  }
+export async function chooseFont(page: Page, label: string | RegExp): Promise<void> {
+  await openPanel(page, /^Typography/);
   await page.getByRole("button", { name: /^Font family$/ }).click();
   // Each option's accessible name is its label plus the picker's preview
   // suffix ("Noto Sans — أبجد"), so match the label followed by that
   // suffix's own dash rather than matching exactly: a bare prefix match
-  // on "Thuluth" also matches "Thuluth Deco".
+  // on "Thuluth" also matches "Thuluth Deco". A caller passing its own
+  // RegExp is trusted to have anchored it itself.
+  const option =
+    typeof label === "string"
+      ? new RegExp(`^${escapeRegExp(label)} —`)
+      : label;
   await page
-    .getByRole("option", { name: new RegExp(`^${label} —`) })
+    .getByRole("option", { name: option })
+    .getByRole("button")
     .click();
+}
+
+/** Escapes a literal for embedding in a RegExp, so a label like "Kufi (2)" cannot mis-match. */
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** Page-space centres of the hover hit rects `DiacriticHoverHandles` mounts, one per mark. */

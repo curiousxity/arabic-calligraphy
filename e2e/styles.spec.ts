@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { getBlocks, gotoApp } from "./harf";
+import { chooseFont, getBlocks, gotoApp, openPanel } from "./harf";
 
 /**
  * Stream E — saveable text styles and palettes.
@@ -13,19 +13,8 @@ import { getBlocks, gotoApp } from "./harf";
 
 /** The Typography panel is collapsed on boot; the Styles row lives at its top. */
 async function openTypography(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /Typography/ }).click();
+  await openPanel(page, /Typography/);
   await expect(page.getByLabel("Text style", { exact: true })).toBeVisible();
-}
-
-/** Picks a font through the custom listbox `FontSelectRow` renders. */
-async function chooseFont(page: Page, label: string): Promise<void> {
-  await page.getByRole("button", { name: "Font family" }).click();
-  // Anchored: every option's accessible name is "<label> — أبجد", and an
-  // unanchored /Kufi/ also matches "Kufi 2".
-  await page
-    .getByRole("option", { name: new RegExp(`^${label} —`) })
-    .getByRole("button")
-    .click();
 }
 
 async function setTextColor(page: Page, hex: string): Promise<void> {
