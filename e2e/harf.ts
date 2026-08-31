@@ -162,9 +162,10 @@ export async function dotCentersWithFill(page: Page, fill: string): Promise<Poin
 }
 
 /**
- * Opens a collapsed sidebar panel by its header's accessible name, and
- * leaves an already-open one alone — an unconditional click would collapse
- * it.
+ * Opens a collapsed sidebar panel by its `CollapsibleSection` header's
+ * accessible name, and leaves an already-open one alone — an unconditional
+ * click would collapse it. The `<details>`-based rows (Presets, Specials,
+ * Urdu-Farsi) expose no `aria-expanded` and are not reachable this way.
  */
 export async function openPanel(page: Page, name: string | RegExp): Promise<void> {
   const header = page.getByRole("button", { name });
@@ -175,26 +176,40 @@ export async function openPanel(page: Page, name: string | RegExp): Promise<void
 }
 
 /**
+ * Opens the Typography panel, which is collapsed on boot and holds the font
+ * picker, the Styles row, and the Kashida controls. Specs that want a
+ * particular control assert its visibility themselves after calling this.
+ */
+export async function openTypography(page: Page): Promise<void> {
+  await openPanel(page, /^Typography/);
+}
+
+/**
  * Picks a font by its label in Typography's font picker.
  *
  * Typography starts collapsed, and the picker is a custom listbox rather
  * than a native `<select>` (it previews each family in itself), so this is
  * three clicks: the section header, the trigger, then the option.
+ *
+ * `uploaded` appends the suffix the picker gives a user-uploaded family
+ * (`Sidebar.tsx` builds it as `${label} (uploaded)`); keeping that here
+ * rather than at each call site is what stops three specs from spelling the
+ * app's own label format out for themselves.
  */
-export async function chooseFont(page: Page, label: string | RegExp): Promise<void> {
-  await openPanel(page, /^Typography/);
+export async function chooseFont(
+  page: Page,
+  label: string,
+  opts: { uploaded?: boolean } = {}
+): Promise<void> {
+  await openTypography(page);
   await page.getByRole("button", { name: /^Font family$/ }).click();
-  // Each option's accessible name is its label plus the picker's preview
-  // suffix ("Noto Sans — أبجد"), so match the label followed by that
-  // suffix's own dash rather than matching exactly: a bare prefix match
-  // on "Thuluth" also matches "Thuluth Deco". A caller passing its own
-  // RegExp is trusted to have anchored it itself.
-  const option =
-    typeof label === "string"
-      ? new RegExp(`^${escapeRegExp(label)} —`)
-      : label;
+  // Every option's accessible name is its label plus the picker's preview
+  // suffix ("Noto Sans — أبجد"). Anchoring on that suffix's own dash rather
+  // than matching a bare prefix is what keeps "Thuluth" from also matching
+  // "Thuluth Deco"; escaping the label is what lets one carry parentheses.
+  const option = opts.uploaded ? `${label} (uploaded)` : label;
   await page
-    .getByRole("option", { name: option })
+    .getByRole("option", { name: new RegExp(`^${escapeRegExp(option)} —`) })
     .getByRole("button")
     .click();
 }

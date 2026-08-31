@@ -9,6 +9,7 @@ import {
   getStageScale,
   gotoApp,
   inkPixels,
+  openPanel,
   setBlockText,
 } from "./harf";
 
@@ -79,7 +80,7 @@ test("undo reverts an edit and redo reapplies it", async ({ page }) => {
 test("Export PNG downloads a non-trivial file", async ({ page }) => {
   await gotoApp(page);
 
-  await page.getByRole("button", { name: /Project & Export/ }).click();
+  await openPanel(page, /^Project & Export/);
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export PNG" }).click();

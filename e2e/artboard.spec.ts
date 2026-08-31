@@ -5,6 +5,7 @@ import {
   getBlocks,
   getStageScale,
   gotoApp,
+  openPanel,
 } from "./harf";
 
 /** Page-space rect of a Konva node, in *stage* coordinates (pan/zoom divided out). */
@@ -32,11 +33,6 @@ async function pngSize(download: Download): Promise<{ width: number; height: num
   const bytes = Buffer.concat(chunks);
   expect(bytes.subarray(12, 16).toString("ascii")).toBe("IHDR");
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
-}
-
-async function openPanel(page: Page, name: RegExp) {
-  const button = page.getByRole("button", { name });
-  if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
 }
 
 /** Picks a page size and waits for the page rect it draws to actually exist. */

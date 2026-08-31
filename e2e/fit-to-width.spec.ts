@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { blockClientBox, getBlocks, getStageScale, gotoApp, setBlockText } from "./harf";
+import {
+  blockClientBox,
+  getBlocks,
+  getStageScale,
+  gotoApp,
+  openTypography,
+  setBlockText,
+} from "./harf";
 
 /**
  * Fit to width spreads tatweel kashida across a run's legal joins until it
@@ -40,11 +47,6 @@ async function inkExtentWidth(page: Page): Promise<number> {
     }
     return Number.isFinite(min) ? max - min : 0;
   });
-}
-
-/** Opens the Typography panel, where the Kashida and Fit controls live. */
-async function openTypography(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /Typography/ }).click();
 }
 
 /** The selected block's rendered width in *block* space, which is what a target is in. */

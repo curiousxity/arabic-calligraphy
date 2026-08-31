@@ -5,6 +5,7 @@ import {
   getBlocks,
   gotoApp,
   hitTargetAt,
+  openTypography,
   settleFrames,
   setBlockText,
 } from "./harf";
@@ -26,7 +27,7 @@ const WORD = "حرف";
 /** Arms the tool, then parks the pointer on a mounted move dot. */
 async function armGlyphMoveDot(page: Page): Promise<{ x: number; y: number }> {
   // The checkbox lives in Typography, which is collapsed on load.
-  await page.getByRole("button", { name: /Typography/ }).click();
+  await openTypography(page);
   await page.getByLabel("Move & scale glyph").check();
 
   const box = await blockClientBox(page, 1);

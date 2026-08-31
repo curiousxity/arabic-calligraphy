@@ -5,14 +5,10 @@ import {
   getBlocks,
   gotoApp,
   inkPixels,
+  openPanel,
 } from "./harf";
 
 const STAGE_CANVAS = ".konvajs-content canvas";
-
-async function openPanel(page: Page, name: RegExp) {
-  const button = page.getByRole("button", { name });
-  if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
-}
 
 /**
  * How many distinct colours appear in a page-space box of the live stage.

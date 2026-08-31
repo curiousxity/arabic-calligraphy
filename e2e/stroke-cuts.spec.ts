@@ -6,6 +6,7 @@ import {
   gotoApp,
   hitTargetAt,
   inkPixels,
+  openTypography,
   settleFrames,
   setBlockText,
 } from "./harf";
@@ -27,7 +28,7 @@ const WORD = "حرف";
 /** Arms the tool, then parks the pointer on a mounted stretch handle. */
 async function armStretchHandle(page: Page): Promise<{ x: number; y: number }> {
   // Typography is collapsed on load.
-  await page.getByRole("button", { name: /Typography/ }).click();
+  await openTypography(page);
   await page.getByLabel("Stretch strokes").check();
 
   const box = await blockClientBox(page, 1);
