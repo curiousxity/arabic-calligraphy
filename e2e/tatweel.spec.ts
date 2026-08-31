@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { getBlocks, gotoApp, setBlockText } from "./harf";
+import { getBlocks, gotoApp, openPanel, openTypography, setBlockText } from "./harf";
 
 /** U+0640 ARABIC TATWEEL — kept literal here so the spec asserts against the
  *  same character a user would type from the Specials row. */
@@ -37,9 +37,9 @@ async function inkExtentX(page: Page): Promise<{ min: number; max: number; width
   });
 }
 
-/** Opens the Typography panel, where the Kashida controls live. */
-async function openTypography(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /Typography/ }).click();
+/** Opens Typography and waits for the Kashida controls inside it. */
+async function openKashida(page: Page): Promise<void> {
+  await openTypography(page);
   await expect(page.getByLabel("Kashida join")).toBeVisible();
 }
 
@@ -50,7 +50,7 @@ test("stepping a kashida up widens the shaped run on the canvas", async ({ page 
   // Four dual-joining letters, so the picker offers three joins and the
   // middle one is unambiguously between two others.
   await setBlockText(page, "بسمل");
-  await openTypography(page);
+  await openKashida(page);
 
   const before = await inkExtentX(page);
   expect(before.width).toBeGreaterThan(0);
@@ -73,7 +73,7 @@ test("stepping a kashida up widens the shaped run on the canvas", async ({ page 
 test("the picker offers no slot inside a lam-alef pair", async ({ page }) => {
   await gotoApp(page);
   await setBlockText(page, "بلا");
-  await openTypography(page);
+  await openKashida(page);
 
   // "بلا" joins beh-lam, and lam-alef is a fused ligature rather than a
   // stretchable join — so exactly one option, labelled with that pair.
@@ -85,7 +85,7 @@ test("the picker offers no slot inside a lam-alef pair", async ({ page }) => {
 test("undo reverts a kashida step", async ({ page }) => {
   await gotoApp(page);
   await setBlockText(page, "بسمل");
-  await openTypography(page);
+  await openKashida(page);
 
   await page.getByRole("button", { name: "Lengthen kashida" }).click();
   await expect.poll(async () => (await getBlocks(page))[0].text).toBe(`ب${TATWEEL}سمل`);
@@ -97,14 +97,14 @@ test("undo reverts a kashida step", async ({ page }) => {
 test("a saved project round-trips the tatweels", async ({ page }) => {
   await gotoApp(page);
   await setBlockText(page, "بسمل");
-  await openTypography(page);
+  await openKashida(page);
 
   await page.getByRole("button", { name: "Lengthen kashida" }).click();
   await page.getByRole("button", { name: "Lengthen kashida" }).click();
   const stretched = (await getBlocks(page))[0].text;
   expect(tatweelCount(stretched)).toBe(2);
 
-  await page.getByRole("button", { name: /Project & Export/ }).click();
+  await openPanel(page, /^Project & Export/);
   await page.getByPlaceholder("Project name…").fill("kashida-roundtrip");
   await page.getByRole("button", { name: "Save As" }).click();
 

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoApp, getBlocks, blockClientBox, inkPixels, setBlockText, type Box } from "./harf";
+import { gotoApp, getBlocks, blockClientBox, inkPixels, openPanel, setBlockText, type Box } from "./harf";
 
 /**
  * Stream B (muthanna & radial). Everything here drives the app the way a user
@@ -52,9 +52,7 @@ async function inkHalves(page: Page, box: Box): Promise<[number, number]> {
  * collapsed and only renders its controls while open.
  */
 async function openMirrorPanel(page: Page): Promise<void> {
-  const header = page.locator("button.sidebarSectionButton", { hasText: "Mirror" });
-  if ((await header.getAttribute("aria-expanded")) === "false") await header.click();
-  await expect(header).toHaveAttribute("aria-expanded", "true");
+  await openPanel(page, /^Mirror/);
 }
 
 /** Adds a mirror of the (already selected) starter block and returns its id. */

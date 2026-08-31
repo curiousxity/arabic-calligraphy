@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { chooseFont, getBlocks, gotoApp, openPanel } from "./harf";
+import { chooseFont, getBlocks, gotoApp, openTypography } from "./harf";
 
 /**
  * Stream E — saveable text styles and palettes.
@@ -11,9 +11,9 @@ import { chooseFont, getBlocks, gotoApp, openPanel } from "./harf";
  * breath, which a pixel assertion could not do.
  */
 
-/** The Typography panel is collapsed on boot; the Styles row lives at its top. */
-async function openTypography(page: Page): Promise<void> {
-  await openPanel(page, /Typography/);
+/** Opens Typography and waits for the Styles row that sits at its top. */
+async function openStyles(page: Page): Promise<void> {
+  await openTypography(page);
   await expect(page.getByLabel("Text style", { exact: true })).toBeVisible();
 }
 
@@ -32,7 +32,7 @@ test("a saved style restyles another block without touching its text or position
   page,
 }) => {
   await gotoApp(page);
-  await openTypography(page);
+  await openStyles(page);
 
   // Block 1 keeps the defaults. Block 2 is the one that gets a look worth
   // saving — duplicated rather than added, because adding starts a
@@ -77,7 +77,7 @@ test("a saved style restyles another block without touching its text or position
 
 test("applying a style is one undo step", async ({ page }) => {
   await gotoApp(page);
-  await openTypography(page);
+  await openStyles(page);
 
   await setTextColor(page, "#a3161b");
   await page.getByLabel("New text style name", { exact: true }).fill("Rubric");
@@ -98,14 +98,14 @@ test("applying a style is one undo step", async ({ page }) => {
 
 test("saved styles survive a reload; the shipped palettes are always there", async ({ page }) => {
   await gotoApp(page);
-  await openTypography(page);
+  await openStyles(page);
 
   await page.getByLabel("New text style name", { exact: true }).fill("Persistent");
   await page.getByRole("button", { name: "Save style" }).click();
 
   await page.reload();
   await gotoApp(page);
-  await openTypography(page);
+  await openStyles(page);
 
   await expect(page.getByLabel("Text style", { exact: true }).locator("option", { hasText: "Persistent" })).toHaveCount(1);
   // The defaults are code, not storage, so they are listed on a fresh profile
@@ -115,7 +115,7 @@ test("saved styles survive a reload; the shipped palettes are always there", asy
 
 test("a palette swatch recolours the selected block", async ({ page }) => {
   await gotoApp(page);
-  await openTypography(page);
+  await openStyles(page);
 
   await page.getByLabel("Palette", { exact: true }).selectOption({ label: "Rubrication" });
   const swatches = page.getByRole("group", { name: "Rubrication colours" }).getByRole("button");

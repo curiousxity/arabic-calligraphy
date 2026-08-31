@@ -109,15 +109,20 @@ export function findDiacriticGlyphIndices(
     entry.glyphs++;
     clusters.set(cluster, entry);
   }
-  const starts = [...clusters.keys()].sort((a, b) => a - b);
-  starts.forEach((from, i) => {
-    const span = shapableText.slice(from, starts[i + 1] ?? shapableText.length);
-    clusters.get(from)!.allowance = [...span].filter((ch) =>
-      ARABIC_DIACRITIC_RE.test(ch)
-    ).length;
+  const ordered = [...clusters.entries()].sort(([a], [b]) => a - b);
+  ordered.forEach(([from, entry], i) => {
+    const span = shapableText.slice(from, ordered[i + 1]?.[0] ?? shapableText.length);
+    let marks = 0;
+    for (const ch of span) if (ARABIC_DIACRITIC_RE.test(ch)) marks++;
+    entry.allowance = marks;
   });
 
-  /** Flag glyph `i` as a mark and debit its cluster's allowance. */
+  /**
+   * Flag glyph `i` as a mark and debit its cluster's allowance. The clamp
+   * is for pass 1, which spends without first checking the allowance — a
+   * cmap-identified mark in a cluster whose source span holds no combining
+   * character would otherwise drive it negative.
+   */
   const take = (i: number) => {
     result.add(i);
     const entry = clusters.get(glyphs[i].cl ?? 0);
@@ -127,27 +132,29 @@ export function findDiacriticGlyphIndices(
   // Pass 1 — the primary signal, which never needs the allowance's
   // permission but does consume it, so a cluster's marks cannot be
   // counted twice.
-  for (let i = 0; i < glyphs.length; i++) {
-    let unicodes: number[] = [];
+  const glyphUnicodes = (g: HarfBuzzGlyph): number[] => {
     try {
-      unicodes = font.glyphs.get(glyphs[i].g)?.unicodes ?? [];
+      return font.glyphs.get(g.g)?.unicodes ?? [];
     } catch {
-      unicodes = [];
+      return [];
     }
-    if (unicodes.some((u) => ARABIC_DIACRITIC_RE.test(String.fromCodePoint(u)))) {
-      take(i);
-    }
+  };
+  for (let i = 0; i < glyphs.length; i++) {
+    const isDirectMark = glyphUnicodes(glyphs[i]).some((u) =>
+      ARABIC_DIACRITIC_RE.test(String.fromCodePoint(u))
+    );
+    if (isDirectMark) take(i);
   }
 
   // Pass 2 — the secondary signals, spending what the source allows.
   // Zero-advance candidates first, across the whole run, so a cluster's
   // allowance is never spent on an advance-carrying glyph while a
   // weightless one in the same cluster goes unflagged.
-  const secondarySignals: Array<(g: HarfBuzzGlyph) => boolean> = [
-    (g) => (g.ax ?? 0) === 0 && (g.ay ?? 0) === 0,
-    (g) => (g.dx ?? 0) !== 0 || (g.dy ?? 0) !== 0,
-  ];
-  for (const isMarkShaped of secondarySignals) {
+  const carriesNoAdvance = (g: HarfBuzzGlyph) =>
+    (g.ax ?? 0) === 0 && (g.ay ?? 0) === 0;
+  const isGposAttached = (g: HarfBuzzGlyph) =>
+    (g.dx ?? 0) !== 0 || (g.dy ?? 0) !== 0;
+  for (const isMarkShaped of [carriesNoAdvance, isGposAttached]) {
     for (let i = 0; i < glyphs.length; i++) {
       if (result.has(i)) continue;
       const entry = clusters.get(glyphs[i].cl ?? 0);
