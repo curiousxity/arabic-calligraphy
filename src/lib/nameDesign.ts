@@ -1,11 +1,12 @@
 import type { Block, ImageBlock } from "../types";
+import { buildMirrorBlock, resolveRadialCount, type MirrorSource } from "./mirror";
 import {
-  buildMirrorBlock,
-  resolveRadialCount,
-  DEFAULT_RADIAL_COUNT,
-  type MirrorSource,
-} from "./mirror";
-import { getOrnament, listOrnaments, ornamentSvgDataUrl, type OrnamentDef } from "./ornaments";
+  DEFAULT_ORNAMENT_FILL,
+  getOrnament,
+  listOrnaments,
+  ornamentSvgDataUrl,
+  type OrnamentDef,
+} from "./ornaments";
 
 /**
  * The pure half of "name designs": given a block and how wide its text
@@ -64,9 +65,6 @@ export const NAME_LAYOUTS: NameLayout[] = [
   },
 ];
 
-export const isNameLayoutId = (value: string): value is NameLayoutId =>
-  NAME_LAYOUTS.some((l) => l.id === value);
-
 /** How wide and tall a name actually draws, in block space. */
 export type RunBox = { width: number; height: number };
 
@@ -75,6 +73,11 @@ export type RunBox = { width: number; height: number };
  * failed) measures at or near zero, and every placement below divides the
  * canvas up by these numbers — an unguarded zero would stack a whole
  * medallion on one point.
+ *
+ * They are applied in exactly one place, `normalizeRunBox`, which
+ * `buildNameDesign` runs over its input (the operation is idempotent, so a
+ * caller that already normalized pays nothing). The placement formulas below
+ * therefore read `run.width`/`run.height` directly and say what they mean.
  */
 export const MIN_RUN_WIDTH = 40;
 export const MIN_RUN_HEIGHT = 24;
@@ -87,7 +90,7 @@ export const MIN_RUN_HEIGHT = 24;
  * and no tashkeel measures far shorter than the line it is drawn on, and
  * spacing a medallion by the ink alone would set its copies overlapping.
  */
-export const normalizeRunBox = (box: RunBox, fontSize: number, lineHeight = 1.2): RunBox => ({
+export const normalizeRunBox = (box: RunBox, fontSize = 0, lineHeight = 1.2): RunBox => ({
   width: Math.max(box.width, MIN_RUN_WIDTH),
   height: Math.max(box.height, fontSize * lineHeight, MIN_RUN_HEIGHT),
 });
@@ -114,7 +117,7 @@ export const estimateRunBox = (text: string, fontSize: number): RunBox =>
  * so a 24px name and a 240px name are spaced alike in proportion.
  */
 export const muthannaOffset = (run: RunBox): number =>
-  Math.max(run.width, MIN_RUN_WIDTH) + Math.max(run.height * 0.25, 24);
+  run.width + Math.max(run.height * 0.25, 24);
 
 /**
  * The radius a medallion's copies sit at.
@@ -133,11 +136,9 @@ export const muthannaOffset = (run: RunBox): number =>
  */
 export const medallionRadius = (run: RunBox, count?: number): number => {
   const n = resolveRadialCount(count);
-  const width = Math.max(run.width, MIN_RUN_WIDTH);
-  const height = Math.max(run.height, MIN_RUN_HEIGHT);
-  const gap = Math.max(height * 0.4, 16);
-  const tangential = (n * (height + gap)) / (2 * Math.PI);
-  return Math.max(tangential, width * 0.6);
+  const gap = Math.max(run.height * 0.4, 16);
+  const tangential = (n * (run.height + gap)) / (2 * Math.PI);
+  return Math.max(tangential, run.width * 0.6);
 };
 
 /**
@@ -159,8 +160,8 @@ export const framePadding = (run: RunBox): number => Math.max(run.height * 0.9, 
  */
 export const frameBoxFor = (viewBox: { w: number; h: number }, run: RunBox): RunBox => {
   const pad = framePadding(run);
-  const neededWidth = Math.max(run.width, MIN_RUN_WIDTH) + pad * 2;
-  const neededHeight = Math.max(run.height, MIN_RUN_HEIGHT) + pad * 2;
+  const neededWidth = run.width + pad * 2;
+  const neededHeight = run.height + pad * 2;
   const scale = Math.max(neededWidth / viewBox.w, neededHeight / viewBox.h);
   return { width: viewBox.w * scale, height: viewBox.h * scale };
 };
@@ -168,8 +169,12 @@ export const frameBoxFor = (viewBox: { w: number; h: number }, run: RunBox): Run
 /** The library's own tag for an ornament that reads as a frame. */
 export const FRAME_TAG = "frame";
 export const DEFAULT_FRAME_ID = "border-frame";
-/** Gold, matching the ornament picker's own default frame colour. */
-export const DEFAULT_FRAME_COLOR = "#c9a227";
+/**
+ * The ornament palette's own default, read from `lib/ornaments.ts` rather
+ * than restated — a second copy of the hex drifted the moment either the
+ * shape picker's palette or this one was edited.
+ */
+export const DEFAULT_FRAME_COLOR = DEFAULT_ORNAMENT_FILL;
 
 /**
  * The frames on offer — filtered by the library's own tag rather than a
@@ -192,7 +197,19 @@ export type NameDesignRequest = {
   frameColor?: string;
 };
 
+/**
+ * What the wizard collects — everything a request needs except the block it
+ * is built around and its measurement, which only `App.tsx` can supply.
+ *
+ * Declared here rather than in the dialog so the state layer does not import
+ * a domain type back out of a component, and so a new `NameDesignRequest`
+ * field is a type error at the wizard rather than a silent omission.
+ */
+export type NameDesignSelection = Omit<NameDesignRequest, "source" | "run">;
+
 export type NameDesignPlan = {
+  /** The composition that was built, so a describer needs no second argument. */
+  layout: NameLayoutId;
   /** Patch for the source block — always at least the chosen style. */
   patch: Partial<Block>;
   /** Companion blocks to insert, in order. */
@@ -266,26 +283,31 @@ export function buildNameDesign(
 ): NameDesignPlan {
   const patch: Partial<Block> = { fontFamily: request.fontFamily };
   const source = { ...request.source, fontFamily: request.fontFamily } as MirrorSource;
-  const run = request.run;
+  // The one place the run floors are enforced. Idempotent, so a caller that
+  // already normalized (App.tsx does) pays nothing.
+  const run = normalizeRunBox(request.run);
+  const layout = request.layout;
 
-  switch (request.layout) {
+  switch (layout) {
     case "muthanna": {
       const mirror = {
         ...buildMirrorBlock(nextId(), source, "mirrorX", muthannaOffset(run)),
         name: "Muthanna",
       };
-      return { patch, added: [mirror], placement: "front" };
+      return { layout, patch, added: [mirror], placement: "front" };
     }
 
     case "medallion": {
-      const count = resolveRadialCount(request.radialCount ?? DEFAULT_RADIAL_COUNT);
+      // `resolveRadialCount` already answers `DEFAULT_RADIAL_COUNT` for a
+      // missing or non-finite count, so no coalesce is needed here.
+      const count = resolveRadialCount(request.radialCount);
       const mirror = {
         ...buildMirrorBlock(nextId(), source, "radial"),
         radialCount: count,
         radialRadius: medallionRadius(run, count),
         name: "Medallion",
       };
-      return { patch, added: [mirror], placement: "front" };
+      return { layout, patch, added: [mirror], placement: "front" };
     }
 
     case "framed": {
@@ -293,10 +315,8 @@ export function buildNameDesign(
       // failing: the id can only come from a stale UI state or a hand-edited
       // call, and dropping the composition silently would be worse.
       const def =
-        getOrnament(request.frameId ?? DEFAULT_FRAME_ID) ??
-        getOrnament(DEFAULT_FRAME_ID) ??
-        frameOrnaments()[0];
-      if (!def) return { patch, added: [], placement: "behind" };
+        getOrnament(request.frameId ?? DEFAULT_FRAME_ID) ?? getOrnament(DEFAULT_FRAME_ID);
+      if (!def) return { layout, patch, added: [], placement: "behind" };
       const box = frameBoxFor(def.viewBox, run);
       const frame = buildFrameBlock(
         nextId(),
@@ -305,18 +325,18 @@ export function buildNameDesign(
         box,
         request.frameColor ?? DEFAULT_FRAME_COLOR
       );
-      return { patch, added: [frame], placement: "behind" };
+      return { layout, patch, added: [frame], placement: "behind" };
     }
 
     case "single":
     default:
-      return { patch, added: [], placement: "front" };
+      return { layout, patch, added: [], placement: "front" };
   }
 }
 
 /** One-line report of what was created, for the sidebar's status row. */
-export const describeNameDesign = (plan: NameDesignPlan, layout: NameLayoutId): string => {
-  const label = NAME_LAYOUTS.find((l) => l.id === layout)?.name ?? "Design";
+export const describeNameDesign = (plan: NameDesignPlan): string => {
+  const label = NAME_LAYOUTS.find((l) => l.id === plan.layout)?.name ?? "Design";
   if (plan.added.length === 0) return `Applied the ${label.toLowerCase()} style.`;
   return `Created a ${label.toLowerCase()} design.`;
 };

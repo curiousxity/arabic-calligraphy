@@ -17,7 +17,8 @@ import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
-import { NameDesignButton, type FontChoice, type NameDesignSelection } from "./NameDesignDialog";
+import { NameDesignButton, type FontChoice } from "./NameDesignDialog";
+import type { NameDesignSelection } from "../lib/nameDesign";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { HistoryPopover, type HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
@@ -136,8 +137,6 @@ export type SidebarProps = {
   // ---- /STREAM-G ----
   /** Name designs: apply a style from the gallery and compose the chosen layout. */
   onApplyNameDesign?: (selection: NameDesignSelection) => void;
-  /** True while a composition is being measured and built. */
-  isBuildingNameDesign?: boolean;
   // Phase 1 parallel-stream prop declarations — each stream adds its own
   // (all optional, arriving via App.tsx's p1* bundles). See PARALLEL-PHASE-1.md.
   /** The document's page, or null for freeform. */
@@ -400,7 +399,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   missingFontKey = null,
   // ---- /STREAM-G ----
   onApplyNameDesign,
-  isBuildingNameDesign = false,
   blocks,
   artboard = null,
   onChooseArtboardPreset,
@@ -2037,7 +2035,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     text={selectedText}
                     fontFamily={selectedBlock.fontFamily}
                     fonts={fontChoices}
-                    busy={isBuildingNameDesign}
                     onApply={onApplyNameDesign}
                   />
                 )}

@@ -1373,6 +1373,14 @@ the colour in its thumbnails before you commit.
 `ornamentSvgMarkup` is deliberately ASCII-only — no `nameAr`, no comment —
 because `btoa` throws above U+00FF.
 
+The colour palette (`ORNAMENT_FILL_SWATCHES`, `DEFAULT_ORNAMENT_FILL`) lives in
+`lib/ornaments.ts` beside `ornamentSvgDataUrl`, and the swatch strip itself is
+`OrnamentFillSwatches`, exported from `OrnamentPicker.tsx`. Both surfaces that
+bake a colour into an ornament use them — this picker and the name-design
+wizard's frame step — because a second copy of either drifted the moment one
+was edited. `lib/nameDesign.ts`'s `DEFAULT_FRAME_COLOR` reads the shared
+default rather than restating the hex.
+
 <!-- ---- STREAM-E: styles & palettes ---- -->
 ### Name designs (`src/lib/nameDesign.ts`, `NameDesignDialog.tsx`)
 
@@ -1422,7 +1430,32 @@ mirror" (a fixed 180px nudge the user then drags) and "compose this name".
 - **One `pushHistory()` covers the style change and the added blocks**, so a
   whole design is a single undo. The block is captured **by id** — solving is
   async and the selection can change while it runs, the same hazard
-  `fitSelectedBlockToWidth` documents beside it.
+  `fitSelectedBlockToWidth` documents beside it. A design that changes nothing
+  (Single, in the font the block already carries) skips the write entirely, so
+  it costs no undo step — the same no-op rule that handler follows.
+- **Only the layouts that place a companion block are measured.** `single`
+  reads `request.run` nowhere, so `applyNameDesign` skips the `await` for it
+  rather than making the style change wait behind a first-use font download
+  (`Urdu.ttf` is 12.8 MB).
+- **`normalizeRunBox` is the only place the run floors are applied.**
+  `buildNameDesign` runs it over its input — it is idempotent, so App's own
+  normalize costs nothing — and the placement formulas then read
+  `run.width`/`run.height` directly instead of each re-flooring.
+- **The `RunStyle` terms come from `runStyleForBlock`** in `lib/fitToWidth.ts`,
+  shared with `fitSelectedBlockToWidth`. Written out at both call sites, a new
+  term joining `styledRunWidth` reaches one and silently not the other — both
+  still compile, both still produce a plausible number. That already happened
+  once: `cutWidth` (straight-stroke cuts) landed inline at the fit handler
+  while the name-design one went on measuring without it, which is why the
+  helper now takes it as a **required** argument. It is an argument rather than
+  another field read off the block because summing cuts needs the nuqta table
+  `fitToWidth.ts` deliberately keeps out — `App.tsx`'s `cutWidthForBlock` owns
+  that half.
+- **`NameDesignSelection` lives in `lib/nameDesign.ts`**, as
+  `Omit<NameDesignRequest, "source" | "run">`, not in the dialog: the state
+  layer must not import a domain type back out of a component, and the `Omit`
+  makes a new request field a type error at the wizard rather than a silent
+  omission.
 - Plain text only, gated in `Sidebar.tsx`: a Shape Fill run is auto-scaled to
   its silhouette and a Curve run to its curve, so a measured run width has
   nothing to act on there — the same reason Fit to width is text-only.

@@ -5,22 +5,21 @@ import {
   DEFAULT_FRAME_ID,
   NAME_LAYOUTS,
   frameOrnaments,
+  type NameDesignSelection,
   type NameLayoutId,
 } from "../lib/nameDesign";
-import { DEFAULT_RADIAL_COUNT, RADIAL_COUNT_MAX, RADIAL_COUNT_MIN } from "../lib/mirror";
+import {
+  DEFAULT_RADIAL_COUNT,
+  RADIAL_COUNT_MAX,
+  RADIAL_COUNT_MIN,
+  resolveRadialCount,
+} from "../lib/mirror";
 import type { OrnamentDef } from "../lib/ornaments";
+import { OrnamentFillSwatches } from "./OrnamentPicker";
 import { CloseIcon } from "./Icons";
 
 /** One entry of the font picker's own list — value, label, and the CSS family to preview in. */
 export type FontChoice = { value: string; label: string; cssFamily: string };
-
-export type NameDesignSelection = {
-  fontFamily: string;
-  layout: NameLayoutId;
-  radialCount: number;
-  frameId: string;
-  frameColor: string;
-};
 
 export type NameDesignDialogProps = {
   /** The block's current text — the name every preview here renders. */
@@ -29,13 +28,9 @@ export type NameDesignDialogProps = {
   fontFamily: string;
   /** Built-ins plus uploads, the same list the Typography picker is given. */
   fonts: FontChoice[];
-  busy?: boolean;
   onApply: (selection: NameDesignSelection) => void;
   onClose: () => void;
 };
-
-/** Frame colours offered up front, matching the ornament picker's palette. */
-const FRAME_SWATCHES = ["#c9a227", "#1e3a5f", "#8c1c13", "#1f5f4a", "#2b2b2b", "#f5f0e6"];
 
 /**
  * How far a medallion preview's copies sit from its centre, in px. The
@@ -65,7 +60,6 @@ export const NameDesignDialog: React.FC<NameDesignDialogProps> = ({
   text,
   fontFamily,
   fonts,
-  busy = false,
   onApply,
   onClose,
 }) => {
@@ -244,30 +238,7 @@ export const NameDesignDialog: React.FC<NameDesignDialogProps> = ({
                     </option>
                   ))}
                 </select>
-                <div className="nameDesignSwatches">
-                  {FRAME_SWATCHES.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={
-                        c === frameColor
-                          ? "ornamentPickerSwatch ornamentPickerSwatch--active"
-                          : "ornamentPickerSwatch"
-                      }
-                      style={{ background: c }}
-                      onClick={() => setFrameColor(c)}
-                      aria-label={`Frame colour ${c}`}
-                      aria-pressed={c === frameColor}
-                    />
-                  ))}
-                  <input
-                    type="color"
-                    className="ornamentPickerColorInput"
-                    value={frameColor}
-                    onChange={(e) => setFrameColor(e.target.value)}
-                    aria-label="Custom frame colour"
-                  />
-                </div>
+                <OrnamentFillSwatches value={frameColor} onChange={setFrameColor} />
                 {/* A frame is inserted as a rasterized image, so its colour is
                     baked in at insert time — hence choosing it here rather
                     than leaving the user to discover the limitation. */}
@@ -306,9 +277,9 @@ export const NameDesignDialog: React.FC<NameDesignDialogProps> = ({
               type="button"
               className="sidebarSmallAction sidebarSmallAction--accent"
               onClick={apply}
-              disabled={busy || name === ""}
+              disabled={name === ""}
             >
-              {busy ? "Composing…" : "Create design"}
+              Create design
             </button>
           )}
         </div>
@@ -358,7 +329,9 @@ const LayoutPreview: React.FC<LayoutPreviewProps> = ({
   }
 
   if (layout === "medallion") {
-    const count = Math.max(2, Math.min(16, Math.round(radialCount)));
+    // The canvas's own clamp, so the preview and the block it creates can
+    // never disagree about how many copies a ring has.
+    const count = resolveRadialCount(radialCount);
     return (
       <span className="namePreview">
         {Array.from({ length: count }, (_, i) => (
@@ -394,9 +367,7 @@ const LayoutPreview: React.FC<LayoutPreviewProps> = ({
   return <span className="namePreview">{sample}</span>;
 };
 
-export type NameDesignButtonProps = Omit<NameDesignDialogProps, "onClose"> & {
-  disabled?: boolean;
-};
+export type NameDesignButtonProps = Omit<NameDesignDialogProps, "onClose">;
 
 /**
  * Launcher plus dialog as one element, the way `OrnamentPickerButton` and
@@ -404,7 +375,6 @@ export type NameDesignButtonProps = Omit<NameDesignDialogProps, "onClose"> & {
  * never reaches `App.tsx`, the undo stack, or a saved layout.
  */
 export const NameDesignButton: React.FC<NameDesignButtonProps> = ({
-  disabled,
   onApply,
   ...dialogProps
 }) => {
@@ -416,7 +386,6 @@ export const NameDesignButton: React.FC<NameDesignButtonProps> = ({
         type="button"
         className="sidebarSectionButton"
         onClick={() => setOpen(true)}
-        disabled={disabled}
         aria-haspopup="dialog"
         data-testid="name-design-open"
       >

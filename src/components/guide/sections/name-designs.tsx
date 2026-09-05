@@ -97,5 +97,3 @@ export const section: GuideSection = {
     </>
   ),
 };
-
-export default section;

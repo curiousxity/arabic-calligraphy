@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  DEFAULT_ORNAMENT_FILL,
+  ORNAMENT_FILL_SWATCHES,
   listOrnaments,
   ornamentSvgDataUrl,
   ornamentSvgMarkup,
@@ -13,12 +15,41 @@ import { CloseIcon, FrameIcon, ShapesIcon } from "./Icons";
 const INSERT_SIZE = 500;
 
 /**
- * Palette offered for a frame's baked-in colour. A frame is inserted as a
- * rasterized image, so this is chosen *before* insert and cannot be changed
- * afterwards — hence offering the app's own accents up front rather than
- * leaving the user to discover the limitation.
+ * The swatch strip that picks an ornament's baked-in colour.
+ *
+ * Shared rather than restated because both surfaces that insert an ornament
+ * offer it — this picker and the name-design wizard's frame step — and the
+ * two were byte-identical markup over two copies of one palette.
  */
-const FILL_SWATCHES = ["#1e3a5f", "#c9a227", "#8c1c13", "#1f5f4a", "#2b2b2b", "#f5f0e6"];
+export const OrnamentFillSwatches: React.FC<{
+  value: string;
+  onChange: (color: string) => void;
+  label?: string;
+}> = ({ value, onChange, label }) => (
+  <div className="ornamentPickerSwatches">
+    {label && <span className="ornamentPickerSwatchLabel">{label}</span>}
+    {ORNAMENT_FILL_SWATCHES.map((c) => (
+      <button
+        key={c}
+        type="button"
+        className={
+          c === value ? "ornamentPickerSwatch ornamentPickerSwatch--active" : "ornamentPickerSwatch"
+        }
+        style={{ background: c }}
+        onClick={() => onChange(c)}
+        aria-label={`Frame colour ${c}`}
+        aria-pressed={c === value}
+      />
+    ))}
+    <input
+      type="color"
+      className="ornamentPickerColorInput"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label="Custom frame colour"
+    />
+  </div>
+);
 
 export type OrnamentPickerProps = {
   onInsertShapeFill?: (pathData: string, w: number, h: number) => void;
@@ -44,7 +75,7 @@ export const OrnamentPicker: React.FC<OrnamentPickerProps> = ({
   onInsertFrame,
   onClose,
 }) => {
-  const [fill, setFill] = useState(FILL_SWATCHES[1]);
+  const [fill, setFill] = useState(DEFAULT_ORNAMENT_FILL);
   const ornaments = listOrnaments();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -114,31 +145,7 @@ export const OrnamentPicker: React.FC<OrnamentPickerProps> = ({
           </button>
         </div>
 
-        <div className="ornamentPickerSwatches">
-          <span className="ornamentPickerSwatchLabel">Frame colour</span>
-          {FILL_SWATCHES.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={
-                c === fill
-                  ? "ornamentPickerSwatch ornamentPickerSwatch--active"
-                  : "ornamentPickerSwatch"
-              }
-              style={{ background: c }}
-              onClick={() => setFill(c)}
-              aria-label={`Frame colour ${c}`}
-              aria-pressed={c === fill}
-            />
-          ))}
-          <input
-            type="color"
-            className="ornamentPickerColorInput"
-            value={fill}
-            onChange={(e) => setFill(e.target.value)}
-            aria-label="Custom frame colour"
-          />
-        </div>
+        <OrnamentFillSwatches value={fill} onChange={setFill} label="Frame colour" />
 
         <div className="ornamentPickerGrid">
           {ornaments.map((o) => (

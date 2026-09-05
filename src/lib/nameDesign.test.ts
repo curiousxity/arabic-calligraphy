@@ -14,7 +14,6 @@ import {
   frameBoxFor,
   frameOrnaments,
   framePadding,
-  isNameLayoutId,
   medallionRadius,
   muthannaOffset,
   normalizeRunBox,
@@ -44,14 +43,9 @@ const ids = (start = 100) => {
 const run = { width: 400, height: 90 };
 
 describe("layout catalogue", () => {
-  it("has unique ids that isNameLayoutId accepts", () => {
+  it("has unique ids", () => {
     const seen = new Set(NAME_LAYOUTS.map((l) => l.id));
     expect(seen.size).toBe(NAME_LAYOUTS.length);
-    for (const layout of NAME_LAYOUTS) expect(isNameLayoutId(layout.id)).toBe(true);
-  });
-
-  it("rejects an unknown id", () => {
-    expect(isNameLayoutId("tughra")).toBe(false);
   });
 });
 
@@ -307,7 +301,7 @@ describe("describeNameDesign", () => {
       { source: source(), layout: "muthanna", fontFamily: "Kufi", run },
       ids()
     );
-    expect(describeNameDesign(single, "single")).toMatch(/style/i);
-    expect(describeNameDesign(muthanna, "muthanna")).toMatch(/muthanna/i);
+    expect(describeNameDesign(single)).toMatch(/style/i);
+    expect(describeNameDesign(muthanna)).toMatch(/muthanna/i);
   });
 });

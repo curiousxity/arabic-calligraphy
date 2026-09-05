@@ -205,6 +205,37 @@ export type RunStyle = {
 };
 
 /**
+ * Every term above, read off a block.
+ *
+ * Each caller that measures a block's drawn width needs exactly this
+ * derivation, and it had been written out twice in `App.tsx` (the fit-to-width
+ * handler and the name-design one). One helper is what keeps a term joining
+ * `styledRunWidth` from reaching one call site and silently not the other —
+ * both would still compile and both would still produce a plausible number.
+ * That is not hypothetical: `cutWidth` landed inline at the fit handler alone
+ * while the name-design one went on measuring without it.
+ *
+ * `cutWidth` is a **required argument** rather than another field read off the
+ * block, for the reason `RunStyle` documents above: summing the cuts needs
+ * nuqta and glyph geometry, which this module stays clear of. Required, so a
+ * caller omitting it is a type error here rather than a run measured short.
+ */
+export const runStyleForBlock = (
+  block: {
+    fontStyle?: string;
+    strokeWidth?: number;
+    warpX?: number;
+  },
+  cutWidth: number
+): RunStyle => ({
+  italic: block.fontStyle === "italic" || block.fontStyle === "bold italic",
+  bold: block.fontStyle === "bold" || block.fontStyle === "bold italic",
+  strokeWidth: block.strokeWidth,
+  warpX: block.warpX,
+  cutWidth,
+});
+
+/**
  * The drawn width of a run whose raw outline extent is `box`.
  *
  * A canvas stroke straddles the path it follows, so half of it falls outside

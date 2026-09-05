@@ -97,3 +97,26 @@ export function ornamentSvgMarkup(def: OrnamentDef, fill: string): string {
 export function ornamentSvgDataUrl(def: OrnamentDef, fill: string): string {
   return `data:image/svg+xml;base64,${btoa(ornamentSvgMarkup(def, fill))}`;
 }
+
+/**
+ * Palette offered for an ornament's baked-in colour.
+ *
+ * A frame is inserted as a rasterized image, so the colour is chosen *before*
+ * insert and cannot be changed afterwards — hence offering the app's own
+ * accents up front rather than leaving the user to discover the limitation.
+ *
+ * It lives here, beside `ornamentSvgDataUrl`, because both surfaces that bake
+ * a colour into an ornament read it: the shape picker and the name-design
+ * wizard's frame step. Two copies drifted the moment either was edited.
+ */
+export const ORNAMENT_FILL_SWATCHES = [
+  "#1e3a5f",
+  "#c9a227",
+  "#8c1c13",
+  "#1f5f4a",
+  "#2b2b2b",
+  "#f5f0e6",
+];
+
+/** The gold both surfaces open on. */
+export const DEFAULT_ORNAMENT_FILL = ORNAMENT_FILL_SWATCHES[1];
