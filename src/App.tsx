@@ -112,7 +112,12 @@ import {
   hasOrphanedMirrors,
   isMirrorSourceCandidate,
 } from "./lib/mirror";
-import { squareColumnTarget, DEFAULT_KUFI_OPTIONS } from "./lib/squareKufi";
+import {
+  squareColumnTarget,
+  layoutSquareKufi,
+  kufiCellSize,
+  DEFAULT_KUFI_OPTIONS,
+} from "./lib/squareKufi";
 import type { MirrorMode } from "./types";
 import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
@@ -283,6 +288,9 @@ const isBrowser = typeof window !== "undefined";
  * because summing them needs the nuqta table that module deliberately keeps
  * out; `runStyleForBlock` takes the result as a required argument.
  */
+/** The text a new square-kufi block starts with, and what its placement ghost is measured from. */
+const SQUARE_KUFI_DEFAULT_TEXT = "كوفي مربع";
+
 const cutWidthForBlock = (block: Block): number =>
   cutAdvanceTotal(block.strokeCuts ?? [], nuqtaUnits(block.fontFamily, block.fontSize));
 
@@ -1766,14 +1774,27 @@ const App: React.FC = () => {
    */
   const addSquareKufiBlock = () => {
     const newId = createNextId();
-    const width = 320;
-    const height = 160;
+    // Measured, not guessed. A square-kufi block draws down-right from its
+    // origin at `cols x rows` cells, so a hardcoded ghost is both the wrong
+    // size and — because the commit offset is half of it — the wrong place:
+    // the default text laid out at ~245x40px under a 320x160 ghost dropped its
+    // ink about 60 document-px above the rectangle the user aimed. The layout
+    // is pure lattice arithmetic with no font to load, which is what makes
+    // measuring it here as cheap as the constants it replaces.
+    const cell = kufiCellSize(DEFAULT_BLOCK.fontSize);
+    const preview = layoutSquareKufi(SQUARE_KUFI_DEFAULT_TEXT, {
+      columns: 0,
+      lineGap: DEFAULT_KUFI_OPTIONS.lineGap,
+      wordGap: DEFAULT_KUFI_OPTIONS.wordGap,
+    });
+    const width = Math.max(preview.cols * cell, cell);
+    const height = Math.max(preview.rows * cell, cell);
 
     beginPlacement(
       {
         ...DEFAULT_BLOCK,
         id: newId,
-        text: "كوفي مربع",
+        text: SQUARE_KUFI_DEFAULT_TEXT,
         type: "squareKufi",
         kufiColumns: 0,
         kufiLineGap: DEFAULT_KUFI_OPTIONS.lineGap,

@@ -50,10 +50,6 @@ async function distinctColors(
   );
 }
 
-/**
- * A new block follows the cursor until a click drops it (`beginPlacement` in
- * App.tsx), so adding one is always two steps.
- */
 /** A page-space box in the top-left corner of the stage, clear of the text. */
 async function paperCorner(page: Page) {
   return page.evaluate(() => {

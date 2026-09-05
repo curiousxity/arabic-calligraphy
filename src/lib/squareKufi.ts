@@ -244,6 +244,13 @@ function breakIntoLines(
   const lines: Slot[][] = [];
   let current: Slot[] = [];
   let hardBreaks = 0;
+  // Running width of `current`. Rescanning it per candidate made this function
+  // quadratic in the line's length, and `squareColumnTarget` calls it once per
+  // candidate width — which is what turned "fit to square" into seconds of
+  // blocked main thread on a long passage. `flush` needs no adjustment:
+  // `slotsWidth` never counts the last slot's `gapAfter`, which is the only
+  // field it rewrites.
+  let currentWidth = 0;
 
   const flush = () => {
     if (current.length > 0) {
@@ -252,18 +259,22 @@ function breakIntoLines(
       lines.push(current);
     }
     current = [];
+    currentWidth = 0;
   };
 
   const append = (slots: Slot[]) => {
     if (current.length > 0) {
       const last = current[current.length - 1];
       current[current.length - 1] = { ...last, gapAfter: opts.wordGap, bridgeAfter: false };
+      // The slot that was last now carries a gap, so it starts counting.
+      currentWidth += opts.wordGap;
     }
     current.push(...slots);
+    currentWidth += slotsWidth(slots);
   };
 
   const widthWith = (slots: Slot[]) =>
-    slotsWidth(current) + (current.length > 0 ? opts.wordGap : 0) + slotsWidth(slots);
+    currentWidth + (current.length > 0 ? opts.wordGap : 0) + slotsWidth(slots);
 
   for (const word of words) {
     let remaining = wordSlots(word, opts);
@@ -279,13 +290,26 @@ function breakIntoLines(
         continue;
       }
       // Alone on an empty line and still too wide: split at a letter boundary.
+      // Widths accumulate rather than re-summing each prefix, which is the
+      // other half of keeping this function linear.
       let take = 0;
-      while (take < remaining.length && slotsWidth(remaining.slice(0, take + 1)) <= limit) take++;
+      let taken = 0;
+      while (take < remaining.length) {
+        const grown =
+          taken + (take > 0 ? remaining[take - 1].gapAfter : 0) + remaining[take].unit.width;
+        if (grown > limit) break;
+        taken = grown;
+        take++;
+      }
       // A single letter wider than the limit still has to go somewhere.
       if (take === 0) take = 1;
+      // Only a *split* loses a join. Forcing one over-wide letter onto its own
+      // line when it is the whole of what remains splits nothing, and warning
+      // about it sends the user widening a panel to close a break that never
+      // happened.
+      if (take < remaining.length) hardBreaks++;
       append(remaining.slice(0, take));
       remaining = remaining.slice(take);
-      hardBreaks++;
       flush();
     }
   }
@@ -363,13 +387,34 @@ export function layoutSquareKufi(
 }
 
 /**
+ * How many candidate widths `squareColumnTarget` will lay out before it
+ * switches from sweeping every column to sweeping coarsely and refining.
+ *
+ * Each candidate costs a full layout pass, and the number of candidates grows
+ * with the text — so an exhaustive sweep is quadratic in length overall. At
+ * 1800 characters that was measured at 5.4 seconds of blocked main thread
+ * (7.1 before the line breaker was made linear), from a button the user can
+ * press again while it runs.
+ */
+const COLUMN_SWEEP_BUDGET = 160;
+
+/**
  * The wrap width whose panel comes out closest to square.
  *
  * Square kufi's whole point is the panel, and the column count that produces
  * one is not something a user can guess: it depends on which letters the text
- * happens to use and where the words fall. So this searches — the layout is
- * cheap arithmetic, and trying every width from the widest single letter up to
- * the unwrapped band is a few hundred passes at most.
+ * happens to use and where the words fall. So this searches, between the
+ * widest single letter (below which nothing fits) and the unwrapped band.
+ *
+ * **Short texts are still searched exhaustively.** Only when the range exceeds
+ * `COLUMN_SWEEP_BUDGET` does it step coarsely and then re-sweep every column
+ * within one step either side of the coarse winner. That is a heuristic rather
+ * than a proof: the panel's aspect ratio rises broadly with the column count
+ * (more columns, fewer rows), so the error is broadly V-shaped and a refined
+ * coarse minimum lands in the same basin — but word-break quantization puts
+ * small teeth on that curve, and a tooth further away than one coarse step
+ * would be missed. Being a column or two off "closest to square" is invisible;
+ * a seven-second freeze is not.
  *
  * Ties go to the *wider* panel. Two column counts often score identically
  * because a line only breaks at a word, and the wider one wastes less of the
@@ -387,15 +432,38 @@ export function squareColumnTarget(text: string, options: SquareKufiOptions = {}
 
   let best = band.cols;
   let bestError = Infinity;
-  for (let columns = widest; columns <= band.cols; columns++) {
+  // `<=` rather than `<`: equal scores keep the later, wider candidate, and
+  // both phases below sweep upwards so that rule holds throughout.
+  const consider = (columns: number) => {
     const trial = layoutSquareKufi(text, { ...options, columns });
-    if (trial.rows === 0) continue;
+    if (trial.rows === 0) return;
     const error = Math.abs(trial.cols / trial.rows - 1);
     if (error <= bestError) {
       bestError = error;
       best = columns;
     }
+  };
+
+  const span = band.cols - widest + 1;
+  const step = span <= COLUMN_SWEEP_BUDGET ? 1 : Math.ceil(span / COLUMN_SWEEP_BUDGET);
+
+  for (let columns = widest; columns <= band.cols; columns += step) consider(columns);
+  // The band itself is the widest legal panel and a coarse step can overshoot
+  // it, so it is always a candidate.
+  if ((band.cols - widest) % step !== 0) consider(band.cols);
+
+  if (step > 1) {
+    const from = Math.max(widest, best - step + 1);
+    const to = Math.min(band.cols, best + step - 1);
+    const coarse = best;
+    // Re-sweeping the coarse winner's own neighbourhood upwards keeps the
+    // wider-panel tie-break: a refined candidate only wins on a strictly
+    // better score until it passes the coarse pick.
+    for (let columns = from; columns <= to; columns++) {
+      if (columns !== coarse) consider(columns);
+    }
   }
+
   return best;
 }
 

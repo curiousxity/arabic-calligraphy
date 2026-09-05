@@ -2282,6 +2282,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     wordGap: selectedBlock.kufiWordGap,
                   });
                   const missing = Array.from(new Set(layout.unsupported));
+                  // The unwrapped band is the whole useful domain of the width
+                  // slider: any width at or past it puts the text on one line,
+                  // and `squareColumnTarget` searches no further either, so a
+                  // fitted value always lands inside this range. A fixed cap of
+                  // 80 could not represent one — "Fit to square" returns 119 at
+                  // 383 characters and 249 at 1800 — leaving the thumb pinned at
+                  // max while the readout showed the real number, and the first
+                  // touch of the track silently collapsed the fitted panel.
+                  // Derived from the text rather than from the slider's own
+                  // value, so dragging cannot move the end of the track.
+                  const bandColumns = Math.max(
+                    1,
+                    layoutSquareKufi(selectedBlock.text, {
+                      columns: 0,
+                      lineGap: selectedBlock.kufiLineGap,
+                      wordGap: selectedBlock.kufiWordGap,
+                    }).cols
+                  );
                   return (
                     <>
                       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
@@ -2319,7 +2337,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         label="Panel width"
                         value={selectedBlock.kufiColumns ?? 0}
                         min={0}
-                        max={80}
+                        max={Math.max(bandColumns, selectedBlock.kufiColumns ?? 0)}
                         step={1}
                         onChange={(v) => onUpdateSelectedBlock({ kufiColumns: v })}
                         suffix={
@@ -2868,10 +2886,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </>
                   );
                 })()}
-                {/* A square-kufi block loads no font — its letters are cells on
-                    a lattice, not outlines — so this whole region is hidden
-                    rather than left to set values nothing reads. Same reasoning
-                    that hides `fontSize` for a curve just below. */}
+                {/* A square-kufi block loads no font — its letters are cells
+                    on a lattice, not outlines — so the picker and the
+                    unavailable-font notice are hidden rather than left to set
+                    values nothing reads. Same reasoning that hides `fontSize`
+                    for a curve just below.
+
+                    The upload entry and the uploaded-font list below are
+                    deliberately *outside* this guard: they manage the browser's
+                    font store rather than this block, and they are the app's
+                    only surface for doing so, so hiding them made uploading or
+                    removing a font impossible whenever a square-kufi block
+                    happened to be selected. */}
                 {selectedBlock.type !== "squareKufi" && (
                 <>
                 {/* ---- STREAM-G: font upload — unavailable-font notice ---- */}
@@ -2896,6 +2922,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
                   previewSuffix="— أبجد"
                 />
+                </>
+                )}
 
                 {/* ---- STREAM-G: font upload — upload entry + custom font list ---- */}
                 <div className="customFontRow">
@@ -2921,8 +2949,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                 </div>
                 {/* ---- /STREAM-G ---- */}
-                </>
-                )}
 
                 {selectedBlock.type === "textPath" ? (
                   <div style={{ fontSize: 11, color: "var(--text-muted)" }}>

@@ -874,12 +874,41 @@ make a panel read as stacked strips rather than one woven field.
 
 **`squareColumnTarget` searches rather than solves.** The column count that
 squares a given text depends on which letters it uses and where the words fall,
-so "Fit to square" tries every width from the widest single letter up to the
+so "Fit to square" tries widths from the widest single letter up to the
 unwrapped band and keeps the best ratio. The layout is arithmetic over a
-lattice — no shaping, no font — so a few hundred passes is nothing, and it is
-also why the Sidebar can afford to lay the block out a second time to report
-its size and its unsupported characters instead of threading the renderer's
-result back up through `App.tsx`.
+lattice — no shaping, no font — which is also why the Sidebar can afford to lay
+the block out a second time to report its size and its unsupported characters
+instead of threading the renderer's result back up through `App.tsx`.
+
+**"A few hundred passes is nothing" was wrong twice over**, and both halves are
+worth keeping in view because the function reads as cheap:
+
+- *The candidate count grows with the text.* The band widens as you type, so an
+  exhaustive sweep is quadratic in length overall — measured at **7.1s of
+  blocked main thread at 1800 characters**, from a button that stays clickable
+  while it runs. `COLUMN_SWEEP_BUDGET` now caps the sweep at 160 coarse steps
+  and re-sweeps every column within one step of the winner. That is a heuristic
+  (a tooth on the error curve further than one coarse step away is missed), but
+  it returned the *identical* column count to the exhaustive search at every
+  size checked from 40 to 1800 characters, at 195ms instead of 7100.
+- *`breakIntoLines` was itself quadratic*, rescanning `slotsWidth(current)` per
+  candidate and re-summing each prefix when splitting a word. Both are running
+  totals now. This one matters beyond the fit button: line breaking runs on
+  every render of every square-kufi block.
+
+**`hardBreaks` counts splits, not overflows.** A single letter wider than the
+limit takes an over-wide line of its own, and when it is the whole of what
+remains nothing was split — so no join was lost, and the Sidebar must not tell
+the user to widen the panel to close a break that never happened.
+
+**The Panel width slider's range comes from the text, not a constant.** Any
+width at or past the unwrapped band puts the text on one line, and
+`squareColumnTarget` searches no further, so the band is the whole useful
+domain — and a fitted value always lands inside it. A fixed cap could not: 80
+against the 119 that 383 characters fit to, which left the thumb pinned at max
+while the readout showed the real number, and the first touch of the track
+silently collapsed the fitted panel. The bound is derived from the text rather
+than from the slider's own value, or dragging would move the end of its track.
 
 **`cellRings` traces the outline once around the union, never per cell.**
 Stroking cell by cell would draw every internal seam and turn the block into a

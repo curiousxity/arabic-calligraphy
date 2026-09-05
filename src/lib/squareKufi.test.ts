@@ -292,6 +292,16 @@ describe("layoutSquareKufi", () => {
     expect(l.cols).toBeLessThanOrEqual(6);
   });
 
+  it("reports no break when one over-wide letter is all that was left", () => {
+    // ط alone cannot fit a two-column limit, so it takes an over-wide line of
+    // its own — but nothing was *split*, so no join was lost and the Sidebar
+    // must not tell the user to widen the panel to close a break that never
+    // happened.
+    const l = layoutSquareKufi("ط", { columns: 2 });
+    expect(l.rows).toBeGreaterThan(0);
+    expect(l.hardBreaks).toBe(0);
+  });
+
   it("keeps a single letter wider than the limit rather than looping forever", () => {
     // ط is six cells wide; a two-column limit cannot hold it, and the honest
     // answer is an overwide line, not an empty grid or a hang.
@@ -318,6 +328,18 @@ describe("squareColumnTarget", () => {
 
   it("answers 0 for text with nothing to lay out", () => {
     expect(squareColumnTarget("")).toBe(0);
+  });
+
+  it("fits a long passage to a near-square panel without an exhaustive sweep", () => {
+    // The sweep is bounded (COLUMN_SWEEP_BUDGET) because it used to cost a
+    // layout per column — seconds of blocked main thread on a passage this
+    // long. The bound must not cost the answer: the panel still has to come
+    // out close to square.
+    const text = "الخط العربي جميل والكتابة فن رفيع في كل زمان ومكان ".repeat(12);
+    const columns = squareColumnTarget(text);
+    expect(columns).toBeGreaterThan(0);
+    const fitted = layoutSquareKufi(text, { columns });
+    expect(Math.abs(fitted.cols / fitted.rows - 1)).toBeLessThan(0.1);
   });
 
   it("never proposes a width narrower than the widest letter", () => {
