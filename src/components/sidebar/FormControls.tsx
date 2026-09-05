@@ -23,6 +23,9 @@ const SLIDER_DEFAULTS: Record<string, number> = {
   imageScale: 1,
   warpShapePadding: 24,
   warpShapeStrength: 1,
+  kufiColumns: 0,
+  kufiLineGap: 2,
+  kufiWordGap: 3,
 };
 
 export const SelectRow = ({

@@ -123,10 +123,47 @@ export async function inkPixels(page: Page, box?: Box): Promise<number> {
   );
 }
 
-/** Types into the Content panel's textarea and waits for the block to catch up. */
-export async function setBlockText(page: Page, text: string): Promise<void> {
+/**
+ * Drops a block that is waiting to be placed, at a fraction of the stage.
+ *
+ * Every add-block button starts a follow-the-cursor placement rather than
+ * committing straight away, so a spec that only clicks the button has added
+ * nothing yet. The `move` before the click is what the app tracks; without it
+ * the block commits wherever the pointer happened to already be.
+ */
+export async function placeAtCanvas(page: Page, fx: number, fy: number): Promise<void> {
+  const pt = await page.evaluate(
+    ({ fx, fy }) => {
+      const c = window.__HARF__!.getStage()!.container().getBoundingClientRect();
+      return { x: c.left + c.width * fx, y: c.top + c.height * fy };
+    },
+    { fx, fy }
+  );
+  await page.mouse.move(pt.x, pt.y);
+  await page.mouse.click(pt.x, pt.y);
+}
+
+/**
+ * Types into the Content panel's textarea and waits for the block to catch up.
+ *
+ * `blockId` names which block to wait on; it defaults to the first, which is
+ * the starter block most specs are editing. A spec that has *added* a block is
+ * editing the selection, not block 0, and without this would poll the starter
+ * block's unchanged text until it timed out.
+ */
+export async function setBlockText(
+  page: Page,
+  text: string,
+  blockId?: number
+): Promise<void> {
   await page.locator("textarea.sidebarTextarea").fill(text);
-  await expect.poll(async () => (await getBlocks(page))[0]?.text).toBe(text);
+  await expect
+    .poll(async () => {
+      const blocks = await getBlocks(page);
+      return (blockId === undefined ? blocks[0] : blocks.find((b) => b.id === blockId))
+        ?.text;
+    })
+    .toBe(text);
 }
 
 /** Centre points of every currently-mounted draggable handle dot, in page space. */

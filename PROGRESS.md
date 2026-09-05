@@ -80,6 +80,31 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-09-05 — Square kufi
+
+A sixth block type: **Square Kufi**, the block's text set as strokes on a
+lattice — الكوفي المربع, the hand worked into brick and tile. Add it from Block
+Controls, type Arabic into Content as with any block, and press **Fit to
+square** to wrap the run into the panel the style is named for; Panel width,
+Line gap and Word gap are the three spacing dials. It mirrors and makes
+medallions like any other block, and because the whole composition is one
+merged shape, an outline or a metallic gradient runs across the panel rather
+than letter by letter.
+
+It is the only block type that **loads no font**: a square-kufi letter is its
+cells, so `lib/squareKufiAlphabet.ts` is a hand-authored table of every letter
+in every joining form and there is nothing to shape. Typography's font picker
+is hidden for the type accordingly. The alphabet's structural rules — one
+connected stroke, never two cells thick, join ink where each form claims a join
+— are asserted over every form in `squareKufi.test.ts` rather than eyeballed;
+`e2e/square-kufi.spec.ts` drives the feature through the sidebar. See CLAUDE.md,
+"Square kufi", for the two conventions the alphabet commits to and why.
+
+**Dots and tashkeel are not drawn**, matching the style, so ب/ت/ث share one
+shape. That is deliberate and is recorded under CLAUDE.md's Deferred features
+alongside hand-editing individual cells and the boustrophedon/spiral
+compositions, neither of which is built.
+
 ### 2026-08-21 — Diacritic detection: two more fonts, and the dots it was flagging
 
 `findDiacriticGlyphIndices` gains the shaped text as a third argument and

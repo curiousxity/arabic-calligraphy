@@ -1,4 +1,10 @@
-export type BlockType = "text" | "shapeFill" | "image" | "textPath" | "mirror";
+export type BlockType =
+  | "text"
+  | "shapeFill"
+  | "image"
+  | "textPath"
+  | "mirror"
+  | "squareKufi";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 
@@ -204,4 +210,34 @@ export type MirrorBlock = BlockCommon & {
   radialRadius?: number;
 };
 
-export type Block = TextBlock | ShapeFillBlock | ImageBlock | TextPathBlock | MirrorBlock;
+/**
+ * Square kufi (كوفي مربع): the block's text drawn as strokes on a lattice
+ * rather than as shaped glyph outlines.
+ *
+ * It is the one block type that loads no font — a square-kufi letter *is* its
+ * cells, so `fontFamily` is inert here (as `fontSize` already is on a curve),
+ * and `fontSize` is read only for how large one lattice cell comes out. The
+ * layout, the alphabet and the reasoning behind both live in
+ * `lib/squareKufi.ts` and `lib/squareKufiAlphabet.ts`.
+ *
+ * The three dials below are spacing, not grammar: stroke width and the gap
+ * between two joined letters are fixed at one cell, which is what square kufi
+ * *is*. `columns` is what turns a running band into a square panel.
+ */
+export type SquareKufiBlock = BlockCommon & {
+  type: "squareKufi";
+  /** Wrap width in cells. 0 or absent runs the text as one unbroken band. */
+  kufiColumns?: number;
+  /** Blank lattice rows between wrapped lines. */
+  kufiLineGap?: number;
+  /** Blank lattice columns between two words. */
+  kufiWordGap?: number;
+};
+
+export type Block =
+  | TextBlock
+  | ShapeFillBlock
+  | ImageBlock
+  | TextPathBlock
+  | MirrorBlock
+  | SquareKufiBlock;

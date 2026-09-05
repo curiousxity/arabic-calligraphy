@@ -814,6 +814,95 @@ kashida moves every cut after it. `setKashidaAtSlot` remaps them
 `pushHistory()` still covers the edit and a stretch is not silently dropped by
 the `glyphId` checksum because an unrelated join was widened.
 
+### Square kufi (`src/lib/squareKufi.ts`, `squareKufiAlphabet.ts`, `SquareKufiText.tsx`)
+
+A sixth `Block` variant, `squareKufi`: the block's text set as strokes on a
+lattice — الكوفي المربع, the hand worked into brick and tile. It is the one
+block type that **loads no font at all**, and that is the fact the whole design
+turns on. In square kufi a letter *is* its cells; there is no outline to fetch,
+so the pipeline is `text → joining forms → boxes → cells → one traced outline`,
+with no HarfBuzz, no `useShapedGlyphs`, and none of the per-glyph loops the
+other four renderers are built around. `SquareKufiText.tsx` is the shortest
+renderer here for that structural reason, not because it is unfinished.
+
+`fontFamily` is therefore inert and its picker is hidden in Typography (with
+the font-upload row and the missing-font notice, which are the same machinery),
+the way `fontSize` is already hidden for a curve. `fontSize` *is* read, but only
+through `kufiCellSize` — `fontSize / KUFI_CELLS_PER_EM`, eight cells to the em,
+chosen so a square-kufi alef (seven cells) stands about as tall as a shaped one
+at the same size. That is what lets the existing size slider work with no new
+field.
+
+**The alphabet is the feature.** `squareKufiAlphabet.ts` is a hand-authored
+table: every letter, in every joining form, as rows of `#`. Two conventions in
+it are load-bearing, and both were choices between coherent alternatives:
+
+- **Every join is on the baseline.** Real cursive Arabic joins jeem to the
+  previous letter at the top of its head; published square-kufi alphabets go
+  both ways. Normalising every join to the baseline row is what lets a join be
+  a plain run of baseline cells (the `bridgeAfter` loop in `layoutSquareKufi`)
+  instead of a stepped path whose corner has to be reasoned about per letter
+  *pair* — 30-odd letters squared. So a form's `joinsRight`/`joinsLeft` is a
+  claim about ink at the **baseline row's own end column**, and
+  `squareKufi.test.ts` asserts that of every form rather than trusting the
+  table. Breaking that claim does not crash; it detaches one letter from the
+  next, which is the kind of defect that reads as a font bug.
+- **No dots and no tashkeel.** Traditional square kufi omits the iʿjām
+  entirely, which is why ب/ت/ث are one skeleton here and not three. This is not
+  a stub: a dot is a cell, and a cell beside a letter in a lattice this tight
+  reads as part of the letter, so drawing them is a real design problem that
+  would also have to widen the letters' advances to keep two neighbours' dots
+  from merging. Deferred rather than half-done.
+
+The table is checked structurally rather than by eye. `squareKufi.test.ts`
+asserts over **every** skeleton and form that the box is rectangular and
+non-empty, that the ink is 4-connected (a letterform in two pieces is a
+floating fragment — there is no second pen lift in this hand), that **no 2×2
+block of ink exists** (stroke = gap = one unit is the entire grammar; a 2×2 is
+a stroke at double weight), and the join-ink rule above. Those four are what
+make adding a letter safe.
+
+**`base` is measured downward.** A form's `base` is how many rows its box hangs
+*below* the baseline — 1 for the tails of ر, و, م and ج, negative to float ء
+above the line. So `baselineRowIndex = rows.length - 1 - base` and
+`formAscent = rows.length - base`. Getting the sign backwards puts the join row
+outside the box, which the join-ink test then catches.
+
+**One ascent and one descent for the whole block**, not per line, so every
+wrapped line's baseline lands on the same lattice rows. Per-line metrics would
+make a panel read as stacked strips rather than one woven field.
+
+**`squareColumnTarget` searches rather than solves.** The column count that
+squares a given text depends on which letters it uses and where the words fall,
+so "Fit to square" tries every width from the widest single letter up to the
+unwrapped band and keeps the best ratio. The layout is arithmetic over a
+lattice — no shaping, no font — so a few hundred passes is nothing, and it is
+also why the Sidebar can afford to lay the block out a second time to report
+its size and its unsupported characters instead of threading the renderer's
+result back up through `App.tsx`.
+
+**`cellRings` traces the outline once around the union, never per cell.**
+Stroking cell by cell would draw every internal seam and turn the block into a
+visible grid. Each filled cell contributes only the edges it does not share
+with another, wound so the material is on the edge's right in screen
+coordinates — which makes outer rings clockwise and **holes counter-clockwise**,
+so an ordinary nonzero `fill()` empties the counters of ه and ص with no
+even-odd flag to push through Konva's context wrapper. In screen coordinates
+(y down) a clockwise ring gives a *positive* shoelace sum, the opposite of the
+textbook reading; the test says so rather than re-deriving it.
+
+Everything else is ordinary. The block takes `fill` through
+`createBlockFillPainter` like the rest (nothing here draws under a transform of
+its own, so the painter's block-space dance is a no-op — but building it over
+the whole grid is what makes one gradient sweep the composition rather than
+each letter), draws its outline before its fill for the reason recorded above,
+and mirrors through `MirrorBlockView` like any other type. Per-glyph tools do
+not apply and are not gated against: they key off shaped glyph indices, which
+this block has none of.
+
+Deliberately out of scope: dots, tashkeel, hand-editing individual cells,
+boustrophedon and spiral compositions, and Latin.
+
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
 A fourth block type, `textPath`, flows shaped text along an arbitrary curve
@@ -1240,9 +1329,9 @@ Two naming rules in the `selected` tier are worth knowing before adding a
 panel there:
 
 - **The *type panel* is named after the block type** — `Shape Fill`,
-  `Curve`, `Image` — and holds only what is specific to it (a Shape Fill
-  block's scale/spacing/rotation rows, a Curve block's preset and pen-tool
-  controls). It renders directly under Content, above the
+  `Curve`, `Image`, `Square Kufi` — and holds only what is specific to it (a
+  Shape Fill block's scale/spacing/rotation rows, a Curve block's preset and
+  pen-tool controls, a Square Kufi block's panel width and gaps). It renders directly under Content, above the
   shared panels, because for those types it is the panel that matters
   most. A plain text block has no type panel; its controls are the shared
   ones.
@@ -1277,8 +1366,9 @@ deliberate action and a second confirmation on top was redundant
 friction.
 
 **Block Controls is three labelled groups on fixed grids**, not one
-wrapping row. `Add` (text, shape fill, curved text, image, ornament, mirror,
-medallion) sits on a 4-column grid; `Selected` (duplicate, delete) and
+wrapping row. `Add` (text, shape fill, curved text, square kufi, image,
+ornament, mirror, medallion) sits on a 4-column grid, which the eight buttons
+now fill exactly two rows of; `Selected` (duplicate, delete) and
 `History` (undo, redo, history) share a line below it. The row this replaced
 was a centred `flex-wrap` of twelve identical chips, which at the sidebar's
 own width wrapped **8 / 1 / 3** — stranding the ornament button alone on a
@@ -1878,6 +1968,22 @@ These are capabilities that have been explicitly identified as valuable but deli
   be evaluated together with that one rather than separately.
 
 - **Per-glyph rotation** — The move/scale handles cover translation and axis-aligned scale only. Rotation needs a fourth handle and its own pivot decision.
+
+- **Dots and tashkeel in square kufi** — Deliberately undrawn, matching the
+  style; see the square-kufi section above for why it is a design problem
+  rather than a missing loop. Doing it means a dot cell, a placement band clear
+  of the letter, and widening a letter's advance so two neighbours' dots cannot
+  merge into one blob.
+
+- **Hand-editing square-kufi cells** — Painting individual cells on top of the
+  generated grid, which is how a calligrapher actually finishes a panel. The
+  layout already produces a plain `boolean[]`, so the data side is trivial; the
+  work is an on-canvas cell overlay and deciding how a hand edit survives a text
+  change, which is the same keying problem `GlyphTransform` records.
+
+- **Boustrophedon and spiral square-kufi compositions** — Classic panels snake
+  back on alternate lines or spiral inward from the edge. `breakIntoLines`
+  produces plain lines of slots, so the placement pass is where this would go.
 
 - **Image trace** — Auto-tracing a raster image into a silhouette shape existed on Shape Warp blocks and was removed with that block type. Rebuilding it for Shape Fill means restoring `lib/imageTrace.ts`, `ImageTraceDialog.tsx`, and the `imagetracerjs` dependency from git history; the tracing itself was block-type agnostic, producing the same `{ pathData, w, h }` shape `extractSvgPaths` returns.
 

@@ -4,6 +4,7 @@ import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
+import { SquareKufiText } from "./SquareKufiText";
 import { ImageBlockView } from "./ImageBlockView";
 import { radialCopyTransforms, type MirrorSource } from "../lib/mirror";
 import type { MirrorMode } from "../types";
@@ -143,6 +144,16 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
           shapeFillTextRotation={source.shapeFillTextRotation ?? 0}
           diacriticOverrides={source.diacriticOverrides ?? []}
           diacriticEditMode={false}
+        />
+      );
+    }
+    if (source.type === "squareKufi") {
+      return (
+        <SquareKufiText
+          {...typographic}
+          kufiColumns={source.kufiColumns}
+          kufiLineGap={source.kufiLineGap}
+          kufiWordGap={source.kufiWordGap}
         />
       );
     }

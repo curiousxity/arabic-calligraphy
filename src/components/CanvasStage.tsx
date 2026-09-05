@@ -4,6 +4,7 @@ import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
+import { SquareKufiText } from "./SquareKufiText";
 import { TextPathEditOverlay } from "./TextPathEditOverlay";
 import { ImageBlockView } from "./ImageBlockView";
 // STREAM-B (muthanna/radial): the file has no anchored import region, so
@@ -931,6 +932,34 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onToggleDiacriticHidden={(glyphIndex) => onToggleDiacriticHidden(block.id, glyphIndex)}
                     locked={block.locked}
                     debugBounds={false}
+                  />
+                );
+              }
+
+              if (block.type === "squareKufi") {
+                return (
+                  <SquareKufiText
+                    key={block.id}
+                    {...commonProps}
+                    text={block.text}
+                    x={block.x}
+                    y={block.y}
+                    fontSize={block.fontSize}
+                    color={block.color}
+                    fill={block.fill}
+                    opacity={block.opacity ?? 1}
+                    stroke={block.stroke}
+                    strokeWidth={block.strokeWidth ?? 0}
+                    shadowColor={block.shadowColor}
+                    shadowBlur={block.shadowBlur ?? 0}
+                    shadowOffsetX={block.shadowOffsetX ?? 0}
+                    shadowOffsetY={block.shadowOffsetY ?? 0}
+                    shadowOpacity={block.shadowOpacity ?? 0.35}
+                    rotation={block.rotation ?? 0}
+                    kufiColumns={block.kufiColumns}
+                    kufiLineGap={block.kufiLineGap}
+                    kufiWordGap={block.kufiWordGap}
+                    locked={block.locked}
                   />
                 );
               }

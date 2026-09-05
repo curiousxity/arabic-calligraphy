@@ -20,8 +20,8 @@ own rules, and ligatures fuse where the font says they should.
   canvas
 - 17 bundled faces across Naskh, Thuluth, Kufi, Diwani, Ruq'ah, Nastaliq and
   more
-- Four block types: plain text, text on an arbitrary curve, text poured into
-  an SVG silhouette, and images
+- Five block types: plain text, text on an arbitrary curve, text poured into
+  an SVG silhouette, square kufi woven on a grid, and images
 - An on-screen Arabic keyboard, plus one-tap insertion of harakat, honorific
   symbols and Urdu/Farsi letters
 

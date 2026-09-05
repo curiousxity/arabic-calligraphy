@@ -112,6 +112,7 @@ import {
   hasOrphanedMirrors,
   isMirrorSourceCandidate,
 } from "./lib/mirror";
+import { squareColumnTarget, DEFAULT_KUFI_OPTIONS } from "./lib/squareKufi";
 import type { MirrorMode } from "./types";
 import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
@@ -1757,6 +1758,58 @@ const App: React.FC = () => {
     );
   };
 
+  /**
+   * A square-kufi block. It opens as a running band (`kufiColumns: 0`) rather
+   * than as a panel: the wrap width that squares a given text is not something
+   * to guess on the user's behalf, and "Fit to square" below computes it once
+   * the text is theirs.
+   */
+  const addSquareKufiBlock = () => {
+    const newId = createNextId();
+    const width = 320;
+    const height = 160;
+
+    beginPlacement(
+      {
+        ...DEFAULT_BLOCK,
+        id: newId,
+        text: "كوفي مربع",
+        type: "squareKufi",
+        kufiColumns: 0,
+        kufiLineGap: DEFAULT_KUFI_OPTIONS.lineGap,
+        kufiWordGap: DEFAULT_KUFI_OPTIONS.wordGap,
+        x: 0,
+        y: 0,
+      },
+      width,
+      height,
+      -width / 2,
+      -height / 2,
+      "New Square Kufi"
+    );
+  };
+
+  /**
+   * Wrap the selected square-kufi block to the width whose panel comes out
+   * closest to square — the composition the style is named for.
+   *
+   * Skips the write when the answer is what the block already carries, so
+   * clicking it twice costs one undo step rather than two. That is the same
+   * no-op rule `fitSelectedBlockToWidth` follows beside it; unlike that one
+   * this is synchronous, the solver being plain arithmetic over a lattice
+   * rather than a font measurement, so there is no captured-by-id hazard here.
+   */
+  const fitSelectedKufiToSquare = useCallback(() => {
+    const block = selectedBlock;
+    if (!block || block.type !== "squareKufi") return;
+    const columns = squareColumnTarget(block.text, {
+      lineGap: block.kufiLineGap,
+      wordGap: block.kufiWordGap,
+    });
+    if (columns <= 0 || columns === (block.kufiColumns ?? 0)) return;
+    updateSelectedBlock({ kufiColumns: columns });
+  }, [selectedBlock, updateSelectedBlock]);
+
   const addImageBlock = (dataUrl: string, naturalWidth: number, naturalHeight: number) => {
     const newId = createNextId();
     const maxDim = (Math.max(canvasWidth, stageViewportHeight) / stageScale) * 0.6;
@@ -2652,6 +2705,8 @@ const App: React.FC = () => {
         onDeleteNamedProject={requestDeleteNamedProject}
         onAddShapeFillBlock={addShapeFillBlock}
         onAddTextPathBlock={addTextPathBlock}
+        onAddSquareKufiBlock={addSquareKufiBlock}
+        onFitKufiToSquare={fitSelectedKufiToSquare}
         onAddImageBlock={uploadImageBlock}
         onGenerateFromTemplate={generateFromTemplate}
         onRandomizeLayout={randomizeLayout}

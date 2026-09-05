@@ -6,6 +6,7 @@ import {
   gotoApp,
   inkPixels,
   openPanel,
+  placeAtCanvas,
 } from "./harf";
 
 const STAGE_CANVAS = ".konvajs-content canvas";
@@ -53,18 +54,6 @@ async function distinctColors(
  * A new block follows the cursor until a click drops it (`beginPlacement` in
  * App.tsx), so adding one is always two steps.
  */
-async function placeAtCanvas(page: Page, fx: number, fy: number) {
-  const pt = await page.evaluate(
-    ({ fx, fy }) => {
-      const c = window.__HARF__!.getStage()!.container().getBoundingClientRect();
-      return { x: c.left + c.width * fx, y: c.top + c.height * fy };
-    },
-    { fx, fy }
-  );
-  await page.mouse.move(pt.x, pt.y);
-  await page.mouse.click(pt.x, pt.y);
-}
-
 /** A page-space box in the top-left corner of the stage, clear of the text. */
 async function paperCorner(page: Page) {
   return page.evaluate(() => {

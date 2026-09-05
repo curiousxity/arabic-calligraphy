@@ -40,6 +40,7 @@ import {
   TATWEEL,
   type KashidaSlot,
 } from "../lib/tatweel";
+import { layoutSquareKufi, DEFAULT_KUFI_OPTIONS } from "../lib/squareKufi";
 import {
   TrashIcon,
   CopyIcon,
@@ -216,6 +217,9 @@ export type SidebarProps = {
 
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddTextPathBlock?: () => void;
+  onAddSquareKufiBlock?: () => void;
+  /** Wrap the selected square-kufi block to the width closest to square. */
+  onFitKufiToSquare?: () => void;
   onAddImageBlock?: () => void;
   onGenerateFromTemplate?: (templateId: string, values: string[]) => void;
   onRandomizeLayout?: () => void;
@@ -458,6 +462,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onChangeSaveDestination,
   onAddShapeFillBlock,
   onAddTextPathBlock,
+  onAddSquareKufiBlock,
+  onFitKufiToSquare,
   onAddImageBlock,
   onGenerateFromTemplate,
   onRandomizeLayout,
@@ -1702,6 +1708,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               )}
 
+              {onAddSquareKufiBlock && (
+                <button
+                  type="button"
+                  className="sidebarCircleButton"
+                  title="Add square kufi — text woven on a grid"
+                  aria-label="Add square kufi"
+                  onClick={onAddSquareKufiBlock}
+                >
+                  {/* Inline rather than an entry in Icons.tsx, matching the
+                      mirror and medallion buttons below. */}
+                  <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
+                    <path
+                      d="M2 2h12v2H6v2h6v2H8v2h6v4H2v-2h4v-2H2V8h4V6H2z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+              )}
+
               {onAddImageBlock && (
                 <button
                   type="button"
@@ -2237,6 +2262,115 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
+        {selectedBlock && selectedBlock.type === "squareKufi" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection
+              title="Square Kufi"
+              isOpen={showText}
+              onToggle={() => setShowText((v) => !v)}
+            >
+              <div className="sectionPanel">
+                {(() => {
+                  // Laid out here as well as in the renderer. It is pure
+                  // arithmetic over a lattice — no shaping, no font — so a
+                  // second pass is cheaper than threading the renderer's
+                  // result back up through App.tsx, and it is what lets the
+                  // panel report its own size and say what it could not draw.
+                  const layout = layoutSquareKufi(selectedBlock.text, {
+                    columns: selectedBlock.kufiColumns,
+                    lineGap: selectedBlock.kufiLineGap,
+                    wordGap: selectedBlock.kufiWordGap,
+                  });
+                  const missing = Array.from(new Set(layout.unsupported));
+                  return (
+                    <>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                        Every stroke is one cell wide and every gap one cell —
+                        that grammar is what square kufi is, so it is fixed. The
+                        dials below are spacing. Dots and tashkeel are not
+                        drawn, as the style has always left them out.
+                      </div>
+
+                      <div className="field">
+                        <span className="fieldTitle">Panel</span>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <button
+                            type="button"
+                            className="sidebarPillButton"
+                            onClick={onFitKufiToSquare}
+                            disabled={!onFitKufiToSquare || layout.cols === 0}
+                            title="Wrap the text to the width that comes out closest to square"
+                          >
+                            Fit to square
+                          </button>
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                          {layout.cols === 0
+                            ? "Nothing to draw yet — type Arabic text under Content."
+                            : `${layout.cols} × ${layout.rows} cells.`}
+                          {layout.hardBreaks > 0 &&
+                            " A word was too wide for the panel and had to be split, so its join across the break is lost — widen the panel to close it up."}
+                        </div>
+                      </div>
+
+                      <RangeRow
+                        id={makeId("kufi-columns", selectedId)}
+                        name={makeId("kufiColumns", selectedId)}
+                        label="Panel width"
+                        value={selectedBlock.kufiColumns ?? 0}
+                        min={0}
+                        max={80}
+                        step={1}
+                        onChange={(v) => onUpdateSelectedBlock({ kufiColumns: v })}
+                        suffix={
+                          (selectedBlock.kufiColumns ?? 0) === 0
+                            ? "one line"
+                            : `${selectedBlock.kufiColumns} cells`
+                        }
+                        fieldKey="kufiColumns"
+                      />
+
+                      <RangeRow
+                        id={makeId("kufi-line-gap", selectedId)}
+                        name={makeId("kufiLineGap", selectedId)}
+                        label="Line gap"
+                        value={selectedBlock.kufiLineGap ?? DEFAULT_KUFI_OPTIONS.lineGap}
+                        min={1}
+                        max={8}
+                        step={1}
+                        onChange={(v) => onUpdateSelectedBlock({ kufiLineGap: v })}
+                        suffix="cells"
+                        fieldKey="kufiLineGap"
+                      />
+
+                      <RangeRow
+                        id={makeId("kufi-word-gap", selectedId)}
+                        name={makeId("kufiWordGap", selectedId)}
+                        label="Word gap"
+                        value={selectedBlock.kufiWordGap ?? DEFAULT_KUFI_OPTIONS.wordGap}
+                        min={1}
+                        max={10}
+                        step={1}
+                        onChange={(v) => onUpdateSelectedBlock({ kufiWordGap: v })}
+                        suffix="cells"
+                        fieldKey="kufiWordGap"
+                      />
+
+                      {missing.length > 0 && (
+                        <div className="fontMissingNotice" role="status">
+                          Left out of the grid: {missing.join(" ")}. The square-kufi
+                          alphabet covers Arabic letters only — digits, Latin and
+                          punctuation have no square form here.
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
         {selectedBlock && selectedBlock.type === "shapeFill" && (
           <div className="sidebarPanel">
             <CollapsibleSection
@@ -2543,7 +2677,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     selected slot (which lives in App.tsx). Written as an IIFE
                     rather than a helper component because this stream owns
                     only the region between these two anchors. */}
-                {(() => {
+                {selectedBlock.type !== "squareKufi" && (() => {
                   const slots = findKashidaSlots(selectedBlock.text);
                   if (slots.length === 0) {
                     return (
@@ -2734,6 +2868,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </>
                   );
                 })()}
+                {/* A square-kufi block loads no font — its letters are cells on
+                    a lattice, not outlines — so this whole region is hidden
+                    rather than left to set values nothing reads. Same reasoning
+                    that hides `fontSize` for a curve just below. */}
+                {selectedBlock.type !== "squareKufi" && (
+                <>
                 {/* ---- STREAM-G: font upload — unavailable-font notice ---- */}
                 {missingFontKey && (
                   <div className="fontMissingNotice" role="status">
@@ -2781,6 +2921,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                 </div>
                 {/* ---- /STREAM-G ---- */}
+                </>
+                )}
 
                 {selectedBlock.type === "textPath" ? (
                   <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
