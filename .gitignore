@@ -37,3 +37,10 @@ src/data/strokeSpines/*-sheet.png
 /test-results/
 /blob-report/
 /playwright/.cache/
+
+# Agent worktrees. The harness creates a nested git worktree here when a
+# subagent is given its own isolated checkout; it is another working tree,
+# not project content, and committing it would vendor a second copy of the
+# repo. Scoped to `worktrees/` rather than all of `.claude/`, which is where
+# repo-level skills would legitimately live.
+/.claude/worktrees/
