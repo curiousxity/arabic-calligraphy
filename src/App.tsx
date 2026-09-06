@@ -116,7 +116,10 @@ import {
   squareColumnTarget,
   layoutSquareKufi,
   kufiCellSize,
+  kufiOptionsFor,
+  upsertCellEdit,
   DEFAULT_KUFI_OPTIONS,
+  type KufiCellEdit,
 } from "./lib/squareKufi";
 import type { MirrorMode } from "./types";
 import { applyKashida, type KashidaSlot } from "./lib/tatweel";
@@ -240,6 +243,17 @@ const supportsGlyphTransforms = (b: Block): b is Extract<Block, { type: "text" }
  */
 const supportsStrokeCuts = (b: Block): b is Extract<Block, { type: "text" }> =>
   b.type === "text";
+
+/**
+ * Square-kufi blocks only — the fields live on `SquareKufiBlock` rather than
+ * on `BlockCommon`, so this is the guard that makes the mutators below
+ * type-check against the one variant that can draw a cell. The trap it avoids
+ * is the one CLAUDE.md records against `supportsDiacriticOverrides`: a guard
+ * that accepts a block whose renderer ignores the field discards every edit
+ * silently.
+ */
+const supportsKufiCellEdits = (b: Block): b is Extract<Block, { type: "squareKufi" }> =>
+  b.type === "squareKufi";
 
 const STORAGE_KEY = "calligraphy-layout-v2";
 const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
@@ -744,6 +758,42 @@ const App: React.FC = () => {
       );
     },
     [pushHistory]
+  );
+
+  /**
+   * One `pushHistory()` for a whole painting stroke, taken on mousedown.
+   *
+   * The write below deliberately pushes none of its own: `updateBlock` and
+   * `updateSelectedBlock` both push unconditionally, so routing paint through
+   * either would leave one undo entry per *cell* — a fifty-cell drag costing
+   * fifty presses of Ctrl+Z to undo.
+   */
+  const beginKufiCellEdit = useCallback(() => {
+    pushHistory();
+  }, [pushHistory]);
+
+  /**
+   * Paint or erase one cell. `setBlocks` directly, no history — see
+   * `beginKufiCellEdit` above.
+   *
+   * `generatedOn` comes from the overlay, which already holds the un-composed
+   * layout; it is what makes a cell painted back to what the alphabet draws a
+   * *removal* rather than a stored no-op (`upsertCellEdit` owns that rule, the
+   * same one `setStrokeCut` follows for a zero-nuqta cut).
+   */
+  const setKufiCell = useCallback(
+    (blockId: number, edit: KufiCellEdit, generatedOn: boolean) => {
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || !supportsKufiCellEdits(b)) return b;
+          return {
+            ...b,
+            kufiCellEdits: upsertCellEdit(b.kufiCellEdits ?? [], edit, generatedOn),
+          };
+        })
+      );
+    },
+    []
   );
 
   const fitShapeFillSpacing = useCallback(
@@ -1782,11 +1832,14 @@ const App: React.FC = () => {
     // is pure lattice arithmetic with no font to load, which is what makes
     // measuring it here as cheap as the constants it replaces.
     const cell = kufiCellSize(DEFAULT_BLOCK.fontSize);
-    const preview = layoutSquareKufi(SQUARE_KUFI_DEFAULT_TEXT, {
-      columns: 0,
-      lineGap: DEFAULT_KUFI_OPTIONS.lineGap,
-      wordGap: DEFAULT_KUFI_OPTIONS.wordGap,
-    });
+    const preview = layoutSquareKufi(
+      SQUARE_KUFI_DEFAULT_TEXT,
+      kufiOptionsFor({
+        kufiColumns: 0,
+        kufiLineGap: DEFAULT_KUFI_OPTIONS.lineGap,
+        kufiWordGap: DEFAULT_KUFI_OPTIONS.wordGap,
+      })
+    );
     const width = Math.max(preview.cols * cell, cell);
     const height = Math.max(preview.rows * cell, cell);
 
@@ -1823,9 +1876,12 @@ const App: React.FC = () => {
   const fitSelectedKufiToSquare = useCallback(() => {
     const block = selectedBlock;
     if (!block || block.type !== "squareKufi") return;
+    // Through the shared helper like every other layout call, minus the wrap
+    // width the search is choosing. Hand edits composite *after* layout and
+    // feed nothing back, so the fit is unaffected by them.
     const columns = squareColumnTarget(block.text, {
-      lineGap: block.kufiLineGap,
-      wordGap: block.kufiWordGap,
+      ...kufiOptionsFor(block),
+      columns: 0,
     });
     if (columns <= 0 || columns === (block.kufiColumns ?? 0)) return;
     updateSelectedBlock({ kufiColumns: columns });
@@ -2832,6 +2888,8 @@ const App: React.FC = () => {
           onSelectBlock={selectBlock}
           onEditBlock={requestTextEdit}
           onUpdateTextPathD={updateTextPathD}
+          onBeginKufiCellEdit={beginKufiCellEdit}
+          onSetKufiCell={setKufiCell}
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
           onUpdateGlyphTransform={updateGlyphTransform}

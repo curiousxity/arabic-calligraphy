@@ -929,8 +929,101 @@ and mirrors through `MirrorBlockView` like any other type. Per-glyph tools do
 not apply and are not gated against: they key off shaped glyph indices, which
 this block has none of.
 
-Deliberately out of scope: dots, tashkeel, hand-editing individual cells,
-boustrophedon and spiral compositions, and Latin.
+Deliberately out of scope: dots, tashkeel, boustrophedon and spiral
+compositions, and Latin.
+
+#### Hand-painted cells (`KufiCellEditOverlay.tsx`)
+
+Ticking **Paint cells** in the Square Kufi panel puts a lattice over the block:
+click or drag to fill cells, click ink to cut it away. This is how a
+calligrapher actually finishes a panel, and it is cheap here for the same
+structural reason the block type is — no font, no shaping, no coordinate
+adapters, no async.
+
+- **An edit is anchored to a letter, never to the grid.** `ascent`/`descent`
+  are block-wide, `cols` is `Math.max(opts.columns, ...lineWidths)`, and every
+  line is laid flush right from `cursor = cols` — so nearly every text edit,
+  and the Panel width, Line gap, Word gap and Fit-to-square controls too, move
+  every absolute coordinate in the panel. `KufiCellEdit` is therefore
+  `{ unitIndex, unitKey?, dx, dy, on }`, with `dx`/`dy` in cells from the
+  letter's own placed box.
+- **`dy` is measured from the baseline row, not the box top.** The box top is
+  `lineTop + (ascent - formAscent(form))`, which moves whenever the form
+  changes height even though the letter has not.
+- **`unitKey` fingerprints the resolved `KufiForm`** (`rows.join("|")|base`),
+  not `skeleton:form`. `squareKufiAlphabet.ts`'s `all()` gives feh, heh and tah
+  one `KufiForm` across all four joining forms and `TOOTH_INITIAL`/
+  `TOOTH_MEDIAL` are shared objects across beh, noon and yeh — so typing the
+  next letter of a word can change the *requested* form while the drawn box is
+  literally the same object, and a `skeleton:form` key would throw the user's
+  edits away on that keystroke. It is the faithful analogue of `glyphId`:
+  identity of what is drawn. And like `glyphId` it is **optional** — an edit
+  carrying none still applies, rather than being dropped as unverifiable.
+- **Placements are emitted from inside the existing `lines.forEach`**, in the
+  same pass that writes the cells, and are **gated behind
+  `layoutSquareKufi`'s third argument**. Both halves matter: a second pass over
+  the same arithmetic type-checks perfectly and lands every edit a cell or two
+  off, and `squareColumnTarget` re-lays the text ~160 times per Fit press —
+  per-unit allocation across that sweep is exactly the cliff this function has
+  already been wrong about twice.
+- **Which letter owns a cell: the nearest one.** That is the maintainer's
+  chosen rule, decided on this feature rather than defaulted into. Distance is
+  measured to the nearest point of the letter's *box*, not to its centre, so a
+  cell just outside a wide letter belongs to it rather than to a small letter
+  whose centre is nearer; a cell inside a box is at distance 0, which is why no
+  separate containing-box stage exists. Ties go to the lower `unitIndex`, never
+  to emission order. It lives alone in `resolveCellOwner` because it decides
+  where a cell painted out in the blank field travels on rewrap — provisional
+  in the sense that it is worth re-judging on a real panel, and one function to
+  change if it is.
+- **`KUFI_EDIT_REACH` (8 cells) bounds the anchor**, because nearest-letter
+  ownership without a bound would tie a cell dropped in an empty corner to a
+  letter half a panel away and then move it with that letter. Out-of-reach is
+  refused at the point of painting *and* counted as dropped when resolving.
+- **The composed grid can start at a negative origin**, and
+  `SquareKufiText` puts `originX * cell` / `originY * cell` on **both the hit
+  `Rect` and the `Shape`**, drawing at plain `cx * cell` in that shifted frame.
+  Keeping the nodes at 0,0 and offsetting only the draw calls leaves Konva's
+  self-rect excluding the grown ink, and `exportBox`, `buildSnapTargets`, Align
+  & Arrange and `MirrorBlockView`'s settle loop then all silently under-report
+  — cells cropped out of every PNG on a freeform document. `e2e/square-kufi.spec.ts`
+  pins it by asserting the client box grows *upward* after a cell is painted
+  above the panel; that assertion was verified to fail with the offset removed.
+- **The overlay is one hit `Rect`, one lattice `Shape` and one highlight**,
+  never a node per cell — a padded 60×60 panel is thousands of listening
+  nodes. It also means the Konva `mouseleave`/`compareShape` race the three
+  hover-handle overlays fight structurally cannot happen here: nothing is
+  hover-*mounted*, so there is no sibling for the pointer to retarget onto.
+  Don't reintroduce per-cell nodes without re-reading that.
+- **Two frames, and the overlay states which it is in.** The pointer resolves
+  to a cell in the *generated* frame (the one placements are expressed in)
+  while the drawing may sit at a negative origin. Everything in the overlay is
+  kept in the generated frame, where group-local px is exactly
+  `cell index × cellSize` — the same convention the renderer draws under.
+- **The stroke ends on a stage-level mouseup.** Konva does not capture the
+  pointer, so a fast drag that leaves the hit rect would otherwise strand paint
+  mode on. A whole stroke is **one** undo entry: `beginKufiCellEdit` is a bare
+  `pushHistory()` on mousedown and `setKufiCell` calls `setBlocks` directly —
+  routing paint through `updateBlock`/`updateSelectedBlock`, which push
+  unconditionally, would cost one undo per painted cell.
+- **Painting a cell back to what the alphabet draws removes the entry**
+  (`upsertCellEdit`), the same zero-is-a-removal rule `setStrokeCut` follows,
+  or the array grows forever as a user paints and unpaints.
+- **`kufiOptionsFor(block)` is the single source of a block's layout options**,
+  used by the renderer, both Sidebar readouts, the placement ghost, Fit to
+  square and the overlay. The overlay resolves a pointer against the grid the
+  renderer drew, so one forgotten field puts the two a wrap apart.
+- **Painted cells legitimately break the alphabet's grammar** — a 2×2 block, a
+  floating island. That is the point of the feature. The four structural
+  assertions in `squareKufi.test.ts` check the *authored table*, which a hand
+  edit never passes through, so paint must not be validated against them.
+- While the tool is armed the panel cannot be dragged; the overlay's hit rect
+  takes the pointer. The guide says so.
+- **A mirror of a hand-edited block still draws the generated grid.**
+  `MirrorBlockView` belongs to another stream this phase and passes
+  `SquareKufiText` no `kufiCellEdits`, so the one prop line that would fix it
+  was not landed here. Known gap, not a design decision — it is one line in
+  that file's `squareKufi` branch.
 
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
@@ -2003,12 +2096,6 @@ These are capabilities that have been explicitly identified as valuable but deli
   rather than a missing loop. Doing it means a dot cell, a placement band clear
   of the letter, and widening a letter's advance so two neighbours' dots cannot
   merge into one blob.
-
-- **Hand-editing square-kufi cells** — Painting individual cells on top of the
-  generated grid, which is how a calligrapher actually finishes a panel. The
-  layout already produces a plain `boolean[]`, so the data side is trivial; the
-  work is an on-canvas cell overlay and deciding how a hand edit survives a text
-  change, which is the same keying problem `GlyphTransform` records.
 
 - **Boustrophedon and spiral square-kufi compositions** — Classic panels snake
   back on alternate lines or spiral inward from the edge. `breakIntoLines`

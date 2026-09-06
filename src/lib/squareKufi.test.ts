@@ -4,7 +4,17 @@ import {
   cellRings,
   formAscent,
   squareColumnTarget,
+  resolveWords,
+  applyCellEdits,
+  resolveCellOwner,
+  cellEditAt,
+  upsertCellEdit,
+  kufiFormKey,
+  KUFI_EDIT_REACH,
   type Ring,
+  type KufiCellEdit,
+  type KufiPlacement,
+  type SquareKufiLayout,
 } from "./squareKufi";
 import {
   ALL_SKELETONS,
@@ -398,6 +408,337 @@ describe("cellRings", () => {
     for (const ring of rings) {
       expect(ring.length).toBeGreaterThanOrEqual(4);
       // Every edge is axis-aligned — a cell grid has no diagonals in it.
+      for (let i = 0; i < ring.length; i++) {
+        const [x0, y0] = ring[i];
+        const [x1, y1] = ring[(i + 1) % ring.length];
+        expect(x0 === x1 || y0 === y1).toBe(true);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hand-painted cells
+//
+// Note that the four structural assertions at the top of this file are about
+// the *authored alphabet*, which a hand edit never passes through. Painted
+// cells legitimately break that grammar — a 2×2 block, a floating island — and
+// must not be validated against it. That is the point of the feature.
+// ---------------------------------------------------------------------------
+
+/** Every unit of a run, by the index a placement and an edit both name. */
+function unitsByIndex(text: string) {
+  const { words } = resolveWords(text);
+  const map = new Map<number, ReturnType<typeof resolveWords>["words"][0][0]>();
+  for (const word of words) for (const unit of word) map.set(unit.index, unit);
+  return map;
+}
+
+const composedAt = (
+  g: { cols: number; rows: number; cells: boolean[]; originX: number; originY: number },
+  x: number,
+  y: number
+) => {
+  const cx = x - g.originX;
+  const cy = y - g.originY;
+  if (cx < 0 || cy < 0 || cx >= g.cols || cy >= g.rows) return false;
+  return g.cells[cy * g.cols + cx];
+};
+
+/** A one-letter stand-in layout, for exercising the tracer over a composition. */
+function gridLayout(rows: string[]): SquareKufiLayout {
+  const cols = rows[0].length;
+  return {
+    cols,
+    rows: rows.length,
+    cells: rows.flatMap((r) => Array.from(r, (c) => c === "#")),
+    unsupported: [],
+    hardBreaks: 0,
+    placements: [
+      {
+        unitIndex: 0,
+        unitKey: "stand-in",
+        x: 0,
+        y: 0,
+        width: cols,
+        height: rows.length,
+        baselineY: rows.length - 1,
+      },
+    ],
+  };
+}
+
+describe("kufi placements", () => {
+  it("places every letter where its ink actually landed", () => {
+    // The load-bearing one. Placements are emitted from inside the same pass
+    // that writes the cells; anything re-deriving them afterwards drifts by a
+    // cell or two and still type-checks, and every hand edit then lands beside
+    // the letter it was painted onto rather than on it.
+    const text = "السلام عليكم ورحمة الله";
+    const layout = layoutSquareKufi(text, { columns: 20 }, { placements: true });
+    const units = unitsByIndex(text);
+
+    expect(layout.placements.length).toBe(units.size);
+    expect(new Set(layout.placements.map((p) => p.unitIndex)).size).toBe(units.size);
+
+    for (const p of layout.placements) {
+      const unit = units.get(p.unitIndex)!;
+      expect(unit, `no unit for placement ${p.unitIndex}`).toBeTruthy();
+      expect(p.unitKey).toBe(kufiFormKey(unit.form));
+      expect(p.width).toBe(unit.width);
+      expect(p.height).toBe(unit.form.rows.length);
+
+      unit.form.rows.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) {
+          if (row[c] !== "#") continue;
+          const x = p.x + c;
+          const y = p.y + r;
+          expect(
+            layout.cells[y * layout.cols + x],
+            `unit ${p.unitIndex} has no ink at ${x},${y} (row ${r}, col ${c})`
+          ).toBe(true);
+        }
+      });
+    }
+  });
+
+  it("costs nothing unless the caller asks", () => {
+    expect(layoutSquareKufi("الله").placements).toEqual([]);
+    expect(layoutSquareKufi("").placements).toEqual([]);
+    expect(layoutSquareKufi("الله", {}, { placements: true }).placements.length).toBe(4);
+  });
+});
+
+describe("resolveCellOwner", () => {
+  const box = (
+    unitIndex: number,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): KufiPlacement => ({
+    unitIndex,
+    unitKey: `k${unitIndex}`,
+    x,
+    y,
+    width,
+    height,
+    baselineY: y + height - 1,
+  });
+
+  it("gives a cell to the nearest letter, measured to the box and not its centre", () => {
+    // A wide letter spanning 0..5 and a one-cell letter at 10. The cell at 7 is
+    // two cells from the wide letter's edge and three from the small one, so it
+    // belongs to the wide letter — while centre-to-cell would say the opposite
+    // (4.5 against 3) and hand it to the letter it is visibly further from.
+    const placements = [box(0, 0, 0, 6, 2), box(1, 10, 0, 1, 1)];
+    expect(resolveCellOwner(placements, 7, 0)?.unitIndex).toBe(0);
+    expect(resolveCellOwner(placements, 9, 0)?.unitIndex).toBe(1);
+  });
+
+  it("gives a cell inside a letter's box to that letter", () => {
+    const placements = [box(0, 0, 0, 6, 2), box(1, 10, 0, 1, 1)];
+    expect(resolveCellOwner(placements, 3, 1)?.unitIndex).toBe(0);
+  });
+
+  it("breaks a tie by the lower unit index, not by emission order", () => {
+    const placements = [box(3, 4, 0, 1, 1), box(1, 0, 0, 1, 1)];
+    // Cell 2 is two cells from each.
+    expect(resolveCellOwner(placements, 2, 0)?.unitIndex).toBe(1);
+    expect(resolveCellOwner([], 0, 0)).toBeNull();
+  });
+});
+
+describe("applyCellEdits", () => {
+  it("keeps an edit on its letter through a rewrap and a spacing change", () => {
+    // The whole point of anchoring to a letter. The same edit is resolved
+    // under three layouts whose absolute grids share almost nothing.
+    const text = "بسم الله الرحمن الرحيم";
+    const configs = [{ columns: 0 }, { columns: 16 }, { columns: 0, wordGap: 6 }];
+
+    const base = layoutSquareKufi(text, configs[0], { placements: true });
+    const anchor = base.placements[5];
+    // One row above the letter's baseline and one column left of its box.
+    const edit: KufiCellEdit = {
+      unitIndex: anchor.unitIndex,
+      unitKey: anchor.unitKey,
+      dx: -1,
+      dy: -1,
+      on: true,
+    };
+
+    const absolute = new Set<string>();
+    for (const options of configs) {
+      const layout = layoutSquareKufi(text, options, { placements: true });
+      const p = layout.placements.find((q) => q.unitIndex === anchor.unitIndex)!;
+      const composed = applyCellEdits(layout, [edit]);
+      expect(composed.applied).toBe(1);
+      expect(composed.dropped).toBe(0);
+      expect(composedAt(composed, p.x - 1, p.baselineY - 1)).toBe(true);
+      absolute.add(`${p.x - 1},${p.baselineY - 1}`);
+    }
+    // …and the letter really did move: one anchor, three different grids.
+    expect(absolute.size).toBe(configs.length);
+  });
+
+  it("drops an edit whose letter now draws a different shape, and counts it", () => {
+    const text = "الله";
+    const layout = layoutSquareKufi(text, {}, { placements: true });
+    const p = layout.placements[0];
+    const composed = applyCellEdits(layout, [
+      { unitIndex: p.unitIndex, unitKey: "not-this-form", dx: 0, dy: -1, on: true },
+    ]);
+    expect(composed.applied).toBe(0);
+    expect(composed.dropped).toBe(1);
+    expect(composed.cells).toEqual(layout.cells);
+  });
+
+  it("drops an edit whose letter is gone entirely", () => {
+    const layout = layoutSquareKufi("الله", {}, { placements: true });
+    const composed = applyCellEdits(layout, [{ unitIndex: 99, dx: 0, dy: 0, on: true }]);
+    expect(composed.dropped).toBe(1);
+  });
+
+  it("applies an edit that carries no key at all", () => {
+    // The glyphId-optionality rule: an edit saved before the fingerprint
+    // existed cannot be checked, and dropping it would be worse than applying
+    // it to whatever letter now holds its index. A naive "always compare the
+    // key" implementation loses exactly these.
+    const layout = layoutSquareKufi("الله", {}, { placements: true });
+    const p = layout.placements[0];
+    const composed = applyCellEdits(layout, [
+      { unitIndex: p.unitIndex, dx: -1, dy: -1, on: true },
+    ]);
+    expect(composed.applied).toBe(1);
+    expect(composed.dropped).toBe(0);
+    expect(composedAt(composed, p.x - 1, p.baselineY - 1)).toBe(true);
+  });
+
+  it("grows the grid around a cell painted outside it, generated ink and all", () => {
+    const text = "الله";
+    const layout = layoutSquareKufi(text, {}, { placements: true });
+    // The leftmost letter — last in logical order, first at the left edge.
+    const p = layout.placements.reduce((a, b) => (b.x < a.x ? b : a));
+    expect(p.x).toBe(0);
+    const dy = -8;
+    const composed = applyCellEdits(layout, [
+      { unitIndex: p.unitIndex, unitKey: p.unitKey, dx: -2, dy, on: true },
+    ]);
+
+    const expectedY = Math.min(0, p.baselineY + dy);
+    expect(expectedY).toBeLessThan(0);
+    expect(composed.originX).toBe(-2);
+    expect(composed.originY).toBe(expectedY);
+    expect(composed.cols).toBe(layout.cols + 2);
+    expect(composed.rows).toBe(layout.rows - expectedY);
+
+    // Every generated cell still sits where it did relative to its letter…
+    for (let y = 0; y < layout.rows; y++) {
+      for (let x = 0; x < layout.cols; x++) {
+        expect(composedAt(composed, x, y), `generated cell ${x},${y} moved`).toBe(
+          layout.cells[y * layout.cols + x]
+        );
+      }
+    }
+    // …and the painted one is at its own place in the grown grid.
+    expect(composedAt(composed, p.x - 2, p.baselineY + dy)).toBe(true);
+  });
+
+  it("refuses an edit that reaches further than a letter's neighbourhood", () => {
+    const layout = layoutSquareKufi("الله", {}, { placements: true });
+    const p = layout.placements[0];
+    const far = applyCellEdits(layout, [
+      {
+        unitIndex: p.unitIndex,
+        unitKey: p.unitKey,
+        dx: KUFI_EDIT_REACH + 1,
+        dy: 0,
+        on: true,
+      },
+    ]);
+    expect(far.applied).toBe(0);
+    expect(far.dropped).toBe(1);
+    expect(far.cols).toBe(layout.cols);
+    expect(far.originX).toBe(0);
+
+    // And it is refused at the point it would be made, too, so a far click
+    // paints nothing rather than storing an edit dropped on every render.
+    expect(
+      cellEditAt(layout.placements, p.x + KUFI_EDIT_REACH + 1, p.baselineY, true)
+    ).toBeNull();
+    expect(cellEditAt(layout.placements, p.x, p.baselineY, true)).not.toBeNull();
+  });
+
+  it("erases a generated cell without moving anything", () => {
+    const layout = layoutSquareKufi("الله", {}, { placements: true });
+    const p = layout.placements[0];
+    const composed = applyCellEdits(layout, [
+      { unitIndex: p.unitIndex, unitKey: p.unitKey, dx: 0, dy: 0, on: false },
+    ]);
+    expect(composed.originX).toBe(0);
+    expect(composed.originY).toBe(0);
+    expect(composed.cols).toBe(layout.cols);
+    expect(composedAt(composed, p.x, p.baselineY)).toBe(false);
+    expect(layout.cells[p.baselineY * layout.cols + p.x]).toBe(true);
+  });
+
+  it("changes nothing at all when there are no edits", () => {
+    const layout = layoutSquareKufi("الله", {}, { placements: true });
+    const composed = applyCellEdits(layout, []);
+    expect(composed.cells).toBe(layout.cells);
+    expect(composed.applied).toBe(0);
+    expect(composed.dropped).toBe(0);
+  });
+});
+
+describe("upsertCellEdit", () => {
+  const edit = (dx: number, on: boolean): KufiCellEdit => ({ unitIndex: 1, dx, dy: 0, on });
+
+  it("replaces the edit already on that cell rather than stacking one", () => {
+    const list = upsertCellEdit([edit(2, true)], edit(2, false), true);
+    expect(list).toEqual([edit(2, false)]);
+  });
+
+  it("removes an edit that asks for exactly what the alphabet draws", () => {
+    // Paint a cell that is already ink and the entry goes away, rather than
+    // being stored as a no-op that grows the array forever as a user paints
+    // and unpaints — the zero-is-a-removal rule setStrokeCut follows.
+    expect(upsertCellEdit([edit(2, true)], edit(2, true), true)).toEqual([]);
+    expect(upsertCellEdit([], edit(2, false), false)).toEqual([]);
+  });
+
+  it("leaves other cells' edits alone", () => {
+    const list = upsertCellEdit([edit(2, true), edit(5, true)], edit(2, true), true);
+    expect(list).toEqual([edit(5, true)]);
+  });
+});
+
+describe("cellRings over a hand-edited grid", () => {
+  it("winds a hole punched by an erase against its outer ring", () => {
+    const layout = gridLayout(["###", "###", "###"]);
+    const composed = applyCellEdits(layout, [
+      { unitIndex: 0, unitKey: "stand-in", dx: 1, dy: -1, on: false },
+    ]);
+    expect(composedAt(composed, 1, 1)).toBe(false);
+    const rings = cellRings(composed.cells, composed.cols, composed.rows);
+    expect(rings).toHaveLength(2);
+    const areas = rings.map(signedArea2);
+    expect(Math.sign(areas[0])).not.toBe(Math.sign(areas[1]));
+  });
+
+  it("closes every ring around a paint that only touches ink diagonally", () => {
+    // A cell sharing one corner with the letter is a pinch — the branch in the
+    // tracer that has to choose between two ways out of a vertex. Nothing
+    // stops a user painting one, so it must come out closed and axis-aligned.
+    const layout = gridLayout(["##", "##"]);
+    const composed = applyCellEdits(layout, [
+      { unitIndex: 0, unitKey: "stand-in", dx: 2, dy: -2, on: true },
+    ]);
+    expect(composed.cols).toBe(3);
+    const rings = cellRings(composed.cells, composed.cols, composed.rows);
+    expect(rings.length).toBeGreaterThan(0);
+    for (const ring of rings) {
+      expect(ring.length).toBeGreaterThanOrEqual(4);
       for (let i = 0; i < ring.length; i++) {
         const [x0, y0] = ring[i];
         const [x1, y1] = ring[(i + 1) % ring.length];

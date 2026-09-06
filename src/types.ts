@@ -63,7 +63,9 @@ export type GlyphTransform = {
 // tests) live in `lib/blockFill.ts`.
 export type { BlockFill, FillStop } from "./lib/blockFill";
 export type { StrokeCut } from "./lib/strokeCuts";
+export type { KufiCellEdit } from "./lib/squareKufi";
 import type { StrokeCut } from "./lib/strokeCuts";
+import type { KufiCellEdit } from "./lib/squareKufi";
 import type { BlockFill } from "./lib/blockFill";
 // ---- /STREAM-F ----
 
@@ -232,6 +234,19 @@ export type SquareKufiBlock = BlockCommon & {
   kufiLineGap?: number;
   /** Blank lattice columns between two words. */
   kufiWordGap?: number;
+  /**
+   * Cells painted or erased by hand over the generated grid. Anchored to a
+   * letter rather than to a grid coordinate — see `KufiCellEdit`. Absent means
+   * today's rendering exactly, so a project saved before this feature needs no
+   * payload version bump.
+   *
+   * Lives here and not on `BlockCommon`, following `textPathEditMode` and
+   * `diacriticEditMode`: a cell is a square-kufi idea, and no other renderer
+   * could do anything with one.
+   */
+  kufiCellEdits?: KufiCellEdit[];
+  /** True while the on-canvas cell painter is armed for this block. */
+  kufiCellEditMode?: boolean;
 };
 
 export type Block =

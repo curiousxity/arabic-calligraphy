@@ -5,7 +5,9 @@ import {
   layoutSquareKufi,
   cellRings,
   kufiCellSize,
-  type SquareKufiOptions,
+  kufiOptionsFor,
+  applyCellEdits,
+  type KufiCellEdit,
 } from "../lib/squareKufi";
 import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
 
@@ -31,6 +33,8 @@ export type SquareKufiTextProps = {
   kufiColumns?: number;
   kufiLineGap?: number;
   kufiWordGap?: number;
+  /** Cells painted or erased by hand. Absent draws the generated grid exactly. */
+  kufiCellEdits?: KufiCellEdit[];
 
   locked?: boolean;
   draggable?: boolean;
@@ -62,6 +66,9 @@ export type SquareKufiTextProps = {
  * Outline before fill, as in every other renderer here — see CLAUDE.md for
  * why reversing the two thickens every stroke by half the outline's width.
  */
+/** Stable empty list, so an unedited block's memos never see a new array. */
+const NO_CELL_EDITS: KufiCellEdit[] = [];
+
 export const SquareKufiText: React.FC<SquareKufiTextProps> = ({
   id,
   text,
@@ -82,6 +89,7 @@ export const SquareKufiText: React.FC<SquareKufiTextProps> = ({
   kufiColumns,
   kufiLineGap,
   kufiWordGap,
+  kufiCellEdits,
   locked,
   draggable = true,
   onClick,
@@ -90,20 +98,33 @@ export const SquareKufiText: React.FC<SquareKufiTextProps> = ({
   onDragMove,
   onDragEnd,
 }) => {
-  const options: SquareKufiOptions = useMemo(
-    () => ({ columns: kufiColumns, lineGap: kufiLineGap, wordGap: kufiWordGap }),
+  const edits = kufiCellEdits ?? NO_CELL_EDITS;
+
+  const options = useMemo(
+    () => kufiOptionsFor({ kufiColumns, kufiLineGap, kufiWordGap }),
     [kufiColumns, kufiLineGap, kufiWordGap]
   );
 
-  const layout = useMemo(() => layoutSquareKufi(text, options), [text, options]);
+  // Placements are asked for only when there is a hand edit to resolve — see
+  // `layoutSquareKufi`'s third argument for why they are not free.
+  const layout = useMemo(
+    () => layoutSquareKufi(text, options, { placements: edits.length > 0 }),
+    [text, options, edits.length]
+  );
+  const composed = useMemo(() => applyCellEdits(layout, edits), [layout, edits]);
   const rings = useMemo(
-    () => cellRings(layout.cells, layout.cols, layout.rows),
-    [layout]
+    () => cellRings(composed.cells, composed.cols, composed.rows),
+    [composed]
   );
 
   const cell = kufiCellSize(fontSize);
-  const width = layout.cols * cell;
-  const height = layout.rows * cell;
+  const width = composed.cols * cell;
+  const height = composed.rows * cell;
+  // A painted cell can sit left of or above the generated grid, so the whole
+  // composition starts at a negative origin. Both nodes carry that offset (see
+  // `ComposedKufiGrid`) and everything below draws at plain `cx * cell` in the
+  // shifted frame, which keeps the block's self-rect around its real ink.
+  const originPx = { x: composed.originX * cell, y: composed.originY * cell };
 
   // An empty block still needs somewhere to grab it, or clearing the text
   // strands the block on the canvas with no way to select it again.
@@ -125,8 +146,8 @@ export const SquareKufiText: React.FC<SquareKufiTextProps> = ({
       opacity={opacity}
     >
       <Rect
-        x={0}
-        y={0}
+        x={originPx.x}
+        y={originPx.y}
         width={hitWidth}
         height={hitHeight}
         fill="transparent"
@@ -135,8 +156,8 @@ export const SquareKufiText: React.FC<SquareKufiTextProps> = ({
       />
 
       <Shape
-        x={0}
-        y={0}
+        x={originPx.x}
+        y={originPx.y}
         width={hitWidth}
         height={hitHeight}
         listening={false}
