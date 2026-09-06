@@ -92,6 +92,26 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-09-06 — Square kufi: boustrophedon
+
+**Composition** in the Square Kufi panel now offers *Boustrophedon* beside the
+plain stacked lines: the first line reads right to left, the next is turned a
+half turn so it carries on from where the first stopped, and the stroke turns
+the corner into it — the reading snakes down the panel as the classic panels
+do.
+
+**A return line is rotated 180°, never mirrored**; published panels do both,
+and this is the choice, because a mirrored Arabic letter is not that letter.
+The turn is a single-cell L running in two reserved gutter columns down each
+side, and those two columns are what make it structurally impossible for the
+turn to sit beside a descender and form a 2×2 — one column each side was
+measured to produce one in 123 of 144 real compositions. A block still on one
+line is wrapped to a square in the same undo step, since one line has nothing
+to turn into. Known and inherent: turning a line with descenders makes the
+white space between lines alternate. See CLAUDE.md, "Square kufi →
+Boustrophedon", for the baseline arithmetic (the turned baseline is `descent`
+rows into its band, not the band's top row) and the falsified guards.
+
 ### 2026-09-06 — Square kufi: painting cells by hand
 
 **Paint cells** in the Square Kufi panel puts a lattice over the block: click
@@ -155,9 +175,9 @@ connected stroke, never two cells thick, join ink where each form claims a join
 
 **Dots and tashkeel are not drawn**, matching the style, so ب/ت/ث share one
 shape. That is deliberate and is recorded under CLAUDE.md's Deferred features
-alongside the boustrophedon and spiral compositions, neither of which is built.
-(Hand-editing individual cells was listed there too, and shipped on
-2026-09-06 — see above.)
+alongside the boustrophedon and spiral compositions, neither of which was built
+at the time. (Hand-editing individual cells and boustrophedon were both listed
+there too, and both shipped on 2026-09-06 — see above.)
 
 ### 2026-08-21 — Diacritic detection: two more fonts, and the dots it was flagging
 
@@ -858,11 +878,10 @@ the result, and most of it came back **declined**.
 
 Still open, in the order that plan sequences them:
 
-- Boustrophedon square-kufi compositions
 - Per-glyph move/scale/rotate on Shape Fill (text-on-path dropped with the rest)
 
-Per-glyph rotation and hand-editing square-kufi cells both shipped on
-2026-09-06 and have left this list.
+Per-glyph rotation, hand-editing square-kufi cells and boustrophedon
+compositions all shipped on 2026-09-06 and have left this list.
 
 Declined there, with the reason in the plan: straight-stroke stretching on
 Shape Fill/Curve (both renormalise the span), image trace (Shape Fill's

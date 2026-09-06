@@ -77,9 +77,9 @@ export type GlyphTransform = {
 // tests) live in `lib/blockFill.ts`.
 export type { BlockFill, FillStop } from "./lib/blockFill";
 export type { StrokeCut } from "./lib/strokeCuts";
-export type { KufiCellEdit } from "./lib/squareKufi";
+export type { KufiCellEdit, KufiComposition } from "./lib/squareKufi";
 import type { StrokeCut } from "./lib/strokeCuts";
-import type { KufiCellEdit } from "./lib/squareKufi";
+import type { KufiCellEdit, KufiComposition } from "./lib/squareKufi";
 import type { BlockFill } from "./lib/blockFill";
 // ---- /STREAM-F ----
 
@@ -244,6 +244,17 @@ export type SquareKufiBlock = BlockCommon & {
   type: "squareKufi";
   /** Wrap width in cells. 0 or absent runs the text as one unbroken band. */
   kufiColumns?: number;
+  /**
+   * How stacked lines are arranged: plain lines, or boustrophedon — every
+   * other line turned 180° so the reading snakes back and the stroke turns the
+   * corner with it.
+   *
+   * Absent is `"lines"`, which is what this block type has always drawn, so a
+   * project saved before the feature needs no payload version bump; the value
+   * is whitelisted on the way in (`normalizeKufiComposition`) rather than
+   * trusted, it being a string union rather than a clamped number.
+   */
+  kufiComposition?: KufiComposition;
   /** Blank lattice rows between wrapped lines. */
   kufiLineGap?: number;
   /** Blank lattice columns between two words. */

@@ -8,6 +8,7 @@ import {
   kufiCellSize,
   kufiOptionsFor,
   type KufiCellEdit,
+  type KufiComposition,
 } from "../lib/squareKufi";
 
 export type KufiCellEditOverlayProps = {
@@ -18,6 +19,8 @@ export type KufiCellEditOverlayProps = {
   text: string;
   fontSize: number;
   kufiColumns?: number;
+  /** Must match the renderer's, or the pointer resolves against another grid. */
+  kufiComposition?: KufiComposition;
   kufiLineGap?: number;
   kufiWordGap?: number;
   kufiCellEdits?: KufiCellEdit[];
@@ -73,6 +76,7 @@ export const KufiCellEditOverlay: React.FC<KufiCellEditOverlayProps> = ({
   text,
   fontSize,
   kufiColumns,
+  kufiComposition,
   kufiLineGap,
   kufiWordGap,
   kufiCellEdits,
@@ -87,8 +91,8 @@ export const KufiCellEditOverlay: React.FC<KufiCellEditOverlayProps> = ({
 
   const edits = useMemo(() => kufiCellEdits ?? [], [kufiCellEdits]);
   const options = useMemo(
-    () => kufiOptionsFor({ kufiColumns, kufiLineGap, kufiWordGap }),
-    [kufiColumns, kufiLineGap, kufiWordGap]
+    () => kufiOptionsFor({ kufiColumns, kufiComposition, kufiLineGap, kufiWordGap }),
+    [kufiColumns, kufiComposition, kufiLineGap, kufiWordGap]
   );
   const layout = useMemo(
     () => layoutSquareKufi(text, options, { placements: true }),

@@ -119,9 +119,10 @@ import {
   kufiOptionsFor,
   upsertCellEdit,
   DEFAULT_KUFI_OPTIONS,
+  normalizeKufiComposition,
   type KufiCellEdit,
 } from "./lib/squareKufi";
-import type { MirrorMode } from "./types";
+import type { MirrorMode, SquareKufiBlock } from "./types";
 import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { mergeGlyphTransform } from "./lib/glyphTransform";
@@ -1887,6 +1888,44 @@ const App: React.FC = () => {
     updateSelectedBlock({ kufiColumns: columns });
   }, [selectedBlock, updateSelectedBlock]);
 
+  /**
+   * Switch the selected square-kufi block between plain lines and
+   * boustrophedon.
+   *
+   * **The wrap width has to come with it.** Every block is created with
+   * `kufiColumns: 0` and `breakIntoLines` reads that as `Infinity`, so a fresh
+   * block is one unbroken line — and a single line has nothing to turn into.
+   * Switching to a snaking composition on such a block would visibly do
+   * nothing at all, which reads as a broken control rather than as a text that
+   * happens not to wrap. So the width `squareColumnTarget` would have chosen is
+   * set in the **same patch**, which is what keeps the whole switch one
+   * `pushHistory()` and therefore one undo.
+   *
+   * It lives here rather than in the Sidebar because it is two document fields
+   * moving together — the Sidebar owns no history and would have to make two
+   * calls, costing the user two undos for one click.
+   */
+  const setKufiComposition = useCallback(
+    (value: string) => {
+      const block = selectedBlock;
+      if (!block || block.type !== "squareKufi") return;
+      const composition = normalizeKufiComposition(value);
+      const current = normalizeKufiComposition(block.kufiComposition);
+      if (composition === current) return;
+
+      const patch: Partial<SquareKufiBlock> = { kufiComposition: composition };
+      if (composition !== "lines" && (block.kufiColumns ?? 0) === 0) {
+        const columns = squareColumnTarget(block.text, {
+          ...kufiOptionsFor(block),
+          columns: 0,
+        });
+        if (columns > 0) patch.kufiColumns = columns;
+      }
+      updateSelectedBlock(patch);
+    },
+    [selectedBlock, updateSelectedBlock]
+  );
+
   const addImageBlock = (dataUrl: string, naturalWidth: number, naturalHeight: number) => {
     const newId = createNextId();
     const maxDim = (Math.max(canvasWidth, stageViewportHeight) / stageScale) * 0.6;
@@ -2808,6 +2847,7 @@ const App: React.FC = () => {
         onAddTextPathBlock={addTextPathBlock}
         onAddSquareKufiBlock={addSquareKufiBlock}
         onFitKufiToSquare={fitSelectedKufiToSquare}
+        onSetKufiComposition={setKufiComposition}
         onAddImageBlock={uploadImageBlock}
         onGenerateFromTemplate={generateFromTemplate}
         onRandomizeLayout={randomizeLayout}

@@ -33,6 +33,43 @@
  * flush right, being RTL. A word wider than a whole line is broken at a letter
  * boundary — the join across that break is lost, which is a real consequence
  * and is why `hardBreaks` is reported rather than swallowed.
+ *
+ * ## Boustrophedon — and the turn convention
+ *
+ * `composition: "boustrophedon"` snakes the reading: line 1 runs right to
+ * left, line 2 continues from where it stopped and runs back, and the stroke
+ * turns the corner with it. Classic panels do this, and it is why a
+ * square-kufi field reads as woven rather than as stacked strips.
+ *
+ * **A return line is rotated 180°, never mirrored.** Both appear in published
+ * panels, and mirroring is the rejected alternative — it is stated here for
+ * the same reason `squareKufiAlphabet.ts` states its two conventions, because
+ * the choice is invisible in the code that implements it:
+ *
+ * - *Rotation* turns the whole line about its own centre. Every letter is
+ *   still the letter the alphabet drew, read upside down, and the line's two
+ *   endpoints land on the same edge as the previous line's — so the turn is a
+ *   short L in a reserved column rather than a run across the panel.
+ * - *Mirroring* reflects it. An Arabic letter reflected is not that letter and
+ *   in general is not any letter: ب becomes a shape with its tooth on the
+ *   wrong side, and every join runs the wrong way. It reads as a font defect,
+ *   which is the one failure mode this whole file is arranged to avoid.
+ *
+ * The turn itself is a single-cell run — the same primitive a letter join
+ * already is — out into a reserved gutter column and down it to the next
+ * line's baseline row. Two consequences are worth stating rather than
+ * discovering:
+ *
+ * - **A rotated line's baseline row is `bandTop + descent`, not `bandTop`.**
+ *   The band is `ascent + descent` rows and the baseline sits at `ascent - 1`,
+ *   so turning it puts the baseline at `(ascent + descent - 1) - (ascent - 1)`.
+ *   `descent` is 1 for any text containing ر و م ج ح ه — most real phrases —
+ *   so reading the band's top row as the baseline lands every turn one row
+ *   short of the letters it is meant to join.
+ * - **Alternate baselines therefore sit on two different lattice rows**
+ *   relative to their bands, so the white space between lines alternates
+ *   between `lineGap + 2·descent` and `lineGap` rows. That is inherent to
+ *   turning a line whose letters hang below the line, not a spacing bug.
  */
 
 import { classifyJoiningForms, type JoiningForm } from "./arabicJoining";
@@ -58,12 +95,46 @@ export const KUFI_CELLS_PER_EM = 8;
 export const kufiCellSize = (fontSize: number) =>
   Math.max(0.5, fontSize / KUFI_CELLS_PER_EM);
 
+/**
+ * How stacked lines are arranged.
+ *
+ * `"lines"` is the plain reading: every line runs right to left, all of them
+ * flush right. `"boustrophedon"` snakes — see the module header for the turn
+ * convention and for why a return line is rotated rather than mirrored.
+ */
+export type KufiComposition = "lines" | "boustrophedon";
+
+/**
+ * A whitelist, not a clamp. `kufiComposition` is a string union that arrives
+ * from a saved project, so anything not named here — including a value from a
+ * later release — falls back to the composition that predates the feature.
+ */
+export const normalizeKufiComposition = (value: unknown): KufiComposition =>
+  value === "boustrophedon" ? "boustrophedon" : "lines";
+
+/**
+ * Blank columns reserved down each side of a snaking panel.
+ *
+ * The turn runs vertically down the **outer** one, which leaves the inner one
+ * as a permanent buffer between that run and the nearest letter. Both are
+ * needed, and one is not enough: the run necessarily spans the baseline row
+ * *and* the descender row of the line it leaves (and of the line it arrives
+ * at), so a single reserved column would put it directly beside ر or ج — both
+ * of which carry ink at their left column on both of those rows — and two
+ * filled columns over two filled rows is exactly the 2×2 the whole grammar
+ * forbids. With the buffer the adjacency cannot arise for any text, which is
+ * what makes the invariant structural rather than lucky.
+ */
+export const KUFI_TURN_GUTTER = 2;
+
 export type SquareKufiOptions = {
   /**
    * Wrap width in cells. 0 or undefined runs the text as one unbroken band,
    * which is the freeform case; a number is what turns it into a panel.
    */
   columns?: number;
+  /** How stacked lines are arranged. Absent is `"lines"`. */
+  composition?: KufiComposition;
   /** Blank rows between wrapped lines. */
   lineGap?: number;
   /** Cells of blank between two words. */
@@ -114,6 +185,7 @@ export type SquareKufiLayout = {
 
 export const DEFAULT_KUFI_OPTIONS: Required<SquareKufiOptions> = {
   columns: 0,
+  composition: "lines",
   lineGap: 2,
   wordGap: 3,
   letterGap: 1,
@@ -159,6 +231,20 @@ type Slot = {
   /** Whether those cells carry the baseline stroke. */
   bridgeAfter: boolean;
 };
+
+/**
+ * The row of a band, counted from its top, that a line's letters sit on.
+ *
+ * A band is `ascent + descent` rows and an unturned line's baseline is
+ * `ascent - 1` rows down it. A half turn maps row `r` to `h - 1 - r`, so a
+ * turned line's baseline lands at `(ascent + descent - 1) - (ascent - 1)`,
+ * which is **`descent`** — not the band's top row. `descent` is 1 for any text
+ * containing ر و م ج ح ه, so reading the top row as the baseline puts every
+ * turn one row clear of the letters it exists to join, and the panel comes
+ * apart in exactly the fonts-are-broken way this file is arranged to avoid.
+ */
+export const baselineRowInBand = (turns: 0 | 2, ascent: number, descent: number) =>
+  turns === 2 ? descent : ascent - 1;
 
 /** Rows of a form at or above the baseline, and rows below it. */
 export const formAscent = (form: KufiForm) => form.rows.length - form.base;
@@ -384,6 +470,103 @@ function breakIntoLines(
   return { lines, hardBreaks };
 }
 
+/** A grid being written into, in its own frame. */
+type CellTarget = { cells: boolean[]; cols: number; rows: number };
+
+/**
+ * Renders one line into its own tight sub-grid and blits it into `dest` under
+ * `turns` quarter-…no: under a half turn or none at all.
+ *
+ * Going through a sub-grid rather than writing letters straight into the panel
+ * is what makes the 180° case correct by construction instead of by a second
+ * set of coordinate formulas. `turns: 0` is an identity blit and reproduces
+ * the flush-right placement that predates boustrophedon cell for cell, which
+ * is the whole safety margin of doing it this way.
+ *
+ * `left`/`top` are the band's top-left in `dest`; the sub-grid is
+ * `lineWidth × (ascent + descent)`. Placements come back in `dest`'s frame —
+ * a rotated letter's box is its *drawn* box, so a hand edit anchored to it
+ * stays anchored the way it does on an unturned line.
+ */
+function placeLine(
+  dest: CellTarget,
+  line: Slot[],
+  lineWidth: number,
+  ascent: number,
+  descent: number,
+  left: number,
+  top: number,
+  turns: 0 | 2,
+  placements: KufiPlacement[] | null
+): void {
+  const w = lineWidth;
+  const h = ascent + descent;
+  if (w <= 0 || h <= 0) return;
+
+  const local = new Array<boolean>(w * h).fill(false);
+  const setLocal = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    local[y * w + x] = true;
+  };
+  const localBaseline = baselineRowInBand(0, ascent, descent);
+
+  // Where a sub-grid cell lands in `dest`. A half turn maps a cell to the
+  // opposite corner of the band, which is all "rotated 180°" means on a
+  // lattice.
+  const putX = (lx: number) => (turns === 2 ? left + (w - 1 - lx) : left + lx);
+  const putY = (ly: number) => (turns === 2 ? top + (h - 1 - ly) : top + ly);
+
+  const boxes: { slot: Slot; x: number; top: number }[] = [];
+  // Flush right inside the sub-grid: RTL runs start at the line's own right
+  // edge, whichever edge of the panel that turns out to be.
+  let cursor = w;
+  for (const slot of line) {
+    const { form } = slot.unit;
+    const x = cursor - slot.unit.width;
+    const boxTop = ascent - formAscent(form);
+
+    form.rows.forEach((row, r) => {
+      for (let c = 0; c < row.length; c++) {
+        if (row[c] === "#") setLocal(x + c, boxTop + r);
+      }
+    });
+
+    if (slot.bridgeAfter) {
+      for (let c = x - slot.gapAfter; c < x; c++) setLocal(c, localBaseline);
+    }
+    if (placements) boxes.push({ slot, x, top: boxTop });
+    cursor = x - slot.gapAfter;
+  }
+
+  for (let ly = 0; ly < h; ly++) {
+    for (let lx = 0; lx < w; lx++) {
+      if (!local[ly * w + lx]) continue;
+      const dx = putX(lx);
+      const dy = putY(ly);
+      if (dx < 0 || dy < 0 || dx >= dest.cols || dy >= dest.rows) continue;
+      dest.cells[dy * dest.cols + dx] = true;
+    }
+  }
+
+  if (!placements) return;
+  const baselineY = putY(localBaseline);
+  for (const b of boxes) {
+    const bw = b.slot.unit.width;
+    const bh = b.slot.unit.form.rows.length;
+    placements.push({
+      unitIndex: b.slot.unit.index,
+      unitKey: b.slot.unit.key,
+      // A half turn swaps which local corner is the top-left one, so the box
+      // is taken from both mapped corners rather than from the first.
+      x: Math.min(putX(b.x), putX(b.x + bw - 1)),
+      y: Math.min(putY(b.top), putY(b.top + bh - 1)),
+      width: bw,
+      height: bh,
+      baselineY,
+    });
+  }
+}
+
 /**
  * Lays the text out on the lattice.
  *
@@ -402,6 +585,7 @@ export function layoutSquareKufi(
 ): SquareKufiLayout {
   const opts: Required<SquareKufiOptions> = {
     columns: Math.max(0, Math.floor(options.columns ?? DEFAULT_KUFI_OPTIONS.columns)),
+    composition: normalizeKufiComposition(options.composition),
     lineGap: Math.max(0, Math.floor(options.lineGap ?? DEFAULT_KUFI_OPTIONS.lineGap)),
     wordGap: Math.max(1, Math.floor(options.wordGap ?? DEFAULT_KUFI_OPTIONS.wordGap)),
     letterGap: Math.max(1, Math.floor(options.letterGap ?? DEFAULT_KUFI_OPTIONS.letterGap)),
@@ -436,12 +620,24 @@ export function layoutSquareKufi(
   const lineHeight = ascent + descent;
 
   const lineWidths = lines.map(slotsWidth);
-  const cols = Math.max(opts.columns, ...lineWidths);
-  const rows = lines.length * lineHeight + (lines.length - 1) * opts.lineGap;
-  const cells = new Array<boolean>(cols * rows).fill(false);
-  const set = (x: number, y: number) => {
-    if (x < 0 || y < 0 || x >= cols || y >= rows) return;
-    cells[y * cols + x] = true;
+
+  // A single line has nothing to turn into, so boustrophedon is exactly
+  // `lines` there — and reserving gutters for a turn that cannot happen would
+  // pad the block with empty columns for nothing.
+  const snaking = opts.composition === "boustrophedon" && lines.length > 1;
+  const gutter = snaking ? KUFI_TURN_GUTTER : 0;
+  // The turn needs a row of its own to travel down. At `lineGap` 0 with no
+  // descenders the two baseline rows are adjacent and the two horizontal runs
+  // would sit one above the other in the gutter — a 2×2 made by the bridge
+  // alone. One blank row is the least that keeps the turn single-width.
+  const lineGap = snaking ? Math.max(1, opts.lineGap) : opts.lineGap;
+
+  const cols = Math.max(opts.columns, ...lineWidths) + gutter * 2;
+  const rows = lines.length * lineHeight + (lines.length - 1) * lineGap;
+  const dest: CellTarget = {
+    cells: new Array<boolean>(cols * rows).fill(false),
+    cols,
+    rows,
   };
 
   // Filled in the same pass that writes the cells, never re-derived after it.
@@ -449,43 +645,102 @@ export function layoutSquareKufi(
   // every hand edit a cell or two off the letter it belongs to.
   const placements: KufiPlacement[] = [];
 
-  lines.forEach((line, lineIndex) => {
-    const lineTop = lineIndex * (lineHeight + opts.lineGap);
-    const baselineY = lineTop + ascent - 1;
-    // Flush right: RTL runs start at the panel's right edge.
-    let cursor = cols;
+  /** A line's band top, its half-turn count, and the row its letters sit on. */
+  const bandTop = (i: number) => i * (lineHeight + lineGap);
+  const turnsOf = (i: number): 0 | 2 => (snaking && i % 2 === 1 ? 2 : 0);
+  // The corrected arithmetic: a turned band's baseline is `descent` rows below
+  // its top, not at its top. See the module header.
+  const baselineRowOf = (i: number) =>
+    bandTop(i) + baselineRowInBand(turnsOf(i), ascent, descent);
 
-    for (const slot of line) {
-      const { form } = slot.unit;
-      const x = cursor - slot.unit.width;
-      const top = lineTop + (ascent - formAscent(form));
-
-      if (emit.placements) {
-        placements.push({
-          unitIndex: slot.unit.index,
-          unitKey: slot.unit.key,
-          x,
-          y: top,
-          width: slot.unit.width,
-          height: form.rows.length,
-          baselineY,
-        });
-      }
-
-      form.rows.forEach((row, r) => {
-        for (let c = 0; c < row.length; c++) {
-          if (row[c] === "#") set(x + c, top + r);
-        }
-      });
-
-      if (slot.bridgeAfter) {
-        for (let c = x - slot.gapAfter; c < x; c++) set(c, baselineY);
-      }
-      cursor = x - slot.gapAfter;
-    }
+  lines.forEach((line, i) => {
+    const turns = turnsOf(i);
+    // Even lines keep the flush-right run of the unturned composition; odd
+    // ones are laid flush left, which after the half turn puts their *first*
+    // letter against the same edge the previous line ended at.
+    const left = turns === 2 ? gutter : cols - gutter - lineWidths[i];
+    placeLine(
+      dest,
+      line,
+      lineWidths[i],
+      ascent,
+      descent,
+      left,
+      bandTop(i),
+      turns,
+      emit.placements ? placements : null
+    );
   });
 
-  return { cols, rows, cells, unsupported, hardBreaks, placements };
+  if (snaking) {
+    for (let i = 0; i + 1 < lines.length; i++) {
+      // Line 0 runs right to left and stops at the panel's left edge; the
+      // line it hands over to has been turned, so its first letter is at that
+      // same edge. Every following turn alternates.
+      const onLeft = i % 2 === 0;
+      drawTurn(dest, baselineRowOf(i), baselineRowOf(i + 1), onLeft);
+    }
+  }
+
+  return {
+    cols,
+    rows,
+    cells: dest.cells,
+    unsupported,
+    hardBreaks,
+    placements,
+  };
+}
+
+/**
+ * The bridge that carries the stroke from one line's end into the next line's
+ * start: along the baseline row out to the gutter, down the gutter, and back
+ * in along the next baseline row.
+ *
+ * Single-cell-wide throughout, which is the same primitive a letter join
+ * already is — there is no second grammar here. The vertical leg runs down the
+ * **outermost** column so the reserved column beside it stays empty; see
+ * `KUFI_TURN_GUTTER` for why one reserved column is not enough.
+ *
+ * Nothing is drawn unless *both* baseline rows carry ink to attach to. A
+ * dangling stub would read as a stray stroke, and a line with no ink on its
+ * baseline row has no end cell to leave from.
+ */
+function drawTurn(
+  dest: CellTarget,
+  fromRow: number,
+  toRow: number,
+  onLeft: boolean
+): void {
+  const gutterCol = onLeft ? 0 : dest.cols - 1;
+  const step = onLeft ? 1 : -1;
+
+  /** The first ink on `row`, scanning inward from the gutter. */
+  const firstInk = (row: number): number => {
+    if (row < 0 || row >= dest.rows) return -1;
+    for (let x = gutterCol; x >= 0 && x < dest.cols; x += step) {
+      if (dest.cells[row * dest.cols + x]) return x;
+    }
+    return -1;
+  };
+
+  const fromInk = firstInk(fromRow);
+  const toInk = firstInk(toRow);
+  if (fromInk < 0 || toInk < 0) return;
+
+  const set = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= dest.cols || y >= dest.rows) return;
+    dest.cells[y * dest.cols + x] = true;
+  };
+  const runIn = (row: number, ink: number) => {
+    for (let x = gutterCol; x !== ink; x += step) set(x, row);
+  };
+
+  runIn(fromRow, fromInk);
+  runIn(toRow, toInk);
+  const top = Math.min(fromRow, toRow);
+  const bottom = Math.max(fromRow, toRow);
+  for (let y = top; y <= bottom; y++) set(gutterCol, y);
 }
 
 /**
@@ -618,6 +873,8 @@ export type KufiOptionSource = {
   kufiColumns?: number;
   kufiLineGap?: number;
   kufiWordGap?: number;
+  /** Free-form on purpose — it is whitelisted, never trusted. */
+  kufiComposition?: string;
 };
 
 /**
@@ -630,6 +887,7 @@ export type KufiOptionSource = {
  */
 export const kufiOptionsFor = (block: KufiOptionSource): SquareKufiOptions => ({
   columns: block.kufiColumns,
+  composition: normalizeKufiComposition(block.kufiComposition),
   lineGap: block.kufiLineGap,
   wordGap: block.kufiWordGap,
 });

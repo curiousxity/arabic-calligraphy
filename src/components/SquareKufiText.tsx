@@ -8,6 +8,7 @@ import {
   kufiOptionsFor,
   applyCellEdits,
   type KufiCellEdit,
+  type KufiComposition,
 } from "../lib/squareKufi";
 import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
 
@@ -31,6 +32,8 @@ export type SquareKufiTextProps = {
   rotation?: number;
 
   kufiColumns?: number;
+  /** Plain stacked lines, or boustrophedon. Absent is `"lines"`. */
+  kufiComposition?: KufiComposition;
   kufiLineGap?: number;
   kufiWordGap?: number;
   /** Cells painted or erased by hand. Absent draws the generated grid exactly. */
@@ -87,6 +90,7 @@ export const SquareKufiText: React.FC<SquareKufiTextProps> = ({
   shadowOpacity = 0.35,
   rotation = 0,
   kufiColumns,
+  kufiComposition,
   kufiLineGap,
   kufiWordGap,
   kufiCellEdits,
@@ -101,8 +105,8 @@ export const SquareKufiText: React.FC<SquareKufiTextProps> = ({
   const edits = kufiCellEdits ?? NO_CELL_EDITS;
 
   const options = useMemo(
-    () => kufiOptionsFor({ kufiColumns, kufiLineGap, kufiWordGap }),
-    [kufiColumns, kufiLineGap, kufiWordGap]
+    () => kufiOptionsFor({ kufiColumns, kufiComposition, kufiLineGap, kufiWordGap }),
+    [kufiColumns, kufiComposition, kufiLineGap, kufiWordGap]
   );
 
   // Placements are asked for only when there is a hand edit to resolve — see

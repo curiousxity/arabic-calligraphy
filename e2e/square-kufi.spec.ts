@@ -339,4 +339,121 @@ test.describe("square kufi", () => {
     const reflected = await blockClientBox(page, mirror.id);
     expect(Math.abs(reflected.width - source.width)).toBeLessThan(cellPx);
   });
+
+  test("snaking a wrapped panel adds the turn and moves the return lines over", async ({
+    page,
+  }) => {
+    // The mode is only visible once the text wraps — a single line has nothing
+    // to turn into — so the width is set first, deliberately, rather than
+    // relying on the switch's own fallback (which the next test covers).
+    await gotoApp(page);
+    const id = await addKufi(page);
+    await setBlockText(page, "لا اله الا الله محمد رسول الله", id);
+    await openKufiPanel(page);
+    await page.locator('input[name^="kufiColumns"]').fill("24");
+    await settleFrames(page);
+
+    const before = await blockClientBox(page, id);
+    const beforeInk = await inkPixels(page, before);
+    const leftHalf = (b: typeof before) => ({ ...b, width: b.width / 2 });
+    const beforeLeft = await inkPixels(page, leftHalf(before));
+
+    await page.locator('select[name^="kufiComposition"]').selectOption("boustrophedon");
+    await expect
+      .poll(async () => {
+        const b = (await getBlocks(page)).find((x) => x.id === id) as
+          | { kufiComposition?: string }
+          | undefined;
+        return b?.kufiComposition;
+      })
+      .toBe("boustrophedon");
+    await settleFrames(page);
+
+    const after = await blockClientBox(page, id);
+    const afterInk = await inkPixels(page, after);
+    const afterLeft = await inkPixels(page, leftHalf(after));
+
+    // Two reserved columns down each side, so the panel widens by four cells
+    // and gains the turning strokes. Both are the feature, in pixels.
+    const block = await kufiBlock(page, id);
+    const cellPx = (block.fontSize / 8) * (await getStageScale(page));
+    expect(after.width - before.width).toBeGreaterThan(cellPx * 3);
+    expect(after.width - before.width).toBeLessThan(cellPx * 5);
+    expect(afterInk).toBeGreaterThan(beforeInk);
+
+    // Return lines are laid flush *left* rather than flush right, so ink
+    // genuinely moves across the panel — a switch that only added the bridge
+    // would leave this share where it was.
+    const share = (part: number, whole: number) => part / Math.max(1, whole);
+    expect(Math.abs(share(afterLeft, afterInk) - share(beforeLeft, beforeInk))).toBeGreaterThan(
+      0.02
+    );
+  });
+
+  test("switching a one-line block wraps it too, and one undo takes both back", async ({
+    page,
+  }) => {
+    // Every block is created unwrapped, and an unwrapped block is one line —
+    // so the mode change has to bring a wrap width with it or it visibly does
+    // nothing. Both fields move in a single history entry.
+    await gotoApp(page);
+    const id = await addKufi(page);
+    await setBlockText(page, "بسم الله الرحمن الرحيم", id);
+    await openKufiPanel(page);
+
+    const kufiFields = async () =>
+      (await getBlocks(page)).find((b) => b.id === id) as unknown as {
+        kufiColumns?: number;
+        kufiComposition?: string;
+      };
+    expect((await kufiFields()).kufiColumns ?? 0).toBe(0);
+
+    await page.locator('select[name^="kufiComposition"]').selectOption("boustrophedon");
+    await expect.poll(async () => (await kufiFields()).kufiComposition).toBe("boustrophedon");
+    expect((await kufiFields()).kufiColumns ?? 0).toBeGreaterThan(0);
+
+    await page.keyboard.press("Control+z");
+    await expect
+      .poll(async () => (await kufiFields()).kufiComposition ?? "lines")
+      .toBe("lines");
+    expect((await kufiFields()).kufiColumns ?? 0).toBe(0);
+  });
+
+  test("a mirror draws a snaking source the way its source is drawn", async ({ page }) => {
+    // `MirrorBlockView` mounts the source's own renderer, so a prop it forgets
+    // to forward is silently absent rather than a type error — the same hole
+    // `strokeCuts` and `kufiCellEdits` each fell into once. A boustrophedon
+    // source is four cells wider than a plain one, which is what makes a
+    // dropped `kufiComposition` visible in the mirror's own box.
+    await gotoApp(page);
+    const id = await addKufi(page);
+    await setBlockText(page, "السلام عليكم ورحمة الله", id);
+    await openKufiPanel(page);
+    await page.locator('input[name^="kufiColumns"]').fill("18");
+    await page.locator('select[name^="kufiComposition"]').selectOption("boustrophedon");
+    await expect
+      .poll(async () => {
+        const b = (await getBlocks(page)).find((x) => x.id === id) as
+          | { kufiComposition?: string }
+          | undefined;
+        return b?.kufiComposition;
+      })
+      .toBe("boustrophedon");
+
+    await page.locator('button[aria-label="Add mirror"]').click();
+    const mirror = (await getBlocks(page)).at(-1)! as { id: number; type: string };
+    expect(mirror.type).toBe("mirror");
+
+    await page.locator('button[aria-label="Reset view"]').click();
+    await expect
+      .poll(async () => (await blockClientBox(page, mirror.id)).width)
+      .toBeGreaterThan(20);
+
+    const block = await kufiBlock(page, id);
+    const cellPx = (block.fontSize / 8) * (await getStageScale(page));
+    const source = await blockClientBox(page, id);
+    const reflected = await blockClientBox(page, mirror.id);
+    expect(Math.abs(reflected.width - source.width)).toBeLessThan(cellPx);
+    expect(Math.abs(reflected.height - source.height)).toBeLessThan(cellPx);
+  });
 });

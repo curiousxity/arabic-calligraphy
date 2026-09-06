@@ -995,8 +995,81 @@ and mirrors through `MirrorBlockView` like any other type. Per-glyph tools do
 not apply and are not gated against: they key off shaped glyph indices, which
 this block has none of.
 
-Deliberately out of scope: dots, tashkeel, boustrophedon and spiral
-compositions, and Latin.
+Deliberately out of scope: dots, tashkeel, spiral compositions, and Latin.
+
+#### Boustrophedon — snaking return lines
+
+`kufiComposition: "boustrophedon"` makes the reading snake: line 1 runs right
+to left, line 2 continues from where it stopped, and the stroke turns the
+corner between them. Absent (or anything unrecognised) is `"lines"`, whitelisted
+by `normalizeKufiComposition` rather than clamped — it is a string union, so a
+value from a later release or a hand-edited save must fall back rather than be
+coerced — which is why a project saved before the feature needs no payload
+version bump.
+
+- **A return line is rotated 180°, never mirrored.** Published panels do both;
+  this is the decision, and the rejected alternative is recorded in the module
+  header beside it because the choice is invisible in the code that implements
+  it. A mirrored Arabic letter is not that letter — its tooth is on the wrong
+  side and its joins run backwards — and rotation additionally puts a line's
+  two endpoints on the same edge as its neighbour's, which is what makes the
+  turn a short L rather than a run across the panel.
+- **`placeLine` renders a line into its own tight sub-grid and blits it under
+  `turns`.** Going through the sub-grid is what makes the turned case correct
+  by construction rather than by a second set of coordinate formulas, and
+  `turns: 0` is an identity blit that reproduces the flush-right composition
+  cell for cell — the whole safety margin of the extraction, and the reason the
+  existing ASCII assertions never moved.
+- **A turned line's baseline row is `bandTop + descent`, not `bandTop`.**
+  `baselineRowInBand` is the one place that arithmetic lives. The band is
+  `ascent + descent` rows and an unturned baseline sits at `ascent - 1`, so the
+  half turn lands it at `descent`. **`descent` is 1 for any text containing
+  ر و م ج ح ه** — most real phrases — so the plausible reading (the band's top
+  row) puts every turn one row clear of the letters it exists to join. A test
+  written with a descender-free fixture holds either way and proves nothing;
+  `squareKufi.test.ts` asserts `descent > 0` of each of its eight phrases
+  first, and the wrong arithmetic takes four of its assertions red at once.
+- **Two reserved gutter columns down each side** (`KUFI_TURN_GUTTER`), so
+  `cols = max(columns, ...lineWidths) + 4`; even lines are flush right against
+  `cols - 3` and odd lines flush left from column 2. The turn's vertical leg
+  runs down the **outermost** column, leaving the inner one as a permanent
+  buffer. **One column each side is not enough**, and that is measured rather
+  than argued: the leg necessarily spans the baseline *and* descender rows of
+  the line it leaves, so with a single gutter it sits directly beside ر or ج —
+  both of which carry ink at their left column on both rows — and 123 of 144
+  real compositions came out with a 2×2. With the buffer, 0 of 144, and 0 of
+  21,600 randomly generated ones across the whole alphabet at four line gaps
+  and three word gaps. The composed-grid test is the guard; the buffer is the
+  mechanism.
+- **The turn is single-cell-wide throughout** — the same primitive a letter
+  join already is. It is drawn only when *both* baseline rows carry ink to
+  attach to, since a dangling stub reads as a stray stroke. Connectivity is
+  asserted **4-connected**, reusing `connectedCount`'s neighbour rule: an
+  8-connected fill accepts a bridge that meets the next letter corner to
+  corner, which is two strokes touching rather than one turning. That was
+  verified by building exactly such a bridge — the 4-connected assertion went
+  red and the 8-connected variant stayed green.
+- **`lineGap` is floored at 1 while snaking.** At gap 0 with no descenders the
+  two baseline rows are adjacent and the turn's own two horizontal legs stack,
+  which is a 2×2 made by the bridge alone.
+- **A single line is exactly `"lines"`** — gutters are not reserved for a turn
+  that cannot happen, or switching mode would widen a block while changing
+  nothing else.
+- **`App.tsx`'s `setKufiComposition` sets a wrap width in the same patch.**
+  Every block is created with `kufiColumns: 0` and `breakIntoLines` reads that
+  as `Infinity`, so a fresh block is one unbroken line and the switch would
+  otherwise do nothing visible at all. Two document fields moving together is
+  why it is a handler in `App.tsx` rather than a `SelectRow` patch in the
+  Sidebar: one `pushHistory()`, one undo.
+- **Known and inherent: the inter-line white space alternates.** A turned
+  line's tails point upward, so the gap under an upright line is
+  `lineGap + 2·descent` rows and the one under a turned line is `lineGap`.
+  That is what turning a line with descenders does. The guide says so.
+
+`squareKufi.test.ts`'s four structural assertions still check only the
+*authored alphabet*; a turn bridge is composed geometry that never passes
+through them, which is why the composed-grid invariants are separate
+assertions over eight real phrases at five widths in both compositions.
 
 #### Hand-painted cells (`KufiCellEditOverlay.tsx`)
 
@@ -2177,9 +2250,10 @@ These are capabilities that have been explicitly identified as valuable but deli
   of the letter, and widening a letter's advance so two neighbours' dots cannot
   merge into one blob.
 
-- **Boustrophedon and spiral square-kufi compositions** — Classic panels snake
-  back on alternate lines or spiral inward from the edge. `breakIntoLines`
-  produces plain lines of slots, so the placement pass is where this would go.
+- **Spiral square-kufi compositions** — Classic panels also spiral inward from
+  the edge. Boustrophedon shipped (see the square-kufi section); a spiral is a
+  different problem, since it turns a line through 90° rather than 180° and so
+  cannot reuse `placeLine`'s half-turn blit.
 
 - **Image trace** — Auto-tracing a raster image into a silhouette shape existed on Shape Warp blocks and was removed with that block type. Rebuilding it for Shape Fill means restoring `lib/imageTrace.ts`, `ImageTraceDialog.tsx`, and the `imagetracerjs` dependency from git history; the tracing itself was block-type agnostic, producing the same `{ pathData, w, h }` shape `extractSvgPaths` returns.
 

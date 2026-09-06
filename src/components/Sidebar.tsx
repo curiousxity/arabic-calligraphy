@@ -44,6 +44,7 @@ import {
   layoutSquareKufi,
   applyCellEdits,
   kufiOptionsFor,
+  normalizeKufiComposition,
   DEFAULT_KUFI_OPTIONS,
 } from "../lib/squareKufi";
 import {
@@ -225,6 +226,14 @@ export type SidebarProps = {
   onAddSquareKufiBlock?: () => void;
   /** Wrap the selected square-kufi block to the width closest to square. */
   onFitKufiToSquare?: () => void;
+  /**
+   * Switch the selected square-kufi block's composition.
+   *
+   * Not a plain `onUpdateSelectedBlock` patch: a zero-column block is one
+   * unbroken line and has nothing to turn into, so App sets a wrap width in
+   * the same history entry. See `setKufiComposition`.
+   */
+  onSetKufiComposition?: (composition: string) => void;
   onAddImageBlock?: () => void;
   onGenerateFromTemplate?: (templateId: string, values: string[]) => void;
   onRandomizeLayout?: () => void;
@@ -469,6 +478,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddTextPathBlock,
   onAddSquareKufiBlock,
   onFitKufiToSquare,
+  onSetKufiComposition,
   onAddImageBlock,
   onGenerateFromTemplate,
   onRandomizeLayout,
@@ -2317,6 +2327,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         dials below are spacing. Dots and tashkeel are not
                         drawn, as the style has always left them out.
                       </div>
+
+                      <SelectRow
+                        id={makeId("kufi-composition", selectedId)}
+                        name={makeId("kufiComposition", selectedId)}
+                        label="Composition"
+                        value={normalizeKufiComposition(selectedBlock.kufiComposition)}
+                        onChange={(v) => onSetKufiComposition?.(v)}
+                      >
+                        <option value="lines">Lines — each reads right to left</option>
+                        <option value="boustrophedon">
+                          Boustrophedon — the reading snakes back
+                        </option>
+                      </SelectRow>
+
+                      {normalizeKufiComposition(selectedBlock.kufiComposition) ===
+                        "boustrophedon" && (
+                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          Every second line is turned upside down and the stroke
+                          turns the corner into it, so the panel reads as one
+                          continuous band. Turn the panel to read a return line.
+                          Two columns down each side are kept clear for the turn.
+                        </div>
+                      )}
 
                       <div className="field">
                         <span className="fieldTitle">Panel</span>

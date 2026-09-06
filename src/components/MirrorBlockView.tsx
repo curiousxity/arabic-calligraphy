@@ -160,6 +160,7 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
         <SquareKufiText
           {...typographic}
           kufiColumns={source.kufiColumns}
+          kufiComposition={source.kufiComposition}
           kufiLineGap={source.kufiLineGap}
           kufiWordGap={source.kufiWordGap}
           kufiCellEdits={source.kufiCellEdits}

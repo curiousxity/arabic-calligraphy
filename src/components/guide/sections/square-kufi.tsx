@@ -26,6 +26,14 @@ export const section: GuideSection = {
     "cells",
     "hand edit",
     "pixel",
+    "boustrophedon",
+    "snake",
+    "snaking",
+    "return line",
+    "upside down",
+    "rotated",
+    "ox",
+    "composition",
   ],
   Body: () => (
     <>
@@ -67,6 +75,36 @@ export const section: GuideSection = {
         as much of the design as the filled ones. If a word is wider than the
         panel it will be split across two lines and its join broken; widen the
         panel to close it back up.
+      </p>
+
+      <h4>Making the reading snake</h4>
+      <p>
+        Set <strong>Composition</strong> to <strong>Boustrophedon</strong> and
+        the panel stops being stacked lines. The first line reads right to left
+        as usual; the second is turned a half turn so it carries on from where
+        the first stopped, and the stroke turns the corner into it. The third
+        turns back again, and so on down the panel. The name is the Greek for
+        “as the ox ploughs”, and the classic square-kufi panels that read this
+        way are doing exactly that.
+      </p>
+      <p>
+        <strong>A return line is upside down, and that is right.</strong> Turn
+        the panel — or your head — and it reads normally. The alternative would
+        be to flip each line in a mirror, and a mirrored Arabic letter is not
+        that letter any more; it is a shape with its tooth on the wrong side and
+        its joins running backwards. So the letters are turned, never reflected.
+      </p>
+      <p>
+        Two columns down each edge are kept empty for the turning stroke to run
+        in, which is why the panel gets a little wider the moment you switch. A
+        block that is still on one line has nothing to turn into, so switching
+        wraps it to a square first — one step, and one undo.
+      </p>
+      <p>
+        One thing to expect: because a turned line's tails point upward, the
+        white space between lines is a little wider under an upright line than
+        under a turned one. That is what turning a line with descenders does,
+        not a spacing fault. <strong>Line gap</strong> adjusts both together.
       </p>
 
       <h4>What it leaves out</h4>

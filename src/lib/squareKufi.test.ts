@@ -1,8 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   layoutSquareKufi,
+  baselineRowInBand,
   cellRings,
   formAscent,
+  formDescent,
+  normalizeKufiComposition,
+  kufiOptionsFor,
+  KUFI_TURN_GUTTER,
   squareColumnTarget,
   resolveWords,
   applyCellEdits,
@@ -743,6 +748,343 @@ describe("cellRings over a hand-edited grid", () => {
         const [x0, y0] = ring[i];
         const [x1, y1] = ring[(i + 1) % ring.length];
         expect(x0 === x1 || y0 === y1).toBe(true);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// boustrophedon — the snaking composition and its turn
+// ---------------------------------------------------------------------------
+
+/**
+ * Eight real phrases, the ones a user actually sets. Every one contains at
+ * least one of ر و م ج ح ه, so `descent` is 1 throughout — which is the whole
+ * point: at `descent === 0` the turned baseline coincides with the band's top
+ * row and every assertion below would hold against arithmetic that is wrong.
+ */
+const PHRASES = [
+  "لا اله الا الله محمد رسول الله",
+  "السلام عليكم ورحمة الله وبركاته",
+  "بسم الله الرحمن الرحيم",
+  "الحمد لله رب العالمين",
+  "سبحان الله وبحمده سبحان الله العظيم",
+  "الخط العربي جميل والكتابة فن رفيع",
+  "ربنا اتنا في الدنيا حسنة",
+  "محمد رسول الله صلى الله عليه وسلم",
+];
+
+const WIDTHS = [16, 20, 24, 28, 32];
+
+/** The block-wide band metrics the layout derives, recomputed independently. */
+function bandMetrics(text: string) {
+  const { words } = resolveWords(text);
+  let ascent = 1;
+  let descent = 0;
+  for (const word of words) {
+    for (const unit of word) {
+      ascent = Math.max(ascent, formAscent(unit.form));
+      descent = Math.max(descent, formDescent(unit.form));
+    }
+  }
+  return { ascent, descent, height: ascent + descent };
+}
+
+type Grid = { cols: number; rows: number; cells: boolean[] };
+const inkAtCell = (g: Grid, x: number, y: number) =>
+  x >= 0 && y >= 0 && x < g.cols && y < g.rows && g.cells[y * g.cols + x];
+
+/** Every 2×2 block of ink in a grid. The invariant is that there are none. */
+function squaresOfFour(g: Grid): [number, number][] {
+  const hits: [number, number][] = [];
+  for (let y = 0; y + 1 < g.rows; y++) {
+    for (let x = 0; x + 1 < g.cols; x++) {
+      if (
+        inkAtCell(g, x, y) &&
+        inkAtCell(g, x + 1, y) &&
+        inkAtCell(g, x, y + 1) &&
+        inkAtCell(g, x + 1, y + 1)
+      ) {
+        hits.push([x, y]);
+      }
+    }
+  }
+  return hits;
+}
+
+/**
+ * Cells reachable from `(sx, sy)` moving only orthogonally — the same
+ * neighbour rule `connectedCount` uses on the authored alphabet, and it is
+ * load-bearing that it is that rule. An 8-connected fill walks a diagonal, so
+ * it accepts a bridge that meets the next line's letter corner to corner —
+ * which is not a stroke turning a corner, it is two strokes that happen to
+ * touch, and it is exactly the defect this test exists to catch.
+ */
+function reachable(g: Grid, sx: number, sy: number): Set<number> {
+  const seen = new Set<number>();
+  if (!inkAtCell(g, sx, sy)) return seen;
+  const queue = [sy * g.cols + sx];
+  seen.add(queue[0]);
+  while (queue.length) {
+    const k = queue.pop()!;
+    const x = k % g.cols;
+    const y = (k - x) / g.cols;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!inkAtCell(g, nx, ny)) continue;
+      const nk = ny * g.cols + nx;
+      if (!seen.has(nk)) {
+        seen.add(nk);
+        queue.push(nk);
+      }
+    }
+  }
+  return seen;
+}
+
+/** The ink cell on `row` nearest the panel's left or right edge. */
+function endCell(g: Grid, row: number, fromLeft: boolean): number {
+  const step = fromLeft ? 1 : -1;
+  for (let x = fromLeft ? 0 : g.cols - 1; x >= 0 && x < g.cols; x += step) {
+    if (inkAtCell(g, x, row)) return x;
+  }
+  return -1;
+}
+
+describe("boustrophedon composition", () => {
+  it("whitelists the composition rather than clamping it", () => {
+    expect(normalizeKufiComposition("boustrophedon")).toBe("boustrophedon");
+    expect(normalizeKufiComposition("lines")).toBe("lines");
+    // Anything else — a typo, a value from a later release, a hand-edited
+    // save, `undefined` — is the composition that predates the feature.
+    expect(normalizeKufiComposition(undefined)).toBe("lines");
+    expect(normalizeKufiComposition("spiral")).toBe("lines");
+    expect(normalizeKufiComposition(2)).toBe("lines");
+    expect(normalizeKufiComposition(null)).toBe("lines");
+    expect(kufiOptionsFor({ kufiComposition: "spiral" }).composition).toBe("lines");
+    expect(kufiOptionsFor({ kufiComposition: "boustrophedon" }).composition).toBe(
+      "boustrophedon"
+    );
+  });
+
+  it("puts a turned line's baseline `descent` rows into its band, not on top of it", () => {
+    // The correction. `descent` is 1 for every phrase here, so `descent` and
+    // the band's top row are genuinely different rows and the assertion has
+    // something to be wrong about — at `descent === 0` it would hold either
+    // way and prove nothing.
+    for (const text of PHRASES) {
+      const { ascent, descent } = bandMetrics(text);
+      expect(descent, `${text} has no descender to test with`).toBeGreaterThan(0);
+      expect(baselineRowInBand(2, ascent, descent)).toBe(descent);
+      expect(baselineRowInBand(0, ascent, descent)).toBe(ascent - 1);
+    }
+  });
+
+  it("leaves no 2×2 anywhere, in either composition, at any width", () => {
+    // The grammar of this hand is stroke = gap = one cell, so a 2×2 is a
+    // stroke at double weight. The four structural tests above check the
+    // *authored alphabet*; a turn bridge is composed geometry that never
+    // passes through them, so it needs its own guard.
+    for (const text of PHRASES) {
+      for (const columns of WIDTHS) {
+        for (const composition of ["lines", "boustrophedon"] as const) {
+          const g = layoutSquareKufi(text, { columns, composition });
+          expect(squaresOfFour(g), `${composition} "${text}" at ${columns} columns`).toEqual(
+            []
+          );
+        }
+      }
+    }
+  });
+
+  it("keeps every letter's ink, unclipped, in whichever orientation its line took", () => {
+    for (const text of PHRASES) {
+      for (const columns of WIDTHS) {
+        const g = layoutSquareKufi(
+          text,
+          { columns, composition: "boustrophedon" },
+          { placements: true }
+        );
+        const units = unitsByIndex(text);
+        expect(g.placements.length).toBe(units.size);
+
+        for (const p of g.placements) {
+          const form = units.get(p.unitIndex)!.form;
+          const h = form.rows.length;
+          const w = p.width;
+          const upright = form.rows.every((row, r) =>
+            Array.from(row).every((ch, c) => ch !== "#" || inkAtCell(g, p.x + c, p.y + r))
+          );
+          const turned = form.rows.every((row, r) =>
+            Array.from(row).every(
+              (ch, c) => ch !== "#" || inkAtCell(g, p.x + (w - 1 - c), p.y + (h - 1 - r))
+            )
+          );
+          expect(
+            upright || turned,
+            `unit ${p.unitIndex} of "${text}" at ${columns} lost ink at ${p.x},${p.y}`
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("turns a return line rather than mirroring it", () => {
+    // The convention, asserted rather than described. A mirrored Arabic letter
+    // is not a letter, so the two mappings have to be told apart on a form
+    // that is asymmetric — ت final (`#..` / `#..` / `###`) is.
+    const text = "بيت دار";
+    const g = layoutSquareKufi(
+      text,
+      { columns: 4, composition: "boustrophedon" },
+      { placements: true }
+    );
+    const units = unitsByIndex(text);
+    const { ascent, descent, height } = bandMetrics(text);
+
+    let checkedTurned = 0;
+    let checkedAsymmetric = 0;
+    for (const p of g.placements) {
+      const form = units.get(p.unitIndex)!.form;
+      const h = form.rows.length;
+      const w = p.width;
+      const bandIndex = Math.floor(p.baselineY / (height + 2));
+      const turned =
+        p.baselineY - bandIndex * (height + 2) === baselineRowInBand(2, ascent, descent);
+      if (!turned) continue;
+      checkedTurned++;
+
+      const rotated = form.rows.every((row, r) =>
+        Array.from(row).every(
+          (ch, c) => ch !== "#" || inkAtCell(g, p.x + (w - 1 - c), p.y + (h - 1 - r))
+        )
+      );
+      expect(rotated, `unit ${p.unitIndex} is not the 180° image of its form`).toBe(true);
+
+      // …and the reflection is a different thing, which is the half that makes
+      // the assertion above mean something.
+      const asymmetric = form.rows.some((row, r) =>
+        Array.from(row).some((ch, c) => ch !== form.rows[h - 1 - r][w - 1 - c])
+      );
+      if (!asymmetric) continue;
+      checkedAsymmetric++;
+      const mirrored = form.rows.every((row, r) =>
+        Array.from(row).every(
+          (ch, c) => ch !== "#" || inkAtCell(g, p.x + (w - 1 - c), p.y + r)
+        )
+      );
+      expect(mirrored, `unit ${p.unitIndex} came out mirrored, not turned`).toBe(false);
+    }
+    expect(checkedTurned, "no line was turned — the fixture wrapped to one line").toBeGreaterThan(
+      0
+    );
+    expect(checkedAsymmetric, "no asymmetric letter on the turned line").toBeGreaterThan(0);
+  });
+
+  it("reserves the gutter columns, so no letter can sit beside the turn", () => {
+    // The mechanism behind the 2×2 invariant. The vertical leg runs down the
+    // outermost column; this keeps the one beside it letter-free, which is
+    // what a single reserved column could not do — measured, a single gutter
+    // put a 2×2 in 123 of 144 real compositions.
+    for (const text of PHRASES) {
+      for (const columns of WIDTHS) {
+        const g = layoutSquareKufi(
+          text,
+          { columns, composition: "boustrophedon" },
+          { placements: true }
+        );
+        for (const p of g.placements) {
+          expect(p.x, `${text} at ${columns}`).toBeGreaterThanOrEqual(KUFI_TURN_GUTTER);
+          expect(p.x + p.width - 1).toBeLessThanOrEqual(g.cols - 1 - KUFI_TURN_GUTTER);
+        }
+      }
+    }
+  });
+
+  it("carries the stroke from each line's end into the next line's start", () => {
+    // Explicitly 4-connected — see `reachable`. A bridge that only meets the
+    // next letter diagonally is two strokes touching at a corner, not a stroke
+    // turning one, and an 8-connected fill would wave it through.
+    let checkedTurns = 0;
+    for (const text of PHRASES) {
+      for (const columns of WIDTHS) {
+        const lineGap = 2;
+        const g = layoutSquareKufi(text, {
+          columns,
+          lineGap,
+          composition: "boustrophedon",
+        });
+        const { ascent, descent, height } = bandMetrics(text);
+        const lines = Math.round((g.rows + lineGap) / (height + lineGap));
+        if (lines < 2) continue;
+
+        const rowOf = (k: number) =>
+          k * (height + lineGap) + baselineRowInBand(k % 2 === 1 ? 2 : 0, ascent, descent);
+
+        for (let i = 0; i + 1 < lines; i++) {
+          const onLeft = i % 2 === 0;
+          const from = endCell(g, rowOf(i), onLeft);
+          const to = endCell(g, rowOf(i + 1), onLeft);
+          expect(
+            from,
+            `${text}@${columns}: line ${i} has no baseline ink`
+          ).toBeGreaterThanOrEqual(0);
+          expect(
+            to,
+            `${text}@${columns}: line ${i + 1} has no baseline ink`
+          ).toBeGreaterThanOrEqual(0);
+
+          const seen = reachable(g, from, rowOf(i));
+          expect(
+            seen.has(rowOf(i + 1) * g.cols + to),
+            `${text}@${columns}: the turn from line ${i} never reaches line ${i + 1}`
+          ).toBe(true);
+          checkedTurns++;
+        }
+      }
+    }
+    expect(checkedTurns, "no phrase wrapped, so no turn was tested").toBeGreaterThan(20);
+  });
+
+  it("is exactly the plain composition when there is only one line to turn", () => {
+    // A single line has nothing to turn into, so reserving gutters for a turn
+    // that cannot happen would pad the block with empty columns — and the mode
+    // switch would visibly widen a block while changing nothing else.
+    const text = "محمد رسول الله";
+    const plain = layoutSquareKufi(text);
+    const snaked = layoutSquareKufi(text, { composition: "boustrophedon" });
+    expect(snaked.cols).toBe(plain.cols);
+    expect(snaked.rows).toBe(plain.rows);
+    expect(snaked.cells).toEqual(plain.cells);
+  });
+
+  it("adds ink rather than moving it, and keeps the first line where it was", () => {
+    const text = "السلام عليكم ورحمة الله وبركاته";
+    const options = { columns: 20, lineGap: 2 };
+    const plain = layoutSquareKufi(text, options);
+    const snaked = layoutSquareKufi(text, { ...options, composition: "boustrophedon" });
+
+    const count = (g: Grid) => g.cells.filter(Boolean).length;
+    // The turn is added stroke; nothing about the letters changed.
+    expect(count(snaked)).toBeGreaterThan(count(plain));
+    expect(snaked.rows).toBe(plain.rows);
+    expect(snaked.cols).toBe(plain.cols + 2 * KUFI_TURN_GUTTER);
+
+    // Line 0 is untouched by the turn convention — it always reads right to
+    // left — so its band comes out identical, just shifted by the gutter.
+    const { height } = bandMetrics(text);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < plain.cols; x++) {
+        if (!plain.cells[y * plain.cols + x]) continue;
+        expect(inkAtCell(snaked, x + KUFI_TURN_GUTTER, y), `line 0 lost ink at ${x},${y}`).toBe(
+          true
+        );
       }
     }
   });
