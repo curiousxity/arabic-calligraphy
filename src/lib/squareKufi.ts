@@ -474,8 +474,8 @@ function breakIntoLines(
 type CellTarget = { cells: boolean[]; cols: number; rows: number };
 
 /**
- * Renders one line into its own tight sub-grid and blits it into `dest` under
- * `turns` quarter-…no: under a half turn or none at all.
+ * Renders one line into its own tight sub-grid and blits it into `dest`, under
+ * either a half turn or none at all.
  *
  * Going through a sub-grid rather than writing letters straight into the panel
  * is what makes the 180° case correct by construction instead of by a second
