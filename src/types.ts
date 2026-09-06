@@ -55,6 +55,20 @@ export type GlyphTransform = {
   scaleX?: number;
   /** Multiplier on the glyph's natural height. Default 1. */
   scaleY?: number;
+  /**
+   * Turn, in degrees clockwise, about the glyph's own *raw* box centre.
+   *
+   * Applied inside the scale, so at a non-uniform scale a rotated letter is
+   * stretched along the block's axes rather than along its own. That keeps
+   * the rotation pivot independent of the scale being dragged — the scale
+   * handles snapshot their pivot at drag start, and a pivot that moved with
+   * the scale would reintroduce the convergence bug `scaleFromHandleDrag`
+   * exists to prevent. Identical either way whenever `scaleX === scaleY`.
+   *
+   * Optional: absent means no rotation, which is byte-for-byte the rendering
+   * that predates the handle.
+   */
+  rotation?: number;
 };
 
 // ---- STREAM-F: ink & surface — BlockFill type ----

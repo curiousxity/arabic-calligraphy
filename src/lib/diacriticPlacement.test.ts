@@ -50,6 +50,20 @@ describe("makeGlyphTransformAdapter", () => {
     { ...base, scaleY: 0.4 },
     { ...base, transformOffsetX: 40, transformOffsetY: -25, scaleX: 1.8, scaleY: 0.4 },
     { ...base, pivotX: -60, pivotY: 35, scaleX: 3, scaleY: 3 },
+    // A turn on its own, and a turn combined with everything else — the
+    // rotation is the innermost of the three, so composing it correctly and
+    // inverting it in the same order is what the round trip is checking.
+    { ...base, rotationDeg: 35, rotationPivotX: 118, rotationPivotY: -20 },
+    {
+      ...base,
+      transformOffsetX: 40,
+      transformOffsetY: -25,
+      scaleX: 1.8,
+      scaleY: 0.4,
+      rotationDeg: -62,
+      rotationPivotX: 118,
+      rotationPivotY: -20,
+    },
   ];
 
   for (const c of cases) {
@@ -83,6 +97,69 @@ describe("makeGlyphTransformAdapter", () => {
     const at = a.toCanvas(120, -40);
     const moved = a.toLocal(at.x, at.y - 30);
     expect(moved.y).toBeCloseTo(-40 - 15, 6);
+  });
+
+  it("still reads a drag back as unscaled and unturned with a rotation set", () => {
+    // The contract the whole adapter exists for, now with the fourth
+    // handle in play: a mark's stored offsetY must stay in the glyph's own
+    // pre-transform units no matter how the glyph itself has been turned or
+    // stretched, or DiacriticHoverHandles cannot invert a drag at all.
+    const a = makeGlyphTransformAdapter({
+      ...base,
+      scaleY: 2,
+      rotationDeg: 40,
+      rotationPivotX: 118,
+      rotationPivotY: -20,
+    });
+    const local = { x: 120, y: -40 };
+    const at = a.toCanvas(local.x, local.y);
+    const back = a.toLocal(at.x, at.y);
+    expect(back.x).toBeCloseTo(local.x, 6);
+    expect(back.y).toBeCloseTo(local.y, 6);
+  });
+
+  it("matches makeOffsetAdapter exactly at a zero rotation, whatever pivot is passed", () => {
+    // Rotation is optional and absent on almost every glyph; a stray pivot
+    // must not perturb the common path.
+    const plain = makeOffsetAdapter(30, -12);
+    const a = makeGlyphTransformAdapter({
+      ...base,
+      rotationDeg: 0,
+      rotationPivotX: 999,
+      rotationPivotY: -999,
+    });
+    expect(a.toCanvas(137, -48)).toEqual(plain.toCanvas(137, -48));
+    expect(a.toLocal(137, -48)).toEqual(plain.toLocal(137, -48));
+  });
+
+  it("treats a non-finite rotation as no rotation rather than propagating NaN", () => {
+    const a = makeGlyphTransformAdapter({
+      ...base,
+      rotationDeg: Number.NaN,
+      rotationPivotX: 118,
+      rotationPivotY: -20,
+    });
+    expect(a.toCanvas(137, -48)).toEqual(makeOffsetAdapter(30, -12).toCanvas(137, -48));
+  });
+
+  it("turns the mark about the pivot the renderer turns the glyph about", () => {
+    // A quarter turn about the mark's own position leaves it exactly there;
+    // a quarter turn about a point beside it swings it round by the radius.
+    const pivot = { x: 118, y: -20 };
+    const a = makeGlyphTransformAdapter({
+      ...base,
+      offsetX: 0,
+      offsetY: 0,
+      rotationDeg: 90,
+      rotationPivotX: pivot.x,
+      rotationPivotY: pivot.y,
+    });
+    expect(a.toCanvas(pivot.x, pivot.y).x).toBeCloseTo(pivot.x, 6);
+    expect(a.toCanvas(pivot.x, pivot.y).y).toBeCloseTo(pivot.y, 6);
+    // 40 to the right of the pivot, turned a quarter clockwise, lands 40 below.
+    const p = a.toCanvas(pivot.x + 40, pivot.y);
+    expect(p.x).toBeCloseTo(pivot.x, 6);
+    expect(p.y).toBeCloseTo(pivot.y + 40, 6);
   });
 
   it("stays finite at a degenerate zero scale", () => {

@@ -11,6 +11,11 @@ export const section: GuideSection = {
     "move",
     "scale",
     "stretch",
+    "rotate",
+    "rotation",
+    "turn",
+    "tilt",
+    "angle",
     "overlap",
     "diacritic",
     "tashkeel",
@@ -22,21 +27,35 @@ export const section: GuideSection = {
     <>
       <p>
         Two tools work on a single letter rather than the block as a whole:
-        one moves and scales a letter, the other adjusts a mark sitting above
-        or below it. Both live on the canvas — you hover the letter and small
-        handles appear.
+        one moves, scales and turns a letter, the other adjusts a mark sitting
+        above or below it. Both live on the canvas — you hover the letter and
+        small handles appear.
       </p>
 
-      <h4>Move &amp; scale a letter</h4>
+      <h4>Move, scale &amp; turn a letter</h4>
       <p>
         On a plain text block, open <strong>Typography</strong> and tick{" "}
-        <strong>Move &amp; scale glyph</strong>, then hover a letter. Three
-        dots appear: one moves the letter bodily, one stretches it sideways,
-        one stretches it vertically. Its neighbours never shift to make room,
+        <strong>Move, scale &amp; rotate glyph</strong>, then hover a letter.
+        Four dots appear: one moves the letter bodily, one stretches it
+        sideways, one stretches it vertically, and one — set out past the
+        letter's upper corner — turns it. A letter turns about its own centre,
+        so it stays where you put it. Its neighbours never shift to make room,
         so you can overlap letters deliberately — which is exactly what a
         calligrapher wants and a word processor refuses.{" "}
-        <strong>Reset glyph moves &amp; scales</strong> undoes all of them for
+        <strong>Reset glyph moves, scales &amp; turns</strong> undoes all of them for
         the block.
+      </p>
+      <p>
+        A letter stretched more in one direction than the other is stretched
+        along the block's own axes, not along the letter's, so turning such a
+        letter shears it a little. At equal stretch — which is nearly always —
+        there is no difference.
+      </p>
+      <p>
+        A moved, stretched or turned letter does not change the width the
+        block reports, so a letter pushed outward can overhang the page margin
+        and <strong>Fit to width</strong> will not count it. Fit the line
+        first, then shape the letters.
       </p>
       <p>
         This is for plain text blocks only. Shape Fill and curve blocks lay

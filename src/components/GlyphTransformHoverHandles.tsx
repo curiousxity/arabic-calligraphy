@@ -1,13 +1,17 @@
 import React, { useRef, useState } from "react";
 import { Group, Circle, Rect } from "react-konva";
 import { projectOntoAxis } from "../lib/dragAxis";
-import { scaleFromHandleDrag } from "../lib/glyphTransform";
+import {
+  resolveGlyphTransform,
+  rotationFromHandleDrag,
+  scaleFromHandleDrag,
+} from "../lib/glyphTransform";
 import type { GlyphHitBox } from "./ShapedText";
 import type { GlyphTransform } from "../types";
 
 export type GlyphTransformHoverHandlesProps = {
   isSelected: boolean;
-  /** Armed by the Morph panel's "Move & scale glyph" checkbox. */
+  /** Armed by Typography's "Move, scale & rotate glyph" checkbox. */
   enabled: boolean;
   /** Already transform-aware: ShapedText applies each glyph's transform when it builds these. */
   glyphHitBoxes: GlyphHitBox[];
@@ -21,12 +25,27 @@ export type GlyphTransformHoverHandlesProps = {
 const MOVE_HANDLE_COLOR = "#38bdf8";
 const SCALE_X_HANDLE_COLOR = "#d4af37";
 const SCALE_Y_HANDLE_COLOR = "#22c55e";
+const ROTATE_HANDLE_COLOR = "#a855f7";
 
 /** How far outside the glyph box the two scale dots sit, in px. */
 const SCALE_HANDLE_GAP = 10;
 
 /**
- * On-canvas hover-only overlay for moving and scaling a whole glyph.
+ * How far diagonally past the box's upper-leading corner the rotate dot
+ * sits, in px.
+ *
+ * Diagonal, and never below the box, on purpose: kasra, kasratan and
+ * shadda-kasra all live under the baseline, and `DiacriticHoverHandles`
+ * mounts *after* this component with a generous vertical margin — so a
+ * rotate dot placed below centre would sit beneath a mark's hit rect, and
+ * Konva, which routes a pointer to the topmost listening shape, would make
+ * it impossible to grab on exactly the letters most likely to want turning.
+ */
+const ROTATE_HANDLE_GAP = 14;
+
+/**
+ * On-canvas hover-only overlay for moving, scaling and rotating a whole
+ * glyph.
  *
  * Only the currently-hovered glyph shows handles — the same rule that keeps
  * the diacritic and stroke-stretch overlays from turning a line of text
@@ -80,6 +99,9 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
     startDistanceY: number;
     pivotX: number;
     pivotY: number;
+    rotation: number;
+    rotPivotX: number;
+    rotPivotY: number;
   } | null>(null);
 
   if (!isSelected || !enabled) return null;
@@ -108,6 +130,11 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
         const cy = box.y + box.height / 2;
         const scaleXAt = { x: box.x + box.width + SCALE_HANDLE_GAP, y: cy };
         const scaleYAt = { x: cx, y: box.y - SCALE_HANDLE_GAP };
+        // Diagonally past the corner the other two dots leave free. The
+        // component of the offset is `gap / sqrt(2)` on each axis, so the dot
+        // sits ROTATE_HANDLE_GAP clear of the corner itself.
+        const diag = ROTATE_HANDLE_GAP / Math.SQRT2;
+        const rotateAt = { x: box.x - diag, y: box.y - diag };
 
         // The scale pivot is the renderer's own pivot: it translates to the
         // pen origin, THEN to the transform's offset, THEN scales (see
@@ -121,10 +148,12 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
         // The hit rect covers the glyph plus every dot's rest position, so
         // a dot dragged outward can't leave the rect, fire onMouseLeave,
         // and unmount itself mid-gesture.
-        const rx1 = Math.min(box.x, scaleYAt.x, scaleXAt.x) - SCALE_HANDLE_GAP;
-        const ry1 = Math.min(box.y, scaleYAt.y, scaleXAt.y) - SCALE_HANDLE_GAP;
-        const rx2 = Math.max(box.x + box.width, scaleXAt.x, scaleYAt.x) + SCALE_HANDLE_GAP;
-        const ry2 = Math.max(box.y + box.height, scaleXAt.y, scaleYAt.y) + SCALE_HANDLE_GAP;
+        const rx1 = Math.min(box.x, scaleYAt.x, scaleXAt.x, rotateAt.x) - SCALE_HANDLE_GAP;
+        const ry1 = Math.min(box.y, scaleYAt.y, scaleXAt.y, rotateAt.y) - SCALE_HANDLE_GAP;
+        const rx2 =
+          Math.max(box.x + box.width, scaleXAt.x, scaleYAt.x, rotateAt.x) + SCALE_HANDLE_GAP;
+        const ry2 =
+          Math.max(box.y + box.height, scaleXAt.y, scaleYAt.y, rotateAt.y) + SCALE_HANDLE_GAP;
 
         const beginDrag = (pointer: { x: number; y: number }) => {
           const scaleX = transform?.scaleX ?? 1;
@@ -145,6 +174,15 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
             startDistanceY: scaleYAt.y - pivotY,
             pivotX,
             pivotY,
+            rotation: resolveGlyphTransform(transform).rotation,
+            // The turn's own pivot, in the group space this overlay draws
+            // in. `transformedBox` rotates the raw outline box about its
+            // centre and takes the AABB, and that operation leaves the
+            // centre exactly where it was — so the drawn box's centre *is*
+            // the point the renderer turns the glyph about, at any scale,
+            // offset or angle. No separate pivot needs threading through.
+            rotPivotX: cx + offsetX,
+            rotPivotY: cy + offsetY,
           };
           setDraggingIndex(box.glyphIndex);
         };
@@ -323,6 +361,55 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
                         dragDistance,
                         -SCALE_HANDLE_GAP,
                         start.scaleY
+                      ),
+                    });
+                  }}
+                  onDragEnd={(e) => {
+                    e.cancelBubble = true;
+                    endDrag();
+                  }}
+                />
+
+                {/*
+                  The rotate dot free-drags — it has no rail, so no
+                  `dragBoundFunc` and therefore no reason to reach for
+                  `getAbsoluteTransform()`. Everything below is in the
+                  overlay's own group space, the space `e.target.position()`
+                  already reports in; the two scale handles need the absolute
+                  transform only because `dragBoundFunc`'s contract is in
+                  stage coordinates, and mixing the two spaces is what once
+                  teleported a handle sideways under pan and zoom.
+                */}
+                <Circle
+                  x={rotateAt.x + offsetX}
+                  y={rotateAt.y + offsetY}
+                  radius={4}
+                  fill={ROTATE_HANDLE_COLOR}
+                  stroke="#ffffff"
+                  strokeWidth={1.5}
+                  draggable
+                  onMouseDown={(e) => {
+                    e.cancelBubble = true;
+                  }}
+                  onDragStart={(e) => {
+                    e.cancelBubble = true;
+                    beginDrag(e.target.position());
+                  }}
+                  onDragMove={(e) => {
+                    e.cancelBubble = true;
+                    const start = dragStartRef.current;
+                    if (!start) return;
+                    const pos = e.target.position();
+                    applyPatch({
+                      // The *change* in bearing since the grab, not the
+                      // bearing itself — which is what makes the first frame
+                      // return the angle unchanged (no jump on mouse-down)
+                      // and lets the dot be grabbed anywhere on its circle.
+                      rotation: rotationFromHandleDrag(
+                        { x: start.rotPivotX, y: start.rotPivotY },
+                        { x: start.pointerX, y: start.pointerY },
+                        { x: pos.x, y: pos.y },
+                        start.rotation
                       ),
                     });
                   }}

@@ -555,7 +555,7 @@ perfectly while silently discarding every edit.
 Text-on-path blocks remain unsupported — their glyphs are rotated to a
 curve tangent, which is separate design work.
 
-### Per-glyph move & scale (`src/lib/glyphTransform.ts`, `GlyphTransformHoverHandles.tsx`)
+### Per-glyph move, scale & rotate (`src/lib/glyphTransform.ts`, `GlyphTransformHoverHandles.tsx`)
 
 Plain text blocks support rigidly moving a single shaped glyph and
 stretching or shrinking it as a whole in x or y — a second per-glyph system
@@ -642,6 +642,72 @@ second time. The `gap` argument is **signed along each dot's rail**: positive
 for the x dot, negative for the y dot, which sits above the glyph while
 canvas y grows downward.
 
+**Rotation is the fourth handle, and it goes *inside* the scale.** The full
+composition is `translate(gx, gy) → translate(offset) → scale → rotate about
+the glyph's raw box centre → [diacritic override] → outline`. Putting the
+turn outside the scale is the plausible alternative, and it is the one thing
+in this feature that would have shipped looking correct:
+
+- **The pivot must not depend on the scale.** Outside the scale the pivot
+  becomes `(boxCentreX − gx) × scaleX`, and the scale handles snapshot
+  `pivotX`/`pivotY` once at `onDragStart` and measure from that frozen point
+  every frame. A pivot that moves under them is exactly the "asking for 2×
+  lands near 1.45×" divergence recorded below — reintroduced by a different
+  route. It is **zero at rotation 0**, so every pre-existing test and both
+  pre-existing e2e drags stay green while the defect ships. The guard is
+  `glyphTransform.test.ts`'s "round-trips with a rotation and a non-unit
+  start scale set together", which was verified to fail against an
+  outside-the-scale `transformedBox` and is the only assertion in the suite
+  that does.
+- **Nothing else had to change.** The scale rails stay axis-aligned in local
+  space, `SCALE_HANDLE_GAP` stays in the same space as `startDistance`, and
+  `scaleFromHandleDrag` needs no signed-axis generalisation — so the three
+  drag readbacks that shipped wrong twice are not touched at all.
+- **The visible cost** is that at a *non-uniform* scale a turned letter is
+  stretched along the block's axes rather than its own. Deliberate, and
+  identical either way whenever `scaleX === scaleY`, which is almost every
+  real use. The guide says so.
+
+`transformedBox` rotates the raw box about its centre and takes the AABB
+*before* scaling. Two consequences worth knowing: the operation leaves that
+centre exactly where it was, so **the drawn box's centre is the rotation
+pivot** at any scale, offset or angle — which is why `GlyphTransformHoverHandles`
+needs no pivot threaded through it and the rotate drag reuses the point the
+move dot already sits on; and the half-extent stays proportional to `scaleX`,
+which is what keeps the scale-handle round trip exact.
+
+The pivots the *renderer* needs are a different matter: they come from
+`ShapedText`'s `glyphMetrics` walk, appended as the last positional parameter
+of `drawWarpedGlyphRun`. They must come from there rather than a
+`getBoundingBox()` inside the draw loop, because the metrics boxes are
+**post-cut** — a surgically lengthened letter has to turn about the centre of
+what it is, not the centre of what it was.
+
+The rotate dot sits **diagonally past the box's upper-outer corner, never
+below it**. Kasra, kasratan and shadda-kasra all hang under the baseline, and
+`DiacriticHoverHandles` mounts *after* this component with a generous
+`fontSize * 0.5` vertical margin — so a dot below centre lands under a mark's
+hit rect, and Konva routes the pointer to the topmost listening shape. The
+symptom is not a dot that fails to work but one that hands the gesture to the
+mark instead, recording a diacritic override. `e2e/glyph-transform.spec.ts`
+pins that by asserting the *drag*, and was verified to fail (`Rect.diacritic-hit`)
+against a below-centre placement.
+
+The rotate handle **free-drags** — no rail, so no `dragBoundFunc` and
+therefore no reason to reach for `getAbsoluteTransform()`; everything is in
+the overlay's own group space, which is the space `e.target.position()`
+already reports in. `rotationFromHandleDrag` reads the *change* in bearing
+about the pivot rather than the bearing itself, which gives the same no-jump
+first frame `scaleFromHandleDrag` guarantees and lets the dot be grabbed
+anywhere on its circle.
+
+Two known limits, both pre-existing and neither widened by much:
+`StrokeCutHoverHandles` builds its rails from bare `gx`/`gy` and is
+glyph-transform-blind (already true of offset and scale; rotation makes it
+more visible), and the PUA preset-honorific branch draws override art whose
+centre differs from the metrics memo's font-glyph box, so a turned honorific
+pivots off-centre.
+
 Plain text only. Shape Fill carries the fields via
 `BlockCommon` but its renderer doesn't read them; `App.tsx`'s
 `supportsGlyphTransforms` gate rejects edits there rather than accepting
@@ -677,7 +743,7 @@ that archive file before resurrecting anything from git history, exactly as the
 
 **What survived, and why it is where it is:**
 
-- **Per-glyph move & scale** (`lib/glyphTransform.ts`,
+- **Per-glyph move, scale & rotate** (`lib/glyphTransform.ts`,
   `GlyphTransformHoverHandles.tsx`) — its own section above. Its arming
   checkbox used to live in the Morph panel and now sits in Sidebar →
   Typography, plain-text-only, matching the arming rule it always had.
@@ -1987,7 +2053,7 @@ live in `e2e/harf.ts`.
 
 These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
 
-- **Per-glyph move & scale on Shape Fill and text-on-path blocks** — Implemented for plain text only. `src/lib/diacriticPlacement.ts`'s adapters are the nearest existing precedent for expressing another renderer's coordinate space, but they were authored for placing *diacritic marks*, not for a general per-glyph transform — treat them as a starting point to evaluate, not as a drop-in that makes this cheap. Each renderer's coordinate space needs its own design and verification pass. Text-on-path is excluded for the same reason every other per-glyph tool is, its glyphs being rotated to a curve tangent.
+- **Per-glyph move, scale & rotate on Shape Fill and text-on-path blocks** — Implemented for plain text only (all four handles). `src/lib/diacriticPlacement.ts`'s adapters are the nearest existing precedent for expressing another renderer's coordinate space, but they were authored for placing *diacritic marks*, not for a general per-glyph transform — treat them as a starting point to evaluate, not as a drop-in that makes this cheap. Each renderer's coordinate space needs its own design and verification pass. Text-on-path is excluded for the same reason every other per-glyph tool is, its glyphs being rotated to a curve tangent.
 
 - **Straight-stroke stretching on Shape Fill and text-on-path blocks** —
   **Declined, not deferred**, and for a stronger reason than the one this
@@ -2011,8 +2077,6 @@ These are capabilities that have been explicitly identified as valuable but deli
   without anyone asking. Reaching for it again means changing what those two
   renderers *are*, which is the render-math rewrite this file declines
   elsewhere.
-
-- **Per-glyph rotation** — The move/scale handles cover translation and axis-aligned scale only. Rotation needs a fourth handle and its own pivot decision.
 
 - **Dots and tashkeel in square kufi** — Deliberately undrawn, matching the
   style; see the square-kufi section above for why it is a design problem

@@ -18,7 +18,7 @@ import {
   type BlockFill,
   type BlockFillPainter,
 } from "../lib/blockFill";
-import { resolveGlyphTransform, transformedBox } from "../lib/glyphTransform";
+import { glyphPivot, resolveGlyphTransform, transformedBox } from "../lib/glyphTransform";
 import { ITALIC_SHEAR, fauxBoldStrokeWidth } from "../lib/fitToWidth";
 import {
   applyCutsToCommands,
@@ -166,7 +166,16 @@ function drawWarpedGlyphRun(
    * they are scaled by `scale` before being applied to a path opentype.js
    * has already drawn at `fontSize`.
    */
-  cutPlan: CutPlan | null = null
+  cutPlan: CutPlan | null = null,
+  /**
+   * Each glyph's rotation pivot — the centre of its own **raw** outline box,
+   * relative to that glyph's pen origin. Passed in rather than measured here
+   * because `glyphMetrics` has already walked the font for exactly these
+   * boxes, and its boxes are post-cut: a `getBoundingBox()` taken in this
+   * loop would turn a surgically lengthened letter about the centre of the
+   * letter it used to be.
+   */
+  glyphPivots: Map<number, { x: number; y: number }> | null = null
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -208,10 +217,30 @@ function drawWarpedGlyphRun(
       // of the advance — with no pivot arithmetic. Deliberately does NOT
       // touch `penX += advance` below: a moved or widened glyph must never
       // shift its neighbours.
-      const { offsetX, offsetY, scaleX, scaleY } = resolveGlyphTransform(transform);
+      const { offsetX, offsetY, scaleX, scaleY, rotation } = resolveGlyphTransform(transform);
       ctx.translate(offsetX, offsetY);
       ctx.scale(scaleX, scaleY);
       localScale *= (scaleX + scaleY) / 2;
+
+      // Rotation goes *inside* the scale, about the glyph's own raw box
+      // centre. Two consequences, both deliberate. The pivot never depends
+      // on the scale, so the scale handles' drag-start snapshot stays valid
+      // — a scale-dependent pivot is the divergence `scaleFromHandleDrag`
+      // exists to remove, and it is zero at rotation 0 so it would ship
+      // green. And at a non-uniform scale a turned letter is stretched along
+      // the block's axes rather than along its own; that is an aesthetic
+      // choice, identical either way whenever scaleX === scaleY.
+      //
+      // Guarded so the overwhelmingly common untouched path is unchanged
+      // instruction for instruction.
+      if (rotation !== 0) {
+        const pivot = glyphPivots?.get(glyphIndex);
+        if (pivot) {
+          ctx.translate(pivot.x, pivot.y);
+          ctx.rotate((rotation * Math.PI) / 180);
+          ctx.translate(-pivot.x, -pivot.y);
+        }
+      }
     }
 
     // Applied *inside* the glyph transform: the transform is the outermost
@@ -491,6 +520,13 @@ export const ShapedText: React.FC<Props> = ({
     bounds: GlyphBounds;
     hitBoxes: GlyphHitBox[];
     transformedHitBoxes: GlyphHitBox[];
+    /**
+     * Rotation pivots, by glyph index — read off the same raw boxes as
+     * `hitBoxes`, in the same font walk, so the draw loop and the overlay
+     * turn every glyph about the identical point. These boxes are post-cut,
+     * which a pivot measured inside the draw loop would not be.
+     */
+    pivots: Map<number, { x: number; y: number }>;
   }>(() => {
     const fallbackBounds = (): GlyphBounds => {
       const rw = fallbackWidth(text, fontSize);
@@ -508,7 +544,12 @@ export const ShapedText: React.FC<Props> = ({
     const { font, glyphs, unitsPerEm } = shapeData;
 
     if (!font || glyphs.length === 0) {
-      return { bounds: fallbackBounds(), hitBoxes: [], transformedHitBoxes: [] };
+      return {
+        bounds: fallbackBounds(),
+        hitBoxes: [],
+        transformedHitBoxes: [],
+        pivots: new Map(),
+      };
     }
 
     const upm = Math.max(unitsPerEm || 1000, 1);
@@ -521,6 +562,7 @@ export const ShapedText: React.FC<Props> = ({
     let maxY = -Infinity;
     const hitBoxes: GlyphHitBox[] = [];
     const transformedHitBoxes: GlyphHitBox[] = [];
+    const pivots = new Map<number, { x: number; y: number }>();
 
     for (let i = 0; i < glyphs.length; i++) {
       const g = glyphs[i];
@@ -582,6 +624,8 @@ export const ShapedText: React.FC<Props> = ({
             gy,
           });
 
+          pivots.set(i, glyphPivot(raw, gx, gy));
+
           const t = transformedBox(
             raw,
             gx,
@@ -610,7 +654,7 @@ export const ShapedText: React.FC<Props> = ({
       !isFinite(maxX) ||
       !isFinite(maxY)
     ) {
-      return { bounds: fallbackBounds(), hitBoxes, transformedHitBoxes };
+      return { bounds: fallbackBounds(), hitBoxes, transformedHitBoxes, pivots };
     }
 
     return {
@@ -624,12 +668,14 @@ export const ShapedText: React.FC<Props> = ({
       },
       hitBoxes,
       transformedHitBoxes,
+      pivots,
     };
   }, [shapeData, text, fontSize, activeGlyphTransforms, cutPlan]);
 
   const glyphBounds = glyphMetrics.bounds;
   const glyphHitBoxes = glyphMetrics.hitBoxes;
   const glyphTransformedHitBoxes = glyphMetrics.transformedHitBoxes;
+  const glyphPivots = glyphMetrics.pivots;
 
   const isBold = fontStyle === "bold" || fontStyle === "bold italic";
   const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
@@ -662,6 +708,9 @@ export const ShapedText: React.FC<Props> = ({
 
         if (transform) {
           const resolved = resolveGlyphTransform(transform);
+          // The rotation pivot is in this same local space, so it is the
+          // glyph's raw box centre put back where the metrics walk found it.
+          const pivot = glyphPivots.get(b.glyphIndex);
           adapter = makeGlyphTransformAdapter({
             offsetX: dx,
             offsetY: dy,
@@ -671,6 +720,9 @@ export const ShapedText: React.FC<Props> = ({
             transformOffsetY: resolved.offsetY,
             scaleX: resolved.scaleX,
             scaleY: resolved.scaleY,
+            rotationDeg: pivot ? resolved.rotation : 0,
+            rotationPivotX: b.gx + (pivot?.x ?? 0),
+            rotationPivotY: b.gy + (pivot?.y ?? 0),
           });
         }
 
@@ -684,6 +736,7 @@ export const ShapedText: React.FC<Props> = ({
   }, [
     glyphHitBoxes,
     activeGlyphTransforms,
+    glyphPivots,
     diacriticGlyphIndices,
     bx,
     by,
@@ -800,7 +853,8 @@ export const ShapedText: React.FC<Props> = ({
             activeDiacriticOverrides,
             activeGlyphTransforms,
             painter,
-            cutPlan
+            cutPlan,
+            glyphPivots
           );
           ctx.restore();
 
@@ -834,7 +888,8 @@ export const ShapedText: React.FC<Props> = ({
               // and its transform is the same block space the painter was
               // built in, so it reuses the same one.
               painter,
-              cutPlan
+              cutPlan,
+              glyphPivots
             );
             ctx.restore();
           }

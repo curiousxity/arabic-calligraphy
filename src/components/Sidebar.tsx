@@ -3027,18 +3027,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     that move nothing. */}
                 {selectedBlock.type === "text" && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Move &amp; scale</div>
+                    <div className="sidebarSectionTitle">Move, scale &amp; rotate</div>
 
                     <CheckboxRow
                       id={makeId("glyph-transform-mode", selectedId)}
-                      label="Move &amp; scale glyph"
+                      label="Move, scale &amp; rotate glyph"
                       checked={!!selectedBlock.glyphTransformMode}
                       onChange={() => onToggleGlyphTransformMode?.(selectedBlock.id)}
                     />
 
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                      Hover a letter on the canvas to move it, or stretch it in x or y.
-                      Neighbouring letters never shift.
+                      Hover a letter on the canvas to move it, stretch it in x or y, or
+                      turn it. Neighbouring letters never shift.
                     </div>
 
                     {(selectedBlock.glyphTransforms?.length ?? 0) > 0 && (
@@ -3048,13 +3048,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         className="sidebarSmallAction"
                         style={{ background: "var(--bg-input)", marginTop: 8 }}
                       >
-                        Reset glyph moves &amp; scales
+                        Reset glyph moves, scales &amp; turns
                       </button>
                     )}
                   </div>
                 )}
 
-                {/* Plain text only, matching the Move & scale row above and
+                {/* Plain text only, matching the Move, scale & rotate row above and
                     for the same reason: only ShapedText performs the outline
                     surgery, so arming it elsewhere would show handles that
                     stretch nothing. */}

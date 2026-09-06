@@ -31,6 +31,22 @@ const safeDivisor = (v: number) =>
   Math.abs(v) < MIN_DIVISOR ? (v < 0 ? -MIN_DIVISOR : MIN_DIVISOR) : v;
 
 /**
+ * Folds an angle into (-180, 180] and turns a non-finite one into no
+ * rotation at all, so a corrupted stored value can never put a mark's
+ * handles at NaN and leave them impossible to grab.
+ *
+ * Deliberately a local copy rather than an import of `glyphTransform.ts`'s
+ * `normalizeRotation`: this module is the coordinate-space layer that
+ * `ShapeFillText` also depends on, and it holds no dependency on the
+ * per-glyph transform model beyond the numbers it is handed.
+ */
+const normalizeDeg = (v: number) => {
+  if (!Number.isFinite(v)) return 0;
+  const wrapped = ((v % 360) + 360) % 360;
+  return wrapped > 180 ? wrapped - 360 : wrapped;
+};
+
+/**
  * Plain translation — used by `ShapedText`, whose local space already *is*
  * the glyph-run space its overlay draws in, offset by the block's own
  * `bx + localDrawX` / `by + localDrawY`.
@@ -47,7 +63,7 @@ export function makeOffsetAdapter(offsetX: number, offsetY: number): PlacementAd
  * (`GlyphTransform`), for the diacritic overlay mounted on top of it.
  *
  * `ShapedText` draws such a glyph as `translate(pivot) → translate(offset)
- * → scale → [diacritic override] → outline`, so the mark's own override
+ * → scale → rotate → [diacritic override] → outline`, so the mark's own override
  * lives *inside* the glyph transform. Expressing that transform as the
  * placement's adapter is what keeps the override in the glyph's own
  * pre-transform space: a drag read back through `toLocal` yields an
@@ -67,19 +83,58 @@ export function makeGlyphTransformAdapter(p: {
   transformOffsetY: number;
   scaleX: number;
   scaleY: number;
+  /** The glyph's own turn, in degrees. Optional — absent is no rotation. */
+  rotationDeg?: number;
+  /**
+   * The point that turn is about, in the same local space as the placement
+   * box: the glyph's raw outline centre. Only read when `rotationDeg` is
+   * non-zero.
+   */
+  rotationPivotX?: number;
+  rotationPivotY?: number;
 }): PlacementAdapter {
   const sx = safeDivisor(p.scaleX);
   const sy = safeDivisor(p.scaleY);
+  const rot = normalizeDeg(p.rotationDeg ?? 0);
+  const rad = (rot * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const rpx = p.rotationPivotX ?? 0;
+  const rpy = p.rotationPivotY ?? 0;
+
+  // The renderer composes `translate(pivot) -> translate(transformOffset) ->
+  // scale -> rotate(about the raw box centre) -> [the mark's own override]`,
+  // so the rotation is the innermost of the three and a point maps as
+  // scale(rotate(p)). Inverting in the same order is what keeps a drag
+  // readable as an `offsetY` in the glyph's own unscaled, unturned units —
+  // which is the whole contract `DiacriticHoverHandles` relies on.
+  const turn = (x: number, y: number) => {
+    if (rot === 0) return { x, y };
+    const dx = x - rpx;
+    const dy = y - rpy;
+    return { x: rpx + dx * cos - dy * sin, y: rpy + dx * sin + dy * cos };
+  };
+
+  const unturn = (x: number, y: number) => {
+    if (rot === 0) return { x, y };
+    const dx = x - rpx;
+    const dy = y - rpy;
+    return { x: rpx + dx * cos + dy * sin, y: rpy - dx * sin + dy * cos };
+  };
 
   return {
-    toCanvas: (x, y) => ({
-      x: p.pivotX + p.transformOffsetX + (x - p.pivotX) * sx + p.offsetX,
-      y: p.pivotY + p.transformOffsetY + (y - p.pivotY) * sy + p.offsetY,
-    }),
-    toLocal: (x, y) => ({
-      x: p.pivotX + (x - p.offsetX - p.pivotX - p.transformOffsetX) / sx,
-      y: p.pivotY + (y - p.offsetY - p.pivotY - p.transformOffsetY) / sy,
-    }),
+    toCanvas: (x, y) => {
+      const r = turn(x, y);
+      return {
+        x: p.pivotX + p.transformOffsetX + (r.x - p.pivotX) * sx + p.offsetX,
+        y: p.pivotY + p.transformOffsetY + (r.y - p.pivotY) * sy + p.offsetY,
+      };
+    },
+    toLocal: (x, y) =>
+      unturn(
+        p.pivotX + (x - p.offsetX - p.pivotX - p.transformOffsetX) / sx,
+        p.pivotY + (y - p.offsetY - p.pivotY - p.transformOffsetY) / sy
+      ),
   };
 }
 

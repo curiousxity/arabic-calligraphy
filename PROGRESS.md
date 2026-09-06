@@ -33,6 +33,14 @@ regression, and what it would take to fix.
 - **Per-glyph tools do not apply to text-on-path blocks.** Their glyphs are
   rotated to a curve tangent, which the straight-bounding-box maths behind
   those tools assumes away.
+- **A turned glyph pivots off-centre when it is a PUA preset honorific.** That
+  branch draws override art whose centre differs from the metrics walk's
+  font-glyph box, which is the box the pivot comes from. Pre-existing for the
+  move and scale handles; the rotate handle makes it visible.
+- **`StrokeCutHoverHandles` is glyph-transform-blind.** It builds its rails
+  from the bare pen origin, so on a letter that has been moved, scaled or
+  turned its dots sit where the letter would be untransformed. Pre-existing;
+  rotation widens the gap.
 - **Straight-stroke stretching is plain-text only, and stays that way.** Not
   the tangent reason above: Shape Fill and Curve both renormalise the run to a
   fixed span, so an added advance is divided straight back out. Declined
@@ -83,6 +91,28 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 ---
 
 ## Shipped
+
+### 2026-09-06 — A fourth per-glyph handle: rotate
+
+Ticking **Move, scale & rotate glyph** in Typography now shows four dots on a
+hovered letter rather than three. The new one, set diagonally past the
+letter's upper-outer corner, turns it about its own centre. Neighbours never
+shift, exactly as with move and scale.
+
+The design decision worth knowing is that the turn is applied *inside* the
+scale, which keeps the rotation pivot independent of the scale being dragged.
+The alternative would have reintroduced the scale-handle convergence bug this
+file already records — and, being zero-valued at rotation 0, would have passed
+every test that existed. CLAUDE.md, "Per-glyph move, scale & rotate", carries
+the argument and names the one assertion that discriminates; it was verified
+to fail against the rejected variant, as was the e2e test guarding the dot's
+placement clear of below-baseline marks.
+
+`rotation` is optional on `GlyphTransform`, so a project saved before today
+renders byte-for-byte as it did and the layout payload's version is unmoved.
+A turned letter is not counted in the block's reported width, so it can
+overhang the page margin and Fit to width will not see it — the same limit
+move and scale already have, now stated in the guide.
 
 ### 2026-09-05 — Square kufi
 
@@ -809,9 +839,10 @@ the result, and most of it came back **declined**.
 Still open, in the order that plan sequences them:
 
 - Hand-editing square-kufi cells
-- Per-glyph rotation
 - Boustrophedon square-kufi compositions
-- Per-glyph move/scale on Shape Fill (text-on-path dropped with the rest)
+- Per-glyph move/scale/rotate on Shape Fill (text-on-path dropped with the rest)
+
+Per-glyph rotation shipped on 2026-09-06 and has left this list.
 
 Declined there, with the reason in the plan: straight-stroke stretching on
 Shape Fill/Curve (both renormalise the span), image trace (Shape Fill's

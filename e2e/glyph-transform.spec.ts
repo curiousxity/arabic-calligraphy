@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   blockClientBox,
+  diacriticHitCenters,
   dotCentersWithFill,
   getBlocks,
   gotoApp,
@@ -22,13 +23,25 @@ import {
  *   it. Both now hang their handlers on the shared ancestor Group.
  */
 const MOVE_DOT = "#38bdf8";
+const ROTATE_DOT = "#a855f7";
 const WORD = "حرف";
+/** The same word with a kasra — a mark that hangs *below* the baseline. */
+const WORD_WITH_LOW_MARK = "حِرف";
 
-/** Arms the tool, then parks the pointer on a mounted move dot. */
-async function armGlyphMoveDot(page: Page): Promise<{ x: number; y: number }> {
+type Point = { x: number; y: number };
+
+/**
+ * Arms the tool, then parks the pointer on a mounted dot of the given
+ * colour.
+ *
+ * Kept colour-parameterised rather than duplicated per handle: all four dots
+ * mount together on hover, so the only thing that differs between them is
+ * which one the pointer finally settles on.
+ */
+async function armGlyphDot(page: Page, fill: string): Promise<Point> {
   // The checkbox lives in Typography, which is collapsed on load.
   await openTypography(page);
-  await page.getByLabel("Move & scale glyph").check();
+  await page.getByLabel("Move, scale & rotate glyph").check();
 
   const box = await blockClientBox(page, 1);
   // Sweep across the run at mid-height until a letter's dots mount.
@@ -40,7 +53,7 @@ async function armGlyphMoveDot(page: Page): Promise<{ x: number; y: number }> {
     await page.mouse.move(probe.x, probe.y);
     await settleFrames(page);
 
-    const dots = await dotCentersWithFill(page, MOVE_DOT);
+    const dots = await dotCentersWithFill(page, fill);
     if (dots.length === 0) continue;
 
     const nearest = dots.reduce((best, d) =>
@@ -53,8 +66,10 @@ async function armGlyphMoveDot(page: Page): Promise<{ x: number; y: number }> {
     await settleFrames(page);
     if ((await hitTargetAt(page, nearest))?.startsWith("Circle")) return nearest;
   }
-  throw new Error("could not park the pointer on a mounted glyph move dot");
+  throw new Error(`could not park the pointer on a mounted glyph ${fill} dot`);
 }
+
+const armGlyphMoveDot = (page: Page) => armGlyphDot(page, MOVE_DOT);
 
 test("the move dot stays mounted while the pointer sits on it", async ({ page }) => {
   await gotoApp(page);
@@ -96,4 +111,123 @@ test("dragging the move dot records a glyph transform, not a block move", async 
   // And it must record which glyph it was made for, or it cannot be
   // re-validated after a later text edit.
   expect(typeof transforms[0].glyphId).toBe("number");
+});
+
+
+test("the rotate dot stays mounted while the pointer sits on it", async ({ page }) => {
+  // The fourth dot is a new sibling under the same per-glyph Group. If the
+  // hover handlers ever drift back onto the hit Rect, or the rect stops
+  // covering this dot's rest position, the every-other-frame flicker returns
+  // — the measured symptom the other two overlays record.
+  await gotoApp(page);
+  await setBlockText(page, WORD);
+  const dot = await armGlyphDot(page, ROTATE_DOT);
+
+  for (let i = 0; i < 8; i++) {
+    await page.mouse.move(dot.x + (i % 2 === 0 ? 0.5 : -0.5), dot.y);
+    await settleFrames(page);
+    expect(
+      (await dotCentersWithFill(page, ROTATE_DOT)).length,
+      `the rotate dot vanished on move ${i}`
+    ).toBeGreaterThan(0);
+  }
+});
+
+test("swinging the rotate dot turns the glyph, not the block", async ({ page }) => {
+  await gotoApp(page);
+  await setBlockText(page, WORD);
+
+  const before = (await getBlocks(page))[0];
+  expect(before.glyphTransforms ?? []).toHaveLength(0);
+
+  // The move dot sits exactly on the rotation pivot — `transformedBox` turns
+  // the raw outline box about its own centre and takes the AABB, which
+  // leaves that centre where it was. So the pivot needs no separate
+  // measurement here: it is wherever the blue dot is.
+  const pivot = await armGlyphMoveDot(page);
+  const dot = await armGlyphDot(page, ROTATE_DOT);
+
+  // Swing the dot a quarter of the way round the pivot. The stage's own
+  // pan and zoom are a translation plus a *uniform* scale, both of which
+  // preserve angles, so the number recorded should be the number swept.
+  const theta = (40 * Math.PI) / 180;
+  const dx = dot.x - pivot.x;
+  const dy = dot.y - pivot.y;
+  const to = {
+    x: pivot.x + dx * Math.cos(theta) - dy * Math.sin(theta),
+    y: pivot.y + dx * Math.sin(theta) + dy * Math.cos(theta),
+  };
+
+  await page.mouse.down();
+  // A deliberately small first step, for the reason `dragFromHere` records.
+  await page.mouse.move(dot.x + (to.x - dot.x) * 0.05, dot.y + (to.y - dot.y) * 0.05);
+  await page.mouse.move(to.x, to.y, { steps: 24 });
+  await page.mouse.up();
+
+  const block = (await getBlocks(page))[0];
+  const transforms = block.glyphTransforms ?? [];
+  expect(transforms.length).toBeGreaterThan(0);
+
+  const turned = transforms.find((t) => (t.rotation ?? 0) !== 0);
+  expect(turned, "no glyph recorded a rotation").toBeDefined();
+  expect(turned!.rotation!).toBeGreaterThan(25);
+  expect(turned!.rotation!).toBeLessThan(55);
+  // Stamped with the glyph it was made for, or it cannot be re-validated
+  // after a later text edit.
+  expect(typeof turned!.glyphId).toBe("number");
+
+  // The gesture must have been consumed by the dot, not by the block under
+  // it: a per-glyph turn is not a block turn.
+  expect(block.rotation ?? 0).toBe(before.rotation ?? 0);
+  expect(block.x).toBe(before.x);
+  expect(block.y).toBe(before.y);
+});
+
+test("the rotate dot is grabbable on a letter carrying a mark below the baseline", async ({
+  page,
+}) => {
+  // Kasra, kasratan and shadda-kasra all hang under the line, and
+  // DiacriticHoverHandles mounts *after* this overlay — Konva routes a
+  // pointer to the topmost listening shape, so a rotate dot placed below the
+  // box centre sits beneath the mark's own hit rect and cannot be grabbed on
+  // exactly the letters most likely to want turning. Placing it diagonally
+  // above the box is what keeps it reachable.
+  //
+  // Asserting the drag rather than the dot's coordinates is what makes this
+  // discriminating: a buried dot does not merely fail to move the glyph, it
+  // hands the gesture to the mark underneath and records a diacritic
+  // override instead.
+  await gotoApp(page);
+  await setBlockText(page, WORD_WITH_LOW_MARK);
+  await settleFrames(page);
+
+  const mark = (await diacriticHitCenters(page))[0];
+  expect(mark, "the kasra mounted no hit rect to collide with").toBeDefined();
+
+  const box = await blockClientBox(page, 1);
+  await openTypography(page);
+  await page.getByLabel("Move, scale & rotate glyph").check();
+
+  // Hover the marked letter clear of the mark's own rect, which covers the
+  // lower half of the glyph and would otherwise take the hover itself.
+  await page.mouse.move(mark.x, box.y + box.height * 0.15);
+  await settleFrames(page);
+
+  const dots = await dotCentersWithFill(page, ROTATE_DOT);
+  expect(dots.length, "the marked letter mounted no rotate dot").toBeGreaterThan(0);
+  const dot = dots[0];
+  expect(await hitTargetAt(page, dot), "the rotate dot is buried").toMatch(/^Circle/);
+
+  await page.mouse.move(dot.x, dot.y);
+  await settleFrames(page);
+  await page.mouse.down();
+  await page.mouse.move(dot.x + 6, dot.y);
+  await page.mouse.move(dot.x + 90, dot.y + 20, { steps: 24 });
+  await page.mouse.up();
+
+  const block = (await getBlocks(page))[0];
+  const turned = (block.glyphTransforms ?? []).find((t) => (t.rotation ?? 0) !== 0);
+  expect(turned, "the gesture recorded no rotation").toBeDefined();
+  // And it went to the glyph, not to the mark sitting under the dot.
+  expect(block.diacriticOverrides ?? []).toHaveLength(0);
 });
