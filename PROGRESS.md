@@ -92,6 +92,31 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-09-06 — Per-glyph move, scale & rotate on Shape Fill
+
+**Move, scale & rotate glyph** in Typography now arms on a Shape Fill block as
+well as on plain text. All four dots work, the transform renders inside the
+tiled draw loop, and a mirror of such a block draws the moved letters too.
+
+Two things were decided rather than inherited, and both are in CLAUDE.md,
+"Per-glyph move, scale & rotate → On Shape Fill":
+
+- **One handle per letter, not one per tile.** A large silhouette tiles a
+  short run into tens of thousands of instances; a listening hit rect on each
+  is a frozen tab. The cap costs nothing, because a transform is keyed by
+  glyph index and so already applies to every repetition — the model the
+  Diacritic tool has always shipped. What it costs is that the handle sits on
+  one designated tile near the middle of the shape.
+- **The transform is applied outside the row's own fit scale**, so a stored
+  offset moves the letter by the same amount on every row rather than by
+  whatever that row happened to be compressed to.
+
+A live defect went with it: `ShapeFillText`'s drag pin returned *layer*-space
+coordinates where Konva's `dragBoundFunc` contract is absolute, so pressing an
+armed silhouette teleported the block — measured at 37px at the default 275%
+zoom. Only a press on the silhouette itself could ever see it; a press on a
+handle cancels the bubble and never starts a block drag.
+
 ### 2026-09-06 — Square kufi: boustrophedon
 
 **Composition** in the Square Kufi panel now offers *Boustrophedon* beside the
@@ -876,12 +901,14 @@ features" section carries the reasoning for each. All of it was re-planned on
 per item — `docs/superpowers/plans/2026-09-06-remaining-work-program.md` holds
 the result, and most of it came back **declined**.
 
-Still open, in the order that plan sequences them:
+Nothing from that plan is still open. Per-glyph rotation, hand-editing
+square-kufi cells, boustrophedon compositions and per-glyph
+move/scale/rotate on Shape Fill all shipped on 2026-09-06; the other five
+items the plan investigated came back declined, with the reasons below.
 
-- Per-glyph move/scale/rotate on Shape Fill (text-on-path dropped with the rest)
-
-Per-glyph rotation, hand-editing square-kufi cells and boustrophedon
-compositions all shipped on 2026-09-06 and have left this list.
+Text-on-path was dropped from the per-glyph item rather than deferred with
+it: `offsetX` on a curve has no defined meaning until a spec answers
+whether it runs along the tangent or along arc length.
 
 Declined there, with the reason in the plan: straight-stroke stretching on
 Shape Fill/Curve (both renormalise the span), image trace (Shape Fill's

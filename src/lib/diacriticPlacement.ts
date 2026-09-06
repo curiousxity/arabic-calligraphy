@@ -189,3 +189,72 @@ export function makeShapeFillInstanceAdapter(p: {
     },
   };
 }
+
+/**
+ * Chains two adapters: `inner`'s local space maps through `inner` into
+ * `outer`'s local space, and through `outer` from there into group space.
+ *
+ * This exists because Shape Fill's draw transform grew a stage in the
+ * middle. A glyph carrying a per-glyph transform is drawn as
+ * `rowFrame → glyphTransform → rowFitScale → [the mark's own override]`, so
+ * a mark on such a glyph needs all three composed to reach where it is
+ * actually drawn — while a glyph with no transform must keep the two-stage
+ * mapping `makeShapeFillInstanceAdapter` already expresses, unchanged.
+ *
+ * Composition rather than a wider adapter builder is what keeps each stage
+ * readable on its own and lets the identity case be proved by test:
+ * composing with an identity-valued stage returns the outer mapping.
+ */
+export function composeAdapters(
+  outer: PlacementAdapter,
+  inner: PlacementAdapter
+): PlacementAdapter {
+  return {
+    toCanvas: (x, y) => {
+      const mid = inner.toCanvas(x, y);
+      return outer.toCanvas(mid.x, mid.y);
+    },
+    toLocal: (x, y) => {
+      const mid = outer.toLocal(x, y);
+      return inner.toLocal(mid.x, mid.y);
+    },
+  };
+}
+
+/**
+ * One hoverable *glyph* on canvas, for the move/scale/rotate overlay.
+ *
+ * Lives here beside `DiacriticPlacement` rather than in the component,
+ * because this module is the coordinate-space layer both renderers already
+ * share; a second placement vocabulary in a component file would be a second
+ * place for the two renderers' spaces to be described.
+ *
+ * **`box` is the glyph's RAW outline box and the transform is deliberately
+ * not folded into it.** Folding it in would make the producing memo depend on
+ * the live drag value — which on Shape Fill means rebuilding and re-mapping
+ * the whole tiled instance array on every frame of a drag, the exact reason
+ * `ShapeFillText`'s diacritic placements exclude `diacriticOverrides` from
+ * their dependency list. The overlay resolves the transform itself, per
+ * render, from a separate prop.
+ *
+ * `gx`/`gy` are the glyph's pen origin in the same local space — the point
+ * the renderer scales about once the transform's own offset is added.
+ */
+export type GlyphTransformPlacement = {
+  glyphIndex: number;
+  key: string;
+  /** The glyph this placement was built for, stamped onto every write. */
+  glyphId: number;
+  box: { x: number; y: number; width: number; height: number };
+  gx: number;
+  gy: number;
+  /**
+   * Canvas px per local unit, per axis. The handle gap is divided by these
+   * so the dots sit a constant distance clear of the glyph on screen however
+   * compressed the row that drew it is — on Shape Fill a row's fit scale can
+   * be well under 1, and a gap left in local units would put the dots inside
+   * the letter. Absent means the local space is already canvas px.
+   */
+  unitScaleX?: number;
+  unitScaleY?: number;
+} & PlacementAdapter;

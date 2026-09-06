@@ -228,12 +228,18 @@ const supportsDiacriticOverrides = (
   b.type === "text" || b.type === "shapeFill";
 
 /**
- * Plain text blocks only for v1 — the other block types carry the
- * `glyphTransforms`/`glyphTransformMode` fields via BlockCommon but no other
- * renderer reads them, so accepting an edit there would silently discard it.
+ * The two block types whose renderers mount `GlyphTransformHoverHandles` and
+ * apply the transform in their draw loop. `image`, `textPath`, `squareKufi`
+ * and `mirror` carry `glyphTransforms`/`glyphTransformMode` via BlockCommon
+ * but no renderer of theirs reads them, so accepting an edit there would
+ * silently discard it — the trap CLAUDE.md records against
+ * `supportsDiacriticOverrides`, and the reason this had to widen in the same
+ * commit as `ShapeFillText`'s draw loop.
  */
-const supportsGlyphTransforms = (b: Block): b is Extract<Block, { type: "text" }> =>
-  b.type === "text";
+const supportsGlyphTransforms = (
+  b: Block
+): b is Extract<Block, { type: "text" | "shapeFill" }> =>
+  b.type === "text" || b.type === "shapeFill";
 
 /**
  * Plain text blocks only, for the same reason as `supportsGlyphTransforms`

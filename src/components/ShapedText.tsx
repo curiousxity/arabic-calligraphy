@@ -10,6 +10,7 @@ import { findDiacriticGlyphIndices } from "../lib/diacritics";
 import {
   makeGlyphTransformAdapter,
   makeOffsetAdapter,
+  type GlyphTransformPlacement,
   type DiacriticPlacement,
 } from "../lib/diacriticPlacement";
 import type { DiacriticOverride, GlyphTransform, StrokeCut } from "../types";
@@ -18,7 +19,11 @@ import {
   type BlockFill,
   type BlockFillPainter,
 } from "../lib/blockFill";
-import { glyphPivot, resolveGlyphTransform, transformedBox } from "../lib/glyphTransform";
+import {
+  filterActiveGlyphTransforms,
+  glyphPivot,
+  resolveGlyphTransform,
+} from "../lib/glyphTransform";
 import { ITALIC_SHEAR, fauxBoldStrokeWidth } from "../lib/fitToWidth";
 import {
   applyCutsToCommands,
@@ -422,10 +427,7 @@ export const ShapedText: React.FC<Props> = ({
   // nothing to check against and is kept, preserving the old behaviour for
   // saved projects rather than dropping their edits.
   const activeGlyphTransforms = useMemo(
-    () =>
-      glyphTransforms.filter(
-        (t) => t.glyphId === undefined || shapeData.glyphs[t.glyphIndex]?.g === t.glyphId
-      ),
+    () => filterActiveGlyphTransforms(glyphTransforms, shapeData.glyphs),
     [glyphTransforms, shapeData.glyphs]
   );
 
@@ -519,7 +521,6 @@ export const ShapedText: React.FC<Props> = ({
   const glyphMetrics = useMemo<{
     bounds: GlyphBounds;
     hitBoxes: GlyphHitBox[];
-    transformedHitBoxes: GlyphHitBox[];
     /**
      * Rotation pivots, by glyph index — read off the same raw boxes as
      * `hitBoxes`, in the same font walk, so the draw loop and the overlay
@@ -547,7 +548,6 @@ export const ShapedText: React.FC<Props> = ({
       return {
         bounds: fallbackBounds(),
         hitBoxes: [],
-        transformedHitBoxes: [],
         pivots: new Map(),
       };
     }
@@ -561,7 +561,6 @@ export const ShapedText: React.FC<Props> = ({
     let maxX = -Infinity;
     let maxY = -Infinity;
     const hitBoxes: GlyphHitBox[] = [];
-    const transformedHitBoxes: GlyphHitBox[] = [];
     const pivots = new Map<number, { x: number; y: number }>();
 
     for (let i = 0; i < glyphs.length; i++) {
@@ -598,15 +597,17 @@ export const ShapedText: React.FC<Props> = ({
         }
 
         if (isFinite(box.x1) && isFinite(box.x2) && isFinite(box.y1) && isFinite(box.y2)) {
-          // `hitBoxes` stays in raw outline space — every consumer besides
-          // the move/scale overlay (the diacritic placements, and whatever
-          // `onGlyphBoxesChange` feeds) reasons about real font outline
-          // points, which a folded-in transform would misalign.
-          // `transformedHitBoxes` tracks where each glyph is actually
-          // drawn, for the move/scale overlay's own hover targets. The
-          // block bounds above deliberately follow neither — those must
-          // stay stable, or transforming one glyph would re-layout the
-          // entire block.
+          // `hitBoxes` stays in **raw** outline space, and every consumer
+          // now takes it that way — the diacritic placements, whatever
+          // `onGlyphBoxesChange` feeds, and (since the overlay port) the
+          // move/scale/rotate placements too, which fold the transform in
+          // themselves via `transformedBox`. That is what keeps this walk —
+          // one `getPath(...).getBoundingBox()` per glyph, the expensive
+          // thing in this component — off the live drag value, so a scale
+          // gesture no longer re-walks the font every frame. The block
+          // bounds above are raw for a different reason: they must stay
+          // stable, or transforming one glyph would re-layout the entire
+          // block.
           const raw = {
             x: box.x1,
             y: box.y1,
@@ -625,23 +626,6 @@ export const ShapedText: React.FC<Props> = ({
           });
 
           pivots.set(i, glyphPivot(raw, gx, gy));
-
-          const t = transformedBox(
-            raw,
-            gx,
-            gy,
-            activeGlyphTransforms.find((gt) => gt.glyphIndex === i)
-          );
-          transformedHitBoxes.push({
-            glyphIndex: i,
-            x: t.x,
-            y: t.y,
-            width: Math.max(t.width, 1),
-            height: Math.max(t.height, 1),
-            glyphId: g.g,
-            gx,
-            gy,
-          });
         }
       }
 
@@ -654,7 +638,7 @@ export const ShapedText: React.FC<Props> = ({
       !isFinite(maxX) ||
       !isFinite(maxY)
     ) {
-      return { bounds: fallbackBounds(), hitBoxes, transformedHitBoxes, pivots };
+      return { bounds: fallbackBounds(), hitBoxes, pivots };
     }
 
     return {
@@ -667,14 +651,12 @@ export const ShapedText: React.FC<Props> = ({
         rawHeight: Math.max(maxY - minY, 1),
       },
       hitBoxes,
-      transformedHitBoxes,
       pivots,
     };
-  }, [shapeData, text, fontSize, activeGlyphTransforms, cutPlan]);
+  }, [shapeData, text, fontSize, cutPlan]);
 
   const glyphBounds = glyphMetrics.bounds;
   const glyphHitBoxes = glyphMetrics.hitBoxes;
-  const glyphTransformedHitBoxes = glyphMetrics.transformedHitBoxes;
   const glyphPivots = glyphMetrics.pivots;
 
   const isBold = fontStyle === "bold" || fontStyle === "bold italic";
@@ -687,6 +669,26 @@ export const ShapedText: React.FC<Props> = ({
   const by = -bh / 2;
   const localDrawX = -glyphBounds.minX + (bw - glyphBounds.rawWidth) / 2;
   const localDrawY = -glyphBounds.minY + (bh - glyphBounds.rawHeight) / 2;
+
+  /**
+   * Move/scale/rotate placements: one per glyph, with the **raw** box and the
+   * glyph's pen origin, and the plain translation into group space as the
+   * adapter. The transform is deliberately absent — the overlay resolves it
+   * per render, so this memo does not rebuild on every frame of a drag.
+   */
+  const glyphTransformPlacements = useMemo<GlyphTransformPlacement[]>(() => {
+    const adapter = makeOffsetAdapter(bx + localDrawX, by + localDrawY);
+    return glyphHitBoxes.map((b) => ({
+      glyphIndex: b.glyphIndex,
+      // One placement per glyph, so the glyph index is already unique.
+      key: String(b.glyphIndex),
+      glyphId: b.glyphId,
+      box: { x: b.x, y: b.y, width: b.width, height: b.height },
+      gx: b.gx,
+      gy: b.gy,
+      ...adapter,
+    }));
+  }, [glyphHitBoxes, bx, by, localDrawX, localDrawY]);
 
   // Identity-plus-offset placements: this component's local space already
   // *is* the glyph-run space its overlay draws in, so its adapter is a
@@ -904,10 +906,8 @@ export const ShapedText: React.FC<Props> = ({
       <GlyphTransformHoverHandles
         isSelected={isSelected}
         enabled={glyphTransformMode}
-        glyphHitBoxes={glyphTransformedHitBoxes}
+        placements={glyphTransformPlacements}
         glyphTransforms={activeGlyphTransforms}
-        offsetX={bx + localDrawX}
-        offsetY={by + localDrawY}
         onUpdateGlyphTransform={onUpdateGlyphTransform}
       />
 

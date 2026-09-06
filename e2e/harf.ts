@@ -256,6 +256,45 @@ function escapeRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Adds a Shape Fill block from the ornament picker and returns its id.
+ *
+ * The picker is the one route to a `shapeFill` block that needs no file
+ * dialog, which is why three specs already reach for it; this is that
+ * sequence with the placement click and the settle poll folded in, so a
+ * caller gets a block that is on the canvas and has actually shaped.
+ */
+export async function addOrnamentShapeFill(page: Page): Promise<number> {
+  const before = new Set((await getBlocks(page)).map((b) => b.id));
+  await page.getByRole("button", { name: "Add ornament" }).click();
+  await page
+    .getByRole("button", { name: /^Fill with text: / })
+    .first()
+    .click();
+  await placeAtCanvas(page, 0.5, 0.5);
+
+  await expect
+    .poll(async () =>
+      (await getBlocks(page)).some((b) => b.type === "shapeFill" && !before.has(b.id))
+    )
+    .toBe(true);
+
+  const block = (await getBlocks(page)).find(
+    (b) => b.type === "shapeFill" && !before.has(b.id)
+  )!;
+  const box = await blockClientBox(page, block.id);
+  await expect.poll(() => inkPixels(page, box)).toBeGreaterThan(0);
+  return block.id;
+}
+
+/** How many nodes of a given Konva `name` are mounted on the stage. */
+export async function namedNodeCount(page: Page, name: string): Promise<number> {
+  return page.evaluate(
+    (n) => window.__HARF__!.getStage()?.find(`.${n}`).length ?? 0,
+    name
+  );
+}
+
 /** Page-space centres of the hover hit rects `DiacriticHoverHandles` mounts, one per mark. */
 export async function diacriticHitCenters(page: Page): Promise<Point[]> {
   return page.evaluate(() => {

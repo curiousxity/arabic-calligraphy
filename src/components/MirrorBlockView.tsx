@@ -152,6 +152,12 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
           shapeFillTextRotation={source.shapeFillTextRotation ?? 0}
           diacriticOverrides={source.diacriticOverrides ?? []}
           diacriticEditMode={false}
+          // Without this a mirror of a source whose letters have been moved,
+          // scaled or turned draws them untransformed — the same one-prop-line
+          // omission this file has already had twice, with `fill` and with
+          // `strokeCuts`. The arming flags stay off: a mirror never edits.
+          glyphTransforms={source.glyphTransforms}
+          glyphTransformMode={false}
         />
       );
     }
