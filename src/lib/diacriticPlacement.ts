@@ -1,3 +1,5 @@
+import { normalizeRotation } from "./glyphTransform";
+
 export type PlacementPoint = { x: number; y: number };
 
 /**
@@ -29,22 +31,6 @@ const MIN_DIVISOR = 1e-4;
 
 const safeDivisor = (v: number) =>
   Math.abs(v) < MIN_DIVISOR ? (v < 0 ? -MIN_DIVISOR : MIN_DIVISOR) : v;
-
-/**
- * Folds an angle into (-180, 180] and turns a non-finite one into no
- * rotation at all, so a corrupted stored value can never put a mark's
- * handles at NaN and leave them impossible to grab.
- *
- * Deliberately a local copy rather than an import of `glyphTransform.ts`'s
- * `normalizeRotation`: this module is the coordinate-space layer that
- * `ShapeFillText` also depends on, and it holds no dependency on the
- * per-glyph transform model beyond the numbers it is handed.
- */
-const normalizeDeg = (v: number) => {
-  if (!Number.isFinite(v)) return 0;
-  const wrapped = ((v % 360) + 360) % 360;
-  return wrapped > 180 ? wrapped - 360 : wrapped;
-};
 
 /**
  * Plain translation — used by `ShapedText`, whose local space already *is*
@@ -95,7 +81,7 @@ export function makeGlyphTransformAdapter(p: {
 }): PlacementAdapter {
   const sx = safeDivisor(p.scaleX);
   const sy = safeDivisor(p.scaleY);
-  const rot = normalizeDeg(p.rotationDeg ?? 0);
+  const rot = normalizeRotation(p.rotationDeg ?? 0);
   const rad = (rot * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);

@@ -1,7 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
-  gotoApp, getBlocks, blockClientBox, dotCentersWithFill, hitTargetAt, inkPixels,
-  openPanel, openTypography, settleFrames, setBlockText, type Box,
+  gotoApp, getBlocks, blockClientBox, inkPixels,
+  openPanel, openTypography, parkOnDot, settleFrames, setBlockText,
+  STRETCH_HANDLE_DOT, strokeProbes, type Box,
 } from "./harf";
 
 /**
@@ -218,37 +219,16 @@ test.describe("mirror blocks", () => {
     const before = await blockClientBox(page, mirrorId);
     expect(before.width).toBeGreaterThan(0);
 
-    // Stretch a stroke on the source. Sweeping for a mounted handle is the
-    // same dance `e2e/stroke-cuts.spec.ts` does, and for the same reason:
-    // which letters carry a straight stroke depends on the font.
+    // Stretch a stroke on the source, sweeping for a mounted handle exactly
+    // as `e2e/stroke-cuts.spec.ts` does — which letters carry a straight
+    // stroke depends on the font, so its probe grid is shared, not restated.
     await openTypography(page);
     await page.getByLabel("Stretch strokes").check();
-    const sourceBox = await blockClientBox(page, SOURCE_ID);
-    let dot: { x: number; y: number } | null = null;
-    for (let i = 1; i < 20 && !dot; i++) {
-      for (const fy of [0.5, 0.35, 0.65]) {
-        const probe = {
-          x: sourceBox.x + (sourceBox.width * i) / 20,
-          y: sourceBox.y + sourceBox.height * fy,
-        };
-        await page.mouse.move(probe.x, probe.y);
-        await settleFrames(page);
-        const dots = await dotCentersWithFill(page, "#f97316");
-        if (dots.length === 0) continue;
-        const nearest = dots.reduce((best, d) =>
-          Math.hypot(d.x - probe.x, d.y - probe.y) <
-          Math.hypot(best.x - probe.x, best.y - probe.y)
-            ? d
-            : best
-        );
-        await page.mouse.move(nearest.x, nearest.y);
-        await settleFrames(page);
-        if ((await hitTargetAt(page, nearest))?.startsWith("Circle")) {
-          dot = nearest;
-          break;
-        }
-      }
-    }
+    const dot = await parkOnDot(
+      page,
+      await strokeProbes(page, SOURCE_ID),
+      STRETCH_HANDLE_DOT
+    );
     if (!dot) throw new Error("setup: found no mounted stretch handle on the source");
 
     await page.mouse.down();

@@ -353,6 +353,22 @@ function drawWarpedGlyphRun(
   }
 }
 
+/**
+ * Stable empty defaults, never a fresh `[]` in the parameter list.
+ *
+ * These three props feed memos below whose work is a walk over every glyph
+ * (one `getPath(...).getBoundingBox()` each), so a new array identity per
+ * render re-runs that walk on every frame of an unrelated drag. Defaulting
+ * here rather than at each call site is what makes the guard hold for
+ * *every* caller — `CanvasStage` and `MirrorBlockView` previously each had
+ * to hoist a constant of their own to protect this component's memos, and a
+ * caller that forgot got a silent per-frame re-walk with nothing to see.
+ * `ShapeFillText` and `SquareKufiText` already follow this pattern.
+ */
+const NO_DIACRITIC_OVERRIDES: DiacriticOverride[] = [];
+const NO_GLYPH_TRANSFORMS: GlyphTransform[] = [];
+const NO_STROKE_CUTS: StrokeCut[] = [];
+
 export const ShapedText: React.FC<Props> = ({
   id,
   text,
@@ -376,10 +392,10 @@ export const ShapedText: React.FC<Props> = ({
   rotation = 0,
   warpX = 0,
   warpY = 0,
-  diacriticOverrides = [],
-  glyphTransforms = [],
+  diacriticOverrides = NO_DIACRITIC_OVERRIDES,
+  glyphTransforms = NO_GLYPH_TRANSFORMS,
   glyphTransformMode = false,
-  strokeCuts = [],
+  strokeCuts = NO_STROKE_CUTS,
   strokeCutEditMode = false,
   onSetStrokeCut,
   isSelected = false,

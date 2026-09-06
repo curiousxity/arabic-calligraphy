@@ -3,13 +3,15 @@ import {
   blockClientBox,
   dotCentersWithFill,
   getBlocks,
+  getStageScale,
   gotoApp,
-  hitTargetAt,
   inkPixels,
   openTypography,
-  settleFrames,
+  parkOnDot,
   setBlockText,
-  getStageScale,
+  STRETCH_HANDLE_DOT,
+  strokeProbes,
+  settleFrames,
 } from "./harf";
 
 /**
@@ -23,7 +25,6 @@ import {
  * Counting ink here is what makes that failure impossible to repeat
  * unnoticed.
  */
-const HANDLE_DOT = "#f97316";
 const WORD = "حرف";
 
 /** Arms the tool, then parks the pointer on a mounted stretch handle. */
@@ -32,35 +33,13 @@ async function armStretchHandle(page: Page): Promise<{ x: number; y: number }> {
   await openTypography(page);
   await page.getByLabel("Stretch strokes").check();
 
-  const box = await blockClientBox(page, 1);
-  // Sweep the run: only some letters have a straight stroke, and which ones
-  // depends on how the font draws them — see docs/archive/stroke-zone-coverage.md.
-  for (let i = 1; i < 20; i++) {
-    for (const fy of [0.5, 0.35, 0.65]) {
-      const probe = {
-        x: box.x + (box.width * i) / 20,
-        y: box.y + box.height * fy,
-      };
-      await page.mouse.move(probe.x, probe.y);
-      await settleFrames(page);
-
-      const dots = await dotCentersWithFill(page, HANDLE_DOT);
-      if (dots.length === 0) continue;
-
-      const nearest = dots.reduce((best, d) =>
-        Math.hypot(d.x - probe.x, d.y - probe.y) <
-        Math.hypot(best.x - probe.x, best.y - probe.y)
-          ? d
-          : best
-      );
-      await page.mouse.move(nearest.x, nearest.y);
-      await settleFrames(page);
-      if ((await hitTargetAt(page, nearest))?.startsWith("Circle")) return nearest;
-    }
+  const dot = await parkOnDot(page, await strokeProbes(page, 1), STRETCH_HANDLE_DOT);
+  if (!dot) {
+    throw new Error(
+      `no stretch handle mounted anywhere on "${WORD}" in the default font`
+    );
   }
-  throw new Error(
-    `no stretch handle mounted anywhere on "${WORD}" in the default font`
-  );
+  return dot;
 }
 
 test("the stretch handle stays mounted while the pointer sits on it", async ({
@@ -76,7 +55,7 @@ test("the stretch handle stays mounted while the pointer sits on it", async ({
     await page.mouse.move(dot.x + (i % 2 === 0 ? 0.5 : -0.5), dot.y);
     await settleFrames(page);
     expect(
-      (await dotCentersWithFill(page, HANDLE_DOT)).length,
+      (await dotCentersWithFill(page, STRETCH_HANDLE_DOT)).length,
       `handle vanished on move ${i}`
     ).toBeGreaterThan(0);
   }

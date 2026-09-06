@@ -220,8 +220,23 @@ export type KufiUnit = {
   key: string;
 };
 
-/** The `KufiUnit.key` fingerprint. Exported so a test can build one by hand. */
-export const kufiFormKey = (form: KufiForm) => `${form.rows.join("|")}|${form.base}`;
+/**
+ * The `KufiUnit.key` fingerprint. Exported so a test can build one by hand.
+ *
+ * Memoised on the form's own identity. `KufiForm`s all come from the
+ * module-level table in `squareKufiAlphabet.ts` — a few dozen stable objects
+ * — while this is called once per letter per layout pass, and
+ * `squareColumnTarget` runs ~160 passes per Fit press. Without the cache the
+ * same handful of strings is rebuilt hundreds of thousands of times.
+ */
+const formKeyCache = new WeakMap<KufiForm, string>();
+export const kufiFormKey = (form: KufiForm): string => {
+  const hit = formKeyCache.get(form);
+  if (hit !== undefined) return hit;
+  const key = `${form.rows.join("|")}|${form.base}`;
+  formKeyCache.set(form, key);
+  return key;
+};
 
 /** A unit placed on a line, with the separation to whatever follows it. */
 type Slot = {
@@ -295,10 +310,12 @@ function isCombiningMark(char: string): boolean {
  * sidebar can say what was left out instead of the user finding a hole in the
  * panel. Empty words (a run of spaces) are not emitted.
  */
-export function resolveWords(text: string): {
+export type ResolvedWords = {
   words: KufiUnit[][];
   unsupported: string[];
-} {
+};
+
+export function resolveWords(text: string): ResolvedWords {
   const classified = classifyJoiningForms(text);
   const chars = Array.from(text);
   const words: KufiUnit[][] = [];
@@ -583,6 +600,23 @@ export function layoutSquareKufi(
   options: SquareKufiOptions = {},
   emit: { placements?: boolean } = {}
 ): SquareKufiLayout {
+  return layoutFromWords(resolveWords(text), options, emit);
+}
+
+/**
+ * The layout proper, taking already-resolved words.
+ *
+ * Split out for `squareColumnTarget`, which lays the *same* text out up to
+ * `COLUMN_SWEEP_BUDGET` + refinement times: `resolveWords` classifies the
+ * joining form of every letter and is a measurable share of a single pass, so
+ * re-running it per candidate re-does that work for a string that never
+ * changes across the sweep.
+ */
+function layoutFromWords(
+  resolved: ResolvedWords,
+  options: SquareKufiOptions = {},
+  emit: { placements?: boolean } = {}
+): SquareKufiLayout {
   const opts: Required<SquareKufiOptions> = {
     columns: Math.max(0, Math.floor(options.columns ?? DEFAULT_KUFI_OPTIONS.columns)),
     composition: normalizeKufiComposition(options.composition),
@@ -592,7 +626,7 @@ export function layoutSquareKufi(
     joinGap: Math.max(1, Math.floor(options.joinGap ?? DEFAULT_KUFI_OPTIONS.joinGap)),
   };
 
-  const { words, unsupported } = resolveWords(text);
+  const { words, unsupported } = resolved;
   const empty: SquareKufiLayout = {
     cols: 0,
     rows: 0,
@@ -778,10 +812,14 @@ const COLUMN_SWEEP_BUDGET = 160;
  * last line.
  */
 export function squareColumnTarget(text: string, options: SquareKufiOptions = {}): number {
-  const band = layoutSquareKufi(text, { ...options, columns: 0 });
+  // Resolved once and reused by every candidate below: the joining-form pass
+  // is a measurable share of a layout, and the text does not change across
+  // the sweep.
+  const resolved = resolveWords(text);
+  const band = layoutFromWords(resolved, { ...options, columns: 0 });
   if (band.cols === 0 || band.rows === 0) return 0;
 
-  const { words } = resolveWords(text);
+  const { words } = resolved;
   let widest = 1;
   for (const word of words) {
     for (const unit of word) widest = Math.max(widest, unit.width);
@@ -792,7 +830,7 @@ export function squareColumnTarget(text: string, options: SquareKufiOptions = {}
   // `<=` rather than `<`: equal scores keep the later, wider candidate, and
   // both phases below sweep upwards so that rule holds throughout.
   const consider = (columns: number) => {
-    const trial = layoutSquareKufi(text, { ...options, columns });
+    const trial = layoutFromWords(resolved, { ...options, columns });
     if (trial.rows === 0) return;
     const error = Math.abs(trial.cols / trial.rows - 1);
     if (error <= bestError) {

@@ -556,7 +556,12 @@ computed and the silhouette stop being draggable.
 `supportsDiacriticOverrides(b)` rather than `b.type === "text"`. Widening
 that guard is what actually makes the feature work on the two shape types —
 `diacriticOverrides` lives on `BlockCommon`, so a narrower guard type-checks
-perfectly while silently discarding every edit.
+perfectly while silently discarding every edit. That predicate and its three
+siblings live in **`src/lib/blockCapabilities.ts`**, not in `App.tsx`: the
+Sidebar needs the same rule to decide whether to offer a tool's arming
+checkbox at all, and written out longhand there a capability widens in one
+place and silently not the other — both still compile, and the symptom is a
+checkbox that arms nothing.
 
 Text-on-path blocks remain unsupported — their glyphs are rotated to a
 curve tangent, which is separate design work.
@@ -716,6 +721,13 @@ of `drawWarpedGlyphRun`. They must come from there rather than a
 **post-cut** — a surgically lengthened letter has to turn about the centre of
 what it is, not the centre of what it was.
 
+Wherever that centre is taken, it is taken through **`glyphPivot`**, never
+restated: both renderers' draw loops and `ShapeFillText`'s placement adapter
+call it, so "where a letter turns" cannot drift between them. Restating it is
+the same shape of mistake as inlining `filterActiveGlyphTransforms` would
+have been — the rule would simply not exist on the second renderer, and the
+divergence is subtle rather than a crash.
+
 The rotate dot sits **diagonally past the box's upper-outer corner, never
 below it**. Kasra, kasratan and shadda-kasra all hang under the baseline, and
 `DiacriticHoverHandles` mounts *after* this component with a generous
@@ -743,7 +755,8 @@ pivots off-centre.
 
 #### On Shape Fill
 
-`App.tsx`'s `supportsGlyphTransforms` is `text | shapeFill`. Widening it is
+`supportsGlyphTransforms` (in `lib/blockCapabilities.ts`) is
+`text | shapeFill`. Widening it is
 what actually makes the feature work on the tiling renderer —
 `glyphTransforms` lives on `BlockCommon`, so a narrower guard type-checks
 perfectly while silently discarding every edit, the trap recorded against
@@ -968,10 +981,20 @@ the per-zone `Group`, never on the hit `Rect`, for the reason recorded under
 every-other-frame check the other two overlays have.
 
 **Kashida coexistence.** Cuts are keyed by source-text offset, so stepping a
-kashida moves every cut after it. `setKashidaAtSlot` remaps them
-(`remapCutsAfterInsert`) inside the same `updateSelectedBlock` patch, so one
-`pushHistory()` still covers the edit and a stretch is not silently dropped by
-the `glyphId` checksum because an unrelated join was widened.
+kashida moves every cut after it. `setKashidaAtSlot` remaps them inside the
+same `updateSelectedBlock` patch, so one `pushHistory()` still covers the edit
+and a stretch is not silently dropped by the `glyphId` checksum because an
+unrelated join was widened.
+
+The rule this expresses is that **any handler rewriting a block's text by
+inserting tatweel owes a remap of everything keyed by a text offset**, so it
+lives in one place rather than being paid by whoever remembers: `App.tsx`'s
+`kashidaTextPatch` builds the patch, over `remapCutsForEdits` in
+`strokeCuts.ts`. Both callers go through it — a single kashida step is the
+one-element case of what a Fit to width solve returns in `result.edits`. That
+matters because the two got out of step exactly this way once before, in
+`runStyleForBlock`; the next text-offset-keyed field is added here rather than
+at whichever call site its author happened to be looking at.
 
 ### Square kufi (`src/lib/squareKufi.ts`, `squareKufiAlphabet.ts`, `SquareKufiText.tsx`)
 
@@ -1037,10 +1060,17 @@ so "Fit to square" tries widths from the widest single letter up to the
 unwrapped band and keeps the best ratio. The layout is arithmetic over a
 lattice — no shaping, no font — which is also why the Sidebar can afford to lay
 the block out a second time to report its size and its unsupported characters
-instead of threading the renderer's result back up through `App.tsx`.
+instead of threading the renderer's result back up through `App.tsx`. That
+second pass is **memoised on the layout inputs, never on the block**
+(`kufiReadout`): `Sidebar` re-renders on every pan, zoom and drag frame, and
+children handed to `CollapsibleSection` are evaluated whether or not the
+section is open — so unmemoised it cost ~4ms of every frame for a text
+readout, collapsed panel included. Keying it on the block rather than on its
+text and gaps would give most of that back, since dragging the panel replaces
+the block object without changing anything the readout reads.
 
-**"A few hundred passes is nothing" was wrong twice over**, and both halves are
-worth keeping in view because the function reads as cheap:
+**"A few hundred passes is nothing" was wrong three times over**, and all of it
+is worth keeping in view because the function reads as cheap:
 
 - *The candidate count grows with the text.* The band widens as you type, so an
   exhaustive sweep is quadratic in length overall — measured at **7.1s of
@@ -1054,6 +1084,17 @@ worth keeping in view because the function reads as cheap:
   candidate and re-summing each prefix when splitting a word. Both are running
   totals now. This one matters beyond the fit button: line breaking runs on
   every render of every square-kufi block.
+- *Every candidate re-resolved the same text.* `layoutSquareKufi` opens by
+  classifying the joining form of every letter, which was a measured **0.71ms
+  of a 1.57ms pass** — re-done ~160 times for a string that cannot change
+  across the sweep. `layoutFromWords` is the layout proper, taking already
+  resolved words; `layoutSquareKufi` is the one-line wrapper that resolves,
+  and `squareColumnTarget` resolves once and hands the result to every
+  candidate. Measured 391ms → 206ms at 1800 characters, identical result.
+  `kufiFormKey` is memoised on the form's own identity for the same reason:
+  the forms are a few dozen stable objects from the module-level alphabet, so
+  the same handful of strings was being rebuilt hundreds of thousands of times
+  per press.
 
 **`hardBreaks` counts splits, not overflows.** A single letter wider than the
 limit takes an over-wide line of its own, and when it is the whole of what
@@ -1252,10 +1293,15 @@ adapters, no async.
 - While the tool is armed the panel cannot be dragged; the overlay's hit rect
   takes the pointer. The guide says so.
 - **A mirror draws the hand edits too**, `MirrorBlockView` passing
-  `kufiCellEdits` straight through. It needs no stable-identity constant
-  beside it the way `strokeCuts` does, because `SquareKufiText` defaults an
-  absent list to its own module-level `NO_CELL_EDITS` rather than keying a
-  memo on whatever the caller passed.
+  `kufiCellEdits` straight through, with no stable-identity constant beside
+  it: `SquareKufiText` defaults an absent list to its own module-level
+  `NO_CELL_EDITS` rather than keying a memo on whatever the caller passed.
+  **Every renderer here now does that**, `ShapedText` and `ShapeFillText`
+  included — a default of `[]` in the parameter list is a fresh identity per
+  render, and these props feed memos that walk every glyph's outline. Defaulted
+  at the component, the guard holds for every caller; defaulted at the call
+  sites, as `CanvasStage` and `MirrorBlockView` used to have to do, a caller
+  that forgets gets a silent per-frame re-walk with nothing to see.
 
 ### Text on path (`src/lib/textPath.ts`, `TextOnPathText.tsx`, `TextPathEditOverlay.tsx`)
 
@@ -2307,6 +2353,18 @@ test — `core.spec.ts` asserts it across a clear/retype/clear cycle.
 Every stream from Phase 1 of the 2026-08-14 program on owns its own
 `e2e/<stream>.spec.ts`, so those files never conflict; the shared helpers
 live in `e2e/harf.ts`.
+
+**Arming a hover-mounted handle goes through `parkOnDot`.** Every overlay
+here arms the same way — sweep probes until a dot mounts, move onto the
+nearest one, confirm it is hit-testable — and the sequencing of those
+`settleFrames` and `hitTargetAt` calls is what the harness's flake-resistance
+rests on. It had been copied four times across three specs before this was
+extracted, so a caller now supplies only its probe grid and the colour it
+wants. `strokeProbes` is shared for the same reason: two specs arm the
+stretch tool on different blocks, and which letters carry a straight stroke
+depends on the font, so the grid is the only thing they have in common. A
+spec importing a helper from another *spec* is not the way to share one —
+Playwright would register that file's tests twice.
 
 ## Deferred features
 

@@ -338,6 +338,71 @@ export async function hitTargetAt(page: Page, point: Point): Promise<string | nu
   }, point);
 }
 
+/** The stroke-stretch handle's orange. */
+export const STRETCH_HANDLE_DOT = "#f97316";
+
+/**
+ * The probe grid a stroke-stretch handle is hunted on: only some letters
+ * have a straight stroke, and which ones depends on how the font draws them
+ * — see docs/archive/stroke-zone-coverage.md.
+ *
+ * Shared because two specs arm this tool on different blocks (`stroke-cuts`
+ * on the one block a fresh session starts with, `mirror` on a mirror's
+ * source), and the grid is the only thing they have in common.
+ */
+export async function strokeProbes(page: Page, blockId: number): Promise<Point[]> {
+  const box = await blockClientBox(page, blockId);
+  const probes: Point[] = [];
+  for (let i = 1; i < 20; i++) {
+    for (const fy of [0.5, 0.35, 0.65]) {
+      probes.push({
+        x: box.x + (box.width * i) / 20,
+        y: box.y + box.height * fy,
+      });
+    }
+  }
+  return probes;
+}
+
+/**
+ * Sweeps `probes` until a dot of `fill` mounts under one, then parks the
+ * pointer on the nearest such dot and confirms it is hit-testable.
+ *
+ * Every hover-mounted overlay in this app arms the same way: only some
+ * positions mount a handle at all (which letters carry a straight stroke,
+ * or a transformable glyph, depends on the font), the dots appear a frame
+ * after the move, and a dot's drawn centre is not where the probe was — so
+ * the pointer has to be moved a second time onto the dot itself and the
+ * landing confirmed. Callers differ only in the probe grid they sweep and
+ * the colour they are looking for.
+ *
+ * Returns `null` rather than throwing so a caller can word its own failure.
+ */
+export async function parkOnDot(
+  page: Page,
+  probes: Point[],
+  fill: string
+): Promise<Point | null> {
+  for (const probe of probes) {
+    await page.mouse.move(probe.x, probe.y);
+    await settleFrames(page);
+
+    const dots = await dotCentersWithFill(page, fill);
+    if (dots.length === 0) continue;
+
+    const nearest = dots.reduce((best, d) =>
+      Math.hypot(d.x - probe.x, d.y - probe.y) <
+      Math.hypot(best.x - probe.x, best.y - probe.y)
+        ? d
+        : best
+    );
+    await page.mouse.move(nearest.x, nearest.y);
+    await settleFrames(page);
+    if ((await hitTargetAt(page, nearest))?.startsWith("Circle")) return nearest;
+  }
+  return null;
+}
+
 /**
  * Parks the pointer on a diacritic's blue move handle with that handle
  * actually mounted and hit-testable, and leaves it there — the caller must

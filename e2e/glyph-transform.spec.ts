@@ -10,8 +10,9 @@ import {
   namedNodeCount,
   openPanel,
   openTypography,
-  settleFrames,
+  parkOnDot,
   setBlockText,
+  settleFrames,
 } from "./harf";
 
 /**
@@ -48,28 +49,15 @@ async function armGlyphDot(page: Page, fill: string): Promise<Point> {
 
   const box = await blockClientBox(page, 1);
   // Sweep across the run at mid-height until a letter's dots mount.
-  for (let i = 1; i < 10; i++) {
-    const probe = {
-      x: box.x + (box.width * i) / 10,
-      y: box.y + box.height * 0.5,
-    };
-    await page.mouse.move(probe.x, probe.y);
-    await settleFrames(page);
-
-    const dots = await dotCentersWithFill(page, fill);
-    if (dots.length === 0) continue;
-
-    const nearest = dots.reduce((best, d) =>
-      Math.hypot(d.x - probe.x, d.y - probe.y) <
-      Math.hypot(best.x - probe.x, best.y - probe.y)
-        ? d
-        : best
-    );
-    await page.mouse.move(nearest.x, nearest.y);
-    await settleFrames(page);
-    if ((await hitTargetAt(page, nearest))?.startsWith("Circle")) return nearest;
+  const probes = Array.from({ length: 9 }, (_, i) => ({
+    x: box.x + (box.width * (i + 1)) / 10,
+    y: box.y + box.height * 0.5,
+  }));
+  const dot = await parkOnDot(page, probes, fill);
+  if (!dot) {
+    throw new Error(`could not park the pointer on a mounted glyph ${fill} dot`);
   }
-  throw new Error(`could not park the pointer on a mounted glyph ${fill} dot`);
+  return dot;
 }
 
 const armGlyphMoveDot = (page: Page) => armGlyphDot(page, MOVE_DOT);
@@ -259,30 +247,24 @@ async function armShapeFillDot(
   fill: string
 ): Promise<Point> {
   const box = await blockClientBox(page, blockId);
+  // A 5x5 grid over the silhouette's middle: only one tile per glyph index
+  // mounts a dot, so which cell finds one is not predictable.
+  const probes = [];
   for (let iy = 3; iy < 8; iy++) {
     for (let ix = 3; ix < 8; ix++) {
-      const probe = {
+      probes.push({
         x: box.x + (box.width * ix) / 10,
         y: box.y + (box.height * iy) / 10,
-      };
-      await page.mouse.move(probe.x, probe.y);
-      await settleFrames(page);
-
-      const dots = await dotCentersWithFill(page, fill);
-      if (dots.length === 0) continue;
-
-      const nearest = dots.reduce((best, d) =>
-        Math.hypot(d.x - probe.x, d.y - probe.y) <
-        Math.hypot(best.x - probe.x, best.y - probe.y)
-          ? d
-          : best
-      );
-      await page.mouse.move(nearest.x, nearest.y);
-      await settleFrames(page);
-      if ((await hitTargetAt(page, nearest))?.startsWith("Circle")) return nearest;
+      });
     }
   }
-  throw new Error(`could not park the pointer on a mounted shape-fill ${fill} dot`);
+  const dot = await parkOnDot(page, probes, fill);
+  if (!dot) {
+    throw new Error(
+      `could not park the pointer on a mounted shape-fill ${fill} dot`
+    );
+  }
+  return dot;
 }
 
 test("a shape fill mounts one hit rect per glyph, not one per tile", async ({

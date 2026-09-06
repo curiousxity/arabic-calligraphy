@@ -111,9 +111,15 @@ export const SquareKufiText: React.FC<SquareKufiTextProps> = ({
 
   // Placements are asked for only when there is a hand edit to resolve — see
   // `layoutSquareKufi`'s third argument for why they are not free.
+  //
+  // The dep is the *boolean*, never `edits.length`: the layout does not
+  // depend on the edits themselves, so keying it on the count re-lays the
+  // whole panel on every cell added during a paint drag — `resolveWords` and
+  // `breakIntoLines` over the full text, per mousemove.
+  const wantPlacements = edits.length > 0;
   const layout = useMemo(
-    () => layoutSquareKufi(text, options, { placements: edits.length > 0 }),
-    [text, options, edits.length]
+    () => layoutSquareKufi(text, options, { placements: wantPlacements }),
+    [text, options, wantPlacements]
   );
   const composed = useMemo(() => applyCellEdits(layout, edits), [layout, edits]);
   const rings = useMemo(

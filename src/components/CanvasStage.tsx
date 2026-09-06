@@ -42,17 +42,6 @@ const SNAP_GUIDE_PX = 6;
 const RULER_SIZE = 20;
 const RULER_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
 
-// A stable empty-array fallback for `block.glyphTransforms`. ShapedText's
-// glyph-metrics memo (which re-walks every glyph's font outline —
-// `glyphObj.getPath(...).getBoundingBox()` per glyph, explicitly documented
-// there as expensive) has `glyphTransforms` in its dependency array; `?? []`
-// inline would hand it a fresh array identity every render and defeat the
-// memo on every drag/pan/zoom frame.
-const NO_GLYPH_TRANSFORMS: GlyphTransform[] = [];
-/** Stable empty array, so a block with no cuts does not re-run
- *  ShapedText's cut-plan memo on every render. */
-const NO_STROKE_CUTS: StrokeCut[] = [];
-
 /**
  * `buildSnapTargets` folds the ruler guides in with the artboard's own lines.
  * The margin rectangle is added by a *second* call, which needs no guides —
@@ -884,8 +873,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
                     diacriticEditMode={block.diacriticEditMode ?? false}
-                    diacriticOverrides={block.diacriticOverrides ?? []}
-                    glyphTransforms={block.glyphTransforms ?? NO_GLYPH_TRANSFORMS}
+                    diacriticOverrides={block.diacriticOverrides}
+                    glyphTransforms={block.glyphTransforms}
                     glyphTransformMode={block.glyphTransformMode ?? false}
                     onUpdateGlyphTransform={(glyphIndex, patch) =>
                       onUpdateGlyphTransform(block.id, glyphIndex, patch)
@@ -928,10 +917,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     warpX={block.warpX ?? 0}
                     warpY={block.warpY ?? 0}
                     isSelected={block.id === selectedId}
-                    diacriticOverrides={block.diacriticOverrides ?? []}
-                    glyphTransforms={block.glyphTransforms ?? NO_GLYPH_TRANSFORMS}
+                    diacriticOverrides={block.diacriticOverrides}
+                    glyphTransforms={block.glyphTransforms}
                     glyphTransformMode={block.glyphTransformMode ?? false}
-                    strokeCuts={block.strokeCuts ?? NO_STROKE_CUTS}
+                    strokeCuts={block.strokeCuts}
                     strokeCutEditMode={block.strokeCutEditMode ?? false}
                     onSetStrokeCut={(cut) => onSetStrokeCut(block.id, cut)}
                     onUpdateGlyphTransform={(glyphIndex, patch) =>

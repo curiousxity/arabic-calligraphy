@@ -49,13 +49,12 @@ export function distributeKashida(
 }
 
 /**
- * Applies one count per slot to `text`.
+ * Applies one count per slot to `text`, returning only the result.
  *
- * Slots are applied **from the highest text offset down**. `applyKashida`
- * only rewrites the text at and after `slot.index`, so working right-to-left
- * leaves every lower offset valid; going left-to-right would shift each later
- * slot by however many characters the earlier insertion added, and every slot
- * after the first would land in the wrong place.
+ * A thin delegate over `applyDistributionWithEdits`, kept for the tests and
+ * for callers that have no text-offset-keyed state to carry — the production
+ * path is the `WithEdits` form, because a block's `strokeCuts` are keyed by
+ * source-text offset and have to be remapped across the insertions.
  */
 export function applyDistribution(
   text: string,
@@ -70,8 +69,8 @@ export function applyDistribution(
  * and how many characters it added or removed there.
  *
  * The list is in **application order**, which is highest offset first — the
- * same order `applyDistribution` works in and for the same reason. Anything
- * keyed by a text offset (a `StrokeCut`'s cluster) must be remapped in exactly
+ * same order `applyDistributionWithEdits` works in, and for the same reason.
+ * Anything keyed by a text offset (a `StrokeCut`'s cluster) must be remapped in exactly
  * this order: working upwards instead would shift every later edit's offset by
  * whatever an earlier one added, so every remap after the first lands wrong.
  */
@@ -83,13 +82,18 @@ export type DistributionEdit = {
 };
 
 /**
- * `applyDistribution`, plus a record of where it edited.
+ * Applies one count per slot to `text`, plus a record of where it edited.
  *
- * The plain version is kept as the one-line delegate above so its callers and
- * tests are untouched. This exists because a caller that mutates the block's
- * text has to bring the block's *other* text-keyed state with it —
- * `setKashidaAtSlot` already does that by hand for a single slot, and Fit to
- * width, which edits several at once, could not without knowing each one.
+ * Slots are applied **from the highest text offset down**. `applyKashida`
+ * only rewrites the text at and after `slot.index`, so working right-to-left
+ * leaves every lower offset valid; going left-to-right would shift each later
+ * slot by however many characters the earlier insertion added, and every slot
+ * after the first would land in the wrong place.
+ *
+ * The `edits` record exists because a caller that mutates the block's text has
+ * to bring the block's *other* text-keyed state with it — `strokeCuts` are
+ * keyed by source-text offset, and `remapCutsForEdits` in `strokeCuts.ts` is
+ * what every such caller folds this list through.
  */
 export function applyDistributionWithEdits(
   text: string,

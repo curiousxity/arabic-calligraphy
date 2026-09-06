@@ -38,6 +38,7 @@ import {
 } from "../lib/diacriticPlacement";
 import {
   filterActiveGlyphTransforms,
+  glyphPivot,
   resolveGlyphTransform,
 } from "../lib/glyphTransform";
 import type { DiacriticOverride, GlyphTransform } from "../types";
@@ -96,6 +97,7 @@ export type ShapeFillTextProps = {
  * reason `CanvasStage` keeps its own `NO_GLYPH_TRANSFORMS`.
  */
 const NO_GLYPH_TRANSFORMS: GlyphTransform[] = [];
+const NO_DIACRITIC_OVERRIDES: DiacriticOverride[] = [];
 
 type GlyphInstance = {
   glyphIndex: number;
@@ -218,7 +220,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   shadowOpacity = 0.35,
   rotation = 0,
   diacriticEditMode = false,
-  diacriticOverrides = [],
+  diacriticOverrides = NO_DIACRITIC_OVERRIDES,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
   glyphTransformMode = false,
@@ -328,6 +330,24 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   const activeDiacriticOverrides = useMemo(
     () => diacriticOverrides.filter((o) => diacriticGlyphIndices.has(o.glyphIndex)),
     [diacriticOverrides, diacriticGlyphIndices]
+  );
+
+  // Both lists indexed for the draw loop, which runs once per glyph per
+  // repetition per line — the worst case in this file's own comments is
+  // ~23,000 instances. A linear `.find` over each list per instance, plus a
+  // fresh `resolveGlyphTransform` object per transformed glyph, is work
+  // proportional to tiles where it should be proportional to glyphs; the
+  // transform is resolved once here instead of per tile.
+  const transformByIndex = useMemo(
+    () =>
+      new Map(
+        activeGlyphTransforms.map((t) => [t.glyphIndex, resolveGlyphTransform(t)])
+      ),
+    [activeGlyphTransforms]
+  );
+  const diacriticByIndex = useMemo(
+    () => new Map(activeDiacriticOverrides.map((o) => [o.glyphIndex, o])),
+    [activeDiacriticOverrides]
   );
 
   // Mirrors the sceneFunc's own scanline-tiling loop in plain JS (no canvas
@@ -524,6 +544,9 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       let adapter: PlacementAdapter;
       if (transform) {
         const r = resolveGlyphTransform(transform);
+        // The turn's pivot in the row frame, from the same `glyphPivot` both
+        // renderers' draw loops use — the pen origin is (0, 0) here.
+        const pivot = glyphPivot(box, 0, 0);
         adapter = composeAdapters(
           rowFrameAdapter(inst),
           composeAdapters(
@@ -537,10 +560,9 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
               scaleX: r.scaleX,
               scaleY: r.scaleY,
               rotationDeg: r.rotation,
-              // The turn's pivot in the row frame: the raw box centre carried
-              // through the row's fit scale, matching the draw loop exactly.
-              rotationPivotX: (box.x + box.width / 2) * inst.scX,
-              rotationPivotY: (box.y + box.height / 2) * inst.scY,
+              // Carried through the row's fit scale, matching the draw loop.
+              rotationPivotX: pivot.x * inst.scX,
+              rotationPivotY: pivot.y * inst.scY,
             }),
             // The row's own fit scale, the stage the mark's override lives
             // inside.
@@ -694,9 +716,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 // No penX accumulator to advance here — glyphCache precomputes
                 // each glyph's penX, so skipping the draw already leaves the
                 // surrounding letters untouched.
-                const diacriticOverride = activeDiacriticOverrides.find(
-                  (o) => o.glyphIndex === gi
-                );
+                const diacriticOverride = diacriticByIndex.get(gi);
                 if (diacriticOverride?.hidden) continue;
                 const gx = startPenX + g.penX * scX + g.dx * scX;
                 const gy = sy + g.dy * scY;
@@ -724,12 +744,10 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 // different amount on every repetition — which reads as a
                 // bug rather than as one edit applied everywhere.
                 let glyphMeanScale = 1;
-                const glyphTransform = activeGlyphTransforms.find(
-                  (t) => t.glyphIndex === gi
-                );
+                const glyphTransform = transformByIndex.get(gi);
                 if (glyphTransform) {
                   const { offsetX, offsetY, scaleX, scaleY, rotation } =
-                    resolveGlyphTransform(glyphTransform);
+                    glyphTransform;
                   targetCtx.translate(offsetX, offsetY);
                   targetCtx.scale(scaleX, scaleY);
                   glyphMeanScale = (scaleX + scaleY) / 2;
@@ -741,8 +759,13 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                   if (rotation !== 0) {
                     const raw = glyphBoxByIndex.get(gi);
                     if (raw) {
-                      const px = (raw.x + raw.width / 2) * scX;
-                      const py = (raw.y + raw.height / 2) * scY;
+                      // Through the shared helper, not restated: `ShapedText`
+                      // turns a glyph about exactly this point, and the two
+                      // renderers must not drift on where a letter turns.
+                      // The pen origin is (0, 0) in this frame.
+                      const pivot = glyphPivot(raw, 0, 0);
+                      const px = pivot.x * scX;
+                      const py = pivot.y * scY;
                       targetCtx.translate(px, py);
                       targetCtx.rotate((rotation * Math.PI) / 180);
                       targetCtx.translate(-px, -py);

@@ -196,6 +196,12 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
         ];
         const xs = corners.map((c) => c.x);
         const ys = corners.map((c) => c.y);
+        // Hoisted: the hit rect needs each bound twice (position, then extent),
+        // and this runs per placement on every frame of a drag.
+        const hitX = Math.min(...xs);
+        const hitY = Math.min(...ys);
+        const hitW = Math.max(...xs) - hitX;
+        const hitH = Math.max(...ys) - hitY;
 
         const moveAt = placement.toCanvas(cx, cy);
         const scaleXDot = placement.toCanvas(scaleXAt.x, scaleXAt.y);
@@ -280,10 +286,10 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
           >
             <Rect
               name="glyph-transform-hit"
-              x={Math.min(...xs)}
-              y={Math.min(...ys)}
-              width={Math.max(...xs) - Math.min(...xs)}
-              height={Math.max(...ys) - Math.min(...ys)}
+              x={hitX}
+              y={hitY}
+              width={hitW}
+              height={hitH}
               fill="transparent"
               // Konva routes a pointer only to the topmost listening shape,
               // and these rects are deliberately wide. Switching every

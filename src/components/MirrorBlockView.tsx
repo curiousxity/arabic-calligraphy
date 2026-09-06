@@ -8,7 +8,6 @@ import { SquareKufiText } from "./SquareKufiText";
 import { ImageBlockView } from "./ImageBlockView";
 import { radialCopyTransforms, type MirrorSource } from "../lib/mirror";
 import type { MirrorMode } from "../types";
-import type { StrokeCut } from "../lib/strokeCuts";
 
 export type MirrorBlockViewProps = {
   id?: string;
@@ -35,13 +34,6 @@ export type MirrorBlockViewProps = {
   onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
 };
-
-/**
- * Stable identity for "this block has no cuts". `ShapedText` keys a `useMemo`
- * on the array, so a fresh `[]` every render would rebuild the cut plan every
- * render — the same reason `CanvasStage` hoists its own `NO_STROKE_CUTS`.
- */
-const EMPTY_STROKE_CUTS: StrokeCut[] = [];
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -196,8 +188,9 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
         // unstretched, and its rAF-settled hit `Rect` is measured off the
         // uncut content. `CanvasStage` passes it on the ordinary path; this is
         // the same one-prop-line omission this file already had once with
-        // `fill`.
-        strokeCuts={source.strokeCuts ?? EMPTY_STROKE_CUTS}
+        // `fill`. The stable-empty default lives on `ShapedText` itself, so
+        // no constant is needed here.
+        strokeCuts={source.strokeCuts}
         glyphTransformMode={false}
       />
     );

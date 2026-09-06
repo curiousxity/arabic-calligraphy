@@ -25,6 +25,12 @@ import {
   computeFitToBox,
   DEFAULT_EMPTY_BOUNDS,
 } from "./lib/canvasBounds";
+import {
+  supportsDiacriticOverrides,
+  supportsGlyphTransforms,
+  supportsKufiCellEdits,
+  supportsStrokeCuts,
+} from "./lib/blockCapabilities";
 import { arcPathD } from "./lib/textPath";
 import type { Block, DiacriticOverride, GlyphTransform, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
@@ -127,7 +133,7 @@ import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { mergeGlyphTransform } from "./lib/glyphTransform";
 import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
-import { cutAdvanceTotal, remapCutsAfterInsert } from "./lib/strokeCuts";
+import { cutAdvanceTotal, remapCutsForEdits } from "./lib/strokeCuts";
 import { nuqtaUnits } from "./lib/nuqta";
 import {
   buildNameDesign,
@@ -216,51 +222,6 @@ type PendingPlacement = {
 
 export type NamedProjectMeta = { name: string; savedAt: number; source: "local" | "cloud" };
 type NamedProjectsStore = Record<string, { savedAt: number; payload: unknown }>;
-
-/**
- * The three block types whose renderers mount DiacriticHoverHandles. Image
- * and textPath blocks inherit `diacriticOverrides` from BlockCommon but have
- * no way to edit or apply it, so the mutators below must not write to them.
- */
-const supportsDiacriticOverrides = (
-  b: Block
-): b is Extract<Block, { type: "text" | "shapeFill" }> =>
-  b.type === "text" || b.type === "shapeFill";
-
-/**
- * The two block types whose renderers mount `GlyphTransformHoverHandles` and
- * apply the transform in their draw loop. `image`, `textPath`, `squareKufi`
- * and `mirror` carry `glyphTransforms`/`glyphTransformMode` via BlockCommon
- * but no renderer of theirs reads them, so accepting an edit there would
- * silently discard it — the trap CLAUDE.md records against
- * `supportsDiacriticOverrides`, and the reason this had to widen in the same
- * commit as `ShapeFillText`'s draw loop.
- */
-const supportsGlyphTransforms = (
-  b: Block
-): b is Extract<Block, { type: "text" | "shapeFill" }> =>
-  b.type === "text" || b.type === "shapeFill";
-
-/**
- * Plain text blocks only, for the same reason as `supportsGlyphTransforms`
- * above: every block type carries `strokeCuts` via BlockCommon, but only
- * `ShapedText` performs the outline surgery, so a wider guard would accept
- * edits here and silently discard them — the trap CLAUDE.md records against
- * `supportsDiacriticOverrides`.
- */
-const supportsStrokeCuts = (b: Block): b is Extract<Block, { type: "text" }> =>
-  b.type === "text";
-
-/**
- * Square-kufi blocks only — the fields live on `SquareKufiBlock` rather than
- * on `BlockCommon`, so this is the guard that makes the mutators below
- * type-check against the one variant that can draw a cell. The trap it avoids
- * is the one CLAUDE.md records against `supportsDiacriticOverrides`: a guard
- * that accepts a block whose renderer ignores the field discards every edit
- * silently.
- */
-const supportsKufiCellEdits = (b: Block): b is Extract<Block, { type: "squareKufi" }> =>
-  b.type === "squareKufi";
 
 const STORAGE_KEY = "calligraphy-layout-v2";
 const NAMED_PROJECTS_KEY = "harfcanvas-named-projects-v1";
@@ -2335,6 +2296,30 @@ const App: React.FC = () => {
     onInsertOrnamentShapeFill: insertOrnamentShapeFill,
     onInsertOrnamentFrame: insertOrnamentFrame,
   };
+  /**
+   * The patch a tatweel-inserting text edit owes: the new text, plus every
+   * field keyed by a source-text offset carried across the insertions.
+   *
+   * Both callers below go through this rather than restating the rule. Right
+   * now that field is `strokeCuts`; the point of the helper is that the next
+   * one is added here instead of at whichever call site its author happened
+   * to be looking at — the omission CLAUDE.md records against
+   * `runStyleForBlock`, where one caller gained a term inline and the other
+   * silently went on without it.
+   *
+   * `strokeCuts` is left off the patch entirely when the block carries none,
+   * so a block that never had the field does not acquire an empty array.
+   */
+  const kashidaTextPatch = useCallback(
+    (block: Block, text: string, edits: readonly { index: number; delta: number }[]) => {
+      const cuts = block.strokeCuts;
+      return cuts?.length
+        ? { text, strokeCuts: remapCutsForEdits(cuts, edits) }
+        : { text };
+    },
+    []
+  );
+
   // Kashida is an ordinary text edit — `applyKashida` returns a new string
   // and it goes through `updateSelectedBlock` like anything the user could
   // have typed, so shaping, history (that call pushes it), saving, and every
@@ -2352,14 +2337,11 @@ const App: React.FC = () => {
       // `pushHistory()` still covers the whole edit, and a stretch is not
       // silently dropped because an unrelated join was widened.
       const delta = next.length - selectedBlock.text.length;
-      const cuts = selectedBlock.strokeCuts ?? [];
       updateSelectedBlock(
-        cuts.length > 0
-          ? { text: next, strokeCuts: remapCutsAfterInsert(cuts, slot.index, delta) }
-          : { text: next }
+        kashidaTextPatch(selectedBlock, next, [{ index: slot.index, delta }])
       );
     },
-    [selectedBlock, updateSelectedBlock]
+    [selectedBlock, updateSelectedBlock, kashidaTextPatch]
   );
 
   // Fit to width. The target defaults to the page's margin box — the content
@@ -2421,17 +2403,7 @@ const App: React.FC = () => {
           // `result.edits` is highest-offset-first, which is the only order
           // this can run in: remapping upwards would shift each later edit's
           // offset by whatever an earlier one added.
-          const cuts = selectedBlock.strokeCuts ?? [];
-          const remapped = cuts.length
-            ? result.edits.reduce(
-                (acc, edit) => remapCutsAfterInsert(acc, edit.index, edit.delta),
-                cuts
-              )
-            : cuts;
-          updateBlock(
-            id,
-            cuts.length ? { text: result.text, strokeCuts: remapped } : { text: result.text }
-          );
+          updateBlock(id, kashidaTextPatch(selectedBlock, result.text, result.edits));
         }
         setExportStatus(describeFitResult(result, target, text));
       } catch (err) {
@@ -2441,7 +2413,7 @@ const App: React.FC = () => {
         setIsFittingWidth(false);
       }
     },
-    [selectedBlock, updateBlock]
+    [selectedBlock, updateBlock, kashidaTextPatch]
   );
 
   /**

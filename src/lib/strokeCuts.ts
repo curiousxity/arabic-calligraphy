@@ -537,7 +537,7 @@ function tAtX(cutX: number, at: (t: number) => number): number {
  * extension runs along the stroke axis rather than horizontally.
  *
  * Cuts are applied from the HIGHEST cutX down, so an earlier application
- * never shifts a later cut's position — the same reason `applyDistribution`
+ * never shifts a later cut's position — the same reason `applyDistributionWithEdits`
  * in `fitToWidth.ts` walks its slots from the highest text offset down.
  */
 export function applyCutsToCommands(cmds: SvgCmd[], cuts: ResolvedCut[]): SvgCmd[] {
@@ -803,5 +803,30 @@ export function remapCutsAfterInsert(
   if (inserted === 0) return cuts;
   return cuts.map((c) =>
     c.cluster > atOffset ? { ...c, cluster: c.cluster + inserted } : c
+  );
+}
+
+/**
+ * The same remap for a whole run of text edits — what a fit-to-width solve
+ * produces, and what a single kashida step is a one-element case of.
+ *
+ * `edits` must be in application order, which is **highest offset first**
+ * (see `DistributionEdit` in `fitToWidth.ts`). Folding them upwards instead
+ * would shift each later edit's offset by whatever an earlier one added, and
+ * every remap after the first would land wrong.
+ *
+ * Every handler that rewrites a block's text by inserting tatweel owes this:
+ * cuts are keyed by source-text offset, so without it a stretch survives the
+ * write only to be dropped by `buildCutPlan`'s `glyphId` checksum. Going
+ * through one function is what stops that debt being paid by whoever
+ * remembers.
+ */
+export function remapCutsForEdits(
+  cuts: StrokeCut[],
+  edits: readonly { index: number; delta: number }[]
+): StrokeCut[] {
+  return edits.reduce(
+    (acc, edit) => remapCutsAfterInsert(acc, edit.index, edit.delta),
+    cuts
   );
 }

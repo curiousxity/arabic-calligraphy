@@ -47,6 +47,7 @@ import {
   normalizeKufiComposition,
   DEFAULT_KUFI_OPTIONS,
 } from "../lib/squareKufi";
+import { supportsGlyphTransforms } from "../lib/blockCapabilities";
 import {
   TrashIcon,
   CopyIcon,
@@ -554,6 +555,67 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ],
     [customFonts]
   );
+  /**
+   * The Square Kufi panel's readout, laid out once per change rather than
+   * once per render.
+   *
+   * The panel needs its own layout — it reports the panel's size, what the
+   * alphabet could not draw, and the width slider's upper bound — and doing
+   * it here rather than threading the renderer's result up through App.tsx
+   * is the deliberate trade CLAUDE.md records. What is *not* deliberate is
+   * paying for it on every render: this component re-renders on every stage
+   * pan/zoom frame, every block-drag frame and every painted cell, while
+   * children passed to `CollapsibleSection` are evaluated whether or not the
+   * section is open. Two layouts plus a cell-edit composite measured ~4ms at
+   * 1800 characters — two-thirds of a frame, for a text readout.
+   */
+  const kufiBlock = selectedBlock?.type === "squareKufi" ? selectedBlock : null;
+  const kufiReadout = useMemo(() => {
+    if (!kufiBlock) return null;
+    const cellEdits = kufiBlock.kufiCellEdits ?? [];
+    const options = kufiOptionsFor(kufiBlock);
+    // Placements cost per-unit allocation, so they are asked for only when
+    // there is a hand edit to resolve — and it is only the resolution that
+    // this panel reports.
+    const layout = layoutSquareKufi(kufiBlock.text, options, {
+      placements: cellEdits.length > 0,
+    });
+    // The unwrapped band is the whole useful domain of the width slider: any
+    // width at or past it puts the text on one line, and `squareColumnTarget`
+    // searches no further either, so a fitted value always lands inside this
+    // range. A fixed cap of 80 could not represent one — "Fit to square"
+    // returns 119 at 383 characters and 249 at 1800 — leaving the thumb
+    // pinned at max while the readout showed the real number, and the first
+    // touch of the track silently collapsed the fitted panel. Derived from
+    // the text rather than from the slider's own value, so dragging cannot
+    // move the end of the track.
+    const bandColumns = Math.max(
+      1,
+      layoutSquareKufi(kufiBlock.text, { ...options, columns: 0 }).cols
+    );
+    return {
+      composed: applyCellEdits(layout, cellEdits),
+      missing: Array.from(new Set(layout.unsupported)),
+      bandColumns,
+      /** The generated grid's own width — 0 when there is nothing to draw. */
+      cols: layout.cols,
+      hardBreaks: layout.hardBreaks,
+      cellEdits,
+    };
+    // Keyed on the layout inputs, not on the block: dragging a square-kufi
+    // panel around the canvas replaces the block object on every frame
+    // without changing a single thing this readout depends on. That is the
+    // whole point of the memo, so `kufiBlock` is deliberately not a dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    kufiBlock?.text,
+    kufiBlock?.kufiCellEdits,
+    kufiBlock?.kufiColumns,
+    kufiBlock?.kufiComposition,
+    kufiBlock?.kufiLineGap,
+    kufiBlock?.kufiWordGap,
+  ]);
+
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(!isMobile);
   const [showAlign, setShowAlign] = useState(false);
@@ -2285,40 +2347,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onToggle={() => setShowText((v) => !v)}
             >
               <div className="sectionPanel">
-                {(() => {
-                  // Laid out here as well as in the renderer. It is pure
-                  // arithmetic over a lattice — no shaping, no font — so a
-                  // second pass is cheaper than threading the renderer's
-                  // result back up through App.tsx, and it is what lets the
-                  // panel report its own size and say what it could not draw.
-                  const cellEdits = selectedBlock.kufiCellEdits ?? [];
-                  const layout = layoutSquareKufi(
-                    selectedBlock.text,
-                    kufiOptionsFor(selectedBlock),
-                    // Placements cost per-unit allocation, so they are asked
-                    // for only when there is a hand edit to resolve — and it
-                    // is only the resolution that this panel reports.
-                    { placements: cellEdits.length > 0 }
-                  );
-                  const composed = applyCellEdits(layout, cellEdits);
-                  const missing = Array.from(new Set(layout.unsupported));
-                  // The unwrapped band is the whole useful domain of the width
-                  // slider: any width at or past it puts the text on one line,
-                  // and `squareColumnTarget` searches no further either, so a
-                  // fitted value always lands inside this range. A fixed cap of
-                  // 80 could not represent one — "Fit to square" returns 119 at
-                  // 383 characters and 249 at 1800 — leaving the thumb pinned at
-                  // max while the readout showed the real number, and the first
-                  // touch of the track silently collapsed the fitted panel.
-                  // Derived from the text rather than from the slider's own
-                  // value, so dragging cannot move the end of the track.
-                  const bandColumns = Math.max(
-                    1,
-                    layoutSquareKufi(selectedBlock.text, {
-                      ...kufiOptionsFor(selectedBlock),
-                      columns: 0,
-                    }).cols
-                  );
+                {kufiReadout && (() => {
+                  // Laid out here as well as in the renderer — see
+                  // `kufiReadout` above for why, and for why it is memoised.
+                  const { composed, missing, bandColumns, cellEdits, cols, hardBreaks } =
+                    kufiReadout;
                   return (
                     <>
                       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
@@ -2358,17 +2391,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             type="button"
                             className="sidebarPillButton"
                             onClick={onFitKufiToSquare}
-                            disabled={!onFitKufiToSquare || layout.cols === 0}
+                            disabled={!onFitKufiToSquare || cols === 0}
                             title="Wrap the text to the width that comes out closest to square"
                           >
                             Fit to square
                           </button>
                         </div>
                         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                          {layout.cols === 0
+                          {cols === 0
                             ? "Nothing to draw yet — type Arabic text under Content."
                             : `${composed.cols} × ${composed.rows} cells.`}
-                          {layout.hardBreaks > 0 &&
+                          {hardBreaks > 0 &&
                             " A word was too wide for the panel and had to be split, so its join across the break is lost — widen the panel to close it up."}
                         </div>
                       </div>
@@ -3117,12 +3150,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
 
                 {/* Relocated here when the Morph Glyph Editor panel was
-                    removed. Text and Shape Fill only — those are the two
-                    renderers that read `glyphTransforms`, and the gate matches
-                    `App.tsx`'s `supportsGlyphTransforms` exactly, so arming it
-                    elsewhere cannot show dots that move nothing. */}
-                {(selectedBlock.type === "text" ||
-                  selectedBlock.type === "shapeFill") && (
+                    removed. Gated on the same shared predicate the state
+                    layer's mutators use, never on a longhand copy of it: a
+                    capability widened in one place and not the other type
+                    checks perfectly and leaves a checkbox that arms nothing. */}
+                {supportsGlyphTransforms(selectedBlock) && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Move, scale &amp; rotate</div>
 
