@@ -92,6 +92,25 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-09-06 — Square kufi: painting cells by hand
+
+**Paint cells** in the Square Kufi panel puts a lattice over the block: click
+or drag to fill squares, click ink to cut it away, and a whole drag is a single
+undo. It is how a panel is actually finished — closing a gap, squaring a
+corner, tying two lines together — and painted squares are free to break the
+one-square grammar the generated alphabet keeps.
+
+An edit is remembered against the *letter nearest it* and an offset from that
+letter's own box, not against a grid coordinate, so it survives rewrapping the
+panel and every spacing dial; retyping the letter it sits on lets it go, and
+the panel says how many were dropped. Cells painted outside the panel grow the
+block, which now reports the larger box so they export. See CLAUDE.md, "Square
+kufi → Hand-painted cells", for the anchoring scheme, the ownership rule and
+the origin-offset trap.
+
+A mirror of a hand-edited block draws the edits too — that one prop line
+belonged to a different stream and was landed with the merge.
+
 ### 2026-09-06 — A fourth per-glyph handle: rotate
 
 Ticking **Move, scale & rotate glyph** in Typography now shows four dots on a
@@ -136,8 +155,9 @@ connected stroke, never two cells thick, join ink where each form claims a join
 
 **Dots and tashkeel are not drawn**, matching the style, so ب/ت/ث share one
 shape. That is deliberate and is recorded under CLAUDE.md's Deferred features
-alongside hand-editing individual cells and the boustrophedon/spiral
-compositions, neither of which is built.
+alongside the boustrophedon and spiral compositions, neither of which is built.
+(Hand-editing individual cells was listed there too, and shipped on
+2026-09-06 — see above.)
 
 ### 2026-08-21 — Diacritic detection: two more fonts, and the dots it was flagging
 
@@ -838,11 +858,11 @@ the result, and most of it came back **declined**.
 
 Still open, in the order that plan sequences them:
 
-- Hand-editing square-kufi cells
 - Boustrophedon square-kufi compositions
 - Per-glyph move/scale/rotate on Shape Fill (text-on-path dropped with the rest)
 
-Per-glyph rotation shipped on 2026-09-06 and has left this list.
+Per-glyph rotation and hand-editing square-kufi cells both shipped on
+2026-09-06 and have left this list.
 
 Declined there, with the reason in the plan: straight-stroke stretching on
 Shape Fill/Curve (both renormalise the span), image trace (Shape Fill's

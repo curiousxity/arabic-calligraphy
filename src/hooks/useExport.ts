@@ -130,6 +130,7 @@ export function useExport(
     const editOverlayNodes = stage.find(
       (node: Konva.Node) =>
         node.id().startsWith("text-path-edit-layer-") ||
+        node.id().startsWith("kufi-cell-edit-layer-") ||
         node.id().startsWith("artboard-chrome-")
     );
     const gridWasVisible = gridNode?.visible() ?? false;

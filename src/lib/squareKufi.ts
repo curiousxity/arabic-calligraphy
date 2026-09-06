@@ -74,6 +74,31 @@ export type SquareKufiOptions = {
   joinGap?: number;
 };
 
+/**
+ * Where one letter ended up on the lattice. Emitted only when the caller asks
+ * for it (see `layoutSquareKufi`'s third argument), because the only consumer
+ * is hand editing and the fit search lays a panel out ~160 times per press.
+ *
+ * All four coordinates are in the *generated* grid's own frame — the one
+ * `SquareKufiLayout.cells` is indexed in, before any hand edit has grown it.
+ */
+export type KufiPlacement = {
+  unitIndex: number;
+  unitKey: string;
+  /** Left column of the letter's box. */
+  x: number;
+  /** Top row of the letter's box. */
+  y: number;
+  width: number;
+  height: number;
+  /**
+   * The row this letter sits on. A hand edit's `dy` is measured from here and
+   * not from `y`: the box top is `lineTop + (ascent - formAscent(form))` and
+   * so moves whenever the form changes height, even when the letter has not.
+   */
+  baselineY: number;
+};
+
 export type SquareKufiLayout = {
   cols: number;
   rows: number;
@@ -83,6 +108,8 @@ export type SquareKufiLayout = {
   unsupported: string[];
   /** How many words had to be split because they did not fit on a line. */
   hardBreaks: number;
+  /** One entry per drawn letter, or empty when the caller did not ask. */
+  placements: KufiPlacement[];
 };
 
 export const DEFAULT_KUFI_OPTIONS: Required<SquareKufiOptions> = {
@@ -101,7 +128,28 @@ export type KufiUnit = {
   joinsRight: boolean;
   /** …and to the next one, which in RTL sits to its left. */
   joinsLeft: boolean;
+  /**
+   * Position in the run, counted across every word in logical order. This is
+   * what a hand edit anchors to — see `KufiCellEdit`.
+   */
+  index: number;
+  /**
+   * A fingerprint of the *resolved* form: its rows and its base, nothing else.
+   *
+   * Deliberately **not** `skeleton:form`. `squareKufiAlphabet.ts`'s `all()`
+   * helper gives feh, heh and tah one `KufiForm` object across all four
+   * joining forms, and `TOOTH_INITIAL`/`TOOTH_MEDIAL` are shared between beh,
+   * noon and yeh — so typing the next letter of a word can change the
+   * *requested* form while the box actually drawn is literally the same
+   * object. Keying on the requested form would drop a user's hand edits on
+   * that keystroke. This is the faithful analogue of `GlyphTransform`'s
+   * `glyphId`: the identity of what is drawn, not of what was asked for.
+   */
+  key: string;
 };
+
+/** The `KufiUnit.key` fingerprint. Exported so a test can build one by hand. */
+export const kufiFormKey = (form: KufiForm) => `${form.rows.join("|")}|${form.base}`;
 
 /** A unit placed on a line, with the separation to whatever follows it. */
 type Slot = {
@@ -119,8 +167,20 @@ export const formDescent = (form: KufiForm) => Math.max(0, form.base);
 const joinsRightOf = (form: JoiningForm) => form === "final" || form === "medial";
 const joinsLeftOf = (form: JoiningForm) => form === "initial" || form === "medial";
 
-function makeUnit(form: KufiForm, right: boolean, left: boolean): KufiUnit {
-  return { form, width: form.rows[0]?.length ?? 0, joinsRight: right, joinsLeft: left };
+function makeUnit(
+  form: KufiForm,
+  right: boolean,
+  left: boolean,
+  index: number
+): KufiUnit {
+  return {
+    form,
+    width: form.rows[0]?.length ?? 0,
+    joinsRight: right,
+    joinsLeft: left,
+    index,
+    key: kufiFormKey(form),
+  };
 }
 
 // The same ranges lib/arabicJoining.ts treats as transparent and
@@ -158,6 +218,10 @@ export function resolveWords(text: string): {
   const words: KufiUnit[][] = [];
   const unsupported: string[] = [];
   let current: KufiUnit[] = [];
+  // Runs across every word, in logical order, so a unit's index survives the
+  // line breaking that comes later — the whole point of anchoring hand edits
+  // to a letter rather than to a grid coordinate.
+  let unitIndex = 0;
 
   const endWord = () => {
     if (current.length > 0) words.push(current);
@@ -191,7 +255,7 @@ export function resolveWords(text: string): {
       const joined = joining === "medial" || joining === "final";
       const form = squareKufiForm(LAM_ALEF_SKELETON, joined ? "final" : "isolated");
       if (form) {
-        current.push(makeUnit(form, joined, false));
+        current.push(makeUnit(form, joined, false, unitIndex++));
         i++;
         continue;
       }
@@ -202,7 +266,9 @@ export function resolveWords(text: string): {
       unsupported.push(char);
       continue;
     }
-    current.push(makeUnit(form, joinsRightOf(joining), joinsLeftOf(joining)));
+    current.push(
+      makeUnit(form, joinsRightOf(joining), joinsLeftOf(joining), unitIndex++)
+    );
   }
   endWord();
 
@@ -318,9 +384,21 @@ function breakIntoLines(
   return { lines, hardBreaks };
 }
 
+/**
+ * Lays the text out on the lattice.
+ *
+ * `emit.placements` is a separate argument rather than a `SquareKufiOptions`
+ * field on purpose: `squareColumnTarget` re-lays the same text up to
+ * `COLUMN_SWEEP_BUDGET` + refinement times through `{ ...options, columns }`,
+ * and a field would ride along on every one of those passes. Nothing in the
+ * fit search, the Sidebar's readout or the placement ghost reads placements,
+ * so per-unit allocation across that sweep would be pure cost — exactly the
+ * cliff CLAUDE.md records this function being wrong about twice already.
+ */
 export function layoutSquareKufi(
   text: string,
-  options: SquareKufiOptions = {}
+  options: SquareKufiOptions = {},
+  emit: { placements?: boolean } = {}
 ): SquareKufiLayout {
   const opts: Required<SquareKufiOptions> = {
     columns: Math.max(0, Math.floor(options.columns ?? DEFAULT_KUFI_OPTIONS.columns)),
@@ -331,7 +409,14 @@ export function layoutSquareKufi(
   };
 
   const { words, unsupported } = resolveWords(text);
-  const empty: SquareKufiLayout = { cols: 0, rows: 0, cells: [], unsupported, hardBreaks: 0 };
+  const empty: SquareKufiLayout = {
+    cols: 0,
+    rows: 0,
+    cells: [],
+    unsupported,
+    hardBreaks: 0,
+    placements: [],
+  };
   if (words.length === 0) return empty;
 
   const { lines, hardBreaks } = breakIntoLines(words, opts);
@@ -359,6 +444,11 @@ export function layoutSquareKufi(
     cells[y * cols + x] = true;
   };
 
+  // Filled in the same pass that writes the cells, never re-derived after it.
+  // A second pass over the same arithmetic type-checks perfectly and lands
+  // every hand edit a cell or two off the letter it belongs to.
+  const placements: KufiPlacement[] = [];
+
   lines.forEach((line, lineIndex) => {
     const lineTop = lineIndex * (lineHeight + opts.lineGap);
     const baselineY = lineTop + ascent - 1;
@@ -369,6 +459,18 @@ export function layoutSquareKufi(
       const { form } = slot.unit;
       const x = cursor - slot.unit.width;
       const top = lineTop + (ascent - formAscent(form));
+
+      if (emit.placements) {
+        placements.push({
+          unitIndex: slot.unit.index,
+          unitKey: slot.unit.key,
+          x,
+          y: top,
+          width: slot.unit.width,
+          height: form.rows.length,
+          baselineY,
+        });
+      }
 
       form.rows.forEach((row, r) => {
         for (let c = 0; c < row.length; c++) {
@@ -383,7 +485,7 @@ export function layoutSquareKufi(
     }
   });
 
-  return { cols, rows, cells, unsupported, hardBreaks };
+  return { cols, rows, cells, unsupported, hardBreaks, placements };
 }
 
 /**
@@ -465,6 +567,258 @@ export function squareColumnTarget(text: string, options: SquareKufiOptions = {}
   }
 
   return best;
+}
+
+// ---------------------------------------------------------------------------
+// Hand edits — painting and erasing individual cells
+// ---------------------------------------------------------------------------
+
+/**
+ * One hand-painted (or hand-erased) cell.
+ *
+ * **Anchored to a letter, never to the grid.** `ascent`/`descent` are
+ * block-wide, `cols` is `Math.max(opts.columns, ...lineWidths)`, and every
+ * line is laid flush right from `cursor = cols` — so nearly every text edit,
+ * and the Panel width, Line gap, Word gap and Fit-to-square controls too,
+ * move every absolute grid coordinate in the panel. `unitIndex` plus a
+ * `dx`/`dy` offset from that letter's own box survives all of them.
+ *
+ * `unitKey` is the form fingerprint the edit was made against (see
+ * `KufiUnit.key`). It is **optional on purpose**, exactly as
+ * `GlyphTransform.glyphId` is: an edit saved before the field existed cannot
+ * be validated, and dropping it would be worse than applying it to whatever
+ * letter now holds its index.
+ */
+export type KufiCellEdit = {
+  /** Which letter of the run this cell belongs to, in logical order. */
+  unitIndex: number;
+  /** Fingerprint of the form the edit was made against. Absent = unchecked. */
+  unitKey?: string;
+  /** Columns right of that letter's left edge. May be negative. */
+  dx: number;
+  /** Rows below that letter's baseline row. May be negative. */
+  dy: number;
+  /** true paints the cell, false erases one the alphabet drew. */
+  on: boolean;
+};
+
+/**
+ * How far from its letter a hand edit may reach, in cells.
+ *
+ * A bound is needed at all because ownership is nearest-letter: without one, a
+ * cell dropped in an empty corner of a large panel would anchor to a letter
+ * half a panel away and then travel with it on rewrap, which reads as the edit
+ * teleporting. Eight cells is one em at `KUFI_CELLS_PER_EM`, so the reachable
+ * neighbourhood is about a letter's own height in every direction.
+ */
+export const KUFI_EDIT_REACH = 8;
+
+/** Just the block fields the layout reads, so this module needs no app types. */
+export type KufiOptionSource = {
+  kufiColumns?: number;
+  kufiLineGap?: number;
+  kufiWordGap?: number;
+};
+
+/**
+ * The layout options a square-kufi block asks for.
+ *
+ * Every call site goes through this — the renderer, the two Sidebar readouts,
+ * App's placement ghost and its Fit-to-square, and the cell-edit overlay. They
+ * must agree exactly: the overlay resolves a pointer against the same grid the
+ * renderer draws, and a single forgotten field puts the two one wrap apart.
+ */
+export const kufiOptionsFor = (block: KufiOptionSource): SquareKufiOptions => ({
+  columns: block.kufiColumns,
+  lineGap: block.kufiLineGap,
+  wordGap: block.kufiWordGap,
+});
+
+/** Squared cell distance from a cell to the nearest point of a placed box. */
+function boxDistance2(p: KufiPlacement, x: number, y: number): number {
+  const dx = x < p.x ? p.x - x : x > p.x + p.width - 1 ? x - (p.x + p.width - 1) : 0;
+  const dy = y < p.y ? p.y - y : y > p.y + p.height - 1 ? y - (p.y + p.height - 1) : 0;
+  return dx * dx + dy * dy;
+}
+
+/**
+ * Which letter owns the cell at `(x, y)` in the generated grid's frame.
+ *
+ * **Nearest letter wins** — the maintainer's chosen rule, not a fallback.
+ * Distance is measured to the nearest point of the letter's *box*, not to its
+ * centre, so a cell just outside a wide letter belongs to that letter rather
+ * than to a small one whose centre happens to be nearer. A cell inside a box
+ * is at distance 0 and so owned by it, which is why no separate
+ * containing-box stage is needed. Ties go to the lower `unitIndex`, so the
+ * answer never depends on the order placements were emitted in.
+ *
+ * Kept as one function on purpose: it decides where a cell painted out in the
+ * blank field travels on rewrap, and it is the single thing to change if a
+ * real panel argues for something else.
+ */
+export function resolveCellOwner(
+  placements: KufiPlacement[],
+  x: number,
+  y: number
+): KufiPlacement | null {
+  let best: KufiPlacement | null = null;
+  let bestD = Infinity;
+  for (const p of placements) {
+    const d = boxDistance2(p, x, y);
+    if (d < bestD || (d === bestD && best !== null && p.unitIndex < best.unitIndex)) {
+      best = p;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
+/**
+ * The edit that paints (or erases) the cell at `(x, y)` in the generated
+ * frame, or `null` when no letter is near enough to anchor it — see
+ * `KUFI_EDIT_REACH`.
+ */
+export function cellEditAt(
+  placements: KufiPlacement[],
+  x: number,
+  y: number,
+  on: boolean
+): KufiCellEdit | null {
+  const owner = resolveCellOwner(placements, x, y);
+  if (!owner) return null;
+  const dx = x - owner.x;
+  const dy = y - owner.baselineY;
+  if (Math.abs(dx) > KUFI_EDIT_REACH || Math.abs(dy) > KUFI_EDIT_REACH) return null;
+  return { unitIndex: owner.unitIndex, unitKey: owner.unitKey, dx, dy, on };
+}
+
+/** Two edits address the same cell when they name the same letter and offset. */
+const sameAnchor = (a: KufiCellEdit, b: KufiCellEdit) =>
+  a.unitIndex === b.unitIndex && a.dx === b.dx && a.dy === b.dy;
+
+/**
+ * Writes one edit into a block's list.
+ *
+ * An edit that asks for exactly what the alphabet already draws there is a
+ * **removal**, not a stored no-op — the same rule `setStrokeCut` follows for a
+ * zero-nuqta cut. Without it the array grows every time a user paints a cell
+ * and paints it back out.
+ */
+export function upsertCellEdit(
+  edits: KufiCellEdit[],
+  edit: KufiCellEdit,
+  generatedOn: boolean
+): KufiCellEdit[] {
+  const rest = edits.filter((e) => !sameAnchor(e, edit));
+  return edit.on === generatedOn ? rest : [...rest, edit];
+}
+
+/**
+ * The grid actually drawn: the generated one with the hand edits composited
+ * over it.
+ *
+ * Painted cells may fall outside the generated grid, so the result can be
+ * larger than the layout and start at a negative origin. `originX`/`originY`
+ * are that origin in the generated frame (both ≤ 0), and the renderer must
+ * offset its Konva nodes by them — not merely its draw calls — or the block
+ * reports a self-rect that no longer contains its own ink, and `exportBox`,
+ * `buildSnapTargets`, Align & Arrange and the mirror's settle loop all
+ * silently under-report it.
+ */
+export type ComposedKufiGrid = {
+  cols: number;
+  rows: number;
+  cells: boolean[];
+  /** Generated-frame column the composed grid starts at. ≤ 0. */
+  originX: number;
+  /** Generated-frame row the composed grid starts at. ≤ 0. */
+  originY: number;
+  /** Edits that resolved onto a letter and were drawn. */
+  applied: number;
+  /** Edits whose letter is gone, whose form changed, or that reach too far. */
+  dropped: number;
+};
+
+export function applyCellEdits(
+  layout: SquareKufiLayout,
+  edits: KufiCellEdit[]
+): ComposedKufiGrid {
+  const base: ComposedKufiGrid = {
+    cols: layout.cols,
+    rows: layout.rows,
+    cells: layout.cells,
+    originX: 0,
+    originY: 0,
+    applied: 0,
+    dropped: 0,
+  };
+  if (edits.length === 0) return base;
+
+  // By the `unitIndex` *field*, never by array position: a line break, an
+  // unsupported character or a lam-alef ligature all make the two differ.
+  const byUnit = new Map<number, KufiPlacement>();
+  for (const p of layout.placements) byUnit.set(p.unitIndex, p);
+
+  const writes: { x: number; y: number; on: boolean }[] = [];
+  let dropped = 0;
+  for (const edit of edits) {
+    const p = byUnit.get(edit.unitIndex);
+    if (!p) {
+      dropped++;
+      continue;
+    }
+    // An edit carrying no key still applies — the `glyphId`-optionality rule.
+    if (edit.unitKey !== undefined && edit.unitKey !== p.unitKey) {
+      dropped++;
+      continue;
+    }
+    if (Math.abs(edit.dx) > KUFI_EDIT_REACH || Math.abs(edit.dy) > KUFI_EDIT_REACH) {
+      dropped++;
+      continue;
+    }
+    writes.push({ x: p.x + edit.dx, y: p.baselineY + edit.dy, on: edit.on });
+  }
+  if (writes.length === 0) return { ...base, dropped };
+
+  // Only paint can grow the grid; an erase outside it has nothing to erase.
+  let minX = 0;
+  let minY = 0;
+  let maxX = layout.cols - 1;
+  let maxY = layout.rows - 1;
+  for (const w of writes) {
+    if (!w.on) continue;
+    minX = Math.min(minX, w.x);
+    minY = Math.min(minY, w.y);
+    maxX = Math.max(maxX, w.x);
+    maxY = Math.max(maxY, w.y);
+  }
+
+  const cols = Math.max(0, maxX - minX + 1);
+  const rows = Math.max(0, maxY - minY + 1);
+  const cells = new Array<boolean>(cols * rows).fill(false);
+  for (let y = 0; y < layout.rows; y++) {
+    for (let x = 0; x < layout.cols; x++) {
+      if (layout.cells[y * layout.cols + x]) {
+        cells[(y - minY) * cols + (x - minX)] = true;
+      }
+    }
+  }
+  let applied = 0;
+  for (const w of writes) {
+    const cx = w.x - minX;
+    const cy = w.y - minY;
+    // Only an erase can land outside: paint grew the grid to cover itself.
+    // It changes nothing, so it counts with the dropped rather than pretending
+    // to have been drawn — `applied + dropped` is always the list's length.
+    if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) {
+      dropped++;
+      continue;
+    }
+    cells[cy * cols + cx] = w.on;
+    applied++;
+  }
+
+  return { cols, rows, cells, originX: minX, originY: minY, applied, dropped };
 }
 
 // ---------------------------------------------------------------------------

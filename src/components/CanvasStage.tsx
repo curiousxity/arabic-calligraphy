@@ -6,6 +6,7 @@ import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
 import { SquareKufiText } from "./SquareKufiText";
 import { TextPathEditOverlay } from "./TextPathEditOverlay";
+import { KufiCellEditOverlay } from "./KufiCellEditOverlay";
 import { ImageBlockView } from "./ImageBlockView";
 // STREAM-B (muthanna/radial): the file has no anchored import region, so
 // these two sit with the other renderer imports. Used only by the STREAM-B
@@ -34,7 +35,7 @@ import {
   type SnapTarget,
 } from "../lib/snapping";
 import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
-import type { Block, DiacriticOverride, GlyphTransform, StrokeCut } from "../types";
+import type { Block, DiacriticOverride, GlyphTransform, StrokeCut, KufiCellEdit } from "../types";
 
 const GRID_SIZE = 40;
 const SNAP_GUIDE_PX = 6;
@@ -90,6 +91,9 @@ export type CanvasStageProps = {
   onSelectBlock: (id: number, additive?: boolean) => void;
   onEditBlock: (id: number) => void;
   onUpdateTextPathD: (blockId: number, d: string) => void;
+  /** One `pushHistory()` per painting stroke — see App's `beginKufiCellEdit`. */
+  onBeginKufiCellEdit: () => void;
+  onSetKufiCell: (blockId: number, edit: KufiCellEdit, generatedOn: boolean) => void;
   onDragDiacriticOverride: (
     blockId: number,
     glyphIndex: number,
@@ -156,6 +160,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSelectBlock,
   onEditBlock,
   onUpdateTextPathD,
+  onBeginKufiCellEdit,
+  onSetKufiCell,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
   onUpdateGlyphTransform,
@@ -938,8 +944,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
               if (block.type === "squareKufi") {
                 return (
+                  <React.Fragment key={block.id}>
                   <SquareKufiText
-                    key={block.id}
                     {...commonProps}
                     text={block.text}
                     x={block.x}
@@ -959,8 +965,34 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     kufiColumns={block.kufiColumns}
                     kufiLineGap={block.kufiLineGap}
                     kufiWordGap={block.kufiWordGap}
+                    kufiCellEdits={block.kufiCellEdits}
                     locked={block.locked}
                   />
+                  {/* Mounted here rather than from inside SquareKufiText, so a
+                      mirror — which renders the source's own renderer — can
+                      never grow an editor of its own. */}
+                  {block.kufiCellEditMode &&
+                    block.id === selectedId &&
+                    !effectivePanMode && (
+                      <KufiCellEditOverlay
+                        id={`kufi-cell-edit-layer-${block.id}`}
+                        x={block.x}
+                        y={block.y}
+                        rotation={block.rotation ?? 0}
+                        text={block.text}
+                        fontSize={block.fontSize}
+                        kufiColumns={block.kufiColumns}
+                        kufiLineGap={block.kufiLineGap}
+                        kufiWordGap={block.kufiWordGap}
+                        kufiCellEdits={block.kufiCellEdits}
+                        stageScale={stageScale}
+                        onBeginStroke={onBeginKufiCellEdit}
+                        onPaintCell={(edit, generatedOn) =>
+                          onSetKufiCell(block.id, edit, generatedOn)
+                        }
+                      />
+                    )}
+                  </React.Fragment>
                 );
               }
 

@@ -22,6 +22,10 @@ export const section: GuideSection = {
     "brick",
     "architectural",
     "logo",
+    "paint",
+    "cells",
+    "hand edit",
+    "pixel",
   ],
   Body: () => (
     <>
@@ -77,6 +81,34 @@ export const section: GuideSection = {
         Some letters that differ only by their dots are therefore drawn
         identically: ب, ت and ث share one shape, as do ج, ح and خ. That is
         correct for the style, not a limitation of the tool.
+      </p>
+
+      <h4>Finishing a panel by hand</h4>
+      <p>
+        The grid the app builds is a starting point. Tick{" "}
+        <strong>Paint cells</strong> in the <strong>Square Kufi</strong> panel
+        and a lattice appears over the block: click a square to fill it, click a
+        filled one to cut it away, and drag to do several at once. A whole drag
+        is one step, so a single undo takes back the stroke rather than one
+        square of it.
+      </p>
+      <p>
+        This is how a panel is actually finished — closing an awkward gap,
+        squaring off a corner, tying two lines together. Painted squares are
+        allowed to break the one-square rule the alphabet keeps: that is your
+        judgement, not the app's.
+      </p>
+      <p>
+        While <strong>Paint cells</strong> is on, the block cannot be dragged —
+        the lattice takes the pointer. Turn it off to move the panel.
+      </p>
+      <p>
+        Each square you paint is remembered against the <em>letter</em> nearest
+        it, not against a position on the grid, so it travels with that letter
+        when you rewrap the panel or change the gaps. The consequence is that
+        retyping the word a square was painted on lets it go — the panel says
+        how many were dropped when that happens. Get the text the way you want
+        it first, then paint.
       </p>
 
       <h4>Two things worth trying</h4>

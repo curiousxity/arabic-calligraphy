@@ -40,7 +40,12 @@ import {
   TATWEEL,
   type KashidaSlot,
 } from "../lib/tatweel";
-import { layoutSquareKufi, DEFAULT_KUFI_OPTIONS } from "../lib/squareKufi";
+import {
+  layoutSquareKufi,
+  applyCellEdits,
+  kufiOptionsFor,
+  DEFAULT_KUFI_OPTIONS,
+} from "../lib/squareKufi";
 import {
   TrashIcon,
   CopyIcon,
@@ -2276,11 +2281,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   // second pass is cheaper than threading the renderer's
                   // result back up through App.tsx, and it is what lets the
                   // panel report its own size and say what it could not draw.
-                  const layout = layoutSquareKufi(selectedBlock.text, {
-                    columns: selectedBlock.kufiColumns,
-                    lineGap: selectedBlock.kufiLineGap,
-                    wordGap: selectedBlock.kufiWordGap,
-                  });
+                  const cellEdits = selectedBlock.kufiCellEdits ?? [];
+                  const layout = layoutSquareKufi(
+                    selectedBlock.text,
+                    kufiOptionsFor(selectedBlock),
+                    // Placements cost per-unit allocation, so they are asked
+                    // for only when there is a hand edit to resolve — and it
+                    // is only the resolution that this panel reports.
+                    { placements: cellEdits.length > 0 }
+                  );
+                  const composed = applyCellEdits(layout, cellEdits);
                   const missing = Array.from(new Set(layout.unsupported));
                   // The unwrapped band is the whole useful domain of the width
                   // slider: any width at or past it puts the text on one line,
@@ -2295,9 +2305,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   const bandColumns = Math.max(
                     1,
                     layoutSquareKufi(selectedBlock.text, {
+                      ...kufiOptionsFor(selectedBlock),
                       columns: 0,
-                      lineGap: selectedBlock.kufiLineGap,
-                      wordGap: selectedBlock.kufiWordGap,
                     }).cols
                   );
                   return (
@@ -2325,7 +2334,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
                           {layout.cols === 0
                             ? "Nothing to draw yet — type Arabic text under Content."
-                            : `${layout.cols} × ${layout.rows} cells.`}
+                            : `${composed.cols} × ${composed.rows} cells.`}
                           {layout.hardBreaks > 0 &&
                             " A word was too wide for the panel and had to be split, so its join across the break is lost — widen the panel to close it up."}
                         </div>
@@ -2373,6 +2382,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         suffix="cells"
                         fieldKey="kufiWordGap"
                       />
+
+                      <div className="field">
+                        <span className="fieldTitle">Hand edits</span>
+                        <CheckboxRow
+                          id={makeId("kufi-cell-edit-mode", selectedId)}
+                          label="Paint cells"
+                          checked={selectedBlock.kufiCellEditMode ?? false}
+                          onChange={(v) =>
+                            onUpdateSelectedBlock({ kufiCellEditMode: v })
+                          }
+                        />
+                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          {selectedBlock.kufiCellEditMode
+                            ? "Click or drag on the lattice to fill cells; click ink to cut it away. The panel cannot be dragged while this is on."
+                            : "Fill or cut single cells by hand — how a panel is finished."}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 6,
+                            alignItems: "center",
+                            marginTop: 6,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="sidebarPillButton"
+                            onClick={() => onUpdateSelectedBlock({ kufiCellEdits: [] })}
+                            disabled={cellEdits.length === 0}
+                            title="Remove every hand-painted cell and go back to the generated grid"
+                          >
+                            Clear hand edits
+                          </button>
+                          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                            {cellEdits.length === 0
+                              ? "none"
+                              : `${cellEdits.length} cell${cellEdits.length === 1 ? "" : "s"}`}
+                          </span>
+                        </div>
+                        {composed.dropped > 0 && (
+                          <div
+                            className="fontMissingNotice"
+                            role="status"
+                            style={{ marginTop: 6 }}
+                          >
+                            {composed.dropped} hand-edited{" "}
+                            {composed.dropped === 1 ? "cell is" : "cells are"} no longer
+                            drawn: the letter each was painted onto has been retyped or
+                            has changed shape. Undo the text edit to bring them back, or
+                            clear the hand edits.
+                          </div>
+                        )}
+                      </div>
 
                       {missing.length > 0 && (
                         <div className="fontMissingNotice" role="status">

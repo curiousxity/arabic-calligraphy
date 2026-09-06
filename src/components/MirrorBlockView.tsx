@@ -162,6 +162,7 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
           kufiColumns={source.kufiColumns}
           kufiLineGap={source.kufiLineGap}
           kufiWordGap={source.kufiWordGap}
+          kufiCellEdits={source.kufiCellEdits}
         />
       );
     }
