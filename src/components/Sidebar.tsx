@@ -3084,10 +3084,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
 
                 {/* Relocated here when the Morph Glyph Editor panel was
-                    removed. Plain text only — no other renderer reads
-                    `glyphTransforms`, so arming it elsewhere would show dots
-                    that move nothing. */}
-                {selectedBlock.type === "text" && (
+                    removed. Text and Shape Fill only — those are the two
+                    renderers that read `glyphTransforms`, and the gate matches
+                    `App.tsx`'s `supportsGlyphTransforms` exactly, so arming it
+                    elsewhere cannot show dots that move nothing. */}
+                {(selectedBlock.type === "text" ||
+                  selectedBlock.type === "shapeFill") && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Move, scale &amp; rotate</div>
 
@@ -3101,6 +3103,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
                       Hover a letter on the canvas to move it, stretch it in x or y, or
                       turn it. Neighbouring letters never shift.
+                      {selectedBlock.type === "shapeFill" && (
+                        <>
+                          {" "}
+                          On a shape fill the handles sit on one tile near the middle
+                          of the shape, and one adjustment applies to every repetition
+                          of that letter.
+                        </>
+                      )}
                     </div>
 
                     {(selectedBlock.glyphTransforms?.length ?? 0) > 0 && (

@@ -542,9 +542,15 @@ of the block type, and an override applied after would detach the mark from
 its letter. **Arming:** plain text shows handles on selection, but Shape
 Fill requires an explicit "Diacritic tool" checkbox (`diacriticEditMode` on `ShapeFillBlock`), because a fill
 tiles its run across the whole silhouette and two marks can become 200+
-instances — that checkbox is also what gates `glyphInstances`'s memo and the
-block's `dragBoundFunc` pin. Because overrides are keyed by glyph index, one
+instances. Because overrides are keyed by glyph index, one
 adjustment applies to every tiled repetition.
+
+That checkbox used to be the *sole* gate on `glyphInstances`'s memo and on
+the block's `dragBoundFunc` pin. It is not any more: per-glyph transforms
+reached Shape Fill and need the same instance layout and the same pin, so
+both now read `diacriticEditMode || glyphTransformMode` (`pinDrag` in
+`ShapeFillText`). Arming either tool is what makes the tiled layout get
+computed and the silhouette stop being draggable.
 
 `App.tsx`'s `dragDiacriticOverride`/`toggleDiacriticHidden` gate on
 `supportsDiacriticOverrides(b)` rather than `b.type === "text"`. Widening
@@ -557,12 +563,12 @@ curve tangent, which is separate design work.
 
 ### Per-glyph move, scale & rotate (`src/lib/glyphTransform.ts`, `GlyphTransformHoverHandles.tsx`)
 
-Plain text blocks support rigidly moving a single shaped glyph and
-stretching or shrinking it as a whole in x or y — a second per-glyph system
-alongside `diacriticOverrides` (uniform scale plus vertical offset, marks
-only). Ticking "Move & scale glyph" in Sidebar → Typography arms it; hovering
-a letter then shows three dots — blue to move, gold to scale x, green to
-scale y.
+Text **and Shape Fill** blocks support rigidly moving a single shaped glyph,
+stretching or shrinking it as a whole in x or y, and turning it — a second
+per-glyph system alongside `diacriticOverrides` (uniform scale plus vertical
+offset, marks only). Ticking "Move, scale & rotate glyph" in Sidebar →
+Typography arms it; hovering a letter then shows four dots — blue to move,
+gold to scale x, green to scale y, purple to turn.
 
 `GlyphTransform` (`types.ts`: `offsetX`/`offsetY`/`scaleX`/`scaleY`, all
 defaulting to the identity) is applied in `ShapedText.tsx`'s
@@ -582,18 +588,41 @@ so `DiacriticHoverHandles` could no longer read a drag back as an unscaled
 reflow its neighbours, matching what `hidden` already guarantees on
 diacritic overrides.
 
-Two consumers need the glyph's box in *different* spaces, so
-`ShapedText.tsx`'s metrics memo emits both from one font walk.
-`glyphHitBoxes` stays **raw** and `glyphTransformedHitBoxes` carries the
-transform (via `transformedBox`). Only `GlyphTransformHoverHandles` gets the
-transformed variant; the diacritic placements get the raw one, because they
-reason in raw outline space and a folded-in transform would misalign them.
-(Before the Morph subsystem was removed this raw/transformed split had
-several more consumers on the raw side; keep it even now that it has one, or
-the placements silently drift.) The block-level `bounds` in that same loop
-are deliberately raw too: they
-must stay based on the untransformed run, or transforming one glyph would
-resize the block and shift every other glyph on canvas.
+**Every box the metrics memo emits is now raw**, and the overlay folds the
+transform in itself. `ShapedText.tsx` used to emit a second,
+transform-folded `glyphTransformedHitBoxes` list beside the raw
+`glyphHitBoxes` purely for this overlay; that list is gone, along with
+`activeGlyphTransforms` from the memo's dependency array — which is what
+stops the expensive walk (one `getPath(...).getBoundingBox()` per glyph)
+re-running on every frame of a drag. The block-level `bounds` in that same
+loop are raw for a *different* reason and always were: they must stay based
+on the untransformed run, or transforming one glyph would resize the block
+and shift every other glyph on canvas.
+
+**Both overlays now take placements, not boxes.** `GlyphTransformHoverHandles`
+takes `GlyphTransformPlacement[]` (`lib/diacriticPlacement.ts`) exactly as
+`DiacriticHoverHandles` takes `DiacriticPlacement[]`: each carries the glyph's
+**raw** box, its pen origin, and a matched `toCanvas`/`toLocal` adapter, so all
+of the overlay's arithmetic — hover, hit rect, the two rails, all four dots,
+and every drag readback — stays in the placement's own local space. Two
+things about that shape are load-bearing:
+
+- **The box is raw and the transform arrives as a separate prop.** A
+  pre-folded box would make the producing memo depend on the live drag value,
+  which on Shape Fill means rebuilding and re-mapping the whole tiled instance
+  array every frame — the same reason `diacriticPlacements`' dep list
+  deliberately excludes `diacriticOverrides`.
+- **Hover and drag state are keyed on `placement.key`, never on
+  `glyphIndex`.** On a tiling renderer an index-keyed hover lights every
+  repetition of that letter at once. (With the Shape Fill cap below the two
+  coincide *there*; the rule still holds, and `e2e/glyph-transform.spec.ts`
+  falsifies it against an uncapped build.)
+
+`unitScaleX`/`unitScaleY` on a placement say how many canvas px one local unit
+spans, and the dots' gaps are divided by them. On plain text they are absent
+(local space *is* canvas px); on Shape Fill a compressed row's local unit is a
+fraction of a pixel, and a gap left at face value there puts both scale dots
+inside the letter.
 
 A mark that itself carries a transform gets `makeGlyphTransformAdapter`
 (`lib/diacriticPlacement.ts`) as its placement adapter instead of the plain
@@ -616,13 +645,17 @@ both systems are now re-validated each render. `diacriticOverrides` are
 filtered against `findDiacriticGlyphIndices`, so a stale override landing on
 a base letter is dropped. A transform has no such signal — every glyph is a
 legitimate target — so it instead records the **`glyphId` it was made for**,
-and `ShapedText`'s `activeGlyphTransforms` drops one whose recorded id no
-longer matches the glyph at that index. `glyphId` is optional on purpose: a
+and **`filterActiveGlyphTransforms`** (pure, in `glyphTransform.ts`) drops one
+whose recorded id no longer matches the glyph at that index. It lives there
+rather than inline in a renderer precisely so **both** `ShapedText` and
+`ShapeFillText` run the identical rule — inlined, the rule would simply not
+exist on the second renderer, and the extraction would be dead code.
+`glyphId` is optional on purpose: a
 transform saved before the field existed cannot be validated, so it keeps the
 original behaviour of applying to whatever glyph now holds its index rather
 than being silently discarded. Every write goes through
 `GlyphTransformHoverHandles`' one `applyPatch` helper, which is what keeps the
-three drag handlers from each having to remember to stamp it.
+four drag handlers from each having to remember to stamp it.
 
 A scale-handle drag snapshots the dot's starting distance from the pivot at
 `onDragStart` rather than reading it from the live hit box: the box already
@@ -708,10 +741,70 @@ more visible), and the PUA preset-honorific branch draws override art whose
 centre differs from the metrics memo's font-glyph box, so a turned honorific
 pivots off-centre.
 
-Plain text only. Shape Fill carries the fields via
-`BlockCommon` but its renderer doesn't read them; `App.tsx`'s
-`supportsGlyphTransforms` gate rejects edits there rather than accepting
-and silently discarding them.
+#### On Shape Fill
+
+`App.tsx`'s `supportsGlyphTransforms` is `text | shapeFill`. Widening it is
+what actually makes the feature work on the tiling renderer —
+`glyphTransforms` lives on `BlockCommon`, so a narrower guard type-checks
+perfectly while silently discarding every edit, the trap recorded against
+`supportsDiacriticOverrides`. `textPath`, `image`, `squareKufi` and `mirror`
+are still out (see Deferred features), and `MirrorBlockView` passes
+`glyphTransforms` on both the `text` and `shapeFill` branches so a mirror
+draws the transformed letters.
+
+- **Placements are capped to one per glyph index**, attached to the tile
+  nearest the silhouette's centre. This was decided up front rather than
+  discovered: a 3000-tall silhouette at `fontSize` 20 gives ~115 rows, and a
+  2000-wide row with a four-glyph run gives ~50 reps — **~23,000 listening
+  Konva rects**, a frozen tab rather than a slow frame. The cap costs nothing
+  semantically, because a transform is keyed by glyph index and therefore
+  **already applies to every tiled repetition**, exactly as
+  `diacriticEditMode` has always worked. What it costs is that the handle may
+  not sit on the tile the user is looking at; the guide says so.
+  `e2e/glyph-transform.spec.ts` pins it against the *diacritic* overlay's
+  per-tile rect count off the same instance array — verified to fail at 780
+  rects with the cap removed.
+- **The transform is applied between `rotate(rotRad)` and
+  `scale(scX, scY)`**, and the second half of that is a choice rather than a
+  consequence. Outside the diacritic override is forced (the transform must
+  stay the outermost rigid transform, or the mark's adapter cannot invert a
+  drag). Outside the *row's fit scale* is chosen: `scX` is a per-line factor,
+  different on every row, so a stored `offsetX` placed inside it would move
+  the letter by a different amount on every repetition. `penX`/`totalAdvance`
+  are untouched, as everywhere else.
+- **Three coordinate spaces, and the placements live in the middle one.** The
+  overlay's local space for this renderer is the **row frame** — after
+  `translate(gx, gy) → rotate`, before `scale(scX, scY)` — where the pen
+  origin is `(0, 0)` and the glyph box is the raw box carried through the
+  row's fit scale. Pre-folding the *row* scale into the placement box is safe
+  (it is layout, fixed for the gesture); pre-folding the *transform* is not.
+  The row frame is a similarity (rotation plus uniform `shapeScale`), which is
+  why the overlay's bearings and axis-aligned rails need no generalisation.
+  Its adapter is `makeShapeFillInstanceAdapter` with unit row scales, not a
+  fourth builder.
+- **A mark on a transformed glyph gets a composed adapter**
+  (`composeAdapters`, pure and tested): row frame, then the glyph transform,
+  then the row's fit scale, which is where the mark's own override lives. With
+  no transform the adapter is byte-identical to the two-stage
+  `makeShapeFillInstanceAdapter` this renderer has always used —
+  `composeAdapters`' "reduces to the outer adapter at the identity" test is
+  that claim. `diacriticInstances` splits the (potentially huge) walk over
+  `glyphInstances` out of the placements memo, so composing a transform in
+  during a live drag costs one pass over the *marks*, not over every tile.
+- **`ShapeFillText`'s `dragBoundFunc` pin was fixed, not widened.** Konva's
+  contract is absolute stage coordinates; the old `() => ({ x, y })` returned
+  the block's *layer-space* props, so at the default 275% zoom pressing an
+  armed silhouette teleported the block — measured at 37px. It now pins to the
+  node's own pre-drag `getAbsolutePosition()`, captured at `dragstart` (with a
+  lazy read as fallback, since Konva asks before it has moved the node). The
+  gesture that sees this is a press on the *silhouette*, never on a dot: a
+  dot cancels the bubble on mousedown, so a handle drag never starts a block
+  drag and never consults the pin at all — the obvious test passes with the
+  bug fully present.
+- Known approximation, inherited: `makeShapeFillInstanceAdapter` ignores the
+  italic shear the draw loop applies inside it, so on an italic Shape Fill
+  block every handle sits a few pixels off. A stacked glyph transform makes it
+  slightly more visible.
 
 ### Removed subsystems — the Morph Glyph Editor and everything under it
 
@@ -2146,7 +2239,15 @@ live in `e2e/harf.ts`.
 
 These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
 
-- **Per-glyph move, scale & rotate on Shape Fill and text-on-path blocks** — Implemented for plain text only (all four handles). `src/lib/diacriticPlacement.ts`'s adapters are the nearest existing precedent for expressing another renderer's coordinate space, but they were authored for placing *diacritic marks*, not for a general per-glyph transform — treat them as a starting point to evaluate, not as a drop-in that makes this cheap. Each renderer's coordinate space needs its own design and verification pass. Text-on-path is excluded for the same reason every other per-glyph tool is, its glyphs being rotated to a curve tangent.
+- **Per-glyph move, scale & rotate on text-on-path blocks** — Shape Fill
+  shipped (see that section above); text-on-path did not, and the reason is
+  its own rather than the coordinate-space work Shape Fill needed.
+  `TextOnPathText` has no metrics pass, no hit boxes, no `isSelected` prop and
+  no overlay of any kind, and — the part a spec has to answer first —
+  `offsetX` on a curve has no defined meaning: along the tangent, or along
+  arc length? That question has now been deferred twice. It is excluded for
+  the same reason every other per-glyph tool excludes it, its glyphs being
+  rotated to a curve tangent.
 
 - **Straight-stroke stretching on Shape Fill and text-on-path blocks** —
   **Declined, not deferred**, and for a stronger reason than the one this

@@ -57,9 +57,24 @@ export const section: GuideSection = {
         and <strong>Fit to width</strong> will not count it. Fit the line
         first, then shape the letters.
       </p>
+      <h4>On a Shape Fill block</h4>
       <p>
-        This is for plain text blocks only. Shape Fill and curve blocks lay
-        their letters out by their own rules, so the dots do not appear there.
+        The same tick-box works on a Shape Fill block, with one difference
+        worth knowing before you reach for it. A Shape Fill tiles your words
+        across the silhouette, so the same letter is drawn over and over —
+        and an adjustment belongs to the <em>letter</em>, not to the copy you
+        happened to grab. Move or turn one and{" "}
+        <strong>every repetition of that letter changes with it</strong>. The
+        handles appear on a single designated tile near the middle of the
+        shape, which may not be the one you were looking at.
+      </p>
+      <p>
+        While the tick-box is on, the shape itself cannot be dragged — the
+        handles have the canvas. Untick it to move the block again.
+      </p>
+      <p>
+        Curve blocks are the exception: once a letter is rotated to follow a
+        curve, the dots do not appear.
       </p>
 
       <h4>Adjusting marks</h4>

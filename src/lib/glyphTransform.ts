@@ -228,3 +228,31 @@ export function mergeGlyphTransform(
   if (!existing || isStale) return { glyphIndex, ...patch };
   return { ...existing, ...patch };
 }
+
+/**
+ * Drops the transforms that have drifted onto a different letter.
+ *
+ * Transforms are keyed by glyph index, and a text edit before a glyph shifts
+ * that index after re-shaping. Overrides can be re-validated by asking
+ * whether the glyph at an index is still a diacritic at all; a transform has
+ * no such signal, because every glyph is a legitimate target — so it records
+ * the `glyphId` it was made for and this checks that instead.
+ *
+ * **The no-`glyphId` carve-out is load-bearing, not a convenience.** A
+ * transform written before that field existed has nothing to check against,
+ * so it is kept and still applied, preserving the behaviour saved projects
+ * were written under rather than silently dropping their edits.
+ *
+ * Pure and structurally typed on purpose: both `ShapedText` and
+ * `ShapeFillText` consume it, so the staleness rule exists once rather than
+ * once per renderer — which is the only thing that makes the rule true of
+ * the tiling renderer at all.
+ */
+export function filterActiveGlyphTransforms(
+  transforms: readonly GlyphTransform[],
+  glyphs: readonly { g: number }[]
+): GlyphTransform[] {
+  return transforms.filter(
+    (t) => t.glyphId === undefined || glyphs[t.glyphIndex]?.g === t.glyphId
+  );
+}

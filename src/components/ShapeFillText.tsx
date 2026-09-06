@@ -14,7 +14,7 @@
  *  - shapeScale, stroke all preserved.
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { Group, Shape, Rect, Circle } from "react-konva";
 import type Konva from "konva";
 import {
@@ -27,11 +27,20 @@ import {
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { findDiacriticGlyphIndices } from "../lib/diacritics";
 import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
+import { GlyphTransformHoverHandles } from "./GlyphTransformHoverHandles";
 import {
+  composeAdapters,
+  makeGlyphTransformAdapter,
   makeShapeFillInstanceAdapter,
   type DiacriticPlacement,
+  type GlyphTransformPlacement,
+  type PlacementAdapter,
 } from "../lib/diacriticPlacement";
-import type { DiacriticOverride } from "../types";
+import {
+  filterActiveGlyphTransforms,
+  resolveGlyphTransform,
+} from "../lib/glyphTransform";
+import type { DiacriticOverride, GlyphTransform } from "../types";
 import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
 
 export type ShapeFillTextProps = {
@@ -66,6 +75,10 @@ export type ShapeFillTextProps = {
   diacriticOverrides?: DiacriticOverride[];
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
+  /** Armed by Typography's "Move, scale & rotate glyph" checkbox. */
+  glyphTransformMode?: boolean;
+  glyphTransforms?: GlyphTransform[];
+  onUpdateGlyphTransform?: (glyphIndex: number, patch: Partial<GlyphTransform>) => void;
   locked?: boolean;
   draggable?: boolean;
   onClick?: () => void;
@@ -76,6 +89,13 @@ export type ShapeFillTextProps = {
   isSelected?: boolean;
   onResizeScale?: (newScale: number) => void;
 };
+
+/**
+ * Stable empty default for `glyphTransforms`, so a block carrying none does
+ * not hand the memos below a fresh array identity on every render — the same
+ * reason `CanvasStage` keeps its own `NO_GLYPH_TRANSFORMS`.
+ */
+const NO_GLYPH_TRANSFORMS: GlyphTransform[] = [];
 
 type GlyphInstance = {
   glyphIndex: number;
@@ -201,6 +221,9 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   diacriticOverrides = [],
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
+  glyphTransformMode = false,
+  glyphTransforms = NO_GLYPH_TRANSFORMS,
+  onUpdateGlyphTransform,
   locked,
   draggable = true,
   onClick, onTap, onDblClick, onDragMove, onDragEnd,
@@ -208,6 +231,11 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   onResizeScale,
 }) => {
   const shapeData = useShapedGlyphs(text, fontFamily);
+
+  const groupRef = useRef<Konva.Group>(null);
+  /** The block's absolute position at drag start, while a per-glyph tool pins it. */
+  const dragPinRef = useRef<{ x: number; y: number } | null>(null);
+  const pinDrag = diacriticEditMode || glyphTransformMode;
 
   // Parse SVG path once
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
@@ -270,6 +298,19 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     return boxes;
   }, [glyphCache, fontSize]);
 
+  const glyphBoxByIndex = useMemo(
+    () => new Map(glyphLocalBoxes.map((b) => [b.glyphIndex, b])),
+    [glyphLocalBoxes]
+  );
+
+  // The same `glyphId` staleness rule ShapedText applies, through the same
+  // pure helper — extracting it is what makes the rule exist on this renderer
+  // at all rather than only on the one it was written for.
+  const activeGlyphTransforms = useMemo(
+    () => filterActiveGlyphTransforms(glyphTransforms, shapeData.glyphs),
+    [glyphTransforms, shapeData.glyphs]
+  );
+
   // Recomputed per render for this component's own current glyph run, so a
   // stale override whose glyph index now lands on a base letter (text edits
   // shift indices) is ignored rather than hiding or ballooning that letter —
@@ -294,7 +335,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   // where every tiled repetition actually lands. Only computed while that
   // tool is armed (it's a real amount of work).
   const glyphInstances = useMemo<GlyphInstance[]>(() => {
-    if (!diacriticEditMode) return [];
+    if (!diacriticEditMode && !glyphTransformMode) return [];
     if (!shapeSvgPath || parsedCmds.length === 0) return [];
     if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) return [];
 
@@ -330,6 +371,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     return instances;
   }, [
     diacriticEditMode,
+    glyphTransformMode,
     shapeSvgPath,
     parsedCmds,
     shapeData.font,
@@ -344,18 +386,184 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     polygon,
   ]);
 
+  /**
+   * The row frame: the space the draw loop is in after
+   * `translate(gx, gy) -> rotate(rotRad)` but *before* the row's own fit
+   * scale. The glyph transform is applied there (see the draw loop), so it is
+   * the space the move/scale/rotate placements live in — and it is a
+   * similarity (a rotation plus the uniform `shapeScale`), which is why the
+   * overlay's bearings and rails need no special handling on this renderer.
+   *
+   * Expressed as `makeShapeFillInstanceAdapter` with unit row scales rather
+   * than as a fourth builder, so the two Shape Fill spaces stay visibly the
+   * same mapping with one stage removed.
+   */
+  const rowFrameAdapter = useMemo(
+    () => (inst: GlyphInstance) =>
+      makeShapeFillInstanceAdapter({
+        gx: inst.gx,
+        gy: inst.gy,
+        rotationDeg: shapeFillTextRotation,
+        scX: 1,
+        scY: 1,
+        shapeScale,
+      }),
+    [shapeFillTextRotation, shapeScale]
+  );
+
+  /**
+   * One placement per glyph index, **not** per tiled repetition.
+   *
+   * The cap is the whole reason this feature is affordable here. Worked from
+   * the real loop: a 3000-tall silhouette at `fontSize` 20 gives ~115 rows,
+   * and a 2000-wide row with a four-glyph run gives ~50 repetitions — about
+   * 23,000 listening Konva rects, which is a frozen tab rather than a slow
+   * one. Capping costs nothing semantically: a transform is keyed by glyph
+   * index, so **one adjustment already applies to every repetition of that
+   * letter**, exactly as `diacriticEditMode` has always worked. The handle is
+   * attached to the instance nearest the silhouette's centre, which is the
+   * one most likely to be the one being looked at.
+   */
+  const glyphTransformPlacements = useMemo<GlyphTransformPlacement[]>(() => {
+    if (!glyphTransformMode) return [];
+
+    const cxShape = shapeWidth / 2;
+    const cyShape = shapeHeight / 2;
+    const best = new Map<number, { inst: GlyphInstance; d2: number }>();
+    for (const inst of glyphInstances) {
+      const dx = inst.gx - cxShape;
+      const dy = inst.gy - cyShape;
+      const d2 = dx * dx + dy * dy;
+      const held = best.get(inst.glyphIndex);
+      if (!held || d2 < held.d2) best.set(inst.glyphIndex, { inst, d2 });
+    }
+
+    return [...best.entries()]
+      // Sorted so the mounted set has a stable order however the scanline
+      // happened to walk the silhouette.
+      .sort((a, b) => a[0] - b[0])
+      .flatMap(([glyphIndex, { inst }]) => {
+        const raw = glyphBoxByIndex.get(glyphIndex);
+        if (!raw) return [];
+
+        // The box in the row frame: the raw outline box carried through the
+        // row's own fit scale, which is the one stage sitting *inside* the
+        // glyph transform. Pre-folding the *row* scale is safe — it is
+        // layout, fixed for the gesture — where pre-folding the transform
+        // would not be.
+        const x1 = raw.x * inst.scX;
+        const x2 = (raw.x + raw.width) * inst.scX;
+        const y1 = raw.y * inst.scY;
+        const y2 = (raw.y + raw.height) * inst.scY;
+
+        return [
+          {
+            glyphIndex,
+            key: `glyph:${glyphIndex}`,
+            glyphId: raw.glyphId,
+            box: {
+              x: Math.min(x1, x2),
+              y: Math.min(y1, y2),
+              width: Math.max(Math.abs(x2 - x1), 1),
+              height: Math.max(Math.abs(y2 - y1), 1),
+            },
+            // The pen origin *is* the row frame's origin: the draw loop has
+            // already translated to it, and the glyph path is drawn from
+            // (0, 0) in that frame.
+            gx: 0,
+            gy: 0,
+            unitScaleX: Math.abs(inst.scX * shapeScale),
+            unitScaleY: Math.abs(inst.scY * shapeScale),
+            ...rowFrameAdapter(inst),
+          },
+        ];
+      });
+  }, [
+    glyphTransformMode,
+    glyphInstances,
+    glyphBoxByIndex,
+    shapeWidth,
+    shapeHeight,
+    shapeScale,
+    rowFrameAdapter,
+  ]);
+
+  /**
+   * Every tiled repetition that is a diacritic, split out from the placements
+   * below so the (potentially very large) walk over `glyphInstances` does not
+   * re-run when a glyph transform changes — only the far shorter map over the
+   * marks does. That split is what keeps composing the transform into a
+   * mark's adapter affordable during a live drag.
+   */
+  const diacriticInstances = useMemo(
+    () =>
+      diacriticEditMode
+        ? glyphInstances.flatMap((inst, i) =>
+            diacriticGlyphIndices.has(inst.glyphIndex) ? [{ inst, i }] : []
+          )
+        : [],
+    [diacriticEditMode, glyphInstances, diacriticGlyphIndices]
+  );
+
   // One placement per tiled repetition of each diacritic. They all edit the
   // same single override, keyed by glyph index — one adjustment therefore
   // applies to every repetition of that mark.
   const diacriticPlacements = useMemo<DiacriticPlacement[]>(() => {
-    if (!diacriticEditMode) return [];
-
-    const boxByIndex = new Map(glyphLocalBoxes.map((b) => [b.glyphIndex, b]));
-
-    return glyphInstances.flatMap((inst, i) => {
-      if (!diacriticGlyphIndices.has(inst.glyphIndex)) return [];
-      const box = boxByIndex.get(inst.glyphIndex);
+    return diacriticInstances.flatMap(({ inst, i }) => {
+      const box = glyphBoxByIndex.get(inst.glyphIndex);
       if (!box) return [];
+
+      // With no glyph transform this is exactly the two-stage mapping this
+      // renderer has always used; the transform, when there is one, is the
+      // stage the draw loop now inserts between the row frame and the row's
+      // own fit scale, so a mark on a moved letter has to be carried through
+      // all three to reach where it is actually drawn.
+      const transform = activeGlyphTransforms.find(
+        (t) => t.glyphIndex === inst.glyphIndex
+      );
+      let adapter: PlacementAdapter;
+      if (transform) {
+        const r = resolveGlyphTransform(transform);
+        adapter = composeAdapters(
+          rowFrameAdapter(inst),
+          composeAdapters(
+            makeGlyphTransformAdapter({
+              offsetX: 0,
+              offsetY: 0,
+              pivotX: 0,
+              pivotY: 0,
+              transformOffsetX: r.offsetX,
+              transformOffsetY: r.offsetY,
+              scaleX: r.scaleX,
+              scaleY: r.scaleY,
+              rotationDeg: r.rotation,
+              // The turn's pivot in the row frame: the raw box centre carried
+              // through the row's fit scale, matching the draw loop exactly.
+              rotationPivotX: (box.x + box.width / 2) * inst.scX,
+              rotationPivotY: (box.y + box.height / 2) * inst.scY,
+            }),
+            // The row's own fit scale, the stage the mark's override lives
+            // inside.
+            makeShapeFillInstanceAdapter({
+              gx: 0,
+              gy: 0,
+              rotationDeg: 0,
+              scX: inst.scX,
+              scY: inst.scY,
+              shapeScale: 1,
+            })
+          )
+        );
+      } else {
+        adapter = makeShapeFillInstanceAdapter({
+          gx: inst.gx,
+          gy: inst.gy,
+          rotationDeg: shapeFillTextRotation,
+          scX: inst.scX,
+          scY: inst.scY,
+          shapeScale,
+        });
+      }
 
       return [
         {
@@ -364,40 +572,63 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
           // one mark apart.
           key: `${i}:${inst.glyphIndex}`,
           box: { x: box.x, y: box.y, width: box.width, height: box.height },
-          ...makeShapeFillInstanceAdapter({
-            gx: inst.gx,
-            gy: inst.gy,
-            rotationDeg: shapeFillTextRotation,
-            scX: inst.scX,
-            scY: inst.scY,
-            shapeScale,
-          }),
+          ...adapter,
         },
       ];
     });
   }, [
-    diacriticEditMode,
-    glyphInstances,
-    glyphLocalBoxes,
-    diacriticGlyphIndices,
+    diacriticInstances,
+    glyphBoxByIndex,
+    activeGlyphTransforms,
+    rowFrameAdapter,
     shapeFillTextRotation,
     shapeScale,
   ]);
 
   return (
     <Group
+      ref={groupRef}
       id={id}
       x={x} y={y}
       rotation={rotation}
       opacity={opacity}
       draggable={draggable && !locked}
-      dragBoundFunc={diacriticEditMode ? () => ({ x, y }) : undefined}
+      // While either per-glyph tool is armed the silhouette itself must not
+      // move: the overlays' hit rects cover most of it, and a press that
+      // slipped past one would drag the whole block out from under the
+      // handles.
+      //
+      // Konva's `dragBoundFunc` contract is **absolute stage coordinates**.
+      // This used to return the block's layer-space `{ x, y }` props, so at
+      // the app's default 275% zoom (or under any pan, or inside a rotated
+      // parent) pressing an armed silhouette teleported it to wherever those
+      // layer coordinates happened to land on screen. Pinning to the node's
+      // own pre-drag absolute position is the fix; it is captured at
+      // `dragstart` and falls back to reading the node, which is still at its
+      // pre-drag position the first time Konva asks.
+      dragBoundFunc={
+        pinDrag
+          ? () =>
+              dragPinRef.current ??
+              groupRef.current?.getAbsolutePosition() ?? { x: 0, y: 0 }
+          : undefined
+      }
+      onDragStart={(e) => {
+        // Only the block's own drag — a handle Circle's dragstart bubbles
+        // here too, and its position is not the block's.
+        if (e.target === groupRef.current) {
+          dragPinRef.current = e.target.getAbsolutePosition();
+        }
+      }}
       onClick={onClick}
       onTap={onTap}
       onDblClick={onDblClick}
       onDblTap={onDblClick}
       onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
+      onDragEnd={(e) => {
+        dragPinRef.current = null;
+        onDragEnd?.(e);
+      }}
       listening
     >
       <Rect x={0} y={0} width={scaledW} height={scaledH} fill="transparent" strokeEnabled={false} listening />
@@ -474,6 +705,51 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                 targetCtx.save();
                 targetCtx.translate(gx, gy);
                 if (shapeFillTextRotation !== 0) targetCtx.rotate(rotRad);
+
+                // The per-glyph transform goes here — outside the row's own
+                // fit scale, inside the tile's rotation. Two things follow,
+                // and the second is a choice rather than a consequence.
+                //
+                // Outside the diacritic override, which satisfies the
+                // ordering ShapedText already fixes: the transform is the
+                // outermost rigid transform of the finished glyph, so a mark
+                // carrying both stays expressed in the glyph's own
+                // pre-transform space and its adapter can still invert a
+                // drag back to an unscaled `offsetY`.
+                //
+                // Outside `scale(scX, scY)` so a stored `offsetX` draws at a
+                // uniform magnitude across the whole silhouette. `scX` is a
+                // *per-line* fit factor, different on every row, so the same
+                // offset placed inside it would move the letter by a
+                // different amount on every repetition — which reads as a
+                // bug rather than as one edit applied everywhere.
+                let glyphMeanScale = 1;
+                const glyphTransform = activeGlyphTransforms.find(
+                  (t) => t.glyphIndex === gi
+                );
+                if (glyphTransform) {
+                  const { offsetX, offsetY, scaleX, scaleY, rotation } =
+                    resolveGlyphTransform(glyphTransform);
+                  targetCtx.translate(offsetX, offsetY);
+                  targetCtx.scale(scaleX, scaleY);
+                  glyphMeanScale = (scaleX + scaleY) / 2;
+                  // Inside the glyph's own scale and about its raw box
+                  // centre — carried through the row's fit scale, since that
+                  // is what this frame's units are — matching ShapedText's
+                  // ordering and, with it, `transformedBox`, so the overlay's
+                  // frozen scale pivot never moves under a turn.
+                  if (rotation !== 0) {
+                    const raw = glyphBoxByIndex.get(gi);
+                    if (raw) {
+                      const px = (raw.x + raw.width / 2) * scX;
+                      const py = (raw.y + raw.height / 2) * scY;
+                      targetCtx.translate(px, py);
+                      targetCtx.rotate((rotation * Math.PI) / 180);
+                      targetCtx.translate(-px, -py);
+                    }
+                  }
+                }
+
                 targetCtx.scale(scX, scY);
                 if (diacriticOverride) {
                   // Applied inside the row's own scale so an adjusted mark
@@ -501,7 +777,12 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                   // space, where a gradient stroke is issued.
                   painter.strokeWithFill(targetCtx, {
                     local: fauxBoldWidth / scX,
-                    block: fauxBoldWidth * (diacriticOverride?.scale ?? 1),
+                    // The glyph's mean scale joins the mark's own here for
+                    // the same reason the mark's already does: `block` is the
+                    // visible weight measured in the silhouette's space, and
+                    // a scaled glyph draws its stroke that much heavier.
+                    block:
+                      fauxBoldWidth * (diacriticOverride?.scale ?? 1) * glyphMeanScale,
                   });
                 }
                 targetCtx.restore();
@@ -536,9 +817,20 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       />
 
       {/*
-        Mounted before the corner resize Circle so that handle keeps winning
-        Konva's topmost-listener contest at the shape's bottom-right corner.
+        Mounted BEFORE the diacritic overlay and both before the corner resize
+        Circle. Konva routes a pointer to the topmost listening shape and
+        later siblings sit on top, so the order is largest -> smallest: a
+        glyph-sized rect, then a mark's smaller and more precise target, then
+        the resize handle at the shape's bottom-right corner.
       */}
+      <GlyphTransformHoverHandles
+        isSelected={isSelected}
+        enabled={glyphTransformMode}
+        placements={glyphTransformPlacements}
+        glyphTransforms={activeGlyphTransforms}
+        onUpdateGlyphTransform={onUpdateGlyphTransform}
+      />
+
       <DiacriticHoverHandles
         isSelected={isSelected && diacriticEditMode}
         placements={diacriticPlacements}

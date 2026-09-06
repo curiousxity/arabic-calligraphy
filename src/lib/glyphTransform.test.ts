@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   GLYPH_SCALE_MAX,
   GLYPH_SCALE_MIN,
+  filterActiveGlyphTransforms,
   glyphPivot,
   mergeGlyphTransform,
   normalizeRotation,
@@ -129,6 +130,71 @@ describe("scaleFromHandleDrag", () => {
   it("stays finite at a degenerate zero starting scale", () => {
     const s = scaleFromHandleDrag(restAt(1), restAt(1), GAP, 0);
     expect(Number.isFinite(s)).toBe(true);
+  });
+
+  it("holds at a compressed row's non-unit gap, from a moved pivot", () => {
+    // Shape Fill expresses the 10px dot gap in the row's own local units, so
+    // a row fitted at 0.37 makes the gap ~27 — a number this function had
+    // only ever been exercised at 10. And the pivot is `penOrigin + offsetX`,
+    // so a moved glyph measures every distance from somewhere else.
+    // Distances below are all relative to that moved pivot, which is what the
+    // overlay's drag-start snapshot holds.
+    const rowGap = 10 / 0.37;
+    const rest = (scale: number) => EXTENT * scale + rowGap;
+
+    for (const startScale of [1, 0.6, 2.4]) {
+      // No-jump on the first frame, whatever the gap.
+      expect(
+        scaleFromHandleDrag(rest(startScale), rest(startScale), rowGap, startScale)
+      ).toBeCloseTo(startScale, 6);
+      // And the dot still lands exactly on the requested scale.
+      expect(
+        scaleFromHandleDrag(rest(startScale), rest(1.9), rowGap, startScale)
+      ).toBeCloseTo(1.9, 6);
+    }
+  });
+
+  it("holds at a negative gap, the y rail's own signing", () => {
+    // The y dot sits *above* the glyph while canvas y grows downward, so
+    // every distance along that rail is signed the other way — including the
+    // gap, which is the argument most easily passed unsigned.
+    const negGap = -10 / 0.37;
+    const rest = (scale: number) => -EXTENT * scale + negGap;
+
+    expect(scaleFromHandleDrag(rest(1.4), rest(1.4), negGap, 1.4)).toBeCloseTo(1.4, 6);
+    expect(scaleFromHandleDrag(rest(1.4), rest(0.8), negGap, 1.4)).toBeCloseTo(0.8, 6);
+  });
+});
+
+describe("filterActiveGlyphTransforms", () => {
+  const glyphs = [{ g: 11 }, { g: 22 }, { g: 33 }];
+
+  it("keeps a transform whose recorded glyph still sits at its index", () => {
+    const t = { glyphIndex: 1, glyphId: 22, offsetX: 5 };
+    expect(filterActiveGlyphTransforms([t], glyphs)).toEqual([t]);
+  });
+
+  it("drops one whose recorded glyph has drifted onto another letter", () => {
+    // A text edit before this glyph shifts every later index after
+    // re-shaping; without this the stored scale would silently apply to
+    // whichever letter now holds the index.
+    expect(
+      filterActiveGlyphTransforms([{ glyphIndex: 1, glyphId: 99, scaleX: 2 }], glyphs)
+    ).toEqual([]);
+  });
+
+  it("keeps one carrying no glyphId at all", () => {
+    // Load-bearing carve-out, not a convenience: a transform saved before the
+    // field existed has nothing to check against, and dropping it would
+    // silently throw away edits from every project written before then.
+    const legacy = { glyphIndex: 1, scaleY: 1.5 };
+    expect(filterActiveGlyphTransforms([legacy], glyphs)).toEqual([legacy]);
+  });
+
+  it("drops one whose index is past the end of the run", () => {
+    expect(
+      filterActiveGlyphTransforms([{ glyphIndex: 9, glyphId: 11 }], glyphs)
+    ).toEqual([]);
   });
 });
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  composeAdapters,
   makeGlyphTransformAdapter,
   makeOffsetAdapter,
   makeShapeFillInstanceAdapter,
@@ -223,5 +224,107 @@ describe("makeShapeFillInstanceAdapter", () => {
     expect(Number.isFinite(canvas.y)).toBe(true);
     expect(Number.isFinite(back.x)).toBe(true);
     expect(Number.isFinite(back.y)).toBe(true);
+  });
+});
+
+describe("composeAdapters", () => {
+  /** Stands in for `ShapeFillText`'s row frame: rotation plus a uniform scale. */
+  const outer = makeShapeFillInstanceAdapter({
+    gx: 40,
+    gy: -15,
+    rotationDeg: 25,
+    scX: 1,
+    scY: 1,
+    shapeScale: 1.7,
+  });
+
+  it("round-trips through both stages", () => {
+    const inner = makeShapeFillInstanceAdapter({
+      gx: 0,
+      gy: 0,
+      rotationDeg: 0,
+      scX: 0.4,
+      scY: 1.3,
+      shapeScale: 1,
+    });
+    const a = composeAdapters(outer, inner);
+    const canvas = a.toCanvas(23, -8);
+    const back = a.toLocal(canvas.x, canvas.y);
+    expect(back.x).toBeCloseTo(23, 6);
+    expect(back.y).toBeCloseTo(-8, 6);
+  });
+
+  it("reduces to the outer adapter when the inner stage is the identity", () => {
+    // The case that matters in `ShapeFillText`: a glyph carrying no transform
+    // must map exactly as it did before the middle stage existed.
+    const identity = makeShapeFillInstanceAdapter({
+      gx: 0,
+      gy: 0,
+      rotationDeg: 0,
+      scX: 1,
+      scY: 1,
+      shapeScale: 1,
+    });
+    const a = composeAdapters(outer, identity);
+    for (const [x, y] of [
+      [0, 0],
+      [12, 40],
+      [-7, -3.5],
+    ]) {
+      const composed = a.toCanvas(x, y);
+      const plain = outer.toCanvas(x, y);
+      expect(composed.x).toBeCloseTo(plain.x, 9);
+      expect(composed.y).toBeCloseTo(plain.y, 9);
+    }
+  });
+
+  it("stays finite at a degenerate zero-scale inner stage", () => {
+    // A Shape Fill row can legitimately produce a near-zero fit scale, and a
+    // NaN here would mount every handle at the origin rather than nowhere.
+    const inner = makeShapeFillInstanceAdapter({
+      gx: 0,
+      gy: 0,
+      rotationDeg: 0,
+      scX: 0,
+      scY: 0,
+      shapeScale: 1,
+    });
+    const a = composeAdapters(outer, inner);
+    const canvas = a.toCanvas(4, 4);
+    const back = a.toLocal(canvas.x, canvas.y);
+    expect([canvas.x, canvas.y, back.x, back.y].every(Number.isFinite)).toBe(true);
+  });
+
+  it("carries a glyph transform between the two Shape Fill stages", () => {
+    // The real composition: row frame outside, glyph transform in the middle,
+    // the row's own fit scale innermost. A point on the glyph's outline must
+    // read back as its own outline coordinate — which is what lets a mark's
+    // drag still be read as an unscaled `offsetY` on a moved letter.
+    const rowScale = makeShapeFillInstanceAdapter({
+      gx: 0,
+      gy: 0,
+      rotationDeg: 0,
+      scX: 0.5,
+      scY: 1,
+      shapeScale: 1,
+    });
+    const glyph = makeGlyphTransformAdapter({
+      offsetX: 0,
+      offsetY: 0,
+      pivotX: 0,
+      pivotY: 0,
+      transformOffsetX: 9,
+      transformOffsetY: -4,
+      scaleX: 2,
+      scaleY: 1.5,
+      rotationDeg: 40,
+      rotationPivotX: 3,
+      rotationPivotY: 3,
+    });
+    const a = composeAdapters(outer, composeAdapters(glyph, rowScale));
+    const canvas = a.toCanvas(30, -20);
+    const back = a.toLocal(canvas.x, canvas.y);
+    expect(back.x).toBeCloseTo(30, 6);
+    expect(back.y).toBeCloseTo(-20, 6);
   });
 });

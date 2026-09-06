@@ -885,6 +885,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
                     diacriticEditMode={block.diacriticEditMode ?? false}
                     diacriticOverrides={block.diacriticOverrides ?? []}
+                    glyphTransforms={block.glyphTransforms ?? NO_GLYPH_TRANSFORMS}
+                    glyphTransformMode={block.glyphTransformMode ?? false}
+                    onUpdateGlyphTransform={(glyphIndex, patch) =>
+                      onUpdateGlyphTransform(block.id, glyphIndex, patch)
+                    }
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)
                     }
