@@ -9,6 +9,7 @@ import {
   openTypography,
   settleFrames,
   setBlockText,
+  getStageScale,
 } from "./harf";
 
 /**
@@ -150,4 +151,56 @@ test("a block with no cuts is byte-identical to one that never had the field", a
   // must load and render unchanged, which is why nothing writes the field
   // until a cut is actually made.
   expect((await getBlocks(page))[0].strokeCuts).toBeUndefined();
+});
+
+test("a fit moves the block's cuts along with the letters they sit on", async ({ page }) => {
+  // Both edits mutate the block's text, and a StrokeCut is keyed by an offset
+  // into it. `setKashidaAtSlot` remapped its cuts from the start; Fit to width
+  // did not — so a fit left every cut pointing at whatever character the
+  // inserted tatweels had pushed into its old offset, and `buildCutPlan`
+  // (which resolves by cluster *and* glyphId) then dropped it, taking the
+  // stretch with it.
+  //
+  // The assertion is deliberately on the character the cut points at, not on
+  // ink or on `strokeCuts.length`: the cuts stay in state either way, and a
+  // fit adds enough tatweel ink to swamp one lost stretch. Verified failing
+  // before the remap was added.
+  await gotoApp(page);
+  const PHRASE = "بسم الله";
+  await setBlockText(page, PHRASE);
+
+  const dot = await armStretchHandle(page);
+  await page.mouse.down();
+  await page.mouse.move(dot.x + 2, dot.y);
+  await page.mouse.move(dot.x + 60, dot.y, { steps: 24 });
+  await page.mouse.up();
+  await settleFrames(page);
+
+  const before = (await getBlocks(page))[0];
+  const cutsBefore = before.strokeCuts ?? [];
+  expect(cutsBefore.length, "setup: the drag recorded no cut").toBeGreaterThan(0);
+  const charsBefore = cutsBefore.map((c) => before.text[c.cluster]);
+
+  const box = await blockClientBox(page, 1);
+  const target = Math.round((box.width / (await getStageScale(page))) * 1.4);
+  await page.getByLabel("Target width in pixels").fill(String(target));
+  const fit = page.getByRole("button", { name: "Fit", exact: true });
+  await fit.click();
+  await expect(fit).toBeEnabled();
+  await settleFrames(page);
+
+  const after = (await getBlocks(page))[0];
+  const cutsAfter = after.strokeCuts ?? [];
+  expect(after.text, "setup: the fit inserted nothing").not.toBe(PHRASE);
+  expect(cutsAfter).toHaveLength(cutsBefore.length);
+
+  // Two assertions, and the first is the one that catches the regression: at
+  // least one cut sat after an insertion, so its offset *must* have moved. An
+  // unremapped fit leaves every cluster exactly where it was, and this fails.
+  const moved = cutsAfter.some((c, i) => c.cluster !== cutsBefore[i].cluster);
+  expect(moved, "no cut offset moved, so the fit did not remap them").toBe(true);
+
+  // And the second says the move was *right*, not merely present: every cut
+  // still points at the character it was made on.
+  expect(cutsAfter.map((c) => after.text[c.cluster])).toEqual(charsBefore);
 });

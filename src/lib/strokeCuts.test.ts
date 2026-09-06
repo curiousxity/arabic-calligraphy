@@ -731,6 +731,58 @@ describe("remapCutsAfterInsert", () => {
     expect(remapCutsAfterInsert([cut(9)], 2, -3)[0].cluster).toBe(6);
   });
 
+  it("is what keeps buildCutPlan from dropping a cut after a text insert", () => {
+    // The mechanism the remap exists for, end to end. `buildCutPlan` resolves
+    // a cut by (cluster, glyphId); inserting a tatweel *before* the cut letter
+    // moves that letter's cluster, so the recorded pair matches nothing and
+    // the cut is dropped — the stretch silently disappears. Remapping by the
+    // same delta the edit inserted restores the match.
+    const glyphs = [
+      { g: 1, cl: 0, ax: 100 },
+      // The cut letter, now two offsets further along after an insert at 0.
+      { g: 7, cl: 3, ax: 100 },
+    ];
+    const stale: StrokeCut = { cluster: 1, glyphId: 7, localX: 10, angle: 0, nuqta: 1 };
+
+    expect(buildCutPlan(glyphs, [stale], 100).addedAdvance).toBe(0);
+
+    const remapped = remapCutsAfterInsert([stale], 0, 2);
+    expect(buildCutPlan(glyphs, remapped, 100).addedAdvance).toBeGreaterThan(0);
+  });
+
+  it("survives a whole distribution when replayed highest offset first", () => {
+    // What Fit to width does: several slots edited in one gesture. Replaying
+    // the edits in `applyDistributionWithEdits`' own order (descending) leaves
+    // every cut where its letter actually ended up.
+    //
+    // Text offsets 0..9, cuts on the letters at 1, 4 and 8. Two insertions:
+    // +2 at offset 6, then +3 at offset 3 — the order the solver reports them.
+    const cuts = [cut(1), cut(4), cut(8)];
+    const edits = [
+      { index: 6, delta: 2 },
+      { index: 3, delta: 3 },
+    ];
+    const out = edits.reduce((acc, e) => remapCutsAfterInsert(acc, e.index, e.delta), cuts);
+    // 1 is before both insertions; 4 is after the second only; 8 is after both.
+    expect(out.map((c) => c.cluster)).toEqual([1, 7, 13]);
+  });
+
+  it("lands cuts wrong if the same edits are replayed lowest offset first", () => {
+    // The falsification of the test above: ascending order shifts the later
+    // insertion's own offset by what the earlier one added, so the cut between
+    // them is moved twice. This is why the order is part of the contract.
+    const cuts = [cut(1), cut(4), cut(8)];
+    const ascending = [
+      { index: 3, delta: 3 },
+      { index: 6, delta: 2 },
+    ];
+    const out = ascending.reduce(
+      (acc, e) => remapCutsAfterInsert(acc, e.index, e.delta),
+      cuts
+    );
+    expect(out.map((c) => c.cluster)).not.toEqual([1, 7, 13]);
+  });
+
   it("is a no-op for a zero delta", () => {
     const cuts = [cut(0), cut(4)];
     expect(remapCutsAfterInsert(cuts, 2, 0)).toEqual(cuts);

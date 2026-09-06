@@ -1990,11 +1990,27 @@ These are capabilities that have been explicitly identified as valuable but deli
 - **Per-glyph move & scale on Shape Fill and text-on-path blocks** — Implemented for plain text only. `src/lib/diacriticPlacement.ts`'s adapters are the nearest existing precedent for expressing another renderer's coordinate space, but they were authored for placing *diacritic marks*, not for a general per-glyph transform — treat them as a starting point to evaluate, not as a drop-in that makes this cheap. Each renderer's coordinate space needs its own design and verification pass. Text-on-path is excluded for the same reason every other per-glyph tool is, its glyphs being rotated to a curve tangent.
 
 - **Straight-stroke stretching on Shape Fill and text-on-path blocks** —
-  Implemented for plain text only. The detector and the surgery are both
-  block-type agnostic (they take an outline and return one), so the work is
-  entirely in each renderer's coordinate space and in where the handle
-  mounts — the same reason per-glyph move & scale is text-only, and it should
-  be evaluated together with that one rather than separately.
+  **Declined, not deferred**, and for a stronger reason than the one this
+  entry used to give (that it was the same coordinate-space work as per-glyph
+  move & scale). The detector and the surgery really are block-type agnostic,
+  so that framing looked right; the blocker is downstream of both.
+
+  **Both target renderers renormalise the run to a fixed span.**
+  `computeShapeFillLines` sets `fitScaleX = lineWidth / (reps ×
+  effectiveAdvance)` and `TextOnPathText` sets `fitScale = curveLen /
+  naturalAdvance`. A cut never touches `g.ax`, so there are two ways to wire
+  it and both fail: feed the added advance into `totalAdvance` /
+  `naturalAdvance` and the renderer divides it straight back out, leaving the
+  run exactly as wide as before; leave it out and the cut glyph grows into
+  its neighbour's slot. Neither is elongation, and the assertion the whole
+  feature rests on — that the advance grows monotonically with the cut
+  distance — cannot hold on a span that is normalised afterwards.
+
+  This is the same property that makes Fit to width text-only, and it is why
+  a Shape Fill run already spans its silhouette and a Curve run its curve
+  without anyone asking. Reaching for it again means changing what those two
+  renderers *are*, which is the render-math rewrite this file declines
+  elsewhere.
 
 - **Per-glyph rotation** — The move/scale handles cover translation and axis-aligned scale only. Rotation needs a fourth handle and its own pivot decision.
 

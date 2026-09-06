@@ -400,7 +400,7 @@ are not part of the gate.
 Per the plan, this was a stop-and-report point: a human reviewed this
 measurement and decided not to proceed. Tasks 4–10 were never started. See
 `docs/superpowers/plans/2026-08-21-straight-stroke-extension.md` and
-CLAUDE.md, "Straight-stroke cut detection (kept, unused)" for that decision
+CLAUDE.md, "Straight-stroke cut detection" for that decision
 and its consequences.
 
 

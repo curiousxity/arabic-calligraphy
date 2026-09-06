@@ -25,7 +25,7 @@ The measurement, the two rejected tunings, and the reasoning for stopping:
 coverage the app's existing tatweel kashida already provides in every
 bundled font; the letterform-internal half — the genuinely new capability —
 is what failed to clear its own coverage bar. See also CLAUDE.md,
-"Straight-stroke cut detection (kept, unused)", and the plan file's own
+"Straight-stroke cut detection", and the plan file's own
 Status block: `docs/superpowers/plans/2026-08-21-straight-stroke-extension.md`.
 
 ## Amendment: axis-relative cuts (2026-08-21)

@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoApp, getBlocks, blockClientBox, inkPixels, openPanel, setBlockText, type Box } from "./harf";
+import {
+  gotoApp, getBlocks, blockClientBox, dotCentersWithFill, hitTargetAt, inkPixels,
+  openPanel, openTypography, settleFrames, setBlockText, type Box,
+} from "./harf";
 
 /**
  * Stream B (muthanna & radial). Everything here drives the app the way a user
@@ -192,6 +195,75 @@ test.describe("mirror blocks", () => {
       const ink = await inkPixels(page, boxAround(centre, probeW, probeH));
       expect(ink, `spoke ${i} of ${COUNT} has no ink`).toBeGreaterThan(0);
     }
+  });
+
+  test("a mirror draws its source's stroke cuts", async ({ page }) => {
+    // `MirrorBlockView` forwards the source's diacritic overrides and glyph
+    // transforms to `ShapedText` but used to omit `strokeCuts`, so a mirror of
+    // a stretched block drew it unstretched — and its rAF-settled hit `Rect`,
+    // measured off that content, came out too small with it. `CanvasStage`
+    // passes the prop on the ordinary path; this is the same one-prop-line
+    // omission this file already had once with `fill`.
+    //
+    // The mirror's own client rect is the assertion because it is measured
+    // from the drawn content: a cut that never reaches the mirror cannot
+    // widen it. Verified failing before the prop was added.
+    await gotoApp(page);
+    await setBlockText(page, "حرف");
+    const mirrorId = await addMirror(page, ADD_MIRROR);
+    await openMirrorPanel(page);
+    await page.locator("button", { hasText: "Select source" }).click();
+    await expect.poll(async () => (await getBlocks(page)).length).toBe(2);
+
+    const before = await blockClientBox(page, mirrorId);
+    expect(before.width).toBeGreaterThan(0);
+
+    // Stretch a stroke on the source. Sweeping for a mounted handle is the
+    // same dance `e2e/stroke-cuts.spec.ts` does, and for the same reason:
+    // which letters carry a straight stroke depends on the font.
+    await openTypography(page);
+    await page.getByLabel("Stretch strokes").check();
+    const sourceBox = await blockClientBox(page, SOURCE_ID);
+    let dot: { x: number; y: number } | null = null;
+    for (let i = 1; i < 20 && !dot; i++) {
+      for (const fy of [0.5, 0.35, 0.65]) {
+        const probe = {
+          x: sourceBox.x + (sourceBox.width * i) / 20,
+          y: sourceBox.y + sourceBox.height * fy,
+        };
+        await page.mouse.move(probe.x, probe.y);
+        await settleFrames(page);
+        const dots = await dotCentersWithFill(page, "#f97316");
+        if (dots.length === 0) continue;
+        const nearest = dots.reduce((best, d) =>
+          Math.hypot(d.x - probe.x, d.y - probe.y) <
+          Math.hypot(best.x - probe.x, best.y - probe.y)
+            ? d
+            : best
+        );
+        await page.mouse.move(nearest.x, nearest.y);
+        await settleFrames(page);
+        if ((await hitTargetAt(page, nearest))?.startsWith("Circle")) {
+          dot = nearest;
+          break;
+        }
+      }
+    }
+    if (!dot) throw new Error("setup: found no mounted stretch handle on the source");
+
+    await page.mouse.down();
+    await page.mouse.move(dot.x + 2, dot.y);
+    await page.mouse.move(dot.x + 60, dot.y, { steps: 24 });
+    await page.mouse.up();
+    await settleFrames(page);
+
+    const cuts = (await getBlocks(page)).find((b) => b.id === SOURCE_ID)?.strokeCuts ?? [];
+    expect(cuts.length, "setup: the drag recorded no cut on the source").toBeGreaterThan(0);
+
+    // The mirror is drawing a wider letter than it was, with no edit of its own.
+    await expect
+      .poll(async () => (await blockClientBox(page, mirrorId)).width)
+      .toBeGreaterThan(before.width);
   });
 });
 

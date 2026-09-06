@@ -62,15 +62,53 @@ export function applyDistribution(
   slots: KashidaSlot[],
   counts: number[]
 ): string {
+  return applyDistributionWithEdits(text, slots, counts).text;
+}
+
+/**
+ * One text insertion this distribution performed, as the offset it happened at
+ * and how many characters it added or removed there.
+ *
+ * The list is in **application order**, which is highest offset first — the
+ * same order `applyDistribution` works in and for the same reason. Anything
+ * keyed by a text offset (a `StrokeCut`'s cluster) must be remapped in exactly
+ * this order: working upwards instead would shift every later edit's offset by
+ * whatever an earlier one added, so every remap after the first lands wrong.
+ */
+export type DistributionEdit = {
+  /** Offset in the *pre-edit* text where the run was rewritten. */
+  index: number;
+  /** Characters added there; negative when tatweels were removed. */
+  delta: number;
+};
+
+/**
+ * `applyDistribution`, plus a record of where it edited.
+ *
+ * The plain version is kept as the one-line delegate above so its callers and
+ * tests are untouched. This exists because a caller that mutates the block's
+ * text has to bring the block's *other* text-keyed state with it —
+ * `setKashidaAtSlot` already does that by hand for a single slot, and Fit to
+ * width, which edits several at once, could not without knowing each one.
+ */
+export function applyDistributionWithEdits(
+  text: string,
+  slots: KashidaSlot[],
+  counts: number[]
+): { text: string; edits: DistributionEdit[] } {
   const ordered = slots
     .map((slot, i) => ({ slot, count: counts[i] ?? 0 }))
     .sort((a, b) => b.slot.index - a.slot.index);
 
   let out = text;
+  const edits: DistributionEdit[] = [];
   for (const { slot, count } of ordered) {
+    const before = out.length;
     out = applyKashida(out, slot, count);
+    const delta = out.length - before;
+    if (delta !== 0) edits.push({ index: slot.index, delta });
   }
-  return out;
+  return { text: out, edits };
 }
 
 /**
@@ -165,6 +203,14 @@ export type FitToWidthResult = {
   counts: number[];
   slotCount: number;
   reason: FitToWidthReason;
+  /**
+   * The insertions that produced `text`, highest offset first.
+   *
+   * A caller writing `text` back to a block must replay these over anything
+   * the block keys by a text offset, in this order. Empty when the fit
+   * changed nothing.
+   */
+  edits: DistributionEdit[];
 };
 
 /**
@@ -303,32 +349,40 @@ export async function solveFitToWidth({
       counts: [],
       slotCount: 0,
       reason: "no-slots",
+      edits: [],
     };
   }
 
   const cap = slots.length * Math.max(0, Math.floor(maxPerSlot));
-  const textFor = (total: number) =>
-    applyDistribution(
+  // Both halves of one call: the candidate text and the edits that produced
+  // it. Deriving them separately would let a caller remap by one distribution
+  // while writing back the text of another.
+  const buildFor = (total: number) =>
+    applyDistributionWithEdits(
       text,
       slots,
       distributeKashida(slots.length, total, maxPerSlot)
     );
+  const textFor = (total: number) => buildFor(total).text;
   const widthFor = (total: number) => measure(textFor(total));
 
-  const base = textFor(0);
-  const width0 = await measure(base);
+  const base = buildFor(0);
+  const width0 = await measure(base.text);
 
   // A non-finite or non-positive target can't be fitted to; treat it the
   // same as a run that is already too wide, which returns the narrowest
   // achievable text rather than throwing.
   if (!Number.isFinite(target) || width0 >= target) {
     return {
-      text: base,
+      text: base.text,
       width: width0,
       total: 0,
       counts: distributeKashida(slots.length, 0, maxPerSlot),
       slotCount: slots.length,
       reason: "already-wider",
+      // Not necessarily empty: this branch strips whatever kashida was there,
+      // which moves every cut after each stripped run.
+      edits: base.edits,
     };
   }
 
@@ -365,13 +419,15 @@ export async function solveFitToWidth({
   }
 
   const total = best;
+  const chosen = buildFor(total);
 
   return {
-    text: textFor(total),
+    text: chosen.text,
     width,
     total,
     counts: distributeKashida(slots.length, total, maxPerSlot),
     slotCount: slots.length,
     reason: total >= cap ? "capped" : "fitted",
+    edits: chosen.edits,
   };
 }

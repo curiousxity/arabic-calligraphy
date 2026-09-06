@@ -2307,7 +2307,31 @@ const App: React.FC = () => {
         });
         // A no-op result must not push history — clicking Fit on an
         // already-fitted run should not cost an undo step.
-        if (result.text !== text) updateBlock(id, { text: result.text });
+        if (result.text !== text) {
+          // A fit mutates the block's text, so it owes the same debt
+          // `setKashidaAtSlot` pays: every straight-stroke cut is keyed by an
+          // offset into that text, and inserting tatweels moves the ones
+          // after each insertion. Without this the cuts survive the write and
+          // are then dropped by `buildCutPlan`'s glyphId checksum — the
+          // stretch vanishes, *and* the run comes out narrower than the fit
+          // promised, because `cutWidthForBlock` had already counted those
+          // cuts into the width being solved for.
+          //
+          // `result.edits` is highest-offset-first, which is the only order
+          // this can run in: remapping upwards would shift each later edit's
+          // offset by whatever an earlier one added.
+          const cuts = selectedBlock.strokeCuts ?? [];
+          const remapped = cuts.length
+            ? result.edits.reduce(
+                (acc, edit) => remapCutsAfterInsert(acc, edit.index, edit.delta),
+                cuts
+              )
+            : cuts;
+          updateBlock(
+            id,
+            cuts.length ? { text: result.text, strokeCuts: remapped } : { text: result.text }
+          );
+        }
         setExportStatus(describeFitResult(result, target, text));
       } catch (err) {
         console.error("fit to width failed", err);

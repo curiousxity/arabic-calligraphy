@@ -21,7 +21,7 @@ four clear the join bar on the design doc's own denominator, but the
 letterform-internal (isolated-letter) half is what failed, and the reason is
 structural rather than a tuning miss — see `docs/archive/stroke-zone-coverage.md`
 for the measurement (the single home for these numbers) and CLAUDE.md,
-"Straight-stroke cut detection (kept, unused)" for what it established. A
+"Straight-stroke cut detection" for what it established. A
 human reviewed that record and decided not to proceed.
 
 **Resumed 2026-08-21.** The stop above stood for as long as its predicate

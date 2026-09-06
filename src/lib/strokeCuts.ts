@@ -1,47 +1,42 @@
 /**
- * Straight-stroke cut detection — geometry only, pure, no `./harfbuzz` and
- * no `opentype.js` import (see `docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`).
+ * Straight-stroke cut detection and surgery — geometry only, pure, with no
+ * `./harfbuzz` import (whose static harfbuzzjs import throws under Vitest's
+ * Node loader before any test code runs) and no runtime `opentype.js`.
+ * Design: `docs/superpowers/specs/2026-08-21-straight-stroke-extension-design.md`.
  *
- * `findCutZones` walks a flattened glyph outline and reports x-ranges where
- * a vertical cut is "legal": crossed an even number of times, at least
- * twice; every crossed segment within `maxSlope` of parallel to the
- * baseline; steady thickness across the run. It was meant to let a
- * calligrapher lengthen a letter's own straight strokes — and the connector
- * between two joined letters — by cutting the outline and bridging the gap,
- * as a second elongation mechanism alongside the tatweel kashida.
+ * Lengthening a letter's own straight strokes by cutting the outline and
+ * bridging the gap — the one elongation mechanism that reaches *inside* a
+ * letterform, which tatweel kashida structurally cannot.
  *
- * **This module has no application consumer.** The plan that specified it
- * (`docs/superpowers/plans/2026-08-21-straight-stroke-extension.md`) stopped
- * at Task 3, its own go/no-go coverage gate, and the gate failed: at the
- * shipped `maxSlope` and at both looser values the plan authorized trying, no
- * setting ever cleared the gate on all four gate fonts (Amiri, Scheherazade,
- * NotoSans, Kufi) at once. That is not a join-coverage failure — measured
- * against the gate's own denominator (positions where a tatweel is actually
- * legal, not every adjacent glyph pair), join coverage reaches 89–100% in
- * three of the four fonts (Scheherazade, NotoSans, Kufi). NotoSans clears
- * both bars at every tested setting including baseline; Kufi clears both
- * only at the two loosened settings, missing on isolated coverage at
- * baseline. What actually fails is the letterform-internal half:
- * Scheherazade's isolated-letter coverage never reaches the 60% bar at any
- * tested setting, getting worse as the tolerance loosens (54% → 46% → 32%),
- * and Kufi's isolated score fails at baseline. Additionally, Amiri also
- * fails the join half (0% at baseline, still only 56% at the loosened
- * ceiling — a genuine property of where its zones sit, not a metric
- * artifact), which is why the join half could not carry the gate on its own
- * despite strong join coverage in the other three fonts. Because the gate requires all four fonts to clear at once,
- * it is never met. The reason is structural — Arabic strokes as these fonts
- * actually draw them are subtly inclined nearly everywhere, so the tolerance
- * that admits a real stroke also admits a curve. Full measurement:
- * `docs/archive/stroke-zone-coverage.md`. See also CLAUDE.md,
- * "Straight-stroke cut detection (kept, unused)".
+ * The four pieces: `findCutZonesSwept` detects, `applyCutsToCommands`
+ * performs the surgery, `buildCutPlan` resolves stored cuts against a shaped
+ * run, and `cutAdvanceTotal` reports the width they add (shared with
+ * `fitToWidth`'s `styledRunWidth` rather than restated).
  *
- * The only caller is `scripts/measureStrokeZones.mjs`, the offline sweep
- * that produced those numbers. This module is kept rather than deleted for
- * the same reason the removed Morph Glyph Editor's Python tooling was kept:
- * it is inert, and it is the other half of "don't redo the work" should the
- * underlying font geometry ever be worth re-measuring. Do not delete it as
- * an unused module — the absence of an application consumer is the intended
- * end state of this work, not an oversight.
+ * **A cut line is perpendicular to the stroke, not to the baseline.** An
+ * earlier predicate measured every crossed segment's slope against the
+ * baseline and rejected anything steeper than `maxSlope`; Arabic strokes as
+ * these fonts actually draw them are subtly inclined nearly everywhere, so a
+ * straight, perfectly extendable stem failed while the tangent point of a
+ * curve passed. Loosening the tolerance could never fix that — one knob, two
+ * populations moving in opposite directions. `findCutZonesSwept` rotates the
+ * outline through candidate angles and runs the same legality code in each
+ * frame, so a stem is horizontal in its own frame and passes with nothing
+ * loosened. Straightness is bow away from a chord, measured **per edge**: a
+ * stroke that bows symmetrically moves its two edges in opposite directions,
+ * so a mean stays put the whole way through.
+ *
+ * **Coverage numbers live in `docs/archive/stroke-zone-coverage.md`, not
+ * here** — see its "Second pass: the axis-relative predicate (2026-08-21)"
+ * section for the shipped figures, the sensitivity table and the accepted
+ * per-font limitation. CLAUDE.md's rule is that the archive is their single
+ * home; a copy in this header went stale the moment the predicate changed,
+ * which is exactly what happened to the one this replaced.
+ *
+ * `scripts/measureStrokeZones.mjs` is the offline sweep that produces those
+ * numbers, and imports this detector rather than reimplementing it. The
+ * application consumers are `ShapedText` (both glyph loops — draw and
+ * metrics), `StrokeCutHoverHandles`, and `App.tsx`.
  */
 import type { SvgCmd } from "./svgPath";
 // normalizeGlyphs is type-only here and imports nothing itself, so this

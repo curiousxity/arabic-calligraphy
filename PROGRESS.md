@@ -33,6 +33,10 @@ regression, and what it would take to fix.
 - **Per-glyph tools do not apply to text-on-path blocks.** Their glyphs are
   rotated to a curve tangent, which the straight-bounding-box maths behind
   those tools assumes away.
+- **Straight-stroke stretching is plain-text only, and stays that way.** Not
+  the tangent reason above: Shape Fill and Curve both renormalise the run to a
+  fixed span, so an added advance is divided straight back out. Declined
+  rather than deferred — CLAUDE.md, "Deferred features", carries the argument.
 - **Qahiri renders no tashkeel at all.** The font has no glyph for fatha,
   sukun or dammatan (its cmap answers 0 for each), so
   `stripUnsupportedDiacritics` drops them before shaping and typed marks
@@ -135,6 +139,42 @@ covers all four cases against real harfbuzzjs and real fonts, and
 `e2e/diacritics.spec.ts` pins the two user-visible ends — the overlay arms on
 Thuluth, and never arms on an unmarked word in Noto Sans. Both new e2e tests
 were confirmed to fail against the previous detector.
+
+### 2026-09-06 — Two ways a stretch went missing
+
+Both found while planning the remaining work (see "Not built yet"), both
+confirmed against the tree before being believed, and both are the same class
+of defect: a stroke cut that exists in state but never reaches the canvas.
+
+- **Fit to width dropped every cut on the block.** It mutates the block's
+  text, and a `StrokeCut` is keyed by an offset into that text — so the cuts
+  survived the write pointing at whatever the inserted tatweels had pushed
+  into their old offsets, and `buildCutPlan`, which resolves by cluster *and*
+  `glyphId`, then dropped them. The stretch vanished, and the fit also came
+  out narrower than it promised, because `cutWidthForBlock` had already
+  counted those cuts into the width it solved for. `setKashidaAtSlot` — the
+  other text mutation — had remapped from the start; this was the asymmetry.
+  `solveFitToWidth` now reports the insertions it made (`edits`, highest
+  offset first, which is the only order a remap can replay them in) and the
+  handler folds `remapCutsAfterInsert` into the same patch, so it stays one
+  `pushHistory()`.
+- **A mirror drew its source unstretched.** `MirrorBlockView` forwarded
+  `diacriticOverrides` and `glyphTransforms` to `ShapedText` but not
+  `strokeCuts`, so the reflection ignored the cuts and its rAF-settled hit
+  `Rect`, measured off that content, came out too small with it. One prop
+  line — the same omission this file already had once with `fill`.
+
+Both regression tests were **verified failing before the fix**, which took two
+attempts on the first one: the obvious assertions (cut count, total ink) pass
+in both worlds, because the cuts stay in state either way and a fit adds
+enough tatweel ink to swamp one lost stretch. What actually discriminates is
+the character each cut points at.
+
+Also here: `strokeCuts.ts`'s header described a superseded predicate, claimed
+the module had no application consumer, and restated a dozen coverage figures
+that belong in `docs/archive/stroke-zone-coverage.md`. Rewritten to the
+shipped state with the numbers deleted rather than refreshed, and four
+references to a CLAUDE.md heading that no longer exists were retargeted.
 
 ### 2026-08-21 — Straight-stroke extension: shipped
 
@@ -761,9 +801,27 @@ subsystem on 2026-08-14. Tatweel-based elongation replaces the second.
 ## Not built yet
 
 Identified as valuable, deliberately deferred. `CLAUDE.md`'s "Deferred
-features" section carries the reasoning for each; the short list:
+features" section carries the reasoning for each. All of it was re-planned on
+2026-09-06 against the real code, one investigator and two adversarial critics
+per item — `docs/superpowers/plans/2026-09-06-remaining-work-program.md` holds
+the result, and most of it came back **declined**.
 
-- Per-glyph move/scale on Shape Fill and text-on-path blocks
+Still open, in the order that plan sequences them:
+
+- Hand-editing square-kufi cells
 - Per-glyph rotation
-- Mark detection via GDEF glyph classes, for fonts using PUA-encoded marks
-- Image trace, removed along with the Shape Warp block type
+- Boustrophedon square-kufi compositions
+- Per-glyph move/scale on Shape Fill (text-on-path dropped with the rest)
+
+Declined there, with the reason in the plan: straight-stroke stretching on
+Shape Fill/Curve (both renormalise the span), image trace (Shape Fill's
+scanline layout is single-span, so a multi-region trace fills as one band),
+dots and tashkeel in square kufi (dot ownership is unreadable under a
+block-wide band), spiral compositions, a unified per-glyph keying scheme (its
+existing saves cannot be migrated), and cloud conflict resolution (ships dark
+— Supabase is not configured in production).
+
+Mark detection via GDEF glyph classes was **evaluated and rejected** rather
+than deferred: the fonts that need arming carry no GDEF table at all, and
+where it exists it classes a letter's dots as marks exactly like tashkeel.
+See CLAUDE.md, "Per-instance diacritic control".

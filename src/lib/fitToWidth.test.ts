@@ -17,6 +17,7 @@ import { findKashidaSlots, TATWEEL } from "./tatweel";
 import {
   distributeKashida,
   applyDistribution,
+  applyDistributionWithEdits,
   inkExtentBox,
   inkExtentWidth,
   solveFitToWidth,
@@ -178,6 +179,58 @@ describe("distributeKashida", () => {
 
   it("handles a degenerate slot list", () => {
     expect(distributeKashida(0, 5)).toEqual([]);
+  });
+});
+
+describe("applyDistributionWithEdits", () => {
+  it("agrees with applyDistribution on the text", () => {
+    const text = "بسم";
+    const slots = findKashidaSlots(text);
+    const { text: withEdits } = applyDistributionWithEdits(text, slots, [2, 1]);
+    expect(withEdits).toBe(applyDistribution(text, slots, [2, 1]));
+  });
+
+  it("reports edits highest offset first", () => {
+    // The order is the contract: a caller remapping text-keyed state has to
+    // replay these in application order, or every remap after the first is
+    // shifted by whatever an earlier one inserted.
+    const text = "بسم";
+    const slots = findKashidaSlots(text);
+    const { edits } = applyDistributionWithEdits(text, slots, [2, 1]);
+    expect(edits.length).toBeGreaterThan(1);
+    for (let i = 1; i < edits.length; i++) {
+      expect(edits[i - 1].index).toBeGreaterThan(edits[i].index);
+    }
+  });
+
+  it("deltas sum to the tatweels it added", () => {
+    const text = "بسم";
+    const slots = findKashidaSlots(text);
+    const { text: out, edits } = applyDistributionWithEdits(text, slots, [2, 1]);
+    const summed = edits.reduce((n, e) => n + e.delta, 0);
+    expect(summed).toBe(out.length - text.length);
+    expect(summed).toBe(countTatweels(out));
+  });
+
+  it("reports negative deltas when it strips existing kashida", () => {
+    // The `already-wider` branch runs a zero distribution over stretched text,
+    // which *removes* characters — cuts after those runs move down, not up.
+    const text = "بسم";
+    const stretched = applyDistribution(text, findKashidaSlots(text), [3, 3]);
+    const { text: cleared, edits } = applyDistributionWithEdits(
+      stretched,
+      findKashidaSlots(stretched),
+      [0, 0]
+    );
+    expect(cleared).toBe(text);
+    expect(edits.length).toBeGreaterThan(0);
+    for (const e of edits) expect(e.delta).toBeLessThan(0);
+  });
+
+  it("records nothing when it changes nothing", () => {
+    const text = "بسم";
+    const { edits } = applyDistributionWithEdits(text, findKashidaSlots(text), [0, 0]);
+    expect(edits).toEqual([]);
   });
 });
 
