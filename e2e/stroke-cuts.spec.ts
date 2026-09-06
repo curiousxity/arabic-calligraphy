@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   blockClientBox,
   dotCentersWithFill,
+  dragFromHere,
   getBlocks,
   getStageScale,
   gotoApp,
@@ -73,10 +74,7 @@ test("dragging the handle records a cut and widens the run", async ({ page }) =>
   // A deliberately small first step, for the same reason the glyph-transform
   // spec uses one: under ~20px a sibling-handler overlay loses the node the
   // gesture is attached to.
-  await page.mouse.down();
-  await page.mouse.move(dot.x + 2, dot.y);
-  await page.mouse.move(dot.x + 60, dot.y, { steps: 24 });
-  await page.mouse.up();
+  await dragFromHere(page, { x: dot.x + 60, y: dot.y }, { via: { x: dot.x + 2, y: dot.y } });
   await settleFrames(page);
 
   const block = (await getBlocks(page))[0];
@@ -105,10 +103,7 @@ test("undo reverts a stretch", async ({ page }) => {
   const dot = await armStretchHandle(page);
   const before = await blockClientBox(page, 1);
 
-  await page.mouse.down();
-  await page.mouse.move(dot.x + 2, dot.y);
-  await page.mouse.move(dot.x + 60, dot.y, { steps: 24 });
-  await page.mouse.up();
+  await dragFromHere(page, { x: dot.x + 60, y: dot.y }, { via: { x: dot.x + 2, y: dot.y } });
   await settleFrames(page);
   expect((await getBlocks(page))[0].strokeCuts ?? []).not.toHaveLength(0);
 
@@ -149,10 +144,7 @@ test("a fit moves the block's cuts along with the letters they sit on", async ({
   await setBlockText(page, PHRASE);
 
   const dot = await armStretchHandle(page);
-  await page.mouse.down();
-  await page.mouse.move(dot.x + 2, dot.y);
-  await page.mouse.move(dot.x + 60, dot.y, { steps: 24 });
-  await page.mouse.up();
+  await dragFromHere(page, { x: dot.x + 60, y: dot.y }, { via: { x: dot.x + 2, y: dot.y } });
   await settleFrames(page);
 
   const before = (await getBlocks(page))[0];

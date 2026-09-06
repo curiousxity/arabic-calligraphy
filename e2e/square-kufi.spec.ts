@@ -71,14 +71,24 @@ async function cellPoint(
   return { x: origin.x + (gx + 0.5) * cellPx, y: origin.y + (gy + 0.5) * cellPx };
 }
 
+/**
+ * One lattice cell in page pixels.
+ *
+ * `KUFI_CELLS_PER_EM` is 8 — the block has no font, so its cell size is
+ * `fontSize / 8` — and the stage's own zoom carries it into page space. The
+ * three places that need it all go through here rather than restating the 8.
+ */
+async function cellPxFor(page: Page, id: number): Promise<number> {
+  const block = await kufiBlock(page, id);
+  return (block.fontSize / 8) * (await getStageScale(page));
+}
+
 /** Arms the cell painter and returns the geometry a click needs. */
 async function armCellPainter(page: Page, id: number) {
   await openKufiPanel(page);
   await page.getByLabel("Paint cells").check();
   const origin = await blockClientBox(page, id);
-  const block = await kufiBlock(page, id);
-  const cellPx = (block.fontSize / 8) * (await getStageScale(page));
-  return { origin, cellPx };
+  return { origin, cellPx: await cellPxFor(page, id) };
 }
 
 test.describe("square kufi", () => {
@@ -375,8 +385,7 @@ test.describe("square kufi", () => {
 
     // Two reserved columns down each side, so the panel widens by four cells
     // and gains the turning strokes. Both are the feature, in pixels.
-    const block = await kufiBlock(page, id);
-    const cellPx = (block.fontSize / 8) * (await getStageScale(page));
+    const cellPx = await cellPxFor(page, id);
     expect(after.width - before.width).toBeGreaterThan(cellPx * 3);
     expect(after.width - before.width).toBeLessThan(cellPx * 5);
     expect(afterInk).toBeGreaterThan(beforeInk);
@@ -449,8 +458,7 @@ test.describe("square kufi", () => {
       .poll(async () => (await blockClientBox(page, mirror.id)).width)
       .toBeGreaterThan(20);
 
-    const block = await kufiBlock(page, id);
-    const cellPx = (block.fontSize / 8) * (await getStageScale(page));
+    const cellPx = await cellPxFor(page, id);
     const source = await blockClientBox(page, id);
     const reflected = await blockClientBox(page, mirror.id);
     expect(Math.abs(reflected.width - source.width)).toBeLessThan(cellPx);

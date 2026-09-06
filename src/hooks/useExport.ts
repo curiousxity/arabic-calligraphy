@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import type Konva from "konva";
 import type { Block } from "../types";
+import { EXPORT_HIDDEN } from "../lib/exportChrome";
 import {
   getBlocksBoundingBox as getBlocksBoundingBoxShared,
   unionRect,
@@ -121,22 +122,15 @@ export function useExport(
     opts: { transparent?: boolean },
     fn: (stage: Konva.Stage) => T | Promise<T>
   ): Promise<T> => {
-    const gridNode = stage.findOne("#grid-lines");
     const bgNode = opts.transparent ? stage.findOne("#artboard-background") : null;
-    // The page outline and the margin guide are editing chrome drawn on the
-    // artboard itself, so they hide alongside the grid rather than being
-    // baked into the output. `artboard-chrome-` is the id prefix CanvasStage
-    // gives every such node.
-    const editOverlayNodes = stage.find(
-      (node: Konva.Node) =>
-        node.id().startsWith("text-path-edit-layer-") ||
-        node.id().startsWith("kufi-cell-edit-layer-") ||
-        node.id().startsWith("artboard-chrome-")
-    );
-    const gridWasVisible = gridNode?.visible() ?? false;
+    // Everything the editor draws over the artwork — the alignment grid, the
+    // page outline and margin guide, the pen-tool and cell-paint overlays —
+    // declares itself with one Konva name, so this hides them without
+    // knowing what any of them are. A new overlay joins by carrying
+    // `EXPORT_HIDDEN`; see that constant for the allowlist this replaced.
+    const editOverlayNodes = stage.find(`.${EXPORT_HIDDEN}`);
     const bgWasVisible = bgNode?.visible() ?? false;
     const overlayVisibility = editOverlayNodes.map((n) => n.visible());
-    gridNode?.visible(false);
     bgNode?.visible(false);
     editOverlayNodes.forEach((n) => n.visible(false));
 
@@ -149,7 +143,6 @@ export function useExport(
     try {
       return await fn(stage);
     } finally {
-      gridNode?.visible(gridWasVisible);
       bgNode?.visible(bgWasVisible);
       editOverlayNodes.forEach((n, i) => n.visible(overlayVisibility[i]));
       stage.scale(prevScale);

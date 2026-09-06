@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   gotoApp, getBlocks, blockClientBox, inkPixels,
-  openPanel, openTypography, parkOnDot, settleFrames, setBlockText,
+  dragFromHere, openPanel, openTypography, parkOnDot, settleFrames, setBlockText,
   STRETCH_HANDLE_DOT, strokeProbes, type Box,
 } from "./harf";
 
@@ -231,10 +231,7 @@ test.describe("mirror blocks", () => {
     );
     if (!dot) throw new Error("setup: found no mounted stretch handle on the source");
 
-    await page.mouse.down();
-    await page.mouse.move(dot.x + 2, dot.y);
-    await page.mouse.move(dot.x + 60, dot.y, { steps: 24 });
-    await page.mouse.up();
+    await dragFromHere(page, { x: dot.x + 60, y: dot.y }, { via: { x: dot.x + 2, y: dot.y } });
     await settleFrames(page);
 
     const cuts = (await getBlocks(page)).find((b) => b.id === SOURCE_ID)?.strokeCuts ?? [];

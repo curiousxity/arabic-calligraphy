@@ -8,6 +8,13 @@ import { SquareKufiText } from "./SquareKufiText";
 import { ImageBlockView } from "./ImageBlockView";
 import { radialCopyTransforms, type MirrorSource } from "../lib/mirror";
 import type { MirrorMode } from "../types";
+import {
+  imageProps,
+  shapeFillProps,
+  shapedTextProps,
+  squareKufiProps,
+  textPathProps,
+} from "../lib/blockRenderProps";
 
 export type MirrorBlockViewProps = {
   id?: string;
@@ -95,104 +102,40 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
   // braces — a Konva node is non-listening if any ancestor is.
   const copy = useMemo(() => {
     if (!source) return null;
+    // Position, opacity and the two "a mirror never edits" overrides. The
+    // *content* comes from `lib/blockRenderProps.ts`, which both this file
+    // and `CanvasStage` build from — so a new field a renderer reads reaches
+    // the mirror too, instead of being dropped here for a fifth time.
     const common = {
       x: 0,
       y: 0,
       opacity: 1,
-      rotation: source.rotation ?? 0,
       locked: true,
       draggable: false,
     };
     if (source.type === "image") {
-      return (
-        <ImageBlockView
-          {...common}
-          imageDataUrl={source.imageDataUrl}
-          imageWidth={source.shapeWidth ?? 300}
-          imageHeight={source.shapeHeight ?? 300}
-          imageScale={source.imageScale ?? 1}
-        />
-      );
+      return <ImageBlockView {...common} {...imageProps(source)} />;
     }
-    const typographic = {
-      ...common,
-      text: source.text,
-      fontSize: source.fontSize,
-      color: source.color,
-      fill: source.fill,
-      fontFamily: source.fontFamily,
-      fontStyle: source.fontStyle ?? ("normal" as const),
-      stroke: source.stroke,
-      strokeWidth: source.strokeWidth ?? 0,
-      shadowColor: source.shadowColor,
-      shadowBlur: source.shadowBlur ?? 0,
-      shadowOffsetX: source.shadowOffsetX ?? 0,
-      shadowOffsetY: source.shadowOffsetY ?? 0,
-      shadowOpacity: source.shadowOpacity ?? 0.35,
-    };
     if (source.type === "shapeFill") {
       return (
         <ShapeFillText
-          {...typographic}
-          shapeSvgPath={source.shapeSvgPath ?? ""}
-          shapeWidth={source.shapeWidth ?? 400}
-          shapeHeight={source.shapeHeight ?? 400}
-          shapeScale={source.shapeScale ?? 1}
-          shapeFillSpacing={source.shapeFillSpacing ?? 1.3}
-          shapeFillScaleX={source.shapeFillScaleX ?? 1}
-          shapeFillScaleY={source.shapeFillScaleY ?? 1}
-          shapeFillTextRotation={source.shapeFillTextRotation ?? 0}
-          diacriticOverrides={source.diacriticOverrides ?? []}
+          {...common}
+          {...shapeFillProps(source)}
+          // Arming flags stay off: a mirror has no overlays of its own, and
+          // its content is `listening={false}` in any case.
           diacriticEditMode={false}
-          // Without this a mirror of a source whose letters have been moved,
-          // scaled or turned draws them untransformed — the same one-prop-line
-          // omission this file has already had twice, with `fill` and with
-          // `strokeCuts`. The arming flags stay off: a mirror never edits.
-          glyphTransforms={source.glyphTransforms}
           glyphTransformMode={false}
         />
       );
     }
     if (source.type === "squareKufi") {
-      return (
-        <SquareKufiText
-          {...typographic}
-          kufiColumns={source.kufiColumns}
-          kufiComposition={source.kufiComposition}
-          kufiLineGap={source.kufiLineGap}
-          kufiWordGap={source.kufiWordGap}
-          kufiCellEdits={source.kufiCellEdits}
-        />
-      );
+      return <SquareKufiText {...common} {...squareKufiProps(source)} />;
     }
     if (source.type === "textPath") {
-      return (
-        <TextOnPathText
-          {...typographic}
-          textPathD={source.textPathD}
-          textPathReversed={source.textPathReversed ?? false}
-          textPathBaselineOffset={source.textPathBaselineOffset ?? 0}
-        />
-      );
+      return <TextOnPathText {...common} {...textPathProps(source)} />;
     }
     return (
-      <ShapedText
-        {...typographic}
-        align={source.align ?? "center"}
-        lineHeight={source.lineHeight ?? 1.2}
-        warpX={source.warpX ?? 0}
-        warpY={source.warpY ?? 0}
-        diacriticOverrides={source.diacriticOverrides ?? []}
-        glyphTransforms={source.glyphTransforms}
-        // Without this a mirror of a stretched block draws its source
-        // unstretched, and its rAF-settled hit `Rect` is measured off the
-        // uncut content. `CanvasStage` passes it on the ordinary path; this is
-        // the same one-prop-line omission this file already had once with
-        // `fill`. The stable-empty default lives on `ShapedText` itself, so
-        // no constant is needed here.
-        strokeCuts={source.strokeCuts}
-        glyphTransformMode={false}
-      />
+      <ShapedText {...common} {...shapedTextProps(source)} glyphTransformMode={false} />
     );
   }, [source]);
 

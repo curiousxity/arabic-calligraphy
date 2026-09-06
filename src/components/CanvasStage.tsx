@@ -36,6 +36,14 @@ import {
 } from "../lib/snapping";
 import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
 import type { Block, DiacriticOverride, GlyphTransform, StrokeCut, KufiCellEdit } from "../types";
+import { EXPORT_HIDDEN } from "../lib/exportChrome";
+import {
+  imageProps,
+  shapeFillProps,
+  shapedTextProps,
+  squareKufiProps,
+  textPathProps,
+} from "../lib/blockRenderProps";
 
 const GRID_SIZE = 40;
 const SNAP_GUIDE_PX = 6;
@@ -80,7 +88,11 @@ export type CanvasStageProps = {
   onSelectBlock: (id: number, additive?: boolean) => void;
   onEditBlock: (id: number) => void;
   onUpdateTextPathD: (blockId: number, d: string) => void;
-  /** One `pushHistory()` per painting stroke — see App's `beginKufiCellEdit`. */
+  /**
+   * One `pushHistory()` per painting stroke, taken on mousedown. App passes
+   * `pushHistory` itself — see `setKufiCell` there for why the per-cell write
+   * must not push.
+   */
   onBeginKufiCellEdit: () => void;
   onSetKufiCell: (blockId: number, edit: KufiCellEdit, generatedOn: boolean) => void;
   onDragDiacriticOverride: (
@@ -749,7 +761,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             />
 
             {showGrid && (
-              <Group id="grid-lines" listening={false}>
+              <Group id="grid-lines" name={EXPORT_HIDDEN} listening={false}>
                 {renderGridLines()}
               </Group>
             )}
@@ -760,6 +772,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             {pageRect && (
               <Rect
                 id="artboard-chrome-outline"
+                name={EXPORT_HIDDEN}
                 x={pageRect.x}
                 y={pageRect.y}
                 width={pageRect.width}
@@ -772,6 +785,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             {pageMarginRect && (
               <Rect
                 id="artboard-chrome-margin"
+                name={EXPORT_HIDDEN}
                 x={pageMarginRect.x}
                 y={pageMarginRect.y}
                 width={pageMarginRect.width}
@@ -824,14 +838,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   <ImageBlockView
                     key={block.id}
                     {...commonProps}
-                    imageDataUrl={block.imageDataUrl}
+                    {...imageProps(block)}
                     x={block.x}
                     y={block.y}
-                    imageWidth={block.shapeWidth ?? 300}
-                    imageHeight={block.shapeHeight ?? 300}
-                    imageScale={block.imageScale ?? 1}
                     opacity={block.opacity ?? 1}
-                    rotation={block.rotation ?? 0}
                     locked={block.locked}
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeImageBlock(block.id, scale)}
@@ -844,37 +854,14 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   <ShapeFillText
                     key={block.id}
                     {...commonProps}
-                    text={block.text}
+                    {...shapeFillProps(block)}
                     x={block.x}
                     y={block.y}
-                    fontSize={block.fontSize}
-                    color={block.color}
-                    fill={block.fill}
-                    fontFamily={block.fontFamily}
-                    fontStyle={block.fontStyle ?? "normal"}
-                    shapeSvgPath={block.shapeSvgPath ?? ""}
-                    shapeWidth={block.shapeWidth ?? 400}
-                    shapeHeight={block.shapeHeight ?? 400}
-                    shapeScale={block.shapeScale ?? 1}
-                    shapeFillSpacing={block.shapeFillSpacing ?? 1.3}
-                    shapeFillScaleX={block.shapeFillScaleX ?? 1}
-                    shapeFillScaleY={block.shapeFillScaleY ?? 1}
-                    shapeFillTextRotation={block.shapeFillTextRotation ?? 0}
                     opacity={block.opacity ?? 1}
-                    stroke={block.stroke}
-                    strokeWidth={block.strokeWidth ?? 0}
-                    shadowColor={block.shadowColor}
-                    shadowBlur={block.shadowBlur ?? 0}
-                    shadowOffsetX={block.shadowOffsetX ?? 0}
-                    shadowOffsetY={block.shadowOffsetY ?? 0}
-                    shadowOpacity={block.shadowOpacity ?? 0.35}
-                    rotation={block.rotation ?? 0}
                     locked={block.locked}
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
                     diacriticEditMode={block.diacriticEditMode ?? false}
-                    diacriticOverrides={block.diacriticOverrides}
-                    glyphTransforms={block.glyphTransforms}
                     glyphTransformMode={block.glyphTransformMode ?? false}
                     onUpdateGlyphTransform={(glyphIndex, patch) =>
                       onUpdateGlyphTransform(block.id, glyphIndex, patch)
@@ -895,32 +882,12 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   <ShapedText
                     key={block.id}
                     {...commonProps}
-                    text={block.text}
+                    {...shapedTextProps(block)}
                     x={block.x}
                     y={block.y}
-                    fontSize={block.fontSize}
-                    color={block.color}
-                    fill={block.fill}
-                    fontFamily={block.fontFamily}
-                    fontStyle={block.fontStyle ?? "normal"}
-                    align={block.align ?? "center"}
-                    lineHeight={block.lineHeight ?? 1.2}
                     opacity={block.opacity ?? 1}
-                    stroke={block.stroke}
-                    strokeWidth={block.strokeWidth ?? 0}
-                    shadowColor={block.shadowColor}
-                    shadowBlur={block.shadowBlur ?? 0}
-                    shadowOffsetX={block.shadowOffsetX ?? 0}
-                    shadowOffsetY={block.shadowOffsetY ?? 0}
-                    shadowOpacity={block.shadowOpacity ?? 0.35}
-                    rotation={block.rotation ?? 0}
-                    warpX={block.warpX ?? 0}
-                    warpY={block.warpY ?? 0}
                     isSelected={block.id === selectedId}
-                    diacriticOverrides={block.diacriticOverrides}
-                    glyphTransforms={block.glyphTransforms}
                     glyphTransformMode={block.glyphTransformMode ?? false}
-                    strokeCuts={block.strokeCuts}
                     strokeCutEditMode={block.strokeCutEditMode ?? false}
                     onSetStrokeCut={(cut) => onSetStrokeCut(block.id, cut)}
                     onUpdateGlyphTransform={(glyphIndex, patch) =>
@@ -941,26 +908,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   <React.Fragment key={block.id}>
                   <SquareKufiText
                     {...commonProps}
-                    text={block.text}
+                    {...squareKufiProps(block)}
                     x={block.x}
                     y={block.y}
-                    fontSize={block.fontSize}
-                    color={block.color}
-                    fill={block.fill}
                     opacity={block.opacity ?? 1}
-                    stroke={block.stroke}
-                    strokeWidth={block.strokeWidth ?? 0}
-                    shadowColor={block.shadowColor}
-                    shadowBlur={block.shadowBlur ?? 0}
-                    shadowOffsetX={block.shadowOffsetX ?? 0}
-                    shadowOffsetY={block.shadowOffsetY ?? 0}
-                    shadowOpacity={block.shadowOpacity ?? 0.35}
-                    rotation={block.rotation ?? 0}
-                    kufiColumns={block.kufiColumns}
-                    kufiComposition={block.kufiComposition}
-                    kufiLineGap={block.kufiLineGap}
-                    kufiWordGap={block.kufiWordGap}
-                    kufiCellEdits={block.kufiCellEdits}
                     locked={block.locked}
                   />
                   {/* Mounted here rather than from inside SquareKufiText, so a
@@ -997,26 +948,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   <React.Fragment key={block.id}>
                     <TextOnPathText
                       {...commonProps}
-                      text={block.text}
+                      {...textPathProps(block)}
                       x={block.x}
                       y={block.y}
-                      fontSize={block.fontSize}
-                      color={block.color}
-                    fill={block.fill}
-                      fontFamily={block.fontFamily}
-                      fontStyle={block.fontStyle ?? "normal"}
                       opacity={block.opacity ?? 1}
-                      stroke={block.stroke}
-                      strokeWidth={block.strokeWidth ?? 0}
-                      shadowColor={block.shadowColor}
-                      shadowBlur={block.shadowBlur ?? 0}
-                      shadowOffsetX={block.shadowOffsetX ?? 0}
-                      shadowOffsetY={block.shadowOffsetY ?? 0}
-                      shadowOpacity={block.shadowOpacity ?? 0.35}
-                      rotation={block.rotation ?? 0}
-                      textPathD={block.textPathD}
-                      textPathReversed={block.textPathReversed ?? false}
-                      textPathBaselineOffset={block.textPathBaselineOffset ?? 0}
                       locked={block.locked}
                     />
                     {block.textPathEditMode && block.id === selectedId && (

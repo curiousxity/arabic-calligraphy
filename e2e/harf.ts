@@ -264,14 +264,17 @@ function escapeRegExp(literal: string): string {
  * sequence with the placement click and the settle poll folded in, so a
  * caller gets a block that is on the canvas and has actually shaped.
  */
-export async function addOrnamentShapeFill(page: Page): Promise<number> {
+export async function addOrnamentShapeFill(
+  page: Page,
+  at: { fx: number; fy: number } = { fx: 0.5, fy: 0.5 }
+): Promise<number> {
   const before = new Set((await getBlocks(page)).map((b) => b.id));
   await page.getByRole("button", { name: "Add ornament" }).click();
   await page
     .getByRole("button", { name: /^Fill with text: / })
     .first()
     .click();
-  await placeAtCanvas(page, 0.5, 0.5);
+  await placeAtCanvas(page, at.fx, at.fy);
 
   await expect
     .poll(async () =>
@@ -469,8 +472,18 @@ export async function armDiacriticMoveHandle(page: Page): Promise<Point> {
  * therefore the honest gesture *and* the regression test: if the overlay
  * ever goes back to sibling handlers, these drags stop moving anything.
  */
-export async function dragFromHere(page: Page, to: Point): Promise<void> {
+export async function dragFromHere(
+  page: Page,
+  to: Point,
+  opts: { via?: Point } = {}
+): Promise<void> {
   await page.mouse.down();
+  // An optional deliberately-small first step, issued as its own move before
+  // the interpolated travel. Several of these drags start on a hover-mounted
+  // dot, where the gesture has to commit before it moves far; the callers
+  // that need it pass the intermediate point explicitly, since only they
+  // know where the pointer is parked.
+  if (opts.via) await page.mouse.move(opts.via.x, opts.via.y);
   await page.mouse.move(to.x, to.y, { steps: 24 });
   await page.mouse.up();
 }

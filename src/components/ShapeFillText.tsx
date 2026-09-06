@@ -352,12 +352,25 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
   // Mirrors the sceneFunc's own scanline-tiling loop in plain JS (no canvas
   // needed — `pointInPolygon` is pure) so the diacritic overlay can know
-  // where every tiled repetition actually lands. Only computed while that
-  // tool is armed (it's a real amount of work).
-  const glyphInstances = useMemo<GlyphInstance[]>(() => {
-    if (!diacriticEditMode && !glyphTransformMode) return [];
-    if (!shapeSvgPath || parsedCmds.length === 0) return [];
-    if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) return [];
+  // where every tiled repetition actually lands. Only computed while one of
+  // the two tools is armed (it's a real amount of work).
+  //
+  // Two results, because the two consumers want very different amounts of
+  // it. The diacritic overlay needs every repetition; the glyph-transform
+  // overlay caps itself at the instance nearest the silhouette's centre per
+  // glyph index, so materialising ~23,000 instances for it and throwing all
+  // but a handful away is pure cost. `instances` is therefore filled only
+  // when the diacritic tool is the one armed, while `nearestByIndex` — at
+  // most one entry per glyph in the run — is accumulated in the same pass
+  // either way.
+  const { instances: glyphInstances, nearestByIndex } = useMemo<{
+    instances: GlyphInstance[];
+    nearestByIndex: Map<number, GlyphInstance>;
+  }>(() => {
+    const empty = { instances: [], nearestByIndex: new Map<number, GlyphInstance>() };
+    if (!diacriticEditMode && !glyphTransformMode) return empty;
+    if (!shapeSvgPath || parsedCmds.length === 0) return empty;
+    if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) return empty;
 
     const inShape = (px: number, py: number) => pointInPolygon(px, py, polygon);
     const lines = computeShapeFillLines({
@@ -371,24 +384,38 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       inShape,
     });
     const instances: GlyphInstance[] = [];
+    const nearestByIndex = new Map<number, GlyphInstance>();
+    const best = new Map<number, number>();
+    const cxShape = shapeWidth / 2;
+    const cyShape = shapeHeight / 2;
+    const keepAll = diacriticEditMode;
 
     for (const line of lines) {
       for (const startPenX of line.repStartXs) {
         for (let gi = 0; gi < glyphCache.length; gi++) {
           const g = glyphCache[gi];
           if (!g.obj || g.commands.length === 0) continue;
-          instances.push({
+          const inst: GlyphInstance = {
             glyphIndex: gi,
             gx: startPenX + g.penX * line.scX + g.dx * line.scX,
             gy: line.lineY + g.dy * line.scY,
             scX: line.scX,
             scY: line.scY,
-          });
+          };
+          if (keepAll) instances.push(inst);
+          const dx = inst.gx - cxShape;
+          const dy = inst.gy - cyShape;
+          const d2 = dx * dx + dy * dy;
+          const held = best.get(gi);
+          if (held === undefined || d2 < held) {
+            best.set(gi, d2);
+            nearestByIndex.set(gi, inst);
+          }
         }
       }
     }
 
-    return instances;
+    return { instances, nearestByIndex };
   }, [
     diacriticEditMode,
     glyphTransformMode,
@@ -447,22 +474,14 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   const glyphTransformPlacements = useMemo<GlyphTransformPlacement[]>(() => {
     if (!glyphTransformMode) return [];
 
-    const cxShape = shapeWidth / 2;
-    const cyShape = shapeHeight / 2;
-    const best = new Map<number, { inst: GlyphInstance; d2: number }>();
-    for (const inst of glyphInstances) {
-      const dx = inst.gx - cxShape;
-      const dy = inst.gy - cyShape;
-      const d2 = dx * dx + dy * dy;
-      const held = best.get(inst.glyphIndex);
-      if (!held || d2 < held.d2) best.set(inst.glyphIndex, { inst, d2 });
-    }
-
-    return [...best.entries()]
+    // Accumulated by the tiling pass itself rather than scanned back out of
+    // the full instance array — see that memo for why the array may not even
+    // exist when this tool is the one armed.
+    return [...nearestByIndex.entries()]
       // Sorted so the mounted set has a stable order however the scanline
       // happened to walk the silhouette.
       .sort((a, b) => a[0] - b[0])
-      .flatMap(([glyphIndex, { inst }]) => {
+      .flatMap(([glyphIndex, inst]) => {
         const raw = glyphBoxByIndex.get(glyphIndex);
         if (!raw) return [];
 
@@ -500,10 +519,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       });
   }, [
     glyphTransformMode,
-    glyphInstances,
+    nearestByIndex,
     glyphBoxByIndex,
-    shapeWidth,
-    shapeHeight,
     shapeScale,
     rowFrameAdapter,
   ]);

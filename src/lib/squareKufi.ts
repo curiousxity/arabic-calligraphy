@@ -491,6 +491,19 @@ function breakIntoLines(
 type CellTarget = { cells: boolean[]; cols: number; rows: number };
 
 /**
+ * Fill one cell, ignoring anything outside the grid.
+ *
+ * The bounds check is the point: a letter's box, a join bridge and a turn's
+ * legs are all positioned by arithmetic that can legitimately reach past an
+ * edge, and every writer here wants the same silent clip rather than three
+ * copies of the same four comparisons.
+ */
+function setCell(target: CellTarget, x: number, y: number): void {
+  if (x < 0 || y < 0 || x >= target.cols || y >= target.rows) return;
+  target.cells[y * target.cols + x] = true;
+}
+
+/**
  * Renders one line into its own tight sub-grid and blits it into `dest`, under
  * either a half turn or none at all.
  *
@@ -520,11 +533,12 @@ function placeLine(
   const h = ascent + descent;
   if (w <= 0 || h <= 0) return;
 
-  const local = new Array<boolean>(w * h).fill(false);
-  const setLocal = (x: number, y: number) => {
-    if (x < 0 || y < 0 || x >= w || y >= h) return;
-    local[y * w + x] = true;
+  const local: CellTarget = {
+    cells: new Array<boolean>(w * h).fill(false),
+    cols: w,
+    rows: h,
   };
+  const setLocal = (x: number, y: number) => setCell(local, x, y);
   const localBaseline = baselineRowInBand(0, ascent, descent);
 
   // Where a sub-grid cell lands in `dest`. A half turn maps a cell to the
@@ -555,13 +569,13 @@ function placeLine(
     cursor = x - slot.gapAfter;
   }
 
+  // A full scan of the sub-grid rather than a list of the ink written into
+  // it: recording coordinates as they are set was measured ~9% *slower*
+  // across a Fit press, because the sweep's narrow candidates give many
+  // small dense sub-grids where the push costs more than the scan saves.
   for (let ly = 0; ly < h; ly++) {
     for (let lx = 0; lx < w; lx++) {
-      if (!local[ly * w + lx]) continue;
-      const dx = putX(lx);
-      const dy = putY(ly);
-      if (dx < 0 || dy < 0 || dx >= dest.cols || dy >= dest.rows) continue;
-      dest.cells[dy * dest.cols + dx] = true;
+      if (local.cells[ly * w + lx]) setCell(dest, putX(lx), putY(ly));
     }
   }
 
@@ -595,12 +609,52 @@ function placeLine(
  * so per-unit allocation across that sweep would be pure cost — exactly the
  * cliff CLAUDE.md records this function being wrong about twice already.
  */
+/**
+ * A tiny cache over the public entry point.
+ *
+ * The same block is laid out by more than one consumer per frame: the
+ * renderer, and — while the cell painter is armed — the overlay, which must
+ * resolve a pointer against exactly the grid the renderer drew. They already
+ * agree, because both go through `kufiOptionsFor`; what they were also doing
+ * was paying for the identical arithmetic twice, on every mousemove of a
+ * paint drag. (The Sidebar's readout is a third, though it is memoised on
+ * its own inputs.)
+ *
+ * Two entries is enough for that pattern and bounds what is retained. It is
+ * keyed on everything `layoutFromWords` reads, and the layout it hands back
+ * is **read-only to callers** — `applyCellEdits` allocates its own cells
+ * whenever it changes any, and nothing else writes to one.
+ *
+ * `squareColumnTarget` deliberately does not come through here: it calls
+ * `layoutFromWords` directly, so its ~160 single-use candidates cannot
+ * evict what the render path is about to ask for again.
+ */
+const LAYOUT_CACHE_SIZE = 2;
+const layoutCache: { key: string; value: SquareKufiLayout }[] = [];
+
 export function layoutSquareKufi(
   text: string,
   options: SquareKufiOptions = {},
   emit: { placements?: boolean } = {}
 ): SquareKufiLayout {
-  return layoutFromWords(resolveWords(text), options, emit);
+  const key = JSON.stringify([
+    text,
+    options.columns ?? null,
+    options.composition ?? null,
+    options.lineGap ?? null,
+    options.wordGap ?? null,
+    options.letterGap ?? null,
+    options.joinGap ?? null,
+    emit.placements === true,
+  ]);
+
+  const hit = layoutCache.findIndex((e) => e.key === key);
+  if (hit >= 0) return layoutCache[hit].value;
+
+  const value = layoutFromWords(resolveWords(text), options, emit);
+  layoutCache.unshift({ key, value });
+  if (layoutCache.length > LAYOUT_CACHE_SIZE) layoutCache.length = LAYOUT_CACHE_SIZE;
+  return value;
 }
 
 /**
@@ -762,19 +816,15 @@ function drawTurn(
   const toInk = firstInk(toRow);
   if (fromInk < 0 || toInk < 0) return;
 
-  const set = (x: number, y: number) => {
-    if (x < 0 || y < 0 || x >= dest.cols || y >= dest.rows) return;
-    dest.cells[y * dest.cols + x] = true;
-  };
   const runIn = (row: number, ink: number) => {
-    for (let x = gutterCol; x !== ink; x += step) set(x, row);
+    for (let x = gutterCol; x !== ink; x += step) setCell(dest, x, row);
   };
 
   runIn(fromRow, fromInk);
   runIn(toRow, toInk);
   const top = Math.min(fromRow, toRow);
   const bottom = Math.max(fromRow, toRow);
-  for (let y = top; y <= bottom; y++) set(gutterCol, y);
+  for (let y = top; y <= bottom; y++) setCell(dest, gutterCol, y);
 }
 
 /**
@@ -929,6 +979,23 @@ export const kufiOptionsFor = (block: KufiOptionSource): SquareKufiOptions => ({
   lineGap: block.kufiLineGap,
   wordGap: block.kufiWordGap,
 });
+
+/**
+ * The column count "Fit to square" chooses for a block: its own layout
+ * options, minus the wrap width the search is choosing.
+ *
+ * Both callers that fit a block go through this — the Fit button, and the
+ * composition switch, which must set a width in the same patch because a
+ * fresh block is one unbroken line and has nothing to snake. Written out at
+ * each of them, the "options minus columns" rule is one a third caller can
+ * get subtly wrong (passing the block's current width makes the search
+ * start from a panel it is meant to be replacing).
+ *
+ * Hand edits composite *after* layout and feed nothing back, so a fit is
+ * unaffected by them.
+ */
+export const squareFitColumns = (block: KufiOptionSource & { text: string }): number =>
+  squareColumnTarget(block.text, { ...kufiOptionsFor(block), columns: 0 });
 
 /** Squared cell distance from a cell to the nearest point of a placed box. */
 function boxDistance2(p: KufiPlacement, x: number, y: number): number {

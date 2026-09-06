@@ -119,7 +119,7 @@ import {
   isMirrorSourceCandidate,
 } from "./lib/mirror";
 import {
-  squareColumnTarget,
+  squareFitColumns,
   layoutSquareKufi,
   kufiCellSize,
   kufiOptionsFor,
@@ -729,20 +729,14 @@ const App: React.FC = () => {
   );
 
   /**
-   * One `pushHistory()` for a whole painting stroke, taken on mousedown.
+   * Paint or erase one cell. `setBlocks` directly, no history.
    *
-   * The write below deliberately pushes none of its own: `updateBlock` and
+   * History for a painting stroke is **one** `pushHistory()` taken on
+   * mousedown — `CanvasStage`'s `onBeginKufiCellEdit`, which is `pushHistory`
+   * itself. This write deliberately pushes none of its own: `updateBlock` and
    * `updateSelectedBlock` both push unconditionally, so routing paint through
    * either would leave one undo entry per *cell* — a fifty-cell drag costing
    * fifty presses of Ctrl+Z to undo.
-   */
-  const beginKufiCellEdit = useCallback(() => {
-    pushHistory();
-  }, [pushHistory]);
-
-  /**
-   * Paint or erase one cell. `setBlocks` directly, no history — see
-   * `beginKufiCellEdit` above.
    *
    * `generatedOn` comes from the overlay, which already holds the un-composed
    * layout; it is what makes a cell painted back to what the alphabet draws a
@@ -1844,13 +1838,7 @@ const App: React.FC = () => {
   const fitSelectedKufiToSquare = useCallback(() => {
     const block = selectedBlock;
     if (!block || block.type !== "squareKufi") return;
-    // Through the shared helper like every other layout call, minus the wrap
-    // width the search is choosing. Hand edits composite *after* layout and
-    // feed nothing back, so the fit is unaffected by them.
-    const columns = squareColumnTarget(block.text, {
-      ...kufiOptionsFor(block),
-      columns: 0,
-    });
+    const columns = squareFitColumns(block);
     if (columns <= 0 || columns === (block.kufiColumns ?? 0)) return;
     updateSelectedBlock({ kufiColumns: columns });
   }, [selectedBlock, updateSelectedBlock]);
@@ -1882,10 +1870,7 @@ const App: React.FC = () => {
 
       const patch: Partial<SquareKufiBlock> = { kufiComposition: composition };
       if (composition !== "lines" && (block.kufiColumns ?? 0) === 0) {
-        const columns = squareColumnTarget(block.text, {
-          ...kufiOptionsFor(block),
-          columns: 0,
-        });
+        const columns = squareFitColumns(block);
         if (columns > 0) patch.kufiColumns = columns;
       }
       updateSelectedBlock(patch);
@@ -2930,7 +2915,7 @@ const App: React.FC = () => {
           onSelectBlock={selectBlock}
           onEditBlock={requestTextEdit}
           onUpdateTextPathD={updateTextPathD}
-          onBeginKufiCellEdit={beginKufiCellEdit}
+          onBeginKufiCellEdit={pushHistory}
           onSetKufiCell={setKufiCell}
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}

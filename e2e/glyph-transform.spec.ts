@@ -4,6 +4,7 @@ import {
   blockClientBox,
   diacriticHitCenters,
   dotCentersWithFill,
+  dragFromHere,
   getBlocks,
   gotoApp,
   hitTargetAt,
@@ -149,11 +150,9 @@ test("swinging the rotate dot turns the glyph, not the block", async ({ page }) 
     y: pivot.y + dx * Math.sin(theta) + dy * Math.cos(theta),
   };
 
-  await page.mouse.down();
-  // A deliberately small first step, for the reason `dragFromHere` records.
-  await page.mouse.move(dot.x + (to.x - dot.x) * 0.05, dot.y + (to.y - dot.y) * 0.05);
-  await page.mouse.move(to.x, to.y, { steps: 24 });
-  await page.mouse.up();
+  await dragFromHere(page, to, {
+    via: { x: dot.x + (to.x - dot.x) * 0.05, y: dot.y + (to.y - dot.y) * 0.05 },
+  });
 
   const block = (await getBlocks(page))[0];
   const transforms = block.glyphTransforms ?? [];
@@ -211,10 +210,11 @@ test("the rotate dot is grabbable on a letter carrying a mark below the baseline
 
   await page.mouse.move(dot.x, dot.y);
   await settleFrames(page);
-  await page.mouse.down();
-  await page.mouse.move(dot.x + 6, dot.y);
-  await page.mouse.move(dot.x + 90, dot.y + 20, { steps: 24 });
-  await page.mouse.up();
+  await dragFromHere(
+    page,
+    { x: dot.x + 90, y: dot.y + 20 },
+    { via: { x: dot.x + 6, y: dot.y } }
+  );
 
   const block = (await getBlocks(page))[0];
   const turned = (block.glyphTransforms ?? []).find((t) => (t.rotation ?? 0) !== 0);

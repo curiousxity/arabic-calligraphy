@@ -10,6 +10,7 @@ import {
   type KufiCellEdit,
   type KufiComposition,
 } from "../lib/squareKufi";
+import { EXPORT_HIDDEN } from "../lib/exportChrome";
 
 export type KufiCellEditOverlayProps = {
   id?: string;
@@ -201,7 +202,7 @@ export const KufiCellEditOverlay: React.FC<KufiCellEditOverlayProps> = ({
   const fieldH = px(field.y1 - field.y0 + 1);
 
   return (
-    <Group ref={groupRef} id={id} x={x} y={y} rotation={rotation}>
+    <Group ref={groupRef} id={id} name={EXPORT_HIDDEN} x={x} y={y} rotation={rotation}>
       <Rect
         x={px(field.x0)}
         y={px(field.y0)}

@@ -1,5 +1,6 @@
 import { expect, test, type Download, type Page } from "@playwright/test";
 import {
+  addOrnamentShapeFill,
   blockClientBox,
   collectConsoleErrors,
   getBlocks,
@@ -251,15 +252,9 @@ test("a gradient reaches a Shape Fill block", async ({ page }) => {
   await chooseSurface(page, "");
 
   // The ornament picker builds a shapeFill block with no file dialog.
-  await page.getByRole("button", { name: "Add ornament" }).click();
-  await page.getByRole("button", { name: /^Fill with text: / }).first().click();
-  await placeAtCanvas(page, 0.5, 0.62);
-  await expect
-    .poll(async () => (await getBlocks(page)).some((b) => b.type === "shapeFill"))
-    .toBe(true);
-
-  const block = (await getBlocks(page)).find((b) => b.type === "shapeFill")!;
-  const box = await blockClientBox(page, block.id);
+  const blockId = await addOrnamentShapeFill(page, { fx: 0.5, fy: 0.62 });
+  const block = (await getBlocks(page)).find((b) => b.id === blockId)!;
+  const box = await blockClientBox(page, blockId);
   const before = await distinctColors(page, box);
 
   await openPanel(page, /Effects/);

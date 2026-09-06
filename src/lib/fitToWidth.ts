@@ -49,22 +49,6 @@ export function distributeKashida(
 }
 
 /**
- * Applies one count per slot to `text`, returning only the result.
- *
- * A thin delegate over `applyDistributionWithEdits`, kept for the tests and
- * for callers that have no text-offset-keyed state to carry — the production
- * path is the `WithEdits` form, because a block's `strokeCuts` are keyed by
- * source-text offset and have to be remapped across the insertions.
- */
-export function applyDistribution(
-  text: string,
-  slots: KashidaSlot[],
-  counts: number[]
-): string {
-  return applyDistributionWithEdits(text, slots, counts).text;
-}
-
-/**
  * One text insertion this distribution performed, as the offset it happened at
  * and how many characters it added or removed there.
  *
@@ -367,8 +351,7 @@ export async function solveFitToWidth({
       slots,
       distributeKashida(slots.length, total, maxPerSlot)
     );
-  const textFor = (total: number) => buildFor(total).text;
-  const widthFor = (total: number) => measure(textFor(total));
+  const widthFor = (total: number) => measure(buildFor(total).text);
 
   const base = buildFor(0);
   const width0 = await measure(base.text);

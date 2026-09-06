@@ -163,6 +163,16 @@ shamsa). It is the one primitive both compositions reduce to.
   is no sync machinery, and nothing to keep in step. It also means every
   block type is mirrorable without touching the four render algorithms this
   file elsewhere refuses to merge.
+- **The block-to-renderer prop mapping is `src/lib/blockRenderProps.ts`, and
+  both call sites build from it.** This file used to map those props by hand,
+  and dropped a field silently **four** times — `fill`, `strokeCuts`,
+  `glyphTransforms`, then `kufiComposition`/`kufiCellEdits` — each fixed by
+  adding the one line that had been missed, with nothing preventing a fifth.
+  The failure mode is what makes it worth a module: `CanvasStage` looks
+  correct, so only the mirror draws the wrong thing. The builders carry
+  *content* only. Position, opacity, `isSelected`, `locked`/`draggable`, the
+  `on*` handlers and every `*EditMode` arming flag are deliberately excluded,
+  because those are exactly what the two callers must disagree about.
 - **Position is its own.** The transform applies to the source's *content*,
   never to the source's place on the canvas — the user drags a mirror
   independently, which is how the two halves of a muthanna are brought
@@ -1060,7 +1070,17 @@ so "Fit to square" tries widths from the widest single letter up to the
 unwrapped band and keeps the best ratio. The layout is arithmetic over a
 lattice — no shaping, no font — which is also why the Sidebar can afford to lay
 the block out a second time to report its size and its unsupported characters
-instead of threading the renderer's result back up through `App.tsx`. That
+instead of threading the renderer's result back up through `App.tsx`.
+
+**`layoutSquareKufi` keeps a two-entry cache**, because more than one consumer
+lays the same block out per frame: the renderer, and — while the cell painter
+is armed — the overlay, which must resolve a pointer against exactly the grid
+the renderer drew. `kufiOptionsFor` already made them *agree*; the cache stops
+them *paying twice*, on every mousemove of a paint drag. The layout it returns
+is read-only to callers (`applyCellEdits` allocates its own cells whenever it
+changes any). `squareColumnTarget` deliberately does not come through it — it
+calls `layoutFromWords` directly, so its ~160 single-use candidates cannot
+evict what the render path is about to ask for again. That
 second pass is **memoised on the layout inputs, never on the block**
 (`kufiReadout`): `Sidebar` re-renders on every pan, zoom and drag frame, and
 children handed to `CollapsibleSection` are evaluated whether or not the
@@ -1153,7 +1173,12 @@ version bump.
   by construction rather than by a second set of coordinate formulas, and
   `turns: 0` is an identity blit that reproduces the flush-right composition
   cell for cell — the whole safety margin of the extraction, and the reason the
-  existing ASCII assertions never moved.
+  existing ASCII assertions never moved. The blit is a **full scan** of the
+  sub-grid, and that was measured rather than assumed: recording each cell's
+  coordinates as it is written and walking that list instead made a *single*
+  wide layout faster but a Fit press ~9% **slower**, because the sweep's narrow
+  candidates give many small dense sub-grids where the push costs more than the
+  scan saves. Don't retry it without measuring the sweep, not one layout.
 - **A turned line's baseline row is `bandTop + descent`, not `bandTop`.**
   `baselineRowInBand` is the one place that arithmetic lives. The band is
   `ascent + descent` rows and an unturned baseline sits at `ascent - 1`, so the
@@ -1614,10 +1639,20 @@ new target kind; `lib/snapping.ts` already models a page rectangle, so it
 needs no fork. Blocks may overhang the page freely — nothing clips on canvas.
 
 **Page chrome is id-prefixed `artboard-chrome-`** (the outline and the margin
-guide). `useExport`'s `withExportAdjustments` hides every node with that
-prefix alongside the grid and the text-path overlays, which is what keeps it
-out of exports. A new piece of on-page chrome must use that prefix or it will
-silently be baked in.
+guide), which is how a *specific* node is addressed — `e2e/artboard.spec.ts`
+looks up `#artboard-chrome-outline`.
+
+**Hiding it on export is a different channel: the Konva name `EXPORT_HIDDEN`**
+(`src/lib/exportChrome.ts`). Every editor-only node carries it — the alignment
+grid, the page outline and margin guide, the pen-tool and cell-paint overlays
+— and `useExport`'s `withExportAdjustments` is one `stage.find(".export-hidden")`
+that needs to know nothing about any of them. It replaced an allowlist of id
+prefixes in that hook which each new overlay had to remember to join, from a
+file its author had no other reason to open; three had accumulated, and the
+price of forgetting is a gold lattice or a page outline baked silently into
+every PNG. A React overlay declares the name on its **own** root Group rather
+than being handed it, so the component that knows it is chrome is the one that
+says so.
 
 **Export.** `useExport(stageRef, blocks, artboard?)` takes an optional third
 argument (`{ config, clipToPage }`, defaulting to freeform), so the two call
@@ -2353,6 +2388,11 @@ test — `core.spec.ts` asserts it across a clear/retype/clear cycle.
 Every stream from Phase 1 of the 2026-08-14 program on owns its own
 `e2e/<stream>.spec.ts`, so those files never conflict; the shared helpers
 live in `e2e/harf.ts`.
+
+`dragFromHere` takes an optional `via` — one explicit small first step before
+the interpolated travel, for the drags that start parked on a hover-mounted
+dot. Six call sites hand-rolled that gesture, one of them citing this
+helper's own rationale in a comment while not calling it.
 
 **Arming a hover-mounted handle goes through `parkOnDot`.** Every overlay
 here arms the same way — sweep probes until a dot mounts, move onto the

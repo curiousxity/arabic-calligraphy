@@ -101,6 +101,14 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
   // gesture converges on the wrong value instead of tracking the pointer
   // linearly. The rest position at scale 1 never changes during a single
   // gesture, so it only needs to be read once.
+  //
+  // **Everything in here is a value a drag changes under itself.** The
+  // handle gaps and the rotation pivot are deliberately *not* — the gaps
+  // derive only from `placement.unitScale*`, and the placements memo
+  // excludes `glyphTransforms`; the pivot is the drawn box's centre, which
+  // `transformedBox` leaves fixed under the only value a rotate drag moves.
+  // Both are read from the render closure instead, which keeps this ref's
+  // one rule true of every field in it.
   const dragStartRef = useRef<{
     scaleX: number;
     scaleY: number;
@@ -110,13 +118,9 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
     pointerY: number;
     startDistanceX: number;
     startDistanceY: number;
-    gapX: number;
-    gapY: number;
     pivotX: number;
     pivotY: number;
     rotation: number;
-    rotPivotX: number;
-    rotPivotY: number;
   } | null>(null);
 
   if (!isSelected || !enabled) return null;
@@ -246,19 +250,9 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
             // not be recomputed from the live box on every move.
             startDistanceX: scaleXAt.x - pivotX,
             startDistanceY: scaleYAt.y - pivotY,
-            gapX,
-            gapY,
             pivotX,
             pivotY,
             rotation: resolveGlyphTransform(transform).rotation,
-            // The turn's own pivot, in this placement's local space.
-            // `transformedBox` rotates the raw outline box about its centre
-            // and takes the AABB, and that operation leaves the centre
-            // exactly where it was — so the drawn box's centre *is* the point
-            // the renderer turns the glyph about, at any scale, offset or
-            // angle. No separate pivot needs threading through.
-            rotPivotX: cx,
-            rotPivotY: cy,
           };
           setDraggingKey(placement.key);
         };
@@ -267,6 +261,82 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
           railRef.current = null;
           dragStartRef.current = null;
           setDraggingKey((v) => (v === placement.key ? null : v));
+        };
+
+        /**
+         * One scale dot. The two differ only by axis: which rail they run
+         * along, which local coordinate the drag reads, which snapshotted
+         * rest distance it measures from, and the sign of the gap — the y
+         * dot sits *above* the glyph while canvas y grows downward, so every
+         * distance along its rail is signed the other way. Written out twice
+         * that one rule appeared in two places and had to be kept in step.
+         */
+        const scaleDot = (axis: "x" | "y") => {
+          const isX = axis === "x";
+          const at = isX ? scaleXDot : scaleYDot;
+          // The rail is "hold the other local coordinate, vary this one".
+          // Two local points define it; mapping both through `toCanvas` and
+          // then the parent's absolute transform expresses it in the space
+          // `dragBoundFunc` actually speaks.
+          const railFrom = isX ? { x: pivotX, y: scaleXAt.y } : { x: scaleYAt.x, y: pivotY };
+          const railTo = isX
+            ? { x: pivotX + 100, y: scaleXAt.y }
+            : { x: scaleYAt.x, y: pivotY - 100 };
+          return (
+            <Circle
+              x={at.x}
+              y={at.y}
+              radius={4}
+              fill={isX ? SCALE_X_HANDLE_COLOR : SCALE_Y_HANDLE_COLOR}
+              stroke="#ffffff"
+              strokeWidth={1.5}
+              draggable
+              dragBoundFunc={(pos) => {
+                const rail = railRef.current;
+                return rail ? projectOntoAxis(rail.a, rail.b, pos) : pos;
+              }}
+              onMouseDown={(e) => {
+                e.cancelBubble = true;
+              }}
+              onDragStart={(e) => {
+                e.cancelBubble = true;
+                const parent = e.target.getParent();
+                if (parent) {
+                  const tr = parent.getAbsoluteTransform();
+                  railRef.current = {
+                    a: tr.point(placement.toCanvas(railFrom.x, railFrom.y)),
+                    b: tr.point(placement.toCanvas(railTo.x, railTo.y)),
+                  };
+                }
+                beginDrag(e.target.position());
+              }}
+              onDragMove={(e) => {
+                e.cancelBubble = true;
+                const start = dragStartRef.current;
+                if (!start) return;
+                const local = placement.toLocal(
+                  e.target.position().x,
+                  e.target.position().y
+                );
+                const along = isX ? local.x : local.y;
+                if (!Number.isFinite(along)) return;
+                // Both the rest distance and the pivot come from the
+                // drag-start snapshot, not the live (already-updated) box —
+                // see the dragStartRef comment above.
+                const next = scaleFromHandleDrag(
+                  isX ? start.startDistanceX : start.startDistanceY,
+                  along - (isX ? start.pivotX : start.pivotY),
+                  isX ? gapX : -gapY,
+                  isX ? start.scaleX : start.scaleY
+                );
+                applyPatch(isX ? { scaleX: next } : { scaleY: next });
+              }}
+              onDragEnd={(e) => {
+                e.cancelBubble = true;
+                endDrag();
+              }}
+            />
+          );
         };
 
         return (
@@ -336,113 +406,8 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
                   }}
                 />
 
-                <Circle
-                  x={scaleXDot.x}
-                  y={scaleXDot.y}
-                  radius={4}
-                  fill={SCALE_X_HANDLE_COLOR}
-                  stroke="#ffffff"
-                  strokeWidth={1.5}
-                  draggable
-                  dragBoundFunc={(pos) => {
-                    const rail = railRef.current;
-                    return rail ? projectOntoAxis(rail.a, rail.b, pos) : pos;
-                  }}
-                  onMouseDown={(e) => {
-                    e.cancelBubble = true;
-                  }}
-                  onDragStart={(e) => {
-                    e.cancelBubble = true;
-                    const parent = e.target.getParent();
-                    if (parent) {
-                      // The rail is "hold local y, vary local x". Two local
-                      // points define it; mapping both through toCanvas and
-                      // then the parent's absolute transform expresses it in
-                      // the space dragBoundFunc actually speaks.
-                      const tr = parent.getAbsoluteTransform();
-                      railRef.current = {
-                        a: tr.point(placement.toCanvas(pivotX, scaleXAt.y)),
-                        b: tr.point(placement.toCanvas(pivotX + 100, scaleXAt.y)),
-                      };
-                    }
-                    beginDrag(e.target.position());
-                  }}
-                  onDragMove={(e) => {
-                    e.cancelBubble = true;
-                    const start = dragStartRef.current;
-                    if (!start) return;
-                    const pos = e.target.position();
-                    const local = placement.toLocal(pos.x, pos.y);
-                    if (!Number.isFinite(local.x)) return;
-                    // Both the rest distance and the pivot come from the
-                    // drag-start snapshot, not the live (already-updated)
-                    // box — see the dragStartRef comment above.
-                    applyPatch({
-                      scaleX: scaleFromHandleDrag(
-                        start.startDistanceX,
-                        local.x - start.pivotX,
-                        start.gapX,
-                        start.scaleX
-                      ),
-                    });
-                  }}
-                  onDragEnd={(e) => {
-                    e.cancelBubble = true;
-                    endDrag();
-                  }}
-                />
-
-                <Circle
-                  x={scaleYDot.x}
-                  y={scaleYDot.y}
-                  radius={4}
-                  fill={SCALE_Y_HANDLE_COLOR}
-                  stroke="#ffffff"
-                  strokeWidth={1.5}
-                  draggable
-                  dragBoundFunc={(pos) => {
-                    const rail = railRef.current;
-                    return rail ? projectOntoAxis(rail.a, rail.b, pos) : pos;
-                  }}
-                  onMouseDown={(e) => {
-                    e.cancelBubble = true;
-                  }}
-                  onDragStart={(e) => {
-                    e.cancelBubble = true;
-                    const parent = e.target.getParent();
-                    if (parent) {
-                      const tr = parent.getAbsoluteTransform();
-                      railRef.current = {
-                        a: tr.point(placement.toCanvas(scaleYAt.x, pivotY)),
-                        b: tr.point(placement.toCanvas(scaleYAt.x, pivotY - 100)),
-                      };
-                    }
-                    beginDrag(e.target.position());
-                  }}
-                  onDragMove={(e) => {
-                    e.cancelBubble = true;
-                    const start = dragStartRef.current;
-                    if (!start) return;
-                    const pos = e.target.position();
-                    const local = placement.toLocal(pos.x, pos.y);
-                    if (!Number.isFinite(local.y)) return;
-                    applyPatch({
-                      // Negative gap: this dot sits *above* the glyph while
-                      // canvas y grows downward, so every distance along
-                      // this rail is signed the other way.
-                      scaleY: scaleFromHandleDrag(
-                        start.startDistanceY,
-                        local.y - start.pivotY,
-                        -start.gapY,
-                        start.scaleY
-                      ),
-                    });
-                  }}
-                  onDragEnd={(e) => {
-                    e.cancelBubble = true;
-                    endDrag();
-                  }}
-                />
+                {scaleDot("x")}
+                {scaleDot("y")}
 
                 {/*
                   The rotate dot free-drags — it has no rail, so no
@@ -488,7 +453,13 @@ export const GlyphTransformHoverHandles: React.FC<GlyphTransformHoverHandlesProp
                       // return the angle unchanged (no jump on mouse-down)
                       // and lets the dot be grabbed anywhere on its circle.
                       rotation: rotationFromHandleDrag(
-                        { x: start.rotPivotX, y: start.rotPivotY },
+                        // The drawn box's centre. `transformedBox` rotates
+                        // the raw box about it and takes the AABB, which
+                        // leaves that centre exactly where it was — so it is
+                        // the point the renderer turns about at any scale,
+                        // offset or angle, and it does not move under the
+                        // one value this drag changes.
+                        { x: cx, y: cy },
                         { x: start.pointerX, y: start.pointerY },
                         { x: local.x, y: local.y },
                         start.rotation

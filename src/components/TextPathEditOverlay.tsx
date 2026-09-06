@@ -3,6 +3,7 @@ import { Group, Circle, Line, Rect } from "react-konva";
 import type Konva from "konva";
 import { parseSvgPath } from "../lib/svgPath";
 import { anchorsToD, dToAnchors, type CurveAnchor } from "../lib/textPath";
+import { EXPORT_HIDDEN } from "../lib/exportChrome";
 
 export type TextPathEditOverlayProps = {
   id?: string;
@@ -51,7 +52,7 @@ export const TextPathEditOverlay: React.FC<TextPathEditOverlayProps> = ({
   };
 
   return (
-    <Group id={id} x={x} y={y} rotation={rotation}>
+    <Group id={id} name={EXPORT_HIDDEN} x={x} y={y} rotation={rotation}>
       <Rect
         x={-2000}
         y={-2000}

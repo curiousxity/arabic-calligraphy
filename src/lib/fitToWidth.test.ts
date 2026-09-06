@@ -7,16 +7,16 @@ import { describe, it, expect } from "vitest";
 import * as opentype from "opentype.js";
 import type { HarfBuzzGlyph } from "./harfbuzz";
 
+
 // See the identical note in tatweel.test.ts and diacritics.test.ts:
 // harfbuzzjs's CommonJS entrypoint exports a Promise, which Node's ESM
 // interop tries to await during a static `import` and throws on. `require`
 // sidesteps it.
 const hbjsModule = createRequire(import.meta.url)("harfbuzzjs");
 import { normalizeGlyphs } from "./normalizeGlyphs";
-import { findKashidaSlots, TATWEEL } from "./tatweel";
+import { findKashidaSlots, TATWEEL, type KashidaSlot } from "./tatweel";
 import {
   distributeKashida,
-  applyDistribution,
   applyDistributionWithEdits,
   inkExtentBox,
   inkExtentWidth,
@@ -26,6 +26,19 @@ import {
   ITALIC_SHEAR,
   fauxBoldStrokeWidth,
 } from "./fitToWidth";
+
+
+/**
+ * Test-local: most assertions here are about the text a distribution produces,
+ * not about where it edited. `fitToWidth.ts` exports only the `WithEdits`
+ * form, since every production caller needs the edit list to carry a block's
+ * text-offset-keyed state across the insertions.
+ */
+const applyDistribution = (
+  text: string,
+  slots: KashidaSlot[],
+  counts: number[]
+): string => applyDistributionWithEdits(text, slots, counts).text;
 
 type HbModule = {
   createBlob: (data: ArrayBuffer | Uint8Array) => { destroy?: () => void };
@@ -183,13 +196,6 @@ describe("distributeKashida", () => {
 });
 
 describe("applyDistributionWithEdits", () => {
-  it("agrees with applyDistribution on the text", () => {
-    const text = "بسم";
-    const slots = findKashidaSlots(text);
-    const { text: withEdits } = applyDistributionWithEdits(text, slots, [2, 1]);
-    expect(withEdits).toBe(applyDistribution(text, slots, [2, 1]));
-  });
-
   it("reports edits highest offset first", () => {
     // The order is the contract: a caller remapping text-keyed state has to
     // replay these in application order, or every remap after the first is
