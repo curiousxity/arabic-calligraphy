@@ -44,8 +44,10 @@ than a text box
   it automatically to match a target width.
 - **Per-mark diacritic control.** Move, resize or hide any single tashkeel
   mark without touching the text underneath.
-- **Move and scale any single glyph**, and reshape outlines directly with a
-  lasso or per-contour mask.
+- **Move, scale and rotate any single glyph.** Arm the tool and hover a
+  letter to see its four handles — move, scale x, scale y, turn.
+
+  ![Hovering a letter shows move, scale and rotate handles; dragging them repositions and turns the glyph](docs/media/glyph-move-scale-rotate.gif)
 
 **Composition**
 
