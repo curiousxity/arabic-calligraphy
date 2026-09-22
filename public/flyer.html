@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HarfCanvas — Arabic calligraphy, in your browser</title>
+<meta name="description" content="HarfCanvas is a design tool for Arabic calligraphy, shaped by real HarfBuzz. Move, scale and rotate letters, elongate with kashida, weave square kufi, and export art-ready files.">
+<link rel="icon" type="image/png" href="/logo-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ink: #1E3A5F;
+    --ink-soft: #3E5772;
+    --body-text: #55637A;
+    --gold: #8F6415;
+    --gold-bright: #F5D98B;
+    --paper: #FAF7F0;
+    --paper-shell: #EDE8DC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper-shell);
+    font-family: 'Public Sans', sans-serif;
+    color: var(--ink);
+  }
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    background: var(--paper);
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+  .grid-texture {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--ink) 1px, transparent 1px),
+      linear-gradient(90deg, var(--ink) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.04;
+    pointer-events: none;
+  }
+  .content {
+    position: relative;
+    padding: 56px 28px 40px;
+  }
+  @media (min-width: 640px) {
+    .content { padding: 72px 64px 56px; }
+  }
+
+  .top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .kicker {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    box-shadow: 0 8px 20px rgba(30,58,95,0.28);
+  }
+  @media (min-width: 640px) {
+    .logo { width: 88px; height: 88px; border-radius: 18px; }
+  }
+
+  .hero {
+    margin-top: 40px;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 28px;
+    text-align: center;
+  }
+  @media (min-width: 720px) {
+    .hero {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      text-align: right;
+      gap: 24px;
+    }
+  }
+  .hero-text { display: flex; flex-direction: column; align-items: center; }
+  @media (min-width: 720px) {
+    .hero-text { align-items: flex-end; }
+  }
+  .hero-word {
+    font-family: 'Amiri', serif;
+    font-weight: 700;
+    font-size: clamp(96px, 26vw, 180px);
+    line-height: 1;
+    color: var(--ink);
+    direction: rtl;
+  }
+  .wordmark {
+    margin-top: 14px;
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(34px, 7vw, 52px);
+    letter-spacing: -0.5px;
+  }
+  .tagline {
+    margin-top: 14px;
+    max-width: 480px;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+  }
+
+  .cta-link {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 26px;
+    border-radius: 999px;
+    background: var(--gold);
+    color: #FFFDF6;
+    text-decoration: none;
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 18px;
+    box-shadow: 0 10px 22px rgba(143,100,21,0.32);
+    white-space: nowrap;
+  }
+  .cta-link:hover { background: #7a5512; }
+
+  .divider {
+    margin: 44px 0 36px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold) 15%, var(--gold) 85%, transparent);
+  }
+
+  .features {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  @media (min-width: 640px) {
+    .features { grid-template-columns: 1fr 1fr; column-gap: 40px; row-gap: 30px; }
+  }
+  .feature { display: flex; gap: 16px; }
+  .feature-num {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: var(--ink);
+    color: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 16px;
+  }
+  .feature-title { font-weight: 600; font-size: 17px; margin-bottom: 4px; }
+  .feature-desc { font-size: 14px; line-height: 1.5; color: var(--body-text); }
+
+  footer {
+    position: relative;
+    padding: 26px 28px;
+    background: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  @media (min-width: 640px) {
+    footer { padding: 30px 64px; }
+  }
+  .foot-note { font-size: 13px; color: #C9D3E0; letter-spacing: 0.2px; max-width: 420px; }
+  .qr-block { display: none; align-items: center; gap: 14px; }
+  @media (min-width: 720px) {
+    .qr-block { display: flex; }
+  }
+  .qr-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.3px;
+    text-transform: uppercase;
+    color: var(--gold-bright);
+    text-align: right;
+  }
+  .qr-img {
+    width: 76px;
+    height: 76px;
+    border-radius: 8px;
+    background: var(--paper);
+    padding: 5px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="grid-texture"></div>
+  <div class="content">
+
+    <div class="top-row">
+      <div class="kicker">Arabic calligraphy &middot; in your browser</div>
+      <img class="logo" src="/logo-icon.png" alt="HarfCanvas icon">
+    </div>
+
+    <div class="hero">
+      <a class="cta-link" href="/">
+        Open HarfCanvas
+        <span aria-hidden="true">&rarr;</span>
+      </a>
+      <div class="hero-text">
+        <div class="hero-word">حرف</div>
+        <div class="wordmark">HarfCanvas</div>
+        <div class="tagline">
+          A design tool for Arabic calligraphy, shaped by real HarfBuzz — the
+          same engine your operating system uses. Compose, elongate, and
+          adjust every letter and mark by hand, then export art-ready files.
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-num">01</div>
+        <div>
+          <div class="feature-title">Move, scale &amp; rotate any letter</div>
+          <div class="feature-desc">Grab a letter's own handles — its neighbours never shift to make room.</div>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-num">02</div>
+        <div>
+          <div class="feature-title">Kashida elongation</div>
+          <div class="feature-desc">Real connecting strokes, drawn at the letters' own weight — never a deformed outline.</div>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-num">03</div>
+        <div>
+          <div class="feature-title">Per-mark diacritic control</div>
+          <div class="feature-desc">Reposition, resize or hide any tashkeel mark without touching the text.</div>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-num">04</div>
+        <div>
+          <div class="feature-title">Square kufi, mirrors &amp; medallions</div>
+          <div class="feature-desc">Weave a lattice panel, or reflect and repeat any block into a muthanna or medallion.</div>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-num">05</div>
+        <div>
+          <div class="feature-title">Gradient fills &amp; paper textures</div>
+          <div class="feature-desc">Gold, silver, copper and lapis presets, and a page that reads as real washi.</div>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-num">06</div>
+        <div>
+          <div class="feature-title">Export to PNG, JPEG, SVG or PDF</div>
+          <div class="feature-desc">An artboard with real page sizes — export crops to the exact pixels you set.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="foot-note">Free &middot; runs fully in your browser &middot; no account required</div>
+    <div class="qr-block">
+      <div class="qr-label">Scan to<br>try it</div>
+      <img class="qr-img" src="/flyer/qr.png" alt="QR code linking to harf.hash.immo">
+    </div>
+  </footer>
+</div>
+</body>
+</html>
