@@ -19,38 +19,52 @@ own rules, and ligatures fuse where the font says they should.
   [opentype.js](https://opentype.js.org/) onto a [Konva](https://konvajs.org/)
   canvas
 - 17 bundled faces across Naskh, Thuluth, Kufi, Diwani, Ruq'ah, Nastaliq and
-  more
-- Five block types: plain text, text on an arbitrary curve, text poured into
-  an SVG silhouette, square kufi woven on a grid, and images
+  more, plus uploading your own `.ttf`/`.otf`
+- Six block types: plain text, text on an arbitrary curve, text poured into
+  an SVG silhouette, square kufi woven on a grid, mirror blocks (reflection
+  or radial repetition of another block, live-linked to it), and images
 - An on-screen Arabic keyboard, plus one-tap insertion of harakat, honorific
   symbols and Urdu/Farsi letters
 
 **Letter-level control** — the part that makes it a calligraphy tool rather
 than a text box
 
-- **Stretch individual strokes.** Drag a dot on a letter to lengthen its
-  body, its tail, or the eye of a feh. The strokes each letter offers come
-  from an anatomical decomposition of the letterform, authored per letter and
-  per contextual form, covering the whole alphabet.
-- **Measured in nuqta.** Stretch snaps to whole and half nuqta — the rhombic
-  dot a reed nib makes, the unit traditional Arabic calligraphy actually
-  measures in — reading "+1½ nuqta" rather than an abstract decimal. Hold
-  Alt for free positioning.
-- **Joins hold while you stretch.** The point where two letters connect is
-  found from where their outlines physically overlap, and pinned, so
-  lengthening one letter does not tear it away from its neighbour.
-- **Kashida.** One dial distributes elongation across every eligible stroke
-  in a block, weighted by how willing each stroke is to stretch — or solve
-  it automatically to match a target width.
+- **Stretch individual strokes.** A letter's straight strokes are detected
+  automatically from its own outline; drag the handle along one to lengthen
+  it, in half-nuqta steps (Alt for free amounts) — the rhombic dot a reed
+  nib makes, the unit traditional Arabic calligraphy actually measures in.
+  Coverage varies by font and letterform; not every stroke offers a handle.
+- **Kashida.** Insert real elongation (U+0640) at any legal join in a run —
+  the connecting stroke is drawn at the letters' own weight, not a deformed
+  outline — or hit Fit to width and let it solve the counts automatically to
+  span a target.
 - **Per-mark diacritic control.** Move, resize or hide any single tashkeel
-  mark without touching the text underneath.
+  mark without touching the text underneath, on plain text and Shape Fill
+  blocks alike.
+
+  ![Hovering a diacritic mark shows reposition, resize and hide handles](docs/media/diacritic-hover-handles.gif)
 - **Move, scale and rotate any single glyph.** Arm the tool and hover a
-  letter to see its four handles — move, scale x, scale y, turn.
+  letter to see its four handles — move, scale x, scale y, turn. Works on
+  plain text and Shape Fill.
 
   ![Hovering a letter shows move, scale and rotate handles; dragging them repositions and turns the glyph](docs/media/glyph-move-scale-rotate.gif)
 
 **Composition**
 
+- **Square kufi.** Fit a run into a woven panel, paint or cut individual
+  cells by hand, and lay it out as classic stacked lines or a
+  boustrophedon that snakes down the panel, turning at the corner.
+- **Muthanna and radial mirrors.** Reflect or repeat any block — a mirrored
+  pair or an N-copy medallion — staying live as the source is edited.
+- **Name designs.** See a block's text rendered in every bundled style at
+  once and drop the one you like into a mirrored pair, a medallion, or a
+  decorative frame.
+- **Saveable text styles and colour palettes**, applied to any selection in
+  one step.
+- **Gradient fills** (including gold/silver/copper/lapis metallic presets)
+  and generated paper textures for the page.
+- **An artboard**: preset or custom page sizes, margins, and exports cropped
+  to exact pixel dimensions regardless of where blocks sit.
 - Multi-select, grouping, alignment and distribution
 - Snapping to other blocks' edges and centres, to ruler guides, and to a
   grid, with equal-spacing hints
