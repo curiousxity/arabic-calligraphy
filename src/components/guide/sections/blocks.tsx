@@ -13,13 +13,18 @@ export const section: GuideSection = {
     "image",
     "svg",
     "silhouette",
+    "square kufi",
+    "mirror",
+    "muthanna",
+    "radial",
+    "medallion",
     "duplicate",
     "delete",
   ],
   Body: () => (
     <>
       <p>
-        There are four kinds of block, all added from{" "}
+        There are six kinds of block, all added from{" "}
         <strong>Block Controls</strong>. Every one of them can be dragged,
         rotated, coloured, and given an outline or shadow; what differs is how
         the text is laid out.
@@ -62,6 +67,25 @@ export const section: GuideSection = {
         curve, tick <strong>Flip direction</strong>.{" "}
         <strong>Baseline offset</strong> lifts the letters off the line or
         drops them below it.
+      </p>
+
+      <h4>Square Kufi</h4>
+      <p>
+        Your text set as strokes on a woven lattice — الكوفي المربع — rather
+        than shaped from a font; this is the one block type that loads no font
+        at all. Type Arabic into Content as with any block and press{" "}
+        <strong>Fit to square</strong> to wrap it into the panel. See{" "}
+        <strong>Square kufi</strong> in this guide for laying it out and
+        painting individual cells by hand.
+      </p>
+
+      <h4>Mirror</h4>
+      <p>
+        Not text of its own — a live reflection or radial repetition of
+        another block, for a muthanna pair or a medallion. Add one with
+        exactly one other block selected; it stays in sync as you keep editing
+        the source. See <strong>Mirrored and radial compositions</strong> in
+        this guide.
       </p>
 
       <h4>Image</h4>
