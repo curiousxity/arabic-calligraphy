@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { PipetteIcon } from "../Icons";
+import { createPortal } from "react-dom";
+import { PipetteIcon, PlayCircleIcon } from "../Icons";
 
 const supportsEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
 
@@ -456,24 +457,95 @@ export const CollapsibleSection = ({
   </>
 );
 
+export type DemoMedia = { src: string; alt: string };
+
+const DEMO_WIDTH = 480;
+// Both recordings are 480x380; used only to keep the popover on screen.
+const DEMO_HEIGHT_ESTIMATE = DEMO_WIDTH * 0.8;
+const DEMO_GAP = 10;
+
+// A small play icon that shows an animated demo while hovered or focused.
+// The popover is portalled to <body> with fixed positioning so the
+// sidebar's scroll container can't clip it, and the <img> is only mounted
+// while open so the GIFs (~2 MB together) never load unless asked for.
+export const DemoHint = ({ demo }: { demo: DemoMedia }) => {
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  const open = () => {
+    const r = anchorRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const fitsRight = r.right + DEMO_GAP + DEMO_WIDTH <= window.innerWidth - 8;
+    const left = fitsRight
+      ? r.right + DEMO_GAP
+      : Math.max(8, r.left - DEMO_GAP - DEMO_WIDTH);
+    const top = Math.min(Math.max(8, r.top - 40), window.innerHeight - DEMO_HEIGHT_ESTIMATE - 8);
+    setPos({ left, top });
+  };
+  const close = () => setPos(null);
+
+  return (
+    <>
+      <button
+        ref={anchorRef}
+        type="button"
+        className="demoHintButton"
+        aria-label={`Show demo: ${demo.alt}`}
+        title="Hover to see a demo"
+        onMouseEnter={open}
+        onMouseLeave={close}
+        onFocus={open}
+        onBlur={close}
+        onKeyDown={(e) => e.key === "Escape" && close()}
+      >
+        <PlayCircleIcon size={15} />
+      </button>
+      {pos &&
+        createPortal(
+          <div
+            className="demoHintPopover"
+            role="tooltip"
+            style={{ left: pos.left, top: pos.top, width: DEMO_WIDTH }}
+          >
+            <img src={demo.src} alt={demo.alt} />
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+};
+
 export const CheckboxRow = ({
   id,
   label,
   checked,
   onChange,
+  demo,
 }: {
   id: string;
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
-}) => (
-  <label className="checkboxRow" htmlFor={id}>
-    <input
-      id={id}
-      type="checkbox"
-      checked={checked}
-      onChange={(e) => onChange(e.target.checked)}
-    />
-    {label}
-  </label>
-);
+  demo?: DemoMedia;
+}) => {
+  const row = (
+    <label className="checkboxRow" htmlFor={id}>
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      {label}
+    </label>
+  );
+  if (!demo) return row;
+  // The hint sits beside the label, not inside it: a button inside a
+  // <label> would toggle the checkbox on every click.
+  return (
+    <div className="checkboxRowWithDemo">
+      {row}
+      <DemoHint demo={demo} />
+    </div>
+  );
+};

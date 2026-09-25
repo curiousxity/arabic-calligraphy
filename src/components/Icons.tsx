@@ -212,6 +212,13 @@ export const CloseIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
+export const PlayCircleIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M10 8.5v7l6-3.5z" />
+  </IconBase>
+);
+
 export const HelpIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>
     <circle cx="12" cy="12" r="9" />

@@ -102,3 +102,13 @@ own focus treatment still wins, and the rule deliberately sets no
 one flattens the circular buttons while they are focused.
 
 Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default to `min-width: auto`**, which refuses to shrink below content size and causes silent overflow/clipping at narrow sidebar widths. When adding a new multi-item row (grid or flex), give items `min-width: 0` explicitly or the row will overflow at the sidebar's minimum width instead of degrading gracefully.
+
+**Demo GIFs on hover.** `CheckboxRow` takes an optional `demo` (`{ src, alt }`),
+which adds a `DemoHint` play icon beside the label: never inside it, because a
+button inside a `<label>` toggles the checkbox. Hovering or focusing the icon
+shows the GIF in a popover portalled to `<body>` with fixed positioning, so the
+sidebar's scroll container can't clip it. The `<img>` mounts only while the
+popover is open, so the recordings never load unless someone asks. The files
+live in `public/demos/` and are 480x380 recordings cropped to the lettering.
+They are separate from the README's full-window GIFs in `docs/media/`, which
+the app can't serve.

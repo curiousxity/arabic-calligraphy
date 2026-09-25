@@ -2542,6 +2542,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       label="Diacritic tool"
                       checked={!!selectedBlock.diacriticEditMode}
                       onChange={() => onToggleDiacriticEditMode?.()}
+                      demo={{
+                        src: "/demos/diacritic-hover-handles.gif",
+                        alt: "Hovering a diacritic mark shows reposition, resize and hide handles",
+                      }}
                     />
 
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
@@ -3163,6 +3167,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       label="Move, scale &amp; rotate glyph"
                       checked={!!selectedBlock.glyphTransformMode}
                       onChange={() => onToggleGlyphTransformMode?.(selectedBlock.id)}
+                      demo={{
+                        src: "/demos/glyph-move-scale-rotate.gif",
+                        alt: "Hovering a letter shows move, scale and rotate handles",
+                      }}
                     />
 
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
