@@ -1,12 +1,28 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import pkg from './package.json' with { type: 'json' }
 
+// Cloudflare Web Analytics for harf.hash.immo — a standalone manual-snippet
+// site, because the hash.immo zone's automatic injection never reaches pages
+// the Worker serves. The token is public by design (it ships in page source).
+// Injected at build time only, so the dev server and the Playwright suite
+// never report localhost traffic. `public/flyer.html` is copied verbatim and
+// carries its own copy of this snippet; keep the two tokens in step.
+const CF_ANALYTICS_SNIPPET =
+  `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" ` +
+  `data-cf-beacon='{"token": "f38e49b1c1b04100b21a5d235c65ed6d"}'></script>`
+
+const cloudflareAnalytics: Plugin = {
+  name: 'cloudflare-web-analytics',
+  apply: 'build',
+  transformIndexHtml: (html) => html.replace('</body>', `  ${CF_ANALYTICS_SNIPPET}\n  </body>`),
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), cloudflareAnalytics],
   define: {
     // package.json is the single source of truth for the version the
     // sidebar shows, so bumping it there is the whole release step.
