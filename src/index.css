@@ -175,6 +175,9 @@ html, body, #root { height: 100%; margin: 0; }
 .checkboxRow input { margin-right: 8px; }
 .checkboxRowWithDemo { display: flex; align-items: center; gap: 6px; }
 .checkboxRowWithDemo .checkboxRow { min-width: 0; }
+.demoHintAnchor { display: inline-flex; }
+.blockControlDemo { display: inline-flex; min-width: 0; }
+.demoHintCaption { margin-top: 6px; padding: 0 2px 2px; font-size: 12px; line-height: 1.35; color: var(--text-primary); }
 .demoHintButton { display: inline-flex; align-items: center; justify-content: center; padding: 2px; border: none; border-radius: 50%; background: transparent; color: var(--text-muted); cursor: help; }
 .demoHintButton:hover, .demoHintButton:focus-visible { color: var(--text-primary); }
 .demoHintPopover { position: fixed; z-index: 2000; pointer-events: none; background: var(--bg-panel-floating); border: 1px solid var(--border-soft); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); padding: 6px; box-sizing: border-box; }

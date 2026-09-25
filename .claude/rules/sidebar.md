@@ -103,12 +103,31 @@ one flattens the circular buttons while they are focused.
 
 Known CSS-layout footgun in this codebase: **CSS Grid and Flex children default to `min-width: auto`**, which refuses to shrink below content size and causes silent overflow/clipping at narrow sidebar widths. When adding a new multi-item row (grid or flex), give items `min-width: 0` explicitly or the row will overflow at the sidebar's minimum width instead of degrading gracefully.
 
-**Demo GIFs on hover.** `CheckboxRow` takes an optional `demo` (`{ src, alt }`),
-which adds a `DemoHint` play icon beside the label: never inside it, because a
-button inside a `<label>` toggles the checkbox. Hovering or focusing the icon
-shows the GIF in a popover portalled to `<body>` with fixed positioning, so the
-sidebar's scroll container can't clip it. The `<img>` mounts only while the
-popover is open, so the recordings never load unless someone asks. The files
-live in `public/demos/` and are 480x380 recordings cropped to the lettering.
-They are separate from the README's full-window GIFs in `docs/media/`, which
-the app can't serve.
+**Demo GIFs on hover.** `DemoHover` (in `FormControls.tsx`) wraps any
+control and shows a GIF in a popover while it is hovered or focused. The
+popover is portalled to `<body>` with fixed positioning, opens beside the
+sidebar's right edge, and mounts its `<img>` only while open, so no recording
+loads until someone asks. The handlers sit on a wrapping `<span>`, because a
+disabled `<button>` fires no mouse events in Chrome and Add mirror/medallion
+are disabled most of the time. It is used in two places:
+
+- **Checkbox rows.** `CheckboxRow`'s optional `demo` adds a `DemoHint` play
+  icon beside the label, never inside it, because a button inside a
+  `<label>` toggles the checkbox. It is used by the Diacritic tool and Move,
+  scale & rotate glyph rows.
+- **The eight Add buttons.** Each button is its own anchor (the 4-column grid
+  has no room for icons) with a 400 ms hover-intent delay, so sweeping across
+  the row doesn't flash eight popovers. Their `title`s were removed and the
+  same text now shows as the popover caption, since a native tooltip would
+  stack on top of it; `OrnamentPickerButton` takes `showTitle={false}` for the
+  same reason. `aria-label`s are unchanged, and the e2e specs use them.
+
+The GIFs live in `public/demos/` and are separate from the README's
+full-window GIFs in `docs/media/`, which the app can't serve. The Add-button
+ones are recorded by `e2e/demos/record.spec.ts`: run `npm run demos:record`
+(needs ffmpeg on PATH). `playwright.config.ts` ignores that folder, so
+`npm run e2e` never runs it. The app always keeps at least one block, so the
+recorder pans the starter block out of view instead of deleting it. SVG `A`
+commands don't survive the shape-fill importer, so its fixture is a circle
+drawn with curves. The two checkbox GIFs were recorded by a one-off script
+that isn't in the repo.

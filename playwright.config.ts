@@ -20,6 +20,8 @@ const BASE_URL = `http://localhost:${PORT}`;
  */
 export default defineConfig({
   testDir: "./e2e",
+  // The demo-GIF recorder (e2e/demos/) runs only via `npm run demos:record`.
+  testIgnore: ["**/demos/**"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

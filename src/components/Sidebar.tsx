@@ -30,6 +30,8 @@ import {
   FontSelectRow,
   CollapsibleSection,
   CheckboxRow,
+  DemoHover,
+  type DemoMedia,
 } from "./sidebar/FormControls";
 import { FloatingArabicKeyboard } from "./sidebar/FloatingKeyboard";
 import { GuideLauncher } from "./guide/GuideLauncher";
@@ -383,6 +385,21 @@ const SidebarTier: React.FC<{ label: string }> = ({ label }) => (
     <span style={{ flex: 1, height: 1, background: "var(--border-soft)", minWidth: 0 }} />
   </div>
 );
+
+/** How long the pointer must rest on an Add button before its demo opens. */
+const BLOCK_DEMO_DELAY = 400;
+
+/** Recordings shown on hover over the Add buttons; captions are set at the call site. */
+const BLOCK_DEMOS = {
+  text: { src: "/demos/add-text.gif", alt: "Placing a new text block on the canvas", width: 400 },
+  shapeFill: { src: "/demos/add-shape-fill.gif", alt: "A shape filled with rows of text", width: 400 },
+  curvedText: { src: "/demos/add-curved-text.gif", alt: "Placing text that follows a curve", width: 400 },
+  squareKufi: { src: "/demos/add-square-kufi.gif", alt: "Placing a square kufi block", width: 400 },
+  image: { src: "/demos/add-image.gif", alt: "Placing an image on the canvas", width: 400 },
+  ornament: { src: "/demos/add-ornament.gif", alt: "Choosing an ornament and placing it", width: 400 },
+  mirror: { src: "/demos/add-mirror.gif", alt: "Adding a mirrored copy of a block", width: 400 },
+  medallion: { src: "/demos/add-medallion.gif", alt: "Repeating a block radially as a medallion", width: 400 },
+} satisfies Record<string, DemoMedia>;
 
 export const Sidebar: React.FC<SidebarProps> = ({
   // ---- STREAM-E: styles & palettes — destructure ----
@@ -1751,128 +1768,172 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="blockControlGroup">
             <div className="blockControlGroupLabel">Add</div>
             <div className="blockControlGrid">
-              <button
-                type="button"
-                onClick={onAddBlock}
-                className="sidebarCircleButton"
-                title="Add a text block"
-                aria-label="Add text"
+              <DemoHover
+                className="blockControlDemo"
+                delay={BLOCK_DEMO_DELAY}
+                demo={{ ...BLOCK_DEMOS.text, caption: "Add a text block" }}
               >
-                <PlusIcon size={15} />
-              </button>
-
-              {onAddShapeFillBlock && (
                 <button
                   type="button"
+                  onClick={onAddBlock}
                   className="sidebarCircleButton"
-                  title="Add a shape filled with text, from an SVG…"
-                  aria-label="Add shape fill"
-                  onClick={() => handleSvgUpload()}
+                  aria-label="Add text"
                 >
-                  <ShapesIcon size={15} />
+                  <PlusIcon size={15} />
                 </button>
+              </DemoHover>
+
+              {onAddShapeFillBlock && (
+                <DemoHover
+                  className="blockControlDemo"
+                  delay={BLOCK_DEMO_DELAY}
+                  demo={{ ...BLOCK_DEMOS.shapeFill, caption: "Add a shape filled with text, from an SVG…" }}
+                >
+                  <button
+                    type="button"
+                    className="sidebarCircleButton"
+                    aria-label="Add shape fill"
+                    onClick={() => handleSvgUpload()}
+                  >
+                    <ShapesIcon size={15} />
+                  </button>
+                </DemoHover>
               )}
 
               {onAddTextPathBlock && (
-                <button
-                  type="button"
-                  className="sidebarCircleButton"
-                  title="Add text on a curve"
-                  aria-label="Add curved text"
-                  onClick={onAddTextPathBlock}
+                <DemoHover
+                  className="blockControlDemo"
+                  delay={BLOCK_DEMO_DELAY}
+                  demo={{ ...BLOCK_DEMOS.curvedText, caption: "Add text on a curve" }}
                 >
-                  <PathTextIcon size={15} />
-                </button>
+                  <button
+                    type="button"
+                    className="sidebarCircleButton"
+                    aria-label="Add curved text"
+                    onClick={onAddTextPathBlock}
+                  >
+                    <PathTextIcon size={15} />
+                  </button>
+                </DemoHover>
               )}
 
               {onAddSquareKufiBlock && (
-                <button
-                  type="button"
-                  className="sidebarCircleButton"
-                  title="Add square kufi — text woven on a grid"
-                  aria-label="Add square kufi"
-                  onClick={onAddSquareKufiBlock}
+                <DemoHover
+                  className="blockControlDemo"
+                  delay={BLOCK_DEMO_DELAY}
+                  demo={{ ...BLOCK_DEMOS.squareKufi, caption: "Add square kufi — text woven on a grid" }}
                 >
-                  {/* Inline rather than an entry in Icons.tsx, matching the
-                      mirror and medallion buttons below. */}
-                  <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                      d="M2 2h12v2H6v2h6v2H8v2h6v4H2v-2h4v-2H2V8h4V6H2z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                </button>
+                  <button
+                    type="button"
+                    className="sidebarCircleButton"
+                    aria-label="Add square kufi"
+                    onClick={onAddSquareKufiBlock}
+                  >
+                    {/* Inline rather than an entry in Icons.tsx, matching the
+                        mirror and medallion buttons below. */}
+                    <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
+                      <path
+                        d="M2 2h12v2H6v2h6v2H8v2h6v4H2v-2h4v-2H2V8h4V6H2z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                </DemoHover>
               )}
 
               {onAddImageBlock && (
-                <button
-                  type="button"
-                  className="sidebarCircleButton"
-                  title="Add an image…"
-                  aria-label="Add image"
-                  onClick={onAddImageBlock}
+                <DemoHover
+                  className="blockControlDemo"
+                  delay={BLOCK_DEMO_DELAY}
+                  demo={{ ...BLOCK_DEMOS.image, caption: "Add an image…" }}
                 >
-                  <ImageIcon size={15} />
-                </button>
+                  <button
+                    type="button"
+                    className="sidebarCircleButton"
+                    aria-label="Add image"
+                    onClick={onAddImageBlock}
+                  >
+                    <ImageIcon size={15} />
+                  </button>
+                </DemoHover>
               )}
 
               {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
-                <OrnamentPickerButton
-                  variant="circle"
-                  onInsertShapeFill={onInsertOrnamentShapeFill}
-                  onInsertFrame={onInsertOrnamentFrame}
-                />
+                <DemoHover
+                  className="blockControlDemo"
+                  delay={BLOCK_DEMO_DELAY}
+                  demo={{ ...BLOCK_DEMOS.ornament, caption: "Add an ornament or frame…" }}
+                >
+                  <OrnamentPickerButton
+                    variant="circle"
+                    showTitle={false}
+                    onInsertShapeFill={onInsertOrnamentShapeFill}
+                    onInsertFrame={onInsertOrnamentFrame}
+                  />
+                </DemoHover>
               )}
 
               {/* Inline SVGs rather than entries in Icons.tsx: that file is not
                   this stream's to edit during the Phase 1 parallel run. */}
               {onAddMirrorBlock && (
                 <>
-                  <button
-                    type="button"
-                    className="sidebarCircleButton"
-                    disabled={!canAddMirrorBlock}
-                    title={
-                      canAddMirrorBlock
+                  <DemoHover
+                    className="blockControlDemo"
+                    delay={BLOCK_DEMO_DELAY}
+                    demo={{
+                      ...BLOCK_DEMOS.mirror,
+                      caption: canAddMirrorBlock
                         ? "Add a mirror (muthanna) of the selected block"
-                        : "Select exactly one non-mirror block to mirror it"
-                    }
-                    aria-label="Add mirror"
-                    onClick={() => onAddMirrorBlock("mirrorX")}
+                        : "Select exactly one non-mirror block to mirror it",
+                    }}
                   >
-                    <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
-                      <path d="M8 1v14" stroke="currentColor" strokeWidth={1.2} strokeDasharray="2 2" />
-                      <path d="M6.5 4 2 8l4.5 4z" fill="currentColor" />
-                      <path
-                        d="M9.5 4 14 8l-4.5 4z"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.2}
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
+                    <button
+                      type="button"
+                      className="sidebarCircleButton"
+                      disabled={!canAddMirrorBlock}
+                      aria-label="Add mirror"
+                      onClick={() => onAddMirrorBlock("mirrorX")}
+                    >
+                      <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M8 1v14" stroke="currentColor" strokeWidth={1.2} strokeDasharray="2 2" />
+                        <path d="M6.5 4 2 8l4.5 4z" fill="currentColor" />
+                        <path
+                          d="M9.5 4 14 8l-4.5 4z"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.2}
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </DemoHover>
 
-                  <button
-                    type="button"
-                    className="sidebarCircleButton"
-                    disabled={!canAddMirrorBlock}
-                    title={
-                      canAddMirrorBlock
+                  <DemoHover
+                    className="blockControlDemo"
+                    delay={BLOCK_DEMO_DELAY}
+                    demo={{
+                      ...BLOCK_DEMOS.medallion,
+                      caption: canAddMirrorBlock
                         ? "Add a medallion: radial copies of the selected block"
-                        : "Select exactly one non-mirror block to repeat it radially"
-                    }
-                    aria-label="Add medallion"
-                    onClick={() => onAddMirrorBlock("radial")}
+                        : "Select exactly one non-mirror block to repeat it radially",
+                    }}
                   >
-                    <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
-                      <g stroke="currentColor" strokeWidth={1.2} strokeLinecap="round">
-                        <path d="M8 1.5v3.2M8 11.3v3.2M1.5 8h3.2M11.3 8h3.2" />
-                        <path d="M3.4 3.4l2.3 2.3M10.3 10.3l2.3 2.3M12.6 3.4l-2.3 2.3M5.7 10.3l-2.3 2.3" />
-                      </g>
-                      <circle cx={8} cy={8} r={1.6} fill="currentColor" />
-                    </svg>
-                  </button>
+                    <button
+                      type="button"
+                      className="sidebarCircleButton"
+                      disabled={!canAddMirrorBlock}
+                      aria-label="Add medallion"
+                      onClick={() => onAddMirrorBlock("radial")}
+                    >
+                      <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
+                        <g stroke="currentColor" strokeWidth={1.2} strokeLinecap="round">
+                          <path d="M8 1.5v3.2M8 11.3v3.2M1.5 8h3.2M11.3 8h3.2" />
+                          <path d="M3.4 3.4l2.3 2.3M10.3 10.3l2.3 2.3M12.6 3.4l-2.3 2.3M5.7 10.3l-2.3 2.3" />
+                        </g>
+                        <circle cx={8} cy={8} r={1.6} fill="currentColor" />
+                      </svg>
+                    </button>
+                  </DemoHover>
                 </>
               )}
             </div>

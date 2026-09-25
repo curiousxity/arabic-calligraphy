@@ -457,63 +457,117 @@ export const CollapsibleSection = ({
   </>
 );
 
-export type DemoMedia = { src: string; alt: string };
+export type DemoMedia = {
+  src: string;
+  alt: string;
+  /** Shown under the GIF. Replaces the anchor's `title`, which would otherwise stack on top. */
+  caption?: string;
+  /** Rendered width in px; defaults to the checkbox recordings' 480. */
+  width?: number;
+};
 
 const DEMO_WIDTH = 480;
-// Both recordings are 480x380; used only to keep the popover on screen.
-const DEMO_HEIGHT_ESTIMATE = DEMO_WIDTH * 0.8;
 const DEMO_GAP = 10;
 
-// A small play icon that shows an animated demo while hovered or focused.
-// The popover is portalled to <body> with fixed positioning so the
-// sidebar's scroll container can't clip it, and the <img> is only mounted
-// while open so the GIFs (~2 MB together) never load unless asked for.
-export const DemoHint = ({ demo }: { demo: DemoMedia }) => {
-  const anchorRef = useRef<HTMLButtonElement>(null);
+/**
+ * Shows an animated demo in a popover while its children are hovered or
+ * focused.
+ *
+ * The popover is portalled to <body> with fixed positioning so the sidebar's
+ * scroll container can't clip it, and the <img> is only mounted while open
+ * so the GIFs never load unless asked for.
+ *
+ * The handlers sit on a wrapping <span>, not on the child, because a
+ * disabled <button> fires no mouse events in Chrome (Add mirror is disabled
+ * most of the time). `delay` is hover intent: sweeping the pointer across a
+ * row of wrapped buttons would otherwise flash a popover for each.
+ */
+export const DemoHover = ({
+  demo,
+  delay = 0,
+  className,
+  children,
+}: {
+  demo: DemoMedia;
+  delay?: number;
+  className?: string;
+  children: React.ReactNode;
+}) => {
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const timer = useRef<number | undefined>(undefined);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const width = demo.width ?? DEMO_WIDTH;
 
-  const open = () => {
-    const r = anchorRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const fitsRight = r.right + DEMO_GAP + DEMO_WIDTH <= window.innerWidth - 8;
-    const left = fitsRight
-      ? r.right + DEMO_GAP
-      : Math.max(8, r.left - DEMO_GAP - DEMO_WIDTH);
-    const top = Math.min(Math.max(8, r.top - 40), window.innerHeight - DEMO_HEIGHT_ESTIMATE - 8);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const show = () => {
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+    const r = anchor.getBoundingClientRect();
+    // Open beside the sidebar rather than the anchor, so the popover never
+    // covers the neighbouring controls.
+    const right = anchor.closest(".sidebarInner")?.getBoundingClientRect().right ?? r.right;
+    // Every recording is 480x380 or 400x300; the caption adds a line or two.
+    const height = width * 0.8 + (demo.caption ? 44 : 0);
+    const fitsRight = right + DEMO_GAP + width <= window.innerWidth - 8;
+    const left = fitsRight ? right + DEMO_GAP : Math.max(8, r.left - DEMO_GAP - width);
+    const top = Math.min(Math.max(8, r.top - 40), window.innerHeight - height - 8);
     setPos({ left, top });
   };
-  const close = () => setPos(null);
+  const open = (e: React.SyntheticEvent) => {
+    // React routes events from portalled children (the ornament picker's
+    // dialog) through this span too; only the anchor itself counts.
+    if (!anchorRef.current?.contains(e.target as Node)) return;
+    window.clearTimeout(timer.current);
+    if (delay > 0) timer.current = window.setTimeout(show, delay);
+    else show();
+  };
+  const close = () => {
+    window.clearTimeout(timer.current);
+    setPos(null);
+  };
 
   return (
-    <>
-      <button
-        ref={anchorRef}
-        type="button"
-        className="demoHintButton"
-        aria-label={`Show demo: ${demo.alt}`}
-        title="Hover to see a demo"
-        onMouseEnter={open}
-        onMouseLeave={close}
-        onFocus={open}
-        onBlur={close}
-        onKeyDown={(e) => e.key === "Escape" && close()}
-      >
-        <PlayCircleIcon size={15} />
-      </button>
+    <span
+      ref={anchorRef}
+      className={className}
+      onMouseEnter={open}
+      onMouseLeave={close}
+      onFocus={open}
+      onBlur={close}
+      // Clicking commits to the action; the demo has done its job.
+      onMouseDown={close}
+      onKeyDown={(e) => e.key === "Escape" && close()}
+    >
+      {children}
       {pos &&
         createPortal(
           <div
             className="demoHintPopover"
             role="tooltip"
-            style={{ left: pos.left, top: pos.top, width: DEMO_WIDTH }}
+            style={{ left: pos.left, top: pos.top, width }}
           >
             <img src={demo.src} alt={demo.alt} />
+            {demo.caption && <div className="demoHintCaption">{demo.caption}</div>}
           </div>,
           document.body,
         )}
-    </>
+    </span>
   );
 };
+
+/** A small play icon that shows a demo when hovered, for rows with room beside the label. */
+export const DemoHint = ({ demo }: { demo: DemoMedia }) => (
+  <DemoHover demo={demo} className="demoHintAnchor">
+    <button
+      type="button"
+      className="demoHintButton"
+      aria-label={`Show demo: ${demo.alt}`}
+    >
+      <PlayCircleIcon size={15} />
+    </button>
+  </DemoHover>
+);
 
 export const CheckboxRow = ({
   id,

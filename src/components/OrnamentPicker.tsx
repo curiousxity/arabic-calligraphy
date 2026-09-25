@@ -198,6 +198,8 @@ export const OrnamentPicker: React.FC<OrnamentPickerProps> = ({
 export type OrnamentPickerButtonProps = Omit<OrnamentPickerProps, "onClose"> & {
   /** `circle` matches the add-block row's icon buttons; `wide` is a labelled row button. */
   variant: "circle" | "wide";
+  /** False when the mount site shows its own tooltip, so the native one doesn't stack on it. */
+  showTitle?: boolean;
 };
 
 /**
@@ -208,6 +210,7 @@ export type OrnamentPickerButtonProps = Omit<OrnamentPickerProps, "onClose"> & {
  */
 export const OrnamentPickerButton: React.FC<OrnamentPickerButtonProps> = ({
   variant,
+  showTitle = true,
   onInsertShapeFill,
   onInsertFrame,
 }) => {
@@ -219,7 +222,7 @@ export const OrnamentPickerButton: React.FC<OrnamentPickerButtonProps> = ({
         <button
           type="button"
           className="sidebarCircleButton"
-          title="Add an ornament or frame…"
+          title={showTitle ? "Add an ornament or frame…" : undefined}
           aria-label="Add ornament"
           onClick={() => setOpen(true)}
         >
