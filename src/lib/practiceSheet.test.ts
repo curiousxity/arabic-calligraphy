@@ -105,8 +105,8 @@ async function shapeReal(
 /** A synthetic run with round numbers so the arithmetic is checkable by hand. */
 const syntheticRun = (advanceUnits: number): MeasuredRun => ({
   advanceUnits,
-  ascenderUnits: 800,
-  descenderUnits: -200,
+  inkTopUnits: 800,
+  inkBottomUnits: -200,
   unitsPerEm: 1000,
 });
 
@@ -151,7 +151,7 @@ describe("layoutPracticeSheet", () => {
     // Row height = (800 - -200)/1000 * 20 + one nuqta of air.
     const rowHeight = 20 + layout.nuqtaMm;
     const first = layout.rows[0].baselineY;
-    expect(first).toBeCloseTo(layout.marginMm + (800 / 1000) * 20, 6);
+    expect(first).toBeCloseTo(layout.marginMm + layout.nuqtaMm / 2 + (800 / 1000) * 20, 6);
     expect(layout.rows[1].baselineY - first).toBeCloseTo(rowHeight, 6);
     expect(layout.rows[3].baselineY - layout.rows[2].baselineY).toBeCloseTo(rowHeight, 6);
   });
@@ -201,6 +201,25 @@ describe("layoutPracticeSheet", () => {
     expect(layout.grid.y[0]).toBeCloseTo(layout.marginMm, 6);
   });
 
+  it("floors the grid pitch at 2 mm by stepping whole nuqta", () => {
+    const tiny = layoutPracticeSheet(opts({ scale: { nibWidthMm: 0.5 } }), syntheticRun(1000));
+    expect(tiny.gridEveryNuqta).toBe(Math.ceil(2 / tiny.nuqtaMm));
+    expect(tiny.gridPitchMm).toBeCloseTo(tiny.nuqtaMm * tiny.gridEveryNuqta, 9);
+    expect(tiny.gridPitchMm).toBeGreaterThanOrEqual(2);
+    expect(tiny.grid.x[1] - tiny.grid.x[0]).toBeCloseTo(tiny.gridPitchMm, 9);
+    expect(tiny.footer).toContain(`grid every ${tiny.gridEveryNuqta} nuqta`);
+    const normal = layoutPracticeSheet(opts({ scale: { nibWidthMm: 4 } }), syntheticRun(1000));
+    expect(normal.gridEveryNuqta).toBe(1);
+    expect(normal.gridPitchMm).toBeCloseTo(4, 9);
+    expect(normal.footer).not.toContain("grid every");
+  });
+
+  it("falls back to a 15 mm margin when marginMm is NaN", () => {
+    const layout = layoutPracticeSheet(opts({ marginMm: Number.NaN }), syntheticRun(1000));
+    expect(layout.marginMm).toBe(15);
+    expect(Number.isFinite(layout.rows[0].baselineY)).toBe(true);
+  });
+
   it("uses Letter dimensions when asked", () => {
     const layout = layoutPracticeSheet(opts({ page: "letter" }), syntheticRun(1000));
     expect(layout.pageMm).toEqual(PAGE_SIZES_MM.letter);
@@ -208,15 +227,15 @@ describe("layoutPracticeSheet", () => {
 });
 
 describe("measuredRunFromGlyphs (real font)", () => {
-  it("sums real advances and carries the font's vertical metrics", async () => {
+  it("sums real advances and measures the run's ink extent", async () => {
     const { glyphs, font, unitsPerEm } = await shapeReal("محمد", "Amiri.ttf");
     const run = measuredRunFromGlyphs(glyphs, font, unitsPerEm);
     const expected = glyphs.reduce((s, g) => s + (g.ax ?? 0), 0);
     expect(run.advanceUnits).toBe(expected);
     expect(run.advanceUnits).toBeGreaterThan(0);
-    expect(run.ascenderUnits).toBe(font.ascender);
-    expect(run.descenderUnits).toBe(font.descender);
-    expect(run.descenderUnits).toBeLessThan(0);
+    expect(run.inkTopUnits).toBeGreaterThan(0);
+    expect(run.inkBottomUnits).toBeLessThanOrEqual(0);
+    expect(run.inkTopUnits).toBeLessThan(font.ascender);
     expect(run.unitsPerEm).toBe(unitsPerEm);
   });
 

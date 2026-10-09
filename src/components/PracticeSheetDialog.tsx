@@ -3,12 +3,16 @@ import { createPortal } from "react-dom";
 import type { Block } from "../types";
 import {
   DEFAULT_PRACTICE_SHEET_OPTIONS,
-  emHeightFromScale,
+  layoutPracticeSheet,
+  type MeasuredRun,
   type PracticeSheetOptions,
   type PracticeSheetPage,
 } from "../lib/practiceSheet";
-import { nuqtaUnits } from "../lib/nuqta";
-import { buildPracticeSheetPdf, practiceSheetFilename } from "../lib/practiceSheetPdf";
+import {
+  buildPracticeSheetPdf,
+  measurePracticeRun,
+  practiceSheetFilename,
+} from "../lib/practiceSheetPdf";
 import { CloseIcon, FileTextIcon } from "./Icons";
 
 export type PracticeSheetDialogProps = {
@@ -16,22 +20,39 @@ export type PracticeSheetDialogProps = {
   onClose: () => void;
 };
 
+const NIB_RANGE = { min: 0.5, max: 15 };
+const EM_RANGE = { min: 5, max: 150 };
+
+/** Parses a draft field; empty, non-numeric or out-of-range gives null. */
+function parseInRange(draft: string, range: { min: number; max: number }): number | null {
+  if (draft.trim() === "") return null;
+  const n = Number(draft);
+  return Number.isFinite(n) && n >= range.min && n <= range.max ? n : null;
+}
+
+type RunState = { run: MeasuredRun | null; error: string | null; key: string };
+
 /**
  * Practice-sheet export. Portaled to `document.body` like `FontUploadDialog`
  * (the sidebar clips modals, and nothing non-artwork may live in the stage).
- * All state is local: nib or em, page, row counts. The live readout is the
- * pure layout's own numbers for the *scale* only — row placement needs the
- * shaped run, which is only fetched on Download.
+ * The text is shaped and measured on open (and when it changes), so the
+ * readout and the warnings are the pure layout's own numbers for the sheet
+ * that will actually print. Numeric fields are kept as draft strings so a
+ * cleared field stays empty instead of snapping to a number.
  */
 export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block, onClose }) => {
-  const [nibMm, setNibMm] = useState(4);
+  const [nibDraft, setNibDraft] = useState("4");
   const [directEm, setDirectEm] = useState(false);
-  const [emMm, setEmMm] = useState(40);
+  const [emDraft, setEmDraft] = useState("40");
   const [page, setPage] = useState<PracticeSheetPage>("a4");
-  const [rows, setRows] = useState(DEFAULT_PRACTICE_SHEET_OPTIONS.rows);
+  const [rowDrafts, setRowDrafts] = useState({
+    model: String(DEFAULT_PRACTICE_SHEET_OPTIONS.rows.model),
+    trace: String(DEFAULT_PRACTICE_SHEET_OPTIONS.rows.trace),
+    blank: String(DEFAULT_PRACTICE_SHEET_OPTIONS.rows.blank),
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [runState, setRunState] = useState<RunState>({ run: null, error: null, key: "" });
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -48,38 +69,93 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
 
   const text = block.text ?? "";
   const empty = text.trim().length === 0;
+  const runKey = `${block.fontFamily}|${text}`;
 
-  const options: PracticeSheetOptions = useMemo(
-    () => ({
-      ...DEFAULT_PRACTICE_SHEET_OPTIONS,
-      page,
-      rows,
-      scale: directEm ? { emHeightMm: emMm } : { nibWidthMm: nibMm },
-      fontFamily: block.fontFamily,
-    }),
-    [page, rows, directEm, emMm, nibMm, block.fontFamily]
-  );
+  // Shape and measure on mount and whenever the text or font changes; a late
+  // result for an older text is ignored.
+  useEffect(() => {
+    if (text.trim().length === 0) return;
+    let cancelled = false;
+    measurePracticeRun(text, block.fontFamily).then(
+      (run) => {
+        if (!cancelled) setRunState({ run, error: null, key: runKey });
+      },
+      (e) => {
+        if (!cancelled) {
+          setRunState({
+            run: null,
+            error: e instanceof Error ? e.message : "Could not measure the text.",
+            key: runKey,
+          });
+        }
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [text, block.fontFamily, runKey]);
 
-  const em = emHeightFromScale(options.scale, block.fontFamily);
-  const nuqta = em * nuqtaUnits(block.fontFamily, 1);
+  const current = runState.key === runKey;
+  const run = current ? runState.run : null;
+  const runError = current ? runState.error : null;
+  const loading = !empty && !current;
+
+  const nibMm = parseInRange(nibDraft, NIB_RANGE);
+  const emMm = parseInRange(emDraft, EM_RANGE);
+  const scaleValue = directEm ? emMm : nibMm;
+  const scaleHint = directEm
+    ? `Enter a letter size from ${EM_RANGE.min} to ${EM_RANGE.max} mm.`
+    : `Enter a nib width from ${NIB_RANGE.min} to ${NIB_RANGE.max} mm.`;
+
+  const rows = useMemo(() => {
+    const n = (d: string) => Math.max(0, Math.min(20, Math.floor(Number(d) || 0)));
+    return { model: n(rowDrafts.model), trace: n(rowDrafts.trace), blank: n(rowDrafts.blank) };
+  }, [rowDrafts]);
   const totalRows = rows.model + rows.trace + rows.blank;
 
+  const options: PracticeSheetOptions | null = useMemo(
+    () =>
+      scaleValue === null
+        ? null
+        : {
+            ...DEFAULT_PRACTICE_SHEET_OPTIONS,
+            page,
+            rows,
+            scale: directEm ? { emHeightMm: scaleValue } : { nibWidthMm: scaleValue },
+            fontFamily: block.fontFamily,
+          },
+    [page, rows, directEm, scaleValue, block.fontFamily]
+  );
+
+  const layout = useMemo(
+    () => (options && run ? layoutPracticeSheet(options, run) : null),
+    [options, run]
+  );
+
+  const notes: string[] = [];
+  if (layout) {
+    if (layout.fitScale < 1) {
+      notes.push(`Shrunk to fit the page: nuqta is ${layout.nuqtaMm.toFixed(2)} mm.`);
+    }
+    if (layout.gridEveryNuqta > 1) {
+      notes.push(`Grid squares are ${layout.gridEveryNuqta} nuqta wide so the lines stay printable.`);
+    }
+    if (layout.droppedRows > 0) {
+      notes.push(
+        `${layout.droppedRows} row${layout.droppedRows === 1 ? "" : "s"} did not fit and will be left off.`
+      );
+    }
+  }
+
+  const canDownload = !busy && !empty && !loading && !runError && !!layout && totalRows > 0;
+
   const download = async () => {
-    if (busy || empty) return;
+    if (!canDownload || !options) return;
     setBusy(true);
     setError(null);
-    setNotice(null);
     try {
-      const { pdf, layout } = await buildPracticeSheetPdf(text, options);
+      const { pdf } = await buildPracticeSheetPdf(text, options);
       pdf.save(practiceSheetFilename(text));
-      const notes: string[] = [];
-      if (layout.fitScale < 1) {
-        notes.push(`Shrunk to fit the page: nuqta is ${layout.nuqtaMm.toFixed(2)} mm.`);
-      }
-      if (layout.droppedRows > 0) {
-        notes.push(`${layout.droppedRows} row${layout.droppedRows === 1 ? "" : "s"} did not fit and were left off.`);
-      }
-      setNotice(notes.length ? notes.join(" ") : null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not build the sheet.");
     } finally {
@@ -87,7 +163,7 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
     }
   };
 
-  const rowInput = (key: keyof typeof rows, label: string) => (
+  const rowInput = (key: keyof typeof rowDrafts, label: string) => (
     <label className="practiceSheetRowField">
       <span className="fieldTitle">{label}</span>
       <input
@@ -96,11 +172,8 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
         max={20}
         step={1}
         className="hexInput"
-        value={rows[key]}
-        onChange={(e) => {
-          const n = Math.max(0, Math.min(20, Math.floor(Number(e.target.value) || 0)));
-          setRows((r) => ({ ...r, [key]: n }));
-        }}
+        value={rowDrafts[key]}
+        onChange={(e) => setRowDrafts((r) => ({ ...r, [key]: e.target.value }))}
       />
     </label>
   );
@@ -152,19 +225,19 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
           </span>
           <input
             type="number"
-            min={directEm ? 5 : 0.5}
-            max={directEm ? 150 : 15}
+            min={directEm ? EM_RANGE.min : NIB_RANGE.min}
+            max={directEm ? EM_RANGE.max : NIB_RANGE.max}
             step={0.5}
             className="hexInput"
-            value={directEm ? emMm : nibMm}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              if (!Number.isFinite(n)) return;
-              if (directEm) setEmMm(n);
-              else setNibMm(n);
-            }}
+            value={directEm ? emDraft : nibDraft}
+            onChange={(e) => (directEm ? setEmDraft(e.target.value) : setNibDraft(e.target.value))}
           />
         </label>
+        {scaleValue === null ? (
+          <div className="practiceSheetHint" role="alert">
+            {scaleHint}
+          </div>
+        ) : null}
         <label className="practiceSheetToggle">
           <input
             type="checkbox"
@@ -193,11 +266,19 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
         </div>
 
         <div className="practiceSheetReadout" aria-live="polite">
-          Em {em.toFixed(1)} mm · nuqta {nuqta.toFixed(2)} mm · {totalRows} row
-          {totalRows === 1 ? "" : "s"}
+          {loading
+            ? "Measuring the text…"
+            : layout
+              ? `Em ${layout.emHeightMm.toFixed(1)} mm · nuqta ${layout.nuqtaMm.toFixed(2)} mm · ${layout.rows.length} row${layout.rows.length === 1 ? "" : "s"} will print`
+              : ""}
         </div>
 
-        {notice ? <div className="practiceSheetNotice">{notice}</div> : null}
+        {notes.length > 0 ? <div className="practiceSheetNotice">{notes.join(" ")}</div> : null}
+        {runError ? (
+          <div className="fontUploadError" role="alert">
+            {runError}
+          </div>
+        ) : null}
         {error ? (
           <div className="fontUploadError" role="alert">
             {error}
@@ -211,7 +292,7 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
           <button
             type="button"
             className="sidebarSmallAction sidebarSmallAction--accent"
-            disabled={busy || empty || totalRows === 0}
+            disabled={!canDownload}
             onClick={() => void download()}
           >
             {busy ? "Building…" : "Download PDF"}
@@ -229,6 +310,9 @@ export type PracticeSheetButtonProps = { block: Block | undefined };
 export const PracticeSheetButton: React.FC<PracticeSheetButtonProps> = ({ block }) => {
   const [open, setOpen] = useState(false);
   const textBlock = block && block.type === "text" ? block : null;
+  // Losing the text selection closes the dialog for good; re-selecting must
+  // not pop it back up.
+  if (open && !textBlock) setOpen(false);
   return (
     <>
       <button
