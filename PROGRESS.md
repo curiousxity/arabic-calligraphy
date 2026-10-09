@@ -101,7 +101,8 @@ Letter, vector outlines, no account needed. The dialog previews the rows that
 will print and warns about shrinking or dropped rows before download.
 
 Not in this version, on purpose: per-glyph editor edits (diacritic overrides,
-glyph transforms, stroke cuts), gradients, and every non-text block type.
+glyph transforms, stroke cuts), gradients, faux bold/italic (`fontStyle`),
+warp (`warpX`/`warpY`), and every non-text block type.
 Alphabet sheets are the planned follow-up. Design and traps in
 `.claude/rules/practice-sheet.md`.
 

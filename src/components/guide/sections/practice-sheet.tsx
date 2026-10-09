@@ -22,9 +22,10 @@ export const section: GuideSection = {
   Body: () => (
     <>
       <p>
-        Select a text block, open <strong>Export</strong>, and click{" "}
+        Select a single text block, open <strong>Export</strong>, and click{" "}
         <strong>Practice sheet…</strong>. You get a PDF to print: the text once
-        in solid ink to study, a few times in faint grey to trace over, and then
+        in solid ink to study, a few times as a faint grey outline to trace
+        over, and then
         ruled lines to write it on your own.
       </p>
 
@@ -47,8 +48,8 @@ export const section: GuideSection = {
           <strong>Model row.</strong> Solid black. Look at it; count the dots.
         </li>
         <li>
-          <strong>Trace rows.</strong> Faint grey. Write over them with your
-          pen, keeping the nib angle steady.
+          <strong>Trace rows.</strong> A faint grey outline of the text. Fill
+          it with your pen, keeping the nib angle steady.
         </li>
         <li>
           <strong>Blank rows.</strong> Only the baseline and grid. Write from
@@ -63,15 +64,18 @@ export const section: GuideSection = {
         rows you asked for don't all fit on the page, it says how many will be
         left off; lower the row counts or the nib width to fit them. A field
         that is out of range is flagged, and Download stays off until it is
-        fixed.
+        fixed. If the block uses a font you uploaded on another computer and
+        this browser doesn't have it, the dialog says so instead of printing
+        the sheet in a substitute face.
       </p>
 
       <h4>If the sheet says it was shrunk</h4>
       <p>
         A long phrase at a wide nib will not fit across the page. Rather than
-        break the line, the sheet is scaled down and the footer tells you the
-        size the grid now represents. Use a shorter phrase, or a narrower pen,
-        to practise at true size.
+        break the line, the sheet is scaled down. The footer says it was
+        shrunk, gives the size the grid now represents, and names the nib width
+        or letter size you asked for. Use a shorter phrase, a narrower pen, or
+        a smaller letter size to practise at true size.
       </p>
 
       <h4>A very fine grid</h4>
