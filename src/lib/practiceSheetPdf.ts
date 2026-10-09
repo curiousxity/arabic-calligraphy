@@ -91,7 +91,7 @@ export async function buildPracticeSheetPdf(
       const glyph = shaped.font.glyphs.get(g.g);
       const ox = row.leftX + (penX + (g.dx ?? 0)) * scale;
       const oy = row.baselineY - (g.dy ?? 0) * scale;
-      const ops = glyphPathToPdfOps(glyph.getPath(0, 0, upm).commands, scale, ox, oy);
+      const ops = glyphPathToPdfOps(glyph.path.commands, scale, ox, oy);
       if (ops.length > 0) pdf.path(ops, style);
       penX += g.ax ?? 0;
     }

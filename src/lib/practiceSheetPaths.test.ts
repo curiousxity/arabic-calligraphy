@@ -62,11 +62,25 @@ describe("glyphPathToPdfOps", () => {
   it("converts a real Amiri glyph into a closed path list", () => {
     const font = loadFont("Amiri.ttf");
     const glyph = font.charToGlyph("ب");
-    const ops = glyphPathToPdfOps(glyph.getPath(0, 0, font.unitsPerEm).commands, 0.02, 0, 0);
+    const ops = glyphPathToPdfOps(glyph.path.commands, 0.02, 0, 0);
     expect(ops.length).toBeGreaterThan(4);
     expect(ops[0].op).toBe("m");
     expect(ops.some((o) => o.op === "h")).toBe(true);
     expect(ops.every((o) => o.op === "h" || (o.c ?? []).every(Number.isFinite))).toBe(true);
+  });
+
+  it("keeps an alif's top above the baseline in PDF space (y up in, y down out)", () => {
+    const font = loadFont("Amiri.ttf");
+    const glyph = font.charToGlyph("ا");
+    const ops = glyphPathToPdfOps(glyph.path.commands, 0.02, 0, 100);
+    const ys = ops.flatMap((o) => (o.c ?? []).filter((_, i) => i % 2 === 1));
+    const yMin = Math.min(...ys);
+    const yMax = Math.max(...ys);
+    const height = (glyph.yMax ?? 0) * 0.02;
+    // Top of the stem sits well above the baseline (smaller y in PDF space).
+    expect(yMin).toBeLessThan(100 - height * 0.5);
+    // It barely descends: the lowest point is within its own yMin below baseline.
+    expect(yMax).toBeLessThanOrEqual(100 - (glyph.yMin ?? 0) * 0.02 + 1e-6);
   });
 });
 
