@@ -22,6 +22,7 @@ export type PracticeSheetDialogProps = {
 
 const NIB_RANGE = { min: 0.5, max: 15 };
 const EM_RANGE = { min: 5, max: 150 };
+const ROW_RANGE = { min: 0, max: 20 };
 
 /** Parses a draft field; empty, non-numeric or out-of-range gives null. */
 function parseInRange(draft: string, range: { min: number; max: number }): number | null {
@@ -108,23 +109,39 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
     : `Enter a nib width from ${NIB_RANGE.min} to ${NIB_RANGE.max} mm.`;
 
   const rows = useMemo(() => {
-    const n = (d: string) => Math.max(0, Math.min(20, Math.floor(Number(d) || 0)));
-    return { model: n(rowDrafts.model), trace: n(rowDrafts.trace), blank: n(rowDrafts.blank) };
+    const parse = (d: string) => {
+      const n = parseInRange(d, ROW_RANGE);
+      return n !== null && Number.isInteger(n) ? n : null;
+    };
+    const model = parse(rowDrafts.model);
+    const trace = parse(rowDrafts.trace);
+    const blank = parse(rowDrafts.blank);
+    const invalid = (
+      [
+        ["Model rows", model],
+        ["Trace rows", trace],
+        ["Blank rows", blank],
+      ] as const
+    )
+      .filter(([, v]) => v === null)
+      .map(([name]) => name);
+    if (model === null || trace === null || blank === null) return { value: null, invalid };
+    return { value: { model, trace, blank }, invalid };
   }, [rowDrafts]);
-  const totalRows = rows.model + rows.trace + rows.blank;
+  const totalRows = rows.value ? rows.value.model + rows.value.trace + rows.value.blank : 0;
 
   const options: PracticeSheetOptions | null = useMemo(
     () =>
-      scaleValue === null
+      scaleValue === null || rows.value === null
         ? null
         : {
             ...DEFAULT_PRACTICE_SHEET_OPTIONS,
             page,
-            rows,
+            rows: rows.value,
             scale: directEm ? { emHeightMm: scaleValue } : { nibWidthMm: scaleValue },
             fontFamily: block.fontFamily,
           },
-    [page, rows, directEm, scaleValue, block.fontFamily]
+    [page, rows.value, directEm, scaleValue, block.fontFamily]
   );
 
   const layout = useMemo(
@@ -264,6 +281,11 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
           {rowInput("trace", "Trace rows")}
           {rowInput("blank", "Blank rows")}
         </div>
+        {rows.invalid.length > 0 ? (
+          <div className="practiceSheetHint" role="alert">
+            {rows.invalid.join(", ")}: enter a whole number from {ROW_RANGE.min} to {ROW_RANGE.max}.
+          </div>
+        ) : null}
 
         <div className="practiceSheetReadout" aria-live="polite">
           {loading

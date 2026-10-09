@@ -207,7 +207,7 @@ describe("layoutPracticeSheet", () => {
     expect(tiny.gridPitchMm).toBeCloseTo(tiny.nuqtaMm * tiny.gridEveryNuqta, 9);
     expect(tiny.gridPitchMm).toBeGreaterThanOrEqual(2);
     expect(tiny.grid.x[1] - tiny.grid.x[0]).toBeCloseTo(tiny.gridPitchMm, 9);
-    expect(tiny.footer).toContain(`grid every ${tiny.gridEveryNuqta} nuqta`);
+    expect(tiny.footer).toContain(` \u00b7 grid every ${tiny.gridEveryNuqta} nuqta`);
     const normal = layoutPracticeSheet(opts({ scale: { nibWidthMm: 4 } }), syntheticRun(1000));
     expect(normal.gridEveryNuqta).toBe(1);
     expect(normal.gridPitchMm).toBeCloseTo(4, 9);

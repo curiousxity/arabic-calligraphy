@@ -188,7 +188,7 @@ export function layoutPracticeSheet(
     "nibWidthMm" in options.scale && fitScale < 1
       ? ` (shrunk to fit; your ${clampNib(options.scale.nibWidthMm).toFixed(1)} mm nib is wider)`
       : "";
-  const footer = `${options.fontFamily} · em ${emHeightMm.toFixed(1)} mm · nuqta ${nuqtaMm.toFixed(2)} mm${nibNote}${gridEveryNuqta > 1 ? ` � grid every ${gridEveryNuqta} nuqta` : ""}`;
+  const footer = `${options.fontFamily} \u00b7 em ${emHeightMm.toFixed(1)} mm \u00b7 nuqta ${nuqtaMm.toFixed(2)} mm${nibNote}${gridEveryNuqta > 1 ? ` \u00b7 grid every ${gridEveryNuqta} nuqta` : ""}`;
 
   return {
     pageMm,
