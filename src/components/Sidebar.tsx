@@ -99,6 +99,7 @@ import type { ArtboardSurface, TextureDef } from "../data/textures";
 // ---- /STREAM-F ----
 // ---- STREAM-G: font upload — imports ----
 import { FontUploadButton } from "./FontUploadDialog";
+import { PracticeSheetButton } from "./PracticeSheetDialog";
 import { describeFontKey, type CustomFont } from "../lib/customFonts";
 // ---- /STREAM-G ----
 
@@ -1634,6 +1635,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <FileTextIcon size={13} /> Export all
                   </button>
                 </div>
+                <PracticeSheetButton block={selectedBlock} />
 
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <label

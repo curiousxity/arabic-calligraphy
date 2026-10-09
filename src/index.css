@@ -416,6 +416,15 @@ html, body, #root { height: 100%; margin: 0; }
 .fontUploadFileInput { width: 100%; box-sizing: border-box; font-size: 12px; color: var(--text-secondary); }
 .fontUploadLabelInput { direction: ltr; text-align: start; }
 .fontUploadError { margin-bottom: 12px; padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; background: var(--danger-soft); color: var(--danger); }
+/* ---- practice sheet dialog ---- */
+.practiceSheetDialog { width: min(460px, 100%); }
+.practiceSheetToggle { display: block; margin: -6px 0 12px; font-size: 12px; color: var(--text-secondary); }
+.practiceSheetRows { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.practiceSheetRows > * { min-width: 0; }
+.practiceSheetRowField { display: block; }
+.practiceSheetRowField .hexInput { width: 100%; min-width: 0; }
+.practiceSheetReadout { margin-bottom: 12px; font-size: 12px; color: var(--text-muted); }
+.practiceSheetNotice { margin-bottom: 12px; padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; background: var(--accent-soft); color: var(--text-secondary); }
 .fontUploadCaveats { margin: 0 0 16px; padding-left: 18px; font-size: 11px; line-height: 1.55; color: var(--text-muted); }
 .fontUploadCaveats li + li { margin-top: 6px; }
 .fontUploadOpen { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
