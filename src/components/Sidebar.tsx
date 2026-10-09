@@ -1635,7 +1635,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <FileTextIcon size={13} /> Export all
                   </button>
                 </div>
-                <PracticeSheetButton block={selectedBlock} />
+                <PracticeSheetButton block={selectedIds.length > 1 ? undefined : selectedBlock} />
 
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <label

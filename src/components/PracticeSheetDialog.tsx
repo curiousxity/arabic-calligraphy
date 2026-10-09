@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Block } from "../types";
 import {
+  DEFAULT_EM_HEIGHT_MM,
+  DEFAULT_NIB_MM,
   DEFAULT_PRACTICE_SHEET_OPTIONS,
   layoutPracticeSheet,
   type MeasuredRun,
@@ -13,6 +15,8 @@ import {
   measurePracticeRun,
   practiceSheetFilename,
 } from "../lib/practiceSheetPdf";
+import { isFontUnavailable } from "../lib/customFonts";
+import { FONT_URLS } from "../hooks/useShapedGlyphs";
 import { CloseIcon, FileTextIcon } from "./Icons";
 
 export type PracticeSheetDialogProps = {
@@ -33,6 +37,16 @@ function parseInRange(draft: string, range: { min: number; max: number }): numbe
 
 type RunState = { run: MeasuredRun | null; error: string | null; key: string };
 
+const FONT_UNAVAILABLE_MESSAGE = "This block's font isn't available in this browser.";
+
+const DEFAULT_SCALE = DEFAULT_PRACTICE_SHEET_OPTIONS.scale;
+const DEFAULT_NIB_DRAFT = String(
+  "nibWidthMm" in DEFAULT_SCALE ? DEFAULT_SCALE.nibWidthMm : DEFAULT_NIB_MM
+);
+const DEFAULT_EM_DRAFT = String(
+  "emHeightMm" in DEFAULT_SCALE ? DEFAULT_SCALE.emHeightMm : DEFAULT_EM_HEIGHT_MM
+);
+
 /**
  * Practice-sheet export. Portaled to `document.body` like `FontUploadDialog`
  * (the sidebar clips modals, and nothing non-artwork may live in the stage).
@@ -42,10 +56,10 @@ type RunState = { run: MeasuredRun | null; error: string | null; key: string };
  * cleared field stays empty instead of snapping to a number.
  */
 export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block, onClose }) => {
-  const [nibDraft, setNibDraft] = useState("4");
+  const [nibDraft, setNibDraft] = useState(DEFAULT_NIB_DRAFT);
   const [directEm, setDirectEm] = useState(false);
-  const [emDraft, setEmDraft] = useState("40");
-  const [page, setPage] = useState<PracticeSheetPage>("a4");
+  const [emDraft, setEmDraft] = useState(DEFAULT_EM_DRAFT);
+  const [page, setPage] = useState<PracticeSheetPage>(DEFAULT_PRACTICE_SHEET_OPTIONS.page);
   const [rowDrafts, setRowDrafts] = useState({
     model: String(DEFAULT_PRACTICE_SHEET_OPTIONS.rows.model),
     trace: String(DEFAULT_PRACTICE_SHEET_OPTIONS.rows.trace),
@@ -70,12 +84,17 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
 
   const text = block.text ?? "";
   const empty = text.trim().length === 0;
-  const runKey = `${block.fontFamily}|${text}`;
+  // An uploaded font this browser does not have would silently shape in the
+  // Noto Sans fallback (`pickFontUrl`). Re-checked every render: when
+  // `primeCustomFonts` registers it, App re-renders down to here, the key
+  // changes, and the run is measured again in the real face.
+  const fontUnavailable = isFontUnavailable(block.fontFamily, FONT_URLS);
+  const runKey = `${block.fontFamily}|${fontUnavailable ? "missing" : "ok"}|${text}`;
 
-  // Shape and measure on mount and whenever the text or font changes; a late
-  // result for an older text is ignored.
+  // Shape and measure on mount and whenever the text, font or font
+  // availability changes; a late result for an older key is ignored.
   useEffect(() => {
-    if (text.trim().length === 0) return;
+    if (text.trim().length === 0 || fontUnavailable) return;
     let cancelled = false;
     measurePracticeRun(text, block.fontFamily).then(
       (run) => {
@@ -94,12 +113,12 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
     return () => {
       cancelled = true;
     };
-  }, [text, block.fontFamily, runKey]);
+  }, [text, block.fontFamily, fontUnavailable, runKey]);
 
   const current = runState.key === runKey;
-  const run = current ? runState.run : null;
-  const runError = current ? runState.error : null;
-  const loading = !empty && !current;
+  const run = current && !fontUnavailable ? runState.run : null;
+  const runError = fontUnavailable ? FONT_UNAVAILABLE_MESSAGE : current ? runState.error : null;
+  const loading = !empty && !fontUnavailable && !current;
 
   const nibMm = parseInRange(nibDraft, NIB_RANGE);
   const emMm = parseInRange(emDraft, EM_RANGE);
@@ -208,6 +227,15 @@ export const PracticeSheetDialog: React.FC<PracticeSheetDialogProps> = ({ block,
         role="dialog"
         aria-modal="true"
         aria-labelledby="practiceSheetTitle"
+        onKeyDown={(e) => {
+          // App's shortcuts listen on window: Delete/Backspace would delete the
+          // block behind the modal and arrows would nudge it. Stopping the
+          // event here also stops it reaching this dialog's own window Escape
+          // listener, so Escape is handled here too. No preventDefault: the
+          // fields still need their keys.
+          e.stopPropagation();
+          if (e.key === "Escape") onClose();
+        }}
       >
         <div className="fontUploadHeader">
           <div id="practiceSheetTitle" className="confirmDialogTitle">
