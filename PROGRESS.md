@@ -92,6 +92,19 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-09 — Practice sheet export
+
+**Practice sheet…** in the Export panel prints the selected text block as a
+PDF *mashq* sheet: a solid model row, faint rows to trace, ruled blank rows,
+on a grid whose square is one nuqta of the pen the learner enters. A4 or
+Letter, vector outlines, no account needed. The dialog previews the rows that
+will print and warns about shrinking or dropped rows before download.
+
+Not in this version, on purpose: per-glyph editor edits (diacritic overrides,
+glyph transforms, stroke cuts), gradients, and every non-text block type.
+Alphabet sheets are the planned follow-up. Design and traps in
+`.claude/rules/practice-sheet.md`.
+
 ### 2026-09-06 — Per-glyph move, scale & rotate on Shape Fill
 
 **Move, scale & rotate glyph** in Typography now arms on a Shape Fill block as
