@@ -79,7 +79,6 @@ export async function buildPracticeSheetPdf(
   const scale = layout.emHeightMm / upm;
   for (const row of layout.rows) {
     if (row.kind === "blank") continue;
-    const style = row.kind === "model" ? "F" : "S";
     if (row.kind === "model") {
       pdf.setFillColor(0, 0, 0);
     } else {
@@ -92,7 +91,11 @@ export async function buildPracticeSheetPdf(
       const ox = row.leftX + (penX + (g.dx ?? 0)) * scale;
       const oy = row.baselineY - (g.dy ?? 0) * scale;
       const ops = glyphPathToPdfOps(glyph.path.commands, scale, ox, oy);
-      if (ops.length > 0) pdf.path(ops, style);
+      if (ops.length > 0) {
+        pdf.path(ops);
+        if (row.kind === "model") pdf.fill();
+        else pdf.stroke();
+      }
       penX += g.ax ?? 0;
     }
   }
