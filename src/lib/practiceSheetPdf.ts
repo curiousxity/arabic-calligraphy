@@ -1,13 +1,10 @@
 /**
- * Draws a `PracticeSheetLayout` into a jsPDF document as vector paths.
+ * Shapes the practice-sheet text and builds the PDF.
  *
- * Model rows fill black; trace rows stroke a hairline grey; blank rows get
- * only the rules. Glyph outlines come from opentype.js (font y up) and are
- * flipped into PDF space (y down) by `glyphPathToPdfOps`. jsPDF is imported
- * lazily, as `useExport.ts` does, so it stays out of the main bundle.
- *
- * The pure pieces live in `practiceSheetPaths.ts` (Vitest-importable); this
- * file imports `./harfbuzz` and is verified in the browser.
+ * This file imports `./harfbuzz`, so Vitest cannot load it. It only shapes
+ * and measures; the painting is `drawPracticeSheet` in the harfbuzz-free
+ * `practiceSheetDraw.ts`, which is unit-tested with real fonts. jsPDF is
+ * imported lazily, as `useExport.ts` does, so it stays out of the main bundle.
  */
 import type { jsPDF } from "jspdf";
 import { shapeText } from "./harfbuzz";
@@ -19,45 +16,9 @@ import {
   type PracticeSheetLayout,
   type PracticeSheetOptions,
 } from "./practiceSheet";
-import { glyphPathToPdfOps } from "./practiceSheetPaths";
+import { drawPracticeSheet } from "./practiceSheetDraw";
 
 export { glyphPathToPdfOps, practiceSheetFilename, type PdfPathOp } from "./practiceSheetPaths";
-
-const TRACE_STROKE_MM = 0.15;
-const TRACE_GREY = 0xb4;
-const GRID_LIGHT_MM = 0.08;
-const GRID_HEAVY_MM = 0.2;
-const GRID_GREY = 0xd0;
-const BASELINE_MM = 0.25;
-
-function drawRules(pdf: jsPDF, layout: PracticeSheetLayout): void {
-  const { grid, marginMm, pageMm } = layout;
-  const right = pageMm.width - marginMm;
-  const top = grid.y[0] ?? marginMm;
-  const bottom = grid.y[grid.y.length - 1] ?? top;
-
-  pdf.setDrawColor(GRID_GREY, GRID_GREY, GRID_GREY);
-  grid.x.forEach((x, i) => {
-    pdf.setLineWidth(i % grid.heavyEvery === 0 ? GRID_HEAVY_MM : GRID_LIGHT_MM);
-    pdf.line(x, top, x, bottom);
-  });
-  grid.y.forEach((y, i) => {
-    pdf.setLineWidth(i % grid.heavyEvery === 0 ? GRID_HEAVY_MM : GRID_LIGHT_MM);
-    pdf.line(marginMm, y, right, y);
-  });
-
-  pdf.setDrawColor(0, 0, 0);
-  pdf.setLineWidth(BASELINE_MM);
-  for (const row of layout.rows) {
-    pdf.line(marginMm, row.baselineY, right, row.baselineY);
-  }
-}
-
-function drawFooter(pdf: jsPDF, layout: PracticeSheetLayout): void {
-  pdf.setFontSize(8);
-  pdf.setTextColor(90, 90, 90);
-  pdf.text(layout.footer, layout.marginMm, layout.pageMm.height - layout.marginMm + 4);
-}
 
 async function shapeRun(text: string, fontFamily: string) {
   const shaped = await shapeText(text, resolveFontUrl(fontFamily));
@@ -85,32 +46,6 @@ export async function buildPracticeSheetPdf(
     format: [layout.pageMm.width, layout.pageMm.height],
   });
 
-  drawRules(pdf, layout);
-
-  const scale = layout.emHeightMm / upm;
-  for (const row of layout.rows) {
-    if (row.kind === "blank") continue;
-    if (row.kind === "model") {
-      pdf.setFillColor(0, 0, 0);
-    } else {
-      pdf.setDrawColor(TRACE_GREY, TRACE_GREY, TRACE_GREY);
-      pdf.setLineWidth(TRACE_STROKE_MM);
-    }
-    let penX = 0;
-    for (const g of shaped.glyphs) {
-      const glyph = shaped.font.glyphs.get(g.g);
-      const ox = row.leftX + (penX + (g.dx ?? 0)) * scale;
-      const oy = row.baselineY - (g.dy ?? 0) * scale;
-      const ops = glyphPathToPdfOps(glyph.path.commands, scale, ox, oy);
-      if (ops.length > 0) {
-        pdf.path(ops);
-        if (row.kind === "model") pdf.fill();
-        else pdf.stroke();
-      }
-      penX += g.ax ?? 0;
-    }
-  }
-
-  drawFooter(pdf, layout);
+  drawPracticeSheet(pdf, layout, shaped.glyphs, shaped.font, upm);
   return { pdf, layout };
 }

@@ -10,6 +10,7 @@ import { normalizeGlyphs } from "./normalizeGlyphs";
 import { nuqtaUnits } from "./nuqta";
 import {
   DEFAULT_PRACTICE_SHEET_OPTIONS,
+  FOOTER_RESERVE_MM,
   MIN_NIB_MM,
   PAGE_SIZES_MM,
   emHeightFromScale,
@@ -107,6 +108,9 @@ const syntheticRun = (advanceUnits: number): MeasuredRun => ({
   advanceUnits,
   inkTopUnits: 800,
   inkBottomUnits: -200,
+  // Ink spans exactly the advance, so the ink arithmetic equals the advance arithmetic.
+  inkLeftUnits: 0,
+  inkRightUnits: advanceUnits,
   unitsPerEm: 1000,
 });
 
@@ -220,6 +224,33 @@ describe("layoutPracticeSheet", () => {
     expect(Number.isFinite(layout.rows[0].baselineY)).toBe(true);
   });
 
+  it("draws the footer inside its reserve, below the last grid line and above the margin", () => {
+    const layout = layoutPracticeSheet(opts(), syntheticRun(1000));
+    const bottomMargin = layout.pageMm.height - layout.marginMm;
+    expect(layout.footerY).toBeLessThan(bottomMargin);
+    expect(layout.footerY).toBeGreaterThan(bottomMargin - FOOTER_RESERVE_MM);
+    const lastGridY = layout.grid.y[layout.grid.y.length - 1];
+    expect(layout.footerY).toBeGreaterThan(lastGridY);
+  });
+
+  it("states an em-mode shrink in the footer with the requested em", () => {
+    const shrunk = layoutPracticeSheet(opts({ scale: { emHeightMm: 40 } }), syntheticRun(20000));
+    expect(shrunk.fitScale).toBeLessThan(1);
+    expect(shrunk.footer).toContain(" (shrunk to fit from 40.0 mm)");
+    const fits = layoutPracticeSheet(opts({ scale: { emHeightMm: 40 } }), syntheticRun(1000));
+    expect(fits.fitScale).toBe(1);
+    expect(fits.footer).not.toContain("shrunk");
+  });
+
+  it("fits and right-aligns on the ink, not the advance", () => {
+    // Ink starts 500 units left of the pen origin and overhangs the advance by 100.
+    const run: MeasuredRun = { ...syntheticRun(1000), inkLeftUnits: -500, inkRightUnits: 1100 };
+    const layout = layoutPracticeSheet(opts({ scale: { emHeightMm: 20 } }), run);
+    expect(layout.runWidthMm).toBeCloseTo((1600 / 1000) * 20, 6);
+    const right = PAGE_SIZES_MM.a4.width - layout.marginMm;
+    expect(layout.rows[0].leftX + (1100 / 1000) * 20).toBeCloseTo(right, 6);
+  });
+
   it("uses Letter dimensions when asked", () => {
     const layout = layoutPracticeSheet(opts({ page: "letter" }), syntheticRun(1000));
     expect(layout.pageMm).toEqual(PAGE_SIZES_MM.letter);
@@ -247,8 +278,50 @@ describe("measuredRunFromGlyphs (real font)", () => {
       run
     );
     expect(layout.rows.length).toBeGreaterThan(0);
-    const right = layout.rows[0].leftX + layout.runWidthMm;
-    expect(right).toBeCloseTo(layout.pageMm.width - layout.marginMm, 6);
-    expect(layout.rows[0].leftX).toBeGreaterThanOrEqual(layout.marginMm - 1e-9);
+    const scale = layout.emHeightMm / run.unitsPerEm;
+    const inkRight = layout.rows[0].leftX + run.inkRightUnits * scale;
+    const inkLeft = layout.rows[0].leftX + run.inkLeftUnits * scale;
+    expect(inkRight).toBeCloseTo(layout.pageMm.width - layout.marginMm, 6);
+    expect(inkLeft).toBeGreaterThanOrEqual(layout.marginMm - 1e-6);
+    expect(inkRight - inkLeft).toBeCloseTo(layout.runWidthMm, 6);
+  });
+
+  it("measures ink left and right from pen position, dx and the glyph box", async () => {
+    const { glyphs, font, unitsPerEm } = await shapeReal("بسم الله الرحمن الرحيم", "Thuluth.ttf");
+    const run = measuredRunFromGlyphs(glyphs, font, unitsPerEm);
+    let pen = 0;
+    let left = Infinity;
+    let right = -Infinity;
+    for (const g of glyphs) {
+      const glyph = font.glyphs.get(g.g);
+      if (glyph.path.commands.length > 0) {
+        const box = glyph.getBoundingBox();
+        left = Math.min(left, pen + (g.dx ?? 0) + box.x1);
+        right = Math.max(right, pen + (g.dx ?? 0) + box.x2);
+      }
+      pen += g.ax ?? 0;
+    }
+    expect(run.inkLeftUnits).toBe(left);
+    expect(run.inkRightUnits).toBe(right);
+    // The reason the fit is on ink: this run's swash starts left of the pen origin.
+    expect(run.inkLeftUnits).toBeLessThan(0);
+  });
+
+  it("keeps a shrunk Thuluth basmala's ink inside both margins at a 4 mm nib on A4", async () => {
+    const { glyphs, font, unitsPerEm } = await shapeReal("بسم الله الرحمن الرحيم", "Thuluth.ttf");
+    const run = measuredRunFromGlyphs(glyphs, font, unitsPerEm);
+    const layout = layoutPracticeSheet(
+      opts({ fontFamily: "Thuluth", page: "a4", scale: { nibWidthMm: 4 } }),
+      run
+    );
+    expect(layout.fitScale).toBeLessThan(1);
+    const scale = layout.emHeightMm / run.unitsPerEm;
+    for (const row of layout.rows) {
+      expect(row.leftX + run.inkLeftUnits * scale).toBeGreaterThanOrEqual(layout.marginMm - 1e-6);
+      expect(row.leftX + run.inkRightUnits * scale).toBeCloseTo(
+        layout.pageMm.width - layout.marginMm,
+        6
+      );
+    }
   });
 });

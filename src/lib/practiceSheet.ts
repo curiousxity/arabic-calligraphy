@@ -32,6 +32,14 @@ export type MeasuredRun = {
   inkTopUnits: number;
   /** Lowest ink of the run (min glyph yMin plus dy), font units; 0 or negative. */
   inkBottomUnits: number;
+  /**
+   * Leftmost ink of the run, font units from the pen origin (pen position
+   * plus dx plus the glyph box's x1). Can be negative: a Thuluth swash starts
+   * hundreds of units left of the pen origin.
+   */
+  inkLeftUnits: number;
+  /** Rightmost ink of the run, font units from the pen origin (pen + dx + x2). */
+  inkRightUnits: number;
   unitsPerEm: number;
 };
 
@@ -39,7 +47,11 @@ export type PracticeSheetRow = {
   kind: PracticeSheetRowKind;
   /** Baseline y from the page top, mm. */
   baselineY: number;
-  /** x of the run's left edge, mm. Glyphs walk rightward from here. */
+  /**
+   * x of the run's pen origin, mm. Glyphs walk rightward from here. Not the
+   * ink's left edge: the ink starts at `leftX + inkLeftUnits` scaled, and its
+   * right edge sits exactly on the right margin.
+   */
   leftX: number;
 };
 
@@ -56,11 +68,14 @@ export type PracticeSheetLayout = {
   gridEveryNuqta: number;
   /** 1 unless the run was wider than the printable area. */
   fitScale: number;
+  /** Width of the run's ink (inkRight - inkLeft) after any shrink, mm; this is what is fitted. */
   runWidthMm: number;
   rows: PracticeSheetRow[];
   droppedRows: number;
   grid: { x: number[]; y: number[]; heavyEvery: number };
   footer: string;
+  /** Footer text baseline, mm from the page top; inside the footer reserve, above the bottom margin. */
+  footerY: number;
 };
 
 export const PAGE_SIZES_MM: Record<PracticeSheetPage, { width: number; height: number }> = {
@@ -68,17 +83,23 @@ export const PAGE_SIZES_MM: Record<PracticeSheetPage, { width: number; height: n
   letter: { width: 215.9, height: 279.4 },
 };
 
+export const DEFAULT_NIB_MM = 4;
+/** Starting value of the dialog's "set letter size directly" field; the shared default is nib-based. */
+export const DEFAULT_EM_HEIGHT_MM = 40;
+
 export const DEFAULT_PRACTICE_SHEET_OPTIONS: Omit<PracticeSheetOptions, "fontFamily"> = {
   page: "a4",
   marginMm: 15,
-  scale: { nibWidthMm: 4 },
+  scale: { nibWidthMm: DEFAULT_NIB_MM },
   rows: { model: 1, trace: 3, blank: 3 },
 };
 
 /** Below this a nib makes no sense and the em would explode. */
 export const MIN_NIB_MM = 0.5;
-/** Space reserved at the page foot for the footer line, mm. */
-const FOOTER_RESERVE_MM = 8;
+/** Space reserved above the bottom margin for the footer line, mm. Rows and grid stop above it. */
+export const FOOTER_RESERVE_MM = 8;
+/** Footer text baseline, measured up from the bottom margin (inside the reserve), mm. */
+const FOOTER_BASELINE_ABOVE_MARGIN_MM = 2;
 const GRID_HEAVY_EVERY = 5;
 /** Grid lines closer than this print as a grey wash. */
 const MIN_GRID_PITCH_MM = 2;
@@ -99,7 +120,7 @@ type InkFont = {
   glyphs: {
     get(index: number): {
       path: { commands: unknown[] };
-      getBoundingBox(): { y1: number; y2: number };
+      getBoundingBox(): { x1: number; x2: number; y1: number; y2: number };
     };
   };
 };
@@ -112,19 +133,32 @@ export function measuredRunFromGlyphs(
   let advanceUnits = 0;
   let inkTop = 0;
   let inkBottom = 0;
+  let inkLeft = Infinity;
+  let inkRight = -Infinity;
   for (const g of glyphs) {
+    const pen = advanceUnits;
     advanceUnits += g.ax ?? 0;
     const glyph = font.glyphs.get(g.g);
     if (!glyph || glyph.path.commands.length === 0) continue;
     const box = glyph.getBoundingBox();
+    const dx = g.dx ?? 0;
     const dy = g.dy ?? 0;
     inkTop = Math.max(inkTop, box.y2 + dy);
     inkBottom = Math.min(inkBottom, box.y1 + dy);
+    inkLeft = Math.min(inkLeft, pen + dx + box.x1);
+    inkRight = Math.max(inkRight, pen + dx + box.x2);
+  }
+  // No inked glyph at all (spaces only): fall back to the advance span.
+  if (!(inkRight > inkLeft)) {
+    inkLeft = 0;
+    inkRight = advanceUnits;
   }
   return {
     advanceUnits,
     inkTopUnits: inkTop,
     inkBottomUnits: inkBottom,
+    inkLeftUnits: inkLeft,
+    inkRightUnits: inkRight,
     unitsPerEm: Math.max(unitsPerEm || 1000, 1),
   };
 }
@@ -148,7 +182,10 @@ export function layoutPracticeSheet(
   const ratio = nuqtaUnits(options.fontFamily, 1);
   const upm = Math.max(run.unitsPerEm || 1000, 1);
   const requestedEm = emHeightFromScale(options.scale, options.fontFamily);
-  const requestedWidth = (run.advanceUnits / upm) * requestedEm;
+  // Fit and align on the ink, not the advance sum: a swash can start well
+  // left of the pen origin, and a final can overhang its advance.
+  const inkWidthUnits = Math.max(0, run.inkRightUnits - run.inkLeftUnits);
+  const requestedWidth = (inkWidthUnits / upm) * requestedEm;
 
   const fitScale = requestedWidth > printableW ? printableW / requestedWidth : 1;
   const emHeightMm = requestedEm * fitScale;
@@ -158,7 +195,8 @@ export function layoutPracticeSheet(
   const topMm = (run.inkTopUnits / upm) * emHeightMm;
   const bottomMm = (-run.inkBottomUnits / upm) * emHeightMm;
   const rowHeight = topMm + bottomMm + nuqtaMm;
-  const leftX = pageMm.width - marginMm - runWidthMm;
+  // Pen origin chosen so the ink's right edge lands on the right margin.
+  const leftX = pageMm.width - marginMm - (run.inkRightUnits / upm) * emHeightMm;
 
   const wanted: PracticeSheetRowKind[] = [];
   if (run.advanceUnits > 0) {
@@ -185,9 +223,11 @@ export function layoutPracticeSheet(
   };
 
   const nibNote =
-    "nibWidthMm" in options.scale && fitScale < 1
-      ? ` (shrunk to fit; your ${clampNib(options.scale.nibWidthMm).toFixed(1)} mm nib is wider)`
-      : "";
+    fitScale >= 1
+      ? ""
+      : "nibWidthMm" in options.scale
+        ? ` (shrunk to fit; your ${clampNib(options.scale.nibWidthMm).toFixed(1)} mm nib is wider)`
+        : ` (shrunk to fit from ${requestedEm.toFixed(1)} mm)`;
   const footer = `${options.fontFamily} \u00b7 em ${emHeightMm.toFixed(1)} mm \u00b7 nuqta ${nuqtaMm.toFixed(2)} mm${nibNote}${gridEveryNuqta > 1 ? ` \u00b7 grid every ${gridEveryNuqta} nuqta` : ""}`;
 
   return {
@@ -203,5 +243,6 @@ export function layoutPracticeSheet(
     droppedRows,
     grid,
     footer,
+    footerY: pageMm.height - marginMm - FOOTER_BASELINE_ABOVE_MARGIN_MM,
   };
 }
