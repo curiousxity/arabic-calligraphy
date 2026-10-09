@@ -31,9 +31,10 @@ and derives the nuqta from it, so the grid is always true to the drawn letters.
   glyphs, font, upm)` draws rules, glyph rows and footer into a jsPDF. It takes
   the shaped glyphs and the opentype font as arguments and must not import
   `./harfbuzz` either, so `practiceSheetDraw.test.ts` paints real Amiri into a
-  real jsPDF under Node and counts operators. Both writer bugs found on the
-  branch (a double y-flip, a path that never painted) were the kind this test
-  catches.
+  real jsPDF under Node, counts operators, and checks that glyph movetos land
+  inside the row's ink band. Both writer bugs found on the branch would fail
+  it: a path that never painted (no `f`/`S`), and a double y-flip (outlines
+  mirrored below the baseline, outside the band).
 - **`practiceSheetPdf.ts`** shapes (`measurePracticeRun`) and builds the PDF
   (`buildPracticeSheetPdf`, which calls `drawPracticeSheet`). It imports
   harfbuzz, so Vitest cannot load it; keep it to shaping and the jsPDF
@@ -85,7 +86,8 @@ and derives the nuqta from it, so the grid is always true to the drawn letters.
   only the outer silhouette. That is why the stroke is **0.30 mm `#B4B4B4`**:
   half of it is covered, so the visible outline is 0.15 mm. Do not interleave
   stroke and fill per glyph, and do not halve the width. Accepted cost: on
-  trace rows the grid is hidden inside the letter bodies.
+  trace rows the grid, and the baseline rule, are hidden inside the letter
+  bodies.
 - Model rows are filled only, never also outlined: an outline over a fill
   thickens the letter (see the stroke-before-fill note in CLAUDE.md).
 - The PDF is written with `compress: true`; jsPDF is imported lazily.
@@ -125,8 +127,8 @@ and derives the nuqta from it, so the grid is always true to the drawn letters.
 Unit coverage is the layout module (`practiceSheet.test.ts`, including real
 Thuluth ink-fit checks), the converter/slug (`practiceSheetPaths.test.ts`),
 and the painter (`practiceSheetDraw.test.ts`: real Amiri, real jsPDF with
-`compress: false`, coarse operator counts and stroke-before-white-fill order,
-no pixels). Only the shaping wrapper in `practiceSheetPdf.ts` is untested.
+`compress: false`, coarse operator counts, stroke-before-white-fill order,
+and an ink-band check on glyph movetos, no pixels). Only the shaping wrapper in `practiceSheetPdf.ts` is untested.
 
 Planned follow-up on the same page machinery, not built: alphabet sheets
 (one letter and its forms per page).

@@ -153,4 +153,30 @@ describe("drawPracticeSheet (real Amiri, real jsPDF)", () => {
     const ruleStrokes = layout.grid.x.length + layout.grid.y.length + layout.rows.length;
     expect(opLines(raw, "S").length).toBe(ruleStrokes);
   });
+
+  it("puts glyph outlines upright inside the row's ink band (catches a y-flip)", async () => {
+    const { raw, layout } = await paint({ model: 1, trace: 0, blank: 0 });
+    const { glyphs, font, unitsPerEm } = await shapeReal("محمد", "Amiri.ttf");
+    const run = measuredRunFromGlyphs(glyphs, font, unitsPerEm);
+    const scale = layout.emHeightMm / unitsPerEm;
+    const row = layout.rows[0];
+    // jsPDF writes y in pt from the page bottom.
+    const k = 72 / 25.4;
+    const toPt = (mm: number) => (297 - mm) * k;
+    const lowPt = toPt(row.baselineY - run.inkBottomUnits * scale) - 1;
+    const highPt = toPt(row.baselineY - run.inkTopUnits * scale) + 1;
+    // Rules come first; every moveto after the last rule stroke is a glyph's.
+    const lines = raw.split("\n");
+    const lastRule = opLines(raw, "S").at(-1)!;
+    const ys = lines
+      .slice(lastRule + 1)
+      .map((l) => l.trim().split(/\s+/))
+      .filter((t) => t.length === 3 && t[2] === "m")
+      .map((t) => Number(t[1]));
+    expect(ys.length).toBeGreaterThan(0);
+    for (const y of ys) {
+      expect(y).toBeGreaterThanOrEqual(lowPt);
+      expect(y).toBeLessThanOrEqual(highPt);
+    }
+  });
 });
