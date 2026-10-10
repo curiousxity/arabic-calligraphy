@@ -100,15 +100,17 @@ import type { ArtboardSurface, TextureDef } from "../data/textures";
 import { FontUploadButton } from "./FontUploadDialog";
 import { PracticeSheetButton } from "./PracticeSheetDialog";
 import { describeFontKey, type CustomFont } from "../lib/customFonts";
-import { supportsGlyphAlternates } from "../lib/blockCapabilities";
+import { supportsGlyphAlternates, supportsStyleSets } from "../lib/blockCapabilities";
 import {
+  activeStyleSets,
   alternatePanelView,
   currentChoice,
+  fallbackFeatureLabel,
   resolveAlternateTarget,
   type AlternateChoice,
   type AlternateTarget,
 } from "../lib/glyphAlternates";
-import type { GlyphAlternatesState } from "../hooks/useGlyphAlternates";
+import type { GlyphAlternatesState, StyleSetsState } from "../hooks/useGlyphAlternates";
 import { AlternateStrip } from "./sidebar/AlternateStrip";
 // ---- /STREAM-G ----
 
@@ -287,6 +289,9 @@ export type SidebarProps = {
   onToggleGlyphAlternateMode?: (blockId: number) => void;
   onResetGlyphAlternates?: (blockId: number) => void;
   onPickGlyphAlternate?: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
+  /** The font's style sets that change the selected block's text. */
+  styleSetsState?: StyleSetsState;
+  onToggleStyleSet?: (blockId: number, tag: string) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
   onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
   onDistributeSelected?: (axis: "x" | "y") => void;
@@ -543,6 +548,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleGlyphAlternateMode,
   onResetGlyphAlternates,
   onPickGlyphAlternate,
+  styleSetsState,
+  onToggleStyleSet,
   onFitShapeFillSpacing,
   onAlignSelected,
   onDistributeSelected,
@@ -3231,10 +3238,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 )}
 
-                {supportsGlyphAlternates(selectedBlock) && (
+                {supportsStyleSets(selectedBlock) && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
                     <div className="sidebarSectionTitle">Letter shapes</div>
 
+                    {/* Block-wide style sets: every matching letter at once.
+                        A set that is on stays listed even if the text no
+                        longer uses it, so it can always be switched off. */}
+                    {(() => {
+                      const state = styleSetsState;
+                      const on = activeStyleSets(selectedBlock.styleSets);
+                      const listed = [
+                        ...(state?.sets ?? []),
+                        ...on
+                          .filter((t) => !(state?.sets ?? []).some((x) => x.feature === t))
+                          .map((t) => ({ feature: t, label: fallbackFeatureLabel({ feature: t, value: 1 }) })),
+                      ];
+                      const note = (text: string) => (
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>{text}</div>
+                      );
+                      if (listed.length === 0) {
+                        if (!state || state.loading) return note("Looking for style sets…");
+                        return note(
+                          state.fontHasStyleSets
+                            ? "No style set in this font changes this text"
+                            : "No style sets in this font"
+                        );
+                      }
+                      return (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 4px" }}>
+                            Style sets — applied to every matching letter
+                          </div>
+                          {listed.map((set) => (
+                            <CheckboxRow
+                              key={set.feature}
+                              id={makeId(`style-set-${set.feature}`, selectedId)}
+                              label={set.label}
+                              checked={on.includes(set.feature)}
+                              onChange={() => onToggleStyleSet?.(selectedBlock.id, set.feature)}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    {supportsGlyphAlternates(selectedBlock) && (<>
                     <CheckboxRow
                       id={makeId("glyph-alternate-mode", selectedId)}
                       label="Alternate letter shapes"
@@ -3293,6 +3342,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         Reset letter shapes
                       </button>
                     )}
+                    </>)}
                   </div>
                 )}
 

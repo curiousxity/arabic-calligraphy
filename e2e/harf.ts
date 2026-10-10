@@ -341,6 +341,30 @@ export async function hitTargetAt(page: Page, point: Point): Promise<string | nu
   }, point);
 }
 
+/**
+ * Centres of the Next Shape overlay's targets, in page space.
+ *
+ * The overlay is pointer-resolved: one listening hit rect, the letter under
+ * the pointer found in arithmetic, so there is no per-letter node to find.
+ * It publishes its targets' centres (group space, capped) on a non-listening
+ * marker node instead, and this maps them through that node's absolute
+ * transform — read-only scene data, like everything else the bridge serves.
+ */
+export async function alternateTargetCenters(page: Page): Promise<Point[]> {
+  return page.evaluate(() => {
+    const stage = window.__HARF__!.getStage();
+    const node = stage?.findOne(".alternate-targets");
+    if (!stage || !node) return [];
+    const c = stage.container().getBoundingClientRect();
+    const t = node.getAbsoluteTransform();
+    const centers = (node.getAttr("centers") as { x: number; y: number }[] | undefined) ?? [];
+    return centers.map((p) => {
+      const q = t.point(p);
+      return { x: c.left + q.x, y: c.top + q.y };
+    });
+  });
+}
+
 /** The stroke-stretch handle's orange. */
 export const STRETCH_HANDLE_DOT = "#f97316";
 

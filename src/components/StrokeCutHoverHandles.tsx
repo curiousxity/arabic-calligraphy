@@ -56,7 +56,7 @@ function snap(nuqta: number, free: boolean): number {
  * On-canvas hover overlay for lengthening a letter's own straight strokes.
  *
  * One handle per detected zone, shown only while that zone is hovered — the
- * same rule that keeps the diacritic and move/scale overlays from turning a
+ * same rule that keeps the diacritic and Next Shape overlays from turning a
  * word into a field of dots.
  *
  * The handle travels along the **stroke's own axis**, not horizontally,

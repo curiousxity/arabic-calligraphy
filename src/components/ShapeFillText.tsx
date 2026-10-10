@@ -31,7 +31,13 @@ import {
   makeShapeFillInstanceAdapter,
   type DiacriticPlacement,
 } from "../lib/diacriticPlacement";
-import type { DiacriticOverride } from "../types";
+import type { DiacriticOverride, GlyphAlternate } from "../types";
+import { AlternateHoverHandles, type AlternateHitTarget } from "./AlternateHoverHandles";
+import {
+  letterAtOffset,
+  type AlternateChoice,
+  type LetterAlternates,
+} from "../lib/glyphAlternates";
 import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
 
 export type ShapeFillTextProps = {
@@ -64,10 +70,18 @@ export type ShapeFillTextProps = {
   rotation?: number;
   diacriticEditMode?: boolean;
   diacriticOverrides?: DiacriticOverride[];
+  /** Block-level OpenType style sets, e.g. ["ss01"]. */
+  styleSets?: string[];
   onBeginDiacriticDrag?: () => void;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
-  /** Armed by Typography's "Move, scale & rotate glyph" checkbox. */
+  /** Per-letter alternates — one pick applies to every tile of that letter. */
+  glyphAlternates?: GlyphAlternate[];
+  /** Arms the Next Shape overlay. */
+  glyphAlternateMode?: boolean;
+  /** The letters that have alternates — App passes them for the selected block only. */
+  alternateLetters?: LetterAlternates[];
+  onPickAlternate?: (letter: number, choice: AlternateChoice | null) => void;
   locked?: boolean;
   draggable?: boolean;
   onClick?: () => void;
@@ -80,6 +94,10 @@ export type ShapeFillTextProps = {
 };
 
 const NO_DIACRITIC_OVERRIDES: DiacriticOverride[] = [];
+const NO_GLYPH_ALTERNATES: GlyphAlternate[] = [];
+const NO_ALTERNATE_LETTERS: LetterAlternates[] = [];
+/** In local glyph units, before the row's fit scale — matches the text block's 3px at a 1:1 row. */
+const ALTERNATE_TARGET_PAD = 3;
 
 type GlyphInstance = {
   glyphIndex: number;
@@ -203,6 +221,11 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   rotation = 0,
   diacriticEditMode = false,
   diacriticOverrides = NO_DIACRITIC_OVERRIDES,
+  styleSets,
+  glyphAlternates = NO_GLYPH_ALTERNATES,
+  glyphAlternateMode = false,
+  alternateLetters = NO_ALTERNATE_LETTERS,
+  onPickAlternate,
   onBeginDiacriticDrag,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
@@ -212,7 +235,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   isSelected = false,
   onResizeScale,
 }) => {
-  const shapeData = useShapedGlyphs(text, fontFamily);
+  const shapeData = useShapedGlyphs(text, fontFamily, glyphAlternates, styleSets);
 
   const groupRef = useRef<Konva.Group>(null);
   /** The block's absolute position at drag start, while the diacritic tool pins it. */
@@ -314,10 +337,10 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   // Mirrors the sceneFunc's own scanline-tiling loop in plain JS (no canvas
   // needed — `pointInPolygon` is pure) so the diacritic overlay can know
   // where every tiled repetition actually lands. Only computed while the
-  // diacritic tool is armed (it's a real amount of work).
+  // diacritic tool or Next Shape is armed (it's a real amount of work).
   const glyphInstances = useMemo<GlyphInstance[]>(() => {
     const empty: GlyphInstance[] = [];
-    if (!diacriticEditMode) return empty;
+    if (!diacriticEditMode && !glyphAlternateMode) return empty;
     if (!shapeSvgPath || parsedCmds.length === 0) return empty;
     if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) return empty;
 
@@ -353,6 +376,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     return instances;
   }, [
     diacriticEditMode,
+    glyphAlternateMode,
     shapeSvgPath,
     parsedCmds,
     shapeData.font,
@@ -365,6 +389,62 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     shapeFillScaleX,
     shapeFillScaleY,
     polygon,
+  ]);
+
+  /**
+   * Next Shape targets: every tiled repetition of every letter that has
+   * alternates, as a quad in this group's space. The letter's local box goes
+   * through the same instance adapter the diacritic handles trust, so the
+   * tile's rotation, its row's fit scale and `shapeScale` are all honoured.
+   * Thousands of these are fine: the overlay hit-tests them in arithmetic
+   * behind one listening node.
+   */
+  const alternateTargets = useMemo<AlternateHitTarget[]>(() => {
+    if (!glyphAlternateMode || alternateLetters.length === 0) return [];
+    const byLetter = new Map(alternateLetters.map((l) => [l.letter, l]));
+    const out: AlternateHitTarget[] = [];
+    glyphInstances.forEach((inst, i) => {
+      // A mark shares its base letter's cluster, so it would resolve to the
+      // same letter — but as a tiny quad drawn after (so above) the base,
+      // stealing the hover from the top of every vocalised letter. The text
+      // and Curve builders already target the letter, not its marks.
+      if (diacriticGlyphIndices.has(inst.glyphIndex)) return;
+      const letter = letterAtOffset(shapeData.shapableText, shapeData.glyphs[inst.glyphIndex]?.cl ?? -1);
+      const la = byLetter.get(letter);
+      const box = glyphBoxByIndex.get(inst.glyphIndex);
+      if (!la || !box) return;
+      const adapter = makeShapeFillInstanceAdapter({
+        gx: inst.gx,
+        gy: inst.gy,
+        rotationDeg: shapeFillTextRotation,
+        scX: inst.scX,
+        scY: inst.scY,
+        shapeScale,
+      });
+      const pad = ALTERNATE_TARGET_PAD;
+      out.push({
+        key: `${i}:${inst.glyphIndex}`,
+        letter,
+        polygon: [
+          adapter.toCanvas(box.x - pad, box.y - pad),
+          adapter.toCanvas(box.x + box.width + pad, box.y - pad),
+          adapter.toCanvas(box.x + box.width + pad, box.y + box.height + pad),
+          adapter.toCanvas(box.x - pad, box.y + box.height + pad),
+        ],
+        options: la.options,
+      });
+    });
+    return out;
+  }, [
+    glyphAlternateMode,
+    alternateLetters,
+    glyphInstances,
+    glyphBoxByIndex,
+    diacriticGlyphIndices,
+    shapeData.glyphs,
+    shapeData.shapableText,
+    shapeFillTextRotation,
+    shapeScale,
   ]);
 
   /** Every tiled repetition that is a diacritic. */
@@ -597,10 +677,18 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       />
 
       {/*
-        Mounted before the corner resize Circle: Konva routes a pointer to
-        the topmost listening shape, and the resize handle at the shape's
-        bottom-right corner must stay on top.
+        Largest -> smallest, all before the corner resize Circle: Konva routes
+        a pointer to the topmost listening shape, so a mark's handles must sit
+        above the letter-sized Next Shape target, and the resize handle at the
+        shape's bottom-right corner above both.
       */}
+      <AlternateHoverHandles
+        isSelected={isSelected}
+        enabled={glyphAlternateMode}
+        targets={alternateTargets}
+        alternates={glyphAlternates}
+        onPick={onPickAlternate}
+      />
       <DiacriticHoverHandles
         isSelected={isSelected && diacriticEditMode}
         placements={diacriticPlacements}

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   activeAlternates,
+  activeStyleSets,
   alternatePanelView,
   alternatesKey,
   resolveAlternateTarget,
@@ -223,5 +224,44 @@ describe("resolveAlternateTarget", () => {
   it("ignores a target that belongs to another block, or none at all", () => {
     expect(resolveAlternateTarget(target, 4, "سهم")).toBeNull();
     expect(resolveAlternateTarget(null, 3, "سهم")).toBeNull();
+  });
+});
+
+describe("style sets in the feature string", () => {
+  const alt = (letter: number, feature: string, value = 1): GlyphAlternate => ({
+    letter,
+    char: "ه",
+    feature,
+    value,
+  });
+
+  it("applies a block's sets to the whole run, first", () => {
+    expect(featureStringFor("هههه", [], undefined, ["ss01", "ss03"])).toBe("ss01,ss03");
+  });
+
+  it("switches the block's sets off on a letter with its own choice, then applies the choice", () => {
+    expect(featureStringFor("هههه", [alt(1, "jalt", 2)], undefined, ["ss01"])).toBe(
+      "ss01,ss01[1:2]=0,jalt[1:2]=2"
+    );
+  });
+
+  it("'none' exempts one letter from the block's sets and adds nothing else", () => {
+    expect(featureStringFor("هههه", [alt(2, "none")], undefined, ["ss01"])).toBe(
+      "ss01,ss01[2:3]=0"
+    );
+    // Without block sets there is nothing to exempt the letter from.
+    expect(featureStringFor("هههه", [alt(2, "none")])).toBe("");
+  });
+
+  it("only accepts ss01–ss20, once each, from a list of strings", () => {
+    expect(activeStyleSets(["ss01", "ss01", "salt", "ss21", "ss01]=1,liga", 7, null] as never)).toEqual([
+      "ss01",
+    ]);
+    expect(activeStyleSets("ss01" as never)).toEqual([]);
+    expect(activeStyleSets(undefined)).toEqual([]);
+  });
+
+  it("alternatesKey still distinguishes a 'none' entry", () => {
+    expect(alternatesKey([alt(0, "none")])).not.toBe("");
   });
 });

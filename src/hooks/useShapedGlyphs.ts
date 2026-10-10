@@ -77,7 +77,8 @@ export type ShapedGlyphsState = {
 export function useShapedGlyphs(
   text: string,
   fontFamily: string,
-  alternates?: readonly GlyphAlternate[]
+  alternates?: readonly GlyphAlternate[],
+  styleSets?: readonly string[]
 ): ShapedGlyphsState {
   const fontUrl = resolveFontUrl(fontFamily);
   // `alternates` is a dependency by identity. A block's array keeps its
@@ -107,7 +108,7 @@ export function useShapedGlyphs(
     setHbLoaded(false);
     setShapeData((prev) => ({ ...prev, isLoading: true }));
 
-    shapeText(text || "", fontUrl, alternates)
+    shapeText(text || "", fontUrl, alternates, styleSets)
       .then((r) => {
         if (!alive) return;
 
@@ -151,7 +152,7 @@ export function useShapedGlyphs(
     return () => {
       alive = false;
     };
-  }, [text, fontUrl, fontFamily, alternates]);
+  }, [text, fontUrl, fontFamily, alternates, styleSets]);
 
   return { ...shapeData, hbLoaded };
 }

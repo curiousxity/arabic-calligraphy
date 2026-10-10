@@ -2,8 +2,21 @@ import React, { useMemo } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
 import { parseSvgPath, replayPath } from "../lib/svgPath";
-import { pathLength, pathBoundingBox, buildArcTable, pointAtArcLengthFromTable } from "../lib/textPath";
+import {
+  pathLength,
+  pathBoundingBox,
+  buildArcTable,
+  curveGlyphPlacements,
+  curvePlacementToGroup,
+} from "../lib/textPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
+import { AlternateHoverHandles, type AlternateHitTarget } from "./AlternateHoverHandles";
+import {
+  letterAtOffset,
+  type AlternateChoice,
+  type LetterAlternates,
+} from "../lib/glyphAlternates";
+import type { GlyphAlternate } from "../types";
 import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
 
 export type TextOnPathTextProps = {
@@ -30,6 +43,16 @@ export type TextOnPathTextProps = {
   textPathD: string;
   textPathReversed?: boolean;
   textPathBaselineOffset?: number;
+  /** Block-level OpenType style sets, e.g. ["ss01"]. */
+  styleSets?: string[];
+  /** Per-letter alternates (Next Shape). */
+  glyphAlternates?: GlyphAlternate[];
+  /** Arms the Next Shape overlay — the one per-glyph tool curves support (click-only). */
+  glyphAlternateMode?: boolean;
+  /** The letters that have alternates — App passes them for the selected block only. */
+  alternateLetters?: LetterAlternates[];
+  onPickAlternate?: (letter: number, choice: AlternateChoice | null) => void;
+  isSelected?: boolean;
 
   locked?: boolean;
   draggable?: boolean;
@@ -47,6 +70,9 @@ export type TextOnPathTextProps = {
  * per-point remap, since text-on-path doesn't distort individual glyph
  * outlines, it just repositions whole glyphs.
  */
+const NO_GLYPH_ALTERNATES: GlyphAlternate[] = [];
+const NO_ALTERNATE_LETTERS: LetterAlternates[] = [];
+
 export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   id,
   text,
@@ -69,6 +95,12 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   textPathD,
   textPathReversed = false,
   textPathBaselineOffset = 0,
+  styleSets,
+  glyphAlternates = NO_GLYPH_ALTERNATES,
+  glyphAlternateMode = false,
+  alternateLetters = NO_ALTERNATE_LETTERS,
+  onPickAlternate,
+  isSelected = false,
   locked,
   draggable = true,
   onClick,
@@ -77,7 +109,12 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   onDragMove,
   onDragEnd,
 }) => {
-  const { glyphs, font, unitsPerEm, hbLoaded } = useShapedGlyphs(text, fontFamily);
+  const { glyphs, font, unitsPerEm, hbLoaded, shapableText } = useShapedGlyphs(
+    text,
+    fontFamily,
+    glyphAlternates,
+    styleSets
+  );
   const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
 
   const parsedCmds = useMemo(() => parseSvgPath(textPathD || ""), [textPathD]);
@@ -97,6 +134,55 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   // extend above/below the baseline (mirrors ShapedText.tsx's hit-rect
   // padding logic, keyed off fontSize instead of measured glyph extents).
   const curveBox = useMemo(() => pathBoundingBox(parsedCmds), [parsedCmds]);
+
+  const layout = useMemo(
+    () =>
+      hbLoaded && font && parsedCmds.length >= 2
+        ? curveGlyphPlacements({ glyphs, fontSize, unitsPerEm, curveLen, arcTable })
+        : null,
+    [hbLoaded, font, parsedCmds.length, glyphs, fontSize, unitsPerEm, curveLen, arcTable]
+  );
+
+  /**
+   * Next Shape targets: one per letter that has alternates — its widest
+   * glyph, so a mark riding on it is not a second target — as the glyph's
+   * ink box carried through the very placement the draw loop uses
+   * (`curveGlyphPlacements`), so the outline tilts with the letter.
+   */
+  const alternateTargets = useMemo<AlternateHitTarget[]>(() => {
+    if (!glyphAlternateMode || !layout || !font || alternateLetters.length === 0) return [];
+    const byLetter = new Map(alternateLetters.map((l) => [l.letter, l]));
+    const widest = new Map<number, number>();
+    layout.placements.forEach((p) => {
+      const letter = letterAtOffset(shapableText, glyphs[p.glyphIndex]?.cl ?? -1);
+      if (!byLetter.has(letter)) return;
+      const held = widest.get(letter);
+      if (held === undefined || (glyphs[p.glyphIndex].ax ?? 0) > (glyphs[held].ax ?? 0)) {
+        widest.set(letter, p.glyphIndex);
+      }
+    });
+    const out: AlternateHitTarget[] = [];
+    for (const [letter, glyphIndex] of widest) {
+      const p = layout.placements[glyphIndex];
+      const glyphObj = font.glyphs.get(glyphs[glyphIndex].g);
+      const bb = glyphObj?.getPath(0, 0, p.size).getBoundingBox();
+      if (!bb || !isFinite(bb.x1) || !isFinite(bb.y1)) continue;
+      const pad = 3;
+      const corners = [
+        { x: bb.x1 - pad, y: bb.y1 - pad },
+        { x: bb.x2 + pad, y: bb.y1 - pad },
+        { x: bb.x2 + pad, y: bb.y2 + pad },
+        { x: bb.x1 - pad, y: bb.y2 + pad },
+      ];
+      out.push({
+        key: String(letter),
+        letter,
+        polygon: corners.map((c) => curvePlacementToGroup(p, c, textPathBaselineOffset)),
+        options: byLetter.get(letter)!.options,
+      });
+    }
+    return out;
+  }, [glyphAlternateMode, layout, font, alternateLetters, shapableText, glyphs, textPathBaselineOffset]);
   const pad = Math.max(fontSize, 24);
   const hitX = curveBox.x - pad;
   const hitY = curveBox.y - pad;
@@ -142,14 +228,11 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
         sceneFunc={(ctx) => {
           if (!hbLoaded || !font || parsedCmds.length < 2 || curveLen <= 0) return;
 
-          const scale = fontSize / Math.max(unitsPerEm || 1000, 1);
-          let naturalAdvance = 0;
-          for (const g of glyphs) naturalAdvance += (g.ax ?? 0) * scale;
-          if (naturalAdvance <= 0) return;
-
           // Auto-fit: the effective size always spans the curve exactly,
           // same idea ShapeFillText already applies per-row to shape width.
-          const fitScale = curveLen / naturalAdvance;
+          // Computed once, in `curveGlyphPlacements`, which the Next Shape
+          // overlay also outlines from.
+          if (!layout) return;
           const c2d = ctx as unknown as CanvasRenderingContext2D;
 
           // Built before the glyph loop, while the ctx is still in the
@@ -164,17 +247,12 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
             height: curveBox.height,
           });
 
-          let cursor = 0;
-          for (const g of glyphs) {
-            const glyphObj = font.glyphs.get(g.g);
-            const advance = (g.ax ?? 0) * scale * fitScale;
-            if (!glyphObj) {
-              cursor += advance;
-              continue;
-            }
+          for (const place of layout.placements) {
+            const glyphObj = font.glyphs.get(glyphs[place.glyphIndex].g);
+            if (!glyphObj) continue;
 
-            const { x: px, y: py, angle } = pointAtArcLengthFromTable(arcTable, cursor);
-            const opPath = glyphObj.getPath(0, 0, fontSize * fitScale);
+            const { x: px, y: py, angle } = place;
+            const opPath = glyphObj.getPath(0, 0, place.size);
 
             c2d.save();
             // Shape is positioned at (hitX, hitY), which Konva already
@@ -198,9 +276,16 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
             painter.fill(c2d);
 
             c2d.restore();
-            cursor += advance;
           }
         }}
+      />
+
+      <AlternateHoverHandles
+        isSelected={isSelected}
+        enabled={glyphAlternateMode}
+        targets={alternateTargets}
+        alternates={glyphAlternates}
+        onPick={onPickAlternate}
       />
     </Group>
   );

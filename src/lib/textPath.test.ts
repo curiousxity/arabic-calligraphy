@@ -8,6 +8,8 @@ import {
   arcPathD,
   wavePathD,
   circlePathD,
+  curveGlyphPlacements,
+  curvePlacementToGroup,
 } from "./textPath";
 
 describe("pathLength", () => {
@@ -162,5 +164,55 @@ describe("anchorsToD / dToAnchors round-trip", () => {
 
   it("returns an empty anchor list for an empty path", () => {
     expect(dToAnchors([])).toEqual([]);
+  });
+});
+
+describe("curveGlyphPlacements", () => {
+  const line = buildArcTable(parseSvgPath("M 0 0 L 300 0"), false);
+
+  it("spreads glyphs along the curve at their advances, tangent-aligned", () => {
+    const r = curveGlyphPlacements({
+      glyphs: [{ ax: 100 }, { ax: 100 }, { ax: 100 }],
+      fontSize: 1000,
+      unitsPerEm: 1000,
+      curveLen: line.total,
+      arcTable: line,
+    })!;
+    expect(r.fitScale).toBeCloseTo(1, 6);
+    expect(r.placements.map((p) => Math.round(p.x))).toEqual([0, 100, 200]);
+    expect(r.placements.every((p) => p.angle === 0 && p.y === 0)).toBe(true);
+    expect(r.placements[0].size).toBeCloseTo(1000, 6);
+  });
+
+  it("scales unequal advances to span the curve exactly", () => {
+    const r = curveGlyphPlacements({
+      glyphs: [{ ax: 50 }, { ax: 100 }],
+      fontSize: 1000,
+      unitsPerEm: 1000,
+      curveLen: line.total,
+      arcTable: line,
+    })!;
+    expect(r.fitScale).toBeCloseTo(2, 6);
+    expect(r.placements.map((p) => Math.round(p.x))).toEqual([0, 100]);
+    expect(r.placements[1].size).toBeCloseTo(2000, 6);
+  });
+
+  it("is null when there is nothing to place", () => {
+    expect(
+      curveGlyphPlacements({ glyphs: [], fontSize: 10, unitsPerEm: 1000, curveLen: 300, arcTable: line })
+    ).toBeNull();
+    expect(
+      curveGlyphPlacements({ glyphs: [{ ax: 0 }], fontSize: 10, unitsPerEm: 1000, curveLen: 300, arcTable: line })
+    ).toBeNull();
+  });
+});
+
+describe("curvePlacementToGroup", () => {
+  it("maps a glyph-local point as R·(p + (0, baseline)) + position", () => {
+    const p = { glyphIndex: 0, x: 10, y: 20, angle: Math.PI / 2, size: 100 };
+    const q = curvePlacementToGroup(p, { x: 5, y: 0 }, 3);
+    // (5, 3) turned 90° is (-3, 5); plus (10, 20).
+    expect(q.x).toBeCloseTo(7, 9);
+    expect(q.y).toBeCloseTo(25, 9);
   });
 });

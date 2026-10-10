@@ -874,6 +874,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
                     diacriticEditMode={block.diacriticEditMode ?? false}
+                    glyphAlternateMode={block.glyphAlternateMode ?? false}
+                    alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
+                    onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}
                     onBeginDiacriticDrag={onBeginDiacriticDrag}
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)
@@ -959,6 +962,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     <TextOnPathText
                       {...commonProps}
                       {...textPathProps(block)}
+                      isSelected={block.id === selectedId}
+                      glyphAlternateMode={block.glyphAlternateMode ?? false}
+                      alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
+                      onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}
                       x={block.x}
                       y={block.y}
                       opacity={block.opacity ?? 1}
