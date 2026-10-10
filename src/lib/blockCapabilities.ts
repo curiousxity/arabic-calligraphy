@@ -36,6 +36,15 @@ export const supportsStrokeCuts = (
 ): b is Extract<Block, { type: "text" }> => b.type === "text";
 
 /**
+ * Plain text blocks only: only `ShapedText` shapes with a block's
+ * `glyphAlternates` and mounts the Next Shape overlay. Shape Fill and
+ * text-on-path are deferred (see the Next Shape spec).
+ */
+export const supportsGlyphAlternates = (
+  b: Block
+): b is Extract<Block, { type: "text" }> => b.type === "text";
+
+/**
  * Square-kufi blocks only — the fields live on `SquareKufiBlock` rather than
  * on `BlockCommon`, so this is the guard that makes the cell mutators
  * type-check against the one variant that can draw a cell.

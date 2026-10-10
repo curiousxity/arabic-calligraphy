@@ -6,6 +6,16 @@ import {
   type HarfBuzzGlyph,
 } from "./normalizeGlyphs";
 import { ARABIC_DIACRITIC_RE } from "./diacritics";
+import type { GlyphAlternate } from "../types";
+import {
+  alternatesKey,
+  fallbackFeatureLabel,
+  featureStringFor,
+  isOptionalFeature,
+  probeAlternates,
+  type LetterAlternates,
+} from "./glyphAlternates";
+import { readFeatureNames } from "./fontFeatureNames";
 
 export { normalizeGlyphs, type HbRawGlyph, type HarfBuzzGlyph };
 
@@ -14,6 +24,7 @@ type HbBlob = {
 };
 
 type HbFace = {
+  getTableFeatureTags?: (table: string) => string[];
   destroy?: () => void;
 };
 
@@ -68,7 +79,18 @@ let hbPromise: Promise<HbModule> | null = null;
 
 const fontDataCache = new Map<string, ArrayBuffer>();
 const parsedFontCache = new Map<string, opentype.Font>();
-const shapeCache = new Map<string, ShapedTextResult>();
+/** fontUrl → (text|alternatesKey → result). Per-font so a font swap clears exactly its own entries. */
+const shapeCache = new Map<string, Map<string, ShapedTextResult>>();
+const alternatesCache = new Map<string, Map<string, AlternatesResult>>();
+
+function cacheFor<T>(root: Map<string, Map<string, T>>, fontUrl: string): Map<string, T> {
+  let inner = root.get(fontUrl);
+  if (!inner) {
+    inner = new Map();
+    root.set(fontUrl, inner);
+  }
+  return inner;
+}
 
 export type ShapedTextResult = {
   glyphs: HarfBuzzGlyph[];
@@ -76,6 +98,14 @@ export type ShapedTextResult = {
   unitsPerEm: number;
   /** The text actually shaped (after stripUnsupportedDiacritics) — `glyph.cl` cluster offsets index into THIS string, not the original input. */
   shapableText: string;
+};
+
+export type AlternatesResult = {
+  letters: LetterAlternates[];
+  /** Whether the font has any optional alternate feature at all. */
+  fontHasAlternates: boolean;
+  font: opentype.Font;
+  unitsPerEm: number;
 };
 
 export async function initHarfBuzz(): Promise<HbModule> {
@@ -231,13 +261,39 @@ function logShapingDebug(
   console.groupEnd();
 }
 
+/** One shaping pass on an already-open font; owns and frees its buffer. */
+function shapeOnFont(hb: HbModule, font: HbFont, text: string, features: string): HarfBuzzGlyph[] {
+  const buffer = hb.createBuffer();
+  try {
+    buffer.addText(text);
+    buffer.guessSegmentProperties?.();
+    buffer.setDirection?.("rtl");
+    buffer.setScript?.("arab");
+    buffer.setLanguage?.("ar");
+    hb.shape(font, buffer, features || undefined);
+    let raw: HbRawGlyph[] = [];
+    if (typeof buffer.json === "function") {
+      try {
+        raw = buffer.json(font);
+      } catch {
+        raw = buffer.json();
+      }
+    }
+    return normalizeGlyphs(raw);
+  } finally {
+    buffer.destroy?.();
+  }
+}
+
 export async function shapeText(
   text: string,
-  fontUrl: string
+  fontUrl: string,
+  alternates?: readonly GlyphAlternate[]
 ): Promise<ShapedTextResult> {
-  const cacheKey = `${text}|${fontUrl}`;
-  if (shapeCache.has(cacheKey)) {
-    const cached = shapeCache.get(cacheKey)!;
+  const cache = cacheFor(shapeCache, fontUrl);
+  const cacheKey = `${text}|${alternatesKey(alternates)}`;
+  if (cache.has(cacheKey)) {
+    const cached = cache.get(cacheKey)!;
     if (DEBUG_HB) {
       console.log(`[HB] cache hit for "${text}"`, {
         fontUrl,
@@ -279,29 +335,22 @@ export async function shapeText(
       unitsPerEm: upm,
       shapableText,
     };
-    shapeCache.set(cacheKey, empty);
+    cache.set(cacheKey, empty);
     return empty;
   }
+
+  // Built against the *shapable* text: HarfBuzz clusters index it, and a
+  // letter ordinal skips marks, so stripping cannot shift a letter.
+  const features = featureStringFor(shapableText, alternates);
 
   const blob = hb.createBlob(new Uint8Array(fontData));
   const face = hb.createFace(blob, 0);
   const font = hb.createFont(face);
-  const buffer = hb.createBuffer();
 
   try {
     if (typeof font.setScale === "function") {
       font.setScale(upm, upm);
     }
-
-    buffer.addText(shapableText);
-
-    if (typeof buffer.guessSegmentProperties === "function") {
-      buffer.guessSegmentProperties();
-    }
-
-    if (typeof buffer.setDirection === "function") buffer.setDirection("rtl");
-    if (typeof buffer.setScript === "function") buffer.setScript("arab");
-    if (typeof buffer.setLanguage === "function") buffer.setLanguage("ar");
 
     if (DEBUG_HB) {
       console.log("[HB] before shape", {
@@ -309,26 +358,15 @@ export async function shapeText(
         shapableText,
         fontUrl,
         upm,
-        usingFeatures: false,
-        features: null,
+        usingFeatures: features !== "",
+        features,
       });
     }
 
-    hb.shape(font, buffer);
-
-    let raw: HbRawGlyph[] = [];
-    if (typeof buffer.json === "function") {
-      try {
-        raw = buffer.json(font);
-      } catch {
-        raw = buffer.json();
-      }
-    }
-
-    const glyphs = normalizeGlyphs(raw);
+    const glyphs = shapeOnFont(hb, font, shapableText, features);
 
     if (DEBUG_HB) {
-      logShapingDebug(shapableText, fontUrl, parsedFont, upm, raw, glyphs);
+      logShapingDebug(shapableText, fontUrl, parsedFont, upm, "(raw unavailable)", glyphs);
     }
 
     const result: ShapedTextResult = {
@@ -338,7 +376,7 @@ export async function shapeText(
       shapableText,
     };
 
-    shapeCache.set(cacheKey, result);
+    cache.set(cacheKey, result);
     return result;
   } catch (err) {
     console.error("shapeText failed", { text, fontUrl, err });
@@ -349,7 +387,61 @@ export async function shapeText(
       shapableText,
     };
   } finally {
-    buffer.destroy?.();
+    font.destroy?.();
+    face.destroy?.();
+    blob.destroy?.();
+  }
+}
+
+/**
+ * Next Shape's discovery: every letter's alternate shapes in this font, with
+ * the other letters' current alternates applied. Opens the font once for the
+ * whole probe (dozens to hundreds of shaping passes on a short run).
+ */
+export async function findAlternates(
+  text: string,
+  fontUrl: string,
+  alternates?: readonly GlyphAlternate[]
+): Promise<AlternatesResult> {
+  const cache = cacheFor(alternatesCache, fontUrl);
+  const cacheKey = `${text}|${alternatesKey(alternates)}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const [hb, fontData, parsedFont] = await Promise.all([
+    initHarfBuzz(),
+    loadFontData(fontUrl),
+    loadParsedFont(fontUrl),
+  ]);
+  const upm = parsedFont.unitsPerEm || 1000;
+  const shapableText = stripUnsupportedDiacritics(text, parsedFont);
+
+  const blob = hb.createBlob(new Uint8Array(fontData));
+  const face = hb.createFace(blob, 0);
+  const font = hb.createFont(face);
+  try {
+    font.setScale?.(upm, upm);
+    const tags = face.getTableFeatureTags?.("GSUB") ?? [];
+    const names = readFeatureNames(fontData);
+    const letters =
+      shapableText.length === 0
+        ? []
+        : probeAlternates({
+            text: shapableText,
+            alternates,
+            tags,
+            shape: (features) => shapeOnFont(hb, font, shapableText, features),
+            labelFor: (c) => names.get(c.feature) ?? fallbackFeatureLabel(c),
+          });
+    const result: AlternatesResult = {
+      letters,
+      fontHasAlternates: tags.some(isOptionalFeature),
+      font: parsedFont,
+      unitsPerEm: upm,
+    };
+    cache.set(cacheKey, result);
+    return result;
+  } finally {
     font.destroy?.();
     face.destroy?.();
     blob.destroy?.();
@@ -358,15 +450,13 @@ export async function shapeText(
 
 export function clearShapeCache(fontUrl?: string): void {
   if (fontUrl) {
-    for (const key of shapeCache.keys()) {
-      if (key.endsWith(`|${fontUrl}`)) {
-        shapeCache.delete(key);
-      }
-    }
+    shapeCache.delete(fontUrl);
+    alternatesCache.delete(fontUrl);
     fontDataCache.delete(fontUrl);
     parsedFontCache.delete(fontUrl);
   } else {
     shapeCache.clear();
+    alternatesCache.clear();
     fontDataCache.clear();
     parsedFontCache.clear();
   }

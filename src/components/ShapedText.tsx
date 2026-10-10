@@ -11,7 +11,7 @@ import {
   makeOffsetAdapter,
   type DiacriticPlacement,
 } from "../lib/diacriticPlacement";
-import type { DiacriticOverride, StrokeCut } from "../types";
+import type { DiacriticOverride, GlyphAlternate, StrokeCut } from "../types";
 import {
   createBlockFillPainter,
   type BlockFill,
@@ -68,6 +68,7 @@ type Props = {
   warpY?: number;
   diacriticOverrides?: DiacriticOverride[];
   strokeCuts?: StrokeCut[];
+  glyphAlternates?: GlyphAlternate[];
   strokeCutEditMode?: boolean;
   onBeginStrokeCut?: () => void;
   onSetStrokeCut?: (cut: StrokeCut) => void;
@@ -304,6 +305,7 @@ function drawWarpedGlyphRun(
  */
 const NO_DIACRITIC_OVERRIDES: DiacriticOverride[] = [];
 const NO_STROKE_CUTS: StrokeCut[] = [];
+const NO_GLYPH_ALTERNATES: GlyphAlternate[] = [];
 
 export const ShapedText: React.FC<Props> = ({
   id,
@@ -330,6 +332,7 @@ export const ShapedText: React.FC<Props> = ({
   warpY = 0,
   diacriticOverrides = NO_DIACRITIC_OVERRIDES,
   strokeCuts = NO_STROKE_CUTS,
+  glyphAlternates = NO_GLYPH_ALTERNATES,
   strokeCutEditMode = false,
   onBeginStrokeCut,
   onSetStrokeCut,
@@ -345,7 +348,7 @@ export const ShapedText: React.FC<Props> = ({
   onDragEnd,
   debugBounds = false,
 }) => {
-  const shapeData = useShapedGlyphs(text, fontFamily);
+  const shapeData = useShapedGlyphs(text, fontFamily, glyphAlternates);
   const { hbLoaded } = shapeData;
   const overrideGlyph = useOverrideGlyph();
 

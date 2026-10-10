@@ -2325,7 +2325,9 @@ const App: React.FC = () => {
           text,
           target,
           measure: (candidate) =>
-            measureShapedWidth(candidate, fontUrl, fontSize, runStyle),
+            // Candidates only insert tatweel, which never moves a letter
+            // ordinal, so the block's alternates apply to every one unchanged.
+            measureShapedWidth(candidate, fontUrl, fontSize, runStyle, selectedBlock.glyphAlternates),
         });
         // A no-op result must not push history — clicking Fit on an
         // already-fitted run should not cost an undo step.

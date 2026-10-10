@@ -55,6 +55,7 @@ export function shapedTextProps(b: Extract<Block, { type: "text" }>) {
     warpY: b.warpY ?? 0,
     diacriticOverrides: b.diacriticOverrides,
     strokeCuts: b.strokeCuts,
+    glyphAlternates: b.glyphAlternates,
   };
 }
 
