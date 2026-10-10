@@ -37,6 +37,7 @@ import {
   charAtLetter,
   setAlternate,
   type AlternateChoice,
+  type AlternateTarget,
 } from "./lib/glyphAlternates";
 import { arcPathD } from "./lib/textPath";
 import type { Block, DiacriticOverride, StrokeCut } from "./types";
@@ -545,7 +546,7 @@ const App: React.FC = () => {
     alternateBlock?.glyphAlternates,
     alternateBlock !== null
   );
-  const [alternateTarget, setAlternateTarget] = useState<{ blockId: number; letter: number } | null>(null);
+  const [alternateTarget, setAlternateTarget] = useState<AlternateTarget | null>(null);
 
   const canvasWidth = isMobile
     ? viewportWidth
@@ -613,8 +614,6 @@ const App: React.FC = () => {
     useUndoRedo(getSnapshot, applySnapshot, captureHistoryThumbnail);
 
   const scheduleMoveHistoryPush = useDebouncedHistoryPush(pushHistory);
-  const scheduleTextPathHistoryPush = useDebouncedHistoryPush(pushHistory);
-  const scheduleDiacriticHistoryPush = useDebouncedHistoryPush(pushHistory);
 
   const dragDiacriticOverride = useCallback(
     (blockId: number, glyphIndex: number, patch: Partial<DiacriticOverride>) => {
@@ -630,9 +629,11 @@ const App: React.FC = () => {
           return { ...b, diacriticOverrides: nextOverrides };
         })
       );
-      scheduleDiacriticHistoryPush();
+      // No push here: the handle's drag start already took one through
+      // `onBeginDiacriticDrag`, so a drag is one undo step however long it
+      // pauses midway.
     },
-    [scheduleDiacriticHistoryPush]
+    []
   );
 
   const toggleDiacriticHidden = useCallback(
@@ -708,11 +709,11 @@ const App: React.FC = () => {
   /** One discrete undo step per pick — no debounce, it is not a drag. */
   const pickGlyphAlternate = useCallback(
     (blockId: number, letter: number, choice: AlternateChoice | null) => {
-      setAlternateTarget({ blockId, letter });
       const block = blocks.find((b) => b.id === blockId);
       if (!block || !supportsGlyphAlternates(block)) return;
       const char = charAtLetter(block.text, letter);
       if (char === null) return;
+      setAlternateTarget({ blockId, letter, char });
       const next = setAlternate(block.glyphAlternates, letter, char, choice);
       if (alternatesKey(next) === alternatesKey(block.glyphAlternates)) return;
       pushHistory();
@@ -814,9 +815,10 @@ const App: React.FC = () => {
       setBlocks((prev) =>
         prev.map((b) => (b.id === id && b.type === "textPath" ? { ...b, textPathD: d } : b))
       );
-      scheduleTextPathHistoryPush();
+      // No push here: `TextPathEditOverlay` calls `onBeginTextPathEdit`
+      // before every edit — a drag's start, an anchor added or removed.
     },
-    [scheduleTextPathHistoryPush]
+    []
   );
 
   const zoomToRect = useCallback(
@@ -2943,8 +2945,10 @@ const App: React.FC = () => {
           onSelectBlock={selectBlock}
           onEditBlock={requestTextEdit}
           onUpdateTextPathD={updateTextPathD}
+          onBeginTextPathEdit={pushHistory}
           onBeginKufiCellEdit={pushHistory}
           onSetKufiCell={setKufiCell}
+          onBeginDiacriticDrag={pushHistory}
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
           onBeginStrokeCut={pushHistory}

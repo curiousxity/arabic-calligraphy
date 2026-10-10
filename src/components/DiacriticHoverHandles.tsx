@@ -15,6 +15,12 @@ export type DiacriticHoverHandlesProps = {
   placements: DiacriticPlacement[];
   diacriticOverrides: DiacriticOverride[];
   fontSize: number;
+  /**
+   * Called once when a move or resize handle drag starts, before any
+   * `onDragDiacriticOverride`. App passes `pushHistory`, so a drag is one
+   * undo step however long it pauses midway.
+   */
+  onBeginDiacriticDrag?: () => void;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
 };
@@ -45,6 +51,7 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
   placements,
   diacriticOverrides,
   fontSize,
+  onBeginDiacriticDrag,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
 }) => {
@@ -189,6 +196,7 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                       };
                     }
                     setDraggingKey(placement.key);
+                    onBeginDiacriticDrag?.();
                   }}
                   onDragMove={(e) => {
                     e.cancelBubble = true;
@@ -220,6 +228,7 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                   onDragStart={(e) => {
                     e.cancelBubble = true;
                     setDraggingKey(placement.key);
+                    onBeginDiacriticDrag?.();
                   }}
                   onDragMove={(e) => {
                     e.cancelBubble = true;

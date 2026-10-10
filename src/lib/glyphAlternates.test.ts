@@ -3,6 +3,7 @@ import {
   activeAlternates,
   alternatePanelView,
   alternatesKey,
+  resolveAlternateTarget,
   charAtLetter,
   currentChoice,
   cycleAlternate,
@@ -196,5 +197,31 @@ describe("alternatePanelView", () => {
     ).toEqual({ kind: "noFontAlternates" });
     expect(alternatePanelView(settled, null)).toEqual({ kind: "prompt" });
     expect(alternatePanelView(settled, 0)).toEqual({ kind: "noLetterAlternates" });
+  });
+});
+
+describe("alternatePanelView: no letter in this text has alternates", () => {
+  it("says so rather than prompting to click an outline that is not there", () => {
+    expect(
+      alternatePanelView({ letters: [], fontHasAlternates: true, loading: false, hasFont: true }, null)
+    ).toEqual({ kind: "noTextAlternates" });
+  });
+});
+
+describe("resolveAlternateTarget", () => {
+  const target = { blockId: 3, letter: 1, char: "ه" };
+
+  it("keeps the target while the same character is still at that letter", () => {
+    expect(resolveAlternateTarget(target, 3, "سهم")).toBe(1);
+  });
+
+  it("drops it once a text edit has put a different character there", () => {
+    expect(resolveAlternateTarget(target, 3, "سبهم")).toBeNull();
+    expect(resolveAlternateTarget(target, 3, "س")).toBeNull();
+  });
+
+  it("ignores a target that belongs to another block, or none at all", () => {
+    expect(resolveAlternateTarget(target, 4, "سهم")).toBeNull();
+    expect(resolveAlternateTarget(null, 3, "سهم")).toBeNull();
   });
 });

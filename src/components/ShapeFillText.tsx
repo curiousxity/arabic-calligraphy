@@ -64,6 +64,7 @@ export type ShapeFillTextProps = {
   rotation?: number;
   diacriticEditMode?: boolean;
   diacriticOverrides?: DiacriticOverride[];
+  onBeginDiacriticDrag?: () => void;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
   /** Armed by Typography's "Move, scale & rotate glyph" checkbox. */
@@ -202,6 +203,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   rotation = 0,
   diacriticEditMode = false,
   diacriticOverrides = NO_DIACRITIC_OVERRIDES,
+  onBeginDiacriticDrag,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
   locked,
@@ -604,6 +606,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
         placements={diacriticPlacements}
         diacriticOverrides={diacriticOverrides}
         fontSize={fontSize}
+        onBeginDiacriticDrag={onBeginDiacriticDrag}
         onDragDiacriticOverride={onDragDiacriticOverride}
         onToggleDiacriticHidden={onToggleDiacriticHidden}
       />

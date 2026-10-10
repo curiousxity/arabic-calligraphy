@@ -37,7 +37,18 @@ a proprietary variant library). Spec:
 - **Names** come from the font's own FeatureParams via
   `readFeatureNames` — opentype.js does not resolve them.
 - **Overlay** mounts first in `ShapedText` (letter-sized rects below the
-  stroke rail and mark handles); hover handlers on the `Group`.
+  stroke rail and mark handles); hover handlers on the `Group`. A press on
+  an outlined letter cancels bubbling, so it never starts a block drag, and
+  the pick happens on **release** within `CLICK_SLOP` px of the press, for
+  the letter that was *pressed*. Konva's `click` does not fire once the
+  pointer has moved, and neighbouring letters' padded rects overlap, so a
+  drifting click often releases on the next letter. `click`/`dblclick` are
+  swallowed so a quick double click cannot reach the block's edit handler,
+  which would focus the textarea with the whole text selected.
+- **Sidebar view** is `alternatePanelView` (pure). A strip it can already
+  draw wins over "loading", or the strip blinks out on every pick. The
+  strip's letter goes through `resolveAlternateTarget`, which drops it once a
+  text edit puts a different character at that ordinal.
 - **Interactions:** a shape change drops stroke cuts on that letter
   (their `glyphId` checksum), which is correct. A ligature-forming
   alternate can shift diacritic-override indices after it; those are

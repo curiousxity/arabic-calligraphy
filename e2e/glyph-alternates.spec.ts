@@ -86,3 +86,23 @@ test("double-clicking through shapes does not open the text for editing", async 
   }
   await expect(page.locator("[data-alternate-strip]")).toBeVisible();
 });
+
+test("a click that slides a few pixels picks a shape instead of moving the block", async ({ page }) => {
+  await gotoApp(page);
+  await armAlternates(page, "Ruqaa", "هههه");
+  await expect.poll(() => namedNodeCount(page, "alternate-hit")).toBeGreaterThan(0);
+  await settleFrames(page);
+  const at = centerOf((await nodeClientBox(page, ".alternate-hit"))!);
+  const before = (await getBlocks(page))[0];
+
+  // A trackpad click that drifts past Konva's drag threshold.
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down();
+  await page.mouse.move(at.x + 6, at.y + 4, { steps: 4 });
+  await page.mouse.up();
+  await settleFrames(page);
+
+  const after = (await getBlocks(page))[0];
+  expect({ x: after.x, y: after.y }).toEqual({ x: before.x, y: before.y });
+  expect(after.glyphAlternates ?? []).toHaveLength(1);
+});

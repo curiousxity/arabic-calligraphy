@@ -41,7 +41,7 @@ import {
   type OverrideGlyph,
 } from "../lib/glyphOverrides";
 import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
-import { AlternateHoverHandles, type AlternateTarget } from "./AlternateHoverHandles";
+import { AlternateHoverHandles, type AlternateHitTarget } from "./AlternateHoverHandles";
 import {
   letterAtOffset,
   type AlternateChoice,
@@ -84,6 +84,7 @@ type Props = {
   onBeginStrokeCut?: () => void;
   onSetStrokeCut?: (cut: StrokeCut) => void;
   isSelected?: boolean;
+  onBeginDiacriticDrag?: () => void;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
   locked?: boolean;
@@ -352,6 +353,7 @@ export const ShapedText: React.FC<Props> = ({
   onBeginStrokeCut,
   onSetStrokeCut,
   isSelected = false,
+  onBeginDiacriticDrag,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
   locked,
@@ -617,7 +619,7 @@ export const ShapedText: React.FC<Props> = ({
 
   // One target per letter that has alternates, its box the union of every
   // glyph in that letter's cluster (a letter and the marks on it).
-  const alternateTargets = useMemo<AlternateTarget[]>(() => {
+  const alternateTargets = useMemo<AlternateHitTarget[]>(() => {
     if (!glyphAlternateMode || alternateLetters.length === 0) return [];
     const byLetter = new Map(alternateLetters.map((l) => [l.letter, l]));
     const boxes = new Map<number, { x1: number; y1: number; x2: number; y2: number }>();
@@ -822,6 +824,7 @@ export const ShapedText: React.FC<Props> = ({
         placements={diacriticPlacements}
         diacriticOverrides={diacriticOverrides}
         fontSize={fontSize}
+        onBeginDiacriticDrag={onBeginDiacriticDrag}
         onDragDiacriticOverride={onDragDiacriticOverride}
         onToggleDiacriticHidden={onToggleDiacriticHidden}
       />

@@ -156,6 +156,11 @@ makes the tiled layout get computed and the silhouette stop being draggable.
 (Per-glyph move/scale/rotate shared both while it existed; it was removed on
 2026-10-10 — [removed-subsystems.md](removed-subsystems.md).)
 
+**Undo:** a move or resize handle drag is one undo step, pushed at the drag's
+start through `onBeginDiacriticDrag` (App passes `pushHistory`).
+`dragDiacriticOverride` itself never pushes, because a time-based debounce
+cannot tell a mid-drag pause from a new gesture.
+
 `App.tsx`'s `dragDiacriticOverride`/`toggleDiacriticHidden` gate on
 `supportsDiacriticOverrides(b)` rather than `b.type === "text"`. Widening
 that guard is what actually makes the feature work on the two shape types —

@@ -260,6 +260,7 @@ export function probeAlternates(args: {
 export type AlternatePanelView =
   | { kind: "loading" }
   | { kind: "noFontAlternates" }
+  | { kind: "noTextAlternates" }
   | { kind: "prompt" }
   | { kind: "noLetterAlternates" }
   | { kind: "strip"; target: LetterAlternates };
@@ -281,6 +282,27 @@ export function alternatePanelView(
   if (target && state.hasFont) return { kind: "strip", target };
   if (state.loading) return { kind: "loading" };
   if (!state.fontHasAlternates) return { kind: "noFontAlternates" };
+  // The font has alternates, but none of them touches a letter of this text,
+  // so there is no outline to click.
+  if (state.letters.length === 0) return { kind: "noTextAlternates" };
   if (letter === null) return { kind: "prompt" };
   return { kind: "noLetterAlternates" };
+}
+
+/** The letter the sidebar strip is showing, and the character it was. */
+export type AlternateTarget = { blockId: number; letter: number; char: string };
+
+/**
+ * The strip's letter for `blockId`, or null. A target is held by ordinal, so
+ * typing before it would silently re-point it at a different letter; the
+ * recorded character drops it instead, the same checksum `GlyphAlternate`
+ * itself carries.
+ */
+export function resolveAlternateTarget(
+  target: AlternateTarget | null | undefined,
+  blockId: number,
+  text: string
+): number | null {
+  if (!target || target.blockId !== blockId) return null;
+  return charAtLetter(text, target.letter) === target.char ? target.letter : null;
 }

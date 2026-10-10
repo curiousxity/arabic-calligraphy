@@ -105,9 +105,11 @@ recorded a gesture's *end* state 300 ms after it settled, so pausing before
 Ctrl+Z after a stroke stretch, block drag, curve edit or diacritic drag made
 the first undo a no-op (`e2e/stroke-cuts.spec.ts` only passed by pressing the
 key inside the window). `useDebouncedHistoryPush` now pushes on the first call
-of a burst, which comes from the render before the change, and the
-stroke-stretch drag pushes once at drag start instead, so a pause mid-drag no
-longer splits it into two entries.
+of a burst, which comes from the render before the change. Stroke-stretch,
+diacritic-handle and curve-anchor drags no longer use it at all: each pushes
+once when the gesture starts (curve edits also before adding or removing an
+anchor), so a pause mid-drag no longer splits it into two entries. Block nudges
+are the remaining debounced caller.
 
 ### 2026-10-09 — Practice sheet export
 

@@ -39,7 +39,9 @@ block when the guess is wrong for a particular curve).
 `TextPathEditOverlay.tsx` is a separate component (not part of
 `TextOnPathText`) providing the on-canvas pen-tool: click empty canvas to
 append an anchor, drag an anchor or its handle to reshape, right-click an
-anchor to remove it. It's shown only when a `textPath` block is both
+anchor to remove it. Each of those edits calls `onBeginChange` first (App
+passes `pushHistory`), so an edit is one undo step: a drag at its start, an
+add or remove before it commits. `updateTextPathD` never pushes itself. It's shown only when a `textPath` block is both
 selected and has `textPathEditMode` set, and is hidden during export
 (`useExport.ts` toggles off every node whose id starts with
 `text-path-edit-layer-`, alongside the grid and artboard background it

@@ -92,6 +92,8 @@ export type CanvasStageProps = {
   onSelectBlock: (id: number, additive?: boolean) => void;
   onEditBlock: (id: number) => void;
   onUpdateTextPathD: (blockId: number, d: string) => void;
+  /** One `pushHistory()` per curve edit (drag, add or remove an anchor), taken before it starts. */
+  onBeginTextPathEdit: () => void;
   /**
    * One `pushHistory()` per painting stroke, taken on mousedown. App passes
    * `pushHistory` itself — see `setKufiCell` there for why the per-cell write
@@ -99,6 +101,8 @@ export type CanvasStageProps = {
    */
   onBeginKufiCellEdit: () => void;
   onSetKufiCell: (blockId: number, edit: KufiCellEdit, generatedOn: boolean) => void;
+  /** One `pushHistory()` per diacritic handle drag, taken on drag start. */
+  onBeginDiacriticDrag: () => void;
   onDragDiacriticOverride: (
     blockId: number,
     glyphIndex: number,
@@ -165,8 +169,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSelectBlock,
   onEditBlock,
   onUpdateTextPathD,
+  onBeginTextPathEdit,
   onBeginKufiCellEdit,
   onSetKufiCell,
+  onBeginDiacriticDrag,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
   onBeginStrokeCut,
@@ -868,6 +874,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
                     diacriticEditMode={block.diacriticEditMode ?? false}
+                    onBeginDiacriticDrag={onBeginDiacriticDrag}
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)
                     }
@@ -895,6 +902,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
                     onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}
                     onSetStrokeCut={(cut) => onSetStrokeCut(block.id, cut)}
+                    onBeginDiacriticDrag={onBeginDiacriticDrag}
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)
                     }
@@ -963,6 +971,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                         y={block.y}
                         rotation={block.rotation ?? 0}
                         textPathD={block.textPathD}
+                        onBeginChange={onBeginTextPathEdit}
                         onChange={(d) => onUpdateTextPathD(block.id, d)}
                       />
                     )}

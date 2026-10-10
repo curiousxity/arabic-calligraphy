@@ -23,6 +23,11 @@ export const section: GuideSection = {
         letter back.
       </p>
       <p>
+        While the tool is on, pressing an outlined letter always changes its
+        shape, even if the pointer slips a little — so to move the block, drag
+        it by a part that isn't outlined, or untick the box first.
+      </p>
+      <p>
         Kashida and <strong>Fit to width</strong> keep your choices on the same
         letters. Editing the wording before a letter you changed can drop its
         shape back to the default, and changing a letter's shape removes any

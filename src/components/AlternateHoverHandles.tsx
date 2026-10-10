@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Group, Rect } from "react-konva";
 import type { GlyphAlternate } from "../types";
 import {
@@ -8,7 +8,7 @@ import {
   type AlternateOption,
 } from "../lib/glyphAlternates";
 
-export type AlternateTarget = {
+export type AlternateHitTarget = {
   key: string;
   letter: number;
   /** The letter's ink box in the run's local space. */
@@ -19,7 +19,7 @@ export type AlternateTarget = {
 type Props = {
   isSelected: boolean;
   enabled: boolean;
-  targets: AlternateTarget[];
+  targets: AlternateHitTarget[];
   alternates: GlyphAlternate[];
   offsetX: number;
   offsetY: number;
@@ -28,6 +28,8 @@ type Props = {
 
 const OUTLINE_COLOR = "#a855f7";
 const PAD = 3;
+/** How far a press may drift, in screen px, and still count as a click. */
+const CLICK_SLOP = 10;
 
 /**
  * Next Shape on the canvas: a letter that has alternate shapes outlines on
@@ -49,6 +51,8 @@ export const AlternateHoverHandles: React.FC<Props> = ({
   onPick,
 }) => {
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  /** Where the current press started, so a release can be judged a click. */
+  const pressRef = useRef<{ key: string; x: number; y: number } | null>(null);
   if (!isSelected || !enabled) return null;
 
   return (
@@ -76,9 +80,42 @@ export const AlternateHoverHandles: React.FC<Props> = ({
               width={width}
               height={height}
               fill="transparent"
+              // A press on an outlined letter belongs to this tool. Bubbling
+              // it would let a click that drifts past Konva's drag threshold
+              // start a block drag instead of picking a shape; the block is
+              // still draggable by any part that is not an outlined letter.
+              onMouseDown={(e) => {
+                e.cancelBubble = true;
+                pressRef.current = { key: t.key, x: e.evt.clientX, y: e.evt.clientY };
+              }}
+              onTouchStart={(e) => {
+                e.cancelBubble = true;
+              }}
+              // Picked on release rather than on Konva's `click`, which does
+              // not fire once the pointer has moved: a press that drifts a
+              // few pixels is still a click.
+              onMouseUp={(e) => {
+                const press = pressRef.current;
+                pressRef.current = null;
+                if (!press) return;
+                if (Math.hypot(e.evt.clientX - press.x, e.evt.clientY - press.y) > CLICK_SLOP) return;
+                // The letter that was *pressed*: neighbouring letters' padded
+                // boxes overlap, so a release a few pixels over can land on
+                // the next one's rect.
+                const pressed = targets.find((x) => x.key === press.key);
+                if (!pressed) return;
+                e.cancelBubble = true;
+                onPick?.(
+                  pressed.letter,
+                  cycleAlternate(
+                    pressed.options,
+                    currentChoice(alternates, pressed.letter),
+                    e.evt.shiftKey ? -1 : 1
+                  )
+                );
+              }}
               onClick={(e) => {
                 e.cancelBubble = true;
-                pick(e.evt.shiftKey);
               }}
               onTap={(e) => {
                 e.cancelBubble = true;
