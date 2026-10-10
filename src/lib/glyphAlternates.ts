@@ -73,13 +73,33 @@ export function charAtLetter(text: string, letter: number): string | null {
 
 const isValidValue = (v: number) => Number.isInteger(v) && v >= 1 && v <= 99;
 
+/**
+ * The entries of a stored list that have the right shape. A save is user
+ * data — a hand-edited project can hold `null`, a string, or an object with
+ * the wrong field types, and every reader goes through this so none of them
+ * throws (a throw here happens during render and takes the whole App down).
+ */
+function wellFormed(list: readonly GlyphAlternate[] | undefined): GlyphAlternate[] {
+  if (!Array.isArray(list)) return [];
+  return list.filter(
+    (a): a is GlyphAlternate =>
+      typeof a === "object" &&
+      a !== null &&
+      typeof a.letter === "number" &&
+      typeof a.char === "string" &&
+      typeof a.feature === "string" &&
+      typeof a.value === "number"
+  );
+}
+
 export function activeAlternates(
   text: string,
   alternates: readonly GlyphAlternate[] | undefined
 ): GlyphAlternate[] {
-  if (!alternates?.length) return [];
+  const list = wellFormed(alternates);
+  if (list.length === 0) return [];
   const offsets = letterOffsets(text);
-  return alternates.filter((a) => {
+  return list.filter((a) => {
     const offset = offsets[a.letter];
     return (
       offset !== undefined &&
@@ -107,8 +127,7 @@ export function featureStringFor(
 
 /** A stable identity for a block's alternates, for cache keys and effect deps. */
 export function alternatesKey(alternates: readonly GlyphAlternate[] | undefined): string {
-  if (!alternates?.length) return "";
-  return alternates.map((a) => `${a.letter}:${a.char}:${a.feature}=${a.value}`).join(",");
+  return wellFormed(alternates).map((a) => `${a.letter}:${a.char}:${a.feature}=${a.value}`).join(",");
 }
 
 export function sameChoice(a: AlternateChoice | null, b: AlternateChoice | null): boolean {
@@ -120,7 +139,7 @@ export function currentChoice(
   alternates: readonly GlyphAlternate[] | undefined,
   letter: number
 ): AlternateChoice | null {
-  const a = alternates?.find((x) => x.letter === letter);
+  const a = wellFormed(alternates).find((x) => x.letter === letter);
   return a ? { feature: a.feature, value: a.value } : null;
 }
 
@@ -142,7 +161,7 @@ export function setAlternate(
   char: string,
   choice: AlternateChoice | null
 ): GlyphAlternate[] {
-  const rest = (list ?? []).filter((a) => a.letter !== letter);
+  const rest = wellFormed(list).filter((a) => a.letter !== letter);
   const next = choice ? [...rest, { letter, char, feature: choice.feature, value: choice.value }] : rest;
   return next.sort((a, b) => a.letter - b.letter);
 }
@@ -236,4 +255,32 @@ export function probeAlternates(args: {
   });
 
   return out;
+}
+
+export type AlternatePanelView =
+  | { kind: "loading" }
+  | { kind: "noFontAlternates" }
+  | { kind: "prompt" }
+  | { kind: "noLetterAlternates" }
+  | { kind: "strip"; target: LetterAlternates };
+
+/**
+ * What the sidebar's Letter shapes section shows. A strip it can already
+ * draw wins over "loading": every pick changes the alternates and re-probes,
+ * and swapping the strip for a message on each click made it blink out
+ * under the pointer, so a second quick pick landed on the note.
+ */
+export function alternatePanelView(
+  state:
+    | { letters: LetterAlternates[]; fontHasAlternates: boolean; loading: boolean; hasFont: boolean }
+    | undefined,
+  letter: number | null
+): AlternatePanelView {
+  if (!state) return { kind: "loading" };
+  const target = letter === null ? undefined : state.letters.find((l) => l.letter === letter);
+  if (target && state.hasFont) return { kind: "strip", target };
+  if (state.loading) return { kind: "loading" };
+  if (!state.fontHasAlternates) return { kind: "noFontAlternates" };
+  if (letter === null) return { kind: "prompt" };
+  return { kind: "noLetterAlternates" };
 }

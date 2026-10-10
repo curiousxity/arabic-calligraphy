@@ -84,6 +84,16 @@ export const AlternateHoverHandles: React.FC<Props> = ({
                 e.cancelBubble = true;
                 pick(false);
               }}
+              // Stepping through shapes invites quick double clicks; let one
+              // reach the block and its edit handler focuses the Content
+              // textarea with the whole text selected, so the next keystroke
+              // would replace it. The two clicks already cycled the shape.
+              onDblClick={(e) => {
+                e.cancelBubble = true;
+              }}
+              onDblTap={(e) => {
+                e.cancelBubble = true;
+              }}
             />
             {hoveredKey === t.key && (
               <Rect

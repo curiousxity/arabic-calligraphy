@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   activeAlternates,
+  alternatePanelView,
   alternatesKey,
   charAtLetter,
   currentChoice,
@@ -146,5 +147,54 @@ describe("fallbackFeatureLabel", () => {
     expect(fallbackFeatureLabel({ feature: "jalt", value: 1 })).toBe("Justification");
     expect(fallbackFeatureLabel({ feature: "jalt", value: 3 })).toBe("Justification 3");
     expect(fallbackFeatureLabel({ feature: "swsh", value: 1 })).toBe("Swash");
+  });
+});
+
+describe("malformed glyphAlternates from a hand-edited save", () => {
+  const junk = [null, "ss01", 7, { letter: "x" }, { letter: 0, char: "ه", feature: 5, value: 1 }];
+
+  it("never throws, and treats junk entries as absent", () => {
+    expect(() => alternatesKey(junk as never)).not.toThrow();
+    expect(activeAlternates("هه", junk as never)).toEqual([]);
+    expect(featureStringFor("هه", junk as never)).toBe("");
+    expect(currentChoice(junk as never, 0)).toBeNull();
+  });
+
+  it("tolerates a non-array value", () => {
+    expect(alternatesKey("ss01" as never)).toBe("");
+    expect(activeAlternates("هه", "ss01" as never)).toEqual([]);
+    expect(featureStringFor("هه", { letter: 0 } as never)).toBe("");
+    expect(setAlternate("ss01" as never, 0, "ه", { feature: "ss01", value: 1 })).toHaveLength(1);
+  });
+});
+
+describe("alternatePanelView", () => {
+  const target = {
+    letter: 1,
+    offset: 1,
+    options: [
+      { choice: null, glyphId: 1, label: "Default" },
+      { choice: { feature: "ss01", value: 1 }, glyphId: 2, label: "Looped Haa" },
+    ],
+  };
+  const settled = { letters: [target], fontHasAlternates: true, loading: false, hasFont: true };
+
+  it("keeps showing the strip while a pick re-probes, so it never blinks out", () => {
+    expect(alternatePanelView({ ...settled, loading: true }, 1)).toEqual({ kind: "strip", target });
+  });
+
+  it("shows loading only when there is nothing to show yet", () => {
+    expect(alternatePanelView(undefined, null)).toEqual({ kind: "loading" });
+    expect(
+      alternatePanelView({ letters: [], fontHasAlternates: false, loading: true, hasFont: false }, 1)
+    ).toEqual({ kind: "loading" });
+  });
+
+  it("covers the empty states", () => {
+    expect(
+      alternatePanelView({ letters: [], fontHasAlternates: false, loading: false, hasFont: true }, null)
+    ).toEqual({ kind: "noFontAlternates" });
+    expect(alternatePanelView(settled, null)).toEqual({ kind: "prompt" });
+    expect(alternatePanelView(settled, 0)).toEqual({ kind: "noLetterAlternates" });
   });
 });

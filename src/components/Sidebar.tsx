@@ -101,7 +101,7 @@ import { FontUploadButton } from "./FontUploadDialog";
 import { PracticeSheetButton } from "./PracticeSheetDialog";
 import { describeFontKey, type CustomFont } from "../lib/customFonts";
 import { supportsGlyphAlternates } from "../lib/blockCapabilities";
-import { currentChoice, type AlternateChoice } from "../lib/glyphAlternates";
+import { alternatePanelView, currentChoice, type AlternateChoice } from "../lib/glyphAlternates";
 import type { GlyphAlternatesState } from "../hooks/useGlyphAlternates";
 import { AlternateStrip } from "./sidebar/AlternateStrip";
 // ---- /STREAM-G ----
@@ -3240,17 +3240,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       const state = glyphAlternatesState;
                       const letter =
                         alternateTarget?.blockId === selectedBlock.id ? alternateTarget.letter : null;
-                      const target = state?.letters.find((l) => l.letter === letter);
                       const note = (text: string) => (
                         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>{text}</div>
                       );
-                      if (!state || state.loading) return note("Looking for alternate shapes…");
-                      if (!state.fontHasAlternates) return note("No alternate shapes in this font");
-                      if (letter === null)
+                      const view = alternatePanelView(
+                        state && { ...state, hasFont: state.font !== null },
+                        letter
+                      );
+                      if (view.kind === "loading") return note("Looking for alternate shapes…");
+                      if (view.kind === "noFontAlternates") return note("No alternate shapes in this font");
+                      if (view.kind === "prompt")
                         return note(
                           "Click an outlined letter to step through its shapes; Shift-click goes back."
                         );
-                      if (!target || !state.font) return note("This letter has no alternates");
+                      if (view.kind === "noLetterAlternates" || !state?.font)
+                        return note("This letter has no alternates");
+                      const { target } = view;
                       return (
                         <>
                           <AlternateStrip

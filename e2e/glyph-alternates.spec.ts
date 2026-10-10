@@ -4,6 +4,7 @@ import {
   chooseFont,
   getBlocks,
   gotoApp,
+  hitTargetAt,
   inkPixels,
   namedNodeCount,
   nodeClientBox,
@@ -60,4 +61,28 @@ test("the hover outline stays mounted while the pointer sits on a letter", async
     await settleFrames(page);
     expect(await namedNodeCount(page, "alternate-outline"), `outline vanished on move ${i}`).toBe(1);
   }
+});
+
+test("double-clicking through shapes does not open the text for editing", async ({ page }) => {
+  await gotoApp(page);
+  await armAlternates(page, "Ruqaa", "هههه");
+  await expect.poll(() => namedNodeCount(page, "alternate-hit")).toBeGreaterThan(0);
+  await settleFrames(page);
+  // Clicking quickly through shapes is exactly what this tool invites; the
+  // block's own double-click handler would otherwise focus the Content
+  // textarea with the whole text selected, so the next keystroke replaces it.
+  const textarea = page.locator("textarea.sidebarTextarea");
+  await expect(textarea, "the Content textarea must be mounted for this to test anything").toHaveCount(1);
+  // Twice, on warm caches the second time. Re-aimed each pass: a new shape
+  // has a new outline, and a double-click on the block's own background
+  // rightly opens the text.
+  for (let i = 0; i < 2; i++) {
+    await settleFrames(page);
+    const at = centerOf((await nodeClientBox(page, ".alternate-hit"))!);
+    expect(await hitTargetAt(page, at)).toBe("Rect.alternate-hit");
+    await page.mouse.dblclick(at.x, at.y);
+    await settleFrames(page);
+    await expect(textarea).not.toBeFocused();
+  }
+  await expect(page.locator("[data-alternate-strip]")).toBeVisible();
 });
