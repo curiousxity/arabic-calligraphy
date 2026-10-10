@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
 import { parseSvgPath, replayPath } from "../lib/svgPath";
-import { pathLength, pathBoundingBox, buildArcTable, pointAtArcLengthFromTable } from "../lib/textPath";
+import { pathLength, pathBoundingBox, buildArcTable, curveGlyphPlacements } from "../lib/textPath";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
 
@@ -100,6 +100,14 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   // extend above/below the baseline (mirrors ShapedText.tsx's hit-rect
   // padding logic, keyed off fontSize instead of measured glyph extents).
   const curveBox = useMemo(() => pathBoundingBox(parsedCmds), [parsedCmds]);
+
+  const layout = useMemo(
+    () =>
+      hbLoaded && font && parsedCmds.length >= 2
+        ? curveGlyphPlacements({ glyphs, fontSize, unitsPerEm, curveLen, arcTable })
+        : null,
+    [hbLoaded, font, parsedCmds.length, glyphs, fontSize, unitsPerEm, curveLen, arcTable]
+  );
   const pad = Math.max(fontSize, 24);
   const hitX = curveBox.x - pad;
   const hitY = curveBox.y - pad;
@@ -145,14 +153,11 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
         sceneFunc={(ctx) => {
           if (!hbLoaded || !font || parsedCmds.length < 2 || curveLen <= 0) return;
 
-          const scale = fontSize / Math.max(unitsPerEm || 1000, 1);
-          let naturalAdvance = 0;
-          for (const g of glyphs) naturalAdvance += (g.ax ?? 0) * scale;
-          if (naturalAdvance <= 0) return;
-
           // Auto-fit: the effective size always spans the curve exactly,
           // same idea ShapeFillText already applies per-row to shape width.
-          const fitScale = curveLen / naturalAdvance;
+          // Computed once, in `curveGlyphPlacements`, which the Next Shape
+          // overlay also outlines from.
+          if (!layout) return;
           const c2d = ctx as unknown as CanvasRenderingContext2D;
 
           // Built before the glyph loop, while the ctx is still in the
@@ -167,17 +172,12 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
             height: curveBox.height,
           });
 
-          let cursor = 0;
-          for (const g of glyphs) {
-            const glyphObj = font.glyphs.get(g.g);
-            const advance = (g.ax ?? 0) * scale * fitScale;
-            if (!glyphObj) {
-              cursor += advance;
-              continue;
-            }
+          for (const place of layout.placements) {
+            const glyphObj = font.glyphs.get(glyphs[place.glyphIndex].g);
+            if (!glyphObj) continue;
 
-            const { x: px, y: py, angle } = pointAtArcLengthFromTable(arcTable, cursor);
-            const opPath = glyphObj.getPath(0, 0, fontSize * fitScale);
+            const { x: px, y: py, angle } = place;
+            const opPath = glyphObj.getPath(0, 0, place.size);
 
             c2d.save();
             // Shape is positioned at (hitX, hitY), which Konva already
@@ -201,7 +201,6 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
             painter.fill(c2d);
 
             c2d.restore();
-            cursor += advance;
           }
         }}
       />

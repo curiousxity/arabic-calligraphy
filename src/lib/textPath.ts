@@ -221,3 +221,65 @@ export function dToAnchors(cmds: SvgCmd[]): CurveAnchor[] {
 
   return anchors;
 }
+
+/** Where one shaped glyph sits on a curve: pen position, tangent angle (radians), drawn size. */
+export type CurveGlyphPlacement = {
+  glyphIndex: number;
+  x: number;
+  y: number;
+  angle: number;
+  /** Font size the glyph is drawn at: `fontSize × fitScale`. */
+  size: number;
+};
+
+/**
+ * Lays a shaped run along a curve: each glyph at its cumulative advance, all
+ * advances scaled so the run spans the curve exactly. The one place this is
+ * computed — `TextOnPathText` draws from it and the Next Shape overlay
+ * outlines from it, so an outline cannot drift from the ink it surrounds.
+ * Null when there is nothing to lay out (no glyphs, or zero total advance).
+ */
+export function curveGlyphPlacements(args: {
+  glyphs: readonly { ax?: number }[];
+  fontSize: number;
+  unitsPerEm: number;
+  curveLen: number;
+  arcTable: ArcTable;
+}): { placements: CurveGlyphPlacement[]; fitScale: number } | null {
+  const { glyphs, fontSize, curveLen, arcTable } = args;
+  if (glyphs.length === 0 || curveLen <= 0) return null;
+  const scale = fontSize / Math.max(args.unitsPerEm || 1000, 1);
+  let naturalAdvance = 0;
+  for (const g of glyphs) naturalAdvance += (g.ax ?? 0) * scale;
+  if (naturalAdvance <= 0) return null;
+
+  const fitScale = curveLen / naturalAdvance;
+  const size = fontSize * fitScale;
+  const placements: CurveGlyphPlacement[] = [];
+  let cursor = 0;
+  glyphs.forEach((g, glyphIndex) => {
+    const { x, y, angle } = pointAtArcLengthFromTable(arcTable, cursor);
+    placements.push({ glyphIndex, x, y, angle, size });
+    cursor += (g.ax ?? 0) * scale * fitScale;
+  });
+  return { placements, fitScale };
+}
+
+/**
+ * A glyph-local point (as opentype.js draws it at `placement.size`) in the
+ * curve's group space, through the same transform the renderer applies:
+ * translate to the pen position, rotate to the tangent, then the baseline
+ * offset. Italic shear is not folded in — the same approximation the Shape
+ * Fill diacritic adapter makes.
+ */
+export function curvePlacementToGroup(
+  placement: CurveGlyphPlacement,
+  local: { x: number; y: number },
+  baselineOffset: number
+): { x: number; y: number } {
+  const cos = Math.cos(placement.angle);
+  const sin = Math.sin(placement.angle);
+  const lx = local.x;
+  const ly = local.y + baselineOffset;
+  return { x: placement.x + lx * cos - ly * sin, y: placement.y + lx * sin + ly * cos };
+}
