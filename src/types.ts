@@ -24,6 +24,17 @@ export type DiacriticOverride = {
   hidden?: boolean;
 };
 
+export type GlyphAlternate = {
+  /** Index among the text's characters, skipping tatweel (U+0640) and combining marks. */
+  letter: number;
+  /** The character at that letter when the choice was made — a checksum. */
+  char: string;
+  /** OpenType feature tag, e.g. "ss01", "salt", "jalt". */
+  feature: string;
+  /** 1 for on/off features; the alternate's index for salt/aalt/jalt/swsh. */
+  value: number;
+};
+
 // ---- STREAM-F: ink & surface — BlockFill type ----
 // Re-exported from the pure module that owns it, so `types.ts` stays the one
 // import site for a block's field types while the gradient maths (and its
@@ -77,6 +88,14 @@ type BlockCommon = {
   strokeCuts?: StrokeCut[];
   /** Arms the on-canvas stretch handles. */
   strokeCutEditMode?: boolean;
+  /**
+   * Per-letter OpenType alternates ("Next Shape"). Absent means default
+   * shapes, so an older save renders byte-identically. Plain text blocks
+   * only — see `supportsGlyphAlternates`.
+   */
+  glyphAlternates?: GlyphAlternate[];
+  /** Arms the on-canvas Next Shape tool. */
+  glyphAlternateMode?: boolean;
 
   // ---- STREAM-F: ink & surface — `fill` field on BlockCommon. Absent
   // means the existing flat `color` renders exactly as today. ----
