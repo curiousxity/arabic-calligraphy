@@ -101,6 +101,8 @@ export type CanvasStageProps = {
     patch: Partial<DiacriticOverride>
   ) => void;
   onToggleDiacriticHidden: (blockId: number, glyphIndex: number) => void;
+  /** One `pushHistory()` per stretch-handle drag, taken on drag start. */
+  onBeginStrokeCut: () => void;
   onSetStrokeCut: (blockId: number, cut: StrokeCut) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   onResizeImageBlock: (id: number, scale: number) => void;
@@ -160,6 +162,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSetKufiCell,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
+  onBeginStrokeCut,
   onSetStrokeCut,
   onResizeShapeFillBlock,
   onResizeImageBlock,
@@ -878,6 +881,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     opacity={block.opacity ?? 1}
                     isSelected={block.id === selectedId}
                     strokeCutEditMode={block.strokeCutEditMode ?? false}
+                    onBeginStrokeCut={onBeginStrokeCut}
                     onSetStrokeCut={(cut) => onSetStrokeCut(block.id, cut)}
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)

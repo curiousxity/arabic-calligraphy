@@ -592,7 +592,6 @@ const App: React.FC = () => {
   const scheduleMoveHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleTextPathHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleDiacriticHistoryPush = useDebouncedHistoryPush(pushHistory);
-  const scheduleStrokeCutHistoryPush = useDebouncedHistoryPush(pushHistory);
 
   const dragDiacriticOverride = useCallback(
     (blockId: number, glyphIndex: number, patch: Partial<DiacriticOverride>) => {
@@ -649,11 +648,12 @@ const App: React.FC = () => {
           return { ...b, strokeCuts: cut.nuqta > 0 ? [...rest, cut] : rest };
         })
       );
-      // Debounced, so one continuous drag is a single undo entry — the same
-      // treatment a diacritic drag gets.
-      scheduleStrokeCutHistoryPush();
+      // No push here: the handle's drag start already took one through
+      // `onBeginStrokeCut`, so a drag is a single undo entry however long it
+      // pauses midway. A time-based debounce cannot tell a pause from a new
+      // gesture, and recorded a mid-drag state as its own entry.
     },
-    [scheduleStrokeCutHistoryPush]
+    []
   );
 
   const toggleStrokeCutMode = useCallback(
@@ -2871,6 +2871,7 @@ const App: React.FC = () => {
           onSetKufiCell={setKufiCell}
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
+          onBeginStrokeCut={pushHistory}
           onSetStrokeCut={setStrokeCut}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           onResizeImageBlock={resizeImageBlock}

@@ -69,6 +69,7 @@ type Props = {
   diacriticOverrides?: DiacriticOverride[];
   strokeCuts?: StrokeCut[];
   strokeCutEditMode?: boolean;
+  onBeginStrokeCut?: () => void;
   onSetStrokeCut?: (cut: StrokeCut) => void;
   isSelected?: boolean;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
@@ -330,6 +331,7 @@ export const ShapedText: React.FC<Props> = ({
   diacriticOverrides = NO_DIACRITIC_OVERRIDES,
   strokeCuts = NO_STROKE_CUTS,
   strokeCutEditMode = false,
+  onBeginStrokeCut,
   onSetStrokeCut,
   isSelected = false,
   onDragDiacriticOverride,
@@ -758,6 +760,7 @@ export const ShapedText: React.FC<Props> = ({
         nuqtaPx={nuqtaUnits(fontFamily, fontSize)}
         offsetX={bx + localDrawX}
         offsetY={by + localDrawY}
+        onBeginCut={onBeginStrokeCut}
         onSetCut={onSetStrokeCut}
       />
 
