@@ -42,6 +42,7 @@ import {
 } from "../lib/glyphOverrides";
 import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
 import { AlternateHoverHandles, type AlternateHitTarget } from "./AlternateHoverHandles";
+import { quadFromBox } from "../lib/alternateTargets";
 import {
   letterAtOffset,
   type AlternateChoice,
@@ -321,6 +322,8 @@ const NO_DIACRITIC_OVERRIDES: DiacriticOverride[] = [];
 const NO_STROKE_CUTS: StrokeCut[] = [];
 const NO_GLYPH_ALTERNATES: GlyphAlternate[] = [];
 const NO_ALTERNATE_LETTERS: LetterAlternates[] = [];
+/** Breathing room around a letter's ink, so its outline does not touch it. */
+const ALTERNATE_TARGET_PAD = 3;
 
 export const ShapedText: React.FC<Props> = ({
   id,
@@ -638,13 +641,31 @@ export const ShapedText: React.FC<Props> = ({
         y2: Math.max(held?.y2 ?? -Infinity, b.y + b.height),
       });
     }
+    // Into the overlay's group space: the run is drawn offset by
+    // `bx + localDrawX` / `by + localDrawY`, the same offset every other
+    // overlay here applies.
+    const ox = bx + localDrawX;
+    const oy = by + localDrawY;
     return [...boxes].map(([letter, r]) => ({
       key: String(letter),
       letter,
-      box: { x: r.x1, y: r.y1, width: r.x2 - r.x1, height: r.y2 - r.y1 },
+      polygon: quadFromBox(
+        { x: r.x1 + ox, y: r.y1 + oy, width: r.x2 - r.x1, height: r.y2 - r.y1 },
+        ALTERNATE_TARGET_PAD
+      ),
       options: byLetter.get(letter)!.options,
     }));
-  }, [glyphAlternateMode, alternateLetters, glyphHitBoxes, shapeData.glyphs, shapeData.shapableText]);
+  }, [
+    glyphAlternateMode,
+    alternateLetters,
+    glyphHitBoxes,
+    shapeData.glyphs,
+    shapeData.shapableText,
+    bx,
+    by,
+    localDrawX,
+    localDrawY,
+  ]);
 
   return (
     <Group
@@ -805,8 +826,6 @@ export const ShapedText: React.FC<Props> = ({
         enabled={glyphAlternateMode}
         targets={alternateTargets}
         alternates={glyphAlternates}
-        offsetX={bx + localDrawX}
-        offsetY={by + localDrawY}
         onPick={onPickAlternate}
       />
       <StrokeCutHoverHandles

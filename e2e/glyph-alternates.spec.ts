@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
-  centerOf,
+  alternateTargetCenters,
   chooseFont,
   getBlocks,
   gotoApp,
@@ -23,12 +23,12 @@ test("clicking a letter steps to an alternate shape, and undo restores it", asyn
   await gotoApp(page);
   await armAlternates(page, "Ruqaa", "هههه");
 
-  await expect.poll(() => namedNodeCount(page, "alternate-hit")).toBeGreaterThan(0);
+  await expect.poll(async () => (await alternateTargetCenters(page)).length).toBeGreaterThan(0);
   await settleFrames(page);
-  const box = (await nodeClientBox(page, ".alternate-hit"))!;
+  const box = (await nodeClientBox(page, "#block-1"))!;
   const inkBefore = await inkPixels(page, box);
 
-  const at = centerOf(box);
+  const at = (await alternateTargetCenters(page))[0];
   await page.mouse.move(at.x, at.y);
   await page.mouse.click(at.x, at.y);
 
@@ -46,15 +46,15 @@ test("a font with no alternates says so", async ({ page }) => {
   await gotoApp(page);
   await armAlternates(page, "Thuluth", "هههه");
   await expect(page.getByText("No alternate shapes in this font")).toBeVisible();
-  expect(await namedNodeCount(page, "alternate-hit")).toBe(0);
+  expect(await alternateTargetCenters(page)).toHaveLength(0);
 });
 
 test("the hover outline stays mounted while the pointer sits on a letter", async ({ page }) => {
   await gotoApp(page);
   await armAlternates(page, "Ruqaa", "هههه");
-  await expect.poll(() => namedNodeCount(page, "alternate-hit")).toBeGreaterThan(0);
+  await expect.poll(async () => (await alternateTargetCenters(page)).length).toBeGreaterThan(0);
   await settleFrames(page);
-  const at = centerOf((await nodeClientBox(page, ".alternate-hit"))!);
+  const at = (await alternateTargetCenters(page))[0];
 
   for (let i = 0; i < 8; i++) {
     await page.mouse.move(at.x + (i % 2 === 0 ? 0.5 : -0.5), at.y);
@@ -66,7 +66,7 @@ test("the hover outline stays mounted while the pointer sits on a letter", async
 test("double-clicking through shapes does not open the text for editing", async ({ page }) => {
   await gotoApp(page);
   await armAlternates(page, "Ruqaa", "هههه");
-  await expect.poll(() => namedNodeCount(page, "alternate-hit")).toBeGreaterThan(0);
+  await expect.poll(async () => (await alternateTargetCenters(page)).length).toBeGreaterThan(0);
   await settleFrames(page);
   // Clicking quickly through shapes is exactly what this tool invites; the
   // block's own double-click handler would otherwise focus the Content
@@ -78,7 +78,7 @@ test("double-clicking through shapes does not open the text for editing", async 
   // rightly opens the text.
   for (let i = 0; i < 2; i++) {
     await settleFrames(page);
-    const at = centerOf((await nodeClientBox(page, ".alternate-hit"))!);
+    const at = (await alternateTargetCenters(page))[0];
     expect(await hitTargetAt(page, at)).toBe("Rect.alternate-hit");
     await page.mouse.dblclick(at.x, at.y);
     await settleFrames(page);
@@ -90,9 +90,9 @@ test("double-clicking through shapes does not open the text for editing", async 
 test("a click that slides a few pixels picks a shape instead of moving the block", async ({ page }) => {
   await gotoApp(page);
   await armAlternates(page, "Ruqaa", "هههه");
-  await expect.poll(() => namedNodeCount(page, "alternate-hit")).toBeGreaterThan(0);
+  await expect.poll(async () => (await alternateTargetCenters(page)).length).toBeGreaterThan(0);
   await settleFrames(page);
-  const at = centerOf((await nodeClientBox(page, ".alternate-hit"))!);
+  const at = (await alternateTargetCenters(page))[0];
   const before = (await getBlocks(page))[0];
 
   // A trackpad click that drifts past Konva's drag threshold.
@@ -129,4 +129,32 @@ test("a font without style sets says so", async ({ page }) => {
   await setBlockText(page, "هههه");
   await chooseFont(page, "Thuluth");
   await expect(page.getByText("No style sets in this font")).toBeVisible();
+});
+
+test("the block can still be dragged from a gap between outlined letters", async ({ page }) => {
+  await gotoApp(page);
+  // A space gives a gap inside the overlay's bounds that is not a letter.
+  await armAlternates(page, "Ruqaa", "هههه   هههه");
+  await expect.poll(async () => (await alternateTargetCenters(page)).length).toBeGreaterThan(1);
+  await settleFrames(page);
+  const centers = await alternateTargetCenters(page);
+  // The widest horizontal gap between neighbouring targets is the space.
+  const xs = centers.map((c) => c.x).sort((a, b) => a - b);
+  let gap = { at: 0, width: 0 };
+  for (let i = 1; i < xs.length; i++) {
+    if (xs[i] - xs[i - 1] > gap.width) gap = { at: (xs[i] + xs[i - 1]) / 2, width: xs[i] - xs[i - 1] };
+  }
+  const from = { x: gap.at, y: centers[0].y };
+  expect(await hitTargetAt(page, from), "the gap must be inside the overlay").toBe("Rect.alternate-hit");
+  const before = (await getBlocks(page))[0];
+
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 40, from.y + 30, { steps: 12 });
+  await page.mouse.up();
+  await settleFrames(page);
+
+  const after = (await getBlocks(page))[0];
+  expect(after.x).not.toBe(before.x);
+  expect(after.glyphAlternates ?? []).toHaveLength(0);
 });
