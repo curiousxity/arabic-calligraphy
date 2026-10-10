@@ -100,6 +100,10 @@ import type { ArtboardSurface, TextureDef } from "../data/textures";
 import { FontUploadButton } from "./FontUploadDialog";
 import { PracticeSheetButton } from "./PracticeSheetDialog";
 import { describeFontKey, type CustomFont } from "../lib/customFonts";
+import { supportsGlyphAlternates } from "../lib/blockCapabilities";
+import { currentChoice, type AlternateChoice } from "../lib/glyphAlternates";
+import type { GlyphAlternatesState } from "../hooks/useGlyphAlternates";
+import { AlternateStrip } from "./sidebar/AlternateStrip";
 // ---- /STREAM-G ----
 
 export type SidebarProps = {
@@ -271,6 +275,12 @@ export type SidebarProps = {
   onToggleDiacriticEditMode?: () => void;
   onToggleStrokeCutMode?: (blockId: number) => void;
   onClearStrokeCuts?: (blockId: number) => void;
+  /** Next Shape: discovery for the selected block, and the last letter clicked. */
+  glyphAlternatesState?: GlyphAlternatesState;
+  alternateTarget?: { blockId: number; letter: number } | null;
+  onToggleGlyphAlternateMode?: (blockId: number) => void;
+  onResetGlyphAlternates?: (blockId: number) => void;
+  onPickGlyphAlternate?: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
   onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
   onDistributeSelected?: (axis: "x" | "y") => void;
@@ -522,6 +532,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleDiacriticEditMode,
   onToggleStrokeCutMode,
   onClearStrokeCuts,
+  glyphAlternatesState,
+  alternateTarget,
+  onToggleGlyphAlternateMode,
+  onResetGlyphAlternates,
+  onPickGlyphAlternate,
   onFitShapeFillSpacing,
   onAlignSelected,
   onDistributeSelected,
@@ -3208,6 +3223,61 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     suffix={(selectedBlock.lineHeight ?? 1.2).toFixed(2)}
                     fieldKey="lineHeight"
                   />
+                )}
+
+                {supportsGlyphAlternates(selectedBlock) && (
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
+                    <div className="sidebarSectionTitle">Letter shapes</div>
+
+                    <CheckboxRow
+                      id={makeId("glyph-alternate-mode", selectedId)}
+                      label="Alternate letter shapes"
+                      checked={!!selectedBlock.glyphAlternateMode}
+                      onChange={() => onToggleGlyphAlternateMode?.(selectedBlock.id)}
+                    />
+
+                    {selectedBlock.glyphAlternateMode && (() => {
+                      const state = glyphAlternatesState;
+                      const letter =
+                        alternateTarget?.blockId === selectedBlock.id ? alternateTarget.letter : null;
+                      const target = state?.letters.find((l) => l.letter === letter);
+                      const note = (text: string) => (
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>{text}</div>
+                      );
+                      if (!state || state.loading) return note("Looking for alternate shapes…");
+                      if (!state.fontHasAlternates) return note("No alternate shapes in this font");
+                      if (letter === null)
+                        return note(
+                          "Click an outlined letter to step through its shapes; Shift-click goes back."
+                        );
+                      if (!target || !state.font) return note("This letter has no alternates");
+                      return (
+                        <>
+                          <AlternateStrip
+                            font={state.font}
+                            unitsPerEm={state.unitsPerEm}
+                            options={target.options}
+                            current={currentChoice(selectedBlock.glyphAlternates, target.letter)}
+                            onPick={(choice: AlternateChoice | null) =>
+                              onPickGlyphAlternate?.(selectedBlock.id, target.letter, choice)
+                            }
+                          />
+                          {note("Changing a letter's shape removes any stroke stretch on it.")}
+                        </>
+                      );
+                    })()}
+
+                    {(selectedBlock.glyphAlternates?.length ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => onResetGlyphAlternates?.(selectedBlock.id)}
+                        className="sidebarSmallAction"
+                        style={{ background: "var(--bg-input)", marginTop: 8 }}
+                      >
+                        Reset letter shapes
+                      </button>
+                    )}
+                  </div>
                 )}
 
                 {/* Plain text only: only ShapedText performs the outline

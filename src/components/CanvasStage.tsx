@@ -36,6 +36,10 @@ import {
 } from "../lib/snapping";
 import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
 import type { Block, DiacriticOverride, StrokeCut, KufiCellEdit } from "../types";
+import type { AlternateChoice, LetterAlternates } from "../lib/glyphAlternates";
+
+/** Stable empty list, so unselected blocks' memos do not re-run. */
+const NO_ALTERNATE_LETTERS: LetterAlternates[] = [];
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 import {
   imageProps,
@@ -103,6 +107,9 @@ export type CanvasStageProps = {
   onToggleDiacriticHidden: (blockId: number, glyphIndex: number) => void;
   /** One `pushHistory()` per stretch-handle drag, taken on drag start. */
   onBeginStrokeCut: () => void;
+  /** Next Shape: the selected text block's letters that have alternates. */
+  alternateLetters: LetterAlternates[];
+  onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
   onSetStrokeCut: (blockId: number, cut: StrokeCut) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   onResizeImageBlock: (id: number, scale: number) => void;
@@ -164,6 +171,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onToggleDiacriticHidden,
   onBeginStrokeCut,
   onSetStrokeCut,
+  alternateLetters,
+  onPickGlyphAlternate,
   onResizeShapeFillBlock,
   onResizeImageBlock,
   showRulers,
@@ -882,6 +891,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelected={block.id === selectedId}
                     strokeCutEditMode={block.strokeCutEditMode ?? false}
                     onBeginStrokeCut={onBeginStrokeCut}
+                    glyphAlternateMode={block.glyphAlternateMode ?? false}
+                    alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
+                    onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}
                     onSetStrokeCut={(cut) => onSetStrokeCut(block.id, cut)}
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)

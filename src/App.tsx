@@ -28,8 +28,16 @@ import {
 import {
   supportsDiacriticOverrides,
   supportsKufiCellEdits,
+  supportsGlyphAlternates,
   supportsStrokeCuts,
 } from "./lib/blockCapabilities";
+import { useGlyphAlternates } from "./hooks/useGlyphAlternates";
+import {
+  alternatesKey,
+  charAtLetter,
+  setAlternate,
+  type AlternateChoice,
+} from "./lib/glyphAlternates";
 import { arcPathD } from "./lib/textPath";
 import type { Block, DiacriticOverride, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
@@ -524,6 +532,21 @@ const App: React.FC = () => {
     [blocks, selectedId]
   );
 
+  // Next Shape: discovery runs only for the selected text block, and only
+  // while its tool is armed. The last letter clicked is UI state, not
+  // document state — it is neither saved nor undoable.
+  const alternateBlock =
+    selectedBlock && supportsGlyphAlternates(selectedBlock) && selectedBlock.glyphAlternateMode
+      ? selectedBlock
+      : null;
+  const glyphAlternatesState = useGlyphAlternates(
+    alternateBlock?.text ?? "",
+    alternateBlock?.fontFamily ?? "",
+    alternateBlock?.glyphAlternates,
+    alternateBlock !== null
+  );
+  const [alternateTarget, setAlternateTarget] = useState<{ blockId: number; letter: number } | null>(null);
+
   const canvasWidth = isMobile
     ? viewportWidth
     : Math.max(0, viewportWidth - effectiveSidebarWidth);
@@ -676,6 +699,52 @@ const App: React.FC = () => {
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === blockId && supportsStrokeCuts(b) ? { ...b, strokeCuts: [] } : b
+        )
+      );
+    },
+    [pushHistory]
+  );
+
+  /** One discrete undo step per pick — no debounce, it is not a drag. */
+  const pickGlyphAlternate = useCallback(
+    (blockId: number, letter: number, choice: AlternateChoice | null) => {
+      setAlternateTarget({ blockId, letter });
+      const block = blocks.find((b) => b.id === blockId);
+      if (!block || !supportsGlyphAlternates(block)) return;
+      const char = charAtLetter(block.text, letter);
+      if (char === null) return;
+      const next = setAlternate(block.glyphAlternates, letter, char, choice);
+      if (alternatesKey(next) === alternatesKey(block.glyphAlternates)) return;
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && supportsGlyphAlternates(b) ? { ...b, glyphAlternates: next } : b
+        )
+      );
+    },
+    [blocks, pushHistory]
+  );
+
+  const toggleGlyphAlternateMode = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && supportsGlyphAlternates(b)
+            ? { ...b, glyphAlternateMode: !b.glyphAlternateMode }
+            : b
+        )
+      );
+    },
+    [pushHistory]
+  );
+
+  const resetGlyphAlternates = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && supportsGlyphAlternates(b) ? { ...b, glyphAlternates: [] } : b
         )
       );
     },
@@ -2799,6 +2868,11 @@ const App: React.FC = () => {
           });
         }}
         onToggleStrokeCutMode={toggleStrokeCutMode}
+        glyphAlternatesState={glyphAlternatesState}
+        alternateTarget={alternateTarget}
+        onToggleGlyphAlternateMode={toggleGlyphAlternateMode}
+        onResetGlyphAlternates={resetGlyphAlternates}
+        onPickGlyphAlternate={pickGlyphAlternate}
         onClearStrokeCuts={clearStrokeCuts}
         onFitShapeFillSpacing={fitShapeFillSpacing}
         onAlignSelected={alignSelectedBlocks}
@@ -2874,6 +2948,8 @@ const App: React.FC = () => {
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
           onBeginStrokeCut={pushHistory}
+          alternateLetters={glyphAlternatesState.letters}
+          onPickGlyphAlternate={pickGlyphAlternate}
           onSetStrokeCut={setStrokeCut}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           onResizeImageBlock={resizeImageBlock}

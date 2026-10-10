@@ -41,6 +41,12 @@ import {
   type OverrideGlyph,
 } from "../lib/glyphOverrides";
 import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
+import { AlternateHoverHandles, type AlternateTarget } from "./AlternateHoverHandles";
+import {
+  letterAtOffset,
+  type AlternateChoice,
+  type LetterAlternates,
+} from "../lib/glyphAlternates";
 
 type Props = {
   id?: string;
@@ -69,6 +75,11 @@ type Props = {
   diacriticOverrides?: DiacriticOverride[];
   strokeCuts?: StrokeCut[];
   glyphAlternates?: GlyphAlternate[];
+  /** Arms the Next Shape overlay. */
+  glyphAlternateMode?: boolean;
+  /** The letters that have alternates — App passes them for the selected block only. */
+  alternateLetters?: LetterAlternates[];
+  onPickAlternate?: (letter: number, choice: AlternateChoice | null) => void;
   strokeCutEditMode?: boolean;
   onBeginStrokeCut?: () => void;
   onSetStrokeCut?: (cut: StrokeCut) => void;
@@ -306,6 +317,7 @@ function drawWarpedGlyphRun(
 const NO_DIACRITIC_OVERRIDES: DiacriticOverride[] = [];
 const NO_STROKE_CUTS: StrokeCut[] = [];
 const NO_GLYPH_ALTERNATES: GlyphAlternate[] = [];
+const NO_ALTERNATE_LETTERS: LetterAlternates[] = [];
 
 export const ShapedText: React.FC<Props> = ({
   id,
@@ -333,6 +345,9 @@ export const ShapedText: React.FC<Props> = ({
   diacriticOverrides = NO_DIACRITIC_OVERRIDES,
   strokeCuts = NO_STROKE_CUTS,
   glyphAlternates = NO_GLYPH_ALTERNATES,
+  glyphAlternateMode = false,
+  alternateLetters = NO_ALTERNATE_LETTERS,
+  onPickAlternate,
   strokeCutEditMode = false,
   onBeginStrokeCut,
   onSetStrokeCut,
@@ -600,6 +615,32 @@ export const ShapedText: React.FC<Props> = ({
     localDrawY,
   ]);
 
+  // One target per letter that has alternates, its box the union of every
+  // glyph in that letter's cluster (a letter and the marks on it).
+  const alternateTargets = useMemo<AlternateTarget[]>(() => {
+    if (!glyphAlternateMode || alternateLetters.length === 0) return [];
+    const byLetter = new Map(alternateLetters.map((l) => [l.letter, l]));
+    const boxes = new Map<number, { x1: number; y1: number; x2: number; y2: number }>();
+    for (const b of glyphHitBoxes) {
+      const g = shapeData.glyphs[b.glyphIndex];
+      const letter = letterAtOffset(shapeData.shapableText, g?.cl ?? -1);
+      if (!byLetter.has(letter)) continue;
+      const held = boxes.get(letter);
+      boxes.set(letter, {
+        x1: Math.min(held?.x1 ?? Infinity, b.x),
+        y1: Math.min(held?.y1 ?? Infinity, b.y),
+        x2: Math.max(held?.x2 ?? -Infinity, b.x + b.width),
+        y2: Math.max(held?.y2 ?? -Infinity, b.y + b.height),
+      });
+    }
+    return [...boxes].map(([letter, r]) => ({
+      key: String(letter),
+      letter,
+      box: { x: r.x1, y: r.y1, width: r.x2 - r.x1, height: r.y2 - r.y1 },
+      options: byLetter.get(letter)!.options,
+    }));
+  }, [glyphAlternateMode, alternateLetters, glyphHitBoxes, shapeData.glyphs, shapeData.shapableText]);
+
   return (
     <Group
       id={id}
@@ -749,11 +790,20 @@ export const ShapedText: React.FC<Props> = ({
       />
 
       {/*
-        Mounted BEFORE the diacritic overlay: a stretch rail runs along one
-        stroke inside a glyph, and a mark's target is smaller still. Konva
-        routes to the topmost listening shape and later siblings sit on top,
-        so this is largest -> smallest.
+        Largest -> smallest: a letter-sized alternates target, then a stretch
+        rail along one stroke inside a glyph, then a mark's smaller target.
+        Konva routes to the topmost listening shape and later siblings sit on
+        top, so the smaller targets must come later.
       */}
+      <AlternateHoverHandles
+        isSelected={isSelected}
+        enabled={glyphAlternateMode}
+        targets={alternateTargets}
+        alternates={glyphAlternates}
+        offsetX={bx + localDrawX}
+        offsetY={by + localDrawY}
+        onPick={onPickAlternate}
+      />
       <StrokeCutHoverHandles
         isSelected={isSelected}
         enabled={strokeCutEditMode}
