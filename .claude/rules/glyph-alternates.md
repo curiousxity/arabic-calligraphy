@@ -2,6 +2,7 @@
 paths:
   - "src/lib/glyphAlternates*.ts"
   - "src/lib/fontFeatureNames*.ts"
+  - "src/lib/alternateTargets*.ts"
   - "src/hooks/useGlyphAlternates.ts"
   - "src/components/AlternateHoverHandles.tsx"
   - "src/components/sidebar/AlternateStrip.tsx"
@@ -36,15 +37,38 @@ a proprietary variant library). Spec:
   App for the selected block).
 - **Names** come from the font's own FeatureParams via
   `readFeatureNames` — opentype.js does not resolve them.
-- **Overlay** mounts first in `ShapedText` (letter-sized rects below the
-  stroke rail and mark handles); hover handlers on the `Group`. A press on
-  an outlined letter cancels bubbling, so it never starts a block drag, and
-  the pick happens on **release** within `CLICK_SLOP` px of the press, for
-  the letter that was *pressed*. Konva's `click` does not fire once the
-  pointer has moved, and neighbouring letters' padded rects overlap, so a
-  drifting click often releases on the next letter. `click`/`dblclick` are
-  swallowed so a quick double click cannot reach the block's edit handler,
-  which would focus the textarea with the whole text selected.
+- **Overlay is pointer-resolved** (`AlternateHoverHandles` over
+  `lib/alternateTargets.ts`). One transparent listening `Rect` spans every
+  target, and the letter under the pointer is found by `hitTestTargets`
+  (box pre-check, then ray cast; the **last** match wins, which is paint
+  order). It is **not** one Konva node per letter: a Shape Fill silhouette
+  tiles ~23,000 letters, and that many listening nodes froze the tab when
+  the removed glyph-transform overlay tried it. Two nodes, whatever the
+  count; `e2e` asserts `alternate-hit` is exactly one on a Shape Fill.
+  - **Targets are group-space polygons**, built by each renderer from
+    geometry it already has.
+    - **Text:** the per-letter union of hit boxes, offset by
+      `bx + localDrawX`.
+    - **Shape Fill:** every tiled instance, through
+      `makeShapeFillInstanceAdapter`, so rotation, row fit and
+      `shapeScale` hold. The tiling walk runs while the diacritic tool or
+      Next Shape is armed.
+    - **Curve:** each letter's widest glyph through `curveGlyphPlacements`
+      / `curvePlacementToGroup`, the same placement the draw loop uses, so
+      the outline tilts with the letter.
+  - **Only a press on a target belongs to the tool.** It cancels bubbling,
+    so a drifting click never starts a block drag, and a press in a gap
+    bubbles, so the block still drags. The pick happens on **release**
+    within `CLICK_SLOP`, for the *pressed* letter. Konva's `click` does not
+    fire once the pointer has moved, and neighbours overlap.
+  - **A `dblclick` is swallowed if either press hit a letter within
+    `DOUBLE_CLICK_WINDOW_MS`.** The first click changes the shape and moves
+    the outline, so the second press often lands in a gap. Without this,
+    the block's edit handler would focus the textarea with the whole text
+    selected.
+  - **Tests** address targets through a non-listening marker
+    (`.alternate-targets`, attr `centers`, capped at 500), read by
+    `e2e/harf.ts`'s `alternateTargetCenters`.
 - **Sidebar view** is `alternatePanelView` (pure). A strip it can already
   draw wins over "loading", or the strip blinks out on every pick. The
   strip's letter goes through `resolveAlternateTarget`, which drops it once a
@@ -66,6 +90,7 @@ a proprietary variant library). Spec:
   keeps a set that is on listed even after the text stops using it, so it
   can always be unticked. Sets need no hit-testing, so they reach text,
   Shape Fill and Curve (`supportsStyleSets`).
-- **Scope (per-letter tool):** text blocks only (`supportsGlyphAlternates`). Shape Fill and
-  text-on-path are deferred; the practice sheet and name designs ignore
-  alternates.
+- **Scope (per-letter tool):** text, Shape Fill (one pick applies to every
+  tile, as diacritic overrides do) and Curve (`supportsGlyphAlternates`).
+  Per-tile choices were offered and declined. The practice sheet and name
+  designs ignore alternates.

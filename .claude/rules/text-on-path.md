@@ -47,12 +47,17 @@ selected and has `textPathEditMode` set, and is hidden during export
 `text-path-edit-layer-`, alongside the grid and artboard background it
 already hides).
 
-Per-glyph tools (move & scale, diacritic overrides) do not apply to
-`textPath` blocks — every internal per-glyph mutator guard excludes
-`"textPath"` the same way it has always excluded `"image"`. Those tools'
-hit-testing assumes a straight glyph bounding box; making it work once a
-glyph is rotated to a curve tangent
-is a real design problem, deliberately left for a future spec rather than
-half-supported here.
+**Drag-based** per-glyph tools (diacritic overrides, stroke stretching) do
+not apply to `textPath` blocks. Their guards exclude `"textPath"` the same
+way they exclude `"image"`. A drag needs an answer to "what does an offset
+mean along a curve": along the tangent, or along the arc? That is left for a
+future spec.
+
+**Next Shape is the exception**, and it is safe because it is click-only.
+It needs to know *which* letter is under the pointer, never how to move one.
+Glyph placement lives in `curveGlyphPlacements` (pure, in `lib/textPath.ts`):
+the draw loop renders from it and the overlay outlines from it, so a rotated
+outline cannot drift from its ink. Keep it that way: placement maths inlined
+back into the draw loop would silently desynchronise the two.
 
 <!-- ---- STREAM-G: font upload — document this feature here (see docs/superpowers/specs/PARALLEL-PHASE-2.md) ---- -->

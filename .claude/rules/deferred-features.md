@@ -9,6 +9,11 @@ paths:
 
 These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
 
+- **Drag-based per-glyph tools on text-on-path blocks** (diacritic
+  overrides; stretching is declined, below). The open question is what an
+  offset means along a curve: along the tangent, or along the arc. Click-only
+  Next Shape does reach curves — see [text-on-path.md](text-on-path.md).
+
 - **Straight-stroke stretching on Shape Fill and text-on-path blocks** —
   **Declined, not deferred**, and for a stronger reason than the one this
   entry used to give (that it was the same coordinate-space work as the

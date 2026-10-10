@@ -81,6 +81,15 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-10 — Next Shape on Shape Fill and Curve blocks
+
+The per-letter tool now works on Shape Fill (one pick changes that letter in
+every tile) and Curve blocks (the outline tilts with the letter). Its overlay
+became pointer-resolved: one listening node instead of one per letter, since a
+large silhouette tiles ~23,000 letters. The block still drags from the gaps
+between letters. Details in
+[glyph-alternates.md](.claude/rules/glyph-alternates.md).
+
 ### 2026-10-10 — Next Shape: block-level style sets
 
 Typography → Letter shapes now lists the font's named style sets that change

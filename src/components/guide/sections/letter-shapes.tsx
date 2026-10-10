@@ -9,8 +9,8 @@ export const section: GuideSection = {
     <>
       <p>
         Many fonts draw more than one version of some letters — a looped haa,
-        a tailed noon, a longer seen for justifying a line. On a text block,
-        open <strong>Typography</strong> and tick{" "}
+        a tailed noon, a longer seen for justifying a line. On a text, Shape
+        Fill or Curve block, open <strong>Typography</strong> and tick{" "}
         <strong>Alternate letter shapes</strong>. Letters that have other
         shapes outline when you hover them: click to step to the next shape,
         Shift-click to go back. The sidebar shows every shape for the letter
@@ -21,6 +21,11 @@ export const section: GuideSection = {
         Lateef and others have alternates; Thuluth and Diwani do not, and the
         sidebar will say so. <strong>Reset letter shapes</strong> puts every
         letter back.
+      </p>
+      <p>
+        On a <strong>Shape Fill</strong>, your words repeat across the whole
+        shape, so changing a letter in one tile changes it in every tile — the
+        choice belongs to the letter, not to the copy you clicked.
       </p>
       <p>
         To change every matching letter at once, tick a <strong>style set</strong>{" "}
