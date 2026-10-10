@@ -404,6 +404,11 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     const byLetter = new Map(alternateLetters.map((l) => [l.letter, l]));
     const out: AlternateHitTarget[] = [];
     glyphInstances.forEach((inst, i) => {
+      // A mark shares its base letter's cluster, so it would resolve to the
+      // same letter — but as a tiny quad drawn after (so above) the base,
+      // stealing the hover from the top of every vocalised letter. The text
+      // and Curve builders already target the letter, not its marks.
+      if (diacriticGlyphIndices.has(inst.glyphIndex)) return;
       const letter = letterAtOffset(shapeData.shapableText, shapeData.glyphs[inst.glyphIndex]?.cl ?? -1);
       const la = byLetter.get(letter);
       const box = glyphBoxByIndex.get(inst.glyphIndex);
@@ -435,6 +440,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     alternateLetters,
     glyphInstances,
     glyphBoxByIndex,
+    diacriticGlyphIndices,
     shapeData.glyphs,
     shapeData.shapableText,
     shapeFillTextRotation,

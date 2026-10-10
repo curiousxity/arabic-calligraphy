@@ -221,3 +221,27 @@ test("on a Curve block a click changes the letter, and undo restores it", async 
   await page.keyboard.press("Control+z");
   await expect.poll(async () => ((await block()).glyphAlternates ?? []).length).toBe(0);
 });
+
+test("on a Shape Fill block a mark is part of its letter's target, not one of its own", async ({ page }) => {
+  await gotoApp(page);
+  const id = await addOrnamentShapeFill(page);
+  await chooseFont(page, "Ruqaa");
+  await page.getByLabel("Alternate letter shapes").check();
+
+  const countFor = async (text: string) => {
+    await setBlockText(page, text, id);
+    await expect.poll(async () => (await alternateTargetCenters(page)).length).toBeGreaterThan(0);
+    await settleFrames(page);
+    return page.evaluate(
+      () => (window.__HARF__!.getStage()!.findOne(".alternate-targets")!.getAttr("count") as number) ?? -1
+    );
+  };
+  // A fatha has no advance, so the tiling is identical; only the targets
+  // could differ — and they must not, or hovering the top of a vocalised
+  // letter outlines its mark instead of the letter.
+  const plain = await countFor("هههه");
+  // The fatha rides on the second heh, which has alternates (Looped Haa).
+  const vocalised = await countFor("ههَهه");
+  expect(plain).toBeGreaterThan(0);
+  expect(vocalised).toBe(plain);
+});

@@ -166,7 +166,7 @@ export const AlternateHoverHandles: React.FC<Props> = ({
       )}
       {/* Read-only scene data for the e2e harness (`alternateTargetCenters`):
           with one hit node there is no per-letter node a test could find. */}
-      <Group name="alternate-targets" listening={false} centers={centres} />
+      <Group name="alternate-targets" listening={false} centers={centres} count={targets.length} />
     </Group>
   );
 };
