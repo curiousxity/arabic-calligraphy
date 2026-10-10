@@ -10,6 +10,7 @@ import {
   inkPixels,
   namedNodeCount,
   nodeClientBox,
+  placeAtCanvas,
   setBlockText,
   settleFrames,
 } from "./harf";
@@ -190,6 +191,33 @@ test("on a Shape Fill block one pick changes the letter in every tile, through o
   await expect.poll(async () => ((await block()).glyphAlternates ?? []).length).toBe(1);
   await expect.poll(() => inkPixels(page, box!)).not.toBe(inkBefore);
 
+  await page.keyboard.press("Control+z");
+  await expect.poll(async () => ((await block()).glyphAlternates ?? []).length).toBe(0);
+});
+
+test("on a Curve block a click changes the letter, and undo restores it", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Add curved text" }).click();
+  await placeAtCanvas(page, 0.6, 0.6);
+  await expect
+    .poll(async () => (await getBlocks(page)).some((b) => b.type === "textPath"))
+    .toBe(true);
+  const id = (await getBlocks(page)).find((b) => b.type === "textPath")!.id;
+  await setBlockText(page, "هههه", id);
+  await chooseFont(page, "Ruqaa");
+  await page.getByLabel("Alternate letter shapes").check();
+  await expect.poll(async () => (await alternateTargetCenters(page)).length).toBeGreaterThan(0);
+  await settleFrames(page);
+
+  const at = (await alternateTargetCenters(page))[0];
+  expect(await hitTargetAt(page, at)).toBe("Rect.alternate-hit");
+  await page.mouse.move(at.x, at.y);
+  await settleFrames(page);
+  expect(await namedNodeCount(page, "alternate-outline")).toBe(1);
+  await page.mouse.click(at.x, at.y);
+
+  const block = async () => (await getBlocks(page)).find((b) => b.id === id)!;
+  await expect.poll(async () => ((await block()).glyphAlternates ?? []).length).toBe(1);
   await page.keyboard.press("Control+z");
   await expect.poll(async () => ((await block()).glyphAlternates ?? []).length).toBe(0);
 });

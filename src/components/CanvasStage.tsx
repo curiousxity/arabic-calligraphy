@@ -962,6 +962,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     <TextOnPathText
                       {...commonProps}
                       {...textPathProps(block)}
+                      isSelected={block.id === selectedId}
+                      glyphAlternateMode={block.glyphAlternateMode ?? false}
+                      alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
+                      onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}
                       x={block.x}
                       y={block.y}
                       opacity={block.opacity ?? 1}
