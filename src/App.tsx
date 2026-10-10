@@ -30,9 +30,11 @@ import {
   supportsKufiCellEdits,
   supportsGlyphAlternates,
   supportsStrokeCuts,
+  supportsStyleSets,
 } from "./lib/blockCapabilities";
-import { useGlyphAlternates } from "./hooks/useGlyphAlternates";
+import { useGlyphAlternates, useStyleSets } from "./hooks/useGlyphAlternates";
 import {
+  activeStyleSets,
   alternatesKey,
   charAtLetter,
   setAlternate,
@@ -544,7 +546,17 @@ const App: React.FC = () => {
     alternateBlock?.text ?? "",
     alternateBlock?.fontFamily ?? "",
     alternateBlock?.glyphAlternates,
-    alternateBlock !== null
+    alternateBlock !== null,
+    alternateBlock?.styleSets
+  );
+  // The style-set toggles are probed whenever a block that can carry them is
+  // selected: one shaping pass per set, cheap enough not to need arming.
+  const styleSetsBlock =
+    selectedBlock && supportsStyleSets(selectedBlock) ? selectedBlock : null;
+  const styleSetsState = useStyleSets(
+    styleSetsBlock?.text ?? "",
+    styleSetsBlock?.fontFamily ?? "",
+    styleSetsBlock !== null
   );
   const [alternateTarget, setAlternateTarget] = useState<AlternateTarget | null>(null);
 
@@ -735,6 +747,24 @@ const App: React.FC = () => {
             ? { ...b, glyphAlternateMode: !b.glyphAlternateMode }
             : b
         )
+      );
+    },
+    [pushHistory]
+  );
+
+  /** Tick or untick one block-level style set — one undo step. */
+  const toggleStyleSet = useCallback(
+    (blockId: number, tag: string) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || !supportsStyleSets(b)) return b;
+          const current = activeStyleSets(b.styleSets);
+          const next = current.includes(tag)
+            ? current.filter((t) => t !== tag)
+            : activeStyleSets([...current, tag]).sort();
+          return { ...b, styleSets: next };
+        })
       );
     },
     [pushHistory]
@@ -2398,7 +2428,14 @@ const App: React.FC = () => {
           measure: (candidate) =>
             // Candidates only insert tatweel, which never moves a letter
             // ordinal, so the block's alternates apply to every one unchanged.
-            measureShapedWidth(candidate, fontUrl, fontSize, runStyle, selectedBlock.glyphAlternates),
+            measureShapedWidth(
+              candidate,
+              fontUrl,
+              fontSize,
+              runStyle,
+              selectedBlock.glyphAlternates,
+              selectedBlock.styleSets
+            ),
         });
         // A no-op result must not push history — clicking Fit on an
         // already-fitted run should not cost an undo step.
@@ -2875,6 +2912,8 @@ const App: React.FC = () => {
         onToggleGlyphAlternateMode={toggleGlyphAlternateMode}
         onResetGlyphAlternates={resetGlyphAlternates}
         onPickGlyphAlternate={pickGlyphAlternate}
+        styleSetsState={styleSetsState}
+        onToggleStyleSet={toggleStyleSet}
         onClearStrokeCuts={clearStrokeCuts}
         onFitShapeFillSpacing={fitShapeFillSpacing}
         onAlignSelected={alignSelectedBlocks}

@@ -96,6 +96,12 @@ type BlockCommon = {
   glyphAlternates?: GlyphAlternate[];
   /** Arms the on-canvas Next Shape tool. */
   glyphAlternateMode?: boolean;
+  /**
+   * Block-level OpenType style sets (`ss01`–`ss20`) applied to every letter;
+   * a letter with its own `glyphAlternates` entry overrides them. Absent
+   * means none. Text, Shape Fill and Curve blocks — see `supportsStyleSets`.
+   */
+  styleSets?: string[];
 
   // ---- STREAM-F: ink & surface — `fill` field on BlockCommon. Absent
   // means the existing flat `color` renders exactly as today. ----

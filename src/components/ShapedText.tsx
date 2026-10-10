@@ -75,6 +75,8 @@ type Props = {
   diacriticOverrides?: DiacriticOverride[];
   strokeCuts?: StrokeCut[];
   glyphAlternates?: GlyphAlternate[];
+  /** Block-level OpenType style sets, e.g. ["ss01"]. */
+  styleSets?: string[];
   /** Arms the Next Shape overlay. */
   glyphAlternateMode?: boolean;
   /** The letters that have alternates — App passes them for the selected block only. */
@@ -346,6 +348,7 @@ export const ShapedText: React.FC<Props> = ({
   diacriticOverrides = NO_DIACRITIC_OVERRIDES,
   strokeCuts = NO_STROKE_CUTS,
   glyphAlternates = NO_GLYPH_ALTERNATES,
+  styleSets,
   glyphAlternateMode = false,
   alternateLetters = NO_ALTERNATE_LETTERS,
   onPickAlternate,
@@ -365,7 +368,7 @@ export const ShapedText: React.FC<Props> = ({
   onDragEnd,
   debugBounds = false,
 }) => {
-  const shapeData = useShapedGlyphs(text, fontFamily, glyphAlternates);
+  const shapeData = useShapedGlyphs(text, fontFamily, glyphAlternates, styleSets);
   const { hbLoaded } = shapeData;
   const overrideGlyph = useOverrideGlyph();
 

@@ -25,9 +25,10 @@ export async function measureShapedWidth(
   fontUrl: string,
   fontSize: number,
   style: RunStyle = {},
-  alternates?: readonly GlyphAlternate[]
+  alternates?: readonly GlyphAlternate[],
+  styleSets?: readonly string[]
 ): Promise<number> {
-  return (await measureShapedRun(text, fontUrl, fontSize, style, alternates)).width;
+  return (await measureShapedRun(text, fontUrl, fontSize, style, alternates, styleSets)).width;
 }
 
 /**
@@ -49,9 +50,10 @@ export async function measureShapedRun(
   fontUrl: string,
   fontSize: number,
   style: RunStyle = {},
-  alternates?: readonly GlyphAlternate[]
+  alternates?: readonly GlyphAlternate[],
+  styleSets?: readonly string[]
 ): Promise<{ width: number; height: number }> {
-  const { glyphs, font, unitsPerEm } = await shapeText(text, fontUrl, alternates);
+  const { glyphs, font, unitsPerEm } = await shapeText(text, fontUrl, alternates, styleSets);
   const box = inkExtentBox(glyphs, font, fontSize, unitsPerEm);
   return { width: styledRunWidth(box, fontSize, style), height: box.height };
 }

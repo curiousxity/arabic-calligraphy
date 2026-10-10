@@ -4,7 +4,7 @@ export const section: GuideSection = {
   id: "letter-shapes",
   title: "Choosing a letter's shape",
   order: 37,
-  keywords: ["alternate", "shape", "next shape", "swash", "stylistic set", "letterform", "variant"],
+  keywords: ["alternate", "shape", "next shape", "swash", "stylistic set", "style set", "letterform", "variant"],
   Body: () => (
     <>
       <p>
@@ -21,6 +21,14 @@ export const section: GuideSection = {
         Lateef and others have alternates; Thuluth and Diwani do not, and the
         sidebar will say so. <strong>Reset letter shapes</strong> puts every
         letter back.
+      </p>
+      <p>
+        To change every matching letter at once, tick a <strong>style set</strong>{" "}
+        under Letter shapes — for example <em>Looped Haa</em> in Ruqaa. Only the
+        sets that change something in your text are listed. Style sets also
+        work on Shape Fill and Curve blocks. A letter you have picked by hand
+        keeps its own shape, and when a set is on, a letter's options include{" "}
+        <strong>Without style sets</strong>, to leave just that one out.
       </p>
       <p>
         While the tool is on, pressing an outlined letter always changes its

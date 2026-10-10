@@ -36,7 +36,8 @@ than a text box
   Coverage varies by font and letterform; not every stroke offers a handle.
 - **Next Shape.** Click a letter to step through the alternate shapes its
   font contains — looped, tailed, swash and justification forms — with
-  labelled thumbnails in the sidebar.
+  labelled thumbnails in the sidebar — or tick one of the font's named style
+  sets to restyle every matching letter at once.
 - **Kashida.** Insert real elongation (U+0640) at any legal join in a run —
   the connecting stroke is drawn at the letters' own weight, not a deformed
   outline — or hit Fit to width and let it solve the counts automatically to

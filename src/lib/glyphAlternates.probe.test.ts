@@ -8,6 +8,7 @@ import { normalizeGlyphs, type HarfBuzzGlyph } from "./normalizeGlyphs";
 import {
   fallbackFeatureLabel,
   probeAlternates,
+  probeStyleSets,
   MAX_PROBE_LETTERS,
   type LetterAlternates,
 } from "./glyphAlternates";
@@ -148,5 +149,52 @@ describe("probeAlternates (real HarfBuzz)", () => {
     const long = "ه".repeat(MAX_PROBE_LETTERS + 10);
     const letters = await probe("Ruqaa.ttf", long);
     expect(Math.max(...letters.map((l) => l.letter))).toBeLessThan(MAX_PROBE_LETTERS);
+  });
+});
+
+describe("style sets (real HarfBuzz)", () => {
+  it("offers only the sets that change a glyph in this text", async () => {
+    const text = "هههه";
+    const { tags, shape } = await openFont("Ruqaa.ttf");
+    const sets = probeStyleSets({ text, tags, shape: shape(text), labelFor: fallbackFeatureLabel });
+    const features = sets.map((s) => s.feature);
+    expect(features).toContain("ss01"); // Looped Haa
+    expect(features).not.toContain("ss03"); // Tailed Noon: no noon here
+    expect(features.every((f) => /^ss\d\d$/.test(f))).toBe(true);
+  });
+
+  it("finds none in a font without sets", async () => {
+    const text = "هههه";
+    const { tags, shape } = await openFont("Thuluth.ttf");
+    expect(probeStyleSets({ text, tags, shape: shape(text), labelFor: fallbackFeatureLabel })).toEqual([]);
+  });
+
+  it("a per-letter choice overrides a block set on its own letter only", async () => {
+    const text = "هههه";
+    const { shape } = await openFont("Ruqaa.ttf");
+    const run = shape(text);
+    const plain = run("");
+    const withSet = run("ss01");
+    const exempt = run("ss01,ss01[1:2]=0");
+    const g = (glyphs: typeof plain, cl: number) => glyphs.find((x) => x.cl === cl)!.g;
+    expect(g(withSet, 1)).not.toBe(g(plain, 1));
+    expect(g(exempt, 1)).toBe(g(plain, 1)); // back to the plain glyph
+    expect(g(exempt, 2)).toBe(g(withSet, 2)); // its neighbour keeps the set
+  });
+
+  it("offers 'Without style sets' on a letter the block's set changed", async () => {
+    const text = "هههه";
+    const { tags, shape } = await openFont("Ruqaa.ttf");
+    const letters = probeAlternates({
+      text,
+      alternates: [],
+      styleSets: ["ss01"],
+      tags,
+      shape: shape(text),
+      labelFor: fallbackFeatureLabel,
+    });
+    const second = letters.find((l) => l.letter === 1)!;
+    expect(second.options.map((o) => o.choice?.feature ?? null)).toContain("none");
+    expect(second.options.find((o) => o.choice?.feature === "none")!.label).toBe("Without style sets");
   });
 });

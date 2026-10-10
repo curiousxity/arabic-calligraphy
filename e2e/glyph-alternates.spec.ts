@@ -106,3 +106,27 @@ test("a click that slides a few pixels picks a shape instead of moving the block
   expect({ x: after.x, y: after.y }).toEqual({ x: before.x, y: before.y });
   expect(after.glyphAlternates ?? []).toHaveLength(1);
 });
+
+test("ticking a style set restyles every matching letter, and undo restores it", async ({ page }) => {
+  await gotoApp(page);
+  await setBlockText(page, "هههه");
+  await chooseFont(page, "Ruqaa");
+  const toggle = page.getByLabel("Looped Haa");
+  await expect(toggle).toBeVisible();
+  const box = await nodeClientBox(page, "#block-1");
+  const inkBefore = await inkPixels(page, box!);
+
+  await toggle.check();
+  await expect.poll(async () => (await getBlocks(page))[0].styleSets ?? []).toEqual(["ss01"]);
+  await expect.poll(() => inkPixels(page, box!)).not.toBe(inkBefore);
+
+  await page.keyboard.press("Control+z");
+  await expect.poll(async () => (await getBlocks(page))[0].styleSets ?? []).toEqual([]);
+});
+
+test("a font without style sets says so", async ({ page }) => {
+  await gotoApp(page);
+  await setBlockText(page, "هههه");
+  await chooseFont(page, "Thuluth");
+  await expect(page.getByText("No style sets in this font")).toBeVisible();
+});

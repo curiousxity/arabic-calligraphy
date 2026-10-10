@@ -30,6 +30,8 @@ export type TextOnPathTextProps = {
   textPathD: string;
   textPathReversed?: boolean;
   textPathBaselineOffset?: number;
+  /** Block-level OpenType style sets, e.g. ["ss01"]. */
+  styleSets?: string[];
 
   locked?: boolean;
   draggable?: boolean;
@@ -69,6 +71,7 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   textPathD,
   textPathReversed = false,
   textPathBaselineOffset = 0,
+  styleSets,
   locked,
   draggable = true,
   onClick,
@@ -77,7 +80,7 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   onDragMove,
   onDragEnd,
 }) => {
-  const { glyphs, font, unitsPerEm, hbLoaded } = useShapedGlyphs(text, fontFamily);
+  const { glyphs, font, unitsPerEm, hbLoaded } = useShapedGlyphs(text, fontFamily, undefined, styleSets);
   const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
 
   const parsedCmds = useMemo(() => parseSvgPath(textPathD || ""), [textPathD]);

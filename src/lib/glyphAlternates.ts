@@ -46,6 +46,24 @@ export function isOptionalFeature(tag: string): boolean {
   return OPTIONAL_FEATURE_RE.test(tag);
 }
 
+/**
+ * A per-letter entry whose feature is this exempts its letter from the
+ * block's style sets and applies nothing else ("Without style sets").
+ */
+export const NO_STYLE_SETS = "none";
+
+const STYLE_SET_RE = /^ss(0[1-9]|1[0-9]|20)$/;
+
+/**
+ * The block-level style sets that may reach HarfBuzz: `ss01`–`ss20` only,
+ * once each. Other alternates (`salt`, `jalt`, …) stay per-letter — applied
+ * to every letter at once they would read as noise, not as a style.
+ */
+export function activeStyleSets(sets: readonly string[] | undefined): string[] {
+  if (!Array.isArray(sets)) return [];
+  return [...new Set(sets.filter((t): t is string => typeof t === "string" && STYLE_SET_RE.test(t)))];
+}
+
 function isSkipped(text: string, i: number): boolean {
   const code = text.charCodeAt(i);
   if (code >= 0xdc00 && code <= 0xdfff) return true; // low surrogate: counted with its high half
@@ -104,25 +122,39 @@ export function activeAlternates(
     return (
       offset !== undefined &&
       text[offset] === a.char &&
-      isOptionalFeature(a.feature) &&
+      (isOptionalFeature(a.feature) || a.feature === NO_STYLE_SETS) &&
       isValidValue(a.value)
     );
   });
 }
 
+/**
+ * The HarfBuzz feature string for a run: the block's style sets over the
+ * whole run first, then each letter's own choice. HarfBuzz applies features
+ * in order, so a letter with a choice first has the block's sets switched
+ * back off on its range (`ss01[5:6]=0`) — a letter picked by hand always
+ * shows exactly what was picked.
+ */
 export function featureStringFor(
   text: string,
   alternates: readonly GlyphAlternate[] | undefined,
-  exceptLetter?: number
+  exceptLetter?: number,
+  styleSets?: readonly string[]
 ): string {
+  const sets = activeStyleSets(styleSets);
   const offsets = letterOffsets(text);
-  return activeAlternates(text, alternates)
-    .filter((a) => a.letter !== exceptLetter)
-    .map((a) => {
-      const o = offsets[a.letter];
-      return `${a.feature}[${o}:${o + 1}]=${a.value}`;
-    })
-    .join(",");
+  const parts: string[] = [...sets];
+  for (const a of activeAlternates(text, alternates)) {
+    if (a.letter === exceptLetter) continue;
+    const o = offsets[a.letter];
+    parts.push(...setsOffAt(sets, o));
+    if (a.feature !== NO_STYLE_SETS) parts.push(`${a.feature}[${o}:${o + 1}]=${a.value}`);
+  }
+  return parts.join(",");
+}
+
+function setsOffAt(sets: readonly string[], offset: number): string[] {
+  return sets.map((t) => `${t}[${offset}:${offset + 1}]=0`);
 }
 
 /** A stable identity for a block's alternates, for cache keys and effect deps. */
@@ -168,6 +200,7 @@ export function setAlternate(
 
 export function fallbackFeatureLabel(choice: AlternateChoice): string {
   const { feature, value } = choice;
+  if (feature === NO_STYLE_SETS) return "Without style sets";
   if (feature.startsWith("ss")) return `Style set ${Number(feature.slice(2))}`;
   if (feature.startsWith("cv")) return `Variant ${Number(feature.slice(2))}`;
   if (feature === "jalt") return value > 1 ? `Justification ${value}` : "Justification";
@@ -205,12 +238,15 @@ function mainGlyph(glyphs: HarfBuzzGlyph[], offset: number): number {
 export function probeAlternates(args: {
   text: string;
   alternates: readonly GlyphAlternate[] | undefined;
+  /** The block's style sets: every letter is probed starting from them. */
+  styleSets?: readonly string[];
   tags: readonly string[];
   shape: ShapeFn;
   labelFor: (choice: AlternateChoice) => string;
   maxLetters?: number;
 }): LetterAlternates[] {
   const { text, alternates, shape, labelFor } = args;
+  const sets = activeStyleSets(args.styleSets);
   const tags = [...new Set(args.tags)].filter(isOptionalFeature);
   if (tags.length === 0) return [];
 
@@ -228,7 +264,7 @@ export function probeAlternates(args: {
   const out: LetterAlternates[] = [];
 
   offsets.forEach((offset, letter) => {
-    const base = featureStringFor(text, alternates, letter);
+    const base = featureStringFor(text, alternates, letter, sets);
     const baseGlyphs = shapeOnce(base);
     const baseSig = clusterSignature(baseGlyphs, offset);
     if (baseSig === "") return; // consumed into another letter's ligature
@@ -237,12 +273,26 @@ export function probeAlternates(args: {
       { choice: null, glyphId: mainGlyph(baseGlyphs, offset), label: "Default" },
     ];
     const seen = new Set([baseSig]);
+    // Every candidate turns the block's sets off on this letter first, as
+    // `featureStringFor` will when the choice is stored.
+    const off = setsOffAt(sets, offset).join(",");
+    const join = (...parts: string[]) => parts.filter(Boolean).join(",");
+
+    if (sets.length > 0) {
+      const glyphs = shapeOnce(join(base, off));
+      const sig = clusterSignature(glyphs, offset);
+      if (sig !== "" && !seen.has(sig)) {
+        seen.add(sig);
+        const choice = { feature: NO_STYLE_SETS, value: 1 };
+        options.push({ choice, glyphId: mainGlyph(glyphs, offset), label: labelFor(choice) });
+      }
+    }
 
     for (const feature of tags) {
       const maxValue = MULTI_VALUE_FEATURES.has(feature) ? MAX_ALTERNATE_VALUE : 1;
       for (let value = 1; value <= maxValue; value++) {
         const probe = `${feature}[${offset}:${offset + 1}]=${value}`;
-        const glyphs = shapeOnce(base ? `${base},${probe}` : probe);
+        const glyphs = shapeOnce(join(base, off, probe));
         const sig = clusterSignature(glyphs, offset);
         if (sig === "" || seen.has(sig)) continue;
         seen.add(sig);
@@ -305,4 +355,27 @@ export function resolveAlternateTarget(
 ): number | null {
   if (!target || target.blockId !== blockId) return null;
   return charAtLetter(text, target.letter) === target.char ? target.letter : null;
+}
+
+export type StyleSetOption = { feature: string; label: string };
+
+/**
+ * The font's style sets that change at least one glyph of this text, for the
+ * block-level toggles. One shaping pass per set; a set that touches nothing
+ * here (Amiri's "Localised @ and &" on Arabic words) is left out rather than
+ * offered as a checkbox that does nothing.
+ */
+export function probeStyleSets(args: {
+  text: string;
+  tags: readonly string[];
+  shape: ShapeFn;
+  labelFor: (choice: AlternateChoice) => string;
+}): StyleSetOption[] {
+  const sig = (glyphs: HarfBuzzGlyph[]) => glyphs.map((g) => g.g).join(",");
+  const tags = activeStyleSets([...args.tags]).sort();
+  if (tags.length === 0 || args.text.length === 0) return [];
+  const plain = sig(args.shape(""));
+  return tags
+    .filter((feature) => sig(args.shape(feature)) !== plain)
+    .map((feature) => ({ feature, label: args.labelFor({ feature, value: 1 }) }));
 }

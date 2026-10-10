@@ -53,6 +53,19 @@ a proprietary variant library). Spec:
   (their `glyphId` checksum), which is correct. A ligature-forming
   alternate can shift diacritic-override indices after it; those are
   re-validated and drop.
-- **Scope:** text blocks only (`supportsGlyphAlternates`). Shape Fill and
+- **Block-level style sets** (`styleSets: string[]`, `ss01`–`ss20` only,
+  via `activeStyleSets`) apply a set to every letter. `featureStringFor`
+  emits them **first**, then per letter: the block's sets switched back off
+  on that letter's range (`ss01[5:6]=0`), then its own choice. HarfBuzz
+  applies features in order (verified: the reverse order does not give the
+  plain glyph back). So a hand-picked letter shows exactly what was picked,
+  and the per-letter feature `"none"` (`NO_STYLE_SETS`, "Without style
+  sets") exempts one letter and adds nothing. `probeAlternates` probes from
+  the block's sets, with them off on the letter for every candidate.
+  `probeStyleSets` lists only the sets that change this text; the sidebar
+  keeps a set that is on listed even after the text stops using it, so it
+  can always be unticked. Sets need no hit-testing, so they reach text,
+  Shape Fill and Curve (`supportsStyleSets`).
+- **Scope (per-letter tool):** text blocks only (`supportsGlyphAlternates`). Shape Fill and
   text-on-path are deferred; the practice sheet and name designs ignore
   alternates.

@@ -64,6 +64,8 @@ export type ShapeFillTextProps = {
   rotation?: number;
   diacriticEditMode?: boolean;
   diacriticOverrides?: DiacriticOverride[];
+  /** Block-level OpenType style sets, e.g. ["ss01"]. */
+  styleSets?: string[];
   onBeginDiacriticDrag?: () => void;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
@@ -203,6 +205,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   rotation = 0,
   diacriticEditMode = false,
   diacriticOverrides = NO_DIACRITIC_OVERRIDES,
+  styleSets,
   onBeginDiacriticDrag,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
@@ -212,7 +215,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   isSelected = false,
   onResizeScale,
 }) => {
-  const shapeData = useShapedGlyphs(text, fontFamily);
+  const shapeData = useShapedGlyphs(text, fontFamily, undefined, styleSets);
 
   const groupRef = useRef<Konva.Group>(null);
   /** The block's absolute position at drag start, while the diacritic tool pins it. */
