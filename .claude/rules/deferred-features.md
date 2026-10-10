@@ -9,20 +9,10 @@ paths:
 
 These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
 
-- **Per-glyph move, scale & rotate on text-on-path blocks** — Shape Fill
-  shipped (see [glyph-transform.md](glyph-transform.md)); text-on-path did not, and the reason is
-  its own rather than the coordinate-space work Shape Fill needed.
-  `TextOnPathText` has no metrics pass, no hit boxes, no `isSelected` prop and
-  no overlay of any kind, and — the part a spec has to answer first —
-  `offsetX` on a curve has no defined meaning: along the tangent, or along
-  arc length? That question has now been deferred twice. It is excluded for
-  the same reason every other per-glyph tool excludes it, its glyphs being
-  rotated to a curve tangent.
-
 - **Straight-stroke stretching on Shape Fill and text-on-path blocks** —
   **Declined, not deferred**, and for a stronger reason than the one this
-  entry used to give (that it was the same coordinate-space work as per-glyph
-  move & scale). The detector and the surgery really are block-type agnostic,
+  entry used to give (that it was the same coordinate-space work as the
+  since-removed per-glyph move & scale). The detector and the surgery really are block-type agnostic,
   so that framing looked right; the blocker is downstream of both.
 
   **Both target renderers renormalise the run to a fixed span.**

@@ -78,8 +78,7 @@ HarfBuzz output for real fonts in `public/fonts/`, not hand-written
 exactly what let the cluster-lookup bug ship unnoticed once before).
 
 Overrides (`DiacriticOverride` in `types.ts`: `scale`/`offsetY`/`hidden`,
-default no-op) are keyed by glyph index — the same scheme
-`GlyphTransform` also uses, including that scheme's known fragility (a text
+default no-op) are keyed by glyph index, which has a known fragility (a text
 edit before a diacritic in the string can
 shift which glyph index its override lands on after re-shaping). Because
 of that fragility, `ShapedText.tsx` recomputes `findDiacriticGlyphIndices`
@@ -151,12 +150,11 @@ tiles its run across the whole silhouette and two marks can become 200+
 instances. Because overrides are keyed by glyph index, one
 adjustment applies to every tiled repetition.
 
-That checkbox used to be the *sole* gate on `glyphInstances`'s memo and on
-the block's `dragBoundFunc` pin. It is not any more: per-glyph transforms
-reached Shape Fill and need the same instance layout and the same pin, so
-both now read `diacriticEditMode || glyphTransformMode` (`pinDrag` in
-`ShapeFillText`). Arming either tool is what makes the tiled layout get
-computed and the silhouette stop being draggable.
+That checkbox is the sole gate on `glyphInstances`'s memo and on the
+block's `dragBoundFunc` pin (`pinDrag` in `ShapeFillText`): arming it is what
+makes the tiled layout get computed and the silhouette stop being draggable.
+(Per-glyph move/scale/rotate shared both while it existed; it was removed on
+2026-10-10 — [removed-subsystems.md](removed-subsystems.md).)
 
 `App.tsx`'s `dragDiacriticOverride`/`toggleDiacriticHidden` gate on
 `supportsDiacriticOverrides(b)` rather than `b.type === "text"`. Widening

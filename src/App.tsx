@@ -27,12 +27,11 @@ import {
 } from "./lib/canvasBounds";
 import {
   supportsDiacriticOverrides,
-  supportsGlyphTransforms,
   supportsKufiCellEdits,
   supportsStrokeCuts,
 } from "./lib/blockCapabilities";
 import { arcPathD } from "./lib/textPath";
-import type { Block, DiacriticOverride, GlyphTransform, StrokeCut } from "./types";
+import type { Block, DiacriticOverride, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
   isCloudConfigured,
@@ -131,7 +130,6 @@ import {
 import type { MirrorMode, SquareKufiBlock } from "./types";
 import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
-import { mergeGlyphTransform } from "./lib/glyphTransform";
 import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
 import { cutAdvanceTotal, remapCutsForEdits } from "./lib/strokeCuts";
 import { nuqtaUnits } from "./lib/nuqta";
@@ -280,13 +278,14 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
 /**
- * Fields the removed Morph Glyph Editor wrote onto blocks. A project saved
- * before 2026-08-14 still carries them; nothing reads them any more, so they
- * are stripped on load rather than left to ride along in every subsequent
- * save — same treatment, and the same reasoning, as the `shapeWarp` filter
- * in `applyParsedLayoutPayload`.
+ * Fields that removed subsystems wrote onto blocks. A project saved before a
+ * removal still carries them; nothing reads them any more, so they are
+ * stripped on load rather than left to ride along in every subsequent save —
+ * same treatment, and the same reasoning, as the `shapeWarp` filter in
+ * `applyParsedLayoutPayload`. See `.claude/rules/removed-subsystems.md`.
  */
-const MORPH_BLOCK_FIELDS = [
+const REMOVED_BLOCK_FIELDS = [
+  // The Morph Glyph Editor, removed 2026-08-14.
   "glyphEdits",
   "glyphRigValues",
   "glyphMaskEdit",
@@ -294,11 +293,15 @@ const MORPH_BLOCK_FIELDS = [
   "selectedGlyphIndex",
   "kashidaAmount",
   "kashidaEditMode",
+  // Per-glyph move, scale & rotate, removed 2026-10-10. A letter moved,
+  // scaled or turned in an older project loads back where HarfBuzz puts it.
+  "glyphTransforms",
+  "glyphTransformMode",
 ] as const;
 
-const stripMorphFields = (block: Block): Block => {
+const stripRemovedFields = (block: Block): Block => {
   const next = { ...block } as Block & Record<string, unknown>;
-  for (const field of MORPH_BLOCK_FIELDS) delete next[field];
+  for (const field of REMOVED_BLOCK_FIELDS) delete next[field];
   return next;
 };
 
@@ -589,7 +592,7 @@ const App: React.FC = () => {
   const scheduleMoveHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleTextPathHistoryPush = useDebouncedHistoryPush(pushHistory);
   const scheduleDiacriticHistoryPush = useDebouncedHistoryPush(pushHistory);
-  const scheduleGlyphTransformHistoryPush = useDebouncedHistoryPush(pushHistory);
+  const scheduleStrokeCutHistoryPush = useDebouncedHistoryPush(pushHistory);
 
   const dragDiacriticOverride = useCallback(
     (blockId: number, glyphIndex: number, patch: Partial<DiacriticOverride>) => {
@@ -630,55 +633,6 @@ const App: React.FC = () => {
     [pushHistory]
   );
 
-  const updateGlyphTransform = useCallback(
-    (blockId: number, glyphIndex: number, patch: Partial<GlyphTransform>) => {
-      setBlocks((prev) =>
-        prev.map((b) => {
-          if (b.id !== blockId || !supportsGlyphTransforms(b)) return b;
-          const existing = (b.glyphTransforms ?? []).find((t) => t.glyphIndex === glyphIndex);
-          // `mergeGlyphTransform` owns the stale-entry rule — see its comment.
-          const merged = mergeGlyphTransform(existing, glyphIndex, patch);
-          const nextTransforms = existing
-            ? (b.glyphTransforms ?? []).map((t) =>
-                t.glyphIndex === glyphIndex ? merged : t
-              )
-            : [...(b.glyphTransforms ?? []), merged];
-          return { ...b, glyphTransforms: nextTransforms };
-        })
-      );
-      // Debounced: one continuous drag collapses to a single undo entry,
-      // the same treatment a diacritic drag gets.
-      scheduleGlyphTransformHistoryPush();
-    },
-    [scheduleGlyphTransformHistoryPush]
-  );
-
-  const toggleGlyphTransformMode = useCallback(
-    (blockId: number) => {
-      pushHistory();
-      setBlocks((prev) =>
-        prev.map((b) =>
-          b.id === blockId && supportsGlyphTransforms(b)
-            ? { ...b, glyphTransformMode: !b.glyphTransformMode }
-            : b
-        )
-      );
-    },
-    [pushHistory]
-  );
-
-  const resetGlyphTransforms = useCallback(
-    (blockId: number) => {
-      pushHistory();
-      setBlocks((prev) =>
-        prev.map((b) =>
-          b.id === blockId && supportsGlyphTransforms(b) ? { ...b, glyphTransforms: [] } : b
-        )
-      );
-    },
-    [pushHistory]
-  );
-
   /**
    * Write one stroke cut, replacing any cut already at the same place on the
    * same letter. A cut of zero nuqta is a removal rather than a stored
@@ -696,10 +650,10 @@ const App: React.FC = () => {
         })
       );
       // Debounced, so one continuous drag is a single undo entry — the same
-      // treatment a glyph-transform or diacritic drag gets.
-      scheduleGlyphTransformHistoryPush();
+      // treatment a diacritic drag gets.
+      scheduleStrokeCutHistoryPush();
     },
-    [scheduleGlyphTransformHistoryPush]
+    [scheduleStrokeCutHistoryPush]
   );
 
   const toggleStrokeCutMode = useCallback(
@@ -1474,7 +1428,7 @@ const App: React.FC = () => {
     const parsedBlocks = Array.isArray(parsed.blocks)
       ? (parsed.blocks as Block[])
           .filter((b) => (b as { type?: string }).type !== "shapeWarp")
-          .map(stripMorphFields)
+          .map(stripRemovedFields)
       : null;
     // `let` because the STREAM-B sanitation region below reassigns it.
     let blocksToLoad: Block[] | null = parsedBlocks;
@@ -2842,8 +2796,6 @@ const App: React.FC = () => {
             diacriticEditMode: !selectedBlock.diacriticEditMode,
           });
         }}
-        onToggleGlyphTransformMode={toggleGlyphTransformMode}
-        onResetGlyphTransforms={resetGlyphTransforms}
         onToggleStrokeCutMode={toggleStrokeCutMode}
         onClearStrokeCuts={clearStrokeCuts}
         onFitShapeFillSpacing={fitShapeFillSpacing}
@@ -2919,7 +2871,6 @@ const App: React.FC = () => {
           onSetKufiCell={setKufiCell}
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
-          onUpdateGlyphTransform={updateGlyphTransform}
           onSetStrokeCut={setStrokeCut}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           onResizeImageBlock={resizeImageBlock}

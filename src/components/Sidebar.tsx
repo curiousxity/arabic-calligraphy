@@ -49,7 +49,6 @@ import {
   normalizeKufiComposition,
   DEFAULT_KUFI_OPTIONS,
 } from "../lib/squareKufi";
-import { supportsGlyphTransforms } from "../lib/blockCapabilities";
 import {
   TrashIcon,
   CopyIcon,
@@ -270,9 +269,6 @@ export type SidebarProps = {
   onCaptureCurrentThumbnail: () => string;
 
   onToggleDiacriticEditMode?: () => void;
-  /** Arms the on-canvas per-glyph move/scale dots. Plain text blocks only. */
-  onToggleGlyphTransformMode?: (blockId: number) => void;
-  onResetGlyphTransforms?: (blockId: number) => void;
   onToggleStrokeCutMode?: (blockId: number) => void;
   onClearStrokeCuts?: (blockId: number) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
@@ -524,8 +520,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onJumpToHistory,
   onCaptureCurrentThumbnail,
   onToggleDiacriticEditMode,
-  onToggleGlyphTransformMode,
-  onResetGlyphTransforms,
   onToggleStrokeCutMode,
   onClearStrokeCuts,
   onFitShapeFillSpacing,
@@ -3216,54 +3210,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 )}
 
-                {/* Relocated here when the Morph Glyph Editor panel was
-                    removed. Gated on the same shared predicate the state
-                    layer's mutators use, never on a longhand copy of it: a
-                    capability widened in one place and not the other type
-                    checks perfectly and leaves a checkbox that arms nothing. */}
-                {supportsGlyphTransforms(selectedBlock) && (
-                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Move, scale &amp; rotate</div>
-
-                    <CheckboxRow
-                      id={makeId("glyph-transform-mode", selectedId)}
-                      label="Move, scale &amp; rotate glyph"
-                      checked={!!selectedBlock.glyphTransformMode}
-                      onChange={() => onToggleGlyphTransformMode?.(selectedBlock.id)}
-                      demo={{
-                        src: "/demos/glyph-move-scale-rotate.gif",
-                        alt: "Hovering a letter shows move, scale and rotate handles",
-                      }}
-                    />
-
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                      Hover a letter on the canvas to move it, stretch it in x or y, or
-                      turn it. Neighbouring letters never shift.
-                      {selectedBlock.type === "shapeFill" && (
-                        <>
-                          {" "}
-                          On a shape fill the handles sit on one tile near the middle
-                          of the shape, and one adjustment applies to every repetition
-                          of that letter.
-                        </>
-                      )}
-                    </div>
-
-                    {(selectedBlock.glyphTransforms?.length ?? 0) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => onResetGlyphTransforms?.(selectedBlock.id)}
-                        className="sidebarSmallAction"
-                        style={{ background: "var(--bg-input)", marginTop: 8 }}
-                      >
-                        Reset glyph moves, scales &amp; turns
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Plain text only, matching the Move, scale & rotate row above and
-                    for the same reason: only ShapedText performs the outline
+                {/* Plain text only: only ShapedText performs the outline
                     surgery, so arming it elsewhere would show handles that
                     stretch nothing. */}
                 {selectedBlock.type === "text" && (

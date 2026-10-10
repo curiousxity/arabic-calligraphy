@@ -656,8 +656,8 @@ export type StrokeCut = {
   /** The stroke's inclination, radians. Stored because it is a property of
    *  the cut, not something re-derivable once the outline has moved. */
   angle: number;
-  /** Shaped glyph id present when the cut was made — a checksum, exactly as
-   *  `GlyphTransform.glyphId` is used. Optional for the same reason: a cut
+  /** Shaped glyph id present when the cut was made — a checksum. Optional
+   *  on purpose: a cut
    *  saved before the field existed cannot be validated, and keeps its
    *  original behaviour rather than being silently discarded. */
   glyphId?: number;

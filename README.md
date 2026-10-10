@@ -43,11 +43,6 @@ than a text box
   blocks alike.
 
   ![Hovering a diacritic mark shows reposition, resize and hide handles](docs/media/diacritic-hover-handles.gif)
-- **Move, scale and rotate any single glyph.** Arm the tool and hover a
-  letter to see its four handles — move, scale x, scale y, turn. Works on
-  plain text and Shape Fill.
-
-  ![Hovering a letter shows move, scale and rotate handles; dragging them repositions and turns the glyph](docs/media/glyph-move-scale-rotate.gif)
 
 **Composition**
 

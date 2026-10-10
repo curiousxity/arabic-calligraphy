@@ -35,7 +35,7 @@ import {
   type SnapTarget,
 } from "../lib/snapping";
 import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
-import type { Block, DiacriticOverride, GlyphTransform, StrokeCut, KufiCellEdit } from "../types";
+import type { Block, DiacriticOverride, StrokeCut, KufiCellEdit } from "../types";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 import {
   imageProps,
@@ -102,11 +102,6 @@ export type CanvasStageProps = {
   ) => void;
   onToggleDiacriticHidden: (blockId: number, glyphIndex: number) => void;
   onSetStrokeCut: (blockId: number, cut: StrokeCut) => void;
-  onUpdateGlyphTransform: (
-    blockId: number,
-    glyphIndex: number,
-    patch: Partial<GlyphTransform>
-  ) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   onResizeImageBlock: (id: number, scale: number) => void;
   showRulers: boolean;
@@ -165,7 +160,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSetKufiCell,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
-  onUpdateGlyphTransform,
   onSetStrokeCut,
   onResizeShapeFillBlock,
   onResizeImageBlock,
@@ -862,10 +856,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
                     diacriticEditMode={block.diacriticEditMode ?? false}
-                    glyphTransformMode={block.glyphTransformMode ?? false}
-                    onUpdateGlyphTransform={(glyphIndex, patch) =>
-                      onUpdateGlyphTransform(block.id, glyphIndex, patch)
-                    }
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)
                     }
@@ -887,12 +877,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     y={block.y}
                     opacity={block.opacity ?? 1}
                     isSelected={block.id === selectedId}
-                    glyphTransformMode={block.glyphTransformMode ?? false}
                     strokeCutEditMode={block.strokeCutEditMode ?? false}
                     onSetStrokeCut={(cut) => onSetStrokeCut(block.id, cut)}
-                    onUpdateGlyphTransform={(glyphIndex, patch) =>
-                      onUpdateGlyphTransform(block.id, glyphIndex, patch)
-                    }
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)
                     }

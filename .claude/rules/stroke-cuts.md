@@ -108,10 +108,10 @@ The zone sweep in `ShapedText` runs **only while the tool is armed**: it
 rotates every glyph outline through fifteen candidate angles, which is far too
 much to run on every text block on the canvas all the time.
 
-`StrokeCutHoverHandles.tsx` is the on-canvas overlay, mounted **between**
-`GlyphTransformHoverHandles` and `DiacriticHoverHandles` — Konva routes to the
-topmost listening shape and later siblings sit on top, so the order is
-largest → smallest (glyph rect, stroke rail, mark). Its hover handlers sit on
+`StrokeCutHoverHandles.tsx` is the on-canvas overlay, mounted **before**
+`DiacriticHoverHandles` — Konva routes to the topmost listening shape and
+later siblings sit on top, so the order is largest → smallest (stroke rail,
+then mark). Its hover handlers sit on
 the per-zone `Group`, never on the hit `Rect`, for the reason recorded in
 [e2e-tests.md](e2e-tests.md); `e2e/stroke-cuts.spec.ts` pins that with the same
 every-other-frame check the other two overlays have.

@@ -10,9 +10,9 @@ export type TextAlign = "left" | "center" | "right";
 
 /**
  * A per-instance manual adjustment to one shaped diacritic glyph — keyed
- * by glyphIndex, the same scheme GlyphTransform also uses (and shares its
- * known fragility: a text edit before this glyph in the string can shift
- * which glyph index the override lands on after re-shaping).
+ * by glyphIndex, which has a known fragility: a text edit before this glyph
+ * in the string can shift which glyph index the override lands on after
+ * re-shaping.
  */
 export type DiacriticOverride = {
   glyphIndex: number;
@@ -22,53 +22,6 @@ export type DiacriticOverride = {
   offsetY?: number;
   /** When true, this instance is skipped entirely during drawing. */
   hidden?: boolean;
-};
-
-/**
- * A rigid whole-glyph transform — move and independent x/y scale — keyed
- * by glyphIndex. Distinct from DiacriticOverride (uniform scale + vertical
- * offset, marks only): this moves and scales the finished glyph as a unit.
- *
- * Shares glyphIndex keying with it, including its known fragility: a text
- * edit before this glyph shifts which index the transform lands on after
- * re-shaping. Every glyph is a legitimate target, so unlike DiacriticOverride
- * there is no *inherent* signal to re-check against — which is why the
- * `glyphId` below is recorded and checked instead.
- */
-export type GlyphTransform = {
-  glyphIndex: number;
-  /**
-   * The shaped glyph id this transform was created for, used to notice when
-   * a text edit has shifted `glyphIndex` onto a different letter — see
-   * `ShapedText`'s `activeGlyphTransforms`.
-   *
-   * Optional on purpose: a transform saved before this field existed cannot
-   * be validated, so it keeps the original behaviour of applying to whatever
-   * glyph now holds its index rather than being silently discarded.
-   */
-  glyphId?: number;
-  /** Horizontal shift in local (unscaled) units. Default 0. */
-  offsetX?: number;
-  /** Vertical shift in local (unscaled) units. Default 0. */
-  offsetY?: number;
-  /** Multiplier on the glyph's natural width. Default 1. */
-  scaleX?: number;
-  /** Multiplier on the glyph's natural height. Default 1. */
-  scaleY?: number;
-  /**
-   * Turn, in degrees clockwise, about the glyph's own *raw* box centre.
-   *
-   * Applied inside the scale, so at a non-uniform scale a rotated letter is
-   * stretched along the block's axes rather than along its own. That keeps
-   * the rotation pivot independent of the scale being dragged — the scale
-   * handles snapshot their pivot at drag start, and a pivot that moved with
-   * the scale would reintroduce the convergence bug `scaleFromHandleDrag`
-   * exists to prevent. Identical either way whenever `scaleX === scaleY`.
-   *
-   * Optional: absent means no rotation, which is byte-for-byte the rendering
-   * that predates the handle.
-   */
-  rotation?: number;
 };
 
 // ---- STREAM-F: ink & surface — BlockFill type ----
@@ -115,20 +68,11 @@ type BlockCommon = {
   diacriticOverrides?: DiacriticOverride[];
 
   /**
-   * Per-glyph rigid move/scale. Plain text blocks only for v1 — the other
-   * block types inherit the field unused, the same intentional
-   * simplification BlockCommon already makes for diacriticOverrides.
-   */
-  glyphTransforms?: GlyphTransform[];
-  /** Arms the on-canvas move/scale handles. */
-  glyphTransformMode?: boolean;
-
-  /**
    * Straight-stroke extensions: a letter's own stroke lengthened by cutting
    * its outline and bridging the gap. Absent means none, so a project saved
    * before this feature renders byte-identically and the payload version
    * needs no bump. Plain text blocks only, the same intentional
-   * simplification BlockCommon already makes for glyphTransforms.
+   * simplification BlockCommon already makes for diacriticOverrides.
    */
   strokeCuts?: StrokeCut[];
   /** Arms the on-canvas stretch handles. */
