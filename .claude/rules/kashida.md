@@ -64,10 +64,14 @@ ordinary text edit with the usual `pushHistory()`. **Mutating the text is the
 design, not a leak**: shaping, undo, saves, and every downstream consumer see
 what they would see if the user had typed the tatweel from the Specials row.
 The consequence is the glyph-index fragility documented in [diacritics.md](diacritics.md) — a
-kashida inserted early in a string shifts the indices `diacriticOverrides` and
-`GlyphTransform` are keyed by, exactly as any typed edit does. That is
+kashida inserted early in a string shifts the indices `diacriticOverrides` are
+keyed by, exactly as any typed edit does. That is
 surfaced to users in the guide ("apply kashida before fine-tuning marks")
 rather than engineered around here.
+
+`glyphAlternates` is the exception by design: keyed by letter ordinal, which
+tatweel never moves, so neither a kashida step nor a Fit to width solve owes
+it a remap — see [glyph-alternates.md](glyph-alternates.md).
 
 Visible for every block type whose text is shaped for joining — the section
 sits inside Typography's existing `type !== "image"` guard, so text, shapeFill

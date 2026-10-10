@@ -149,3 +149,30 @@ test("a letter's own dots never arm the overlay (Noto Sans)", async ({ page }) =
   await settleFrames(page);
   expect(await diacriticHitCenters(page)).toHaveLength(0);
 });
+
+/**
+ * A drag that pauses mid-gesture is still one undo step. The debounced
+ * history push used to split it: the pause point became its own entry, so
+ * one Ctrl+Z only rewound to the middle of the drag.
+ */
+test("a drag that pauses midway is undone by a single undo", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator("textarea.sidebarTextarea").fill(VOCALIZED);
+  await expect.poll(() => diacriticHitCenters(page).then((m) => m.length)).toBeGreaterThan(0);
+
+  const handle = await armDiacriticMoveHandle(page);
+  await page.mouse.down();
+  await page.mouse.move(handle.x, handle.y + 20, { steps: 10 });
+  await page.waitForTimeout(600);
+  await page.mouse.move(handle.x, handle.y + 40, { steps: 10 });
+  await page.mouse.up();
+  await settleFrames(page);
+  expect(((await getBlocks(page))[0].diacriticOverrides ?? []).length).toBeGreaterThan(0);
+
+  await page.keyboard.press("Control+z");
+  await expect
+    .poll(async () =>
+      ((await getBlocks(page))[0].diacriticOverrides ?? []).every((o) => (o.offsetY ?? 0) === 0)
+    )
+    .toBe(true);
+});

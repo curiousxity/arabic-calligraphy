@@ -35,7 +35,11 @@ import {
   type SnapTarget,
 } from "../lib/snapping";
 import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
-import type { Block, DiacriticOverride, GlyphTransform, StrokeCut, KufiCellEdit } from "../types";
+import type { Block, DiacriticOverride, StrokeCut, KufiCellEdit } from "../types";
+import type { AlternateChoice, LetterAlternates } from "../lib/glyphAlternates";
+
+/** Stable empty list, so unselected blocks' memos do not re-run. */
+const NO_ALTERNATE_LETTERS: LetterAlternates[] = [];
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 import {
   imageProps,
@@ -88,6 +92,8 @@ export type CanvasStageProps = {
   onSelectBlock: (id: number, additive?: boolean) => void;
   onEditBlock: (id: number) => void;
   onUpdateTextPathD: (blockId: number, d: string) => void;
+  /** One `pushHistory()` per curve edit (drag, add or remove an anchor), taken before it starts. */
+  onBeginTextPathEdit: () => void;
   /**
    * One `pushHistory()` per painting stroke, taken on mousedown. App passes
    * `pushHistory` itself — see `setKufiCell` there for why the per-cell write
@@ -95,18 +101,20 @@ export type CanvasStageProps = {
    */
   onBeginKufiCellEdit: () => void;
   onSetKufiCell: (blockId: number, edit: KufiCellEdit, generatedOn: boolean) => void;
+  /** One `pushHistory()` per diacritic handle drag, taken on drag start. */
+  onBeginDiacriticDrag: () => void;
   onDragDiacriticOverride: (
     blockId: number,
     glyphIndex: number,
     patch: Partial<DiacriticOverride>
   ) => void;
   onToggleDiacriticHidden: (blockId: number, glyphIndex: number) => void;
+  /** One `pushHistory()` per stretch-handle drag, taken on drag start. */
+  onBeginStrokeCut: () => void;
+  /** Next Shape: the selected text block's letters that have alternates. */
+  alternateLetters: LetterAlternates[];
+  onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
   onSetStrokeCut: (blockId: number, cut: StrokeCut) => void;
-  onUpdateGlyphTransform: (
-    blockId: number,
-    glyphIndex: number,
-    patch: Partial<GlyphTransform>
-  ) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   onResizeImageBlock: (id: number, scale: number) => void;
   showRulers: boolean;
@@ -161,12 +169,16 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSelectBlock,
   onEditBlock,
   onUpdateTextPathD,
+  onBeginTextPathEdit,
   onBeginKufiCellEdit,
   onSetKufiCell,
+  onBeginDiacriticDrag,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
-  onUpdateGlyphTransform,
+  onBeginStrokeCut,
   onSetStrokeCut,
+  alternateLetters,
+  onPickGlyphAlternate,
   onResizeShapeFillBlock,
   onResizeImageBlock,
   showRulers,
@@ -862,10 +874,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
                     diacriticEditMode={block.diacriticEditMode ?? false}
-                    glyphTransformMode={block.glyphTransformMode ?? false}
-                    onUpdateGlyphTransform={(glyphIndex, patch) =>
-                      onUpdateGlyphTransform(block.id, glyphIndex, patch)
-                    }
+                    onBeginDiacriticDrag={onBeginDiacriticDrag}
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)
                     }
@@ -887,12 +896,13 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     y={block.y}
                     opacity={block.opacity ?? 1}
                     isSelected={block.id === selectedId}
-                    glyphTransformMode={block.glyphTransformMode ?? false}
                     strokeCutEditMode={block.strokeCutEditMode ?? false}
+                    onBeginStrokeCut={onBeginStrokeCut}
+                    glyphAlternateMode={block.glyphAlternateMode ?? false}
+                    alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
+                    onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}
                     onSetStrokeCut={(cut) => onSetStrokeCut(block.id, cut)}
-                    onUpdateGlyphTransform={(glyphIndex, patch) =>
-                      onUpdateGlyphTransform(block.id, glyphIndex, patch)
-                    }
+                    onBeginDiacriticDrag={onBeginDiacriticDrag}
                     onDragDiacriticOverride={(glyphIndex, patch) =>
                       onDragDiacriticOverride(block.id, glyphIndex, patch)
                     }
@@ -961,6 +971,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                         y={block.y}
                         rotation={block.rotation ?? 0}
                         textPathD={block.textPathD}
+                        onBeginChange={onBeginTextPathEdit}
                         onChange={(d) => onUpdateTextPathD(block.id, d)}
                       />
                     )}

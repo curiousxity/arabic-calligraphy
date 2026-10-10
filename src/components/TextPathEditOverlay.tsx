@@ -11,6 +11,12 @@ export type TextPathEditOverlayProps = {
   y: number;
   rotation?: number;
   textPathD: string;
+  /**
+   * Called once before each edit — a drag's start, an anchor added, an
+   * anchor removed — so App can `pushHistory()`. A drag is then one undo
+   * step however long it pauses midway, which a debounce cannot promise.
+   */
+  onBeginChange?: () => void;
   onChange: (d: string) => void;
 };
 
@@ -30,6 +36,7 @@ export const TextPathEditOverlay: React.FC<TextPathEditOverlayProps> = ({
   y,
   rotation = 0,
   textPathD,
+  onBeginChange,
   onChange,
 }) => {
   const anchors = useMemo(
@@ -48,6 +55,7 @@ export const TextPathEditOverlay: React.FC<TextPathEditOverlayProps> = ({
     e.cancelBubble = true;
     const pos = relativePos(e);
     if (!pos) return;
+    onBeginChange?.();
     commit([...anchors, { x: pos.x, y: pos.y, handleX: pos.x, handleY: pos.y }]);
   };
 
@@ -92,6 +100,10 @@ export const TextPathEditOverlay: React.FC<TextPathEditOverlayProps> = ({
             onMouseDown={(e) => {
               e.cancelBubble = true;
             }}
+            onDragStart={(e) => {
+              e.cancelBubble = true;
+              onBeginChange?.();
+            }}
             onDragMove={(e) => {
               e.cancelBubble = true;
               const pos = relativePos(e);
@@ -113,6 +125,10 @@ export const TextPathEditOverlay: React.FC<TextPathEditOverlayProps> = ({
             draggable
             onMouseDown={(e) => {
               e.cancelBubble = true;
+            }}
+            onDragStart={(e) => {
+              e.cancelBubble = true;
+              onBeginChange?.();
             }}
             onDragMove={(e) => {
               e.cancelBubble = true;
@@ -138,6 +154,7 @@ export const TextPathEditOverlay: React.FC<TextPathEditOverlayProps> = ({
               e.evt.preventDefault();
               e.cancelBubble = true;
               if (anchors.length <= 2) return;
+              onBeginChange?.();
               commit(anchors.filter((_, idx) => idx !== i));
             }}
           />

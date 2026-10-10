@@ -49,7 +49,6 @@ import {
   normalizeKufiComposition,
   DEFAULT_KUFI_OPTIONS,
 } from "../lib/squareKufi";
-import { supportsGlyphTransforms } from "../lib/blockCapabilities";
 import {
   TrashIcon,
   CopyIcon,
@@ -101,6 +100,16 @@ import type { ArtboardSurface, TextureDef } from "../data/textures";
 import { FontUploadButton } from "./FontUploadDialog";
 import { PracticeSheetButton } from "./PracticeSheetDialog";
 import { describeFontKey, type CustomFont } from "../lib/customFonts";
+import { supportsGlyphAlternates } from "../lib/blockCapabilities";
+import {
+  alternatePanelView,
+  currentChoice,
+  resolveAlternateTarget,
+  type AlternateChoice,
+  type AlternateTarget,
+} from "../lib/glyphAlternates";
+import type { GlyphAlternatesState } from "../hooks/useGlyphAlternates";
+import { AlternateStrip } from "./sidebar/AlternateStrip";
 // ---- /STREAM-G ----
 
 export type SidebarProps = {
@@ -270,11 +279,14 @@ export type SidebarProps = {
   onCaptureCurrentThumbnail: () => string;
 
   onToggleDiacriticEditMode?: () => void;
-  /** Arms the on-canvas per-glyph move/scale dots. Plain text blocks only. */
-  onToggleGlyphTransformMode?: (blockId: number) => void;
-  onResetGlyphTransforms?: (blockId: number) => void;
   onToggleStrokeCutMode?: (blockId: number) => void;
   onClearStrokeCuts?: (blockId: number) => void;
+  /** Next Shape: discovery for the selected block, and the last letter clicked. */
+  glyphAlternatesState?: GlyphAlternatesState;
+  alternateTarget?: AlternateTarget | null;
+  onToggleGlyphAlternateMode?: (blockId: number) => void;
+  onResetGlyphAlternates?: (blockId: number) => void;
+  onPickGlyphAlternate?: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
   onFitShapeFillSpacing?: (blockId: number) => void;
   onAlignSelected?: (edge: "left" | "centerX" | "right" | "top" | "centerY" | "bottom") => void;
   onDistributeSelected?: (axis: "x" | "y") => void;
@@ -524,10 +536,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onJumpToHistory,
   onCaptureCurrentThumbnail,
   onToggleDiacriticEditMode,
-  onToggleGlyphTransformMode,
-  onResetGlyphTransforms,
   onToggleStrokeCutMode,
   onClearStrokeCuts,
+  glyphAlternatesState,
+  alternateTarget,
+  onToggleGlyphAlternateMode,
+  onResetGlyphAlternates,
+  onPickGlyphAlternate,
   onFitShapeFillSpacing,
   onAlignSelected,
   onDistributeSelected,
@@ -3216,54 +3231,72 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 )}
 
-                {/* Relocated here when the Morph Glyph Editor panel was
-                    removed. Gated on the same shared predicate the state
-                    layer's mutators use, never on a longhand copy of it: a
-                    capability widened in one place and not the other type
-                    checks perfectly and leaves a checkbox that arms nothing. */}
-                {supportsGlyphTransforms(selectedBlock) && (
+                {supportsGlyphAlternates(selectedBlock) && (
                   <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Move, scale &amp; rotate</div>
+                    <div className="sidebarSectionTitle">Letter shapes</div>
 
                     <CheckboxRow
-                      id={makeId("glyph-transform-mode", selectedId)}
-                      label="Move, scale &amp; rotate glyph"
-                      checked={!!selectedBlock.glyphTransformMode}
-                      onChange={() => onToggleGlyphTransformMode?.(selectedBlock.id)}
-                      demo={{
-                        src: "/demos/glyph-move-scale-rotate.gif",
-                        alt: "Hovering a letter shows move, scale and rotate handles",
-                      }}
+                      id={makeId("glyph-alternate-mode", selectedId)}
+                      label="Alternate letter shapes"
+                      checked={!!selectedBlock.glyphAlternateMode}
+                      onChange={() => onToggleGlyphAlternateMode?.(selectedBlock.id)}
                     />
 
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                      Hover a letter on the canvas to move it, stretch it in x or y, or
-                      turn it. Neighbouring letters never shift.
-                      {selectedBlock.type === "shapeFill" && (
+                    {selectedBlock.glyphAlternateMode && (() => {
+                      const state = glyphAlternatesState;
+                      const letter = resolveAlternateTarget(
+                        alternateTarget,
+                        selectedBlock.id,
+                        selectedBlock.text
+                      );
+                      const note = (text: string) => (
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>{text}</div>
+                      );
+                      const view = alternatePanelView(
+                        state && { ...state, hasFont: state.font !== null },
+                        letter
+                      );
+                      if (view.kind === "loading") return note("Looking for alternate shapes…");
+                      if (view.kind === "noFontAlternates") return note("No alternate shapes in this font");
+                      if (view.kind === "noTextAlternates")
+                        return note("No letter in this text has alternate shapes");
+                      if (view.kind === "prompt")
+                        return note(
+                          "Click an outlined letter to step through its shapes; Shift-click goes back."
+                        );
+                      if (view.kind === "noLetterAlternates" || !state?.font)
+                        return note("This letter has no alternates");
+                      const { target } = view;
+                      return (
                         <>
-                          {" "}
-                          On a shape fill the handles sit on one tile near the middle
-                          of the shape, and one adjustment applies to every repetition
-                          of that letter.
+                          <AlternateStrip
+                            font={state.font}
+                            unitsPerEm={state.unitsPerEm}
+                            options={target.options}
+                            current={currentChoice(selectedBlock.glyphAlternates, target.letter)}
+                            onPick={(choice: AlternateChoice | null) =>
+                              onPickGlyphAlternate?.(selectedBlock.id, target.letter, choice)
+                            }
+                          />
+                          {note("Changing a letter's shape removes any stroke stretch on it.")}
                         </>
-                      )}
-                    </div>
+                      );
+                    })()}
 
-                    {(selectedBlock.glyphTransforms?.length ?? 0) > 0 && (
+                    {(selectedBlock.glyphAlternates?.length ?? 0) > 0 && (
                       <button
                         type="button"
-                        onClick={() => onResetGlyphTransforms?.(selectedBlock.id)}
+                        onClick={() => onResetGlyphAlternates?.(selectedBlock.id)}
                         className="sidebarSmallAction"
                         style={{ background: "var(--bg-input)", marginTop: 8 }}
                       >
-                        Reset glyph moves, scales &amp; turns
+                        Reset letter shapes
                       </button>
                     )}
                   </div>
                 )}
 
-                {/* Plain text only, matching the Move, scale & rotate row above and
-                    for the same reason: only ShapedText performs the outline
+                {/* Plain text only: only ShapedText performs the outline
                     surgery, so arming it elsewhere would show handles that
                     stretch nothing. */}
                 {selectedBlock.type === "text" && (

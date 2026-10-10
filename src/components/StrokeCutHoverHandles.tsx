@@ -26,6 +26,12 @@ export type StrokeCutHoverHandlesProps = {
   /** The block's own canvas-space origin — zones are in glyph-run space. */
   offsetX: number;
   offsetY: number;
+  /**
+   * Called once when a handle drag starts, before any `onSetCut`. App passes
+   * `pushHistory` itself, so a drag is exactly one undo step however long it
+   * pauses midway — the `onBeginKufiCellEdit` pattern.
+   */
+  onBeginCut?: () => void;
   onSetCut?: (cut: StrokeCut) => void;
 };
 
@@ -71,6 +77,7 @@ export const StrokeCutHoverHandles: React.FC<StrokeCutHoverHandlesProps> = ({
   nuqtaPx,
   offsetX,
   offsetY,
+  onBeginCut,
   onSetCut,
 }) => {
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
@@ -200,6 +207,7 @@ export const StrokeCutHoverHandles: React.FC<StrokeCutHoverHandlesProps> = ({
                     }
                     originRef.current = { x: originX, y: originY };
                     setDraggingKey(key);
+                    onBeginCut?.();
                   }}
                   onDragMove={(e) => {
                     e.cancelBubble = true;

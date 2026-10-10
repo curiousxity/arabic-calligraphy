@@ -34,8 +34,8 @@ panel there:
   most. A plain text block has no type panel; its controls are the shared
   ones.
 - **`Typography` is the shared styling panel** (font family, size,
-  colour, alignment, line height, plus the text-only Warp and
-  Move & scale sections). It is *not* called "Text" precisely because it renders for
+  colour, alignment, line height, plus the text-only Letter shapes,
+  Stretch strokes and Warp sections). It is *not* called "Text" precisely because it renders for
   shape and curve blocks too, where a panel named "Text" sitting beside
   one named "Shape Fill" reads as two competing type panels.
 
@@ -113,8 +113,7 @@ are disabled most of the time. It is used in two places:
 
 - **Checkbox rows.** `CheckboxRow`'s optional `demo` adds a `DemoHint` play
   icon beside the label, never inside it, because a button inside a
-  `<label>` toggles the checkbox. It is used by the Diacritic tool and Move,
-  scale & rotate glyph rows.
+  `<label>` toggles the checkbox. It is used by the Diacritic tool row.
 - **The eight Add buttons.** Each button is its own anchor (the 4-column grid
   has no room for icons) with a 400 ms hover-intent delay, so sweeping across
   the row doesn't flash eight popovers. Their `title`s were removed and the

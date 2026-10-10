@@ -1,4 +1,5 @@
 import { shapeText } from "./harfbuzz";
+import type { GlyphAlternate } from "../types";
 import { inkExtentBox, styledRunWidth, type RunStyle } from "./fitToWidth";
 
 /**
@@ -23,9 +24,10 @@ export async function measureShapedWidth(
   text: string,
   fontUrl: string,
   fontSize: number,
-  style: RunStyle = {}
+  style: RunStyle = {},
+  alternates?: readonly GlyphAlternate[]
 ): Promise<number> {
-  return (await measureShapedRun(text, fontUrl, fontSize, style)).width;
+  return (await measureShapedRun(text, fontUrl, fontSize, style, alternates)).width;
 }
 
 /**
@@ -46,9 +48,10 @@ export async function measureShapedRun(
   text: string,
   fontUrl: string,
   fontSize: number,
-  style: RunStyle = {}
+  style: RunStyle = {},
+  alternates?: readonly GlyphAlternate[]
 ): Promise<{ width: number; height: number }> {
-  const { glyphs, font, unitsPerEm } = await shapeText(text, fontUrl);
+  const { glyphs, font, unitsPerEm } = await shapeText(text, fontUrl, alternates);
   const box = inkExtentBox(glyphs, font, fontSize, unitsPerEm);
   return { width: styledRunWidth(box, fontSize, style), height: box.height };
 }

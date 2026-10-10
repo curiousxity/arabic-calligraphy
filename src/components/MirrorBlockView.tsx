@@ -124,7 +124,6 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
           // Arming flags stay off: a mirror has no overlays of its own, and
           // its content is `listening={false}` in any case.
           diacriticEditMode={false}
-          glyphTransformMode={false}
         />
       );
     }
@@ -134,9 +133,7 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
     if (source.type === "textPath") {
       return <TextOnPathText {...common} {...textPathProps(source)} />;
     }
-    return (
-      <ShapedText {...common} {...shapedTextProps(source)} glyphTransformMode={false} />
-    );
+    return <ShapedText {...common} {...shapedTextProps(source)} />;
   }, [source]);
 
   const radialCopies = useMemo(

@@ -6,6 +6,7 @@ import {
   type ShapedTextResult,
 } from "../lib/harfbuzz";
 import { pickFontUrl, setShapeCacheInvalidator } from "../lib/customFonts";
+import type { GlyphAlternate } from "../types";
 
 export const FONT_URLS: Record<string, string> = {
   TahaNaskhRegular: "/fonts/TahaNaskhRegular.ttf",
@@ -73,8 +74,15 @@ export type ShapedGlyphsState = {
  * inputs have changed again. Shared by ShapedText, ShapeFillText, and
  * TextOnPathText, which all need the same glyph data.
  */
-export function useShapedGlyphs(text: string, fontFamily: string): ShapedGlyphsState {
+export function useShapedGlyphs(
+  text: string,
+  fontFamily: string,
+  alternates?: readonly GlyphAlternate[]
+): ShapedGlyphsState {
   const fontUrl = resolveFontUrl(fontFamily);
+  // `alternates` is a dependency by identity. A block's array keeps its
+  // identity until its alternates change, and `ShapedText` defaults it to a
+  // module constant, so this reshapes only on a real change.
 
   const [hbLoaded, setHbLoaded] = useState(false);
   const [shapeData, setShapeData] = useState<{
@@ -99,7 +107,7 @@ export function useShapedGlyphs(text: string, fontFamily: string): ShapedGlyphsS
     setHbLoaded(false);
     setShapeData((prev) => ({ ...prev, isLoading: true }));
 
-    shapeText(text || "", fontUrl)
+    shapeText(text || "", fontUrl, alternates)
       .then((r) => {
         if (!alive) return;
 
@@ -143,7 +151,7 @@ export function useShapedGlyphs(text: string, fontFamily: string): ShapedGlyphsS
     return () => {
       alive = false;
     };
-  }, [text, fontUrl, fontFamily]);
+  }, [text, fontUrl, fontFamily, alternates]);
 
   return { ...shapeData, hbLoaded };
 }

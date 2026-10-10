@@ -11,7 +11,7 @@ import type { Block } from "../types";
  * a tool with no way to arm it, or a checkbox whose dots move nothing.
  *
  * That is the trap CLAUDE.md already records twice, against
- * `runStyleForBlock` and `filterActiveGlyphTransforms`. Each predicate below
+ * `runStyleForBlock` and `supportsDiacriticOverrides`. Each predicate below
  * narrows to the variants whose renderer really reads the field, so widening
  * a capability is one edit here.
  */
@@ -27,23 +27,20 @@ export const supportsDiacriticOverrides = (
   b.type === "text" || b.type === "shapeFill";
 
 /**
- * The two block types whose renderers mount `GlyphTransformHoverHandles` and
- * apply the transform in their draw loop. `image`, `textPath`, `squareKufi`
- * and `mirror` carry `glyphTransforms`/`glyphTransformMode` via `BlockCommon`
- * but no renderer of theirs reads them, so accepting an edit there would
- * silently discard it.
- */
-export const supportsGlyphTransforms = (
-  b: Block
-): b is Extract<Block, { type: "text" | "shapeFill" }> =>
-  b.type === "text" || b.type === "shapeFill";
-
-/**
  * Plain text blocks only: every block type carries `strokeCuts` via
  * `BlockCommon`, but only `ShapedText` performs the outline surgery, so a
  * wider guard would accept edits and silently discard them.
  */
 export const supportsStrokeCuts = (
+  b: Block
+): b is Extract<Block, { type: "text" }> => b.type === "text";
+
+/**
+ * Plain text blocks only: only `ShapedText` shapes with a block's
+ * `glyphAlternates` and mounts the Next Shape overlay. Shape Fill and
+ * text-on-path are deferred (see the Next Shape spec).
+ */
+export const supportsGlyphAlternates = (
   b: Block
 ): b is Extract<Block, { type: "text" }> => b.type === "text";
 

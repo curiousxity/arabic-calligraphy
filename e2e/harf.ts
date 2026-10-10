@@ -373,7 +373,7 @@ export async function strokeProbes(page: Page, blockId: number): Promise<Point[]
  *
  * Every hover-mounted overlay in this app arms the same way: only some
  * positions mount a handle at all (which letters carry a straight stroke,
- * or a transformable glyph, depends on the font), the dots appear a frame
+ * or a mark, depends on the font), the dots appear a frame
  * after the move, and a dot's drawn centre is not where the probe was — so
  * the pointer has to be moved a second time onto the dot itself and the
  * landing confirmed. Callers differ only in the probe grid they sweep and

@@ -23,24 +23,13 @@ Current: **0.1.x**, pre-1.0, actively developed.
 Real, reproducible, and currently unfixed. Each says whether it is a
 regression, and what it would take to fix.
 
-- **Per-glyph edits are keyed by glyph index**, so editing text *before* an
-  edited letter can shift which letter the edit lands on after re-shaping.
-  Affects per-glyph transforms and diacritic overrides alike. Both are now
-  re-validated each render and dropped rather than misapplied — overrides
-  against whether the glyph is still a mark, transforms against the `glyphId`
-  they were made for. A transform saved before 2026-08-19 carries no
-  `glyphId` and cannot be checked, so it keeps the old behaviour.
+- **Diacritic overrides are keyed by glyph index**, so editing text *before*
+  an edited mark can shift which mark the edit lands on after re-shaping.
+  They are re-validated each render against whether the glyph is still a
+  mark, and dropped rather than misapplied.
 - **Per-glyph tools do not apply to text-on-path blocks.** Their glyphs are
   rotated to a curve tangent, which the straight-bounding-box maths behind
   those tools assumes away.
-- **A turned glyph pivots off-centre when it is a PUA preset honorific.** That
-  branch draws override art whose centre differs from the metrics walk's
-  font-glyph box, which is the box the pivot comes from. Pre-existing for the
-  move and scale handles; the rotate handle makes it visible.
-- **`StrokeCutHoverHandles` is glyph-transform-blind.** It builds its rails
-  from the bare pen origin, so on a letter that has been moved, scaled or
-  turned its dots sit where the letter would be untransformed. Pre-existing;
-  rotation widens the gap.
 - **Straight-stroke stretching is plain-text only, and stays that way.** Not
   the tangent reason above: Shape Fill and Curve both renormalise the run to a
   fixed span, so an added advance is divided straight back out. Declined
@@ -91,6 +80,36 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 ---
 
 ## Shipped
+
+### 2026-10-10 — Next Shape: per-letter alternate glyphs
+
+Tick **Alternate letter shapes** in Typography and click a letter to step
+through the alternate shapes its font already contains (Shift-click goes
+back); the sidebar shows the clicked letter's options as thumbnails labelled
+with the font's own set names ("Looped Haa", "Tailed Noon"). Ruqaa, Amiri,
+Qahiri, Scheherazade, Lateef, Wessam, Yekan, AlFatemi and FatemiMaqala have
+alternates; Thuluth, Diwani and Taha Naskh have none and say so. Text blocks
+only. How it works and why it is keyed by letter ordinal:
+[glyph-alternates.md](.claude/rules/glyph-alternates.md).
+
+### 2026-10-10 — Per-glyph move, scale & rotate removed; drag undo fixed
+
+The move/scale/rotate tool is gone from text and Shape Fill blocks: scaling a
+whole letter skews its edges, and what was wanted was stroke length, which
+Stretch strokes already does without distortion. Old projects load with those
+edits dropped. Recoverable from tag `glyph-transform-final`; the reasoning is
+in [removed-subsystems.md](.claude/rules/removed-subsystems.md).
+
+The removal exposed a pre-existing undo bug. The shared debounced history push
+recorded a gesture's *end* state 300 ms after it settled, so pausing before
+Ctrl+Z after a stroke stretch, block drag, curve edit or diacritic drag made
+the first undo a no-op (`e2e/stroke-cuts.spec.ts` only passed by pressing the
+key inside the window). `useDebouncedHistoryPush` now pushes on the first call
+of a burst, which comes from the render before the change. Stroke-stretch,
+diacritic-handle and curve-anchor drags no longer use it at all: each pushes
+once when the gesture starts (curve edits also before adding or removing an
+anchor), so a pause mid-drag no longer splits it into two entries. Block nudges
+are the remaining debounced caller.
 
 ### 2026-10-09 — Practice sheet export
 

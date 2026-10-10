@@ -8,7 +8,7 @@ export type AxisPoint = { x: number; y: number };
  * `dragBoundFunc` specifically receives/returns *absolute* (stage)
  * coordinates, so callers project the rail's endpoints into that same
  * absolute space before calling this (see `DiacriticHoverHandles.tsx` and
- * `GlyphTransformHoverHandles.tsx`).
+ * `StrokeCutHoverHandles.tsx`).
  */
 export function projectOntoAxis(
   a: AxisPoint,

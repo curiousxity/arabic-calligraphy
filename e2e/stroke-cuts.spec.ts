@@ -71,9 +71,8 @@ test("dragging the handle records a cut and widens the run", async ({ page }) =>
   const inkBefore = await inkPixels(page);
 
   const dot = await armStretchHandle(page);
-  // A deliberately small first step, for the same reason the glyph-transform
-  // spec uses one: under ~20px a sibling-handler overlay loses the node the
-  // gesture is attached to.
+  // A deliberately small first step: under ~20px a sibling-handler overlay
+  // loses the node the gesture is attached to (see e2e-tests.md).
   await dragFromHere(page, { x: dot.x + 60, y: dot.y }, { via: { x: dot.x + 2, y: dot.y } });
   await settleFrames(page);
 

@@ -214,7 +214,7 @@ export type KufiUnit = {
    * noon and yeh — so typing the next letter of a word can change the
    * *requested* form while the box actually drawn is literally the same
    * object. Keying on the requested form would drop a user's hand edits on
-   * that keystroke. This is the faithful analogue of `GlyphTransform`'s
+   * that keystroke. This is the faithful analogue of `StrokeCut`'s
    * `glyphId`: the identity of what is drawn, not of what was asked for.
    */
   key: string;
@@ -928,7 +928,7 @@ export function squareColumnTarget(text: string, options: SquareKufiOptions = {}
  *
  * `unitKey` is the form fingerprint the edit was made against (see
  * `KufiUnit.key`). It is **optional on purpose**, exactly as
- * `GlyphTransform.glyphId` is: an edit saved before the field existed cannot
+ * `StrokeCut.glyphId` is: an edit saved before the field existed cannot
  * be validated, and dropping it would be worse than applying it to whatever
  * letter now holds its index.
  */
