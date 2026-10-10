@@ -1,0 +1,34 @@
+import type { GuideSection } from "../types";
+
+export const section: GuideSection = {
+  id: "letter-shapes",
+  title: "Choosing a letter's shape",
+  order: 37,
+  keywords: ["alternate", "shape", "next shape", "swash", "stylistic set", "letterform", "variant"],
+  Body: () => (
+    <>
+      <p>
+        Many fonts draw more than one version of some letters — a looped haa,
+        a tailed noon, a longer seen for justifying a line. On a text block,
+        open <strong>Typography</strong> and tick{" "}
+        <strong>Alternate letter shapes</strong>. Letters that have other
+        shapes outline when you hover them: click to step to the next shape,
+        Shift-click to go back. The sidebar shows every shape for the letter
+        you clicked, so you can also pick one directly.
+      </p>
+      <p>
+        What you get depends on the font. Ruqaa, Amiri, Qahiri, Scheherazade,
+        Lateef and others have alternates; Thuluth and Diwani do not, and the
+        sidebar will say so. <strong>Reset letter shapes</strong> puts every
+        letter back.
+      </p>
+      <p>
+        Kashida and <strong>Fit to width</strong> keep your choices on the same
+        letters. Editing the wording before a letter you changed can drop its
+        shape back to the default, and changing a letter's shape removes any
+        stroke stretch on it — so settle the wording, then the shapes, then the
+        stretches.
+      </p>
+    </>
+  ),
+};

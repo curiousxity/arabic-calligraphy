@@ -34,6 +34,9 @@ than a text box
   it, in half-nuqta steps (Alt for free amounts) — the rhombic dot a reed
   nib makes, the unit traditional Arabic calligraphy actually measures in.
   Coverage varies by font and letterform; not every stroke offers a handle.
+- **Next Shape.** Click a letter to step through the alternate shapes its
+  font contains — looped, tailed, swash and justification forms — with
+  labelled thumbnails in the sidebar.
 - **Kashida.** Insert real elongation (U+0640) at any legal join in a run —
   the connecting stroke is drawn at the letters' own weight, not a deformed
   outline — or hit Fit to width and let it solve the counts automatically to

@@ -69,6 +69,10 @@ keyed by, exactly as any typed edit does. That is
 surfaced to users in the guide ("apply kashida before fine-tuning marks")
 rather than engineered around here.
 
+`glyphAlternates` is the exception by design: keyed by letter ordinal, which
+tatweel never moves, so neither a kashida step nor a Fit to width solve owes
+it a remap — see [glyph-alternates.md](glyph-alternates.md).
+
 Visible for every block type whose text is shaped for joining — the section
 sits inside Typography's existing `type !== "image"` guard, so text, shapeFill
 and textPath all get it with no separate gate.

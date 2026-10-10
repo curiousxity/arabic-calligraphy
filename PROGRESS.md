@@ -81,6 +81,17 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-10 — Next Shape: per-letter alternate glyphs
+
+Tick **Alternate letter shapes** in Typography and click a letter to step
+through the alternate shapes its font already contains (Shift-click goes
+back); the sidebar shows the clicked letter's options as thumbnails labelled
+with the font's own set names ("Looped Haa", "Tailed Noon"). Ruqaa, Amiri,
+Qahiri, Scheherazade, Lateef, Wessam, Yekan, AlFatemi and FatemiMaqala have
+alternates; Thuluth, Diwani and Taha Naskh have none and say so. Text blocks
+only. How it works and why it is keyed by letter ordinal:
+[glyph-alternates.md](.claude/rules/glyph-alternates.md).
+
 ### 2026-10-10 — Per-glyph move, scale & rotate removed; drag undo fixed
 
 The move/scale/rotate tool is gone from text and Shape Fill blocks: scaling a
