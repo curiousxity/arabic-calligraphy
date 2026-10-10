@@ -73,6 +73,7 @@ export function shapeFillProps(b: Extract<Block, { type: "shapeFill" }>) {
     shapeFillScaleY: b.shapeFillScaleY ?? 1,
     shapeFillTextRotation: b.shapeFillTextRotation ?? 0,
     diacriticOverrides: b.diacriticOverrides,
+    glyphAlternates: b.glyphAlternates,
     styleSets: b.styleSets,
   };
 }
@@ -96,6 +97,7 @@ export function textPathProps(b: Extract<Block, { type: "textPath" }>) {
     textPathD: b.textPathD,
     textPathReversed: b.textPathReversed ?? false,
     textPathBaselineOffset: b.textPathBaselineOffset ?? 0,
+    glyphAlternates: b.glyphAlternates,
     styleSets: b.styleSets,
   };
 }

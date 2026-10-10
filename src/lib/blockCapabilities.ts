@@ -36,13 +36,16 @@ export const supportsStrokeCuts = (
 ): b is Extract<Block, { type: "text" }> => b.type === "text";
 
 /**
- * Plain text blocks only: only `ShapedText` shapes with a block's
- * `glyphAlternates` and mounts the Next Shape overlay. Shape Fill and
- * text-on-path are deferred (see the Next Shape spec).
+ * The block types whose renderers shape with `glyphAlternates` and mount
+ * the Next Shape overlay: text, Shape Fill (one pick applies to every tile)
+ * and Curve. The field sits on `BlockCommon`, so widening this guard is what
+ * turns the feature on — and a renderer that does not read the field would
+ * still type-check while silently discarding every pick.
  */
 export const supportsGlyphAlternates = (
   b: Block
-): b is Extract<Block, { type: "text" }> => b.type === "text";
+): b is Extract<Block, { type: "text" | "shapeFill" | "textPath" }> =>
+  b.type === "text" || b.type === "shapeFill" || b.type === "textPath";
 
 /**
  * Block-level style sets need no on-canvas hit-testing, only shaping, so

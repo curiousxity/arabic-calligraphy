@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  addOrnamentShapeFill,
   alternateTargetCenters,
+  centerOf,
   chooseFont,
   getBlocks,
   gotoApp,
@@ -157,4 +159,37 @@ test("the block can still be dragged from a gap between outlined letters", async
   const after = (await getBlocks(page))[0];
   expect(after.x).not.toBe(before.x);
   expect(after.glyphAlternates ?? []).toHaveLength(0);
+});
+
+test("on a Shape Fill block one pick changes the letter in every tile, through one hit node", async ({ page }) => {
+  await gotoApp(page);
+  const id = await addOrnamentShapeFill(page);
+  await setBlockText(page, "هههه", id);
+  await chooseFont(page, "Ruqaa");
+  await page.getByLabel("Alternate letter shapes").check();
+  await expect.poll(async () => (await alternateTargetCenters(page)).length).toBeGreaterThan(4);
+  // The whole silhouette's letters, resolved through a single listening node.
+  expect(await namedNodeCount(page, "alternate-hit")).toBe(1);
+  await settleFrames(page);
+
+  const box = await nodeClientBox(page, `#block-${id}`);
+  const inkBefore = await inkPixels(page, box!);
+  // The ornament's silhouette is larger than the viewport, so its first
+  // tiles are off screen; aim at the tile nearest the block's centre.
+  const mid = centerOf(box!);
+  const at = (await alternateTargetCenters(page)).reduce((best, c) =>
+    Math.hypot(c.x - mid.x, c.y - mid.y) < Math.hypot(best.x - mid.x, best.y - mid.y) ? c : best
+  );
+  expect(await hitTargetAt(page, at)).toBe("Rect.alternate-hit");
+  await page.mouse.move(at.x, at.y);
+  await settleFrames(page);
+  expect(await namedNodeCount(page, "alternate-outline")).toBe(1);
+  await page.mouse.click(at.x, at.y);
+
+  const block = async () => (await getBlocks(page)).find((b) => b.id === id)!;
+  await expect.poll(async () => ((await block()).glyphAlternates ?? []).length).toBe(1);
+  await expect.poll(() => inkPixels(page, box!)).not.toBe(inkBefore);
+
+  await page.keyboard.press("Control+z");
+  await expect.poll(async () => ((await block()).glyphAlternates ?? []).length).toBe(0);
 });

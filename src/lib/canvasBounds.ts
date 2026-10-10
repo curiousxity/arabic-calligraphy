@@ -7,7 +7,7 @@ export const MIN_SCALE = 0.05;
 
 /**
  * Zoom ceiling. Deliberately far above the ~2.75× the app opens at: the
- * per-glyph tools (stretch dots, diacritic handles, move/scale handles) put
+ * per-glyph tools (stretch dots, diacritic handles, letter outlines) put
  * several small targets on one letter, and inspecting or grabbing them needs
  * to get much closer than the whole composition does. A ceiling near the
  * default view leaves barely one click of zoom-in available.
