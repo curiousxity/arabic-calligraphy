@@ -1,5 +1,6 @@
 import type { GlyphAlternate } from "../types";
 import { ARABIC_DIACRITIC_RE } from "./diacritics";
+import type { HarfBuzzGlyph } from "./normalizeGlyphs";
 
 /**
  * Next Shape: per-letter OpenType alternates. Pure — no `./harfbuzz` import,
@@ -153,4 +154,86 @@ export function fallbackFeatureLabel(choice: AlternateChoice): string {
   if (feature === "jalt") return value > 1 ? `Justification ${value}` : "Justification";
   if (feature === "swsh") return value > 1 ? `Swash ${value}` : "Swash";
   return `Alternate ${value}`;
+}
+
+export type ShapeFn = (features: string) => HarfBuzzGlyph[];
+
+/** The glyphs HarfBuzz emitted for one cluster, as a comparable signature. */
+function clusterSignature(glyphs: HarfBuzzGlyph[], offset: number): string {
+  return glyphs
+    .filter((g) => (g.cl ?? -1) === offset)
+    .map((g) => g.g)
+    .join(",");
+}
+
+/** The cluster's widest glyph — the letter itself rather than a mark on it. */
+function mainGlyph(glyphs: HarfBuzzGlyph[], offset: number): number {
+  let best: HarfBuzzGlyph | null = null;
+  for (const g of glyphs) {
+    if ((g.cl ?? -1) !== offset) continue;
+    if (!best || (g.ax ?? 0) > (best.ax ?? 0)) best = g;
+  }
+  return best?.g ?? 0;
+}
+
+/**
+ * For each letter, reshape the run with every optional feature switched on
+ * for that letter alone, and keep the results that change its glyph. Each
+ * letter is probed with the *other* letters' alternates applied, so a
+ * contextual alternate sees its real neighbours. Features that never touch
+ * the letter fall out on their own.
+ */
+export function probeAlternates(args: {
+  text: string;
+  alternates: readonly GlyphAlternate[] | undefined;
+  tags: readonly string[];
+  shape: ShapeFn;
+  labelFor: (choice: AlternateChoice) => string;
+  maxLetters?: number;
+}): LetterAlternates[] {
+  const { text, alternates, shape, labelFor } = args;
+  const tags = [...new Set(args.tags)].filter(isOptionalFeature);
+  if (tags.length === 0) return [];
+
+  const memo = new Map<string, HarfBuzzGlyph[]>();
+  const shapeOnce = (features: string) => {
+    let hit = memo.get(features);
+    if (!hit) {
+      hit = shape(features);
+      memo.set(features, hit);
+    }
+    return hit;
+  };
+
+  const offsets = letterOffsets(text).slice(0, args.maxLetters ?? MAX_PROBE_LETTERS);
+  const out: LetterAlternates[] = [];
+
+  offsets.forEach((offset, letter) => {
+    const base = featureStringFor(text, alternates, letter);
+    const baseGlyphs = shapeOnce(base);
+    const baseSig = clusterSignature(baseGlyphs, offset);
+    if (baseSig === "") return; // consumed into another letter's ligature
+
+    const options: AlternateOption[] = [
+      { choice: null, glyphId: mainGlyph(baseGlyphs, offset), label: "Default" },
+    ];
+    const seen = new Set([baseSig]);
+
+    for (const feature of tags) {
+      const maxValue = MULTI_VALUE_FEATURES.has(feature) ? MAX_ALTERNATE_VALUE : 1;
+      for (let value = 1; value <= maxValue; value++) {
+        const probe = `${feature}[${offset}:${offset + 1}]=${value}`;
+        const glyphs = shapeOnce(base ? `${base},${probe}` : probe);
+        const sig = clusterSignature(glyphs, offset);
+        if (sig === "" || seen.has(sig)) continue;
+        seen.add(sig);
+        const choice = { feature, value };
+        options.push({ choice, glyphId: mainGlyph(glyphs, offset), label: labelFor(choice) });
+      }
+    }
+
+    if (options.length > 1) out.push({ letter, offset, options });
+  });
+
+  return out;
 }
