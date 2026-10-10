@@ -45,4 +45,21 @@ describe("classifyJoiningForms", () => {
     expect(chars[1].form).toBeNull();
     expect(chars[2].form).toBe("isolated");
   });
+
+  it("treats ZWJ as join-causing: a letter before it takes its initial form", () => {
+    const [beh, zwj] = classifyJoiningForms("ب‍");
+    expect(beh.form).toBe("initial");
+    expect(zwj.form).toBeNull();
+  });
+
+  it("treats ZWJ as join-causing: a letter after it takes its final form", () => {
+    const [, beh] = classifyJoiningForms("‍ب");
+    expect(beh.form).toBe("final");
+  });
+
+  it("ZWNJ still breaks the join", () => {
+    const [beh, , teh] = classifyJoiningForms("ب‌ت");
+    expect(beh.form).toBe("isolated");
+    expect(teh.form).toBe("isolated");
+  });
 });

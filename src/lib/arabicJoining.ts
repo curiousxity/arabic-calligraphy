@@ -1,5 +1,5 @@
 export type JoiningForm = "isolated" | "initial" | "medial" | "final";
-type JoiningType = "D" | "R" | "T" | "U";
+type JoiningType = "C" | "D" | "R" | "T" | "U";
 
 export type ClassifiedChar = {
   index: number;
@@ -45,8 +45,13 @@ function isTransparent(cp: number): boolean {
   );
 }
 
+// Join-causing (Unicode joining type C): ZERO WIDTH JOINER. It joins on both
+// sides without itself having a form, so a letter beside it connects to it.
+const ZWJ = 0x200d;
+
 function joiningType(cp: number): JoiningType {
   if (isTransparent(cp)) return "T";
+  if (cp === ZWJ) return "C";
   if (DUAL_JOINING.has(cp)) return "D";
   if (RIGHT_JOINING.has(cp)) return "R";
   return "U";
@@ -94,7 +99,8 @@ export function classifyJoiningForms(text: string): ClassifiedChar[] {
     let form: JoiningForm | null = null;
 
     if (type === "D" || type === "R") {
-      const prevJoinsIntoMe = prevParticipant(i) === "D";
+      const prev = prevParticipant(i);
+      const prevJoinsIntoMe = prev === "D" || prev === "C";
       const nextJoinsFromMe = type === "D" && nextParticipant(i) !== null;
 
       form = prevJoinsIntoMe
