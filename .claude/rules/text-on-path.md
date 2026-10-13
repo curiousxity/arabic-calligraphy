@@ -47,6 +47,12 @@ selected and has `textPathEditMode` set, and is hidden during export
 `text-path-edit-layer-`, alongside the grid and artboard background it
 already hides).
 
+**Guide-attached mode.** With `guide` set, the block's own `textPathD` and
+position are ignored: CanvasStage passes the guide's path, and the text is
+laid out by `guideGlyphPlacements` at its natural size (shrinking only to
+fit) instead of `curveGlyphPlacements`' stretch-to-span. Its hit box is its
+letters' extent, not the curve's. See [guides.md](guides.md).
+
 **Drag-based** per-glyph tools (diacritic overrides, stroke stretching) do
 not apply to `textPath` blocks. Their guards exclude `"textPath"` the same
 way they exclude `"image"`. A drag needs an answer to "what does an offset

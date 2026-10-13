@@ -81,6 +81,13 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-13 — Shaped guides
+
+Add guide places an export-hidden circle, ellipse, arc, wave, line or pen
+curve; Curve text attached to it keeps its own size, slides along it, picks a
+side and a flip, and follows the guide. Deleting a guide keeps its texts.
+Details in [guides.md](.claude/rules/guides.md).
+
 ### 2026-10-13 — Multi-line verse with per-line justification
 
 New verse… in Block Controls makes one text block per line, stacked or as bayt

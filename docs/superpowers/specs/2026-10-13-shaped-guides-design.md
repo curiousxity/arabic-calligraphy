@@ -1,6 +1,6 @@
 # Shaped guides with attached text
 
-Date: 2026-10-13. Status: design, awaiting review.
+Date: 2026-10-13. Status: implemented on branch `shaped-guides`.
 
 The third of three Kelk-gap projects, in build order:
 
@@ -340,3 +340,35 @@ guideGlyphPlacements({
 - A paragraph in `text-on-path.md` on the guide-attached mode.
 - `guide/sections/guides.tsx`.
 - A `PROGRESS.md` entry.
+
+## Decisions made during planning and build
+
+These were settled after the design above was approved. Where they differ
+from it, they win.
+
+1. **Guide paths are centred on the block origin.** The guide's `x`, `y` and
+   `rotation` place it, so rotation pivots on its centre.
+2. **A line guide has no angle parameter.** Its angle is the block's own
+   rotation, set in the Transform panel.
+3. **Pen guides reuse `TextPathEditOverlay` unchanged.** It already edits
+   any `d` through `onChange`, so it was not generalised.
+4. **Baseline-offset sign follows the renderer.** A positive offset moves
+   glyphs down in the glyph frame. Rising is `−gap`, and hanging is
+   `+(ascent + gap)`.
+5. **"Start" alignment** means the anchor sits at the text's first glyph in
+   walking order.
+6. **Sliding keeps the grab offset** taken on the first frame, so the text
+   does not jump under the pointer.
+7. **The shrink note uses non-persisted renderer feedback.**
+   `TextOnPathText` reports `onGuideLayout`, and App holds a `Map` that is
+   neither saved nor undoable.
+8. **Detaching approximates the hang offset** with an ascent of
+   0.8 × font size (`DETACH_ASCENT`).
+9. **An attached text's `textPathD` is set to the guide's path** when it is
+   created, so the orphan fallback has a sensible curve.
+10. **Hit areas.** An attached text's hit box is its letters' extent, not the
+    guide's box, and the guide's path does not hit-test its interior
+    (`fillEnabled={false}`). The e2e suite found both. Without them, a circle
+    guide swallowed every click inside it.
+11. **`circlePathD` in `textPath.ts` is an open 270° arc.** Guides build
+    their own closed shapes and do not reuse it.

@@ -85,7 +85,7 @@ Because handlers reference each other via closures declared later in the same fu
 
 ### The `Block` discriminated union (`src/types.ts`)
 
-Everything drawn on the canvas is a `Block`: `TextBlock | ShapeFillBlock | ImageBlock | TextPathBlock`, discriminated by `type`. All four share a large `BlockCommon` (position, font fields, stroke/shadow, `groupId`, lock state, etc.) even where a variant doesn't conceptually need them (e.g. `ImageBlock` still carries unused `text`/`fontSize`/`color`/`fontFamily` because `BlockCommon` requires them) — this is an intentional simplification, not an oversight.
+Everything drawn on the canvas is a `Block`: `TextBlock | ShapeFillBlock | ImageBlock | TextPathBlock` (plus `MirrorBlock`, `SquareKufiBlock` and `GuideBlock` — a guide is an export-hidden construction path, see guides.md), discriminated by `type`. All four share a large `BlockCommon` (position, font fields, stroke/shadow, `groupId`, lock state, etc.) even where a variant doesn't conceptually need them (e.g. `ImageBlock` still carries unused `text`/`fontSize`/`color`/`fontFamily` because `BlockCommon` requires them) — this is an intentional simplification, not an oversight.
 
 Because `Partial<Block>` patches spread onto a `Block` union member don't type-check cleanly across 4+ variants, the two generic update paths (`updateBlock`, `updateSelectedBlock` in `App.tsx`) cast the result `as Block`. This is a deliberate, narrow trust-the-caller escape hatch — don't propagate `as Block` elsewhere; fix the type properly if a new case needs it.
 
@@ -95,7 +95,7 @@ Because `Partial<Block>` patches spread onto a `Block` union member don't type-c
 
 ### Rendering: one Konva component per block type
 
-`CanvasStage.tsx` maps `blocks` to one of `ShapedText` (text), `ShapeFillText` (shapeFill), `TextOnPathText` (textPath), or `ImageBlockView` (image), each a `react-konva` `Group`. Common per-block wiring (id, draggable, click/drag handlers) is built once as `commonProps` and spread into whichever component renders.
+`CanvasStage.tsx` maps `blocks` to one of `ShapedText` (text), `ShapeFillText` (shapeFill), `TextOnPathText` (textPath), `GuideView` (guide, drawn above all other blocks), or `ImageBlockView` (image), each a `react-konva` `Group`. Common per-block wiring (id, draggable, click/drag handlers) is built once as `commonProps` and spread into whichever component renders.
 
 - **`ShapedText.tsx`** — a normal text block; single shaped run, optional per-glyph `warpX`/`warpY` distortion via `src/lib/warp.ts`.
 - **`ShapeFillText.tsx`** — *tiles* the shaped text in repeating rows to fill an uploaded SVG shape's silhouette (scanline + ray-casting against a sampled polygon), auto-scaling each row to span the shape width exactly.
@@ -154,6 +154,7 @@ below are the trap most likely to bite, not a substitute for the note.
 - **Kashida elongation** — [`.claude/rules/kashida.md`](.claude/rules/kashida.md). Inserts real tatweel characters; `applyKashida` is absolute, a slot is a letter pair. Any tatweel-inserting handler must go through `kashidaTextPatch` so text-offset-keyed data (stroke cuts) is remapped.
 - **Letter & word spacing** — [`.claude/rules/spacing.md`](.claude/rules/spacing.md). Letter spacing only at piece breaks (never inside a join or cluster); only `ax` changes so index-keyed data needs no remap. Applied in `ShapedText` and `measureShapedRun` only — a new shaping consumer must apply it too.
 - **Multi-line verse** — [`.claude/rules/verse.md`](.claude/rules/verse.md). Lines are plain text blocks with a `verse` tag; anchor derived from the blocks, not stored; the tag stores the user's base spacing and the fitted total, so absolute writes (reset, styles) are adopted, never subtracted from. Copies drop the tag.
+- **Shaped guides** — [`.claude/rules/guides.md`](.claude/rules/guides.md). A `guide` block is an export-hidden path; Curve text with `guide` set keeps its own size at an offset along it. Offset stored un-flipped; hang = inside XOR flip; the guide Path must stay `fillEnabled={false}`; deleting a guide detaches its texts in the same undo step.
 - **Next Shape (letter alternates)** — [`.claude/rules/glyph-alternates.md`](.claude/rules/glyph-alternates.md). Keyed by letter ordinal (skips tatweel and marks), so kashida needs no remap; tags validated before reaching HarfBuzz. The overlay is **pointer-resolved** (one listening node; a Shape Fill tiles ~23k letters); text, Shape Fill and Curve build group-space polygons; block-level style sets precede per-letter overrides in the feature string.
 - **Fit to width** — [`.claude/rules/fit-to-width.md`](.claude/rules/fit-to-width.md). Pure solver with injected measurement (keeps it Vitest-importable); never overshoots; renderer imports `ITALIC_SHEAR`/`fauxBoldStrokeWidth` from it. Style terms come from `runStyleForBlock` only.
 - **Per-instance diacritic control** — [`.claude/rules/diacritics.md`](.claude/rules/diacritics.md). Marks are found by glyph identity plus a per-cluster allowance, never by cluster lookup. Hover handlers belong on the per-placement `Group`, not the hit `Rect` (Konva leave race). Capability guards live in `blockCapabilities.ts`.

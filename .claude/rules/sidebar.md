@@ -23,6 +23,11 @@ Then Shortcuts, outside any tier. The point of the split is that every
 panel which appears and disappears with the selection sits in one
 contiguous run, instead of interleaving with the permanent ones.
 
+A **Guide** type panel (size rows, Add text to guide, the texts on it)
+renders for a guide block, which hides Content, Typography and Effects; an
+attached Curve block's `Curve` panel swaps its curve-editing rows for the On
+guide controls (`GuideAttachmentPanel`). See [guides.md](guides.md).
+
 Two naming rules in the `selected` tier are worth knowing before adding a
 panel there:
 
@@ -64,9 +69,11 @@ deliberate action and a second confirmation on top was redundant
 friction.
 
 **Block Controls is three labelled groups on fixed grids**, not one
-wrapping row. `Add` (text, shape fill, curved text, square kufi, image,
-ornament, mirror, medallion) sits on a 4-column grid, which the eight buttons
-now fill exactly two rows of; `Selected` (duplicate, delete) and
+wrapping row. `Add` (text, shape fill, curved text, guide, square kufi,
+image, ornament, mirror, medallion) sits on a 4-column grid. Nine buttons
+since guides arrived (2026-10-13), so medallion sits alone on a third row —
+accepted in the guides spec, but it is exactly the orphan described below, so
+the next Add button should fill that row rather than start a fourth; `Selected` (duplicate, delete) and
 `History` (undo, redo, history) share a line below it. The row this replaced
 was a centred `flex-wrap` of twelve identical chips, which at the sidebar's
 own width wrapped **8 / 1 / 3** — stranding the ornament button alone on a
