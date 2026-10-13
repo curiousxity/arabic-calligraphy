@@ -9,6 +9,8 @@ const SLIDER_DEFAULTS: Record<string, number> = {
   opacity: 1,
   rotation: 0,
   lineHeight: 1.2,
+  letterSpacing: 0,
+  wordSpacing: 0,
   strokeWidth: 0,
   shadowBlur: 0,
   shadowOffsetX: 0,

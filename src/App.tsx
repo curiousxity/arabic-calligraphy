@@ -142,6 +142,7 @@ import type { MirrorMode, SquareKufiBlock } from "./types";
 import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
+import { spacingForBlock } from "./lib/spacing";
 import { cutAdvanceTotal, remapCutsForEdits } from "./lib/strokeCuts";
 import { nuqtaUnits } from "./lib/nuqta";
 import {
@@ -2434,7 +2435,8 @@ const App: React.FC = () => {
               fontSize,
               runStyle,
               selectedBlock.glyphAlternates,
-              selectedBlock.styleSets
+              selectedBlock.styleSets,
+              spacingForBlock(selectedBlock)
             ),
         });
         // A no-op result must not push history — clicking Fit on an
@@ -2509,7 +2511,10 @@ const App: React.FC = () => {
           // outlines are not the whole of what is drawn, and a composition
           // spaced by outlines alone sets an italic, outlined or stretched
           // name too close to its own reflection.
-          runStyleForBlock(source, cutWidthForBlock(source))
+          runStyleForBlock(source, cutWidthForBlock(source)),
+          undefined,
+          undefined,
+          spacingForBlock(source)
         );
         run = normalizeRunBox(measured, fontSize, lineHeight);
       } catch (err) {

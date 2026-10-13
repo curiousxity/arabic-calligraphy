@@ -1,6 +1,7 @@
 import { shapeText } from "./harfbuzz";
 import type { GlyphAlternate } from "../types";
 import { inkExtentBox, styledRunWidth, type RunStyle } from "./fitToWidth";
+import { applySpacing, type Spacing } from "./spacing";
 
 /**
  * How wide a run of text draws on canvas, in block space.
@@ -26,9 +27,10 @@ export async function measureShapedWidth(
   fontSize: number,
   style: RunStyle = {},
   alternates?: readonly GlyphAlternate[],
-  styleSets?: readonly string[]
+  styleSets?: readonly string[],
+  spacing?: Spacing
 ): Promise<number> {
-  return (await measureShapedRun(text, fontUrl, fontSize, style, alternates, styleSets)).width;
+  return (await measureShapedRun(text, fontUrl, fontSize, style, alternates, styleSets, spacing)).width;
 }
 
 /**
@@ -51,9 +53,12 @@ export async function measureShapedRun(
   fontSize: number,
   style: RunStyle = {},
   alternates?: readonly GlyphAlternate[],
-  styleSets?: readonly string[]
+  styleSets?: readonly string[],
+  spacing?: Spacing
 ): Promise<{ width: number; height: number }> {
-  const { glyphs, font, unitsPerEm } = await shapeText(text, fontUrl, alternates, styleSets);
-  const box = inkExtentBox(glyphs, font, fontSize, unitsPerEm);
+  const { glyphs, font, unitsPerEm, shapableText } = await shapeText(text, fontUrl, alternates, styleSets);
+  // What is measured must be what is drawn: ShapedText applies the same spacing.
+  const spaced = applySpacing(glyphs, shapableText, spacing ?? {}, Math.max(unitsPerEm || 1000, 1));
+  const box = inkExtentBox(spaced, font, fontSize, unitsPerEm);
   return { width: styledRunWidth(box, fontSize, style), height: box.height };
 }

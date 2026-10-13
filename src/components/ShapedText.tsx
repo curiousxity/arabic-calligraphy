@@ -34,6 +34,7 @@ import {
   type StrokeCutZone,
 } from "./StrokeCutHoverHandles";
 import { nuqtaUnits } from "../lib/nuqta";
+import { applySpacing } from "../lib/spacing";
 import {
   isOverrideGlyphChar,
   OVERRIDE_SCALE,
@@ -62,6 +63,9 @@ type Props = {
   fontStyle?: "normal" | "bold" | "italic" | "bold italic";
   align?: "left" | "center" | "right";
   lineHeight?: number;
+  /** Fraction of font size; see lib/spacing.ts. */
+  letterSpacing?: number;
+  wordSpacing?: number;
   opacity?: number;
   stroke?: string;
   strokeWidth?: number;
@@ -337,6 +341,8 @@ export const ShapedText: React.FC<Props> = ({
   fontStyle = "normal",
   align = "center",
   lineHeight = 1.2,
+  letterSpacing = 0,
+  wordSpacing = 0,
   opacity = 1,
   stroke = "#000000",
   strokeWidth = 0,
@@ -371,7 +377,24 @@ export const ShapedText: React.FC<Props> = ({
   onDragEnd,
   debugBounds = false,
 }) => {
-  const shapeData = useShapedGlyphs(text, fontFamily, glyphAlternates, styleSets);
+  const rawShape = useShapedGlyphs(text, fontFamily, glyphAlternates, styleSets);
+  // Spacing changes only advances, so applying it here — once, before
+  // anything below reads the run — reaches every loop, the bounding box and
+  // every overlay. At 0/0 it is the identity and nothing re-renders.
+  const spacedGlyphs = useMemo(
+    () =>
+      applySpacing(
+        rawShape.glyphs,
+        rawShape.shapableText,
+        { letter: letterSpacing, word: wordSpacing },
+        Math.max(rawShape.unitsPerEm || 1000, 1)
+      ),
+    [rawShape.glyphs, rawShape.shapableText, rawShape.unitsPerEm, letterSpacing, wordSpacing]
+  );
+  const shapeData = useMemo(
+    () => (spacedGlyphs === rawShape.glyphs ? rawShape : { ...rawShape, glyphs: spacedGlyphs }),
+    [rawShape, spacedGlyphs]
+  );
   const { hbLoaded } = shapeData;
   const overrideGlyph = useOverrideGlyph();
 
