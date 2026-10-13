@@ -26,6 +26,12 @@ export type MirrorBlockViewProps = {
    * removes the block shortly after.
    */
   source: MirrorSource | null;
+  /**
+   * When the source is guide-attached Curve text, its resolved guide path —
+   * as primitives, so the memoised copy is rebuilt only when the guide changes.
+   */
+  sourceGuideD?: string;
+  sourceGuideClosed?: boolean;
   mode: MirrorMode;
   radialCount?: number;
   radialRadius?: number;
@@ -76,6 +82,8 @@ const boxesMatch = (a: Box | null, b: Box | null) =>
 export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
   id,
   source,
+  sourceGuideD,
+  sourceGuideClosed = false,
   mode,
   radialCount,
   radialRadius,
@@ -131,10 +139,10 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
       return <SquareKufiText {...common} {...squareKufiProps(source)} />;
     }
     if (source.type === "textPath") {
-      return <TextOnPathText {...common} {...textPathProps(source)} />;
+      return <TextOnPathText {...common} {...textPathProps(source)} guidePath={sourceGuideD !== undefined ? { d: sourceGuideD, closed: sourceGuideClosed } : undefined} />;
     }
     return <ShapedText {...common} {...shapedTextProps(source)} />;
-  }, [source]);
+  }, [source, sourceGuideD, sourceGuideClosed]);
 
   const radialCopies = useMemo(
     () => (mode === "radial" ? radialCopyTransforms(radialCount, radialRadius) : null),

@@ -4,6 +4,8 @@ import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
+import { GuideView } from "./GuideView";
+import { resolveGuidePath } from "../lib/guides";
 import { SquareKufiText } from "./SquareKufiText";
 import { TextPathEditOverlay } from "./TextPathEditOverlay";
 import { KufiCellEditOverlay } from "./KufiCellEditOverlay";
@@ -94,6 +96,10 @@ export type CanvasStageProps = {
   onUpdateTextPathD: (blockId: number, d: string) => void;
   /** One `pushHistory()` per curve edit (drag, add or remove an anchor), taken before it starts. */
   onBeginTextPathEdit: () => void;
+  /** Writes a pen guide's path while its points are being edited (no history push). */
+  onUpdateGuideD?: (blockId: number, d: string) => void;
+  /** Renderer feedback: how far an attached text shrank to fit its guide. */
+  onGuideLayout?: (blockId: number, shrink: number) => void;
   /**
    * One `pushHistory()` per painting stroke, taken on mousedown. App passes
    * `pushHistory` itself — see `setKufiCell` there for why the per-cell write
@@ -170,6 +176,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onEditBlock,
   onUpdateTextPathD,
   onBeginTextPathEdit,
+  onUpdateGuideD,
+  onGuideLayout,
   onBeginKufiCellEdit,
   onSetKufiCell,
   onBeginDiacriticDrag,
@@ -810,7 +818,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
               />
             )}
 
-            {blocks.map((block) => {
+            {/* Guides draw above everything: a construction line hidden under
+                ink would be impossible to grab. */}
+            {[...blocks.filter((b) => b.type !== "guide"), ...blocks.filter((b) => b.type === "guide")].map((block) => {
               const onDragEnd = makeDragEndHandler(block);
               const onDragMove = makeDragMoveHandler(block);
               const commonProps = {
@@ -829,11 +839,17 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
               // An unresolvable source renders nothing; App's orphan pass
               // then removes the block.
               if (block.type === "mirror") {
+                // A mirror of guide-attached text needs the guide's path too.
+                const mirrorSrc = resolveMirrorSource(blocks, block);
+                const mirrorGuide =
+                  mirrorSrc?.type === "textPath" ? resolveGuidePath(blocks, mirrorSrc) : null;
                 return (
                   <MirrorBlockView
                     key={block.id}
                     {...commonProps}
-                    source={resolveMirrorSource(blocks, block)}
+                    source={mirrorSrc}
+                    sourceGuideD={mirrorGuide?.d}
+                    sourceGuideClosed={mirrorGuide?.closed}
                     mode={block.mode}
                     radialCount={block.radialCount}
                     radialRadius={block.radialRadius}
@@ -956,7 +972,40 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 );
               }
 
+              if (block.type === "guide") {
+                return (
+                  <React.Fragment key={block.id}>
+                    <GuideView
+                      {...commonProps}
+                      x={block.x}
+                      y={block.y}
+                      rotation={block.rotation ?? 0}
+                      d={block.guideD}
+                      stageScale={stageScale}
+                      selected={block.id === selectedId}
+                    />
+                    {block.guideShape === "pen" &&
+                      block.guideEditMode &&
+                      block.id === selectedId &&
+                      onUpdateGuideD && (
+                        <TextPathEditOverlay
+                          id={`text-path-edit-layer-${block.id}`}
+                          x={block.x}
+                          y={block.y}
+                          rotation={block.rotation ?? 0}
+                          textPathD={block.guideD}
+                          onBeginChange={onBeginTextPathEdit}
+                          onChange={(d) => onUpdateGuideD(block.id, d)}
+                        />
+                      )}
+                  </React.Fragment>
+                );
+              }
+
               if (block.type === "textPath") {
+                // Attached text draws on its guide, at the guide's place; the
+                // block's own x/y/rotation are ignored while attached.
+                const guidePlace = block.guide ? resolveGuidePath(blocks, block) : null;
                 return (
                   <React.Fragment key={block.id}>
                     <TextOnPathText
@@ -966,8 +1015,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                       glyphAlternateMode={block.glyphAlternateMode ?? false}
                       alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
                       onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}
-                      x={block.x}
-                      y={block.y}
+                      guidePath={guidePlace ? { d: guidePlace.d, closed: guidePlace.closed } : undefined}
+                      onGuideLayout={onGuideLayout ? (info) => onGuideLayout(block.id, info.shrink) : undefined}
+                      x={guidePlace?.x ?? block.x}
+                      y={guidePlace?.y ?? block.y}
+                      rotation={guidePlace?.rotation ?? block.rotation ?? 0}
                       opacity={block.opacity ?? 1}
                       locked={block.locked}
                     />

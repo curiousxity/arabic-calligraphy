@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Group, Shape, Rect } from "react-konva";
 import type Konva from "konva";
 import { parseSvgPath, replayPath } from "../lib/svgPath";
@@ -16,7 +16,8 @@ import {
   type AlternateChoice,
   type LetterAlternates,
 } from "../lib/glyphAlternates";
-import type { GlyphAlternate } from "../types";
+import type { GlyphAlternate, GuideAttachment } from "../types";
+import { guideGlyphPlacements } from "../lib/guidePlacement";
 import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
 
 export type TextOnPathTextProps = {
@@ -43,6 +44,14 @@ export type TextOnPathTextProps = {
   textPathD: string;
   textPathReversed?: boolean;
   textPathBaselineOffset?: number;
+  /**
+   * Attached to a guide: the guide's path replaces `textPathD`, and the text
+   * keeps its own size at `guideAttachment.offset` (see lib/guidePlacement).
+   */
+  guidePath?: { d: string; closed: boolean };
+  guideAttachment?: GuideAttachment;
+  /** Renderer feedback for the panel's shrink note; never saved. */
+  onGuideLayout?: (info: { shrink: number }) => void;
   /** Block-level OpenType style sets, e.g. ["ss01"]. */
   styleSets?: string[];
   /** Per-letter alternates (Next Shape). */
@@ -95,6 +104,9 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   textPathD,
   textPathReversed = false,
   textPathBaselineOffset = 0,
+  guidePath,
+  guideAttachment,
+  onGuideLayout,
   styleSets,
   glyphAlternates = NO_GLYPH_ALTERNATES,
   glyphAlternateMode = false,
@@ -117,11 +129,15 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   );
   const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
 
-  const parsedCmds = useMemo(() => parseSvgPath(textPathD || ""), [textPathD]);
+  // Attached to a guide: the guide's path, walked flipped or not, with the
+  // natural-size placement. Otherwise the block's own curve, stretched to fit.
+  const attached = guideAttachment && guidePath ? guideAttachment : null;
+  const curveD = attached ? guidePath!.d : textPathD;
+  const parsedCmds = useMemo(() => parseSvgPath(curveD || ""), [curveD]);
   const curveLen = useMemo(() => pathLength(parsedCmds), [parsedCmds]);
   // RTL text anchors to the curve's end point by default (walking the
   // reversed flattened point list); textPathReversed flips that per block.
-  const walkReversed = !textPathReversed;
+  const walkReversed = attached ? attached.flip : !textPathReversed;
   // Built once per curve (not once per glyph, per render) — the arc-length
   // lookup used inside the glyph loop below just does a table scan instead
   // of re-flattening the whole path from scratch every time.
@@ -135,13 +151,29 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   // padding logic, keyed off fontSize instead of measured glyph extents).
   const curveBox = useMemo(() => pathBoundingBox(parsedCmds), [parsedCmds]);
 
-  const layout = useMemo(
-    () =>
-      hbLoaded && font && parsedCmds.length >= 2
-        ? curveGlyphPlacements({ glyphs, fontSize, unitsPerEm, curveLen, arcTable })
-        : null,
-    [hbLoaded, font, parsedCmds.length, glyphs, fontSize, unitsPerEm, curveLen, arcTable]
-  );
+  const guideClosed = guidePath?.closed ?? false;
+  const layout = useMemo(() => {
+    if (!hbLoaded || !font || parsedCmds.length < 2) return null;
+    if (attached) {
+      return guideGlyphPlacements({
+        glyphs,
+        fontSize,
+        unitsPerEm,
+        ascender: font.ascender,
+        arcTable,
+        closed: guideClosed,
+        attachment: attached,
+      });
+    }
+    const fit = curveGlyphPlacements({ glyphs, fontSize, unitsPerEm, curveLen, arcTable });
+    return fit ? { placements: fit.placements, baselineOffset: textPathBaselineOffset, shrink: 1 } : null;
+  }, [hbLoaded, font, parsedCmds.length, glyphs, fontSize, unitsPerEm, curveLen, arcTable, attached, guideClosed, textPathBaselineOffset]);
+  const baselineOffset = layout?.baselineOffset ?? textPathBaselineOffset;
+
+  const shrink = attached ? layout?.shrink : undefined;
+  useEffect(() => {
+    if (shrink !== undefined) onGuideLayout?.({ shrink });
+  }, [shrink, onGuideLayout]);
 
   /**
    * Next Shape targets: one per letter that has alternates — its widest
@@ -177,12 +209,12 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
       out.push({
         key: String(letter),
         letter,
-        polygon: corners.map((c) => curvePlacementToGroup(p, c, textPathBaselineOffset)),
+        polygon: corners.map((c) => curvePlacementToGroup(p, c, baselineOffset)),
         options: byLetter.get(letter)!.options,
       });
     }
     return out;
-  }, [glyphAlternateMode, layout, font, alternateLetters, shapableText, glyphs, textPathBaselineOffset]);
+  }, [glyphAlternateMode, layout, font, alternateLetters, shapableText, glyphs, baselineOffset]);
   const pad = Math.max(fontSize, 24);
   const hitX = curveBox.x - pad;
   const hitY = curveBox.y - pad;
@@ -261,7 +293,7 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
             // space) need that same offset subtracted back out here.
             c2d.translate(px - hitX, py - hitY);
             c2d.rotate(angle);
-            c2d.translate(0, textPathBaselineOffset);
+            c2d.translate(0, baselineOffset);
             if (isItalic) c2d.transform(1, 0, -0.25, 1, 0, 0);
 
             c2d.fillStyle = painter.style;

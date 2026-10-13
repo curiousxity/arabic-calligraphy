@@ -1,5 +1,7 @@
 import type { Block, GuideBlock, TextBlock, TextPathBlock } from "../types";
 import { DEFAULT_ATTACHMENT } from "./guidePlacement";
+import { isClosedPath } from "./guideShapes";
+import { parseSvgPath } from "./svgPath";
 
 /**
  * Guide bookkeeping. Pure: attach, detach, delete-with-detach, orphans.
@@ -114,4 +116,16 @@ export function newAttachedText(id: number, guide: GuideBlock, style: Partial<Bl
     textPathD: guide.guideD,
     guide: { id: guide.id, ...DEFAULT_ATTACHMENT },
   };
+}
+
+/** The guide an attached text draws on, in the form its renderer needs; null when gone. */
+export function resolveGuidePath(
+  blocks: readonly Block[],
+  b: TextPathBlock
+): { d: string; closed: boolean; x: number; y: number; rotation: number } | null {
+  const ref = b.guide;
+  if (!ref) return null;
+  const g = blocks.find((x): x is GuideBlock => x.type === "guide" && x.id === ref.id);
+  if (!g) return null;
+  return { d: g.guideD, closed: isClosedPath(parseSvgPath(g.guideD)), x: g.x, y: g.y, rotation: g.rotation ?? 0 };
 }
