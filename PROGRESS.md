@@ -81,6 +81,13 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-13 — Letter and word spacing
+
+Two Typography sliders on text blocks. Letter spacing acts only at the gaps
+between a word's pieces, word spacing at spaces; both go negative to
+tighten. Fit to width and Name Designs measure the spaced run; mirrors
+follow. Details in [spacing.md](.claude/rules/spacing.md).
+
 ### 2026-10-10 — Next Shape on Shape Fill and Curve blocks
 
 The per-letter tool now works on Shape Fill (one pick changes that letter in

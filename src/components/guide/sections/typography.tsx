@@ -88,6 +88,15 @@ export const section: GuideSection = {
           marks above one line start crowding the line above.
         </li>
         <li>
+          <strong>Letter spacing</strong> and <strong>Word spacing</strong> —
+          for plain text blocks. Letter spacing opens or closes the gaps
+          between the separate pieces of a word (after ا, د, ر, و and the
+          other letters that don&apos;t join forward); joined letters never
+          come apart. Word spacing changes the space between words. Drag
+          below zero to tighten until pieces touch or overlap — useful for
+          compact compositions. Double-click a slider to reset it.
+        </li>
+        <li>
           <strong>Horizontal warp</strong> and <strong>Vertical warp</strong> —
           a gentle overall distortion of a plain text block, separate from the
           per-letter tools.

@@ -118,7 +118,7 @@ and derives the nuqta from it, so the grid is always true to the drawn letters.
   React event also keeps it from the dialog's own window Escape listener, so
   the `onKeyDown` handles Escape itself.
 - **Deliberately ignored in v1:** diacritic overrides, stroke cuts, gradients, faux bold/italic (`fontStyle`), warp
-  (`warpX`/`warpY`). Kashida works because it is real tatweel text.
+  (`warpX`/`warpY`), letter and word spacing. Kashida works because it is real tatweel text.
   Non-text block types never reach the dialog; the launcher is disabled.
 
 ## Tests
