@@ -987,6 +987,8 @@ features" section carries the reasoning for each. All of it was re-planned on
 per item — `docs/superpowers/plans/2026-09-06-remaining-work-program.md` holds
 the result, and most of it came back **declined**.
 
+Free movement of nuqtas and diacritics was added on 2026-10-13, not yet designed — see [deferred-features.md](.claude/rules/deferred-features.md).
+
 Nothing from that plan is still open. Per-glyph rotation, hand-editing
 square-kufi cells, boustrophedon compositions and per-glyph
 move/scale/rotate on Shape Fill all shipped on 2026-09-06; the other five

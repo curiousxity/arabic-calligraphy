@@ -49,3 +49,21 @@ These are capabilities that have been explicitly identified as valuable but deli
   cannot reuse `placeLine`'s half-turn blit.
 
 - **Image trace** — Auto-tracing a raster image into a silhouette shape existed on Shape Warp blocks and was removed with that block type. Rebuilding it for Shape Fill means restoring `lib/imageTrace.ts`, `ImageTraceDialog.tsx`, and the `imagetracerjs` dependency from git history; the tracing itself was block-type agnostic, producing the same `{ pathData, w, h }` shape `extractSvgPaths` returns.
+
+- **Free movement of nuqtas and diacritics** — Wanted (2026-10-13, after
+  looking at Qalam Studio, which splits every glyph into body, dots and marks
+  and moves each one). Not started; the purpose is not settled yet (collision
+  fixes, traditional placement, or decorative freedom), and it should be
+  asked before choosing an approach. Two separate pieces:
+  - *Diacritics sideways.* Tashkeel already moves vertically, resizes and
+    hides ([diacritics.md](diacritics.md)); adding `offsetX` is a widening of
+    `DiacriticOverride` and the drag rail, not a new subsystem.
+  - *Nuqtas.* The new subsystem. In NotoSans, Ruqaa, Kufi2 and Qahiri a dot is
+    its own zero-advance glyph — the very glyph `findDiacriticGlyphIndices`'
+    allowance gate exists to *exclude*, so it must not be armed through that
+    path. In every other font the dots are contours inside the letter's
+    outline and need splitting out, so identifying a dot from its outline is
+    the real work. Start from `docs/archive/nuqta-measurements.md` (per-font
+    dot size, verified) and `scripts/measureNuqta.py` (modal-contour sweep)
+    rather than re-measuring. Moving a dot is a translate only — no scale, per
+    [removed-subsystems.md](removed-subsystems.md).
