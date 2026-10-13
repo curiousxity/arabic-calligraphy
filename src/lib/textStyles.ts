@@ -43,6 +43,9 @@ export type TextStyle = {
   shadowOpacity?: number;
   /** Text blocks only; harmlessly inert on the other types, like the rest of `BlockCommon`. */
   lineHeight?: number;
+  /** Text blocks only, like `lineHeight`. Fraction of font size; see lib/spacing.ts. */
+  letterSpacing?: number;
+  wordSpacing?: number;
 };
 
 export const TEXT_STYLES_KEY = "harfcanvas-text-styles-v1";
@@ -66,6 +69,8 @@ const STYLE_FIELDS = [
   "shadowOffsetY",
   "shadowOpacity",
   "lineHeight",
+  "letterSpacing",
+  "wordSpacing",
 ] as const;
 
 export type StyleField = (typeof STYLE_FIELDS)[number];
@@ -82,6 +87,8 @@ const isStyleValue = (field: StyleField, value: unknown): boolean => {
     case "shadowOffsetY":
     case "shadowOpacity":
     case "lineHeight":
+    case "letterSpacing":
+    case "wordSpacing":
       return typeof value === "number" && Number.isFinite(value);
     default:
       return typeof value === "string";

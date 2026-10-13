@@ -222,6 +222,20 @@ describe("applySpacing (real HarfBuzz shaping)", () => {
   });
 });
 
+describe("applySpacing: letters beyond the core Arabic block", () => {
+  it("treats Urdu ہ as a letter: وہ has one break after و", async () => {
+    const { glyphs, upm } = await shaped("وہ", "Urdu.ttf");
+    const out = applySpacing(glyphs, "وہ", { letter: 0.2 }, upm);
+    expect(sumAx(out) - sumAx(glyphs)).toBeCloseTo(0.2 * upm, 6);
+  });
+
+  it("treats alef wasla as a right-joiner: ٱب has one break after ٱ", async () => {
+    const { glyphs, upm } = await shaped("ٱب");
+    const out = applySpacing(glyphs, "ٱب", { letter: 0.2 }, upm);
+    expect(sumAx(out) - sumAx(glyphs)).toBeCloseTo(0.2 * upm, 6);
+  });
+});
+
 describe("spacingForBlock", () => {
   it("reads a text block's fields and gives other types nothing", () => {
     const text = { type: "text", letterSpacing: 0.1, wordSpacing: 0.4 } as unknown as Block;

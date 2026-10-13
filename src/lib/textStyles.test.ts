@@ -164,3 +164,11 @@ describe("the style store", () => {
     expect(removeStyle(list, "nope")).toHaveLength(3);
   });
 });
+
+describe("letter and word spacing in styles", () => {
+  it("captures and re-applies both spacing fields", () => {
+    const style = captureStyle(block({ letterSpacing: 0.3, wordSpacing: -0.2 }), "Tight");
+    expect(style).toMatchObject({ letterSpacing: 0.3, wordSpacing: -0.2 });
+    expect(styleToPatch(style)).toMatchObject({ letterSpacing: 0.3, wordSpacing: -0.2 });
+  });
+});
