@@ -4,7 +4,8 @@ export type BlockType =
   | "image"
   | "textPath"
   | "mirror"
-  | "squareKufi";
+  | "squareKufi"
+  | "guide";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 
@@ -201,6 +202,38 @@ export type TextPathBlock = BlockCommon & {
   textPathBaselineOffset?: number;
   /** True while the on-canvas pen-tool curve editor is active for this block. */
   textPathEditMode?: boolean;
+  /**
+   * Set when this text is attached to a guide: the guide's path replaces
+   * `textPathD` and the text keeps its own size. See .claude/rules/guides.md.
+   */
+  guide?: GuideAttachment;
+};
+
+export type GuideShape = "circle" | "ellipse" | "arc" | "wave" | "line" | "pen";
+export type GuideParams = { width?: number; height?: number; sweep?: number; amplitude?: number };
+
+/** A dashed construction path that Curve text can attach to; never exported. */
+export type GuideBlock = BlockCommon & {
+  type: "guide";
+  /** SVG path in the block's local space, centred on its origin. */
+  guideD: string;
+  guideShape: GuideShape;
+  /** What the Guide panel edits; `guideD` is regenerated from it (never for pen). */
+  guideParams?: GuideParams;
+  /** Pen point editing active (pen guides only). */
+  guideEditMode?: boolean;
+};
+
+export type GuideAttachment = {
+  /** The guide block's id. */
+  id: number;
+  /** 0..1 along the guide, in its un-flipped direction. */
+  offset: number;
+  align: "start" | "center" | "end";
+  side: "outside" | "inside";
+  flip: boolean;
+  /** Distance from the line, × font size. */
+  gap: number;
 };
 
 // owner of the `BlockType` union (line 1) and the `Block` union just below
@@ -291,4 +324,5 @@ export type Block =
   | ImageBlock
   | TextPathBlock
   | MirrorBlock
-  | SquareKufiBlock;
+  | SquareKufiBlock
+  | GuideBlock;
