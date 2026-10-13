@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MAX_STEP, ZOOM_STEP, zoomFactorFromWheel } from "./canvasBounds";
+import { MAX_SCALE, MAX_STEP, MIN_SCALE, ZOOM_STEP, pinchStep, zoomFactorFromWheel } from "./canvasBounds";
 
 describe("zoomFactorFromWheel", () => {
   it("does nothing at zero travel", () => {
@@ -62,5 +62,50 @@ describe("zoomFactorFromWheel", () => {
 
   it("returns the identity for a non-finite delta", () => {
     expect(zoomFactorFromWheel(Number.NaN)).toBe(1);
+  });
+});
+
+describe("pinchStep", () => {
+  const pair = (ax: number, ay: number, bx: number, by: number) => [
+    { x: ax, y: ay },
+    { x: bx, y: by },
+  ] as const;
+
+  it("pans by the midpoint's travel when the fingers keep their spacing", () => {
+    const r = pinchStep(pair(100, 100, 200, 100), pair(130, 140, 230, 140), 2, { x: 10, y: 20 });
+    expect(r.scale).toBeCloseTo(2, 9);
+    expect(r.position).toEqual({ x: 40, y: 60 });
+  });
+
+  it("zooms by the ratio of finger spacing", () => {
+    const r = pinchStep(pair(100, 100, 200, 100), pair(50, 100, 250, 100), 1, { x: 0, y: 0 });
+    expect(r.scale).toBeCloseTo(2, 9);
+  });
+
+  it("keeps the content point under the fingers' midpoint fixed", () => {
+    const scale = 1.5;
+    const position = { x: -30, y: 45 };
+    const prev = pair(100, 200, 180, 260);
+    const next = pair(60, 170, 260, 330);
+    const r = pinchStep(prev, next, scale, position);
+    // Content point under the previous midpoint...
+    const cx = (140 - position.x) / scale;
+    const cy = (230 - position.y) / scale;
+    // ...lands under the new midpoint.
+    expect(cx * r.scale + r.position.x).toBeCloseTo(160, 9);
+    expect(cy * r.scale + r.position.y).toBeCloseTo(250, 9);
+  });
+
+  it("clamps to the zoom limits and still anchors at the clamped scale", () => {
+    const r = pinchStep(pair(100, 100, 101, 100), pair(0, 100, 1000, 100), MAX_SCALE / 2, { x: 0, y: 0 });
+    expect(r.scale).toBe(MAX_SCALE);
+    const out = pinchStep(pair(0, 100, 1000, 100), pair(500, 100, 501, 100), MIN_SCALE * 2, { x: 0, y: 0 });
+    expect(out.scale).toBe(MIN_SCALE);
+  });
+
+  it("treats fingers on the same spot as a pure pan rather than dividing by zero", () => {
+    const r = pinchStep(pair(100, 100, 100, 100), pair(120, 100, 180, 100), 1, { x: 0, y: 0 });
+    expect(r.scale).toBe(1);
+    expect(Number.isFinite(r.position.x)).toBe(true);
   });
 });

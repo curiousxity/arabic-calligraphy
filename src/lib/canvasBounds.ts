@@ -75,6 +75,43 @@ export function zoomFactorFromWheel(deltaY: number, deltaMode = 0): number {
   return Math.min(MAX_STEP, Math.max(1 / MAX_STEP, factor));
 }
 
+type Point = { x: number; y: number };
+
+/**
+ * One frame of a two-finger touch gesture: the stage scale and position that
+ * follow the fingers from `prev` to `next` (both in stage-container pixels).
+ *
+ * Pan and zoom are one gesture, not two modes: the content point that sat
+ * under the fingers' midpoint stays under it, while the scale changes by the
+ * ratio of the fingers' spacing. Moving both fingers together therefore pans
+ * and spreading them zooms, with no threshold to decide which. The anchor is
+ * computed at the *clamped* scale, so pinching past a zoom limit pans
+ * rather than drifting.
+ */
+export function pinchStep(
+  prev: readonly [Point, Point],
+  next: readonly [Point, Point],
+  scale: number,
+  position: Point
+): { scale: number; position: Point } {
+  const mid = (p: readonly [Point, Point]) => ({ x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 });
+  const dist = (p: readonly [Point, Point]) => Math.hypot(p[1].x - p[0].x, p[1].y - p[0].y);
+
+  const prevMid = mid(prev);
+  const nextMid = mid(next);
+  const prevDist = dist(prev);
+  // Fingers on one spot have no spacing to compare against: pan only.
+  const ratio = prevDist > 0 ? dist(next) / prevDist : 1;
+  const newScale = clamp(scale * ratio, MIN_SCALE, MAX_SCALE);
+
+  const contentX = (prevMid.x - position.x) / scale;
+  const contentY = (prevMid.y - position.y) / scale;
+  return {
+    scale: newScale,
+    position: { x: nextMid.x - contentX * newScale, y: nextMid.y - contentY * newScale },
+  };
+}
+
 /** Fallback bounds when there's no content yet (empty canvas), centered on the world origin. */
 export const DEFAULT_EMPTY_BOUNDS: Rect = { x: -400, y: -300, width: 800, height: 600 };
 

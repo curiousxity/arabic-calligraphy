@@ -86,6 +86,14 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-13 — Touch: pinch zoom, two-finger pan
+
+On a phone or tablet a pinch used to zoom the whole page. Now one finger
+moves a block, two fingers pan and pinch-zoom the canvas, and the rest of
+the app never zooms. Unverified on a real iOS device so far (the e2e suite is
+Chromium). How it works and its traps:
+[pan-zoom.md](.claude/rules/pan-zoom.md).
+
 ### 2026-10-13 — Font picker grouped by genre; five new styles
 
 The font picker and Name designs gallery are grouped by calligraphic genre

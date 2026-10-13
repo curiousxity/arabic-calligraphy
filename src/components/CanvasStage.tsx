@@ -28,6 +28,7 @@ function guideArcTable(d: string): ArcTable {
 import { SquareKufiText } from "./SquareKufiText";
 import { TextPathEditOverlay } from "./TextPathEditOverlay";
 import { KufiCellEditOverlay } from "./KufiCellEditOverlay";
+import { useTouchPinch } from "../hooks/useTouchPinch";
 import { ImageBlockView } from "./ImageBlockView";
 // STREAM-B (muthanna/radial): the file has no anchored import region, so
 // these two sit with the other renderer imports. Used only by the STREAM-B
@@ -247,6 +248,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
   const [spacePan, setSpacePan] = useState(false);
   const effectivePanMode = panMode || spacePan;
+  useTouchPinch(stageRef, stageScale, stagePosition, onUpdateStage);
   const additiveSelectRef = useRef(false);
 
   const [contentBox, setContentBox] = useState(padBox(DEFAULT_EMPTY_BOUNDS));
@@ -676,6 +678,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         overflow: "hidden",
         background: "var(--bg-canvas-area)",
         cursor: effectivePanMode ? "grab" : "default",
+        // Gestures here are the canvas's own (useTouchPinch); without this the
+        // browser takes a pinch as a page zoom and scales the whole app.
+        touchAction: "none",
       }}
     >
       <div style={{ width: viewportWidth, height: stageViewportHeight }}>

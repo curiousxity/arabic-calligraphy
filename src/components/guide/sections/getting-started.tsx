@@ -11,6 +11,9 @@ export const section: GuideSection = {
     "zoom",
     "scroll",
     "pinch",
+    "phone",
+    "tablet",
+    "touch",
     "first",
     "new",
     "add text",
@@ -64,6 +67,11 @@ export const section: GuideSection = {
           <strong>Zoom</strong> — hold Ctrl (⌘ on a Mac) while scrolling, or
           pinch on a trackpad. Zooming follows the wheel's actual travel, so a
           gentle pinch nudges and a fast flick moves further.
+        </li>
+        <li>
+          <strong>On a phone or tablet</strong> — one finger moves a block (or, on
+          empty canvas, pans), two fingers pan, and pinching zooms the canvas. The rest of the app stays
+          put; only the canvas zooms.
         </li>
         <li>
           <strong>Drag to pan</strong> — hold Space and drag, drag with the
