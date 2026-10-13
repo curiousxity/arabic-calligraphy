@@ -26,6 +26,8 @@ import { TemplateWizardDialog } from "./TemplateWizardDialog";
 import { NameDesignButton, type FontChoice } from "./NameDesignDialog";
 import type { NameDesignSelection } from "../lib/nameDesign";
 import type { VerseLayout, VerseSettings } from "../types";
+import { VerseButton } from "./VerseDialog";
+import { VersePanel } from "./sidebar/VersePanel";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { HistoryPopover, type HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
@@ -463,6 +465,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   missingFontKey = null,
   // ---- /STREAM-G ----
   onApplyNameDesign,
+  onCreateVerse,
+  onJustifyVerse,
+  isJustifyingVerse,
   blocks,
   artboard = null,
   onChooseArtboardPreset,
@@ -588,6 +593,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showEffects, setShowEffects] = useState(false);
   const [effectsTab, setEffectsTab] = useState<"outline" | "shadow">("outline");
   const [showContent, setShowContent] = useState(true);
+  const [showVerse, setShowVerse] = useState(true);
 
   /**
    * The font list both the Typography picker and the name-design gallery
@@ -2034,6 +2040,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           </div>
+          {onCreateVerse && (
+            <div style={{ marginTop: 10 }}>
+              <VerseButton onCreate={onCreateVerse} disabled={isJustifyingVerse} />
+            </div>
+          )}
         </div>
 
         <div className="sidebarPanel">
@@ -2288,6 +2299,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   collapsible
                 />
               </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {/* A verse line is an ordinary text block, so this sits under Content
+            the way a type panel does — it is what that line has that others
+            don't. See .claude/rules/verse.md. */}
+        {selectedBlock?.type === "text" && selectedBlock.verse && onJustifyVerse && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Verse" isOpen={showVerse} onToggle={() => setShowVerse((v) => !v)}>
+              <VersePanel
+                verse={selectedBlock.verse}
+                busy={!!isJustifyingVerse}
+                onJustify={onJustifyVerse}
+              />
             </CollapsibleSection>
           </div>
         )}
