@@ -19,7 +19,13 @@ import { OrnamentFillSwatches } from "./OrnamentPicker";
 import { CloseIcon } from "./Icons";
 
 /** One entry of the font picker's own list — value, label, and the CSS family to preview in. */
-export type FontChoice = { value: string; label: string; cssFamily: string };
+export type FontChoice = {
+  value: string;
+  label: string;
+  cssFamily: string;
+  /** Calligraphic genre (Naskh, Kufi…) — pickers head a group with it. */
+  genre?: string;
+};
 
 export type NameDesignDialogProps = {
   /** The block's current text — the name every preview here renders. */
@@ -163,7 +169,9 @@ export const NameDesignDialog: React.FC<NameDesignDialogProps> = ({
                 >
                   {name || "أبجد"}
                 </span>
-                <span className="nameStyleLabel">{font.label}</span>
+                <span className="nameStyleLabel">
+                  {font.genre ? `${font.genre} · ${font.label}` : font.label}
+                </span>
               </button>
             ))}
           </div>

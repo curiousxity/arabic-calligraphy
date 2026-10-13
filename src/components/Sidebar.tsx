@@ -354,24 +354,38 @@ export type SidebarProps = {
   onDeleteExportPreset?: () => void;
 };
 
-const FONT_OPTIONS: { value: string; label: string; cssFamily: string }[] = [
-  { value: "FatemiMaqala", label: "Fatemi Maqala", cssFamily: "FatemiMaqala" },
-  { value: "AlFatemi", label: "Al Fatemi", cssFamily: "AlFatemi" },
-  { value: "TahaNaskhRegular", label: "Taha Naskh", cssFamily: "TahaNaskhRegular" },
-  { value: "Kufi", label: "Kufi", cssFamily: "Kufi" },
-  { value: "Kufi2", label: "Kufi 2", cssFamily: "Kufi2" },
-  { value: "Thuluth", label: "Thuluth", cssFamily: "Thuluth" },
-  { value: "ThuluthDeco", label: "Thuluth Deco", cssFamily: "ThuluthDeco" },
-  { value: "Wessam", label: "Wessam", cssFamily: "Wessam" },
-  { value: "Yekan", label: "Yekan", cssFamily: "Yekan" },
-  { value: "NotoSans", label: "Noto Sans", cssFamily: "'Noto Sans Arabic'" },
-  { value: "Lateef", label: "Lateef", cssFamily: "Lateef" },
-  { value: "Amiri", label: "Amiri", cssFamily: "Amiri" },
-  { value: "Ruqaa", label: "Ruqaa", cssFamily: "Ruqaa" },
-  { value: "Qahiri", label: "Qahiri", cssFamily: "Qahiri" },
-  { value: "Scheherazade", label: "Scheherazade", cssFamily: "Scheherazade" },
-  { value: "Urdu", label: "Urdu", cssFamily: "Urdu" },
-  { value: "HarfCanvasDiwani", label: "Diwani", cssFamily: "HarfCanvasDiwani" },
+/**
+ * The bundled fonts, grouped by calligraphic genre and listed in picker
+ * order — `FontSelectRow` and the name-design gallery start a new heading
+ * wherever `genre` changes, so a genre's fonts must sit together here.
+ *
+ * `value` is persisted in every saved block; never rename one. Labels are
+ * free to change (the "Kufi" key is Janna LT, a modern sans, and "Urdu" is
+ * Jameel Noori Nastaleeq).
+ */
+const FONT_OPTIONS: FontChoice[] = [
+  { genre: "Fatemi", value: "FatemiMaqala", label: "Fatemi Maqala", cssFamily: "FatemiMaqala" },
+  { genre: "Fatemi", value: "AlFatemi", label: "Al Fatemi", cssFamily: "AlFatemi" },
+  { genre: "Naskh", value: "TahaNaskhRegular", label: "Taha Naskh", cssFamily: "TahaNaskhRegular" },
+  { genre: "Naskh", value: "Amiri", label: "Amiri", cssFamily: "Amiri" },
+  { genre: "Naskh", value: "Scheherazade", label: "Scheherazade", cssFamily: "Scheherazade" },
+  { genre: "Naskh", value: "Lateef", label: "Lateef", cssFamily: "Lateef" },
+  { genre: "Thuluth", value: "Thuluth", label: "Thuluth", cssFamily: "Thuluth" },
+  { genre: "Thuluth", value: "ThuluthDeco", label: "Thuluth Deco", cssFamily: "ThuluthDeco" },
+  { genre: "Nastaliq", value: "Urdu", label: "Jameel Noori", cssFamily: "Urdu" },
+  { genre: "Nastaliq", value: "Gulzar", label: "Gulzar", cssFamily: "Gulzar" },
+  { genre: "Diwani", value: "HarfCanvasDiwani", label: "Diwani", cssFamily: "HarfCanvasDiwani" },
+  { genre: "Diwani", value: "Wessam", label: "Wessam", cssFamily: "Wessam" },
+  { genre: "Ruqaa", value: "Ruqaa", label: "Ruqaa", cssFamily: "Ruqaa" },
+  { genre: "Maghribi", value: "Rabat", label: "Rabat", cssFamily: "Rabat" },
+  { genre: "Kufi", value: "Kufi2", label: "Reem Kufi", cssFamily: "Kufi2" },
+  { genre: "Kufi", value: "Qahiri", label: "Qahiri", cssFamily: "Qahiri" },
+  { genre: "Mushaf Kufi", value: "Raqq", label: "Raqq", cssFamily: "Raqq" },
+  { genre: "Decorated Kufi", value: "RanaKufi", label: "Rana Kufi", cssFamily: "RanaKufi" },
+  { genre: "Wide Kufi", value: "Blaka", label: "Blaka", cssFamily: "Blaka" },
+  { genre: "Modern", value: "Yekan", label: "Yekan", cssFamily: "Yekan" },
+  { genre: "Modern", value: "Kufi", label: "Janna", cssFamily: "Kufi" },
+  { genre: "Modern", value: "NotoSans", label: "Noto Sans", cssFamily: "'Noto Sans Arabic'" },
 ];
 
 /** Serializes parsed SVG path commands back into a `d` string (module-local, one-off — mirrors ShapedText.tsx's commandsToSvgPath). */
@@ -629,6 +643,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         value: f.key,
         label: `${f.label} (uploaded)`,
         cssFamily: `'${f.key}'`,
+        genre: "Uploaded",
       })),
     ],
     [customFonts]

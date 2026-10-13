@@ -44,6 +44,17 @@ Modified Version and it must be renamed:
     incoming/TheirFont.ttf public/fonts/OurName.ttf --rename OurName
 ```
 
+The script rescales the glyphs when the target's unitsPerEm differs from
+FatemiMaqala's 2048. It needs a `glyf` font: a CFF2 (variable OpenType)
+target must be instanced and converted to TrueType first — opentype.js
+cannot read CFF2 anyway. `scripts/prepareFont.py` does both (and
+`--strip-color` drops COLR/CPAL/SVG); `RanaKufi.ttf` and `Raqq.ttf` are
+its worked examples (`.claude/rules/bundled-fonts.md`).
+
+**Check the licence before merging.** The honorifics are not OFL; merging
+them into an AGPL or no-modification font is not allowed. Those fonts ship
+without them — the table in `.claude/rules/bundled-fonts.md`.
+
 Keep the upstream licence beside it as `public/fonts/OurName-OFL.txt`,
 including a note on what was modified. `HarfCanvasDiwani-OFL.txt` is the
 worked example.

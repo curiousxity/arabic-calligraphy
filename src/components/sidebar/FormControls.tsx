@@ -73,7 +73,7 @@ export const FontSelectRow = ({
   id: string;
   label: string;
   value: string;
-  options: { value: string; label: string; cssFamily: string }[];
+  options: { value: string; label: string; cssFamily: string; genre?: string }[];
   onChange: (v: string) => void;
   previewSuffix?: string;
 }) => {
@@ -125,7 +125,16 @@ export const FontSelectRow = ({
         </button>
         {open && (
           <ul className="fontSelectList" role="listbox" aria-labelledby={`${id}-label`}>
-            {options.map((o) => (
+            {options.flatMap((o, i) => [
+              // A genre heading wherever the genre changes — the list is
+              // ordered by genre, so each heading appears once.
+              ...(o.genre && o.genre !== options[i - 1]?.genre
+                ? [
+                    <li key={`genre:${o.genre}`} role="presentation" className="fontSelectGroup">
+                      {o.genre}
+                    </li>,
+                  ]
+                : []),
               <li key={o.value} role="option" aria-selected={o.value === value}>
                 <button
                   type="button"
@@ -143,8 +152,8 @@ export const FontSelectRow = ({
                   {o.label}
                   {previewSuffix ? ` ${previewSuffix}` : ""}
                 </button>
-              </li>
-            ))}
+              </li>,
+            ])}
           </ul>
         )}
       </div>

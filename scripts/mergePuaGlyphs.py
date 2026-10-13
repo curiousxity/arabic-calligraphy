@@ -28,6 +28,7 @@ import sys
 
 from fontTools.ttLib import TTFont
 from fontTools.pens.recordingPen import DecomposingRecordingPen
+from fontTools.pens.transformPen import TransformPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -56,12 +57,10 @@ def merge(source_path, target_path, out_path, new_name=None):
     src = TTFont(source_path)
     dst = TTFont(target_path)
 
-    if src["head"].unitsPerEm != dst["head"].unitsPerEm:
-        raise SystemExit(
-            f"unitsPerEm mismatch: source {src['head'].unitsPerEm} vs "
-            f"target {dst['head'].unitsPerEm}. The glyphs would come out the "
-            "wrong size; rescale before merging."
-        )
+    # Fonts differ in unitsPerEm (FatemiMaqala is 2048; most Google Fonts are
+    # 1000, Qahiri 750). The copied outlines and advances are rescaled so an
+    # honorific stands the same height relative to the em in every face.
+    scale = dst["head"].unitsPerEm / src["head"].unitsPerEm
 
     if "glyf" not in dst:
         raise SystemExit("target is not a TrueType (glyf) font; CFF merging "
@@ -83,14 +82,15 @@ def merge(source_path, target_path, out_path, new_name=None):
         rec = DecomposingRecordingPen(src_gs)
         src_gs[sname].draw(rec)
         pen = TTGlyphPen(None)
-        rec.replay(pen)
+        rec.replay(TransformPen(pen, (scale, 0, 0, scale, 0, 0)) if scale != 1 else pen)
 
         new_glyph_name = f"honorific{cp:04X}"
         while new_glyph_name in order:
             new_glyph_name += "_x"
 
         dst["glyf"].glyphs[new_glyph_name] = pen.glyph()
-        dst["hmtx"].metrics[new_glyph_name] = src["hmtx"].metrics[sname]
+        adv, lsb = src["hmtx"].metrics[sname]
+        dst["hmtx"].metrics[new_glyph_name] = (round(adv * scale), round(lsb * scale))
         order.append(new_glyph_name)
 
         # Overwrite the codepoint in every unicode subtable. The target's own

@@ -29,6 +29,13 @@ export const FONT_URLS: Record<string, string> = {
   // OFL requires, with the honorific PUA glyphs merged in. Provenance and
   // licence: public/fonts/HarfCanvasDiwani-OFL.txt.
   HarfCanvasDiwani: "/fonts/HarfCanvasDiwani.ttf",
+  Gulzar: "/fonts/Gulzar.ttf",
+  // The next three are not OFL and ship without the honorific PUA glyphs —
+  // licences and modifications in public/fonts/<Name>-LICENSE.txt.
+  Rabat: "/fonts/Rabat.otf",
+  Raqq: "/fonts/Raqq.ttf",
+  RanaKufi: "/fonts/RanaKufi.ttf",
+  Blaka: "/fonts/Blaka.ttf",
 };
 
 /** The family a block falls back to when its own font cannot be resolved. */

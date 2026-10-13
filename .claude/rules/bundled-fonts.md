@@ -8,7 +8,7 @@ paths:
 
 # Font files carry custom glyphs — don't blindly replace them
 
-`public/fonts/*.ttf|otf` are not stock font files. `FatemiMaqala.ttf` has custom Private Use Area glyphs (honorific symbols used by the sidebar's "Presets" row) that were manually merged (via a Python `fontTools` script, not committed to the repo) into every *other* font file in `public/fonts/` too, so those symbols render regardless of the selected font. If a font file in `public/fonts/` is ever regenerated/replaced from an upstream source, those PUA glyphs will be lost and the Presets buttons will silently show missing-glyph boxes in every font except FatemiMaqala again.
+`public/fonts/*.ttf|otf` are not stock font files. `FatemiMaqala.ttf` has custom Private Use Area glyphs (honorific symbols used by the sidebar's "Presets" row) that were manually merged (via a Python `fontTools` script, not committed to the repo) into every *other* font file in `public/fonts/` too, so those symbols render regardless of the selected font — **except three fonts whose licences forbid it** (see "Fonts shipped without the honorifics" below). If a font file in `public/fonts/` is ever regenerated/replaced from an upstream source, those PUA glyphs will be lost and the Presets buttons will silently show missing-glyph boxes in every font except FatemiMaqala again.
 
 **There are TEN of those glyphs, and they are not a contiguous range.** The
 authoritative list is `PRESETS` in `src/lib/presets.ts`:
@@ -31,8 +31,13 @@ four* of these or it half-works in a way that is easy to misdiagnose:
 2. an `@font-face` rule at the top of `src/index.css` — this is what the
    sidebar's dropdown uses to preview each font's own name;
 3. `FONT_OPTIONS` in `src/components/Sidebar.tsx` — a hand-ordered array of
-   `{ value, label, cssFamily }`, and **the only thing that decides whether
-   a font appears in the picker at all**;
+   `{ genre, value, label, cssFamily }`, and **the only thing that decides whether
+   a font appears in the picker at all**. It is ordered by `genre`: the
+   picker and the name-design gallery start a heading wherever the genre
+   changes, so a font placed away from its genre's block makes that heading
+   appear twice. `value` is persisted in saved blocks and must never be
+   renamed; `label` is free (the `Kufi` key is labelled Janna, `Urdu` is
+   Jameel Noori, `Kufi2` is Reem Kufi);
 4. `FONT_URLS` in `src/hooks/useShapedGlyphs.ts` — what HarfBuzz actually
    shapes with.
 
@@ -87,3 +92,51 @@ working Diwani — **`HarfCanvasDiwani.ttf` replaces it** (see above). Worth
 knowing if another Diwani is ever sought: Google Fonts has none, and most
 named Diwani faces (DecoType Diwani, Diwani Letter, Diwani Bent) are
 proprietary or free-for-personal-use only, so they cannot be vendored here.
+
+## Fonts shipped without the honorifics
+
+Added 2026-10-13 with the genre picker, to match the styles the name-generator
+sites offer: **Gulzar** (Nastaliq), **Blaka** (Wide Kufi) — both OFL, no
+Reserved Font Name, honorifics merged as usual — and three that are *not* OFL:
+
+| key | genre | licence | modified? |
+|---|---|---|---|
+| `Raqq` | Mushaf Kufi | AGPL-3.0 | instanced static; COLR/CPAL/SVG colour tables removed |
+| `RanaKufi` | Decorated Kufi | AGPL-3.0 | instanced static; CFF2 → TrueType |
+| `Rabat` | Maghribi | "may be used freely, no copying of glyphs" | no — byte-for-byte upstream |
+
+**None of the three carries the honorific glyphs, on purpose.** The glyphs
+come from FatemiMaqala, which is all-rights-reserved; merging them into an
+AGPL font makes a combined work the AGPL cannot cover, and Rabat's licence
+forbids modification outright. The Presets buttons draw missing-glyph boxes
+in these three — and so do SVG/PDF exports of Rabat raise the same
+embedded-outline question as the AGPL caveat below. Don't "fix" that with `mergePuaGlyphs.py`. The exemption list
+lives in `SHIPS_WITHOUT_HONORIFICS` in `src/lib/bundledFonts.test.ts`, which
+fails if any other font lacks the full set.
+
+Why the modifications:
+- **CFF2 is unreadable by opentype.js** ("Font doesn't contain TrueType or
+  CFF outlines"), so Rana Kufi upstream would shape in HarfBuzz and then draw
+  nothing. Converted by `scripts/prepareFont.py` (instancer + `Cu2QuPen`, max error
+  1 unit); Raqq by the same script with `--strip-color`.
+- **Colour tables split preview from canvas.** The browser draws COLR/SVG
+  glyphs in colour in the picker; the canvas draws monochrome outlines. Raqq's
+  colour layers are only its red vowel dots, so stripping them costs nothing
+  on canvas and makes the preview honest.
+
+Coverage gaps: **Rana Kufi has no tashkeel, no آ and no Persian letters.**
+Marks are dropped before shaping by `stripUnsupportedDiacritics` (as with
+Qahiri); آ and Persian letters draw as the crossed `.notdef` box — checked
+in the app 2026-10-13, no error. Raqq maps shadda to an
+empty glyph, which is period-correct. Rana Kufi's space is 0.05 em by design, so
+words nearly touch; Word spacing in Typography is the remedy.
+
+**AGPL caveat:** a design exported as SVG or PDF embeds outlines of Raqq or
+Rana Kufi, and the AGPL has no font exception. PNG/JPEG carry pixels only.
+Licence and provenance for each sit beside it as `<Name>-LICENSE.txt` /
+`<Name>-OFL.txt`.
+
+`src/lib/bundledFonts.test.ts` shapes every `FONT_URLS` font with real
+HarfBuzz and checks opentype.js returns outlines for each glyph — the check
+that catches a CFF2 file — and that each is registered in `@font-face` and
+`FONT_OPTIONS` (Noto Sans excepted: its preview uses the system family).

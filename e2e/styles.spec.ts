@@ -46,7 +46,7 @@ test("a saved style restyles another block without touching its text or position
   await expect
     .poll(async () => (await getBlocks(page)).find((b) => b.id === 2)?.text)
     .toBe("ثاني");
-  await chooseFont(page, "Kufi");
+  await chooseFont(page, "Janna");
   await setTextColor(page, "#c9a227");
 
   const styled = (await getBlocks(page)).find((b) => b.id === 2)!;

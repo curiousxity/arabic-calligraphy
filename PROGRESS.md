@@ -34,6 +34,11 @@ regression, and what it would take to fix.
   the tangent reason above: Shape Fill and Curve both renormalise the run to a
   fixed span, so an added advance is divided straight back out. Declined
   rather than deferred — CLAUDE.md, "Deferred features", carries the argument.
+- **Honorific Presets draw boxes in Raqq, Rana Kufi and Rabat**, by licence,
+  and Rana Kufi has no tashkeel or Persian letters. Not fixable without
+  different fonts — [bundled-fonts.md](.claude/rules/bundled-fonts.md).
+- **Scheherazade lacks two honorifics** (U+E841/E842), predating the
+  bundled-fonts test that now exempts it. Fix: re-run `mergePuaGlyphs.py`.
 - **Qahiri renders no tashkeel at all.** The font has no glyph for fatha,
   sukun or dammatan (its cmap answers 0 for each), so
   `stripUnsupportedDiacritics` drops them before shaping and typed marks
@@ -80,6 +85,15 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 ---
 
 ## Shipped
+
+### 2026-10-13 — Font picker grouped by genre; five new styles
+
+The font picker and Name designs gallery are grouped by calligraphic genre
+(Naskh, Thuluth, Nastaliq, Diwani, Ruqaa, Maghribi, Kufi, Mushaf Kufi,
+Decorated Kufi, Wide Kufi, Modern). New: Gulzar (Nastaliq), Rabat
+(Maghribi), Raqq (Mushaf Kufi), Rana Kufi (Decorated Kufi), Blaka (Wide
+Kufi). Three are not OFL — licences and limits in
+[bundled-fonts.md](.claude/rules/bundled-fonts.md).
 
 ### 2026-10-13 — Shaped guides
 

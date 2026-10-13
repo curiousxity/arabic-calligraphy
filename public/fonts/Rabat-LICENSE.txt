@@ -1,0 +1,21 @@
+Rabat.otf — licence and provenance
+==================================
+
+Rabat ("Font Maghribi Mabsout RABAT v1.0") by Youssef JABRI.
+Source: https://sourceforge.net/projects/maghribifonts/
+
+Shipped UNMODIFIED, byte-for-byte as downloaded. Its licence, as stated
+in the font's own name table, is:
+
+  Copyright (c) 2010 by Youssef JABRI. All rights reserved. May be used
+  Freely. No copying of glyphs or reverse engeneering allowed without the
+  written permission of the copyright owner. yjabri@ensa.ump.ma
+
+Because of that clause, the honorific Presets glyphs are NOT merged into
+this font, so the Presets buttons render as missing-glyph boxes in it.
+Do not run scripts/mergePuaGlyphs.py on this file without the author's
+written permission. See .claude/rules/bundled-fonts.md.
+
+Caveat: a design exported as SVG or PDF embeds this font's glyph outlines
+in the exported file, which the "no copying of glyphs" clause may reach.
+Raster exports (PNG/JPEG) carry pixels only.
