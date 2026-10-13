@@ -33,7 +33,7 @@ const RIGHT_JOINING = new Set<number>([
 // signs) — same ranges as ARABIC_DIACRITIC_RE in lib/harfbuzz.ts. These are
 // "transparent": they don't break the cursive join chain and are skipped
 // over when looking for a letter's joining neighbor.
-function isTransparent(cp: number): boolean {
+export function isTransparent(cp: number): boolean {
   return (
     (cp >= 0x0610 && cp <= 0x061a) ||
     (cp >= 0x064b && cp <= 0x065f) ||

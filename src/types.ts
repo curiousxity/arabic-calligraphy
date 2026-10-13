@@ -130,6 +130,10 @@ export type TextBlock = BlockCommon & {
   lineHeight?: number;
   warpX?: number;
   warpY?: number;
+  /** Space at gaps between a word's pieces, as a fraction of font size. Absent = 0. See lib/spacing.ts. */
+  letterSpacing?: number;
+  /** Space at word gaps, as a fraction of font size. Absent = 0. */
+  wordSpacing?: number;
 };
 
 export type ShapeFillBlock = BlockCommon & {
