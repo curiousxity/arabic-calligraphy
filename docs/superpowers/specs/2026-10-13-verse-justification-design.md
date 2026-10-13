@@ -1,6 +1,6 @@
 # Multi-line verse with per-line justification
 
-Date: 2026-10-13. Status: design, awaiting review.
+Date: 2026-10-13. Status: implemented on branch `verse-justification`.
 
 The second of three Kelk-gap projects, in build order: spacing (shipped),
 multi-line verse, shaped guides. Each gets its own spec.
@@ -54,6 +54,7 @@ verse?: {
   lineGap: number;       // row pitch, × font size (default 1.6)
   columnGap: number;     // bayt gutter, × font size (default 1.0)
   baseFontSize: number;  // size before any shrink
+  fittedFontSize: number; // size Justify last wrote; differs = user changed it
   addedLetter: number;   // spacing Justify added, removed before the next run
   addedWord: number;
 }
@@ -73,7 +74,7 @@ group as usual.
 
 ## Creating a verse
 
-The Verse entry in the document tier has a textarea that takes one line of
+The **New verse…** dialog (opened from Block Controls) has a textarea that takes one line of
 poem per line of text, a layout choice, and a Create button.
 
 - `createVerse` makes one text block per non-empty line.
@@ -99,9 +100,10 @@ layoutVerse(lines: { index; fontSize; width }[], settings, anchor: { x; y })
   - Line `2k+1` sits in the left column, centred at `anchor.x − (W + gutter)/2`.
   - `W` is the target width and the gutter is `columnGap × fontSize₀`.
   - An odd last line is centred on its own row.
-- **The anchor** is the column centre and the first row's position. The
-  first time, it comes from line 0's current position. Laying the verse out
-  again never moves it, so the verse doesn't jump.
+- **The anchor** is the column centre and the first row's position. It is
+  derived from the blocks, not stored: line 0's `x` when stacked, or the
+  midpoint of lines 0 and 1 in bayt, and line 0's `y`. Laying the verse out
+  again never moves it, and a dragged verse stays where it was dragged.
 - The lines' `align` is set to `"center"` so their positions mean what the
   layout says.
 - No `./harfbuzz` import.
@@ -181,7 +183,9 @@ block has a `verse` tag. It contains:
 - Line gap and Column gap RangeRows (column gap only in bayt);
 - a **Justify** button.
 
-The document tier gets the Verse creation entry.
+Block Controls gets the **New verse…** button.
+The Width and gap fields are number inputs that commit on blur or Enter,
+because each commit is a full re-justify.
 
 ## Out of scope (v1)
 

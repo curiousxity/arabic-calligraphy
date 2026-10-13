@@ -81,6 +81,13 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-13 — Multi-line verse with per-line justification
+
+New verse… in Block Controls makes one text block per line, stacked or as bayt
+couplets, and justifies every line to a common width: kashida first, then
+spacing, shrinking a line too long for the width. Details in
+[verse.md](.claude/rules/verse.md).
+
 ### 2026-10-13 — Letter and word spacing
 
 Two Typography sliders on text blocks. Letter spacing acts only at the gaps

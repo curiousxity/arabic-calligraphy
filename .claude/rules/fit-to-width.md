@@ -105,3 +105,7 @@ has nothing to act on — the same reason `fontSize` is hidden for a curve.
 Inherits the glyph-index fragility every text edit has (see
 [kashida.md](kashida.md)); the guide says to fit before fine-tuning marks rather than
 engineering around it.
+
+Verse Justify (`verseJustify.ts`, see [verse.md](verse.md)) reuses `solveFitToWidth`
+per line with its own injected measure, so the never-overshoot guarantee and
+the absolute-count idempotence carry over unchanged.
