@@ -30,6 +30,9 @@ export const GuideView: React.FC<{
       strokeWidth={(selected ? 2 : 1) / stageScale}
       dash={[6 / stageScale, 4 / stageScale]}
       hitStrokeWidth={14 / stageScale}
+      // Only the line itself is hittable: a closed path would otherwise
+      // claim its whole interior, stealing clicks from what sits inside it.
+      fillEnabled={false}
       opacity={0.85}
     />
   </Group>

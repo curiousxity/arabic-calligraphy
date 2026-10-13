@@ -215,11 +215,26 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
     }
     return out;
   }, [glyphAlternateMode, layout, font, alternateLetters, shapableText, glyphs, baselineOffset]);
-  const pad = Math.max(fontSize, 24);
-  const hitX = curveBox.x - pad;
-  const hitY = curveBox.y - pad;
-  const hitWidth = curveBox.width + pad * 2;
-  const hitHeight = curveBox.height + pad * 2;
+  // Attached text only covers part of its guide, so its hit area is its own
+  // letters' extent, not the whole guide's box: a circle guide's box would
+  // otherwise swallow every click inside the medallion.
+  const hitBox = useMemo(() => {
+    if (!attached || !layout || layout.placements.length === 0) return curveBox;
+    const reach = layout.placements[0].size + Math.abs(baselineOffset);
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (const p of layout.placements) {
+      x1 = Math.min(x1, p.x);
+      y1 = Math.min(y1, p.y);
+      x2 = Math.max(x2, p.x);
+      y2 = Math.max(y2, p.y);
+    }
+    return { x: x1 - reach, y: y1 - reach, width: x2 - x1 + reach * 2, height: y2 - y1 + reach * 2 };
+  }, [attached, layout, curveBox, baselineOffset]);
+  const pad = attached ? 0 : Math.max(fontSize, 24);
+  const hitX = hitBox.x - pad;
+  const hitY = hitBox.y - pad;
+  const hitWidth = hitBox.width + pad * 2;
+  const hitHeight = hitBox.height + pad * 2;
 
   return (
     <Group

@@ -28,6 +28,11 @@ import type { NameDesignSelection } from "../lib/nameDesign";
 import type { GuideAttachment, GuideParams, GuideShape, VerseLayout, VerseSettings } from "../types";
 import { VerseButton } from "./VerseDialog";
 import { VersePanel } from "./sidebar/VersePanel";
+import { AddGuideButton } from "./GuideDialog";
+import { GuidePanel } from "./sidebar/GuidePanel";
+import { GuideAttachmentPanel } from "./sidebar/GuideAttachmentPanel";
+import { GUIDE_SHAPE_LABELS } from "../lib/guideShapes";
+import { attachedTo, guidesIn } from "../lib/guides";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { HistoryPopover, type HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
@@ -536,6 +541,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onChangeSaveDestination,
   onAddShapeFillBlock,
   onAddTextPathBlock,
+  onAddGuide,
+  onUpdateGuideParams,
+  onAddTextToGuide,
+  onAttachToGuide,
+  onDetachFromGuide,
+  onUpdateGuideAttachment,
+  guideShrink,
   onAddSquareKufiBlock,
   onFitKufiToSquare,
   onSetKufiComposition,
@@ -603,6 +615,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [effectsTab, setEffectsTab] = useState<"outline" | "shadow">("outline");
   const [showContent, setShowContent] = useState(true);
   const [showVerse, setShowVerse] = useState(true);
+  const [showGuide, setShowGuide] = useState(true);
 
   /**
    * The font list both the Typography picker and the name-design gallery
@@ -1865,6 +1878,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                 </DemoHover>
               )}
+          {onAddGuide && <AddGuideButton onAdd={onAddGuide} />}
 
               {onAddSquareKufiBlock && (
                 <DemoHover
@@ -2254,6 +2268,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     fonts={fontChoices}
                     onApply={onApplyNameDesign}
                   />
+                )}
+
+                {/* Bend this block along a guide on the canvas. It becomes a
+                    Curve block; the picker lists only the guides that exist. */}
+                {selectedBlock?.type === "text" && onAttachToGuide && guidesIn(blocks).length > 0 && (
+                  <SelectRow
+                    id={makeId("attach-to-guide", selectedId)}
+                    name={makeId("attachToGuide", selectedId)}
+                    label="Attach to guide"
+                    value=""
+                    onChange={(v) => {
+                      if (v !== "") onAttachToGuide(Number(v));
+                    }}
+                  >
+                    <option value="">Choose a guide…</option>
+                    {guidesIn(blocks).map((g) => (
+                      <option key={g.id} value={String(g.id)}>
+                        {g.name ?? `Guide · ${GUIDE_SHAPE_LABELS[g.guideShape]}`}
+                      </option>
+                    ))}
+                  </SelectRow>
                 )}
 
 
@@ -2780,9 +2815,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
+        {selectedBlock?.type === "guide" && onUpdateGuideParams && onAddTextToGuide && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Guide" isOpen={showGuide} onToggle={() => setShowGuide((v) => !v)}>
+              <GuidePanel
+                guide={selectedBlock}
+                texts={attachedTo(blocks, selectedBlock.id)}
+                onParams={onUpdateGuideParams}
+                onAddText={onAddTextToGuide}
+                onSelect={(id) => onSelectBlock(id)}
+                onToggleEdit={() => onUpdateSelectedBlock({ guideEditMode: !selectedBlock.guideEditMode })}
+              />
+            </CollapsibleSection>
+          </div>
+        )}
+
         {selectedBlock && selectedBlock.type === "textPath" && (
           <div className="sidebarPanel">
             <CollapsibleSection title="Curve" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
+              {/* Attached to a guide: the guide owns the curve, so the
+                  curve-editing rows give way to the On guide controls. */}
+              {selectedBlock.guide && onUpdateGuideAttachment && onDetachFromGuide ? (
+                <GuideAttachmentPanel
+                  blockId={selectedBlock.id}
+                  attachment={selectedBlock.guide}
+                  shrink={guideShrink?.get(selectedBlock.id)}
+                  onChange={onUpdateGuideAttachment}
+                  onDetach={onDetachFromGuide}
+                />
+              ) : (
               <div className="sectionPanel">
                 <button
                   type="button"
@@ -2854,6 +2915,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   fieldKey="textPathBaselineOffset"
                 />
               </div>
+              )}
             </CollapsibleSection>
           </div>
         )}
@@ -3212,7 +3274,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 {/* ---- /STREAM-G ---- */}
 
-                {selectedBlock.type === "textPath" ? (
+                {selectedBlock.type === "textPath" && !selectedBlock.guide ? (
                   <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                     Letter size on a text-path block is set by the curve's length — drag the
                     curve longer or shorter in Edit Curve mode, or change the text.
