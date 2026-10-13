@@ -2195,7 +2195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* A mirror has no content or typography of its own — both come from
             its source — so it hides these two panels the way image already
             does. (STREAM-B edit outside its anchors; see the stream report.) */}
-        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && (
+        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && (
           <div className="sidebarPanel">
             <CollapsibleSection
               title="Content"
@@ -2849,7 +2849,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && (
+        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && (
           <div className="sidebarPanel">
             <CollapsibleSection title="Typography" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
               <div className="sectionPanel">
@@ -3508,7 +3508,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {selectedBlock && selectedBlock.type !== "image" && (
+        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "guide" && (
           <div className="sidebarPanel">
             <CollapsibleSection title="Effects" isOpen={showEffects} onToggle={() => setShowEffects((v) => !v)}>
               <div className="sectionPanel">

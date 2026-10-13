@@ -1122,7 +1122,7 @@ const App: React.FC = () => {
     setBackgroundColor(bg);
     setBlocks((prev) =>
       prev.map((b) =>
-        b.type === "image" ? b : ({ ...b, fontFamily: font, color: textColor } as Block)
+        b.type === "image" || b.type === "guide" ? b : ({ ...b, fontFamily: font, color: textColor } as Block)
       )
     );
   };
@@ -3006,7 +3006,7 @@ const App: React.FC = () => {
     const missing = [
       ...new Set(
         blocks
-          .filter((b) => b.type !== "image" && b.type !== "mirror")
+          .filter((b) => b.type !== "image" && b.type !== "mirror" && b.type !== "guide")
           .map((b) => b.fontFamily)
           .filter((key) => key && isFontUnavailable(key, FONT_URLS))
       ),
@@ -3032,6 +3032,7 @@ const App: React.FC = () => {
   const selectedFontUnavailable =
     !!selectedBlock &&
     selectedBlock.type !== "image" &&
+    selectedBlock.type !== "guide" &&
     isFontUnavailable(selectedBlock.fontFamily, FONT_URLS);
 
   const p2gSidebarProps: Partial<SidebarProps> = {

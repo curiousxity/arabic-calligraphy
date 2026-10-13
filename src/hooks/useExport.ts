@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import type Konva from "konva";
 import type { Block } from "../types";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
+import { exportableBlocks } from "../lib/guides";
 import {
   getBlocksBoundingBox as getBlocksBoundingBoxShared,
   unionRect,
@@ -84,7 +85,8 @@ export function useExport(
   artboard: ExportArtboard = NO_ARTBOARD
 ) {
   const getBlocksBoundingBox = (stage: Konva.Stage) =>
-    getBlocksBoundingBoxShared(stage, blocks);
+    // A guide is export-hidden, so it must not widen the crop either.
+    getBlocksBoundingBoxShared(stage, exportableBlocks(blocks));
 
   /**
    * The rectangle every format crops to.

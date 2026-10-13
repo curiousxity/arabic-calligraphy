@@ -84,3 +84,11 @@ describe("guides bookkeeping", () => {
     expect(isMirrorSourceCandidate(guide)).toBe(false);
   });
 });
+
+import { exportableBlocks } from "./guides";
+
+describe("exportableBlocks", () => {
+  it("leaves guides out of the export crop", () => {
+    expect(exportableBlocks([guide, onGuide(2)]).map((b) => b.id)).toEqual([2]);
+  });
+});

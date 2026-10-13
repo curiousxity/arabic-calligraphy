@@ -129,3 +129,6 @@ export function resolveGuidePath(
   if (!g) return null;
   return { d: g.guideD, closed: isClosedPath(parseSvgPath(g.guideD)), x: g.x, y: g.y, rotation: g.rotation ?? 0 };
 }
+
+/** Blocks that count toward an export's crop: everything but guides, which are never drawn there. */
+export const exportableBlocks = (blocks: readonly Block[]): Block[] => blocks.filter((b) => b.type !== "guide");

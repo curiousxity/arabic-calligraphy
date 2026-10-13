@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { GUIDE_SHAPE_LABELS } from "../../lib/guideShapes";
 import type { Block } from "../../types";
 import { makeId } from "./utils";
 import {
@@ -23,9 +24,15 @@ const blockTypeIcon = (b: Block) =>
     <ShapesIcon size={13} />
   ) : b.type === "image" ? (
     <ImageIcon size={13} />
+  ) : b.type === "guide" ? (
+    "◯"
   ) : (
     "T"
   );
+
+/** A block's default label; a guide names its shape so a list of them is readable. */
+const defaultLabel = (b: Block) =>
+  b.type === "guide" ? `Guide · ${GUIDE_SHAPE_LABELS[b.guideShape]}` : `Block ${b.id}`;
 
 export type LayersPanelProps = {
   blocks: Block[];
@@ -68,7 +75,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   const startEdit = (block: Block, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingId(block.id);
-    setEditValue(block.name ?? `Block ${block.id}`);
+    setEditValue(block.name ?? defaultLabel(block));
     setTimeout(() => editRef.current?.select(), 0);
   };
 
@@ -133,7 +140,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
         const isMultiSelected = selectedIds.length > 1 && selectedIds.includes(block.id);
         const isSelected = block.id === selectedId || isMultiSelected;
         const isMerge = block.id === mergeTarget;
-        const label = block.name ?? `Block ${block.id}`;
+        const label = block.name ?? defaultLabel(block);
 
         return (
           <div
