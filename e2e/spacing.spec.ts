@@ -26,6 +26,13 @@ async function setRange(page: Page, label: RegExp, value: number) {
   }, value);
 }
 
+/** The starter block, narrowed to a text block so its spacing fields type-check. */
+async function firstTextBlock(page: Page) {
+  const b = (await getBlocks(page))[0];
+  if (b.type !== "text") throw new Error(`expected a text block, got ${b.type}`);
+  return b;
+}
+
 async function firstBlockWidth(page: Page) {
   const id = (await getBlocks(page))[0].id;
   return (await blockClientBox(page, id)).width;
@@ -39,7 +46,7 @@ test("letter spacing widens a run at its piece breaks", async ({ page }) => {
   const before = await firstBlockWidth(page);
 
   await setRange(page, /^Letter spacing/, 0.5);
-  await expect.poll(async () => (await getBlocks(page))[0].letterSpacing).toBe(0.5);
+  await expect.poll(async () => (await firstTextBlock(page)).letterSpacing).toBe(0.5);
   await expect.poll(() => firstBlockWidth(page)).toBeGreaterThan(before + 10);
 });
 
@@ -51,7 +58,7 @@ test("letter spacing leaves a fully joined word alone", async ({ page }) => {
   const before = await firstBlockWidth(page);
 
   await setRange(page, /^Letter spacing/, 0.8);
-  await expect.poll(async () => (await getBlocks(page))[0].letterSpacing).toBe(0.8);
+  await expect.poll(async () => (await firstTextBlock(page)).letterSpacing).toBe(0.8);
   await settleFrames(page);
   expect(Math.abs((await firstBlockWidth(page)) - before)).toBeLessThan(1);
 });
@@ -67,7 +74,7 @@ test("word spacing widens the gap between words, and undo restores it", async ({
   await expect.poll(() => firstBlockWidth(page)).toBeGreaterThan(before + 10);
 
   await page.keyboard.press("Control+z");
-  await expect.poll(async () => (await getBlocks(page))[0].wordSpacing ?? 0).toBe(0);
+  await expect.poll(async () => (await firstTextBlock(page)).wordSpacing ?? 0).toBe(0);
 });
 
 test("Fit to width measures the spaced run, so it still never overshoots", async ({ page }) => {
@@ -76,7 +83,7 @@ test("Fit to width measures the spaced run, so it still never overshoots", async
   await setBlockText(page, "بسم درود");
   await openTypography(page);
   await setRange(page, /^Letter spacing/, 1);
-  await expect.poll(async () => (await getBlocks(page))[0].letterSpacing).toBe(1);
+  await expect.poll(async () => (await firstTextBlock(page)).letterSpacing).toBe(1);
   await settleFrames(page);
 
   const before = await firstBlockWidth(page);
