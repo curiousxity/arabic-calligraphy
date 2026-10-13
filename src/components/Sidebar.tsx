@@ -25,7 +25,7 @@ import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
 import { NameDesignButton, type FontChoice } from "./NameDesignDialog";
 import type { NameDesignSelection } from "../lib/nameDesign";
-import type { VerseLayout, VerseSettings } from "../types";
+import type { GuideAttachment, GuideParams, GuideShape, VerseLayout, VerseSettings } from "../types";
 import { VerseButton } from "./VerseDialog";
 import { VersePanel } from "./sidebar/VersePanel";
 import { LayersPanel } from "./sidebar/LayersPanel";
@@ -250,6 +250,15 @@ export type SidebarProps = {
 
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddTextPathBlock?: () => void;
+  /** Guides — see .claude/rules/guides.md. */
+  onAddGuide?: (shape: GuideShape) => void;
+  onUpdateGuideParams?: (params: GuideParams) => void;
+  onAddTextToGuide?: () => void;
+  onAttachToGuide?: (guideId: number) => void;
+  onDetachFromGuide?: () => void;
+  onUpdateGuideAttachment?: (patch: Partial<GuideAttachment>) => void;
+  /** Renderer-measured shrink per attached text; never saved. */
+  guideShrink?: ReadonlyMap<number, number>;
   onAddSquareKufiBlock?: () => void;
   /** Wrap the selected square-kufi block to the width closest to square. */
   onFitKufiToSquare?: () => void;

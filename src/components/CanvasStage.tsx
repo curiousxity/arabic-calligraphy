@@ -6,6 +6,25 @@ import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
 import { GuideView } from "./GuideView";
 import { resolveGuidePath } from "../lib/guides";
+import { projectToGuide } from "../lib/guidePlacement";
+import { buildArcTable, type ArcTable } from "../lib/textPath";
+import { parseSvgPath } from "../lib/svgPath";
+
+/**
+ * Un-reversed arc tables for sliding text along a guide, keyed by path. A
+ * slide projects the pointer every frame; rebuilding the table each time
+ * would re-flatten the guide 60 times a second.
+ */
+const guideTableCache = new Map<string, ArcTable>();
+function guideArcTable(d: string): ArcTable {
+  let t = guideTableCache.get(d);
+  if (!t) {
+    if (guideTableCache.size > 64) guideTableCache.clear();
+    t = buildArcTable(parseSvgPath(d), false);
+    guideTableCache.set(d, t);
+  }
+  return t;
+}
 import { SquareKufiText } from "./SquareKufiText";
 import { TextPathEditOverlay } from "./TextPathEditOverlay";
 import { KufiCellEditOverlay } from "./KufiCellEditOverlay";
@@ -100,6 +119,8 @@ export type CanvasStageProps = {
   onUpdateGuideD?: (blockId: number, d: string) => void;
   /** Renderer feedback: how far an attached text shrank to fit its guide. */
   onGuideLayout?: (blockId: number, shrink: number) => void;
+  /** A drag on attached text slides it along its guide (0..1, un-flipped). */
+  onSlideAlongGuide?: (blockId: number, offset: number) => void;
   /**
    * One `pushHistory()` per painting stroke, taken on mousedown. App passes
    * `pushHistory` itself — see `setKufiCell` there for why the per-cell write
@@ -178,6 +199,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onBeginTextPathEdit,
   onUpdateGuideD,
   onGuideLayout,
+  onSlideAlongGuide,
   onBeginKufiCellEdit,
   onSetKufiCell,
   onBeginDiacriticDrag,
@@ -217,6 +239,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   /** The same measurement as rectangles, for the equal-spacing markers. */
   const snapRectsRef = useRef<SnapRect[]>([]);
   /** Which block `snapTargetsRef` was measured for, so it is built once a drag. */
+  // The grab offset of a slide along a guide, kept from its first frame so
+  // the text does not jump its anchor under the pointer.
+  const slideGrabRef = useRef<{ id: number; delta: number } | null>(null);
   const snapTargetsForRef = useRef<number | null>(null);
   const [gapBadges, setGapBadges] = useState<GapBadge[]>([]);
 
@@ -1006,6 +1031,34 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 // Attached text draws on its guide, at the guide's place; the
                 // block's own x/y/rotation are ignored while attached.
                 const guidePlace = block.guide ? resolveGuidePath(blocks, block) : null;
+                const attachment = block.guide;
+                // Sliding replaces the ordinary drag: the node stays pinned
+                // to the guide's origin and the pointer is projected onto the
+                // guide. No snapping, no grid. The text's own lock governs.
+                const slide =
+                  guidePlace && attachment && onSlideAlongGuide
+                    ? (e: Konva.KonvaEventObject<DragEvent>, end: boolean) => {
+                        const node = e.target;
+                        node.position({ x: guidePlace.x, y: guidePlace.y });
+                        const p = node.getParent()?.getRelativePointerPosition();
+                        if (!p) return;
+                        const r = (-guidePlace.rotation * Math.PI) / 180;
+                        const dx = p.x - guidePlace.x;
+                        const dy = p.y - guidePlace.y;
+                        const local = {
+                          x: dx * Math.cos(r) - dy * Math.sin(r),
+                          y: dx * Math.sin(r) + dy * Math.cos(r),
+                        };
+                        const projected = projectToGuide(guideArcTable(guidePlace.d), local);
+                        if (slideGrabRef.current?.id !== block.id) {
+                          slideGrabRef.current = { id: block.id, delta: projected - attachment.offset };
+                        }
+                        const raw = projected - slideGrabRef.current.delta;
+                        const offset = guidePlace.closed ? ((raw % 1) + 1) % 1 : Math.min(Math.max(raw, 0), 1);
+                        onSlideAlongGuide(block.id, offset);
+                        if (end) slideGrabRef.current = null;
+                      }
+                    : null;
                 return (
                   <React.Fragment key={block.id}>
                     <TextOnPathText
@@ -1020,6 +1073,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                       x={guidePlace?.x ?? block.x}
                       y={guidePlace?.y ?? block.y}
                       rotation={guidePlace?.rotation ?? block.rotation ?? 0}
+                      onDragMove={slide ? (e) => slide(e, false) : commonProps.onDragMove}
+                      onDragEnd={slide ? (e) => slide(e, true) : commonProps.onDragEnd}
                       opacity={block.opacity ?? 1}
                       locked={block.locked}
                     />

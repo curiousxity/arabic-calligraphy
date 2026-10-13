@@ -42,6 +42,16 @@ import {
   type AlternateTarget,
 } from "./lib/glyphAlternates";
 import { arcPathD } from "./lib/textPath";
+import { GUIDE_DEFAULTS, guidePathD } from "./lib/guideShapes";
+import {
+  attachTextToGuide,
+  deleteBlocksDetachingGuides,
+  detachFromGuide,
+  dropOrphanedAttachments,
+  hasOrphanedAttachments,
+  newAttachedText,
+} from "./lib/guides";
+import type { GuideAttachment, GuideBlock, GuideParams, GuideShape } from "./types";
 import type { Block, DiacriticOverride, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
@@ -991,7 +1001,9 @@ const App: React.FC = () => {
     if (idsToDelete.size === 0) return;
     pushHistory();
     setBlocks((prev) => {
-      const filtered = dissolveSingletonGroups(prev.filter((b) => !idsToDelete.has(b.id)));
+      // Deleting a guide detaches its surviving texts in this same step, so
+      // one undo restores the guide with its texts still attached.
+      const filtered = dissolveSingletonGroups(deleteBlocksDetachingGuides(prev, idsToDelete));
       setSelectedId(filtered.length > 0 ? filtered[0].id : null);
       return filtered;
     });
@@ -1555,7 +1567,7 @@ const App: React.FC = () => {
     // from the payload would occupy the layer list and the selection while
     // drawing nothing. Dropped on load for the same reason, and by the same
     // precedent, as the `shapeWarp` filter above.
-    if (blocksToLoad) blocksToLoad = dropOrphanedMirrors(blocksToLoad);
+    if (blocksToLoad) blocksToLoad = dropOrphanedAttachments(dropOrphanedMirrors(blocksToLoad));
     const loadedBlocks: Block[] = blocksToLoad ?? blocks;
     if (blocksToLoad) setBlocks(blocksToLoad);
     if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
@@ -1849,6 +1861,100 @@ const App: React.FC = () => {
       "New Text on Path"
     );
   };
+
+  // Guides: dashed construction paths that Curve text can attach to.
+  // See .claude/rules/guides.md.
+  const addGuideBlock = (shape: GuideShape) => {
+    const newId = createNextId();
+    const params = GUIDE_DEFAULTS[shape];
+    const w = params.width ?? 300;
+    const h = params.height ?? params.width ?? 300;
+    const guide: GuideBlock = {
+      ...DEFAULT_BLOCK,
+      id: newId,
+      text: "",
+      type: "guide",
+      guideShape: shape,
+      guideParams: params,
+      guideD: guidePathD(shape, params),
+      guideEditMode: shape === "pen",
+      x: 0,
+      y: 0,
+    };
+    // Guide paths are centred on the origin, so the click is the centre.
+    beginPlacement(guide, w, h, 0, 0, "New Guide");
+  };
+
+  const updateGuideParams = (params: GuideParams) => {
+    if (selectedBlock?.type !== "guide" || selectedBlock.guideShape === "pen") return;
+    const next = { ...selectedBlock.guideParams, ...params };
+    updateSelectedBlock({ guideParams: next, guideD: guidePathD(selectedBlock.guideShape, next) });
+  };
+
+  /** Pen-guide point edits; the overlay's onBeginChange already pushed history. */
+  const updateGuideD = (id: number, d: string) => {
+    setBlocks((prev) => prev.map((b) => (b.id === id && b.type === "guide" ? { ...b, guideD: d } : b)));
+  };
+
+  /** Replaces a whole block — a spread patch cannot remove a key such as `guide`. */
+  const replaceBlockWithHistory = (id: number, block: Block) => {
+    pushHistory();
+    setBlocks((prev) => prev.map((b) => (b.id === id ? block : b)));
+  };
+
+  const addTextToGuide = () => {
+    if (selectedBlock?.type !== "guide") return;
+    const guide = selectedBlock;
+    const styleSource = blocks.find((b) => b.type === "text");
+    const id = createNextId();
+    pushHistory();
+    setBlocks((prev) => [
+      ...prev,
+      newAttachedText(id, guide, styleSource ? styleToPatch(captureStyle(styleSource, "guide")) : {}),
+    ]);
+    setSelectedIds([]);
+    setSelectedId(id);
+  };
+
+  const attachSelectedToGuide = (guideId: number) => {
+    if (selectedBlock?.type !== "text") return;
+    const guide = blocks.find((b): b is GuideBlock => b.type === "guide" && b.id === guideId);
+    if (!guide) return;
+    const { block, dropped } = attachTextToGuide(selectedBlock, guide);
+    replaceBlockWithHistory(block.id, block);
+    setExportStatus(
+      dropped.length ? `Attached to the guide. Dropped: ${dropped.join(", ")}.` : "Attached to the guide."
+    );
+  };
+
+  const detachSelectedFromGuide = () => {
+    if (selectedBlock?.type !== "textPath" || !selectedBlock.guide) return;
+    const guideId = selectedBlock.guide.id;
+    const guide = blocks.find((b): b is GuideBlock => b.type === "guide" && b.id === guideId);
+    if (!guide) return;
+    replaceBlockWithHistory(selectedBlock.id, detachFromGuide(selectedBlock, guide));
+  };
+
+  const updateGuideAttachment = (patch: Partial<GuideAttachment>) => {
+    if (selectedBlock?.type !== "textPath" || !selectedBlock.guide) return;
+    updateSelectedBlock({ guide: { ...selectedBlock.guide, ...patch } });
+  };
+
+  /** A slide along the guide, from a drag: history the way any drag pushes it. */
+  const slideAlongGuide = (id: number, offset: number) => {
+    setBlocks((prev) =>
+      prev.map((b) =>
+        b.id === id && b.type === "textPath" && b.guide ? { ...b, guide: { ...b.guide, offset } } : b
+      )
+    );
+    scheduleMoveHistoryPush();
+  };
+
+  // Not saved, not undoable: what the renderer measured, for the panel's note.
+  const [guideShrink, setGuideShrink] = useState<ReadonlyMap<number, number>>(() => new Map());
+  const reportGuideLayout = useCallback((id: number, shrink: number) => {
+    setGuideShrink((prev) => (prev.get(id) === shrink ? prev : new Map(prev).set(id, shrink)));
+  }, []);
 
   /**
    * A square-kufi block. It opens as a running band (`kufiColumns: 0`) rather
@@ -2324,6 +2430,13 @@ const App: React.FC = () => {
     setSelectedId((prev) =>
       prev != null && !keptIds.has(prev) ? kept[kept.length - 1]?.id ?? null : prev
     );
+  }, [blocks]);
+
+  // An attached text whose guide vanished outside delete becomes a plain
+  // Curve block. Like the mirror pass above: no history.
+  useEffect(() => {
+    if (!hasOrphanedAttachments(blocks)) return;
+    setBlocks(dropOrphanedAttachments(blocks));
   }, [blocks]);
 
   const p1bSidebarProps: Partial<SidebarProps> = {
@@ -3096,6 +3209,13 @@ const App: React.FC = () => {
         onDeleteNamedProject={requestDeleteNamedProject}
         onAddShapeFillBlock={addShapeFillBlock}
         onAddTextPathBlock={addTextPathBlock}
+        onAddGuide={addGuideBlock}
+        onUpdateGuideParams={updateGuideParams}
+        onAddTextToGuide={addTextToGuide}
+        onAttachToGuide={attachSelectedToGuide}
+        onDetachFromGuide={detachSelectedFromGuide}
+        onUpdateGuideAttachment={updateGuideAttachment}
+        guideShrink={guideShrink}
         onAddSquareKufiBlock={addSquareKufiBlock}
         onFitKufiToSquare={fitSelectedKufiToSquare}
         onSetKufiComposition={setKufiComposition}
@@ -3208,6 +3328,9 @@ const App: React.FC = () => {
           onSelectBlock={selectBlock}
           onEditBlock={requestTextEdit}
           onUpdateTextPathD={updateTextPathD}
+          onUpdateGuideD={updateGuideD}
+          onGuideLayout={reportGuideLayout}
+          onSlideAlongGuide={slideAlongGuide}
           onBeginTextPathEdit={pushHistory}
           onBeginKufiCellEdit={pushHistory}
           onSetKufiCell={setKufiCell}
