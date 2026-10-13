@@ -143,6 +143,17 @@ import { applyKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
 import { spacingForBlock } from "./lib/spacing";
+import { layoutVerse, verseAnchor, DEFAULT_LINE_GAP, DEFAULT_COLUMN_GAP } from "./lib/verseLayout";
+import {
+  justifyLine,
+  naturalWidth,
+  baseFontSizeForLine,
+  baseSpacingForLine,
+  describeVerseResult,
+  type JustifyLineResult,
+  type LineMeasure,
+} from "./lib/verseJustify";
+import type { TextBlock, VerseLayout, VerseSettings } from "./types";
 import { cutAdvanceTotal, remapCutsForEdits } from "./lib/strokeCuts";
 import { nuqtaUnits } from "./lib/nuqta";
 import {
@@ -2467,6 +2478,184 @@ const App: React.FC = () => {
     [selectedBlock, updateBlock, kashidaTextPatch]
   );
 
+  // Verse: several ordinary text blocks justified to one width and laid out
+  // as stacked lines or bayt couplets. See .claude/rules/verse.md.
+  const [isJustifyingVerse, setIsJustifyingVerse] = useState(false);
+
+  /** A per-line measure: each line's own font, style, alternates and size. */
+  const measureForLine = (line: TextBlock): LineMeasure => {
+    const fontUrl = resolveFontUrl(line.fontFamily);
+    return (text, fontSize, spacing) => {
+      const sized = { ...line, fontSize };
+      return measureShapedWidth(
+        text,
+        fontUrl,
+        fontSize,
+        runStyleForBlock(sized, cutWidthForBlock(sized)),
+        line.glyphAlternates,
+        line.styleSets,
+        spacing
+      );
+    };
+  };
+
+  /**
+   * Measures and solves every line, returning one patch per line id. Async and
+   * side-effect free; callers push history and write the patches in one go,
+   * so a whole verse is one undo step.
+   */
+  const solveVerse = async (
+    lines: readonly TextBlock[],
+    verseId: number,
+    settings: VerseSettings,
+    anchor: { x: number; y: number }
+  ) => {
+    const inputs = lines.map((line) => ({
+      line,
+      measure: measureForLine(line),
+      baseFontSize: baseFontSizeForLine(line),
+      base: baseSpacingForLine(line),
+    }));
+    const target =
+      settings.width ??
+      Math.max(
+        0,
+        ...(await Promise.all(
+          inputs.map((i) => naturalWidth(i.line.text, i.baseFontSize, i.base, i.measure))
+        ))
+      );
+    const results: JustifyLineResult[] = [];
+    for (const i of inputs) {
+      results.push(
+        await justifyLine({
+          text: i.line.text,
+          baseFontSize: i.baseFontSize,
+          userSpacing: i.base,
+          target,
+          measure: i.measure,
+        })
+      );
+    }
+    const positions = layoutVerse(
+      lines.length,
+      { ...settings, target, fontSize: inputs[0]?.baseFontSize ?? DEFAULT_NEW_BLOCK_FONT_SIZE },
+      anchor
+    );
+    const patches = new Map<number, Partial<TextBlock>>();
+    inputs.forEach((i, index) => {
+      const r = results[index];
+      patches.set(i.line.id, {
+        ...kashidaTextPatch(i.line, r.text, r.edits),
+        fontSize: r.fontSize,
+        letterSpacing: i.base.letter + r.addedLetter,
+        wordSpacing: i.base.word + r.addedWord,
+        x: positions[index].x,
+        y: positions[index].y,
+        align: "center",
+        verse: {
+          ...settings,
+          id: verseId,
+          index,
+          baseFontSize: i.baseFontSize,
+          fittedFontSize: r.fontSize,
+          addedLetter: r.addedLetter,
+          addedWord: r.addedWord,
+        },
+      });
+    });
+    return { patches, status: describeVerseResult(results, target) };
+  };
+
+  /** Re-justifies the selected block's verse, optionally with new settings. One undo step. */
+  const justifyVerse = async (overrides?: Partial<VerseSettings>) => {
+    if (!selectedBlock || selectedBlock.type !== "text" || !selectedBlock.verse) return;
+    if (isJustifyingVerse) return;
+    const verseId = selectedBlock.verse.id;
+    const lines = blocks
+      .filter((b): b is TextBlock => b.type === "text" && b.verse?.id === verseId)
+      .sort((a, b) => a.verse!.index - b.verse!.index || a.id - b.id);
+    const tag = lines[0].verse!;
+    const settings: VerseSettings = {
+      layout: tag.layout,
+      width: tag.width,
+      lineGap: tag.lineGap,
+      columnGap: tag.columnGap,
+      ...overrides,
+    };
+    // Read the anchor in the layout the blocks are in *now*, before any
+    // override changes it — that is what keeps a dragged verse in place.
+    const anchor = verseAnchor(lines, tag.layout);
+    setIsJustifyingVerse(true);
+    try {
+      const { patches, status } = await solveVerse(lines, verseId, settings, anchor);
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => {
+          const patch = patches.get(b.id);
+          // A line deleted during the solve has no entry to match; the rest still land.
+          return patch ? ({ ...b, ...patch } as Block) : b;
+        })
+      );
+      setExportStatus(status);
+    } catch (err) {
+      console.error("verse justify failed", err);
+      setExportStatus("Could not justify this verse.");
+    } finally {
+      setIsJustifyingVerse(false);
+    }
+  };
+
+  /** Creates a verse from typed lines, justified and laid out. One undo step. */
+  const createVerse = async (rawLines: string[], layout: VerseLayout) => {
+    const texts = rawLines.map((l) => l.trim()).filter((l) => l !== "");
+    if (texts.length === 0) {
+      setExportStatus("Type at least one line of verse.");
+      return;
+    }
+    const style =
+      selectedBlock?.type === "text" ? styleToPatch(captureStyle(selectedBlock, "verse")) : {};
+    const verseId =
+      1 + Math.max(0, ...blocks.map((b) => (b.type === "text" ? b.verse?.id ?? 0 : 0)));
+    const groupId = texts.length > 1 ? nextGroupIdRef.current++ : undefined;
+    const settings: VerseSettings = {
+      layout,
+      lineGap: DEFAULT_LINE_GAP,
+      columnGap: DEFAULT_COLUMN_GAP,
+    };
+    const lines: TextBlock[] = texts.map(
+      (text) =>
+        ({
+          ...DEFAULT_BLOCK,
+          fontSize: DEFAULT_NEW_BLOCK_FONT_SIZE,
+          ...style,
+          id: createNextId(),
+          text,
+          type: "text",
+          groupId,
+        }) as TextBlock
+    );
+    const fontSize = lines[0].fontSize;
+    const rows = layout === "bayt" ? Math.ceil(lines.length / 2) : lines.length;
+    // Centre the new verse on the artboard (whose centre is the origin) or the
+    // freeform origin, which is where a fresh session's content sits.
+    const anchor = { x: 0, y: -((rows - 1) * DEFAULT_LINE_GAP * fontSize) / 2 };
+    setIsJustifyingVerse(true);
+    try {
+      const { patches, status } = await solveVerse(lines, verseId, settings, anchor);
+      pushHistory();
+      const built: Block[] = lines.map((l) => ({ ...l, ...patches.get(l.id) }));
+      setBlocks((prev) => [...prev, ...built]);
+      setSelectedIds([]);
+      setSelectedId(built[0].id);
+      setExportStatus(status);
+    } catch (err) {
+      console.error("verse create failed", err);
+      setExportStatus("Could not create this verse.");
+    } finally {
+      setIsJustifyingVerse(false);
+    }
+  };
+
   /**
    * "Name designs": write the selected name in the style picked from the
    * gallery, and add whatever companion blocks the chosen layout needs.
@@ -2563,6 +2752,9 @@ const App: React.FC = () => {
     isFittingWidth,
     onChangeFitTargetWidth: setFitTargetWidth,
     onFitToWidth: fitSelectedBlockToWidth,
+    onCreateVerse: createVerse,
+    onJustifyVerse: justifyVerse,
+    isJustifyingVerse,
   };
 
   // Phase 2 (2026-08-14 run) prop bundles — same mechanism as the p1* set

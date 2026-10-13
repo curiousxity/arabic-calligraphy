@@ -25,6 +25,7 @@ import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
 import { NameDesignButton, type FontChoice } from "./NameDesignDialog";
 import type { NameDesignSelection } from "../lib/nameDesign";
+import type { VerseLayout, VerseSettings } from "../types";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import { HistoryPopover, type HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
@@ -165,6 +166,9 @@ export type SidebarProps = {
   // ---- /STREAM-G ----
   /** Name designs: apply a style from the gallery and compose the chosen layout. */
   onApplyNameDesign?: (selection: NameDesignSelection) => void;
+  onCreateVerse?: (lines: string[], layout: VerseLayout) => void;
+  onJustifyVerse?: (overrides?: Partial<VerseSettings>) => void;
+  isJustifyingVerse?: boolean;
   // Phase 1 parallel-stream prop declarations — each stream adds its own
   // (all optional, arriving via App.tsx's p1* bundles). See PARALLEL-PHASE-1.md.
   /** The document's page, or null for freeform. */
