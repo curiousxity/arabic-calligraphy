@@ -10,6 +10,12 @@ import type { Block, MirrorMode, TextAlign } from "../types";
 // STREAM-B (muthanna/radial): the file has no anchored import region, so this
 // sits with the other lib imports. Used only by the STREAM-B regions below.
 import { RADIAL_COUNT_MIN, RADIAL_COUNT_MAX, DEFAULT_RADIAL_COUNT, DEFAULT_RADIAL_RADIUS } from "../lib/mirror";
+import {
+  LETTER_SPACING_MAX,
+  LETTER_SPACING_MIN,
+  WORD_SPACING_MAX,
+  WORD_SPACING_MIN,
+} from "../lib/spacing";
 import type { NamedProjectMeta } from "../App";
 import { extractSvgPaths } from "../lib/svgImport";
 import { arcPathD, wavePathD, circlePathD } from "../lib/textPath";
@@ -3235,6 +3241,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onChange={(v) => onUpdateSelectedBlock({ lineHeight: v })}
                     suffix={(selectedBlock.lineHeight ?? 1.2).toFixed(2)}
                     fieldKey="lineHeight"
+                  />
+                )}
+
+                {selectedBlock.type === "text" && (
+                  <RangeRow
+                    id={makeId("letter-spacing", selectedId)}
+                    name={makeId("letterSpacing", selectedId)}
+                    label="Letter spacing"
+                    value={selectedBlock.letterSpacing ?? 0}
+                    min={LETTER_SPACING_MIN}
+                    max={LETTER_SPACING_MAX}
+                    step={0.01}
+                    onChange={(v) => onUpdateSelectedBlock({ letterSpacing: v })}
+                    suffix={(selectedBlock.letterSpacing ?? 0).toFixed(2)}
+                    fieldKey="letterSpacing"
+                  />
+                )}
+
+                {selectedBlock.type === "text" && (
+                  <RangeRow
+                    id={makeId("word-spacing", selectedId)}
+                    name={makeId("wordSpacing", selectedId)}
+                    label="Word spacing"
+                    value={selectedBlock.wordSpacing ?? 0}
+                    min={WORD_SPACING_MIN}
+                    max={WORD_SPACING_MAX}
+                    step={0.01}
+                    onChange={(v) => onUpdateSelectedBlock({ wordSpacing: v })}
+                    suffix={(selectedBlock.wordSpacing ?? 0).toFixed(2)}
+                    fieldKey="wordSpacing"
                   />
                 )}
 
