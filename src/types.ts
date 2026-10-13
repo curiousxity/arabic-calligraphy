@@ -124,6 +124,33 @@ type BlockCommon = {
   shapeHeight?: number;
 };
 
+export type VerseLayout = "stacked" | "bayt";
+
+/** A text block's membership in a verse. See `.claude/rules/verse.md`. */
+export type VerseTag = {
+  /** Shared by every line of one verse. */
+  id: number;
+  /** Reading order, 0-based. */
+  index: number;
+  layout: VerseLayout;
+  /** Target width in px; absent = the widest line's natural width. */
+  width?: number;
+  /** Row pitch, × line 0's base font size. */
+  lineGap: number;
+  /** Bayt gutter between the two misra', × line 0's base font size. */
+  columnGap: number;
+  /** The size before any shrink-to-fit. */
+  baseFontSize: number;
+  /** The size the last Justify wrote; a different `fontSize` means the user changed it. */
+  fittedFontSize: number;
+  /** Spacing the last Justify added on top of the user's own; removed before the next run. */
+  addedLetter: number;
+  addedWord: number;
+};
+
+/** The verse-wide part of a tag — what the Verse panel edits. */
+export type VerseSettings = Pick<VerseTag, "layout" | "width" | "lineGap" | "columnGap">;
+
 export type TextBlock = BlockCommon & {
   type: "text";
   align?: TextAlign;
@@ -134,6 +161,8 @@ export type TextBlock = BlockCommon & {
   letterSpacing?: number;
   /** Space at word gaps, as a fraction of font size. Absent = 0. */
   wordSpacing?: number;
+  /** Set when this block is a line of a verse; see .claude/rules/verse.md. */
+  verse?: VerseTag;
 };
 
 export type ShapeFillBlock = BlockCommon & {
