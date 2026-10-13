@@ -131,7 +131,7 @@ async function shapeReal(
 import { parseSvgPath } from "./svgPath";
 import { buildArcTable, pointAtArcLengthFromTable, type ArcTable } from "./textPath";
 import { guidePathD, isClosedPath } from "./guideShapes";
-import { DEFAULT_ATTACHMENT, guideGlyphPlacements, projectToGuide } from "./guidePlacement";
+import { DEFAULT_ATTACHMENT, guideGlyphPlacements, guideInkBox, projectToGuide } from "./guidePlacement";
 import type { GuideAttachment } from "../types";
 
 async function amiri(text: string) {
@@ -171,10 +171,12 @@ describe("guideGlyphPlacements (real HarfBuzz, Amiri)", () => {
     const firstAt = (align: GuideAttachment["align"]) =>
       guideGlyphPlacements({ glyphs, fontSize: 40, unitsPerEm: upm, ascender, arcTable: t, closed, attachment: attach({ offset: 0.5, align }) })!
         .placements[0].x;
-    // Line runs from x = -500 to 500; offset 0.5 is x = 0.
-    expect(firstAt("start")).toBeCloseTo(0, 1);
+    // Line runs from x = -500 to 500; offset 0.5 is x = 0. Glyphs are laid
+    // left to right, so Arabic *reads* from the right-hand end: "start" puts
+    // the reading start (the right end) at the anchor, "end" the left end.
+    expect(firstAt("start")).toBeCloseTo(-L, 1);
     expect(firstAt("center")).toBeCloseTo(-L / 2, 1);
-    expect(firstAt("end")).toBeCloseTo(-L, 1);
+    expect(firstAt("end")).toBeCloseTo(0, 1);
   });
 
   it("clamps the text inside an open guide", async () => {
@@ -245,5 +247,26 @@ describe("projectToGuide", () => {
         expect(Math.hypot(q.x - p.x, q.y - p.y)).toBeLessThan(0.5);
       }
     }
+  });
+});
+
+describe("guideInkBox", () => {
+  it("reaches the font's full extent, not just one em, around every glyph", () => {
+    const placements = [
+      { glyphIndex: 0, x: 0, y: 0, angle: 0, size: 20 },
+      { glyphIndex: 1, x: 30, y: 10, angle: 0, size: 20 },
+    ];
+    // FatemiMaqala-like: ink up to 1.77em above and 0.6em below the baseline.
+    const box = guideInkBox(placements, 20, 2.37, -3);
+    const reach = 20 * 2.37 + 3;
+    expect(box.x).toBeCloseTo(-reach, 6);
+    expect(box.y).toBeCloseTo(-reach, 6);
+    expect(box.width).toBeCloseTo(30 + 2 * reach, 6);
+    expect(box.height).toBeCloseTo(10 + 2 * reach, 6);
+  });
+
+  it("never reaches less than one em", () => {
+    const box = guideInkBox([{ glyphIndex: 0, x: 0, y: 0, angle: 0, size: 10 }], 10, 0.5, 0);
+    expect(box.width).toBeCloseTo(20, 6);
   });
 });

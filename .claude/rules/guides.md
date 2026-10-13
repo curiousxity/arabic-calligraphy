@@ -59,6 +59,27 @@ A `textPath` block with `guide` set is *attached*:
 
 ## Traps
 
+- **An attached text's own fields mirror its guide.** That covers
+  `x`/`y`/`rotation`, `textPathD`, `textPathReversed` and
+  `textPathBaselineOffset`. `syncAttachedToGuides` maintains them in an effect
+  with no history. Rendering ignores those fields, but co-moving drags,
+  mirrors, snapping and the orphan fallback all read them. When they went
+  stale, a guide deleted from Layers left its texts on an old curve, running
+  backwards.
+- **Every delete path detaches.** The Delete key uses
+  `deleteBlocksDetachingGuides`. The Layers panel deletes through reorder, so
+  `reorderBlocks` uses `reorderDetachingGuides`.
+- **A dragged guide carries its texts as co-movers** (`getCoMovers`). An
+  attached text never co-moves with anything other than its guide.
+- **A slide pushes history once**, on its first frame. The debounced move push
+  would open a second undo step whenever the user paused mid-slide.
+- **"Start" is where reading begins.** Glyphs are laid in visual order along
+  the walk, so for Arabic, "start" puts the far end of the run at the anchor.
+- **The hit box reaches the font's full extent** (`guideInkBox`, ascender to
+  descender). A freeform export crops to the client rect, so a box sized to one
+  em would clip tall letters and stacked marks.
+- **Transform is hidden for attached text.** Its rotation comes from the guide.
+
 - **Hit areas.**
   - The guide's `Path` has `fillEnabled={false}`. Otherwise a closed guide
     hit-tests its whole interior and steals every click inside a medallion.

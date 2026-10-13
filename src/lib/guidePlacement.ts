@@ -54,8 +54,11 @@ export function guideGlyphPlacements(args: {
   // `length - s`.
   const raw = Math.min(Math.max(attachment.offset, 0), 1) * length;
   const anchor = attachment.flip ? length - raw : raw;
+  // Glyphs are laid in visual order along the walk, so Arabic *reads* from
+  // the far end of the run: "start" (where reading begins) puts that far end
+  // at the anchor, "end" puts the near end there.
   let start =
-    attachment.align === "start" ? anchor : attachment.align === "center" ? anchor - textLen / 2 : anchor - textLen;
+    attachment.align === "end" ? anchor : attachment.align === "center" ? anchor - textLen / 2 : anchor - textLen;
   if (!closed) start = Math.min(Math.max(start, 0), Math.max(length - textLen, 0));
 
   const placements: CurveGlyphPlacement[] = [];
@@ -99,4 +102,31 @@ export function projectToGuide(arcTable: ArcTable, point: { x: number; y: number
     }
   }
   return best / total;
+}
+
+/**
+ * The box an attached text's ink can occupy: every placement point grown by
+ * the font's full vertical extent (`extentEm`, ascender − descender in em,
+ * never less than one em) plus the side offset. Used as the text's hit and
+ * client rect, which a freeform export crops to — so it must not undercut
+ * tall letters or stacked marks.
+ */
+export function guideInkBox(
+  placements: readonly CurveGlyphPlacement[],
+  size: number,
+  extentEm: number,
+  baselineOffset: number
+): { x: number; y: number; width: number; height: number } {
+  const reach = size * Math.max(1, extentEm) + Math.abs(baselineOffset);
+  let x1 = Infinity;
+  let y1 = Infinity;
+  let x2 = -Infinity;
+  let y2 = -Infinity;
+  for (const p of placements) {
+    x1 = Math.min(x1, p.x);
+    y1 = Math.min(y1, p.y);
+    x2 = Math.max(x2, p.x);
+    y2 = Math.max(y2, p.y);
+  }
+  return { x: x1 - reach, y: y1 - reach, width: x2 - x1 + reach * 2, height: y2 - y1 + reach * 2 };
 }

@@ -3553,7 +3553,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {selectedBlock && selectedBlock.type !== "image" && (
+        {/* Attached text draws at its guide, so its own rotation is inert:
+            the guide's Transform is the one that turns it. */}
+        {selectedBlock && selectedBlock.type !== "image" && !(selectedBlock.type === "textPath" && selectedBlock.guide) && (
           <div className="sidebarPanel">
             <CollapsibleSection
               title="Transform"

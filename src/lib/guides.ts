@@ -132,3 +132,51 @@ export function resolveGuidePath(
 
 /** Blocks that count toward an export's crop: everything but guides, which are never drawn there. */
 export const exportableBlocks = (blocks: readonly Block[]): Block[] => blocks.filter((b) => b.type !== "guide");
+
+/**
+ * Keeps every attached text's own geometry — x/y/rotation, curve, walk
+ * direction and side offset — equal to what it draws on its guide. Those
+ * fields are ignored while attached, but everything that reads a block
+ * generically (co-moving drags, mirrors, snapping, and above all the orphan
+ * fallback after a guide vanishes) sees them, so they must never go stale.
+ * Returns `blocks` itself when nothing changed, so an effect can bail.
+ */
+export function syncAttachedToGuides(blocks: readonly Block[]): Block[] {
+  const byId = new Map(guidesIn(blocks).map((g) => [g.id, g]));
+  let changed = false;
+  const out = blocks.map((b) => {
+    if (b.type !== "textPath" || !b.guide) return b;
+    const g = byId.get(b.guide.id);
+    if (!g) return b;
+    const baked = detachFromGuide(b, g);
+    if (
+      b.x === baked.x &&
+      b.y === baked.y &&
+      (b.rotation ?? 0) === baked.rotation &&
+      b.textPathD === baked.textPathD &&
+      b.textPathReversed === baked.textPathReversed &&
+      b.textPathBaselineOffset === baked.textPathBaselineOffset
+    ) {
+      return b;
+    }
+    changed = true;
+    return { ...baked, guide: b.guide };
+  });
+  return changed ? out : (blocks as Block[]);
+}
+
+/**
+ * A reorder that also removed blocks (the Layers panel's delete goes through
+ * reorder) must detach the texts of any guide it removed, exactly as
+ * `deleteBlocksDetachingGuides` does. A pure reorder is passed through.
+ */
+export function reorderDetachingGuides(prev: readonly Block[], next: Block[]): Block[] {
+  const kept = new Set(next.map((b) => b.id));
+  const removedGuides = new Map(guidesIn(prev).filter((g) => !kept.has(g.id)).map((g) => [g.id, g]));
+  if (removedGuides.size === 0) return next;
+  return next.map((b) => {
+    if (b.type !== "textPath" || !b.guide) return b;
+    const g = removedGuides.get(b.guide.id);
+    return g ? detachFromGuide(b, g) : b;
+  });
+}

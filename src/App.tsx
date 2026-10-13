@@ -50,6 +50,8 @@ import {
   dropOrphanedAttachments,
   hasOrphanedAttachments,
   newAttachedText,
+  reorderDetachingGuides,
+  syncAttachedToGuides,
 } from "./lib/guides";
 import type { GuideAttachment, GuideBlock, GuideParams, GuideShape } from "./types";
 import type { Block, DiacriticOverride, StrokeCut } from "./types";
@@ -1175,7 +1177,9 @@ const App: React.FC = () => {
   const reorderBlocks = useCallback(
     (newBlocks: Block[]) => {
       pushHistory();
-      setBlocks(dissolveSingletonGroups(newBlocks));
+      // The Layers panel deletes through reorder; a guide removed that way
+      // must detach its texts just as the Delete key does.
+      setBlocks((prev) => dissolveSingletonGroups(reorderDetachingGuides(prev, newBlocks)));
     },
     [pushHistory]
   );
@@ -1940,14 +1944,18 @@ const App: React.FC = () => {
     updateSelectedBlock({ guide: { ...selectedBlock.guide, ...patch } });
   };
 
-  /** A slide along the guide, from a drag: history the way any drag pushes it. */
-  const slideAlongGuide = (id: number, offset: number) => {
+  /**
+   * A slide along the guide, from a drag. History is pushed once, on the
+   * gesture's first frame — the debounced move push would open a second
+   * undo step whenever the user paused mid-slide.
+   */
+  const slideAlongGuide = (id: number, offset: number, first: boolean) => {
+    if (first) pushHistory();
     setBlocks((prev) =>
       prev.map((b) =>
         b.id === id && b.type === "textPath" && b.guide ? { ...b, guide: { ...b.guide, offset } } : b
       )
     );
-    scheduleMoveHistoryPush();
   };
 
   // Not saved, not undoable: what the renderer measured, for the panel's note.
@@ -2430,6 +2438,14 @@ const App: React.FC = () => {
     setSelectedId((prev) =>
       prev != null && !keptIds.has(prev) ? kept[kept.length - 1]?.id ?? null : prev
     );
+  }, [blocks]);
+
+  // Attached texts carry their guide's geometry in their own fields, so a
+  // drag, a mirror, or the orphan fallback below never sees stale values.
+  // Derived state, like the orphan passes: no history.
+  useEffect(() => {
+    const synced = syncAttachedToGuides(blocks);
+    if (synced !== blocks) setBlocks(synced);
   }, [blocks]);
 
   // An attached text whose guide vanished outside delete becomes a plain

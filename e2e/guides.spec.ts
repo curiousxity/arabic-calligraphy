@@ -125,3 +125,59 @@ test("a guide is marked for every export to leave out", async ({ page }) => {
   }, g.id);
   expect(hidden).toBe(true);
 });
+
+test("deleting a guide from the Layers panel also keeps its texts in place", async ({ page }) => {
+  await addCircleWithTwoTexts(page);
+  // Reshape the guide after the texts were attached, so a fallback that kept
+  // the attach-time curve would be caught.
+  await selectInLayers(page, "Guide · Circle");
+  await setRange(page, /^Diameter/, 160);
+  await expect.poll(async () => (await guides(page))[0].guideParams?.width).toBe(160);
+  await settleFrames(page);
+  const g = (await guides(page))[0];
+  const textBox = await blockClientBox(page, (await attached(page))[0].id);
+  await page.getByRole("button", { name: "Delete selected layer" }).click();
+  await expect.poll(async () => (await guides(page)).length).toBe(0);
+  const curves = (await getBlocks(page)).filter((b): b is TextPathBlock => b.type === "textPath");
+  expect(curves).toHaveLength(2);
+  for (const c of curves) {
+    expect(c.guide).toBeUndefined();
+    expect(c.textPathD).toBe(g.guideD);
+    expect([c.x, c.y]).toEqual([g.x, g.y]);
+  }
+  // Still drawn where it was (now stretched along the curve, so wider).
+  const after = await blockClientBox(page, curves[0].id);
+  expect(Math.abs(after.y - textBox.y)).toBeLessThan(textBox.height + 40);
+});
+
+test("attached texts move with the guide during the drag, not only on drop", async ({ page }) => {
+  await addCircleWithTwoTexts(page);
+  const [t1] = await attached(page);
+  const before = await blockClientBox(page, t1.id);
+  const gBox = await blockClientBox(page, (await guides(page))[0].id);
+  const grab = { x: gBox.x + gBox.width - 2, y: gBox.y + gBox.height / 2 };
+  await page.mouse.move(grab.x, grab.y);
+  await page.mouse.down();
+  await page.mouse.move(grab.x + 90, grab.y + 30, { steps: 12 });
+  await settleFrames(page);
+  const mid = await blockClientBox(page, t1.id);
+  await page.mouse.up();
+  expect(mid.x - before.x).toBeGreaterThan(50);
+});
+
+test("a slide with a pause in it is still one undo step", async ({ page }) => {
+  await addCircleWithTwoTexts(page);
+  const t1 = (await attached(page)).at(-1)!;
+  const gBox = await blockClientBox(page, (await guides(page))[0].id);
+  const from = { x: gBox.x + gBox.width / 2, y: gBox.y - 30 };
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 60, from.y + 40, { steps: 8 });
+  await page.waitForTimeout(600);
+  await page.mouse.move(from.x + 140, from.y + 150, { steps: 8 });
+  await page.mouse.up();
+  const offsetOf = async () => (await attached(page)).find((b) => b.id === t1.id)!.guide!.offset;
+  await expect.poll(offsetOf).not.toBe(t1.guide!.offset);
+  await page.keyboard.press("Control+z");
+  await expect.poll(offsetOf).toBe(t1.guide!.offset);
+});

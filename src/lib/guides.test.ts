@@ -92,3 +92,46 @@ describe("exportableBlocks", () => {
     expect(exportableBlocks([guide, onGuide(2)]).map((b) => b.id)).toEqual([2]);
   });
 });
+
+import { reorderDetachingGuides, syncAttachedToGuides } from "./guides";
+
+describe("syncAttachedToGuides", () => {
+  it("keeps an attached text's own geometry equal to its guide's", () => {
+    const out = syncAttachedToGuides([guide, onGuide(2, { x: 1, y: 2, rotation: 0 })]);
+    const t = out[1] as TextPathBlock;
+    expect([t.x, t.y, t.rotation]).toEqual([50, 60, 15]);
+    expect(t.textPathD).toBe(guide.guideD);
+    expect(t.textPathReversed).toBe(true);
+    expect(t.guide?.id).toBe(1);
+  });
+
+  it("returns the same array when everything is already in sync", () => {
+    const once = syncAttachedToGuides([guide, onGuide(2)]);
+    expect(syncAttachedToGuides(once)).toBe(once);
+  });
+
+  it("leaves orphans and plain blocks alone", () => {
+    const plain = onGuide(3, { guide: undefined });
+    const blocks: Block[] = [plain, onGuide(4)];
+    expect(syncAttachedToGuides(blocks)).toBe(blocks);
+  });
+});
+
+describe("reorderDetachingGuides", () => {
+  it("detaches the texts of a guide the reorder removed (Layers delete)", () => {
+    const prev: Block[] = [guide, onGuide(2), onGuide(3)];
+    const next = prev.filter((b) => b.id !== 1);
+    const out = reorderDetachingGuides(prev, next);
+    expect(out.map((b) => b.id)).toEqual([2, 3]);
+    for (const b of out as TextPathBlock[]) {
+      expect(b.guide).toBeUndefined();
+      expect([b.x, b.y]).toEqual([50, 60]);
+    }
+  });
+
+  it("passes a pure reorder through untouched", () => {
+    const prev: Block[] = [guide, onGuide(2)];
+    const next = [prev[1], prev[0]];
+    expect(reorderDetachingGuides(prev, next)).toBe(next);
+  });
+});

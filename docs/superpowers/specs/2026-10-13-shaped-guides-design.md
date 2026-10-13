@@ -355,8 +355,9 @@ from it, they win.
 4. **Baseline-offset sign follows the renderer.** A positive offset moves
    glyphs down in the glyph frame. Rising is `−gap`, and hanging is
    `+(ascent + gap)`.
-5. **"Start" alignment** means the anchor sits at the text's first glyph in
-   walking order.
+5. **"Start" alignment is where reading begins.** For Arabic, that is the far
+   end of the visually ordered run. This was changed in review: the original
+   choice, the first glyph in walking order, read backwards.
 6. **Sliding keeps the grab offset** taken on the first frame, so the text
    does not jump under the pointer.
 7. **The shrink note uses non-persisted renderer feedback.**
@@ -372,3 +373,7 @@ from it, they win.
     guide swallowed every click inside it.
 11. **`circlePathD` in `textPath.ts` is an open 270° arc.** Guides build
     their own closed shapes and do not reuse it.
+12. **An attached text's own geometry is kept in sync with its guide**
+    (`syncAttachedToGuides`, an effect with no history). Both the Delete key
+    and the Layers delete route detach a deleted guide's texts. A dragged
+    guide carries its texts as co-movers. A slide is one undo step.

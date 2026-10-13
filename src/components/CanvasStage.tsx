@@ -119,8 +119,8 @@ export type CanvasStageProps = {
   onUpdateGuideD?: (blockId: number, d: string) => void;
   /** Renderer feedback: how far an attached text shrank to fit its guide. */
   onGuideLayout?: (blockId: number, shrink: number) => void;
-  /** A drag on attached text slides it along its guide (0..1, un-flipped). */
-  onSlideAlongGuide?: (blockId: number, offset: number) => void;
+  /** A drag on attached text slides it along its guide (0..1, un-flipped); `first` opens the gesture's one undo step. */
+  onSlideAlongGuide?: (blockId: number, offset: number, first: boolean) => void;
   /**
    * One `pushHistory()` per painting stroke, taken on mousedown. App passes
    * `pushHistory` itself — see `setKufiCell` there for why the per-cell write
@@ -303,12 +303,28 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     };
   }, []);
 
-  const getCoMovers = (block: Block) =>
-    blocks.filter((other) => {
+  const getCoMovers = (block: Block) => {
+    const base = blocks.filter((other) => {
       if (other.id === block.id) return false;
       if (block.groupId != null && other.groupId === block.groupId) return true;
       return selectedIds.length > 1 && selectedIds.includes(block.id) && selectedIds.includes(other.id);
     });
+    // An attached text moves with its guide and only with its guide: it
+    // rides along whenever the guide is moving (so it never lags mid-drag),
+    // and is left out otherwise (it draws at the guide, not at its own x/y).
+    const movingGuides = new Set(
+      [block, ...base].filter((b) => b.type === "guide").map((b) => b.id)
+    );
+    const riders = blocks.filter(
+      (b) => b.type === "textPath" && b.guide && movingGuides.has(b.guide.id) && b.id !== block.id
+    );
+    const seen = new Set<number>();
+    return [...base, ...riders].filter((b) => {
+      if (seen.has(b.id)) return false;
+      seen.add(b.id);
+      return !(b.type === "textPath" && b.guide && !movingGuides.has(b.guide.id));
+    });
+  };
 
   const findNearest = (value: number, targets: number[], threshold: number) => {
     let best: number | null = null;
@@ -1050,12 +1066,13 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                           y: dx * Math.sin(r) + dy * Math.cos(r),
                         };
                         const projected = projectToGuide(guideArcTable(guidePlace.d), local);
-                        if (slideGrabRef.current?.id !== block.id) {
+                        const first = slideGrabRef.current?.id !== block.id;
+                        if (first) {
                           slideGrabRef.current = { id: block.id, delta: projected - attachment.offset };
                         }
-                        const raw = projected - slideGrabRef.current.delta;
+                        const raw = projected - slideGrabRef.current!.delta;
                         const offset = guidePlace.closed ? ((raw % 1) + 1) % 1 : Math.min(Math.max(raw, 0), 1);
-                        onSlideAlongGuide(block.id, offset);
+                        onSlideAlongGuide(block.id, offset, first);
                         if (end) slideGrabRef.current = null;
                       }
                     : null;
