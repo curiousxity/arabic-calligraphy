@@ -99,3 +99,31 @@ export function applySpacing(
 
   return out;
 }
+
+/**
+ * How many places `applySpacing` would add letter and word spacing to.
+ *
+ * Counted on the logical text with the same rules, so a caller dividing a
+ * gap across the boundaries (verse justification) divides by the number
+ * that will actually receive it. A ligature that swallows a break (the
+ * Allah ligature's alef–lam) makes this an over-count; callers measure the
+ * result rather than trust the arithmetic, so that costs a correction pass,
+ * never an overshoot.
+ */
+export function countSpacingBoundaries(text: string): { pieceBreaks: number; wordGaps: number } {
+  const forms = classifyJoiningForms(text);
+  let pieceBreaks = 0;
+  let wordGaps = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (isSpace(text[i])) {
+      wordGaps++;
+      continue;
+    }
+    const form = forms[i]?.form;
+    if (form !== "final" && form !== "isolated") continue;
+    let k = i + 1;
+    while (k < text.length && (isMark(text[k]) || text[k] === ZWNJ)) k++;
+    if (k < text.length && forms[k]?.form != null) pieceBreaks++;
+  }
+  return { pieceBreaks, wordGaps };
+}

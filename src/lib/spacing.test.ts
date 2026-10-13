@@ -128,7 +128,7 @@ async function shapeReal(
   }
 }
 
-import { applySpacing, spacingForBlock } from "./spacing";
+import { applySpacing, countSpacingBoundaries, spacingForBlock } from "./spacing";
 import type { Block } from "../types";
 
 const sumAx = (gs: readonly HarfBuzzGlyph[]) => gs.reduce((s, g) => s + (g.ax ?? 0), 0);
@@ -242,5 +242,27 @@ describe("spacingForBlock", () => {
     expect(spacingForBlock(text)).toEqual({ letter: 0.1, word: 0.4 });
     const fill = { type: "shapeFill" } as unknown as Block;
     expect(spacingForBlock(fill)).toEqual({});
+  });
+});
+
+describe("countSpacingBoundaries", () => {
+  it("counts piece breaks and word gaps on plain text", () => {
+    // د and ر and و do not join forward: محمد ends before a space (not a
+    // break); inside رسول the breaks fall after ر and after و.
+    expect(countSpacingBoundaries("محمد رسول")).toEqual({ pieceBreaks: 2, wordGaps: 1 });
+    expect(countSpacingBoundaries("بببب")).toEqual({ pieceBreaks: 0, wordGaps: 0 });
+    expect(countSpacingBoundaries("")).toEqual({ pieceBreaks: 0, wordGaps: 0 });
+  });
+
+  it("agrees with where applySpacing actually adds advance (real shaping)", async () => {
+    for (const text of ["محمد رسول", "درود درود", "سلام عليكم"]) {
+      const { glyphs, upm } = await shaped(text);
+      const { pieceBreaks, wordGaps } = countSpacingBoundaries(text);
+      const lettered = applySpacing(glyphs, text, { letter: 0.3 }, upm);
+      const worded = applySpacing(glyphs, text, { word: 0.3 }, upm);
+      const changed = (out: HarfBuzzGlyph[]) => out.filter((g, i) => g.ax !== glyphs[i].ax).length;
+      expect(changed(lettered)).toBe(pieceBreaks);
+      expect(changed(worded)).toBe(wordGaps);
+    }
   });
 });
