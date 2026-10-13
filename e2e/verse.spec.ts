@@ -17,13 +17,13 @@ async function verseLines(page: Page): Promise<TextBlock[]> {
     .sort((a, b) => a.verse!.index - b.verse!.index);
 }
 
-async function createVerse(page: Page, layout: "Stacked" | "Bayt") {
+async function createVerse(page: Page, layout: "Stacked" | "Bayt", poem: string[] = POEM) {
   await page.getByRole("button", { name: "New verse…" }).click();
   const dialog = page.getByRole("dialog", { name: "New verse" });
-  await dialog.getByLabel("Verse lines").fill(POEM.join("\n"));
+  await dialog.getByLabel("Verse lines").fill(poem.join("\n"));
   await dialog.getByLabel(layout).check();
   await dialog.getByRole("button", { name: "Create verse" }).click();
-  await expect.poll(async () => (await verseLines(page)).length).toBe(3);
+  await expect.poll(async () => (await verseLines(page)).length).toBe(poem.length);
   await settleFrames(page);
 }
 
@@ -73,4 +73,37 @@ test("Justify twice changes nothing, and a width change is one undo", async ({ p
   await page.getByRole("button", { name: "Justify", exact: true }).focus();
   await page.keyboard.press("Control+z");
   await expect.poll(async () => (await verseLines(page)).map((l) => l.text)).toEqual(before);
+});
+
+test("a duplicated verse line is a plain block, not a member of the verse", async ({ page }) => {
+  await gotoApp(page);
+  await createVerse(page, "Stacked");
+  await page.getByRole("button", { name: "Duplicate block" }).click();
+  await expect.poll(async () => (await getBlocks(page)).length).toBe(5);
+  const blocks = await getBlocks(page);
+  const copy = blocks[blocks.length - 1];
+  expect(copy.type === "text" && copy.verse).toBeFalsy();
+  expect((await verseLines(page)).length).toBe(3);
+});
+
+test("a second verse made with a justified line selected starts from that line's own base", async ({ page }) => {
+  await gotoApp(page);
+  // "دار دور" has no join to stretch, so Justify can only fill it with spacing.
+  await createVerse(page, "Stacked", ["دار دور", "سلام عليكم ورحمة الله"]);
+  const first = await verseLines(page);
+  const firstIds = new Set(first.map((l) => l.id));
+  // The selected line carries Justify's fill on top of a base of 0; the new
+  // verse must start from 0, not from the filled total.
+  expect(first[0].letterSpacing ?? 0).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "New verse…" }).click();
+  const dialog = page.getByRole("dialog", { name: "New verse" });
+  await dialog.getByLabel("Verse lines").fill(POEM.join("\n"));
+  await dialog.getByRole("button", { name: "Create verse" }).click();
+  await expect.poll(async () => (await verseLines(page)).length).toBe(5);
+  const second = (await verseLines(page)).filter((l) => !firstIds.has(l.id));
+  for (const l of second) {
+    expect(l.verse!.baseLetterSpacing).toBe(0);
+    expect(l.verse!.baseWordSpacing).toBe(0);
+    expect(l.verse!.baseFontSize).toBe(first[0].verse!.baseFontSize);
+  }
 });

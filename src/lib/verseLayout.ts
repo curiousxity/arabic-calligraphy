@@ -51,13 +51,21 @@ export function layoutVerse(
  * re-laid-out where it now is instead of snapping back.
  */
 export function verseAnchor(
-  lines: readonly { x: number; y: number }[],
+  lines: readonly { x: number; y: number; index: number }[],
   layout: VerseLayout
 ): { x: number; y: number } {
   if (lines.length === 0) return { x: 0, y: 0 };
   const first = lines[0];
-  if (layout === "bayt" && lines.length >= 2) {
-    return { x: (first.x + lines[1].x) / 2, y: first.y };
+  if (layout === "bayt") {
+    // The midpoint of a complete couplet, found by the indices the verse was
+    // last laid out with — not by sorted position, which after a deleted
+    // misra' can pair two right-column lines and shift the verse sideways.
+    const byIndex = new Map(lines.map((l) => [l.index, l]));
+    for (const l of lines) {
+      if (l.index % 2 !== 0) continue;
+      const partner = byIndex.get(l.index + 1);
+      if (partner) return { x: (l.x + partner.x) / 2, y: first.y };
+    }
   }
   return { x: first.x, y: first.y };
 }

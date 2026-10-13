@@ -224,13 +224,22 @@ describe("line bases", () => {
       wordSpacing: 0.1,
       verse: {
         id: 1, index: 0, layout: "stacked", lineGap: 1.6, columnGap: 1,
-        baseFontSize: 40, fittedFontSize: 30, addedLetter: 0.3, addedWord: 0.05,
+        baseFontSize: 40, fittedFontSize: 30,
+        baseLetterSpacing: 0.1, baseWordSpacing: 0.05,
+        fittedLetterSpacing: 0.4, fittedWordSpacing: 0.1,
       },
       ...over,
     }) as TextBlock;
 
-  it("takes Justify's own additions back off, never stacking them", () => {
-    expect(baseSpacingForLine(line({}))).toEqual({ letter: 0.4 - 0.3, word: 0.1 - 0.05 });
+  it("returns the stored base exactly while the spacing is what Justify wrote", () => {
+    expect(baseSpacingForLine(line({}))).toEqual({ letter: 0.1, word: 0.05 });
+  });
+
+  it("adopts spacing the user reset or set absolutely after Justify", () => {
+    // The slider's reset writes 0; a saved style writes its own value. Either
+    // is the user's new base, never "that minus what Justify had added".
+    expect(baseSpacingForLine(line({ letterSpacing: 0 }))).toEqual({ letter: 0, word: 0.05 });
+    expect(baseSpacingForLine(line({ wordSpacing: 0.3 }))).toEqual({ letter: 0.1, word: 0.3 });
   });
 
   it("keeps the base size while the fitted size is untouched", () => {
@@ -244,6 +253,25 @@ describe("line bases", () => {
   it("treats a block with no tag as its own base", () => {
     expect(baseFontSizeForLine(line({ verse: undefined }))).toBe(30);
     expect(baseSpacingForLine(line({ verse: undefined }))).toEqual({ letter: 0.4, word: 0.1 });
+  });
+
+  it("round-trips through the tag: a second Justify starts from the same base", async () => {
+    const user = { letter: 0.1, word: 0 };
+    const r = await justifyLine({ text: "بب دد", baseFontSize: 10, userSpacing: user, target: 45, measure: fake });
+    expect(r.addedLetter).toBeGreaterThan(0);
+    const written = line({
+      fontSize: r.fontSize,
+      letterSpacing: user.letter + r.addedLetter,
+      wordSpacing: user.word + r.addedWord,
+      verse: {
+        id: 1, index: 0, layout: "stacked", lineGap: 1.6, columnGap: 1,
+        baseFontSize: 10, fittedFontSize: r.fontSize,
+        baseLetterSpacing: user.letter, baseWordSpacing: user.word,
+        fittedLetterSpacing: user.letter + r.addedLetter, fittedWordSpacing: user.word + r.addedWord,
+      },
+    });
+    expect(baseSpacingForLine(written)).toEqual(user);
+    expect(baseFontSizeForLine(written)).toBe(10);
   });
 });
 

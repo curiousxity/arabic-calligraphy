@@ -143,9 +143,18 @@ export type VerseTag = {
   baseFontSize: number;
   /** The size the last Justify wrote; a different `fontSize` means the user changed it. */
   fittedFontSize: number;
-  /** Spacing the last Justify added on top of the user's own; removed before the next run. */
-  addedLetter: number;
-  addedWord: number;
+  /**
+   * The user's own spacing, and the totals the last Justify wrote (theirs plus
+   * its fill). A block whose spacing still equals the fitted total is
+   * re-justified from the stored base; one that differs was set by the user
+   * (slider, reset, applied style) and that value becomes the base. Storing
+   * the base outright, rather than subtracting the fill back off, is what
+   * keeps an absolute write from turning into a negative base.
+   */
+  baseLetterSpacing: number;
+  baseWordSpacing: number;
+  fittedLetterSpacing: number;
+  fittedWordSpacing: number;
 };
 
 /** The verse-wide part of a tag — what the Verse panel edits. */

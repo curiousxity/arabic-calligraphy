@@ -39,11 +39,26 @@ dimension in every per-letter tool.
 
 ## Traps
 
-- **`addedLetter` / `addedWord` record what the last Justify added.**
-  `baseSpacingForLine` takes them off before solving, so spacing never stacks.
-  Code that writes `letterSpacing` on a verse line without updating the tag
-  makes the next Justify subtract the wrong amount. The Typography slider is
-  fine, because the user's change is relative to the sum.
+- **The tag stores the user's base spacing and the total Justify wrote**
+  (`baseLetterSpacing`/`fittedLetterSpacing`, and the same for word).
+  `baseSpacingForLine` returns the stored base while the block still holds the
+  fitted total. Otherwise it adopts the block's current value as the user's.
+  It never subtracts the fill back off: the slider's reset, a drag to a value,
+  and an applied style all write *absolute* values, and subtracting from one
+  of those gave a negative base.
+- **A copy is not a member.** Paste and Duplicate set `verse: undefined`, as
+  they already did for `groupId`. Otherwise the copy would slot into the
+  verse on the next Justify.
+- **The bayt anchor pairs lines by stored `index`.** After a misra' is
+  deleted, pairing by sorted position matched two right-column lines and
+  shifted the verse sideways by half a column.
+- **History is pushed before the solve's `await`.** Pushing after it
+  snapshots the click-time blocks and folds any edit made during the solve
+  into the Justify's undo. A line whose text changed during the solve is
+  left as the user typed it.
+- **New verse… copies the selected line's base, not its fitted values**
+  (`baseFontSizeForLine`/`baseSpacingForLine`). A second verse should not
+  inherit the first one's shrink and fill.
 - **`fittedFontSize` is how a manual size change is detected.** Justify
   writes it together with `fontSize`. If anything else changes a verse line's
   `fontSize`, that size is treated as the user's new base.

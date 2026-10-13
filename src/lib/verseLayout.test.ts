@@ -37,16 +37,23 @@ describe("verseAnchor", () => {
     for (const layout of ["stacked", "bayt"] as const) {
       for (const count of [1, 2, 3, 4]) {
         const anchor = { x: 37, y: -12 };
-        const pos = layoutVerse(count, { ...g, layout }, anchor);
+        const pos = layoutVerse(count, { ...g, layout }, anchor).map((p, index) => ({ ...p, index }));
         expect(verseAnchor(pos, layout)).toEqual(anchor);
       }
     }
   });
 
+  it("keeps a bayt verse in place after its left misra' is deleted", () => {
+    const pos = layoutVerse(4, { ...g, layout: "bayt" }, { x: 0, y: 0 }).map((p, index) => ({ ...p, index }));
+    const remaining = [pos[0], pos[2], pos[3]];
+    expect(verseAnchor(remaining, "bayt")).toEqual({ x: 0, y: 0 });
+  });
+
   it("follows a dragged verse", () => {
-    const pos = layoutVerse(2, { ...g, layout: "bayt" }, { x: 0, y: 0 }).map((p) => ({
+    const pos = layoutVerse(2, { ...g, layout: "bayt" }, { x: 0, y: 0 }).map((p, index) => ({
       x: p.x + 50,
       y: p.y + 7,
+      index,
     }));
     expect(verseAnchor(pos, "bayt")).toEqual({ x: 50, y: 7 });
   });

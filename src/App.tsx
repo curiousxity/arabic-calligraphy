@@ -1022,7 +1022,10 @@ const App: React.FC = () => {
               x: clipboardRef.current.x + 20,
               y: clipboardRef.current.y + 20,
               groupId: undefined,
-            };
+              // A copy is a plain block: keeping the tag would slot it into
+              // the verse (or a later verse that reused the id) on Justify.
+              verse: undefined,
+            } as Block;
             setBlocks((prev) => [...prev, copy]);
             setSelectedIds([]);
             setSelectedId(newId);
@@ -1488,7 +1491,9 @@ const App: React.FC = () => {
       x: selectedBlock.x - 20,
       y: selectedBlock.y + 20,
       groupId: undefined,
-    };
+      // See the paste handler: a copied verse line is not a member of the verse.
+      verse: undefined,
+    } as Block;
 
     setBlocks((prev) => [...prev, copy]);
     setSelectedIds([]);
@@ -2558,8 +2563,10 @@ const App: React.FC = () => {
           index,
           baseFontSize: i.baseFontSize,
           fittedFontSize: r.fontSize,
-          addedLetter: r.addedLetter,
-          addedWord: r.addedWord,
+          baseLetterSpacing: i.base.letter,
+          baseWordSpacing: i.base.word,
+          fittedLetterSpacing: i.base.letter + r.addedLetter,
+          fittedWordSpacing: i.base.word + r.addedWord,
         },
       });
     });
@@ -2584,16 +2591,25 @@ const App: React.FC = () => {
     };
     // Read the anchor in the layout the blocks are in *now*, before any
     // override changes it — that is what keeps a dragged verse in place.
-    const anchor = verseAnchor(lines, tag.layout);
+    const anchor = verseAnchor(
+      lines.map((l) => ({ x: l.x, y: l.y, index: l.verse!.index })),
+      tag.layout
+    );
+    const solvedText = new Map(lines.map((l) => [l.id, l.text]));
     setIsJustifyingVerse(true);
+    // Pushed before the await, while this render's snapshot is still the
+    // current state: after it, `pushHistory` would snapshot the blocks as they
+    // were at the click, folding any edit made during the solve into this undo.
+    pushHistory();
     try {
       const { patches, status } = await solveVerse(lines, verseId, settings, anchor);
-      pushHistory();
       setBlocks((prev) =>
         prev.map((b) => {
           const patch = patches.get(b.id);
-          // A line deleted during the solve has no entry to match; the rest still land.
-          return patch ? ({ ...b, ...patch } as Block) : b;
+          // A line deleted during the solve has no entry to match, and one
+          // whose text was edited meanwhile keeps the edit; the rest land.
+          if (!patch || b.text !== solvedText.get(b.id)) return b;
+          return { ...b, ...patch } as Block;
         })
       );
       setExportStatus(status);
@@ -2612,8 +2628,17 @@ const App: React.FC = () => {
       setExportStatus("Type at least one line of verse.");
       return;
     }
-    const style =
-      selectedBlock?.type === "text" ? styleToPatch(captureStyle(selectedBlock, "verse")) : {};
+    // A justified line's size and spacing include Justify's own shrink and
+    // fill; the new verse starts from that line's base, not from those.
+    const style: Partial<Block> =
+      selectedBlock?.type === "text"
+        ? {
+            ...styleToPatch(captureStyle(selectedBlock, "verse")),
+            fontSize: baseFontSizeForLine(selectedBlock),
+            letterSpacing: baseSpacingForLine(selectedBlock).letter,
+            wordSpacing: baseSpacingForLine(selectedBlock).word,
+          }
+        : {};
     const verseId =
       1 + Math.max(0, ...blocks.map((b) => (b.type === "text" ? b.verse?.id ?? 0 : 0)));
     const groupId = texts.length > 1 ? nextGroupIdRef.current++ : undefined;
@@ -2640,9 +2665,10 @@ const App: React.FC = () => {
     // freeform origin, which is where a fresh session's content sits.
     const anchor = { x: 0, y: -((rows - 1) * DEFAULT_LINE_GAP * fontSize) / 2 };
     setIsJustifyingVerse(true);
+    // Before the await, for the reason `justifyVerse` gives.
+    pushHistory();
     try {
       const { patches, status } = await solveVerse(lines, verseId, settings, anchor);
-      pushHistory();
       const built: Block[] = lines.map((l) => ({ ...l, ...patches.get(l.id) }));
       setBlocks((prev) => [...prev, ...built]);
       setSelectedIds([]);

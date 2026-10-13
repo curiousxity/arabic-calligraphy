@@ -148,11 +148,19 @@ export function baseFontSizeForLine(b: TextBlock): number {
   return b.fontSize === v.fittedFontSize ? v.baseFontSize : b.fontSize;
 }
 
-/** The user's own spacing, with the last Justify's additions taken back off. */
+/**
+ * The user's own spacing: the stored base while the block still carries what
+ * Justify wrote, otherwise whatever the user has set since — same rule as
+ * `baseFontSizeForLine`.
+ */
 export function baseSpacingForLine(b: TextBlock): LineSpacing {
+  const letter = b.letterSpacing ?? 0;
+  const word = b.wordSpacing ?? 0;
+  const v = b.verse;
+  if (!v) return { letter, word };
   return {
-    letter: (b.letterSpacing ?? 0) - (b.verse?.addedLetter ?? 0),
-    word: (b.wordSpacing ?? 0) - (b.verse?.addedWord ?? 0),
+    letter: letter === v.fittedLetterSpacing ? v.baseLetterSpacing : letter,
+    word: word === v.fittedWordSpacing ? v.baseWordSpacing : word,
   };
 }
 

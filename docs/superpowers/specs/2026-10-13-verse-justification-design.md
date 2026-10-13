@@ -55,8 +55,10 @@ verse?: {
   columnGap: number;     // bayt gutter, × font size (default 1.0)
   baseFontSize: number;  // size before any shrink
   fittedFontSize: number; // size Justify last wrote; differs = user changed it
-  addedLetter: number;   // spacing Justify added, removed before the next run
-  addedWord: number;
+  baseLetterSpacing: number;   // the user's own spacing
+  baseWordSpacing: number;
+  fittedLetterSpacing: number; // what Justify last wrote; differs = user changed it
+  fittedWordSpacing: number;
 }
 ```
 
@@ -120,9 +122,9 @@ justifyLine({ text, baseFontSize, userSpacing, target,
 line's ink width, measured at `baseFontSize` with tatweel removed and user
 spacing only. In bayt, every half-line counts as a line.
 
-**For each line**, the spacing the last Justify added (`addedLetter` and
-`addedWord`) is taken off first, so the user's own spacing is the base.
-Then:
+**For each line**, the user's own spacing is the base. That is the stored
+`baseLetterSpacing`/`baseWordSpacing` while the block still holds what Justify
+last wrote, or else whatever the user has set since. Then:
 
 1. **Shrink.** If the line is wider than the target at `baseFontSize` with
    tatweel removed, set
