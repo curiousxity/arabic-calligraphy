@@ -46,7 +46,7 @@ async function shape(hb, fontData, upm, text) {
   }
 }
 
-const { toSvgCmds, flattenContours, rotateContours, crossingsAt, findCutZones, DEFAULT_DETECT_OPTS } =
+const { toSvgCmds, flattenContours, rotateContours, findCutZonesSwept, DEFAULT_DETECT_OPTS } =
   await import("../src/lib/strokeCuts.ts");
 
 const hb = await resolveHb(hbjs);
@@ -62,13 +62,30 @@ for (const file of fs.readdirSync(FONT_DIR).filter((f) => /\.(ttf|otf)$/i.test(f
     const [g] = await shape(hb, bytes, upm, text);
     return flattenContours(toSvgCmds(parsed.glyphs.get(g.g).getPath(0, 0, upm).commands));
   };
-  const tat = findCutZones(await outline("ـ"), { glyphIndex: 0, cluster: 0 }, opts);
-  const horizontal = tat.length ? tat.reduce((a, z) => a + z.thickness, 0) / tat.length : NaN;
+  const meta = { glyphIndex: 0, cluster: 0 };
+  const meanThickness = (zones) => (zones.length ? zones.reduce((a, z) => a + z.thickness, 0) / zones.length : NaN);
+  // Both sides use the swept detector, which reports the stroke's
+  // perpendicular thickness in its own inclined frame (mean over zones).
+  // Horizontal: the middle glyph of "ببب" (a connector in context); a lone
+  // tatweel only if that yields no zone, marked "tatweel" in the output.
+  const mid = (await shape(hb, bytes, upm, "ببب"))[1];
+  let horizontal = NaN, hSrc = "context";
+  if (mid) {
+    horizontal = meanThickness(findCutZonesSwept(
+      flattenContours(toSvgCmds(parsed.glyphs.get(mid.g).getPath(0, 0, upm).commands)), meta, opts));
+  }
+  if (!Number.isFinite(horizontal)) {
+    hSrc = "tatweel";
+    horizontal = meanThickness(findCutZonesSwept(await outline("ـ"), meta, opts));
+  }
   const alef = rotateContours(await outline("ا"), Math.PI / 2);
-  const xs = alef.flat().map((p) => p[0]);
-  const mid = (Math.min(...xs) + Math.max(...xs)) / 2;
-  const cr = crossingsAt(alef, mid);
-  const vertical = cr.length >= 2 ? cr[cr.length - 1].y - cr[0].y : NaN;
+  const vertical = meanThickness(findCutZonesSwept(alef, meta, opts));
   const ratio = vertical / horizontal;
-  console.log(`${file.replace(/\.(ttf|otf)$/i, "")}: ${Number.isFinite(ratio) ? ratio.toFixed(3) : "—"}  (v ${vertical.toFixed(0)} / h ${horizontal.toFixed(0)})`);
+  // Clamp to [0.1, 1], round to 2 dp: the value that goes in NIB_FLOOR_RATIO.
+  // A clamp at 1 means "never thin"; the raw value is printed so it is visible.
+  const fin = Number.isFinite(ratio) ? Math.round(Math.min(1, Math.max(0.1, ratio)) * 100) / 100 : NaN;
+  console.log(
+    `${file.replace(/\.(ttf|otf)$/i, "")}: raw ${Number.isFinite(ratio) ? ratio.toFixed(3) : "—"}  final ${Number.isFinite(fin) ? fin.toFixed(2) : "—"}` +
+    `${Number.isFinite(ratio) && ratio > 1 ? " (CLAMPED)" : ""}  (v ${vertical.toFixed(0)} alef / h ${horizontal.toFixed(0)} ${hSrc})`
+  );
 }
