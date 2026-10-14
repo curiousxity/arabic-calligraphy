@@ -544,3 +544,13 @@ html, body, #root { height: 100%; margin: 0; }
 }
 details[open] > .sidebarPresetKeyboardSummary::after { transform: rotate(-135deg); }
 details:not([open]) > .sidebarPresetKeyboardSummary { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
+.startScreen { position: fixed; inset: 0; z-index: 3000; display: flex; flex-direction: column; gap: 12px; padding: 28px clamp(16px, 6vw, 96px); background: var(--bg-page); color: var(--text-primary); overflow: hidden; }
+.startScreenHeader { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.startScreenHeader > * { min-width: 0; }
+.startScreenTitle { margin: 0; font-size: 22px; letter-spacing: 0.02em; }
+.startScreenSubtitle { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
+.startScreenInput { flex: 1 1 320px; font-size: 28px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-input); color: var(--text-primary); }
+.startScreenSkip { flex: 0 0 auto; padding: 8px 14px; border: 1px solid var(--border-soft); border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.startScreen .fontPickerBody { flex: 1; }
+.startScreen .fontPickerSample { font-size: 40px; line-height: 1.7; }
