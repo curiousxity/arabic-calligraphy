@@ -178,6 +178,7 @@ import { shapeText } from "./lib/harfbuzz";
 import { convertRunToStack, splitPieceAtCut, type UnjoinedPair } from "./lib/stackConvert";
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
+import { sanitizeLegacyBlocks } from "./lib/legacySaves";
 import {
   buildComposition,
   describeComposition,
@@ -321,34 +322,6 @@ const cutWidthForBlock = (block: Block): number =>
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
-
-/**
- * Fields that removed subsystems wrote onto blocks. A project saved before a
- * removal still carries them; nothing reads them any more, so they are
- * stripped on load rather than left to ride along in every subsequent save —
- * same treatment, and the same reasoning, as the `shapeWarp` filter in
- * `applyParsedLayoutPayload`. See `.claude/rules/removed-subsystems.md`.
- */
-const REMOVED_BLOCK_FIELDS = [
-  // The Morph Glyph Editor, removed 2026-08-14.
-  "glyphEdits",
-  "glyphRigValues",
-  "glyphMaskEdit",
-  "glyphEditTool",
-  "selectedGlyphIndex",
-  "kashidaAmount",
-  "kashidaEditMode",
-  // Per-glyph move, scale & rotate, removed 2026-10-10. A letter moved,
-  // scaled or turned in an older project loads back where HarfBuzz puts it.
-  "glyphTransforms",
-  "glyphTransformMode",
-] as const;
-
-const stripRemovedFields = (block: Block): Block => {
-  const next = { ...block } as Block & Record<string, unknown>;
-  for (const field of REMOVED_BLOCK_FIELDS) delete next[field];
-  return next;
-};
 
 const App: React.FC = () => {
   const [confirmRequest, setConfirmRequest] = useState<ConfirmDialogRequest | null>(null);
@@ -1760,18 +1733,9 @@ const App: React.FC = () => {
   // in their own try/catch since they differ in failure behavior (silent
   // resetView vs. an alert).
   const applyParsedLayoutPayload = (parsed: Record<string, unknown>) => {
-    // Projects saved before the Shape Warp block type was removed can still
-    // carry blocks of that type. Nothing renders them any more, so drop them
-    // rather than letting CanvasStage's exhaustive type switch fall through to
-    // an unrendered block that still occupies the layer list and selection.
-    //
-    // The same goes for the Morph Glyph Editor's per-block fields: a save from
-    // before its removal still carries them, and stripping them here is what
-    // keeps an old project loading cleanly instead of half-rendered.
+    // Removed block types are dropped and removed fields stripped; see `lib/legacySaves.ts`.
     const parsedBlocks = Array.isArray(parsed.blocks)
-      ? (parsed.blocks as Block[])
-          .filter((b) => (b as { type?: string }).type !== "shapeWarp")
-          .map(stripRemovedFields)
+      ? sanitizeLegacyBlocks(parsed.blocks as unknown[])
       : null;
     // `let` because the STREAM-B sanitation region below reassigns it.
     let blocksToLoad: Block[] | null = parsedBlocks;
@@ -1779,7 +1743,7 @@ const App: React.FC = () => {
     // A mirror renders its source's content, so one whose source is missing
     // from the payload would occupy the layer list and the selection while
     // drawing nothing. Dropped on load for the same reason, and by the same
-    // precedent, as the `shapeWarp` filter above.
+    // precedent, as the removed-type filter above.
     if (blocksToLoad) blocksToLoad = dropOrphanedAttachments(dropOrphanedMirrors(blocksToLoad));
     const loadedBlocks: Block[] = blocksToLoad ?? blocks;
     if (blocksToLoad) setBlocks(blocksToLoad);
