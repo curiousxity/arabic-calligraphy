@@ -953,6 +953,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
                     diacriticEditMode={block.diacriticEditMode ?? false}
+                    detachedMarkEditMode={block.detachedMarkEditMode ?? false}
+                    onBeginDetachedMarkDrag={onBeginDetachedMarkDrag}
+                    onSetDetachedMark={(o) => onSetDetachedMark(block.id, o)}
                     glyphAlternateMode={block.glyphAlternateMode ?? false}
                     alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
                     onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}

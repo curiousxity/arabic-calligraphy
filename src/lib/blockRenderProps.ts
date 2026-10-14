@@ -76,6 +76,7 @@ export function shapeFillProps(b: Extract<Block, { type: "shapeFill" }>) {
     shapeFillScaleY: b.shapeFillScaleY ?? 1,
     shapeFillTextRotation: b.shapeFillTextRotation ?? 0,
     diacriticOverrides: b.diacriticOverrides,
+    detachedMarkOverrides: b.detachedMarkOverrides,
     glyphAlternates: b.glyphAlternates,
     styleSets: b.styleSets,
   };
