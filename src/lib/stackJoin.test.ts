@@ -20,12 +20,23 @@ describe("joinCenterline", () => {
     expect(p2[1]).toBeCloseTo(-50, 9);     // handle along B's tangent (−x)
     expect(p2[0]).toBeLessThan(100);
   });
-  it("bow lengthens both handles without turning them", () => {
+  it("bow lengthens A's handle and shortens B's, both still along their tangents", () => {
     const [, p1a, p2a] = joinCenterline(A, B, 0);
     const [, p1b, p2b] = joinCenterline(A, B, 0.5);
-    expect(p1b[0]).toBeGreaterThan(p1a[0]);
-    expect(p2b[0]).toBeLessThan(p2a[0]);
+    expect(p1b[0]).toBeGreaterThan(p1a[0]);     // A's handle (+x) is longer
+    expect(p2b[0]).toBeGreaterThan(p2a[0]);     // B's handle (−x from 100) is shorter
     expect(p1b[1]).toBeCloseTo(0, 9);
+    expect(p2b[1]).toBeCloseTo(-50, 9);
+  });
+  it("bow moves an S-curve's midpoint along A's tangent by chord/4 · bow", () => {
+    const up: CutFace = { a: [0, -110], b: [0, -90], tangent: Math.PI };
+    const midOf = (bow: number) => {
+      const [p0, p1, p2, p3] = joinCenterline(A, up, bow);
+      return [(p0[0] + 3 * p1[0] + 3 * p2[0] + p3[0]) / 8, (p0[1] + 3 * p1[1] + 3 * p2[1] + p3[1]) / 8];
+    };
+    const m0 = midOf(0), m1 = midOf(0.5);
+    expect(m1[0] - m0[0]).toBeCloseTo((100 / 4) * 0.5, 6);   // A's tangent is +x; chord is 100
+    expect(m1[1] - m0[1]).toBeCloseTo(0, 6);
   });
 });
 

@@ -9,16 +9,18 @@ const near = (p: Pt, q: Pt) => Math.abs(p[0] - q[0]) < EPS && Math.abs(p[1] - q[
 const mid = (f: CutFace): Pt => [(f.a[0] + f.b[0]) / 2, (f.a[1] + f.b[1]) / 2];
 
 /** Cubic from A's midpoint to B's, leaving along A's outward tangent and
- *  arriving along B's. Handles are chord × (1/3 + bow) so a bend never
- *  breaks the tangent match. */
+ *  arriving along B's. `bow` is an asymmetry: A's handle is chord/3 × (1+bow)
+ *  and B's chord/3 × (1−bow), so the tangent match holds at both ends. For
+ *  opposed tangents (an S) the midpoint moves by (chord/4)·bow along A's
+ *  tangent — a symmetric lengthening would leave it on the chord. */
 export function joinCenterline(A: CutFace, B: CutFace, bow: number): [Pt, Pt, Pt, Pt] {
   const m0 = mid(A), m3 = mid(B);
   const chord = Math.hypot(m3[0] - m0[0], m3[1] - m0[1]);
-  const h = chord * (1 / 3 + bow);
+  const h0 = (chord / 3) * (1 + bow), h1 = (chord / 3) * (1 - bow);
   return [
     m0,
-    [m0[0] + h * Math.cos(A.tangent), m0[1] + h * Math.sin(A.tangent)],
-    [m3[0] + h * Math.cos(B.tangent), m3[1] + h * Math.sin(B.tangent)],
+    [m0[0] + h0 * Math.cos(A.tangent), m0[1] + h0 * Math.sin(A.tangent)],
+    [m3[0] + h1 * Math.cos(B.tangent), m3[1] + h1 * Math.sin(B.tangent)],
     m3,
   ];
 }
