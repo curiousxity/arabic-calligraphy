@@ -56,7 +56,7 @@ const NIB_FLOOR_RATIO: Record<string, number> = {
   UKIJDiwani: 0.44,
   Yekan: 0.82,
 };
-export const FALLBACK_NIB_FLOOR = 0.15;
+export const FALLBACK_NIB_FLOOR = 0.5;
 /** Fonts with a measured entry, for tests. */
 export function nibFloorFonts(): string[] {
   return Object.keys(NIB_FLOOR_RATIO);

@@ -36,7 +36,7 @@ seam shows.
 cross-section, so on a 90° climb the model would thin to nothing; a real reed
 held at ~45° draws a vertical stroke nearly as heavy as a horizontal one.
 `nibFloorFraction` in `nuqta.ts` holds the measured vertical/horizontal ratio
-per font (`scripts/measureNibFloor.mjs`); 0.15 is only the fallback.
+per font (`scripts/measureNibFloor.mjs`); 0.5 is only the fallback.
 
 **A join is a splice, not a second shape.** `spliceJoin` finds each face's
 straight bridge edge (left by `splitAtCut`), removes both, and threads the

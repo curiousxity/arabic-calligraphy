@@ -54,7 +54,7 @@ import {
   syncAttachedToGuides,
 } from "./lib/guides";
 import type { GuideAttachment, GuideBlock, GuideParams, GuideShape } from "./types";
-import type { Block, DiacriticOverride, StrokeCut } from "./types";
+import type { Block, DiacriticOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
   isCloudConfigured,
@@ -151,10 +151,10 @@ import {
   type KufiCellEdit,
 } from "./lib/squareKufi";
 import type { MirrorMode, SquareKufiBlock } from "./types";
-import { applyKashida, type KashidaSlot } from "./lib/tatweel";
+import { applyKashida, findKashidaSlots, readKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
-import { spacingForBlock } from "./lib/spacing";
+import { applySpacing, spacingForBlock } from "./lib/spacing";
 import { layoutVerse, verseAnchor, DEFAULT_LINE_GAP, DEFAULT_COLUMN_GAP } from "./lib/verseLayout";
 import {
   justifyLine,
@@ -166,8 +166,11 @@ import {
   type LineMeasure,
 } from "./lib/verseJustify";
 import type { TextBlock, VerseLayout, VerseSettings } from "./types";
-import { cutAdvanceTotal, remapCutsForEdits } from "./lib/strokeCuts";
-import { nuqtaUnits } from "./lib/nuqta";
+import { buildCutPlan, cutAdvanceTotal, remapCutsForEdits } from "./lib/strokeCuts";
+import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
+import { shapeText } from "./lib/harfbuzz";
+import { convertRunToStack } from "./lib/stackConvert";
+import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import {
   buildComposition,
   describeComposition,
@@ -2881,6 +2884,86 @@ const App: React.FC = () => {
     setExportStatus(describeComposition(plan));
   };
 
+  /**
+   * Bake the selected text block into a stack block. One-way (undo restores
+   * the text block). Captured by id like `applyComposition`: shaping is
+   * async and the selection can change meanwhile.
+   *
+   * Joins the detector cannot cut get a tatweel inserted and are cut there
+   * instead — only when the shaped text equals the block text, because the
+   * cluster offsets index the shaped text.
+   */
+  const convertSelectedBlockToStack = async () => {
+    const source = selectedBlock;
+    if (!source || source.type !== "text") return;
+    if (source.text.trim() === "") { setExportStatus("Type some text into this block first."); return; }
+    if ((source.warpX ?? 0) !== 0 || (source.warpY ?? 0) !== 0) {
+      setExportStatus("Set Warp to 0 before converting to a stacked composition.");
+      return;
+    }
+    if ([...source.text].some((ch) => isOverrideGlyphChar(ch.codePointAt(0)))) {
+      setExportStatus("Honorific glyphs cannot be converted to a stacked composition.");
+      return;
+    }
+    const { id, fontFamily, fontSize } = source;
+    const fontUrl = resolveFontUrl(fontFamily);
+    const shapeAndConvert = async (text: string, cuts: StrokeCut[]) => {
+      const shaped = await shapeText(text, fontUrl, source.glyphAlternates, source.styleSets);
+      const upm = Math.max(shaped.unitsPerEm || 1000, 1);
+      const glyphs = applySpacing(shaped.glyphs, shaped.shapableText, spacingForBlock(source), upm);
+      const cutPlan = cuts.length ? buildCutPlan(glyphs, cuts, nuqtaUnits(fontFamily, upm)) : null;
+      const result = convertRunToStack({
+        glyphs, font: shaped.font, unitsPerEm: upm, shapableText: shaped.shapableText,
+        cutPlan, diacriticOverrides: source.diacriticOverrides ?? [], fontSize,
+      });
+      return { shaped, upm, result };
+    };
+    try {
+      let text = source.text;
+      let cuts = source.strokeCuts ?? [];
+      let { shaped, upm, result } = await shapeAndConvert(text, cuts);
+      if (result.unjoined.length > 0 && shaped.shapableText === text) {
+        const slots = findKashidaSlots(text);
+        const counts = readKashida(text, slots);
+        // Highest offset first so earlier insertions do not move later ones.
+        const targets = [...result.unjoined].sort((a, b) => b.laterCl - a.laterCl);
+        const edits: { index: number; delta: number }[] = [];
+        for (const u of targets) {
+          const slot = slots.find((s) => s.index > u.earlierCl && s.index <= u.laterCl);
+          if (!slot) continue;
+          const next = applyKashida(text, slot, (counts.get(slot.index) ?? 0) + 1);
+          edits.push({ index: slot.index, delta: next.length - text.length });
+          text = next;
+        }
+        if (edits.length) {
+          cuts = remapCutsForEdits(cuts, edits);
+          ({ shaped, upm, result } = await shapeAndConvert(text, cuts));
+        }
+      }
+      const stack: StackBlock = {
+        id, type: "stack", name: source.name, text: source.text, x: source.x, y: source.y,
+        fontSize, color: source.color, fontFamily, fontStyle: source.fontStyle, opacity: source.opacity,
+        stroke: source.stroke, strokeWidth: source.strokeWidth, shadowColor: source.shadowColor,
+        shadowBlur: source.shadowBlur, shadowOffsetX: source.shadowOffsetX, shadowOffsetY: source.shadowOffsetY,
+        shadowOpacity: source.shadowOpacity, locked: source.locked, rotation: source.rotation,
+        ornamental: source.ornamental, groupId: source.groupId, fill: source.fill,
+        source: { text: source.text, fontFamily },
+        unitsPerEm: upm,
+        nib: { width: nuqtaUnits(fontFamily, upm), minFraction: nibFloorFraction(fontFamily) },
+        pieces: result.pieces, joins: result.joins,
+      };
+      replaceBlockWithHistory(id, stack);
+      setExportStatus(
+        result.unjoined.length
+          ? `Converted; ${result.unjoined.length} join${result.unjoined.length === 1 ? "" : "s"} could not be cut and stay rigid.`
+          : "Converted to a stacked composition."
+      );
+    } catch (err) {
+      console.error("stack conversion failed", err);
+      setExportStatus("Could not convert this block.");
+    }
+  };
+
   const p1dSidebarProps: Partial<SidebarProps> = {
     kashidaSlotOrdinal,
     onSelectKashidaSlot: setKashidaSlotOrdinal,
@@ -3118,7 +3201,7 @@ const App: React.FC = () => {
     const missing = [
       ...new Set(
         blocks
-          .filter((b) => b.type !== "image" && b.type !== "mirror" && b.type !== "guide")
+          .filter((b) => b.type !== "image" && b.type !== "mirror" && b.type !== "guide" && b.type !== "stack")
           .map((b) => b.fontFamily)
           .filter((key) => key && isFontUnavailable(key, FONT_URLS))
       ),
@@ -3145,6 +3228,7 @@ const App: React.FC = () => {
     !!selectedBlock &&
     selectedBlock.type !== "image" &&
     selectedBlock.type !== "guide" &&
+    selectedBlock.type !== "stack" &&
     isFontUnavailable(selectedBlock.fontFamily, FONT_URLS);
 
   const p2gSidebarProps: Partial<SidebarProps> = {
@@ -3169,6 +3253,7 @@ const App: React.FC = () => {
       }}
     >
       <Sidebar
+        onConvertToStack={convertSelectedBlockToStack}
         blocks={blocks}
         selectedBlock={selectedBlock}
         selectedIds={selectedIds}
