@@ -27,6 +27,13 @@ regression, and what it would take to fix.
   an edited mark can shift which mark the edit lands on after re-shaping.
   They are re-validated each render against whether the glyph is still a
   mark, and dropped rather than misapplied.
+- **A dot dragged across a stroke cut on the same letter gets cut**: mark
+  translation runs before cut surgery. See
+  [detached-marks.md](.claude/rules/detached-marks.md).
+- **Five fonts show no dot handles** (Kufi2, Qahiri, RanaKufi, ThuluthDeco,
+  Wessam — they build letters from loose pieces, and the detector cannot
+  tell a piece from a dot); a dot fused to its stem has no handle in any
+  font. Numbers in `docs/archive/detached-mark-coverage.md`.
 - **Per-glyph tools do not apply to text-on-path blocks.** Their glyphs are
   rotated to a curve tangent, which the straight-bounding-box maths behind
   those tools assumes away.
@@ -85,6 +92,15 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 ---
 
 ## Shipped
+
+### 2026-10-14 — Free movement of tashkeel and dots
+
+Tashkeel drag in two dimensions (Shift for the old vertical rail). A
+letter's dots, hamza and kaf stroke move on text and Shape Fill blocks
+("Move dots & marks") and become rider pieces at stack convert. The
+detector's per-font gate numbers are in
+`docs/archive/detached-mark-coverage.md`; the subsystem note is
+[detached-marks.md](.claude/rules/detached-marks.md).
 
 ### 2026-10-14 — Stacked compositions shipped
 

@@ -10,8 +10,19 @@ import { findDiacriticGlyphIndices } from "../lib/diacritics";
 import {
   makeOffsetAdapter,
   type DiacriticPlacement,
+  type DetachedMarkPlacement,
 } from "../lib/diacriticPlacement";
-import type { DiacriticOverride, GlyphAlternate, StrokeCut } from "../types";
+import type { DiacriticOverride, DetachedMarkOverride, GlyphAlternate, StrokeCut } from "../types";
+import {
+  findDetachedMarks,
+  buildDetachedMarkPlan,
+  overrideGlyphKey,
+  glyphIndicesFromKey,
+  applyMarkPlanToGlyph,
+  EMPTY_MARK_PLAN,
+  type DetachedMark,
+  type DetachedMarkPlan,
+} from "../lib/detachedMarks";
 import {
   createBlockFillPainter,
   type BlockFill,
@@ -42,6 +53,7 @@ import {
   type OverrideGlyph,
 } from "../lib/glyphOverrides";
 import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
+import { DetachedMarkHoverHandles } from "./DetachedMarkHoverHandles";
 import { AlternateHoverHandles, type AlternateHitTarget } from "./AlternateHoverHandles";
 import { quadFromBox } from "../lib/alternateTargets";
 import {
@@ -90,6 +102,11 @@ type Props = {
   strokeCutEditMode?: boolean;
   onBeginStrokeCut?: () => void;
   onSetStrokeCut?: (cut: StrokeCut) => void;
+  detachedMarkOverrides?: DetachedMarkOverride[];
+  /** Arms the "Move dots & marks" overlay. */
+  detachedMarkEditMode?: boolean;
+  onBeginDetachedMarkDrag?: () => void;
+  onSetDetachedMark?: (o: DetachedMarkOverride) => void;
   isSelected?: boolean;
   onBeginDiacriticDrag?: () => void;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
@@ -177,7 +194,9 @@ function drawWarpedGlyphRun(
    * they are scaled by `scale` before being applied to a path opentype.js
    * has already drawn at `fontSize`.
    */
-  cutPlan: CutPlan | null = null
+  cutPlan: CutPlan | null = null,
+  /** Moved dots and marks, font units; see lib/detachedMarks.ts. */
+  markPlan: DetachedMarkPlan = EMPTY_MARK_PLAN
 ) {
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
@@ -213,11 +232,15 @@ function drawWarpedGlyphRun(
     let localScale = 1;
 
     if (diacriticOverride) {
-      ctx.translate(0, diacriticOverride.offsetY ?? 0);
+      ctx.translate(diacriticOverride.offsetX ?? 0, diacriticOverride.offsetY ?? 0);
       const diacScale = diacriticOverride.scale ?? 1;
       ctx.scale(diacScale, diacScale);
       localScale *= diacScale;
     }
+
+    // A dot drawn as its own glyph (NotoSans and kin), moved whole.
+    const wholeMark = markPlan.glyphs.get(glyphIndex);
+    if (wholeMark) ctx.translate(wholeMark[0] * scale, wholeMark[1] * scale);
 
     if (
       overrideGlyph &&
@@ -233,15 +256,21 @@ function drawWarpedGlyphRun(
     } else {
       const opPath = glyphObj.getPath(0, 0, fontSize);
       const cutsHere = cutPlan?.surgery.get(glyphIndex);
+      // Dot translation first, on raw contour indices; then cut surgery. A
+      // dot dragged across a cut line gets cut — accepted residue. Both
+      // happen before the warp mapping below, so a moved dot follows its
+      // letter through the warp (the opposite order from the tashkeel
+      // override, which is a ctx transform on a separate glyph).
       // SvgCmd and PathCommand are structurally identical; `toSvgCmds` is the
       // one checked conversion, and the cast back mirrors how the override
       // glyph's own commands are handled a few lines above.
+      const rawCmds = toSvgCmds(opPath.commands);
+      const markedCmds = applyMarkPlanToGlyph(rawCmds, markPlan, glyphIndex, scale);
       const sourceCmds: PathCommand[] = cutsHere?.length
-        ? (applyCutsToCommands(
-            toSvgCmds(opPath.commands),
-            scaleCuts(cutsHere, scale)
-          ) as unknown as PathCommand[])
-        : opPath.commands;
+        ? (applyCutsToCommands(markedCmds, scaleCuts(cutsHere, scale)) as unknown as PathCommand[])
+        : markedCmds === rawCmds
+          ? opPath.commands
+          : (markedCmds as unknown as PathCommand[]);
       const cmds: PathCommand[] = sourceCmds.map((cmd) => {
         type MutableCmd = {
           type: PathCommand["type"];
@@ -323,6 +352,7 @@ function drawWarpedGlyphRun(
  * `ShapeFillText` and `SquareKufiText` already follow this pattern.
  */
 const NO_DIACRITIC_OVERRIDES: DiacriticOverride[] = [];
+const NO_MARK_OVERRIDES: DetachedMarkOverride[] = [];
 const NO_STROKE_CUTS: StrokeCut[] = [];
 const NO_GLYPH_ALTERNATES: GlyphAlternate[] = [];
 const NO_ALTERNATE_LETTERS: LetterAlternates[] = [];
@@ -364,6 +394,10 @@ export const ShapedText: React.FC<Props> = ({
   strokeCutEditMode = false,
   onBeginStrokeCut,
   onSetStrokeCut,
+  detachedMarkOverrides = NO_MARK_OVERRIDES,
+  detachedMarkEditMode = false,
+  onBeginDetachedMarkDrag,
+  onSetDetachedMark,
   isSelected = false,
   onBeginDiacriticDrag,
   onDragDiacriticOverride,
@@ -416,6 +450,29 @@ export const ShapedText: React.FC<Props> = ({
   const activeDiacriticOverrides = useMemo(
     () => diacriticOverrides.filter((o) => diacriticGlyphIndices.has(o.glyphIndex)),
     [diacriticOverrides, diacriticGlyphIndices]
+  );
+
+  // Detection walks every contour with point-in-polygon tests, so it runs
+  // over the whole run only while the tool is armed; otherwise only over the
+  // glyphs that carry an override, which is what the plan needs.
+  // Keyed on *which* glyphs carry overrides, not on the overrides array:
+  // a drag replaces that array every frame, and re-detecting per frame
+  // (and on Shape Fill re-tiling the silhouette) made the handle lag.
+  const overrideKey = useMemo(
+    () => (detachedMarkEditMode ? null : overrideGlyphKey(detachedMarkOverrides, shapeData.glyphs)),
+    [detachedMarkEditMode, detachedMarkOverrides, shapeData.glyphs]
+  );
+  const detectedMarks = useMemo(() => {
+    const only = overrideKey === null ? undefined : glyphIndicesFromKey(overrideKey);
+    if (only && only.size === 0) return new Map<number, DetachedMark[]>();
+    return findDetachedMarks(
+      shapeData.glyphs, shapeData.font, shapeData.unitsPerEm, diacriticGlyphIndices, fontFamily, only
+    );
+  }, [overrideKey, shapeData.glyphs, shapeData.font, shapeData.unitsPerEm, diacriticGlyphIndices, fontFamily]);
+
+  const markPlan = useMemo<DetachedMarkPlan>(
+    () => (detachedMarkOverrides.length ? buildDetachedMarkPlan(detachedMarkOverrides, shapeData.glyphs, detectedMarks) : EMPTY_MARK_PLAN),
+    [detachedMarkOverrides, shapeData.glyphs, detectedMarks]
   );
 
   /**
@@ -549,15 +606,18 @@ export const ShapedText: React.FC<Props> = ({
         // A cut letter must report the ink it actually draws, or snapping,
         // alignment and Fit to width all keep measuring the un-stretched run.
         const cutsHere = cutPlan.surgery.get(i);
-        const box = cutsHere?.length
+        // A moved dot, like a cut, must report the ink it actually draws.
+        const hasMarks = markPlan.contours.has(i) || markPlan.glyphs.has(i);
+        const box = cutsHere?.length || hasMarks
           ? (() => {
+              const raw = toSvgCmds(glyphObj.getPath(0, 0, fontSize).commands);
+              const marked = applyMarkPlanToGlyph(raw, markPlan, i, scale);
               const b = outlineBounds(
-                applyCutsToCommands(
-                  toSvgCmds(glyphObj.getPath(0, 0, fontSize).commands),
-                  scaleCuts(cutsHere, scale)
-                )
+                cutsHere?.length ? applyCutsToCommands(marked, scaleCuts(cutsHere, scale)) : marked
               );
-              return { x1: b.x1 + gx, y1: b.y1 + gy, x2: b.x2 + gx, y2: b.y2 + gy };
+              const whole = markPlan.glyphs.get(i);
+              const ox = (whole?.[0] ?? 0) * scale, oy = (whole?.[1] ?? 0) * scale;
+              return { x1: b.x1 + gx + ox, y1: b.y1 + gy + oy, x2: b.x2 + gx + ox, y2: b.y2 + gy + oy };
             })()
           : glyphObj.getPath(gx, gy, fontSize).getBoundingBox();
 
@@ -605,7 +665,7 @@ export const ShapedText: React.FC<Props> = ({
       },
       hitBoxes,
     };
-  }, [shapeData, text, fontSize, cutPlan]);
+  }, [shapeData, text, fontSize, cutPlan, markPlan]);
 
   const glyphBounds = glyphMetrics.bounds;
   const glyphHitBoxes = glyphMetrics.hitBoxes;
@@ -645,6 +705,41 @@ export const ShapedText: React.FC<Props> = ({
     localDrawX,
     localDrawY,
   ]);
+
+  const detachedMarkPlacements = useMemo<DetachedMarkPlacement[]>(() => {
+    if (!detachedMarkEditMode || !shapeData.font) return [];
+    const upm = Math.max(shapeData.unitsPerEm || 1000, 1);
+    const scale = fontSize / upm;
+    const adapter = makeOffsetAdapter(bx + localDrawX, by + localDrawY);
+    const out: DetachedMarkPlacement[] = [];
+    let penX = 0;
+    for (let i = 0; i < shapeData.glyphs.length; i++) {
+      const g = shapeData.glyphs[i];
+      const gx = (penX + (g.dx ?? 0) + (cutPlan.shift[i] ?? 0)) * scale;
+      const gy = -(g.dy ?? 0) * scale;
+      penX += g.ax ?? 0;
+      const list = detectedMarks.get(i);
+      if (!list) continue;
+      for (const m of list) {
+        const off = m.mark < 0 ? markPlan.glyphs.get(i) : markPlan.contours.get(i)?.get(m.mark);
+        const dx = off?.[0] ?? 0, dy = off?.[1] ?? 0;
+        // m.bounds is in font units in the y-down frame opentype draws at
+        // `upm`, the same frame getPath(0, 0, fontSize) uses scaled by
+        // `scale`, so one multiply is the whole conversion.
+        out.push({
+          key: `${i}:${m.mark}`, cluster: m.cluster, glyphId: m.glyphId, mark: m.mark, dx, dy,
+          box: {
+            x: gx + (m.bounds.x1 + dx) * scale,
+            y: gy + (m.bounds.y1 + dy) * scale,
+            width: Math.max((m.bounds.x2 - m.bounds.x1) * scale, 1),
+            height: Math.max((m.bounds.y2 - m.bounds.y1) * scale, 1),
+          },
+          ...adapter,
+        });
+      }
+    }
+    return out;
+  }, [detachedMarkEditMode, detectedMarks, markPlan, shapeData, fontSize, cutPlan, bx, by, localDrawX, localDrawY]);
 
   // One target per letter that has alternates, its box the union of every
   // glyph in that letter's cluster (a letter and the marks on it).
@@ -798,7 +893,8 @@ export const ShapedText: React.FC<Props> = ({
             overrideGlyph,
             activeDiacriticOverrides,
             painter,
-            cutPlan
+            cutPlan,
+            markPlan
           );
           ctx.restore();
 
@@ -831,7 +927,8 @@ export const ShapedText: React.FC<Props> = ({
               // and its transform is the same block space the painter was
               // built in, so it reuses the same one.
               painter,
-              cutPlan
+              cutPlan,
+              markPlan
             );
             ctx.restore();
           }
@@ -840,9 +937,10 @@ export const ShapedText: React.FC<Props> = ({
 
       {/*
         Largest -> smallest: a letter-sized alternates target, then a stretch
-        rail along one stroke inside a glyph, then a mark's smaller target.
-        Konva routes to the topmost listening shape and later siblings sit on
-        top, so the smaller targets must come later.
+        rail along one stroke inside a glyph, then a dot or detached mark,
+        then a tashkeel's smaller target. Konva routes to the topmost
+        listening shape and later siblings sit on top, so the smaller targets
+        must come later.
       */}
       <AlternateHoverHandles
         isSelected={isSelected}
@@ -862,6 +960,16 @@ export const ShapedText: React.FC<Props> = ({
         offsetY={by + localDrawY}
         onBeginCut={onBeginStrokeCut}
         onSetCut={onSetStrokeCut}
+      />
+
+      <DetachedMarkHoverHandles
+        isSelected={isSelected}
+        enabled={detachedMarkEditMode}
+        placements={detachedMarkPlacements}
+        fontScale={fontSize / Math.max(shapeData.unitsPerEm || 1000, 1)}
+        fontSize={fontSize}
+        onBeginDrag={onBeginDetachedMarkDrag}
+        onSet={onSetDetachedMark}
       />
 
       <DiacriticHoverHandles

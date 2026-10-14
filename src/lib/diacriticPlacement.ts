@@ -93,3 +93,19 @@ export function makeShapeFillInstanceAdapter(p: {
     },
   };
 }
+
+/**
+ * One hoverable detached mark (a dot, hamza or kaf stroke) on canvas. `box`
+ * is where it is drawn now, i.e. already offset by `dx`/`dy`; the overlay
+ * adds a drag delta to those and writes the sum back.
+ */
+export type DetachedMarkPlacement = {
+  key: string;
+  cluster: number;
+  glyphId: number;
+  mark: number;
+  box: { x: number; y: number; width: number; height: number };
+  /** Current offset, font units. */
+  dx: number;
+  dy: number;
+} & PlacementAdapter;

@@ -56,6 +56,7 @@ export function shapedTextProps(b: Extract<Block, { type: "text" }>) {
     letterSpacing: b.letterSpacing ?? 0,
     wordSpacing: b.wordSpacing ?? 0,
     diacriticOverrides: b.diacriticOverrides,
+    detachedMarkOverrides: b.detachedMarkOverrides,
     strokeCuts: b.strokeCuts,
     glyphAlternates: b.glyphAlternates,
     styleSets: b.styleSets,
@@ -75,6 +76,7 @@ export function shapeFillProps(b: Extract<Block, { type: "shapeFill" }>) {
     shapeFillScaleY: b.shapeFillScaleY ?? 1,
     shapeFillTextRotation: b.shapeFillTextRotation ?? 0,
     diacriticOverrides: b.diacriticOverrides,
+    detachedMarkOverrides: b.detachedMarkOverrides,
     glyphAlternates: b.glyphAlternates,
     styleSets: b.styleSets,
   };

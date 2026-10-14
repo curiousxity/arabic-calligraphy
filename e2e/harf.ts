@@ -366,6 +366,20 @@ export async function alternateTargetCenters(page: Page): Promise<Point[]> {
 
 /** The stroke-stretch handle's orange. */
 export const STRETCH_HANDLE_DOT = "#f97316";
+export const DETACHED_MARK_HANDLE_FILL = "#a855f7";
+
+/** Page-space centres of the hover hit rects `DetachedMarkHoverHandles` mounts, one per dot or mark. */
+export async function detachedMarkHitCenters(page: Page): Promise<Point[]> {
+  return page.evaluate(() => {
+    const stage = window.__HARF__!.getStage();
+    if (!stage) return [];
+    const c = stage.container().getBoundingClientRect();
+    return stage.find(".detached-mark-hit").map((n) => {
+      const r = n.getClientRect();
+      return { x: c.left + r.x + r.width / 2, y: c.top + r.y + r.height / 2 };
+    });
+  });
+}
 
 /**
  * The probe grid a stroke-stretch handle is hunted on: only some letters

@@ -64,6 +64,36 @@ test("dragging a diacritic move handle records an override", async ({ page }) =>
   expect(block.y).toBe(0);
 });
 
+test("a diagonal drag records offsetX as well as offsetY", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator("textarea.sidebarTextarea").fill(VOCALIZED);
+  await expect.poll(() => diacriticHitCenters(page).then((m) => m.length)).toBeGreaterThan(0);
+
+  const handle = await armDiacriticMoveHandle(page);
+  await dragFromHere(page, { x: handle.x + 40, y: handle.y + 40 });
+
+  const overrides = (await getBlocks(page))[0].diacriticOverrides ?? [];
+  expect(overrides.length).toBeGreaterThan(0);
+  expect(Math.abs(overrides[0].offsetX ?? 0)).toBeGreaterThan(5);
+  expect(overrides[0].offsetY ?? 0).toBeGreaterThan(5);
+});
+
+test("Shift keeps the old vertical rail", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator("textarea.sidebarTextarea").fill(VOCALIZED);
+  await expect.poll(() => diacriticHitCenters(page).then((m) => m.length)).toBeGreaterThan(0);
+
+  const handle = await armDiacriticMoveHandle(page);
+  await page.keyboard.down("Shift");
+  await dragFromHere(page, { x: handle.x + 40, y: handle.y + 40 });
+  await page.keyboard.up("Shift");
+
+  const overrides = (await getBlocks(page))[0].diacriticOverrides ?? [];
+  expect(overrides.length).toBeGreaterThan(0);
+  expect(Math.abs(overrides[0].offsetX ?? 0)).toBeLessThan(1);
+  expect(overrides[0].offsetY ?? 0).toBeGreaterThan(5);
+});
+
 /**
  * The overlay used to unmount its own handle the instant the pointer landed
  * on it: the hover hit `Rect` and the handle `Circle` were sibling Konva

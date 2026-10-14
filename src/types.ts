@@ -20,6 +20,8 @@ export type DiacriticOverride = {
   glyphIndex: number;
   /** Multiplier on the diacritic's natural size. Default 1. */
   scale?: number;
+  /** Extra horizontal shift in local (unscaled) units. Default 0. */
+  offsetX?: number;
   /** Extra vertical shift in local (unscaled) units. Default 0. */
   offsetY?: number;
   /** When true, this instance is skipped entirely during drawing. */
@@ -43,8 +45,10 @@ export type GlyphAlternate = {
 // tests) live in `lib/blockFill.ts`.
 export type { BlockFill, FillStop } from "./lib/blockFill";
 export type { StrokeCut } from "./lib/strokeCuts";
+export type { DetachedMarkOverride } from "./lib/detachedMarks";
 export type { KufiCellEdit, KufiComposition } from "./lib/squareKufi";
 import type { StrokeCut } from "./lib/strokeCuts";
+import type { DetachedMarkOverride } from "./lib/detachedMarks";
 import type { KufiCellEdit, KufiComposition } from "./lib/squareKufi";
 import type { BlockFill } from "./lib/blockFill";
 import type { SvgCmd } from "./lib/svgPath";
@@ -92,6 +96,14 @@ type BlockCommon = {
   strokeCuts?: StrokeCut[];
   /** Arms the on-canvas stretch handles. */
   strokeCutEditMode?: boolean;
+  /**
+   * A letter's dots, hamza or kaf stroke moved off their drawn position.
+   * Absent means none, so an older save renders byte-identically. Text and
+   * Shape Fill — see `supportsDetachedMarks`.
+   */
+  detachedMarkOverrides?: DetachedMarkOverride[];
+  /** Arms the on-canvas "Move dots & marks" handles. */
+  detachedMarkEditMode?: boolean;
   /**
    * Per-letter OpenType alternates ("Next Shape"). Absent means default
    * shapes, so an older save renders byte-identically. Plain text blocks

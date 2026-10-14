@@ -66,5 +66,15 @@ export const supportsKufiCellEdits = (
   b: Block
 ): b is Extract<Block, { type: "squareKufi" }> => b.type === "squareKufi";
 
+/**
+ * Text and Shape Fill: the two renderers that split a glyph's contours and
+ * mount `DetachedMarkHoverHandles`. The fields sit on `BlockCommon`, so a
+ * wider guard would accept edits that nothing draws.
+ */
+export const supportsDetachedMarks = (
+  b: Block
+): b is Extract<Block, { type: "text" | "shapeFill" }> =>
+  b.type === "text" || b.type === "shapeFill";
+
 export const isStackBlock = (b: Block): b is Extract<Block, { type: "stack" }> =>
   b.type === "stack";

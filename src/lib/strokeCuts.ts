@@ -795,11 +795,11 @@ export function outlineBounds(
  * delta is signed, because `applyKashida` is absolute rather than additive
  * and lowering a count removes characters.
  */
-export function remapCutsAfterInsert(
-  cuts: StrokeCut[],
+export function remapCutsAfterInsert<T extends { cluster: number }>(
+  cuts: T[],
   atOffset: number,
   inserted: number
-): StrokeCut[] {
+): T[] {
   if (inserted === 0) return cuts;
   return cuts.map((c) =>
     c.cluster > atOffset ? { ...c, cluster: c.cluster + inserted } : c
@@ -821,10 +821,10 @@ export function remapCutsAfterInsert(
  * through one function is what stops that debt being paid by whoever
  * remembers.
  */
-export function remapCutsForEdits(
-  cuts: StrokeCut[],
+export function remapCutsForEdits<T extends { cluster: number }>(
+  cuts: T[],
   edits: readonly { index: number; delta: number }[]
-): StrokeCut[] {
+): T[] {
   return edits.reduce(
     (acc, edit) => remapCutsAfterInsert(acc, edit.index, edit.delta),
     cuts

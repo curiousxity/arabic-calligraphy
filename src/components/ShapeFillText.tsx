@@ -30,8 +30,21 @@ import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
 import {
   makeShapeFillInstanceAdapter,
   type DiacriticPlacement,
+  type DetachedMarkPlacement,
 } from "../lib/diacriticPlacement";
-import type { DiacriticOverride, GlyphAlternate } from "../types";
+import type { DiacriticOverride, DetachedMarkOverride, GlyphAlternate } from "../types";
+import {
+  findDetachedMarks,
+  buildDetachedMarkPlan,
+  overrideGlyphKey,
+  glyphIndicesFromKey,
+  applyMarkPlanToGlyph,
+  EMPTY_MARK_PLAN,
+  type DetachedMark,
+  type DetachedMarkPlan,
+} from "../lib/detachedMarks";
+import { toSvgCmds, outlineBounds } from "../lib/strokeCuts";
+import { DetachedMarkHoverHandles } from "./DetachedMarkHoverHandles";
 import { AlternateHoverHandles, type AlternateHitTarget } from "./AlternateHoverHandles";
 import {
   letterAtOffset,
@@ -75,6 +88,11 @@ export type ShapeFillTextProps = {
   onBeginDiacriticDrag?: () => void;
   onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
   onToggleDiacriticHidden?: (glyphIndex: number) => void;
+  detachedMarkOverrides?: DetachedMarkOverride[];
+  /** Arms the "Move dots & marks" overlay. */
+  detachedMarkEditMode?: boolean;
+  onBeginDetachedMarkDrag?: () => void;
+  onSetDetachedMark?: (o: DetachedMarkOverride) => void;
   /** Per-letter alternates — one pick applies to every tile of that letter. */
   glyphAlternates?: GlyphAlternate[];
   /** Arms the Next Shape overlay. */
@@ -94,6 +112,7 @@ export type ShapeFillTextProps = {
 };
 
 const NO_DIACRITIC_OVERRIDES: DiacriticOverride[] = [];
+const NO_MARK_OVERRIDES: DetachedMarkOverride[] = [];
 const NO_GLYPH_ALTERNATES: GlyphAlternate[] = [];
 const NO_ALTERNATE_LETTERS: LetterAlternates[] = [];
 /** In local glyph units, before the row's fit scale — matches the text block's 3px at a 1:1 row. */
@@ -229,6 +248,10 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   onBeginDiacriticDrag,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
+  detachedMarkOverrides = NO_MARK_OVERRIDES,
+  detachedMarkEditMode = false,
+  onBeginDetachedMarkDrag,
+  onSetDetachedMark,
   locked,
   draggable = true,
   onClick, onTap, onDblClick, onDragMove, onDragEnd,
@@ -238,9 +261,9 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   const shapeData = useShapedGlyphs(text, fontFamily, glyphAlternates, styleSets);
 
   const groupRef = useRef<Konva.Group>(null);
-  /** The block's absolute position at drag start, while the diacritic tool pins it. */
+  /** The block's absolute position at drag start, while a per-glyph tool pins it. */
   const dragPinRef = useRef<{ x: number; y: number } | null>(null);
-  const pinDrag = diacriticEditMode;
+  const pinDrag = diacriticEditMode || detachedMarkEditMode;
 
   // Parse SVG path once
   const parsedCmds = useMemo(() => parseSvgPath(shapeSvgPath || ""), [shapeSvgPath]);
@@ -248,8 +271,47 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   // Build polygon for hit-testing once
   const polygon = useMemo(() => pathToPolygon(parsedCmds, 12), [parsedCmds]);
 
-  // Pre-compute glyph path commands + advances
-  const glyphCache = useMemo(() => {
+  // Recomputed per render for this component's own current glyph run, so a
+  // stale override whose glyph index now lands on a base letter (text edits
+  // shift indices) is ignored rather than hiding or ballooning that letter —
+  // the same guard ShapedText.tsx already applies.
+  const diacriticGlyphIndices = useMemo(
+    () =>
+      findDiacriticGlyphIndices(
+        shapeData.glyphs,
+        shapeData.font,
+        shapeData.shapableText
+      ),
+    [shapeData.glyphs, shapeData.font, shapeData.shapableText]
+  );
+
+  // Detection walks every contour with point-in-polygon tests, so it runs
+  // over the whole run only while the tool is armed; otherwise only over the
+  // glyphs that carry an override. Declared above `glyphCache`, which reads
+  // the plan: a `const` read before its declaration throws at runtime.
+  // Keyed on *which* glyphs carry overrides, not on the overrides array:
+  // a drag replaces that array every frame, and re-detecting per frame
+  // (and on Shape Fill re-tiling the silhouette) made the handle lag.
+  const overrideKey = useMemo(
+    () => (detachedMarkEditMode ? null : overrideGlyphKey(detachedMarkOverrides, shapeData.glyphs)),
+    [detachedMarkEditMode, detachedMarkOverrides, shapeData.glyphs]
+  );
+  const detectedMarks = useMemo(() => {
+    const only = overrideKey === null ? undefined : glyphIndicesFromKey(overrideKey);
+    if (only && only.size === 0) return new Map<number, DetachedMark[]>();
+    return findDetachedMarks(
+      shapeData.glyphs, shapeData.font, shapeData.unitsPerEm, diacriticGlyphIndices, fontFamily, only
+    );
+  }, [overrideKey, shapeData.glyphs, shapeData.font, shapeData.unitsPerEm, diacriticGlyphIndices, fontFamily]);
+
+  const markPlan = useMemo<DetachedMarkPlan>(
+    () => (detachedMarkOverrides.length ? buildDetachedMarkPlan(detachedMarkOverrides, shapeData.glyphs, detectedMarks) : EMPTY_MARK_PLAN),
+    [detachedMarkOverrides, shapeData.glyphs, detectedMarks]
+  );
+
+  // Pre-compute glyph path commands + advances. Plan-free: this is what the
+  // tiling reads, and a dot drag must not re-tile the silhouette per frame.
+  const baseGlyphCache = useMemo(() => {
     const { glyphs, font, unitsPerEm } = shapeData;
     if (!font) return [];
     const scale = fontSize / unitsPerEm;
@@ -259,14 +321,28 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       const dx = (g.dx ?? 0) * scale;
       const dy = (g.dy ?? 0) * scale;
       const advance = (g.ax ?? 0) * scale;
-      const commands: SvgCmd[] = obj ? obj.getPath(0, 0, fontSize).commands : [];
+      const commands: SvgCmd[] = obj ? toSvgCmds(obj.getPath(0, 0, fontSize).commands) : [];
       const result = { obj, penX, dx, dy, advance, commands, glyphId: g.g };
       penX += advance;
       return result;
     });
   }, [shapeData, fontSize]);
 
-  const totalAdvance = glyphCache.reduce((s, g) => s + g.advance, 0);
+  // The same, with moved dots applied once per glyph (never per tile); a
+  // whole-glyph mark's offset folds into dx/dy so every repetition carries
+  // it. The draw loop and the hover boxes read this one.
+  const glyphCache = useMemo(() => {
+    if (markPlan === EMPTY_MARK_PLAN) return baseGlyphCache;
+    const scale = fontSize / Math.max(shapeData.unitsPerEm || 1000, 1);
+    return baseGlyphCache.map((g, i) => {
+      const whole = markPlan.glyphs.get(i);
+      const commands = applyMarkPlanToGlyph(g.commands, markPlan, i, scale);
+      if (!whole && commands === g.commands) return g;
+      return { ...g, dx: g.dx + (whole?.[0] ?? 0) * scale, dy: g.dy + (whole?.[1] ?? 0) * scale, commands };
+    });
+  }, [baseGlyphCache, markPlan, fontSize, shapeData.unitsPerEm]);
+
+  const totalAdvance = baseGlyphCache.reduce((s, g) => s + g.advance, 0);
 
   const isBold = fontStyle === "bold" || fontStyle === "bold italic";
   const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
@@ -287,7 +363,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     for (let i = 0; i < glyphCache.length; i++) {
       const g = glyphCache[i];
       if (!g.obj) continue;
-      const box = g.obj.getPath(0, 0, fontSize).getBoundingBox();
+      // From the drawn commands, so a moved dot's box is where it is drawn.
+      const box = outlineBounds(g.commands);
       if (isFinite(box.x1) && isFinite(box.x2) && isFinite(box.y1) && isFinite(box.y2)) {
         boxes.push({
           glyphIndex: i,
@@ -299,25 +376,11 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       }
     }
     return boxes;
-  }, [glyphCache, fontSize]);
+  }, [glyphCache]);
 
   const glyphBoxByIndex = useMemo(
     () => new Map(glyphLocalBoxes.map((b) => [b.glyphIndex, b])),
     [glyphLocalBoxes]
-  );
-
-  // Recomputed per render for this component's own current glyph run, so a
-  // stale override whose glyph index now lands on a base letter (text edits
-  // shift indices) is ignored rather than hiding or ballooning that letter —
-  // the same guard ShapedText.tsx already applies.
-  const diacriticGlyphIndices = useMemo(
-    () =>
-      findDiacriticGlyphIndices(
-        shapeData.glyphs,
-        shapeData.font,
-        shapeData.shapableText
-      ),
-    [shapeData.glyphs, shapeData.font, shapeData.shapableText]
   );
 
   const activeDiacriticOverrides = useMemo(
@@ -340,9 +403,9 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   // diacritic tool or Next Shape is armed (it's a real amount of work).
   const glyphInstances = useMemo<GlyphInstance[]>(() => {
     const empty: GlyphInstance[] = [];
-    if (!diacriticEditMode && !glyphAlternateMode) return empty;
+    if (!diacriticEditMode && !glyphAlternateMode && !detachedMarkEditMode) return empty;
     if (!shapeSvgPath || parsedCmds.length === 0) return empty;
-    if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) return empty;
+    if (!shapeData.font || baseGlyphCache.length === 0 || totalAdvance <= 0) return empty;
 
     const inShape = (px: number, py: number) => pointInPolygon(px, py, polygon);
     const lines = computeShapeFillLines({
@@ -359,8 +422,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
     for (const line of lines) {
       for (const startPenX of line.repStartXs) {
-        for (let gi = 0; gi < glyphCache.length; gi++) {
-          const g = glyphCache[gi];
+        for (let gi = 0; gi < baseGlyphCache.length; gi++) {
+          const g = baseGlyphCache[gi];
           if (!g.obj || g.commands.length === 0) continue;
           instances.push({
             glyphIndex: gi,
@@ -377,10 +440,11 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   }, [
     diacriticEditMode,
     glyphAlternateMode,
+    detachedMarkEditMode,
     shapeSvgPath,
     parsedCmds,
     shapeData.font,
-    glyphCache,
+    baseGlyphCache,
     totalAdvance,
     fontSize,
     shapeFillSpacing,
@@ -492,6 +556,36 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     shapeFillTextRotation,
     shapeScale,
   ]);
+
+  // One placement per tiled repetition of each detached mark. The instances
+  // come from the plan-free cache, so the mark's own offset moves the box
+  // here for both routes.
+  const detachedMarkPlacements = useMemo<DetachedMarkPlacement[]>(() => {
+    if (!detachedMarkEditMode) return [];
+    const scale = fontSize / Math.max(shapeData.unitsPerEm || 1000, 1);
+    const out: DetachedMarkPlacement[] = [];
+    glyphInstances.forEach((inst, i) => {
+      const list = detectedMarks.get(inst.glyphIndex);
+      if (!list) return;
+      const adapter = makeShapeFillInstanceAdapter({
+        gx: inst.gx, gy: inst.gy, rotationDeg: shapeFillTextRotation, scX: inst.scX, scY: inst.scY, shapeScale,
+      });
+      for (const m of list) {
+        const off = m.mark < 0 ? markPlan.glyphs.get(inst.glyphIndex) : markPlan.contours.get(inst.glyphIndex)?.get(m.mark);
+        const dx = off?.[0] ?? 0, dy = off?.[1] ?? 0;
+        const bx = dx, by = dy;
+        out.push({
+          key: `${i}:${inst.glyphIndex}:${m.mark}`, cluster: m.cluster, glyphId: m.glyphId, mark: m.mark, dx, dy,
+          box: {
+            x: (m.bounds.x1 + bx) * scale, y: (m.bounds.y1 + by) * scale,
+            width: Math.max((m.bounds.x2 - m.bounds.x1) * scale, 1), height: Math.max((m.bounds.y2 - m.bounds.y1) * scale, 1),
+          },
+          ...adapter,
+        });
+      }
+    });
+    return out;
+  }, [detachedMarkEditMode, glyphInstances, detectedMarks, markPlan, shapeData.unitsPerEm, fontSize, shapeFillTextRotation, shapeScale]);
 
   return (
     <Group
@@ -618,7 +712,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                   // keeps being scaled with its row, and pivoted on the
                   // glyph's pen origin — the same meaning offsetY has on
                   // plain text.
-                  targetCtx.translate(0, diacriticOverride.offsetY ?? 0);
+                  targetCtx.translate(diacriticOverride.offsetX ?? 0, diacriticOverride.offsetY ?? 0);
                   const ds = diacriticOverride.scale ?? 1;
                   targetCtx.scale(ds, ds);
                 }
@@ -688,6 +782,15 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
         targets={alternateTargets}
         alternates={glyphAlternates}
         onPick={onPickAlternate}
+      />
+      <DetachedMarkHoverHandles
+        isSelected={isSelected}
+        enabled={detachedMarkEditMode}
+        placements={detachedMarkPlacements}
+        fontScale={fontSize / Math.max(shapeData.unitsPerEm || 1000, 1)}
+        fontSize={fontSize}
+        onBeginDrag={onBeginDetachedMarkDrag}
+        onSet={onSetDetachedMark}
       />
       <DiacriticHoverHandles
         isSelected={isSelected && diacriticEditMode}

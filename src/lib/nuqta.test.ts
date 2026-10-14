@@ -44,11 +44,18 @@ describe("nuqtaUnits", () => {
     );
   });
 
-  it("falls back for the faces the archive does not cover", () => {
-    // The two Diwanis postdate the measurement; Ruqaa was never measured.
-    // Pinned so that if either is measured later, this test is the reminder
-    // that the fallback is no longer what they should use.
-    for (const family of ["HarfCanvasDiwani", "UKIJDiwani", "Ruqaa"]) {
+  it("the five fonts measured on 2026-10-14 have their own ratio", () => {
+    for (const family of ["Blaka", "Gulzar", "HarfCanvasDiwani", "Rabat", "UKIJDiwani"]) {
+      expect(nuqtaUnits(family, 1000)).not.toBeCloseTo(FALLBACK_RATIO * 1000, 6);
+    }
+  });
+
+  it("falls back for the faces whose two measurements disagree", () => {
+    // Ruqaa and RanaKufi: the beh-dot and modal methods disagree; Raqq:
+    // modal only, with an alif 11 dots wide. All three need a look by eye
+    // (docs/archive/nuqta-measurements.md). Pinned so that measuring one
+    // later is the reminder to drop it from here.
+    for (const family of ["Ruqaa", "RanaKufi", "Raqq"]) {
       expect(nuqtaUnits(family, 1000)).toBeCloseTo(FALLBACK_RATIO * 1000, 6);
     }
   });

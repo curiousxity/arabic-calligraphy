@@ -60,7 +60,7 @@ import {
   type SnapTarget,
 } from "../lib/snapping";
 import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
-import type { Block, DiacriticOverride, StrokeCut, KufiCellEdit } from "../types";
+import type { Block, DiacriticOverride, DetachedMarkOverride, StrokeCut, KufiCellEdit } from "../types";
 import type { AlternateChoice, LetterAlternates } from "../lib/glyphAlternates";
 
 /** Stable empty list, so unselected blocks' memos do not re-run. */
@@ -143,6 +143,9 @@ export type CanvasStageProps = {
   onToggleDiacriticHidden: (blockId: number, glyphIndex: number) => void;
   /** One `pushHistory()` per stretch-handle drag, taken on drag start. */
   onBeginStrokeCut: () => void;
+  /** One `pushHistory()` per dot/mark handle drag, taken on drag start. */
+  onBeginDetachedMarkDrag: () => void;
+  onSetDetachedMark: (blockId: number, o: DetachedMarkOverride) => void;
   onBeginStackEdit: () => void;
   onSetStackPieces: (blockId: number, patches: { id: string; x?: number; y?: number; rotation?: number }[]) => void;
   onSetStackJoinBow: (blockId: number, joinId: string, bend: { bow: number; depth: number }) => void;
@@ -215,6 +218,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
   onBeginStrokeCut,
+  onBeginDetachedMarkDrag,
+  onSetDetachedMark,
   onBeginStackEdit,
   onSetStackPieces,
   onSetStackJoinBow,
@@ -948,6 +953,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelected={block.id === selectedId}
                     onResizeScale={(scale) => onResizeShapeFillBlock(block.id, scale)}
                     diacriticEditMode={block.diacriticEditMode ?? false}
+                    detachedMarkEditMode={block.detachedMarkEditMode ?? false}
+                    onBeginDetachedMarkDrag={onBeginDetachedMarkDrag}
+                    onSetDetachedMark={(o) => onSetDetachedMark(block.id, o)}
                     glyphAlternateMode={block.glyphAlternateMode ?? false}
                     alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
                     onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}
@@ -975,6 +983,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelected={block.id === selectedId}
                     strokeCutEditMode={block.strokeCutEditMode ?? false}
                     onBeginStrokeCut={onBeginStrokeCut}
+                    detachedMarkEditMode={block.detachedMarkEditMode ?? false}
+                    onBeginDetachedMarkDrag={onBeginDetachedMarkDrag}
+                    onSetDetachedMark={(o) => onSetDetachedMark(block.id, o)}
                     glyphAlternateMode={block.glyphAlternateMode ?? false}
                     alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
                     onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}

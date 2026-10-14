@@ -11,6 +11,8 @@ import {
 import { findKashidaSlots, TATWEEL } from "./tatweel";
 import { splitAtCut, translateCmds, cmdsCentre } from "./stackGeometry";
 import { rebasePiece } from "./stackOutline";
+import { findDetachedMarks, buildDetachedMarkPlan, splitContours, type DetachedMarkOverride } from "./detachedMarks";
+import { findDiacriticGlyphIndices } from "./diacritics";
 
 export type ConvertInput = {
   glyphs: HarfBuzzGlyph[];
@@ -21,6 +23,10 @@ export type ConvertInput = {
   diacriticOverrides: readonly DiacriticOverride[];
   /** Diacritic overrides are stored in px at this size. */
   fontSize: number;
+  /** Moved dots and marks, font units; each becomes a rider piece. */
+  detachedMarkOverrides: readonly DetachedMarkOverride[];
+  /** For the detector's per-font opt-out list. */
+  fontFamily: string;
 };
 export type UnjoinedPair = { earlierCl: number; laterCl: number };
 export type ConvertResult = { pieces: StackPiece[]; joins: StackJoin[]; unjoined: UnjoinedPair[] };
@@ -31,10 +37,16 @@ type Placed = {
   px: number; py: number;
   cmds: SvgCmd[];
   kind: "letter" | "tatweel" | "mark";
+  /** A letter's own dots, hamza or kaf stroke, split out of `cmds`, with
+   *  the user's offset in font units. */
+  detached: { cmds: SvgCmd[]; dx: number; dy: number }[];
 };
 
 function placeGlyphs(input: ConvertInput): Placed[] {
   const { glyphs, font, unitsPerEm: upm, cutPlan, shapableText } = input;
+  const diacritics = findDiacriticGlyphIndices(glyphs, font, shapableText);
+  const detected = findDetachedMarks(glyphs, font, upm, diacritics, input.fontFamily);
+  const plan = buildDetachedMarkPlan(input.detachedMarkOverrides, glyphs, detected);
   const out: Placed[] = [];
   let penX = 0;
   for (let i = 0; i < glyphs.length; i++) {
@@ -43,12 +55,34 @@ function placeGlyphs(input: ConvertInput): Placed[] {
     const obj = font.glyphs.get(g.g);
     if (obj) {
       const raw = toSvgCmds(obj.getPath(0, 0, upm).commands);
-      const cuts = cutPlan?.surgery.get(i);
-      const cmds = cuts?.length ? applyCutsToCommands(raw, cuts) : raw;
       const cl = g.cl ?? 0;
       const kind: Placed["kind"] =
         ax === 0 ? "mark" : shapableText[cl] === TATWEEL ? "tatweel" : "letter";
-      out.push({ index: i, cl, ax, px: penX + (g.dx ?? 0) + (cutPlan?.shift[i] ?? 0), py: -(g.dy ?? 0), cmds, kind });
+      // A letter's detached marks leave its commands before any cut, so the
+      // join sweep runs on the body only; each becomes a rider piece.
+      const detached: Placed["detached"] = [];
+      let body = raw;
+      if (kind === "letter") {
+        const list = detected.get(i) ?? [];
+        if (list.length) {
+          const drop = new Set(list.map((m) => m.mark));
+          body = splitContours(raw).flatMap((p, k) => (drop.has(k) ? [] : p));
+          for (const m of list) {
+            const off = plan.contours.get(i)?.get(m.mark);
+            detached.push({ cmds: m.cmds, dx: off?.[0] ?? 0, dy: off?.[1] ?? 0 });
+          }
+        }
+      }
+      const cuts = cutPlan?.surgery.get(i);
+      const cmds = cuts?.length ? applyCutsToCommands(body, cuts) : body;
+      // A dot drawn as its own glyph (kind "mark") moves whole.
+      const whole = plan.glyphs.get(i);
+      out.push({
+        index: i, cl, ax,
+        px: penX + (g.dx ?? 0) + (cutPlan?.shift[i] ?? 0) + (whole?.[0] ?? 0),
+        py: -(g.dy ?? 0) + (whole?.[1] ?? 0),
+        cmds, kind, detached,
+      });
     }
     penX += ax;
   }
@@ -62,7 +96,8 @@ export function runOutline(input: ConvertInput): SvgCmd[] {
   for (const p of placeGlyphs(input)) {
     const o = input.diacriticOverrides.find((d) => d.glyphIndex === p.index);
     if (o?.hidden) continue;
-    out.push(...translateCmds(markAdjusted(p.cmds, o), p.px, p.py + (o?.offsetY ?? 0) * scale));
+    out.push(...translateCmds(markAdjusted(p.cmds, o), p.px + (o?.offsetX ?? 0) * scale, p.py + (o?.offsetY ?? 0) * scale));
+    for (const d of p.detached) out.push(...translateCmds(d.cmds, p.px + d.dx, p.py + d.dy));
   }
   return out;
 }
@@ -162,8 +197,18 @@ export function convertRunToStack(input: ConvertInput): ConvertResult {
     if (!parent) continue;
     const cmds = markAdjusted(m.cmds, o);
     markPieces.push({
-      id: `m${m.index}`, cmds, x: m.px, y: m.py + (o?.offsetY ?? 0) * scale, rotation: 0,
+      id: `m${m.index}`, cmds, x: m.px + (o?.offsetX ?? 0) * scale, y: m.py + (o?.offsetY ?? 0) * scale, rotation: 0,
       pivot: cmdsCentre(cmds), homeX: 0, homeY: 0, order: parent.order, role: "mark", parentId: parent.id, faces: [],
+    });
+  }
+
+  // A letter's own dots, hamza or kaf stroke: rider pieces on the letter.
+  for (const d of drafts) {
+    d.placed.detached.forEach((m, k) => {
+      markPieces.push({
+        id: `d${d.placed.index}-${k}`, cmds: m.cmds, x: d.placed.px + m.dx, y: d.placed.py + m.dy, rotation: 0,
+        pivot: cmdsCentre(m.cmds), homeX: 0, homeY: 0, order: d.order, role: "mark", parentId: d.id, faces: [],
+      });
     });
   }
 

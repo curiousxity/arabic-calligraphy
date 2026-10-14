@@ -32,6 +32,7 @@ import {
   supportsStrokeCuts,
   supportsStyleSets,
   isStackBlock,
+  supportsDetachedMarks,
 } from "./lib/blockCapabilities";
 import { useGlyphAlternates, useStyleSets } from "./hooks/useGlyphAlternates";
 import {
@@ -55,7 +56,7 @@ import {
   syncAttachedToGuides,
 } from "./lib/guides";
 import type { GuideAttachment, GuideBlock, GuideParams, GuideShape } from "./types";
-import type { Block, DiacriticOverride, StackBlock, StrokeCut } from "./types";
+import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
   isCloudConfigured,
@@ -168,6 +169,7 @@ import {
 } from "./lib/verseJustify";
 import type { TextBlock, VerseLayout, VerseSettings } from "./types";
 import { buildCutPlan, cutAdvanceTotal, outlineBounds, remapCutsForEdits } from "./lib/strokeCuts";
+import { remapMarksForEdits } from "./lib/detachedMarks";
 import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
 import { shapeText } from "./lib/harfbuzz";
 import { convertRunToStack, splitPieceAtCut, type UnjoinedPair } from "./lib/stackConvert";
@@ -757,6 +759,49 @@ const App: React.FC = () => {
       )
     );
   }, []);
+
+  const setDetachedMark = useCallback(
+    (blockId: number, o: DetachedMarkOverride) => {
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || !supportsDetachedMarks(b)) return b;
+          const rest = (b.detachedMarkOverrides ?? []).filter(
+            (m) => !(m.cluster === o.cluster && m.glyphId === o.glyphId && m.mark === o.mark)
+          );
+          const keep = o.dx !== 0 || o.dy !== 0;
+          return { ...b, detachedMarkOverrides: keep ? [...rest, o] : rest };
+        })
+      );
+      // No push: the drag start took one through `onBeginDetachedMarkDrag`.
+    },
+    []
+  );
+
+  const toggleDetachedMarkMode = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && supportsDetachedMarks(b)
+            ? { ...b, detachedMarkEditMode: !b.detachedMarkEditMode }
+            : b
+        )
+      );
+    },
+    [pushHistory]
+  );
+
+  const clearDetachedMarks = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && supportsDetachedMarks(b) ? { ...b, detachedMarkOverrides: [] } : b
+        )
+      );
+    },
+    [pushHistory]
+  );
 
   const toggleStrokeCutMode = useCallback(
     (blockId: number) => {
@@ -2550,9 +2595,12 @@ const App: React.FC = () => {
   const kashidaTextPatch = useCallback(
     (block: Block, text: string, edits: readonly { index: number; delta: number }[]) => {
       const cuts = block.strokeCuts;
-      return cuts?.length
-        ? { text, strokeCuts: remapCutsForEdits(cuts, edits) }
-        : { text };
+      const marks = block.detachedMarkOverrides;
+      return {
+        text,
+        ...(cuts?.length ? { strokeCuts: remapCutsForEdits(cuts, edits) } : {}),
+        ...(marks?.length ? { detachedMarkOverrides: remapMarksForEdits(marks, edits) } : {}),
+      };
     },
     []
   );
@@ -2966,6 +3014,7 @@ const App: React.FC = () => {
     const { id, fontFamily, fontSize } = source;
     const fontUrl = resolveFontUrl(fontFamily);
     const overrides = source.diacriticOverrides ?? [];
+    const marks = source.detachedMarkOverrides ?? [];
     const baseCuts = source.strokeCuts ?? [];
     const shapeAndConvert = async (text: string, cuts: StrokeCut[]) => {
       const shaped = await shapeText(text, fontUrl, source.glyphAlternates, source.styleSets);
@@ -2975,6 +3024,7 @@ const App: React.FC = () => {
       const result = convertRunToStack({
         glyphs, font: shaped.font, unitsPerEm: upm, shapableText: shaped.shapableText,
         cutPlan, diacriticOverrides: overrides, fontSize,
+        detachedMarkOverrides: marks, fontFamily,
       });
       return { shaped, upm, result };
     };
@@ -2998,7 +3048,9 @@ const App: React.FC = () => {
       let { shaped, upm, result } = await shapeAndConvert(source.text, baseCuts);
       let inserted = 0;
       const before = result.unjoined.length;
-      if (before > 0 && shaped.shapableText === source.text && overrides.length === 0) {
+      // Mark overrides are keyed by cluster like cuts, but the retry re-shapes
+      // from scratch, so it is refused the same way tashkeel overrides are.
+      if (before > 0 && shaped.shapableText === source.text && overrides.length === 0 && marks.length === 0) {
         const all = withTatweels(result.unjoined);
         if (all.edits.length) {
           const trial = await shapeAndConvert(all.text, all.cuts);
@@ -3444,6 +3496,8 @@ const App: React.FC = () => {
         styleSetsState={styleSetsState}
         onToggleStyleSet={toggleStyleSet}
         onClearStrokeCuts={clearStrokeCuts}
+        onToggleDetachedMarkMode={toggleDetachedMarkMode}
+        onClearDetachedMarks={clearDetachedMarks}
         onFitShapeFillSpacing={fitShapeFillSpacing}
         onAlignSelected={alignSelectedBlocks}
         onDistributeSelected={distributeSelectedBlocks}
@@ -3523,6 +3577,8 @@ const App: React.FC = () => {
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
           onBeginStrokeCut={pushHistory}
+          onBeginDetachedMarkDrag={pushHistory}
+          onSetDetachedMark={setDetachedMark}
           onBeginStackEdit={pushHistory}
           onSetStackPieces={setStackPieces}
           onSetStackJoinBow={setStackJoinBow}

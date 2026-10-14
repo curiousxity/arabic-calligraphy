@@ -63,20 +63,10 @@ These are capabilities that have been explicitly identified as valuable but deli
     م tail): font-side glyph design, exposed through Next Shape; see
     [bundled-fonts.md](bundled-fonts.md).
 
-- **Free movement of nuqtas and diacritics** — Wanted (2026-10-13, after
-  looking at Qalam Studio, which splits every glyph into body, dots and marks
-  and moves each one). Not started; the purpose is not settled yet (collision
-  fixes, traditional placement, or decorative freedom), and it should be
-  asked before choosing an approach. Two separate pieces:
-  - *Diacritics sideways.* Tashkeel already moves vertically, resizes and
-    hides ([diacritics.md](diacritics.md)); adding `offsetX` is a widening of
-    `DiacriticOverride` and the drag rail, not a new subsystem.
-  - *Nuqtas.* The new subsystem. In NotoSans, Ruqaa, Kufi2 and Qahiri a dot is
-    its own zero-advance glyph — the very glyph `findDiacriticGlyphIndices`'
-    allowance gate exists to *exclude*, so it must not be armed through that
-    path. In every other font the dots are contours inside the letter's
-    outline and need splitting out, so identifying a dot from its outline is
-    the real work. Start from `docs/archive/nuqta-measurements.md` (per-font
-    dot size, verified) and `scripts/measureNuqta.py` (modal-contour sweep)
-    rather than re-measuring. Moving a dot is a translate only — no scale, per
-    [removed-subsystems.md](removed-subsystems.md).
+- **Free movement of nuqtas and diacritics** — Shipped 2026-10-14; see
+  [detached-marks.md](detached-marks.md) and [diacritics.md](diacritics.md).
+  Still deferred: rotation of a mark; splitting a dot the font draws fused
+  to its stem (Diwani ف, Ruqaa ن); and dot handles on the five pieced or
+  decorative faces the gate opted out (Kufi2, Qahiri, RanaKufi, ThuluthDeco,
+  Wessam), which would need a different notion of "body" than touch
+  connectivity.

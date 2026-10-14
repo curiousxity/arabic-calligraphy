@@ -85,6 +85,8 @@ to pieces.
 
 **A tail is a split plus a join, and the end cap is a rider.** `splitPieceAtCut` makes the smaller fragment an end cap: `role: "letter"` (it keeps a tilt handle), `parentId` = the body, same `order`. `chainOf` treats any piece with a `parentId` as a rider — it moves with its body, is draggable alone, and never drags anything else. Neither side of the cut is "the tail"; size decides. Cap ids are `<body>t<n>` with a monotonic `n` (relies on pieces never being deleted).
 
+**A letter's own dots, hamza and kaf stroke are riders too.** `convertRunToStack` splits them out of the letter's commands before any cut, at their moved position (`d<index>-<k>` ids, `role: "mark"`, `parentId` the letter), so the join sweep runs on the body only — see [detached-marks.md](detached-marks.md). That is why Amiri's مصبح joins all three pairs now where it joined one.
+
 **The piece transform rotates about a stored `pivot`**, the outline centre
 at creation. `rebasePiece` recomputes it after a split so nothing moves.
 

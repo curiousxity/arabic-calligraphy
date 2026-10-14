@@ -59,9 +59,14 @@ describe("guides bookkeeping", () => {
     const t: TextBlock = {
       ...base, id: 9, type: "text", text: "الله", letterSpacing: 0.2,
       diacriticOverrides: [{ glyphIndex: 1 }],
+      detachedMarkOverrides: [{ cluster: 0, glyphId: 1, mark: 1, dx: 10, dy: 0 }],
+      detachedMarkEditMode: true,
       glyphAlternates: [{ letter: 0, char: "ا", feature: "salt", value: 1 }],
     };
     const { block, dropped } = attachTextToGuide(t, guide);
+    expect("detachedMarkOverrides" in block).toBe(false);
+    expect("detachedMarkEditMode" in block).toBe(false);
+    expect(dropped).toContain("dot and mark moves");
     expect(block.type).toBe("textPath");
     expect(block.id).toBe(9);
     expect(block.text).toBe("الله");
