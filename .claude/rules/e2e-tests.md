@@ -94,6 +94,12 @@ Every stream from Phase 1 of the 2026-08-14 program on owns its own
 `e2e/<stream>.spec.ts`, so those files never conflict; the shared helpers
 live in `e2e/harf.ts`.
 
+**`gotoApp` dismisses the start screen.** A fresh browser context has no
+quick-save, so the app boots under the start-screen overlay; `gotoApp` waits
+for the stage canvas, then clicks Skip if the overlay is up. A spec that
+wants the start screen must load its own way, as `start-screen.spec.ts`
+does. See [font-first.md](font-first.md).
+
 `dragFromHere` takes an optional `via` — one explicit small first step before
 the interpolated travel, for the drags that start parked on a hover-mounted
 dot. Six call sites hand-rolled that gesture, one of them citing this

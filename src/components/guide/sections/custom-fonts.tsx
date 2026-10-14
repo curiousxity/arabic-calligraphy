@@ -24,8 +24,8 @@ export const section: GuideSection = {
       <p>
         The font list is not fixed. If you own an Arabic font the app doesn't
         ship with, you can add it yourself: select a text block, open{" "}
-        <strong>Typography</strong>, and click{" "}
-        <strong>Upload a font…</strong> under the font picker. Choose the file,
+        <strong>Font</strong>, and click{" "}
+        <strong>Upload a font…</strong> under the font strip. Choose the file,
         give it a name, and it joins the list — marked{" "}
         <em>(uploaded)</em> — ready to use on any block.
       </p>

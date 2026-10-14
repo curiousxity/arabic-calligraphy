@@ -7,7 +7,25 @@ paths:
 
 # Sidebar structure
 
-`Sidebar.tsx` reads/writes through props from `App.tsx` and is being split: its panels now live in their own files under `src/components/sidebar/` (`BlockControlsPanel`, `FontPanel`, `TypographyPanel`, `EffectsPanel`, `LayersPanel`, `MirrorPanel`, `CurvePanel`, `ShapeFillPanel`, `GuidePanel`, `GuideAttachmentPanel`, `VersePanel`, `StackPanel`, …). Shared low-level form pieces (`SelectRow`, `ColorRow`, `RangeRow`, `CheckboxRow`, `PresetKeyboard`) live in `src/components/sidebar/FormControls.tsx`; the layer list is `src/components/sidebar/LayersPanel.tsx`. `src/components/sidebar/utils.ts` has one helper (`makeId`).
+`Sidebar.tsx` (about 2,100 lines since the 2026-10-14 split, down from
+3,500) is the tier layout plus wiring: it owns the panels' open/closed state
+and reads/writes through props from `App.tsx`. The panels themselves live in
+their own files under `src/components/sidebar/`:
+
+- `BlockControlsPanel` — the Add / Selected / History groups.
+- `FontPanel` — the font strip, the gallery button and font upload.
+- `ShapeFillPanel`, `CurvePanel`, `MirrorPanel`, `GuidePanel`,
+  `GuideAttachmentPanel`, `VersePanel`, `StackPanel` — the type panels.
+- `TypographyPanel`, `EffectsPanel` — the shared styling panels.
+- `LayersPanel` — the layer list.
+
+The split was file boundaries only: no prop was renamed and no behaviour
+changed, so the e2e suite is its regression check. Shared low-level form
+pieces (`SelectRow`, `ColorRow`, `RangeRow`, `CheckboxRow`, `PresetKeyboard`,
+`DemoHover`) live in `FormControls.tsx`; `utils.ts` has one helper
+(`makeId`). The document-tier panels (Templates, Artboard, Background &
+Grid, Project & Export), Content, Align & Arrange and Shortcuts are still
+inline in `Sidebar.tsx`.
 
 Its panels are ordered in **three tiers by scope**, each introduced by a
 `SidebarTier` rule (a quiet labelled divider, deliberately lighter than a
@@ -15,54 +33,77 @@ panel title so it groups without competing):
 
 | Tier | Panels |
 |---|---|
-| `document` | Start from a Template · Background & Grid · Project & Export |
-| `canvas` | Block Controls · Layers · Align & Arrange |
-| `selected` | Content · *type panel* · Typography · Effects |
+| `document` | Start from a Template · Artboard · Background & Grid · Project & Export |
+| `canvas` | Block Controls (Add · Selected · History) · Layers · Align & Arrange |
+| `selected` | **Font** · Content · *type panel* (Verse / Mirror / Shape Fill / Guide / Stacked composition / Curve) · Typography · Effects |
 
 Then Shortcuts, outside any tier. The point of the split is that every
 panel which appears and disappears with the selection sits in one
 contiguous run, instead of interleaving with the permanent ones.
 
-A **Guide** type panel (size rows, Add text to guide, the texts on it)
-renders for a guide block, which hides Content, Typography and Effects; an
-attached Curve block's `Curve` panel swaps its curve-editing rows for the On
-guide controls (`GuideAttachmentPanel`). See [guides.md](guides.md).
+Not every panel shows for every type. **Font and Content** hide for a
+mirror, a guide and a stacked composition: a mirror draws its source, a
+guide is a path, and a stack is a bake that nothing re-shapes.
+**Typography** hides for a mirror and a guide (a stacked composition keeps
+it). **Effects** hides only for a guide, which is never
+exported. The **Guide** type panel (size rows, Rotation, Add text to guide, the
+texts on it) renders for a guide block; an attached Curve block's `Curve`
+panel swaps its curve-editing rows for the On guide controls
+(`GuideAttachmentPanel`). See [guides.md](guides.md).
 
 Two naming rules in the `selected` tier are worth knowing before adding a
 panel there:
 
 - **The *type panel* is named after the block type** — `Shape Fill`,
-  `Curve` — and holds only what is specific to it (a
-  Shape Fill block's scale/spacing/rotation rows, a Curve block's preset and
-  pen-tool controls). It renders directly under Content, above the
-  shared panels, because for those types it is the panel that matters
-  most. A plain text block has no type panel; its controls are the shared
-  ones.
-- **`Typography` is the shared styling panel** (font family, size,
-  colour, alignment, line height, plus the text-only Letter shapes and
-  Stretch strokes sections). It is *not* called "Text" precisely because it renders for
+  `Curve`, `Mirror` — and holds only what is specific to it (a Shape Fill
+  block's scale/spacing/rotation rows, a Curve block's preset and pen-tool
+  controls). It renders directly under Content, above the shared panels,
+  because for those types it is the panel that matters most. A plain text
+  block has no type panel; its controls are the shared ones.
+- **`Typography` is the shared styling panel** (size, colour, alignment,
+  line height, plus the text-only Letter shapes and Stretch strokes
+  sections). It is *not* called "Text" precisely because it renders for
   shape and curve blocks too, where a panel named "Text" sitting beside
   one named "Shape Fill" reads as two competing type panels.
 
-**Rotation has no panel of its own** (the Transform panel was folded away
-2026-10-14). It is the last row of Typography; Mirror and Guide hide
+**Rotation has no panel of its own.** The Transform panel was deleted
+2026-10-14; rotation is the last row of Typography. Mirror and Guide hide
 Typography, so each carries its own Rotation row in its type panel. Attached
 Curve text has none, because the guide turns it.
 
-**The font family row is a button, not a dropdown** (since 2026-10-13).
-`FontPickerField` in `FontPickerDialog.tsx` shows the current font's name in
-that font and opens a dialog of the block's own text in every font, under
-genre headings derived from consecutive runs of `FontChoice.genre` (so
-`FONT_OPTIONS` must keep a genre's fonts together). One click applies and
-closes; picking the font the block already has makes no change and costs no
-undo step. Its accessible name is the label then the current font
-("Font family Amiri — أبجد"), which is why `e2e/harf.ts`'s `chooseFont`
-anchors on `/^Font family\b/`. A key the list does not know shows the key
-itself, never another family's name. A `FontChoice` marked `retired` (Layla Diwani,
-2026-10-13) stays in `FONT_OPTIONS` — the font tests require every
-`FONT_URLS` key there, and the trigger needs its label — but the gallery
-filters it out unless it is the selected block's current font, so an old
-project still sees and keeps it while nobody new can pick it.
+## Font panel
+
+**The Font panel is first in the `selected` tier and starts open**
+(`showFont` defaults to `true`): picking a face is the decision everything
+else in the tier is styled around. It holds, top to bottom, the
+missing-font notice, the **strip**, the gallery button, and font upload.
+How the strip, the catalogue and the start screen fit together, and their
+traps, are in [font-first.md](font-first.md); what follows is the panel's
+place in the sidebar.
+
+- **The strip** is a horizontal row of cards (`data-testid="font-strip"`),
+  each the block's own text in one face; one click applies, and clicking the
+  active card does nothing.
+- **The gallery button is a button, not a dropdown** (since 2026-10-13).
+  `FontPickerField` in `FontPickerDialog.tsx` shows the current font's name
+  in that font and opens a dialog of the block's own text in every font,
+  under genre headings derived from consecutive runs of `FontChoice.genre`
+  (so `FONT_OPTIONS` in `lib/fontCatalog.ts` must keep a genre's fonts
+  together). One click applies and closes; picking the font the block
+  already has makes no change and costs no undo step. Its accessible name is
+  the label then the current font ("Font family Amiri — أبجد"), which is why
+  `e2e/harf.ts`'s `chooseFont` anchors on `/^Font family\b/`; `chooseFont`
+  opens the Font panel, not Typography. A key the list does not know shows
+  the key itself, never another family's name. A `FontChoice` marked
+  `retired` (Layla Diwani, 2026-10-13) stays in `FONT_OPTIONS` — the font
+  tests require every `FONT_URLS` key there, and the trigger needs its
+  label — but both the strip and the gallery filter it out unless it is the
+  selected block's current font, so an old project still sees and keeps it
+  while nobody new can pick it.
+- **Font upload** lives here (see [custom-fonts.md](custom-fonts.md)): it
+  is the app's only surface for managing the browser's font store.
+
+## Other panels and conventions
 
 `Content` owns everything that puts characters into the block: the RTL
 textarea, the Arabic Keyboard toggle, and the `PresetKeyboard` rows
@@ -85,17 +126,24 @@ deliberate action and a second confirmation on top was redundant
 friction.
 
 **Block Controls is three labelled groups on fixed grids**, not one
-wrapping row. `Add` (text, shape fill, curved text, guide, mirror) sits on
-a 5-column grid — five buttons, one row, since the Square Kufi, image and
-ornament buttons went and the medallion moved to Compositions only
-(2026-10-14); `Selected` (duplicate, delete) and
-`History` (undo, redo, history) share a line below it. The row this replaced
-was a centred `flex-wrap` of twelve identical chips, which at the sidebar's
-own width wrapped **8 / 1 / 3** — stranding one button alone on a
-line, which reads as a bug rather than a layout. Columns are fixed so the
-shape is chosen rather than emergent. The split also moves the destructive
-`Delete` out of the leading position, where it sat immediately beside
-`Duplicate`.
+wrapping row. `Add` holds five buttons — text, shape fill, curved text,
+guide, mirror — on a 5-column grid, one row. `Selected` (duplicate, delete)
+and `History` (undo, redo, history) share a line below it. A medallion is
+made only from Compositions; its Add button went 2026-10-14 along with the
+Square Kufi, image and ornament buttons.
+
+The fixed grid exists because the row it replaced was a centred
+`flex-wrap` of identical chips, which at the sidebar's own width wrapped
+**8 / 1 / 3** — stranding one button alone on a line, which reads as a bug
+rather than a layout. Columns are fixed so the shape is chosen rather than
+emergent. The split also moves the destructive `Delete` out of the leading
+position, where it sat immediately beside `Duplicate`.
+
+**The Add grid has `columnGap: 0`** (inline, in `BlockControlsPanel`). At
+the sidebar's 220px minimum the row is 171px wide, and five 34px buttons fit
+only if the columns take all of it; with the shared 8px gap the columns drop
+to about 28px and the buttons squash into ovals. Wider, the `1fr` columns
+space them out. Adding a sixth button means redoing that arithmetic.
 
 Icon-button labels follow **sentence case and name the outcome**, not the
 mechanism: `Add shape fill`, not "Upload SVG for Shape Fill". The `title`
@@ -136,9 +184,10 @@ is disabled most of the time. It is used in two places:
 - **Checkbox rows.** `CheckboxRow`'s optional `demo` adds a `DemoHint` play
   icon beside the label, never inside it, because a button inside a
   `<label>` toggles the checkbox. It is used by the Diacritic tool row.
-- **The five Add buttons.** Each button is its own anchor (the 5-column grid
-  has no room for icons) with a 400 ms hover-intent delay, so sweeping across
-  the row doesn't flash five popovers. Their `title`s were removed and the
+- **Four of the five Add buttons** (text, shape fill, curved text, mirror;
+  Add guide has no recording). Each button is its own anchor (the 5-column
+  grid has no room for icons) with a 400 ms hover-intent delay, so sweeping
+  across the row doesn't flash a popover per button. Their `title`s were removed and the
   same text now shows as the popover caption, since a native tooltip would
   stack on top of it. `aria-label`s are unchanged, and the e2e specs use them.
 

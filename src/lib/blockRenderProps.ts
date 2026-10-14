@@ -8,7 +8,7 @@ import type { Block } from "../types";
  * transform wrapper. Both were mapping block fields to renderer props by
  * hand, and the second had silently dropped a field four separate times —
  * `fill`, `strokeCuts`, `glyphTransforms`, `kufiComposition`/`kufiCellEdits`
- * — each fixed by adding the one line that was missed, with nothing to stop
+ * (the last three since removed with their subsystems) — each fixed by adding the one line that was missed, with nothing to stop
  * a fifth. The failure is invisible on the ordinary path: `CanvasStage`
  * looks right, and only the mirror draws the wrong thing.
  *

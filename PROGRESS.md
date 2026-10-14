@@ -99,6 +99,30 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-14 — Font-first redesign
+
+The app was cut back to what it is best at, the fonts
+(spec: `docs/superpowers/specs/2026-10-14-font-first-redesign.md`).
+
+- **Four subsystems removed:** Square Kufi; horizontal and vertical warp;
+  image blocks; the ornament and frame library (a frame was an image block).
+  Old projects load with those blocks and fields dropped, through one
+  sanitizer, `src/lib/legacySaves.ts`. Recoverable from tag
+  `pre-font-first-redesign`; what went and why is in
+  [removed-subsystems.md](.claude/rules/removed-subsystems.md).
+- **Start screen.** A fresh load opens on a word field above every font
+  card; type, pick a face, and the editor opens with that block. Skip opens
+  the default. A quick-save skips the screen.
+- **Font panel.** First in the selected tier: a one-click strip of the
+  block's text in every face, the full gallery button, and font upload.
+- **Sidebar.** Transform folded into Typography (rotation is its last row;
+  Mirror and Guide carry their own); the Add grid is five buttons, with the
+  medallion made from Compositions only; the type, Typography and Effects
+  panels moved into their own files under `src/components/sidebar/`.
+
+How the start screen and strip work, and their traps:
+[font-first.md](.claude/rules/font-first.md).
+
 ### 2026-10-14 — Writing on a guide
 
 Type with a guide selected, or double-click a point on it, and the letters

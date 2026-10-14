@@ -4,14 +4,95 @@ paths:
   - "scripts/*.py"
   - "src/lib/dragAxis*.ts"
   - "src/lib/diacriticPlacement*.ts"
+  - "src/lib/legacySaves*.ts"
 ---
 
 # Removed subsystems
 
-Two removals so far. Both strip their fields from old saves through the one
-list in `App.tsx`, `REMOVED_BLOCK_FIELDS` / `stripRemovedFields`, applied in
-`applyParsedLayoutPayload` beside the `shapeWarp` filter. A third removal adds
-its fields there rather than writing a second stripper.
+Six removals so far (the four of 2026-10-14 are the font-first redesign,
+spec `docs/superpowers/specs/2026-10-14-font-first-redesign.md`), plus the
+older `shapeWarp` block type described in CLAUDE.md. Every one of them is
+handled in old saves by the one sanitizer in **`src/lib/legacySaves.ts`**:
+`REMOVED_BLOCK_TYPES` lists block types that are dropped on load, and
+`REMOVED_BLOCK_FIELDS` lists per-block fields that are deleted.
+`sanitizeLegacyBlocks` applies both and is called from
+`applyParsedLayoutPayload` in `App.tsx`; `legacySaves.test.ts` pins it with a
+fixture save. A further removal adds its type or fields to those two lists
+rather than writing a second stripper.
+
+## The font-first redesign: four removals on 2026-10-14
+
+**Why — in the user's words:** *"It has become too bulky and some features
+are redundant. I want the app to be clean, and showcase the thing it excels
+at; the fonts."* The cut list was the user's own: *"cut Square Kufi,
+Horizontal and vertical warp and image blocks"*. The ornament and frame
+library followed from the third, because a frame is an image block, and an
+image type nobody can add themselves is plumbing. Deleted, not hidden behind
+an "advanced" toggle, which would have kept the code and the bloat.
+
+**Recovery:** every file below is recoverable from the local git tag
+**`pre-font-first-redesign`** (commit `2d3aeb1`), the last commit before the
+first deletion, including the deleted `.claude/rules/square-kufi.md` and
+`.claude/rules/ornaments.md` write-ups. Read those before resurrecting
+anything piecemeal.
+
+### Square Kufi
+
+**What went:** the `SquareKufiBlock` type and its `kufi*` fields,
+`SquareKufiText.tsx`, `KufiCellEditOverlay.tsx`, `lib/squareKufi.ts` and its
+1,091-line test, `lib/squareKufiAlphabet.ts`, the Square Kufi sidebar panel
+and Add button, `kufiOptionsFor`, the kufi guards in `blockCapabilities.ts`,
+the kufi mapping in `blockRenderProps.ts`, `MirrorBlockView`'s kufi path,
+`e2e/square-kufi.spec.ts`, the guide section `square-kufi.tsx`, the demo GIF,
+the deferred-features lines, and `.claude/rules/square-kufi.md`.
+
+**Old saves:** `squareKufi` is in `REMOVED_BLOCK_TYPES`; `kufiColumns`,
+`kufiComposition`, `kufiLineGap`, `kufiWordGap`, `kufiCellEdits` and
+`kufiCellEditMode` are in `REMOVED_BLOCK_FIELDS`.
+
+### Horizontal and vertical warp
+
+**What went:** `lib/warp.ts` and its test, `warpX`/`warpY` on `BlockCommon`,
+the two Typography sliders, `ShapedText`'s per-glyph warp pass, the
+`blockRenderProps` mapping, the warp term in `DiacriticHoverHandles` and in
+the fit-to-width solver (`fitToWidth.ts` lost its `warpX` input), and
+`composition.ts`'s copy of the warp fields. The detached-marks order
+"marks, then cuts, then warp" became "marks, then cuts".
+
+**Old saves:** `warpX` and `warpY` are in `REMOVED_BLOCK_FIELDS`, so a
+warped block loads back unwarped.
+
+### Image blocks
+
+**What went:** the `ImageBlock` type with `imageDataUrl`/`imageScale`,
+`ImageBlockView.tsx`, `addImageBlock`, the Add image button and its file
+input, the Image panel, `MirrorBlockView`'s mirror-of-image path, the image
+mapping in `blockRenderProps.ts`, `randomizeLayout`'s image exemption, the
+Layers panel's image row, and the demo GIF.
+
+**Old saves:** `image` is in `REMOVED_BLOCK_TYPES`; `imageDataUrl` and
+`imageScale` are in `REMOVED_BLOCK_FIELDS`.
+
+### The ornament and frame library
+
+**What went:** `OrnamentPicker.tsx`, `lib/ornaments.ts` and its test, the
+whole of `src/data/ornaments/`, the Add ornament button,
+`insertOrnamentShapeFill`/`insertOrnamentFrame`, the `ornamental` flag on
+`BlockCommon`, Compositions' `framed` layout and `CompositionDialog`'s frame
+swatches (muthanna and medallion stay), `FontUploadDialog`'s ornament
+reference, `e2e/ornaments.spec.ts`, the guide section `ornaments.tsx`, the
+demo GIF, and `.claude/rules/ornaments.md`. The e2e helper
+`addOrnamentShapeFill` became `addShapeFillFromSvg`, which uploads
+`e2e/fixtures/circle.svg`.
+
+**Old saves:** `ornamental` is in `REMOVED_BLOCK_FIELDS`. An ornament poured
+as a Shape Fill was an ordinary `shapeFill` block and loads unchanged; a
+frame was an `image` block and is dropped with the image type.
+
+**What survived the redesign, and why:** mirror blocks, including
+"Add mirror" and the medallion composition. The "Add medallion" button left
+the Add grid (it duplicated Compositions' medallion), so a medallion is now
+made only from Compositions.
 
 ## Per-glyph move, scale & rotate
 
@@ -98,13 +179,14 @@ that archive file before resurrecting anything from git history, exactly as the
   `factorForPosition` went with the stretch tool.
 - **`lib/arabicJoining.ts`** — kept when its only caller, the deleted
   `strokeSchema/glyphLookup.ts`, went. It has consumers again (`tatweel.ts`,
-  `squareKufi.ts`), so it is no longer at risk of looking like dead code.
+  `spacing.ts`), so it is no longer at risk of looking like dead code.
 
-**Old saves.** `App.tsx`'s `stripRemovedFields` deletes `glyphEdits`,
+**Old saves.** `REMOVED_BLOCK_FIELDS` (`src/lib/legacySaves.ts`; it lived in
+`App.tsx` as `stripRemovedFields` at the time) deletes `glyphEdits`,
 `glyphRigValues`, `glyphMaskEdit`, `glyphEditTool`, `selectedGlyphIndex`,
 `kashidaAmount` and `kashidaEditMode` off every block in
-`applyParsedLayoutPayload` — same mechanism and same reasoning as the
-`shapeWarp` filter beside it. A project saved before the removal loads with
+`applyParsedLayoutPayload` — the same mechanism and reasoning as the
+`shapeWarp` type filter. A project saved before the removal loads with
 those edits dropped rather than half-rendered. The layout payload's `version`
 moved 4 → 5 and no longer embeds `glyphRigs`. The `harfcanvas-glyph-rigs-v1`
 localStorage key is simply orphaned; nothing reads or clears it.

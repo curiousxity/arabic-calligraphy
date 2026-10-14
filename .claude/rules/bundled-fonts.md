@@ -30,7 +30,8 @@ four* of these or it half-works in a way that is easy to misdiagnose:
 1. the file itself in `public/fonts/`;
 2. an `@font-face` rule at the top of `src/index.css` — this is what the
    font picker uses to preview the block's text in each font;
-3. `FONT_OPTIONS` in `src/components/Sidebar.tsx` — a hand-ordered array of
+3. `FONT_OPTIONS` in `src/lib/fontCatalog.ts` (moved out of `Sidebar.tsx`
+   2026-10-14; see [font-first.md](font-first.md)) — a hand-ordered array of
    `{ genre, value, label, cssFamily }`, and **the only thing that decides whether
    a font appears in the picker at all**. It is ordered by `genre`: the
    font picker starts a heading wherever the genre changes, so a font placed away from its genre's block makes that heading
@@ -90,8 +91,9 @@ glyphs and the GSUB are byte-identical, and HarfBuzz picks the right forms
 (meem.init, hah.medi, meem.medi, dal.fina) in the browser and on the canvas
 alike. The file, `FONT_URLS` entry and `@font-face` stay so saved blocks
 still render; its `FONT_OPTIONS` entry carries `retired: true`, which keeps
-it out of the font picker unless it is the selected block's current font
-(see [sidebar.md](sidebar.md)).
+it out of the font picker, the Font panel's strip and the start screen
+unless it is the selected block's current font (`visibleFonts`; see
+[font-first.md](font-first.md)).
 
 **`UKIJDiwani.ttf` replaces it** — UKIJ Diwani Tom (`UKIJDiT.ttf`, v3.10,
 Uyghur Computer Science Association) with the ten honorifics merged in;

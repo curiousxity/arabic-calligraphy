@@ -7,7 +7,7 @@ paths:
 
 # User-uploaded fonts (`src/lib/customFonts.ts`, `FontUploadDialog.tsx`)
 
-A user can add their own `.ttf`/`.otf` from Typography → **Upload a font…**.
+A user can add their own `.ttf`/`.otf` from the Font panel → **Upload a font…** (it moved there from Typography on 2026-10-14).
 This is the runtime counterpart of the five-place source edit documented in
 "Adding a new font" in [bundled-fonts.md](bundled-fonts.md), and it exists *because* the Morph removal deleted
 the one step that needed offline measurement (the per-font nuqta): a font is
@@ -56,7 +56,7 @@ of it, and only a bundled font gets the PUA honorifics.
 - **Projects reference fonts by key only** — bytes are never in the layout
   payload (a cloud row has limits). A key that resolves to nothing renders in
   Noto Sans *and says so*: an effect over `blocks` in `App.tsx` reports it
-  through the existing transient status row, and the Typography panel shows a
+  through the existing transient status row, and the Font panel shows a
   notice for the selected block. Silence here is exactly the misdiagnosis
   trap [bundled-fonts.md](bundled-fonts.md) records for a missing `FONT_URLS` entry, so don't "tidy"
   either notice away. The block keeps its key, so re-uploading the file

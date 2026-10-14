@@ -8,7 +8,7 @@ paths:
 
 # Mirror blocks — muthanna and radial (`src/lib/mirror.ts`, `MirrorBlockView.tsx`)
 
-`mirror` is a fifth `Block` variant that draws **another block's content**
+`mirror` is the `Block` variant that draws **another block's content**
 under a transform: a reflection (`mirrorX` / `mirrorY`, the classical
 muthanna) or `radialCount` copies turned around a centre (a medallion or
 shamsa). It is the one primitive both compositions reduce to.
@@ -19,12 +19,13 @@ shamsa). It is the one primitive both compositions reduce to.
   `TextOnPathText`) inside transform wrapper groups. That
   lookup is the entire "stays live as the source is edited" mechanism — there
   is no sync machinery, and nothing to keep in step. It also means every
-  block type is mirrorable without touching the four render algorithms this
-  file elsewhere refuses to merge.
+  block type is mirrorable without touching the three render algorithms
+  (text, Shape Fill, Curve) that CLAUDE.md refuses to merge.
 - **The block-to-renderer prop mapping is `src/lib/blockRenderProps.ts`, and
   both call sites build from it.** This file used to map those props by hand,
   and dropped a field silently **four** times — `fill`, `strokeCuts`,
-  `glyphTransforms`, then `kufiComposition`/`kufiCellEdits` — each fixed by
+  `glyphTransforms`, then `kufiComposition`/`kufiCellEdits` (the last three
+  since removed with their subsystems) — each fixed by
   adding the one line that had been missed, with nothing preventing a fifth.
   The failure mode is what makes it worth a module: `CanvasStage` looks
   correct, so only the mirror draws the wrong thing. The builders carry
@@ -58,8 +59,8 @@ shamsa). It is the one primitive both compositions reduce to.
   wrapper group needs no pivot arithmetic. Radius 0 stacks every copy on the
   centre, each still at its own angle.
 - **Orphans.** A mirror whose source is gone renders nothing and is removed:
-  on load by `dropOrphanedMirrors` in `applyParsedLayoutPayload` (the
-  `shapeWarp`-filter precedent beside it), and at runtime by an effect over
+  on load by `dropOrphanedMirrors` in `applyParsedLayoutPayload`, right after
+  `sanitizeLegacyBlocks` drops removed block types (the same precedent), and at runtime by an effect over
   `blocks` in `App.tsx`. That effect deliberately does **not** `pushHistory` —
   the action that removed the source already pushed, and its snapshot holds
   both blocks, so one undo restores the pair. It lives in an effect rather
@@ -67,6 +68,6 @@ shamsa). It is the one primitive both compositions reduce to.
   covered (delete button, Delete key, the Layers panel's own delete, a
   reorder).
 - **Sidebar.** The type panel is `Mirror` (mode select, radial count/radius,
-  and a "Select source" button that moves the selection to the source).
-  Content and Typography are hidden for this type — a mirror has neither of
-  its own.
+  and a "Select source" button that moves the selection to the source,
+  plus its own Rotation row). Font, Content and Typography are hidden for
+  this type — a mirror has none of its own. Effects stays.

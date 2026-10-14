@@ -7,6 +7,9 @@ export const section: GuideSection = {
   keywords: [
     "font",
     "typeface",
+    "font strip",
+    "gallery",
+    "change font",
     "size",
     "colour",
     "color",
@@ -31,6 +34,29 @@ export const section: GuideSection = {
   ],
   Body: () => (
     <>
+      <h4>Font</h4>
+      <p>
+        The first panel under a selected block, and open from the start. Its
+        strip is a row of cards, each showing your own text written in one
+        of the fonts; scroll it sideways and click a card to switch. The font
+        you are using is highlighted and slides to the middle of the strip
+        whenever it changes.
+      </p>
+      <p>
+        <strong>Font family</strong>, just below the strip, opens the same
+        fonts as a larger gallery, grouped by style, from formal Thuluth and
+        Naskh to Kufi and Ruqaa, with any font you have uploaded at the end.
+        Click one to use it; Esc closes without changing anything.{" "}
+        <strong>Upload a font…</strong> sits underneath — see{" "}
+        <em>Using your own fonts</em>.
+      </p>
+      <p>
+        The previews in the strip and the gallery are drawn by the browser, so
+        a font may sit very slightly differently on the canvas, where the text
+        is shaped properly. A mirror, a guide and a stacked composition have no
+        Font panel: a mirror takes its font from the block it copies.
+      </p>
+
       <h4>Content</h4>
       <p>
         Everything that puts characters into a block lives in one place. The
@@ -70,14 +96,6 @@ export const section: GuideSection = {
       </p>
       <ul>
         <li>
-          <strong>Font family</strong> — click it to see your own text written
-          in every font at once, grouped by style, from formal Thuluth and
-          Naskh to Kufi and Ruqaa, with any font you have uploaded at the end.
-          Click one to use it; Esc closes without changing anything. The
-          previews are drawn by the browser, so a font may sit very slightly
-          differently on the canvas, where the text is shaped properly.
-        </li>
-        <li>
           <strong>Font size</strong> — hidden for curve blocks, where the
           length of the curve sets the size instead.
         </li>
@@ -97,12 +115,6 @@ export const section: GuideSection = {
           come apart. Word spacing changes the space between words. Drag
           below zero to tighten until pieces touch or overlap — useful for
           compact compositions. Double-click a slider to reset it.
-        </li>
-        <li>
-          <strong>Move &amp; scale glyph</strong> — for plain text blocks. Tick
-          it, then hover a letter on the canvas to move or stretch that one
-          letter without shifting its neighbours. See{" "}
-          <em>Shaping individual letters</em>.
         </li>
       </ul>
       <p>

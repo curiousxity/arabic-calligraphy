@@ -16,6 +16,8 @@ export const section: GuideSection = {
     "touch",
     "first",
     "new",
+    "start screen",
+    "skip",
     "add text",
     "template",
     "background",
@@ -31,10 +33,26 @@ export const section: GuideSection = {
         shows the controls for whatever block is currently selected.
       </p>
 
+      <h4>The start screen</h4>
+      <p>
+        When you open HarfCanvas, before anything else, you see a
+        word written in every font the app has, grouped by style. Type your own
+        word in the field at the top and every card rewrites itself as you
+        type. Click the font you like and the canvas opens with your word
+        already set in it. <strong>Skip</strong> opens the canvas with the
+        starter word instead, and you can change the font at any time from the{" "}
+        <strong>Font</strong> panel.
+      </p>
+      <p>
+        The start screen greets you on each visit until you use{" "}
+        <strong>Quick save</strong>, in the <strong>Project &amp; Export</strong>{" "}
+        panel. From then on the app opens straight onto your saved work.
+      </p>
+
       <h4>Your first piece</h4>
       <ol>
         <li>
-          Press <strong>Add text</strong> under{" "}
+          Pick a font on the start screen, press <strong>Add text</strong> under{" "}
           <strong>Block Controls &rarr; Add</strong>, or pick something from{" "}
           <strong>Start from a Template</strong> at the top of the sidebar.
         </li>

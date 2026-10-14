@@ -18,11 +18,13 @@ own rules, and ligatures fuse where the font says they should.
 - Arabic text shaped by HarfBuzz, rendered from real font outlines via
   [opentype.js](https://opentype.js.org/) onto a [Konva](https://konvajs.org/)
   canvas
-- 17 bundled faces across Naskh, Thuluth, Kufi, Diwani, Ruq'ah, Nastaliq and
-  more, plus uploading your own `.ttf`/`.otf`
-- Six block types: plain text, text on an arbitrary curve, text poured into
-  an SVG silhouette, square kufi woven on a grid, mirror blocks (reflection
-  or radial repetition of another block, live-linked to it), and images
+- 22 bundled faces across Naskh, Thuluth, Kufi, Diwani, Ruq'ah, Nastaliq,
+  Maghribi and more, plus uploading your own `.ttf`/`.otf`
+- Start by typing a word and seeing it in every face; switch fonts from a
+  one-click strip in the editor
+- Five block types: plain text, text on a curve, text poured into an SVG
+  silhouette, mirror blocks (reflection or radial repetition of another
+  block, live-linked to it), and guides
 - An on-screen Arabic keyboard, plus one-tap insertion of harakat, honorific
   symbols and Urdu/Farsi letters
 
@@ -50,15 +52,12 @@ than a text box
 
 **Composition**
 
-- **Square kufi.** Fit a run into a woven panel, paint or cut individual
-  cells by hand, and lay it out as classic stacked lines or a
-  boustrophedon that snakes down the panel, turning at the corner.
 - **Muthanna and radial mirrors.** Reflect or repeat any block — a mirrored
   pair or an N-copy medallion — staying live as the source is edited.
 - **A font picker that shows your own text** in every bundled and uploaded
   style at once, grouped by genre.
-- **Compositions.** Drop a block's text into a mirrored pair, a medallion,
-  or a decorative frame, spaced to the width it actually draws.
+- **Compositions.** Drop a block's text into a mirrored pair or a
+  medallion, spaced to the width it actually draws.
 - **Saveable text styles and colour palettes**, applied to any selection in
   one step.
 - **Gradient fills** (including gold/silver/copper/lapis metallic presets)
