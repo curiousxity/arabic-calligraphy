@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
-import { nuqtaUnits, FALLBACK_RATIO, nibFloorFraction, FALLBACK_NIB_FLOOR } from "./nuqta";
+import { nuqtaUnits, FALLBACK_RATIO, nibFloorFraction, nibFloorFonts, FALLBACK_NIB_FLOOR } from "./nuqta";
 
 const FONT_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -56,13 +56,14 @@ describe("nuqtaUnits", () => {
 
 describe("nibFloorFraction", () => {
   it("is within [0.1, 1] for every measured font and falls back otherwise", () => {
-    for (const f of ["UKIJDiwani", "NotoSans", "HarfCanvasDiwani"]) {
+    expect(nibFloorFonts().length).toBeGreaterThan(10);
+    for (const f of nibFloorFonts()) {
       const v = nibFloorFraction(f);
       expect(v).toBeGreaterThanOrEqual(0.1);
       expect(v).toBeLessThanOrEqual(1);
     }
-    // Amiri and Ruqaa printed "-" in the script (no tatweel zone found).
-    expect(nibFloorFraction("Amiri")).toBe(FALLBACK_NIB_FLOOR);
+    // Printed "—" in the script (no stem zone found).
+    expect(nibFloorFraction("Lateef")).toBe(FALLBACK_NIB_FLOOR);
     expect(nibFloorFraction("NoSuchFont")).toBe(FALLBACK_NIB_FLOOR);
   });
 });
