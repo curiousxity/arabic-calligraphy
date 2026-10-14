@@ -32,6 +32,8 @@ exists or is needed. `nib.minFraction` floors the perpendicular thickness,
 never at the two ends — the ends must land on the faces exactly or the
 seam shows.
 
+**Bow is asymmetry.** `joinCenterline`'s two handle lengths are `chord/3·(1±bow)`; scaling both together never moves an S-curve's midpoint, so a symmetric bow had no visible effect. The bow handle drags along the leaving tangent.
+
 **The floor is the pen's slant**: a face vector is the stroke's perpendicular
 cross-section, so on a 90° climb the model would thin to nothing; a real reed
 held at ~45° draws a vertical stroke nearly as heavy as a horizontal one.
@@ -51,9 +53,7 @@ the stroke's frame) is visually left, which is the **later** letter in
 reading order. `convertRunToStack` relies on this when handing fragments
 to pieces.
 
-**A tail is a split plus a join.** `splitPieceAtCut` makes the far fragment
-its own piece and joins it; dragging that piece sweeps the tail. There is
-no tail-specific geometry.
+**A tail is a split plus a join, and the end cap is a rider.** `splitPieceAtCut` makes the smaller fragment an end cap: `role: "letter"` (it keeps a tilt handle), `parentId` = the body, same `order`. `chainOf` treats any piece with a `parentId` as a rider — it moves with its body, is draggable alone, and never drags anything else. Neither side of the cut is "the tail"; size decides. Cap ids are `<body>t<n>` with a monotonic `n` (relies on pieces never being deleted).
 
 **The piece transform rotates about a stored `pivot`**, the outline centre
 at creation. `rebasePiece` recomputes it after a split so nothing moves.
