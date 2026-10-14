@@ -20,6 +20,8 @@ const ROWS: Record<Exclude<GuideBlock["guideShape"], "pen">, Row[]> = {
     { key: "amplitude", label: "Amplitude", min: 0, max: 200 },
   ],
   line: [{ key: "width", label: "Length", min: 40, max: 1600 }],
+  teardrop: [{ key: "width", label: "Width", min: 40, max: 1200 }, { key: "height", label: "Height", min: 40, max: 1600 }],
+  almond: [{ key: "width", label: "Width", min: 40, max: 1200 }, { key: "height", label: "Height", min: 40, max: 1600 }],
 };
 
 /**

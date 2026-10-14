@@ -209,7 +209,7 @@ export type TextPathBlock = BlockCommon & {
   guide?: GuideAttachment;
 };
 
-export type GuideShape = "circle" | "ellipse" | "arc" | "wave" | "line" | "pen";
+export type GuideShape = "circle" | "ellipse" | "arc" | "wave" | "line" | "pen" | "teardrop" | "almond";
 export type GuideParams = { width?: number; height?: number; sweep?: number; amplitude?: number };
 
 /** A dashed construction path that Curve text can attach to; never exported. */
