@@ -9,6 +9,9 @@ import type Konva from "konva";
 import { Sidebar, type SidebarProps } from "./components/Sidebar";
 import { CanvasStage, type CanvasStageProps } from "./components/CanvasStage";
 import { ConfirmDialog, type ConfirmDialogRequest } from "./components/ConfirmDialog";
+import { StartScreen } from "./components/StartScreen";
+import { shouldShowStartScreen } from "./lib/startScreen";
+import { fontChoicesWith } from "./lib/fontCatalog";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useDebouncedHistoryPush } from "./hooks/useDebouncedHistoryPush";
 import { useExport } from "./hooks/useExport";
@@ -311,6 +314,7 @@ const App: React.FC = () => {
   const [pendingPlacement, setPendingPlacement] = useState<PendingPlacement | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showStart, setShowStart] = useState(() => isBrowser && shouldShowStartScreen(localStorage, STORAGE_KEY));
   const [showGrid, setShowGrid] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [showRulers, setShowRulers] = useState(false);
@@ -366,6 +370,7 @@ const App: React.FC = () => {
   // saved nor undoable — it is a property of the installation, like the
   // export presets.
   const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
+  const startFonts = useMemo(() => fontChoicesWith(customFonts), [customFonts]);
   // Whether the shared status row is currently showing *this* stream's
   // unavailable-font notice, so clearing it can never wipe an export result.
   const fontNoticeShownRef = useRef(false);
@@ -934,6 +939,17 @@ const App: React.FC = () => {
     },
     [canvasWidth, stageViewportHeight]
   );
+
+  // No pushHistory: the start screen precedes the first edit, and undo
+  // should not reopen it.
+  const beginFromStart = (text: string, fontFamily: string) => {
+    const next: Block[] = [{ ...DEFAULT_BLOCK, id: 1, text, fontFamily }];
+    setBlocks(next);
+    setSelectedIds([]);
+    setSelectedId(1);
+    setShowStart(false);
+    fitInitialView(next);
+  };
 
   const zoomToActualSize = useCallback(() => {
     if (canvasWidth <= 0 || stageViewportHeight <= 0) return;
@@ -3457,6 +3473,7 @@ const App: React.FC = () => {
       </div>
 
       <ConfirmDialog request={confirmRequest} onCancel={() => setConfirmRequest(null)} />
+      {showStart && <StartScreen fonts={startFonts} onPick={beginFromStart} onSkip={() => setShowStart(false)} />}
     </div>
   );
 };

@@ -15,7 +15,7 @@ export type Box = { x: number; y: number; width: number; height: number };
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
 
 /** Konva mounts its scene canvas inside this wrapper; the stage has one layer. */
-const STAGE_CANVAS = ".konvajs-content canvas";
+export const STAGE_CANVAS = ".konvajs-content canvas";
 
 /** Fill colours `DiacriticHoverHandles` gives its three handles. */
 export const DIACRITIC_MOVE_HANDLE_FILL = "#38bdf8";
@@ -43,7 +43,18 @@ export function collectConsoleErrors(page: Page): string[] {
 /** Loads the app and waits until the bridge is live and the default block has actually rendered. */
 export async function gotoApp(page: Page): Promise<void> {
   await page.goto("/");
+  // Wait for the stage first: StartScreen and CanvasStage mount in the same
+  // React tree, so once the canvas exists the overlay is either present or
+  // never will be. Checking for Skip before this races React's first render
+  // and leaves the overlay intercepting every later click.
   await page.locator(STAGE_CANVAS).first().waitFor();
+  // A fresh browser context has no quick-save, so the start screen is up.
+  // Every spec here wants the editor; start-screen.spec.ts loads its own way.
+  const start = page.getByTestId("start-screen");
+  if ((await start.count()) > 0) {
+    await page.getByRole("button", { name: "Skip", exact: true }).click();
+    await start.waitFor({ state: "detached" });
+  }
   await page.waitForFunction(() => !!window.__HARF__?.getStage());
   // Shaping is async (HarfBuzz WASM + a font fetch), so a mounted stage is
   // not yet a drawn one.
