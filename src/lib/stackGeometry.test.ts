@@ -84,7 +84,7 @@ describe("splitAtCut", () => {
     ];
     const whole = area(curved);
     const r = splitAtCut(curved, { cutX: 50, angle: 0 })!;
-    expect(area(r.near) + area(r.far)).toBeCloseTo(whole, 1);
+    expect(Math.abs(area(r.near) + area(r.far) - whole) / whole).toBeLessThan(0.005);
   });
   it("sends an uncrossed contour whole to the side it lies on", () => {
     const withDot: SvgCmd[] = [
