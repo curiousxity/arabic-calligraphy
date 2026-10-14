@@ -30,7 +30,6 @@ import {
   supportsKufiCellEdits,
   supportsGlyphAlternates,
   supportsStrokeCuts,
-  isStackBlock,
   supportsStyleSets,
   isStackBlock,
 } from "./lib/blockCapabilities";
