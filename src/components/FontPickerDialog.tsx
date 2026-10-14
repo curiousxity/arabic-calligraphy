@@ -1,24 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CloseIcon } from "./Icons";
+import { groupByGenre, SAMPLE_FALLBACK, visibleFonts, type FontChoice } from "../lib/fontCatalog";
 
-/** One entry of the font picker's list — value, label, and the CSS family to preview in. */
-export type FontChoice = {
-  value: string;
-  label: string;
-  cssFamily: string;
-  /** Calligraphic genre (Naskh, Kufi…) — the picker heads a group with it. */
-  genre?: string;
-  /**
-   * No longer offered. Kept in the list so a saved block on it still renders
-   * and the trigger can still name it; the gallery shows it only when it is
-   * the selected block's current font.
-   */
-  retired?: boolean;
-};
-
-/** Shown when the block has no text yet, so every card still has letters. */
-const SAMPLE_FALLBACK = "أبجد";
+export type { FontChoice };
 
 export type FontPickerDialogProps = {
   /** The block's current text — what every card previews. */
@@ -29,18 +14,6 @@ export type FontPickerDialogProps = {
   fonts: FontChoice[];
   onPick: (value: string) => void;
   onClose: () => void;
-};
-
-/** Consecutive runs of the same genre, in list order. */
-const groupByGenre = (fonts: FontChoice[]) => {
-  const groups: { genre: string; fonts: FontChoice[] }[] = [];
-  for (const font of fonts) {
-    const genre = font.genre ?? "Other";
-    const last = groups[groups.length - 1];
-    if (last && last.genre === genre) last.fonts.push(font);
-    else groups.push({ genre, fonts: [font] });
-  }
-  return groups;
 };
 
 /**
@@ -120,7 +93,7 @@ export const FontPickerDialog: React.FC<FontPickerDialogProps> = ({
         </div>
 
         <div className="fontPickerBody" data-testid="font-picker">
-          {groupByGenre(fonts.filter((f) => !f.retired || f.value === value)).map((group) => (
+          {groupByGenre(visibleFonts(fonts, value)).map((group) => (
             <section key={group.genre} aria-label={group.genre}>
               <h3 className="fontPickerGenre">{group.genre}</h3>
               <div className="fontPickerGrid">

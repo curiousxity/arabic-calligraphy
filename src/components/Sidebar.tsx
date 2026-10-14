@@ -24,7 +24,8 @@ import { STARTER_TEMPLATES } from "../lib/templates";
 import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
 import { CompositionButton } from "./CompositionDialog";
-import { FontPickerField, type FontChoice } from "./FontPickerDialog";
+import { FontPickerField } from "./FontPickerDialog";
+import { fontChoicesWith, type FontChoice } from "../lib/fontCatalog";
 import type { CompositionSelection } from "../lib/composition";
 import type { GuideAttachment, GuideParams, GuideShape, VerseLayout, VerseSettings } from "../types";
 import { VerseButton } from "./VerseDialog";
@@ -360,50 +361,6 @@ export type SidebarProps = {
   onDeleteExportPreset?: () => void;
 };
 
-/**
- * The bundled fonts, grouped by calligraphic genre and listed in picker
- * order — the font picker starts a new heading wherever `genre` changes, so
- * a genre's fonts must sit together here.
- *
- * `value` is persisted in every saved block; never rename one. Labels are
- * free to change (the "Kufi" key is Janna LT, a modern sans, and "Urdu" is
- * Jameel Noori Nastaleeq).
- */
-const FONT_OPTIONS: FontChoice[] = [
-  { genre: "Fatemi", value: "FatemiMaqala", label: "Fatemi Maqala", cssFamily: "FatemiMaqala" },
-  { genre: "Fatemi", value: "AlFatemi", label: "Al Fatemi", cssFamily: "AlFatemi" },
-  { genre: "Naskh", value: "TahaNaskhRegular", label: "Taha Naskh", cssFamily: "TahaNaskhRegular" },
-  { genre: "Naskh", value: "Amiri", label: "Amiri", cssFamily: "Amiri" },
-  { genre: "Naskh", value: "Scheherazade", label: "Scheherazade", cssFamily: "Scheherazade" },
-  { genre: "Naskh", value: "Lateef", label: "Lateef", cssFamily: "Lateef" },
-  { genre: "Thuluth", value: "Thuluth", label: "Thuluth", cssFamily: "Thuluth" },
-  { genre: "Thuluth", value: "ThuluthDeco", label: "Thuluth Deco", cssFamily: "ThuluthDeco" },
-  { genre: "Nastaliq", value: "Urdu", label: "Jameel Noori", cssFamily: "Urdu" },
-  { genre: "Nastaliq", value: "Gulzar", label: "Gulzar", cssFamily: "Gulzar" },
-  { genre: "Diwani", value: "UKIJDiwani", label: "UKIJ Diwani", cssFamily: "UKIJDiwani" },
-  // Retired 2026-10-13: Layla Diwani's own medial meem and hah are drawn so
-  // small that محمد reads as نصر. Kept so a saved block on it still renders
-  // and still shows its name; hidden from the picker otherwise.
-  {
-    genre: "Diwani",
-    value: "HarfCanvasDiwani",
-    label: "Layla Diwani (retired)",
-    cssFamily: "HarfCanvasDiwani",
-    retired: true,
-  },
-  { genre: "Diwani", value: "Wessam", label: "Wessam", cssFamily: "Wessam" },
-  { genre: "Ruqaa", value: "Ruqaa", label: "Ruqaa", cssFamily: "Ruqaa" },
-  { genre: "Maghribi", value: "Rabat", label: "Rabat", cssFamily: "Rabat" },
-  { genre: "Kufi", value: "Kufi2", label: "Reem Kufi", cssFamily: "Kufi2" },
-  { genre: "Kufi", value: "Qahiri", label: "Qahiri", cssFamily: "Qahiri" },
-  { genre: "Mushaf Kufi", value: "Raqq", label: "Raqq", cssFamily: "Raqq" },
-  { genre: "Decorated Kufi", value: "RanaKufi", label: "Rana Kufi", cssFamily: "RanaKufi" },
-  { genre: "Wide Kufi", value: "Blaka", label: "Blaka", cssFamily: "Blaka" },
-  { genre: "Modern", value: "Yekan", label: "Yekan", cssFamily: "Yekan" },
-  { genre: "Modern", value: "Kufi", label: "Janna", cssFamily: "Kufi" },
-  { genre: "Modern", value: "NotoSans", label: "Noto Sans", cssFamily: "'Noto Sans Arabic'" },
-];
-
 /** Serializes parsed SVG path commands back into a `d` string (module-local, one-off — mirrors ShapedText.tsx's commandsToSvgPath). */
 function cmdsToD(cmds: SvgCmd[]): string {
   const parts: string[] = [];
@@ -657,18 +614,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
    * uploaded font has to reach this list, not only the shaping seam, or the
    * picker could not show or offer the family a block is actually on.
    */
-  const fontChoices = useMemo<FontChoice[]>(
-    () => [
-      ...FONT_OPTIONS,
-      ...customFonts.map((f) => ({
-        value: f.key,
-        label: `${f.label} (uploaded)`,
-        cssFamily: `'${f.key}'`,
-        genre: "Uploaded",
-      })),
-    ],
-    [customFonts]
-  );
+  const fontChoices = useMemo<FontChoice[]>(() => fontChoicesWith(customFonts), [customFonts]);
   /**
    * The Square Kufi panel's readout, laid out once per change rather than
    * once per render.

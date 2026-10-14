@@ -101,7 +101,7 @@ describe("bundled fonts", () => {
 
   it("registers every FONT_URLS entry in @font-face and the picker", () => {
     const css = read("src/index.css");
-    const sidebar = read("src/components/Sidebar.tsx");
+    const sidebar = read("src/lib/fontCatalog.ts");
     // Noto Sans predates this check: its picker preview names the system
     // family 'Noto Sans Arabic' rather than a bundled @font-face.
     const noFace = [...fonts]
