@@ -313,6 +313,22 @@ export function glyphIndicesWithOverrides(overrides: readonly DetachedMarkOverri
   return out;
 }
 
+/**
+ * A stable key for *which* glyphs carry overrides, independent of their
+ * offsets: the renderers memo detection on this rather than on the
+ * overrides array, which is replaced on every drag frame. Without it a drag
+ * re-ran the point-in-polygon walk per mousemove, and on Shape Fill
+ * re-tiled the whole silhouette with it.
+ */
+export function overrideGlyphKey(overrides: readonly DetachedMarkOverride[], glyphs: HarfBuzzGlyph[]): string {
+  return [...glyphIndicesWithOverrides(overrides, glyphs)].sort((a, b) => a - b).join(",");
+}
+
+/** The glyph indices a key names (the inverse of `overrideGlyphKey`). */
+export function glyphIndicesFromKey(key: string): Set<number> {
+  return new Set(key === "" ? [] : key.split(",").map(Number));
+}
+
 /** Cluster keys shift when a tatweel is inserted; same remap as stroke cuts. */
 export const remapMarksForEdits = (
   marks: DetachedMarkOverride[],

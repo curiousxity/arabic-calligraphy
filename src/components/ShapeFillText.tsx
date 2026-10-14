@@ -36,7 +36,8 @@ import type { DiacriticOverride, DetachedMarkOverride, GlyphAlternate } from "..
 import {
   findDetachedMarks,
   buildDetachedMarkPlan,
-  glyphIndicesWithOverrides,
+  overrideGlyphKey,
+  glyphIndicesFromKey,
   applyMarkPlanToGlyph,
   EMPTY_MARK_PLAN,
   type DetachedMark,
@@ -288,42 +289,60 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
   // over the whole run only while the tool is armed; otherwise only over the
   // glyphs that carry an override. Declared above `glyphCache`, which reads
   // the plan: a `const` read before its declaration throws at runtime.
+  // Keyed on *which* glyphs carry overrides, not on the overrides array:
+  // a drag replaces that array every frame, and re-detecting per frame
+  // (and on Shape Fill re-tiling the silhouette) made the handle lag.
+  const overrideKey = useMemo(
+    () => (detachedMarkEditMode ? null : overrideGlyphKey(detachedMarkOverrides, shapeData.glyphs)),
+    [detachedMarkEditMode, detachedMarkOverrides, shapeData.glyphs]
+  );
   const detectedMarks = useMemo(() => {
-    const only = detachedMarkEditMode ? undefined : glyphIndicesWithOverrides(detachedMarkOverrides, shapeData.glyphs);
+    const only = overrideKey === null ? undefined : glyphIndicesFromKey(overrideKey);
     if (only && only.size === 0) return new Map<number, DetachedMark[]>();
     return findDetachedMarks(
       shapeData.glyphs, shapeData.font, shapeData.unitsPerEm, diacriticGlyphIndices, fontFamily, only
     );
-  }, [detachedMarkEditMode, detachedMarkOverrides, shapeData.glyphs, shapeData.font, shapeData.unitsPerEm, diacriticGlyphIndices, fontFamily]);
+  }, [overrideKey, shapeData.glyphs, shapeData.font, shapeData.unitsPerEm, diacriticGlyphIndices, fontFamily]);
 
   const markPlan = useMemo<DetachedMarkPlan>(
     () => (detachedMarkOverrides.length ? buildDetachedMarkPlan(detachedMarkOverrides, shapeData.glyphs, detectedMarks) : EMPTY_MARK_PLAN),
     [detachedMarkOverrides, shapeData.glyphs, detectedMarks]
   );
 
-  // Pre-compute glyph path commands + advances. A moved dot is applied here,
-  // once per glyph, never per tile; a whole-glyph mark's offset folds into
-  // dx/dy so every repetition carries it.
-  const glyphCache = useMemo(() => {
+  // Pre-compute glyph path commands + advances. Plan-free: this is what the
+  // tiling reads, and a dot drag must not re-tile the silhouette per frame.
+  const baseGlyphCache = useMemo(() => {
     const { glyphs, font, unitsPerEm } = shapeData;
     if (!font) return [];
     const scale = fontSize / unitsPerEm;
     let penX = 0;
-    return glyphs.map((g, i) => {
+    return glyphs.map((g) => {
       const obj = font.glyphs.get(g.g);
-      const whole = markPlan.glyphs.get(i);
-      const dx = (g.dx ?? 0) * scale + (whole?.[0] ?? 0) * scale;
-      const dy = (g.dy ?? 0) * scale + (whole?.[1] ?? 0) * scale;
+      const dx = (g.dx ?? 0) * scale;
+      const dy = (g.dy ?? 0) * scale;
       const advance = (g.ax ?? 0) * scale;
-      const raw: SvgCmd[] = obj ? toSvgCmds(obj.getPath(0, 0, fontSize).commands) : [];
-      const commands = applyMarkPlanToGlyph(raw, markPlan, i, scale);
+      const commands: SvgCmd[] = obj ? toSvgCmds(obj.getPath(0, 0, fontSize).commands) : [];
       const result = { obj, penX, dx, dy, advance, commands, glyphId: g.g };
       penX += advance;
       return result;
     });
-  }, [shapeData, fontSize, markPlan]);
+  }, [shapeData, fontSize]);
 
-  const totalAdvance = glyphCache.reduce((s, g) => s + g.advance, 0);
+  // The same, with moved dots applied once per glyph (never per tile); a
+  // whole-glyph mark's offset folds into dx/dy so every repetition carries
+  // it. The draw loop and the hover boxes read this one.
+  const glyphCache = useMemo(() => {
+    if (markPlan === EMPTY_MARK_PLAN) return baseGlyphCache;
+    const scale = fontSize / Math.max(shapeData.unitsPerEm || 1000, 1);
+    return baseGlyphCache.map((g, i) => {
+      const whole = markPlan.glyphs.get(i);
+      const commands = applyMarkPlanToGlyph(g.commands, markPlan, i, scale);
+      if (!whole && commands === g.commands) return g;
+      return { ...g, dx: g.dx + (whole?.[0] ?? 0) * scale, dy: g.dy + (whole?.[1] ?? 0) * scale, commands };
+    });
+  }, [baseGlyphCache, markPlan, fontSize, shapeData.unitsPerEm]);
+
+  const totalAdvance = baseGlyphCache.reduce((s, g) => s + g.advance, 0);
 
   const isBold = fontStyle === "bold" || fontStyle === "bold italic";
   const isItalic = fontStyle === "italic" || fontStyle === "bold italic";
@@ -386,7 +405,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     const empty: GlyphInstance[] = [];
     if (!diacriticEditMode && !glyphAlternateMode && !detachedMarkEditMode) return empty;
     if (!shapeSvgPath || parsedCmds.length === 0) return empty;
-    if (!shapeData.font || glyphCache.length === 0 || totalAdvance <= 0) return empty;
+    if (!shapeData.font || baseGlyphCache.length === 0 || totalAdvance <= 0) return empty;
 
     const inShape = (px: number, py: number) => pointInPolygon(px, py, polygon);
     const lines = computeShapeFillLines({
@@ -403,8 +422,8 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
 
     for (const line of lines) {
       for (const startPenX of line.repStartXs) {
-        for (let gi = 0; gi < glyphCache.length; gi++) {
-          const g = glyphCache[gi];
+        for (let gi = 0; gi < baseGlyphCache.length; gi++) {
+          const g = baseGlyphCache[gi];
           if (!g.obj || g.commands.length === 0) continue;
           instances.push({
             glyphIndex: gi,
@@ -425,7 +444,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     shapeSvgPath,
     parsedCmds,
     shapeData.font,
-    glyphCache,
+    baseGlyphCache,
     totalAdvance,
     fontSize,
     shapeFillSpacing,
@@ -538,9 +557,9 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
     shapeScale,
   ]);
 
-  // One placement per tiled repetition of each detached mark. A whole-glyph
-  // mark's offset is already in the instance's gx/gy via glyphCache.dx/dy,
-  // so only a contour mark's offset moves the box here.
+  // One placement per tiled repetition of each detached mark. The instances
+  // come from the plan-free cache, so the mark's own offset moves the box
+  // here for both routes.
   const detachedMarkPlacements = useMemo<DetachedMarkPlacement[]>(() => {
     if (!detachedMarkEditMode) return [];
     const scale = fontSize / Math.max(shapeData.unitsPerEm || 1000, 1);
@@ -554,7 +573,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
       for (const m of list) {
         const off = m.mark < 0 ? markPlan.glyphs.get(inst.glyphIndex) : markPlan.contours.get(inst.glyphIndex)?.get(m.mark);
         const dx = off?.[0] ?? 0, dy = off?.[1] ?? 0;
-        const bx = m.mark < 0 ? 0 : dx, by = m.mark < 0 ? 0 : dy;
+        const bx = dx, by = dy;
         out.push({
           key: `${i}:${inst.glyphIndex}:${m.mark}`, cluster: m.cluster, glyphId: m.glyphId, mark: m.mark, dx, dy,
           box: {

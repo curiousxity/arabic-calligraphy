@@ -16,7 +16,8 @@ import type { DiacriticOverride, DetachedMarkOverride, GlyphAlternate, StrokeCut
 import {
   findDetachedMarks,
   buildDetachedMarkPlan,
-  glyphIndicesWithOverrides,
+  overrideGlyphKey,
+  glyphIndicesFromKey,
   applyMarkPlanToGlyph,
   EMPTY_MARK_PLAN,
   type DetachedMark,
@@ -454,13 +455,20 @@ export const ShapedText: React.FC<Props> = ({
   // Detection walks every contour with point-in-polygon tests, so it runs
   // over the whole run only while the tool is armed; otherwise only over the
   // glyphs that carry an override, which is what the plan needs.
+  // Keyed on *which* glyphs carry overrides, not on the overrides array:
+  // a drag replaces that array every frame, and re-detecting per frame
+  // (and on Shape Fill re-tiling the silhouette) made the handle lag.
+  const overrideKey = useMemo(
+    () => (detachedMarkEditMode ? null : overrideGlyphKey(detachedMarkOverrides, shapeData.glyphs)),
+    [detachedMarkEditMode, detachedMarkOverrides, shapeData.glyphs]
+  );
   const detectedMarks = useMemo(() => {
-    const only = detachedMarkEditMode ? undefined : glyphIndicesWithOverrides(detachedMarkOverrides, shapeData.glyphs);
+    const only = overrideKey === null ? undefined : glyphIndicesFromKey(overrideKey);
     if (only && only.size === 0) return new Map<number, DetachedMark[]>();
     return findDetachedMarks(
       shapeData.glyphs, shapeData.font, shapeData.unitsPerEm, diacriticGlyphIndices, fontFamily, only
     );
-  }, [detachedMarkEditMode, detachedMarkOverrides, shapeData.glyphs, shapeData.font, shapeData.unitsPerEm, diacriticGlyphIndices, fontFamily]);
+  }, [overrideKey, shapeData.glyphs, shapeData.font, shapeData.unitsPerEm, diacriticGlyphIndices, fontFamily]);
 
   const markPlan = useMemo<DetachedMarkPlan>(
     () => (detachedMarkOverrides.length ? buildDetachedMarkPlan(detachedMarkOverrides, shapeData.glyphs, detectedMarks) : EMPTY_MARK_PLAN),

@@ -51,9 +51,13 @@ kaf stroke detached (movable) and 0 where it is fused.
 
 ## Residue on passing fonts
 
-Each is a dot the font draws fused to the body (`0/n`) or, on Lateef's
-hamza rows, the hamza counted once by the tashkeel detector and once as a
-contour on the decomposed base.
+Each is a dot the font draws fused to the body (`0/n`), except Lateef's
+hamza rows (`2/1`): its ؤ and ئ are precomposed glyphs whose hamza is drawn
+as **two non-touching contours** (head and hook), each admitted as a mark,
+so the user gets two handles on one hamza and can pull it apart. That is
+over-detection on a dotted letter, which the gate does not score; a
+bounding-box-overlap merge of candidates would fold it into one mark
+(deferred).
 
 - **HarfCanvasDiwani** dotted 92.1%: `ف:0/1 ن:0/1 ـن:0/1 ق:0/2 ـق:0/2 ـي:0/2`
 - **Lateef** dotted 89.5%: `ؤ:2/1 ؤـ:2/1 ـؤـ:2/1 ـؤ:2/1 ئ:2/1 ئـ:2/1 ـئـ:2/1 ـئ:2/1`

@@ -20,7 +20,7 @@ import type { HarfBuzzGlyph } from "./harfbuzz";
 const hbjsModule = createRequire(import.meta.url)("harfbuzzjs");
 import {
   findDetachedContours, splitContours, translateContours, MAX_MARK_FRACTION, findDetachedMarks,
-  buildDetachedMarkPlan, remapMarksForEdits, applyMarkPlanToGlyph,
+  buildDetachedMarkPlan, remapMarksForEdits, applyMarkPlanToGlyph, overrideGlyphKey,
 } from "./detachedMarks";
 import { findDiacriticGlyphIndices } from "./diacritics";
 import { toSvgCmds, outlineBounds } from "./strokeCuts";
@@ -311,5 +311,22 @@ describe("applyMarkPlanToGlyph", () => {
     expect(same).toBe(cmds);
     const moved = applyMarkPlanToGlyph(cmds, plan, 3, 0.1);
     expect(outlineBounds(splitContours(moved)[dot.mark]).x1).toBeCloseTo(dot.bounds.x1 + 10, 6);
+  });
+});
+
+describe("overrideGlyphKey", () => {
+  it("is stable while an override's offset changes and changes when a new glyph gains one", async () => {
+    const { glyphs, font } = await shapeReal("ثبت", "FatemiMaqala.ttf");
+    const detected = findDetachedMarks(glyphs, font, font.unitsPerEm || 1000, new Set(), "FatemiMaqala");
+    const [a, b] = [...detected.values()].map((l) => l[0]);
+    const k1 = overrideGlyphKey([{ cluster: a.cluster, glyphId: a.glyphId, mark: a.mark, dx: 1, dy: 2 }], glyphs);
+    const k2 = overrideGlyphKey([{ cluster: a.cluster, glyphId: a.glyphId, mark: a.mark, dx: 50, dy: -9 }], glyphs);
+    const k3 = overrideGlyphKey([
+      { cluster: a.cluster, glyphId: a.glyphId, mark: a.mark, dx: 1, dy: 2 },
+      { cluster: b.cluster, glyphId: b.glyphId, mark: b.mark, dx: 1, dy: 2 },
+    ], glyphs);
+    expect(k1).toBe(k2);
+    expect(k3).not.toBe(k1);
+    expect(overrideGlyphKey([], glyphs)).toBe("");
   });
 });

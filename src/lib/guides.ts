@@ -78,6 +78,8 @@ const TEXT_ONLY_FIELDS = [
   "diacriticOverrides",
   "strokeCuts",
   "strokeCutEditMode",
+  "detachedMarkOverrides",
+  "detachedMarkEditMode",
 ] as const;
 
 export function attachTextToGuide(
@@ -87,6 +89,7 @@ export function attachTextToGuide(
   const dropped: string[] = [];
   if (text.diacriticOverrides?.length) dropped.push("diacritic moves");
   if (text.strokeCuts?.length) dropped.push("stroke cuts");
+  if (text.detachedMarkOverrides?.length) dropped.push("dot and mark moves");
   if (text.letterSpacing || text.wordSpacing) dropped.push("letter and word spacing");
   if (text.verse) dropped.push("verse membership");
   return {
