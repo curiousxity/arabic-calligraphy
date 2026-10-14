@@ -8,9 +8,10 @@ import { GuideView } from "./GuideView";
 import { StackView } from "./StackView";
 import { StackEditOverlay } from "./StackEditOverlay";
 import { stackScale } from "../lib/stackOutline";
-import { resolveGuidePath } from "../lib/guides";
-import { projectToGuide } from "../lib/guidePlacement";
-import { buildArcTable, type ArcTable } from "../lib/textPath";
+import { resolveGuidePath, type WritingSession } from "../lib/guides";
+import { isClosedPath } from "../lib/guideShapes";
+import { guideCaret, projectToGuide, type GuideCaret } from "../lib/guidePlacement";
+import { buildArcTable, curvePlacementToGroup, type ArcTable } from "../lib/textPath";
 import { parseSvgPath } from "../lib/svgPath";
 
 /**
@@ -19,6 +20,34 @@ import { parseSvgPath } from "../lib/svgPath";
  * would re-flatten the guide 60 times a second.
  */
 const guideTableCache = new Map<string, ArcTable>();
+/**
+ * Where the pointer is along a placed guide, 0..1 un-flipped, from a Konva
+ * event on anything in the same layer. Used by the slide drag and by a
+ * double-click that starts writing at the clicked point.
+ */
+function pointerOffsetOnGuide(
+  node: Konva.Node,
+  guidePlace: { d: string; x: number; y: number; rotation: number }
+): number | null {
+  const p = node.getLayer()?.getRelativePointerPosition();
+  if (!p) return null;
+  const r = (-guidePlace.rotation * Math.PI) / 180;
+  const dx = p.x - guidePlace.x;
+  const dy = p.y - guidePlace.y;
+  const local = {
+    x: dx * Math.cos(r) - dy * Math.sin(r),
+    y: dx * Math.sin(r) + dy * Math.cos(r),
+  };
+  return projectToGuide(guideArcTable(guidePlace.d), local);
+}
+
+/** A caret as a Konva `points` array: baseline up the ascent, tilted to the tangent. */
+function caretLinePoints(c: GuideCaret, ascentEm: number): number[] {
+  const a = curvePlacementToGroup(c, { x: 0, y: 0 }, c.baselineOffset);
+  const b = curvePlacementToGroup(c, { x: 0, y: -ascentEm * c.size }, c.baselineOffset);
+  return [a.x, a.y, b.x, b.y];
+}
+
 function guideArcTable(d: string): ArcTable {
   let t = guideTableCache.get(d);
   if (!t) {
@@ -126,6 +155,15 @@ export type CanvasStageProps = {
   onGuideLayout?: (blockId: number, shrink: number) => void;
   /** A drag on attached text slides it along its guide (0..1, un-flipped); `first` opens the gesture's one undo step. */
   onSlideAlongGuide?: (blockId: number, offset: number, first: boolean) => void;
+  /** Typing on a guide, when open: the caret is drawn and a hidden field takes the keys. See guides.md. */
+  writing?: WritingSession | null;
+  /** Double-click on a guide: start writing there (`offset` along it, un-flipped), or at the default place when null. */
+  onBeginWritingOnGuide?: (guideId: number, offset: number | null) => void;
+  /** Double-click on attached text: keep writing it on the canvas. */
+  onBeginWritingText?: (textId: number) => void;
+  /** Every change of the hidden field while writing. */
+  onWriteText?: (text: string) => void;
+  onEndWriting?: () => void;
   /**
    * One `pushHistory()` per painting stroke, taken on mousedown. App passes
    * `pushHistory` itself — see `setKufiCell` there for why the per-cell write
@@ -187,6 +225,59 @@ export type CanvasStageProps = {
 
 const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
 
+/**
+ * The field that takes the keys while writing on a guide. A real textarea,
+ * not a keydown listener, so Arabic layouts, IMEs and on-screen keyboards
+ * all deliver text the way they do everywhere else. It is invisible and
+ * takes no pointer events; focus lands on it when writing starts and
+ * leaving it (a click anywhere, Escape, Enter) ends the session, once: the
+ * blur that follows an Escape must not end it a second time.
+ *
+ * One mount per session, whatever the session's `textId`: remounting when
+ * the first letter creates the block would drop an IME composition mid-word.
+ */
+const WritingField: React.FC<{ value: string; onChange: (text: string) => void; onEnd: () => void }> = ({
+  value,
+  onChange,
+  onEnd,
+}) => {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  const endedRef = useRef(false);
+  const end = () => {
+    if (endedRef.current) return;
+    endedRef.current = true;
+    onEnd();
+  };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
+  return (
+    <textarea
+      ref={ref}
+      aria-label="Write on guide"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={end}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" || e.key === "Enter") {
+          e.preventDefault();
+          end();
+        }
+      }}
+      dir="rtl"
+      lang="ar"
+      spellCheck={false}
+      autoCorrect="off"
+      autoCapitalize="off"
+      rows={1}
+      style={{ position: "absolute", left: 0, top: 0, width: 1, height: 1, opacity: 0, pointerEvents: "none", resize: "none", overflow: "hidden" }}
+    />
+  );
+};
+
 export const CanvasStage: React.FC<CanvasStageProps> = ({
   blocks,
   selectedId,
@@ -212,6 +303,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onUpdateGuideD,
   onGuideLayout,
   onSlideAlongGuide,
+  writing = null,
+  onBeginWritingOnGuide,
+  onBeginWritingText,
+  onWriteText,
+  onEndWriting,
   onBeginKufiCellEdit,
   onSetKufiCell,
   onBeginDiacriticDrag,
@@ -686,6 +782,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       }
     };
 
+  const writingBlock = writing?.textId != null ? blocks.find((b) => b.id === writing.textId) : undefined;
+  const writingText = writingBlock?.text ?? "";
+
   return (
     <div
       style={{
@@ -701,6 +800,13 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       }}
     >
       <div style={{ width: viewportWidth, height: stageViewportHeight }}>
+        {writing && (
+          <WritingField
+            value={writingText}
+            onChange={(t) => onWriteText?.(t)}
+            onEnd={() => onEndWriting?.()}
+          />
+        )}
         <div className="canvasToolbar">
           <button
             type="button"
@@ -1042,10 +1148,35 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
               }
 
               if (block.type === "guide") {
+                // A double-click on the line starts writing where it landed.
+                const guidePlace = { d: block.guideD, x: block.x, y: block.y, rotation: block.rotation ?? 0 };
+                const beginWriting = onBeginWritingOnGuide
+                  ? (e: Konva.KonvaEventObject<Event>) =>
+                      onBeginWritingOnGuide(block.id, pointerOffsetOnGuide(e.target, guidePlace))
+                  : commonProps.onDblClick;
+                // Before the first letter the text block does not exist, so
+                // the caret is drawn here, at the point the run will grow
+                // from, at the size the new text will open with. The ascent
+                // is a stand-in: no font is loaded for a guide.
+                const pendingCaret =
+                  writing && writing.guideId === block.id && writing.textId === null
+                    ? guideCaret({
+                        glyphs: [],
+                        layout: null,
+                        fontSize: writing.fontSize,
+                        unitsPerEm: 1000,
+                        ascender: 800,
+                        arcTable: guideArcTable(block.guideD),
+                        closed: isClosedPath(parseSvgPath(block.guideD)),
+                        attachment: { id: block.id, ...writing.attachment },
+                      })
+                    : null;
                 return (
                   <React.Fragment key={block.id}>
                     <GuideView
                       {...commonProps}
+                      onDblClick={beginWriting}
+                      onDblTap={beginWriting}
                       x={block.x}
                       y={block.y}
                       rotation={block.rotation ?? 0}
@@ -1053,6 +1184,17 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                       stageScale={stageScale}
                       selected={block.id === selectedId}
                     />
+                    {pendingCaret && (
+                      <Group
+                        name={EXPORT_HIDDEN}
+                        x={block.x}
+                        y={block.y}
+                        rotation={block.rotation ?? 0}
+                        listening={false}
+                      >
+                        <Line points={caretLinePoints(pendingCaret, 0.8)} stroke="#d4af37" strokeWidth={2} lineCap="round" />
+                      </Group>
+                    )}
                     {block.guideShape === "pen" &&
                       block.guideEditMode &&
                       block.id === selectedId &&
@@ -1084,16 +1226,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     ? (e: Konva.KonvaEventObject<DragEvent>, end: boolean) => {
                         const node = e.target;
                         node.position({ x: guidePlace.x, y: guidePlace.y });
-                        const p = node.getParent()?.getRelativePointerPosition();
-                        if (!p) return;
-                        const r = (-guidePlace.rotation * Math.PI) / 180;
-                        const dx = p.x - guidePlace.x;
-                        const dy = p.y - guidePlace.y;
-                        const local = {
-                          x: dx * Math.cos(r) - dy * Math.sin(r),
-                          y: dx * Math.sin(r) + dy * Math.cos(r),
-                        };
-                        const projected = projectToGuide(guideArcTable(guidePlace.d), local);
+                        const projected = pointerOffsetOnGuide(node, guidePlace);
+                        if (projected === null) return;
                         const first = slideGrabRef.current?.id !== block.id;
                         if (first) {
                           slideGrabRef.current = { id: block.id, delta: projected - attachment.offset };
@@ -1115,6 +1249,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                       onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}
                       guidePath={guidePlace ? { d: guidePlace.d, closed: guidePlace.closed } : undefined}
                       onGuideLayout={onGuideLayout ? (info) => onGuideLayout(block.id, info.shrink) : undefined}
+                      caret={writing?.textId === block.id}
+                      onDblClick={
+                        guidePlace && onBeginWritingText ? () => onBeginWritingText(block.id) : commonProps.onDblClick
+                      }
                       x={guidePlace?.x ?? block.x}
                       y={guidePlace?.y ?? block.y}
                       rotation={guidePlace?.rotation ?? block.rotation ?? 0}

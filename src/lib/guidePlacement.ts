@@ -48,18 +48,7 @@ export function guideGlyphPlacements(args: {
   const shrink = Math.min(1, length / natural);
   const size = fontSize * shrink;
   const textLen = natural * shrink;
-
-  // The offset is stored in the guide's un-flipped direction; a flipped
-  // attachment walks a reversed table, where that same point sits at
-  // `length - s`.
-  const raw = Math.min(Math.max(attachment.offset, 0), 1) * length;
-  const anchor = attachment.flip ? length - raw : raw;
-  // Glyphs are laid in visual order along the walk, so Arabic *reads* from
-  // the far end of the run: "start" (where reading begins) puts that far end
-  // at the anchor, "end" puts the near end there.
-  let start =
-    attachment.align === "end" ? anchor : attachment.align === "center" ? anchor - textLen / 2 : anchor - textLen;
-  if (!closed) start = Math.min(Math.max(start, 0), Math.max(length - textLen, 0));
+  const start = runStart(textLen, length, closed, attachment);
 
   const placements: CurveGlyphPlacement[] = [];
   let cursor = start;
@@ -70,14 +59,98 @@ export function guideGlyphPlacements(args: {
     cursor += (g.ax ?? 0) * scale * shrink;
   });
 
-  // The renderer translates by (0, baselineOffset) after rotating to the
-  // tangent: negative moves a glyph up (away from the line, on the side its
-  // own "up" points to), positive moves it down. Walking a flipped guide turns
-  // the glyphs' up toward the other side, so "outside" must then hang.
-  const ascent = (args.ascender * size) / upm;
+  return {
+    placements,
+    size,
+    shrink,
+    baselineOffset: baselineOffsetFor(size, fontSize, args.ascender, upm, attachment),
+  };
+}
+
+/**
+ * Arc position (along the walk) where a run `textLen` long begins.
+ *
+ * The offset is stored in the guide's un-flipped direction; a flipped
+ * attachment walks a reversed table, where that same point sits at
+ * `length - s`. Glyphs are laid in visual order along the walk, so Arabic
+ * *reads* from the far end of the run: "start" (where reading begins) puts
+ * that far end at the anchor, "end" puts the near end there.
+ */
+function runStart(textLen: number, length: number, closed: boolean, attachment: GuideAttachment): number {
+  const raw = Math.min(Math.max(attachment.offset, 0), 1) * length;
+  const anchor = attachment.flip ? length - raw : raw;
+  let start =
+    attachment.align === "end" ? anchor : attachment.align === "center" ? anchor - textLen / 2 : anchor - textLen;
+  if (!closed) start = Math.min(Math.max(start, 0), Math.max(length - textLen, 0));
+  return start;
+}
+
+/**
+ * The renderer translates by (0, baselineOffset) after rotating to the
+ * tangent: negative moves a glyph up (away from the line, on the side its
+ * own "up" points to), positive moves it down. Walking a flipped guide turns
+ * the glyphs' up toward the other side, so "outside" must then hang.
+ */
+function baselineOffsetFor(
+  size: number,
+  fontSize: number,
+  ascender: number,
+  upm: number,
+  attachment: GuideAttachment
+): number {
+  const ascent = (ascender * size) / upm;
   const gap = attachment.gap * fontSize;
   const hang = (attachment.side === "inside") !== attachment.flip;
-  return { placements, size, shrink, baselineOffset: hang ? ascent + gap : -gap };
+  return hang ? ascent + gap : -gap;
+}
+
+export type GuideCaret = { x: number; y: number; angle: number; size: number; baselineOffset: number };
+
+/**
+ * Where a typing caret sits on attached text: at the origin of the glyph
+ * carrying the last typed letter — the highest cluster, its base glyph
+ * rather than a mark riding on it — which is the run's reading end, where
+ * the next letter will go. With no text yet, at the anchor the run will
+ * grow from, at the full font size.
+ */
+export function guideCaret(args: {
+  glyphs: readonly { ax?: number; cl?: number }[];
+  layout: GuideLayout | null;
+  fontSize: number;
+  unitsPerEm: number;
+  ascender: number;
+  arcTable: ArcTable;
+  closed: boolean;
+  attachment: GuideAttachment;
+}): GuideCaret {
+  const { glyphs, layout, fontSize, arcTable, closed, attachment } = args;
+  const upm = Math.max(args.unitsPerEm || 1000, 1);
+  if (layout && layout.placements.length > 0) {
+    let best = layout.placements[0];
+    let bestCl = -1;
+    let bestBase = false;
+    for (const p of layout.placements) {
+      const g = glyphs[p.glyphIndex];
+      const cl = g?.cl ?? 0;
+      const base = (g?.ax ?? 0) > 0;
+      if (cl > bestCl || (cl === bestCl && base && !bestBase)) {
+        best = p;
+        bestCl = cl;
+        bestBase = base;
+      }
+    }
+    return { x: best.x, y: best.y, angle: best.angle, size: layout.size, baselineOffset: layout.baselineOffset };
+  }
+  const length = arcTable.total;
+  const start = runStart(0, length, closed, attachment);
+  const { x, y, angle } = pointAtArcLengthFromTable(arcTable, closed ? mod(start, length) : start);
+  return {
+    x,
+    y,
+    angle,
+    size: fontSize,
+    baselineOffset: baselineOffsetFor(fontSize, fontSize, args.ascender, upm, attachment),
+  };
 }
 
 /** Nearest point on the guide to `point`, as 0..1 along its un-flipped direction. */

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   blockClientBox,
+  centerOf,
   dragMouse,
   getBlocks,
   gotoApp,
@@ -180,4 +181,77 @@ test("a slide with a pause in it is still one undo step", async ({ page }) => {
   await expect.poll(offsetOf).not.toBe(t1.guide!.offset);
   await page.keyboard.press("Control+z");
   await expect.poll(offsetOf).toBe(t1.guide!.offset);
+});
+
+/** A guide on screen at the opening zoom, selected, with nothing on it yet. */
+async function addSmallCircle(page: Page) {
+  await gotoApp(page);
+  await addGuide(page, "Circle");
+  await setRange(page, /^Diameter/, 120);
+  await expect.poll(async () => (await guides(page))[0].guideParams?.width).toBe(120);
+  await settleFrames(page);
+  return (await guides(page))[0];
+}
+
+const writingField = (page: Page) => page.getByLabel("Write on guide");
+
+/**
+ * Starts writing on the selected guide by pressing a key, then types `text`.
+ * Playwright cannot press a key outside the US layout (`keyboard.type` turns
+ * an Arabic letter into an `insertText`, with no keydown at all), so the
+ * session opens on a Latin key and the real words replace it in the field.
+ */
+async function writeOnSelectedGuide(page: Page, text: string) {
+  await page.keyboard.press("s");
+  await expect(writingField(page)).toBeFocused();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type(text);
+}
+
+test("typing with a guide selected writes on it; Escape keeps the words", async ({ page }) => {
+  await addSmallCircle(page);
+  await writeOnSelectedGuide(page, "سلام");
+  await expect.poll(async () => (await attached(page)).map((b) => b.text)).toEqual(["سلام"]);
+  await page.keyboard.press("Escape");
+  await expect(writingField(page)).toHaveCount(0);
+  const [t] = await attached(page);
+  expect(t.text).toBe("سلام");
+  // Anchored at the reading start, so what was typed never shifted.
+  expect(t.guide!.align).toBe("start");
+});
+
+test("a double-click on the guide starts writing there; leaving before typing adds nothing", async ({ page }) => {
+  const g = await addSmallCircle(page);
+  const gBox = await blockClientBox(page, g.id);
+  // The right-hand point of the circle.
+  await page.mouse.dblclick(gBox.x + gBox.width - 2, gBox.y + gBox.height / 2);
+  await expect(writingField(page)).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(writingField(page)).toHaveCount(0);
+  expect(await attached(page)).toHaveLength(0);
+  expect(await guides(page)).toHaveLength(1);
+  // The bottom point: offset 0.5 on a top-start clockwise circle.
+  await page.mouse.dblclick(gBox.x + gBox.width / 2, gBox.y + gBox.height - 2);
+  await expect(writingField(page)).toBeFocused();
+  await page.keyboard.type("اب");
+  await expect.poll(async () => (await attached(page)).map((b) => b.text)).toEqual(["اب"]);
+  const [t] = await attached(page);
+  expect(t.guide!.align).toBe("start");
+  expect(t.guide!.offset).toBeCloseTo(0.5, 1);
+});
+
+test("a double-click on words written on a guide keeps writing them", async ({ page }) => {
+  await addSmallCircle(page);
+  await writeOnSelectedGuide(page, "سلام");
+  await expect.poll(async () => (await attached(page)).map((b) => b.text)).toEqual(["سلام"]);
+  await page.keyboard.press("Escape");
+  await expect(writingField(page)).toHaveCount(0);
+  await settleFrames(page);
+  const t = (await attached(page))[0];
+  const c = centerOf(await blockClientBox(page, t.id));
+  await page.mouse.dblclick(c.x, c.y);
+  await expect(writingField(page)).toBeFocused();
+  await expect(writingField(page)).toHaveValue("سلام");
+  await page.keyboard.type("ي");
+  await expect.poll(async () => (await attached(page)).map((b) => b.text)).toEqual(["سلامي"]);
 });

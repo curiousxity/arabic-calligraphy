@@ -131,7 +131,7 @@ async function shapeReal(
 import { parseSvgPath } from "./svgPath";
 import { buildArcTable, pointAtArcLengthFromTable, type ArcTable } from "./textPath";
 import { guidePathD, isClosedPath } from "./guideShapes";
-import { DEFAULT_ATTACHMENT, guideGlyphPlacements, guideInkBox, projectToGuide } from "./guidePlacement";
+import { DEFAULT_ATTACHMENT, guideCaret, guideGlyphPlacements, guideInkBox, projectToGuide } from "./guidePlacement";
 import type { GuideAttachment } from "../types";
 
 async function amiri(text: string) {
@@ -231,6 +231,54 @@ describe("guideGlyphPlacements (real HarfBuzz, Amiri)", () => {
   it("returns null for empty text", () => {
     const { t, closed } = table(guidePathD("circle"), false);
     expect(guideGlyphPlacements({ glyphs: [], fontSize: 40, unitsPerEm: 1000, ascender: 800, arcTable: t, closed, attachment: attach() })).toBeNull();
+  });
+});
+
+describe("guideCaret (real HarfBuzz, Amiri)", () => {
+  const line = () => table(guidePathD("line", { width: 1000 }), false);
+
+  it("sits at the reading end: the origin of the last typed letter's glyph", async () => {
+    const { glyphs, upm, ascender } = await amiri("اب");
+    const { t, closed } = line();
+    const attachment = attach({ offset: 0.5, align: "start" });
+    const layout = guideGlyphPlacements({ glyphs, fontSize: 40, unitsPerEm: upm, ascender, arcTable: t, closed, attachment })!;
+    const c = guideCaret({ glyphs, layout, fontSize: 40, unitsPerEm: upm, ascender, arcTable: t, closed, attachment });
+    // ب is the last letter typed and the leftmost glyph drawn; the next
+    // letter goes on its left, so the caret is at the run's left end.
+    expect(c.x).toBeCloseTo(Math.min(...layout.placements.map((p) => p.x)), 1);
+    expect(c.size).toBe(layout.size);
+    expect(c.baselineOffset).toBe(layout.baselineOffset);
+  });
+
+  it("stays on the letter when a mark rides on the last letter", async () => {
+    const { glyphs, upm, ascender } = await amiri("ابَ");
+    const { t, closed } = line();
+    const attachment = attach({ offset: 0.5, align: "start" });
+    const layout = guideGlyphPlacements({ glyphs, fontSize: 40, unitsPerEm: upm, ascender, arcTable: t, closed, attachment })!;
+    const c = guideCaret({ glyphs, layout, fontSize: 40, unitsPerEm: upm, ascender, arcTable: t, closed, attachment });
+    const maxCl = Math.max(...glyphs.map((g) => g.cl ?? 0));
+    const base = layout.placements.find((p) => (glyphs[p.glyphIndex].cl ?? 0) === maxCl && (glyphs[p.glyphIndex].ax ?? 0) > 0)!;
+    expect(c.x).toBeCloseTo(base.x, 6);
+    expect(c.y).toBeCloseTo(base.y, 6);
+  });
+
+  it("with no text sits at the anchor, rising outside and hanging inside", () => {
+    const { t, closed } = line();
+    const at = (a: Partial<GuideAttachment>) =>
+      guideCaret({ glyphs: [], layout: null, fontSize: 40, unitsPerEm: 1000, ascender: 800, arcTable: t, closed, attachment: attach({ offset: 0.5, align: "start", ...a }) });
+    // The line runs from x = -500 to 500; offset 0.5 is x = 0.
+    expect(at({}).x).toBeCloseTo(0, 1);
+    expect(at({}).size).toBe(40);
+    expect(at({ side: "outside" }).baselineOffset).toBeCloseTo(-0.15 * 40, 6);
+    expect(at({ side: "inside" }).baselineOffset).toBeCloseTo((800 * 40) / 1000 + 0.15 * 40, 6);
+  });
+
+  it("with no text on a closed guide wraps the anchor like a run would", () => {
+    const { t, closed } = table(guidePathD("circle", { width: 600 }), false);
+    const c = guideCaret({ glyphs: [], layout: null, fontSize: 40, unitsPerEm: 1000, ascender: 800, arcTable: t, closed, attachment: attach({ offset: 0, align: "center" }) });
+    // Offset 0 on a top-start circle is the top: (0, -300).
+    expect(Math.abs(c.x)).toBeLessThan(1);
+    expect(c.y).toBeCloseTo(-300, 0);
   });
 });
 

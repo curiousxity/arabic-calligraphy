@@ -40,6 +40,13 @@ export const section: GuideSection = {
       <h4>Putting words on it</h4>
       <ul>
         <li>
+          <strong>Just type.</strong> With a guide selected, start typing and
+          the letters appear along it, with a caret at the pen's end. Or
+          double-click a point on the guide to begin writing there. Escape,
+          Enter, or a click elsewhere finishes; double-click the words later
+          to keep writing them.
+        </li>
+        <li>
           <strong>Add text to guide</strong> in the Guide panel starts a new
           piece of text on it.
         </li>
