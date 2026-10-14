@@ -16,16 +16,12 @@ const SLIDER_DEFAULTS: Record<string, number> = {
   shadowOffsetX: 0,
   shadowOffsetY: 0,
   shadowOpacity: 0.35,
-  warpX: 0,
-  warpY: 0,
   shapeFillSpacing: 1.3,
   shapeFillScaleX: 1,
   shapeFillScaleY: 1,
   shapeFillTextRotation: 0,
   shapeScale: 1,
   imageScale: 1,
-  warpShapePadding: 24,
-  warpShapeStrength: 1,
 };
 
 export const SelectRow = ({

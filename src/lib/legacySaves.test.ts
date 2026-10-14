@@ -21,4 +21,9 @@ describe("sanitizeLegacyBlocks", () => {
     ]);
     expect(out).toEqual([legacyText]);
   });
+
+  it("strips warpX and warpY", () => {
+    const [out] = sanitizeLegacyBlocks([{ ...legacyText, warpX: 40, warpY: -10 }]);
+    expect(out).toEqual(legacyText);
+  });
 });

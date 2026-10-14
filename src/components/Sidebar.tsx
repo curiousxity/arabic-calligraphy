@@ -3262,37 +3262,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
 
-                {selectedBlock.type === "text" && (
-                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Warp</div>
-
-                    <RangeRow
-                      id={makeId("warp-x", selectedId)}
-                      name={makeId("warpX", selectedId)}
-                      label="Horizontal warp"
-                      value={selectedBlock.warpX ?? 0}
-                      min={-100}
-                      max={100}
-                      step={1}
-                      onChange={(v) => onUpdateSelectedBlock({ warpX: v })}
-                      suffix={selectedBlock.warpX ?? 0}
-                      fieldKey="warpX"
-                    />
-
-                    <RangeRow
-                      id={makeId("warp-y", selectedId)}
-                      name={makeId("warpY", selectedId)}
-                      label="Vertical warp"
-                      value={selectedBlock.warpY ?? 0}
-                      min={-100}
-                      max={100}
-                      step={1}
-                      onChange={(v) => onUpdateSelectedBlock({ warpY: v })}
-                      suffix={selectedBlock.warpY ?? 0}
-                      fieldKey="warpY"
-                    />
-                  </div>
-                )}
               </div>
             </CollapsibleSection>
           </div>

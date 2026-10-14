@@ -3,7 +3,6 @@ import { Group, Shape, Rect, Arc } from "react-konva";
 import type Konva from "konva";
 import type { PathCommand } from "opentype.js";
 import type { HarfBuzzGlyph, ShapedTextResult } from "../lib/harfbuzz";
-import { warpPoint, type GlyphBounds } from "../lib/warp";
 import { useShapedGlyphs } from "../hooks/useShapedGlyphs";
 import { useOverrideGlyph } from "../hooks/useOverrideGlyph";
 import { findDiacriticGlyphIndices } from "../lib/diacritics";
@@ -87,8 +86,6 @@ type Props = {
   shadowOffsetY?: number;
   shadowOpacity?: number;
   rotation?: number;
-  warpX?: number;
-  warpY?: number;
   diacriticOverrides?: DiacriticOverride[];
   strokeCuts?: StrokeCut[];
   glyphAlternates?: GlyphAlternate[];
@@ -124,6 +121,16 @@ type Props = {
 const fallbackWidth = (text: string, fs: number) =>
   Math.max(text.length * fs * 0.55, 20);
 
+/** The run's ink extent, which lays out and centres the block. */
+type GlyphBounds = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  rawWidth: number;
+  rawHeight: number;
+};
+
 export type GlyphHitBox = {
   glyphIndex: number;
   x: number;
@@ -155,11 +162,6 @@ function tracePath(ctx: CanvasRenderingContext2D, commands: PathCommand[]) {
   }
 }
 
-/**
- * Draws each glyph in its own local transform, then warps points
- * in that local frame using warpX / warpY. This is the same
- * block-level warp you’ve been using.
- */
 /** Cuts are stored in font units; a path opentype.js drew at `fontSize` is
  *  already scaled, so the cut positions and distances must be too. The angle
  *  is unaffected — the scaling is uniform. */
@@ -167,15 +169,13 @@ function scaleCuts(cuts: ResolvedCut[], scale: number): ResolvedCut[] {
   return cuts.map((c) => ({ cutX: c.cutX * scale, d: c.d * scale, angle: c.angle }));
 }
 
-function drawWarpedGlyphRun(
+/** Draws each glyph of the run in its own local transform. */
+function drawGlyphRun(
   ctx: CanvasRenderingContext2D,
   glyphs: HarfBuzzGlyph[],
   font: NonNullable<ShapedTextResult["font"]>,
   fontSize: number,
   unitsPerEm: number,
-  bounds: GlyphBounds,
-  warpX: number,
-  warpY: number,
   drawStroke: boolean,
   strokeColor: string,
   strokeWidth: number,
@@ -201,8 +201,6 @@ function drawWarpedGlyphRun(
   let penX = 0;
   const upm = Math.max(unitsPerEm || 1000, 1);
   const scale = fontSize / upm;
-  const width = Math.max(bounds.rawWidth, 1);
-  const height = Math.max(bounds.rawHeight, fontSize);
 
   for (let glyphIndex = 0; glyphIndex < glyphs.length; glyphIndex++) {
     const g = glyphs[glyphIndex];
@@ -257,10 +255,8 @@ function drawWarpedGlyphRun(
       const opPath = glyphObj.getPath(0, 0, fontSize);
       const cutsHere = cutPlan?.surgery.get(glyphIndex);
       // Dot translation first, on raw contour indices; then cut surgery. A
-      // dot dragged across a cut line gets cut — accepted residue. Both
-      // happen before the warp mapping below, so a moved dot follows its
-      // letter through the warp (the opposite order from the tashkeel
-      // override, which is a ctx transform on a separate glyph).
+      // dot dragged across a cut line gets cut — accepted residue. (The
+      // tashkeel override is different: a ctx transform on a separate glyph.)
       // SvgCmd and PathCommand are structurally identical; `toSvgCmds` is the
       // one checked conversion, and the cast back mirrors how the override
       // glyph's own commands are handled a few lines above.
@@ -271,41 +267,7 @@ function drawWarpedGlyphRun(
         : markedCmds === rawCmds
           ? opPath.commands
           : (markedCmds as unknown as PathCommand[]);
-      const cmds: PathCommand[] = sourceCmds.map((cmd) => {
-        type MutableCmd = {
-          type: PathCommand["type"];
-          x?: number;
-          y?: number;
-          x1?: number;
-          y1?: number;
-          x2?: number;
-          y2?: number;
-        };
-        const c = cmd as MutableCmd;
-        const out: MutableCmd = { ...c };
-
-        if (typeof c.x === "number" && typeof c.y === "number") {
-          const p = warpPoint(c.x + gx, c.y + gy, bounds, width, height, warpX, warpY);
-          out.x = p.x - gx;
-          out.y = p.y - gy;
-        }
-
-        if (typeof c.x1 === "number" && typeof c.y1 === "number") {
-          const p1 = warpPoint(c.x1 + gx, c.y1 + gy, bounds, width, height, warpX, warpY);
-          out.x1 = p1.x - gx;
-          out.y1 = p1.y - gy;
-        }
-
-        if (typeof c.x2 === "number" && typeof c.y2 === "number") {
-          const p2 = warpPoint(c.x2 + gx, c.y2 + gy, bounds, width, height, warpX, warpY);
-          out.x2 = p2.x - gx;
-          out.y2 = p2.y - gy;
-        }
-
-        return out as PathCommand;
-      });
-
-      tracePath(ctx, cmds);
+      tracePath(ctx, sourceCmds);
     }
 
     // Outline first, fill second. A canvas stroke straddles the path, so
@@ -382,8 +344,6 @@ export const ShapedText: React.FC<Props> = ({
   shadowOffsetY = 0,
   shadowOpacity = 0.35,
   rotation = 0,
-  warpX = 0,
-  warpY = 0,
   diacriticOverrides = NO_DIACRITIC_OVERRIDES,
   strokeCuts = NO_STROKE_CUTS,
   glyphAlternates = NO_GLYPH_ALTERNATES,
@@ -877,15 +837,12 @@ export const ShapedText: React.FC<Props> = ({
             height: glyphBounds.rawHeight,
           });
           ctx.fillStyle = painter.style;
-          drawWarpedGlyphRun(
+          drawGlyphRun(
             ctx as unknown as CanvasRenderingContext2D,
             shapeData.glyphs,
             font,
             fontSize,
             shapeData.unitsPerEm,
-            glyphBounds,
-            warpX,
-            warpY,
             false,
             stroke,
             strokeWidth,
@@ -908,15 +865,12 @@ export const ShapedText: React.FC<Props> = ({
             // the run is repainted in whatever style the context happened to
             // be carrying.
             ctx.fillStyle = painter.style;
-            drawWarpedGlyphRun(
+            drawGlyphRun(
               ctx as unknown as CanvasRenderingContext2D,
               shapeData.glyphs,
               font,
               fontSize,
               shapeData.unitsPerEm,
-              glyphBounds,
-              warpX,
-              warpY,
               true,
               stroke,
               strokeWidth,

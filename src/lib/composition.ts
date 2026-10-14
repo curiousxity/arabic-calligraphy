@@ -217,7 +217,7 @@ export type CompositionPlan = {
  *
  * Built explicitly rather than by patching a template block, for the reason
  * `buildMirrorBlock` beside it is: the fields a block needs are not optional,
- * and spreading a caller's block would carry text/warp/glyph fields that mean
+ * and spreading a caller's block would carry text/glyph fields that mean
  * nothing on an image and would then be saved with it.
  */
 const buildFrameBlock = (

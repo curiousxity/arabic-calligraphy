@@ -84,11 +84,11 @@ shift which glyph index its override lands on after re-shaping). Because
 of that fragility, `ShapedText.tsx` recomputes `findDiacriticGlyphIndices`
 for its own current glyph run each render and filters `diacriticOverrides`
 down to only the glyph indices that call currently identifies as
-diacritics before handing them to `drawWarpedGlyphRun` — a stale override
+diacritics before handing them to `drawGlyphRun` — a stale override
 whose glyph index now lands on a base letter (rather than a mark) is
 silently ignored instead of hiding or grotesquely scaling that letter.
 Surviving overrides are applied inside `ShapedText.tsx`'s shared
-`drawWarpedGlyphRun` as an
+`drawGlyphRun` as an
 extra `ctx.translate`/`ctx.scale` pivoted on the glyph's own pen-origin
 `(gx, gy)`, structurally identical to how that same function already
 handles the Private-Use-Area "override glyph" preset symbols. A `hidden`
@@ -147,9 +147,9 @@ is a plain translation; `ShapeFillText`'s is the per-tile affine
 transform, which deliberately ignores the italic shear.
 
 Two behaviours differ per block type, both deliberate. **Order:**
-`ShapedText` applies an override *after* its own `warpX`/`warpY` (it is a
-`ctx` transform wrapping already-warped point math), while Shape Fill
-applies it *before* its deformation — that deformation is the entire point
+`ShapedText` has no deformation, so an override is simply a `ctx` transform
+around the glyph's outline, while Shape Fill applies it *before* its
+deformation — that deformation is the entire point
 of the block type, and an override applied after would detach the mark from
 its letter. **Arming:** plain text shows handles on selection, but Shape
 Fill requires an explicit "Diacritic tool" checkbox (`diacriticEditMode` on `ShapeFillBlock`), because a fill

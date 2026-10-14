@@ -62,11 +62,9 @@ both on a tatweel insertion (`remapMarksForEdits` is the generic cut remap).
 **Translate only.** No scale (removed-subsystems.md), no hide (a missing
 dot changes the word). Double-click the handle resets.
 
-**Order on text blocks: marks, then cuts, then warp.** The contour
-translation is applied to the raw commands (raw contour indices), then
-stroke-cut surgery, then the warp mapping, so a moved dot follows its
-letter through the warp. That is the opposite order from the tashkeel
-override, which is a ctx transform after the warp on a separate glyph. A
+**Order on text blocks: marks, then cuts.** The contour translation is
+applied to the raw commands (raw contour indices), then stroke-cut surgery.
+The tashkeel override is different: a ctx transform on a separate glyph. A
 dot dragged across a cut line gets cut: accepted residue.
 
 **The metrics loop boxes the moved outline** through `outlineBounds`, the

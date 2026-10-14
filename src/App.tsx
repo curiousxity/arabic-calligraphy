@@ -286,8 +286,6 @@ const DEFAULT_BLOCK: Block = {
   locked: false,
   rotation: 0,
   ornamental: false,
-  warpX: 0,
-  warpY: 0,
   type: "text",
 };
 
@@ -2601,10 +2599,10 @@ const App: React.FC = () => {
       // would then rewrite whatever the user selected in the meantime.
       const { id, text, fontFamily, fontSize } = selectedBlock;
       const fontUrl = resolveFontUrl(fontFamily);
-      // The italic shear, the faux-bold stroke, the outline, the horizontal
-      // warp and any straight-stroke cuts all widen what is drawn beyond the
-      // glyph outlines. Measuring without them would let the fit promise a
-      // width an italic, outlined, warped or stretched block then overshot.
+      // The italic shear, the faux-bold stroke, the outline and any
+      // straight-stroke cuts all widen what is drawn beyond the glyph
+      // outlines. Measuring without them would let the fit promise a width
+      // an italic, outlined or stretched block then overshot.
       const runStyle = runStyleForBlock(selectedBlock, cutWidthForBlock(selectedBlock));
 
       setIsFittingWidth(true);
@@ -2939,10 +2937,6 @@ const App: React.FC = () => {
     if (source.text.trim() === "") { setExportStatus("Type some text into this block first."); return; }
     if (source.verse) {
       setExportStatus("Verse lines cannot be converted to a stacked composition yet. Remove the line from its verse first.");
-      return;
-    }
-    if ((source.warpX ?? 0) !== 0 || (source.warpY ?? 0) !== 0) {
-      setExportStatus("Set Warp to 0 before converting to a stacked composition.");
       return;
     }
     if (source.fontStyle && source.fontStyle !== "normal") {

@@ -25,7 +25,6 @@ export const section: GuideSection = {
     "harakat",
     "marks",
     "irab",
-    "warp",
     "outline",
     "shadow",
     "rotation",
@@ -98,11 +97,6 @@ export const section: GuideSection = {
           come apart. Word spacing changes the space between words. Drag
           below zero to tighten until pieces touch or overlap — useful for
           compact compositions. Double-click a slider to reset it.
-        </li>
-        <li>
-          <strong>Horizontal warp</strong> and <strong>Vertical warp</strong> —
-          a gentle overall distortion of a plain text block, separate from the
-          per-letter tools.
         </li>
         <li>
           <strong>Move &amp; scale glyph</strong> — for plain text blocks. Tick

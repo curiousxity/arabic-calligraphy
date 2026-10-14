@@ -212,22 +212,12 @@ export const ITALIC_SHEAR = 0.25;
 export const fauxBoldStrokeWidth = (fontSize: number) =>
   Math.max(fontSize * 0.035, 0.6);
 
-/**
- * How far a full-strength `warpX` can spread a run, as a fraction of its own
- * width. `lib/warp.ts` displaces each point by `(warpX / 100) * ny * width *
- * 0.25` with `ny` clamped to [-1, 1], so the extent grows by twice that
- * quarter-width at most — hence 0.5, not 0.25.
- */
-export const WARP_X_SPREAD = 0.5;
-
 /** Style that widens a drawn run beyond its raw outline extent. */
 export type RunStyle = {
   italic?: boolean;
   bold?: boolean;
   /** The block's outline width, which straddles the path. */
   strokeWidth?: number;
-  /** The block's horizontal warp, in the slider's own -100..100 units. */
-  warpX?: number;
   /**
    * Width added by straight-stroke cuts, from
    * `cutAdvanceTotal(block.strokeCuts, nuqtaUnits(...))`. Passed in already
@@ -258,14 +248,12 @@ export const runStyleForBlock = (
   block: {
     fontStyle?: string;
     strokeWidth?: number;
-    warpX?: number;
   },
   cutWidth: number
 ): RunStyle => ({
   italic: block.fontStyle === "italic" || block.fontStyle === "bold italic",
   bold: block.fontStyle === "bold" || block.fontStyle === "bold italic",
   strokeWidth: block.strokeWidth,
-  warpX: block.warpX,
   cutWidth,
 });
 
@@ -275,15 +263,9 @@ export const runStyleForBlock = (
  * A canvas stroke straddles the path it follows, so half of it falls outside
  * the outline on each side and the full width is added once. The italic shear
  * maps `x' = x - ITALIC_SHEAR·y`, widening the extent by that fraction of the
- * run's *height*. `warpX` slides points sideways by a fraction of the run's
- * own width. All four are summed independently rather than composed, which
- * slightly over-estimates — the safe direction for a promise never to
+ * run's *height*. All four are summed independently rather than composed,
+ * which slightly over-estimates — the safe direction for a promise never to
  * overshoot.
- *
- * The warp term is the only deliberately loose one: it is the widest the
- * distortion *can* push the extent, whereas the actual spread depends on
- * where the ink sits vertically. A block with no warp — every block, until
- * the slider is touched — pays nothing for it.
  */
 export function styledRunWidth(
   box: { width: number; height: number },
@@ -293,14 +275,12 @@ export function styledRunWidth(
   const shear = style.italic ? ITALIC_SHEAR * box.height : 0;
   const bold = style.bold ? fauxBoldStrokeWidth(fontSize) : 0;
   const outline = Math.max(style.strokeWidth ?? 0, 0);
-  const warp =
-    (Math.abs(style.warpX ?? 0) / 100) * Math.max(box.width, 1) * WARP_X_SPREAD;
   // Cuts add width the shaping measurement cannot see — they are geometry,
   // not characters. Without this term a fit promises a width a stretched
   // block then visibly exceeds, which is the exact bug this term list exists
   // to prevent.
   const cuts = Math.max(style.cutWidth ?? 0, 0);
-  return box.width + shear + bold + outline + warp + cuts;
+  return box.width + shear + bold + outline + cuts;
 }
 
 /**

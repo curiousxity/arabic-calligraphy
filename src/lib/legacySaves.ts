@@ -15,6 +15,8 @@ export const REMOVED_BLOCK_FIELDS = [
   "glyphTransforms", "glyphTransformMode",
   // Square Kufi, removed 2026-10-14.
   "kufiColumns", "kufiComposition", "kufiLineGap", "kufiWordGap", "kufiCellEdits", "kufiCellEditMode",
+  // Warp, removed 2026-10-14.
+  "warpX", "warpY",
 ] as const;
 
 export function sanitizeLegacyBlocks(blocks: unknown[]): Block[] {

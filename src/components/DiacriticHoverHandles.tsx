@@ -10,7 +10,7 @@ export type DiacriticHoverHandlesProps = {
    * One entry per hoverable diacritic instance on canvas, already filtered
    * to real diacritics by the calling renderer. Each carries its own
    * local↔canvas mapping, so this component's arithmetic stays in local
-   * space regardless of whether the host block warps, tiles, or neither.
+   * space regardless of whether the host block tiles or not.
    */
   placements: DiacriticPlacement[];
   diacriticOverrides: DiacriticOverride[];
@@ -40,7 +40,7 @@ const HIDE_BUTTON_COLOR_ACTIVE = "#9ca3af";
  * it's easy to grab, not exactly where the glyph visually pivots from.
  *
  * All arithmetic below is in the placement's *local* space (the glyph run
- * for text and shape-warp blocks, one tiled glyph instance for shape-fill
+ * for text blocks, one tiled glyph instance for shape-fill
  * blocks); `toCanvas` is applied only when drawing and `toLocal` only when
  * reading a drag back. That is the whole of what varies between block
  * types — hover state, the rail, the hit rect, and the three handles are
@@ -66,10 +66,10 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
   // start only while Shift is held — a plain drag is free in both axes.
   // Konva's dragBoundFunc receives and returns absolute coordinates while
   // everything else here is local, and mixing the two previously
-  // teleported this handle sideways under any block offset/pan/zoom. Under
-  // a warp the rail is not vertical on screen even though it is vertical in
-  // local space, so it is stored as two mapped endpoints rather than a
-  // single fixed x.
+  // teleported this handle sideways under any block offset/pan/zoom. On a
+  // rotated tile the rail is not vertical on screen even though it is
+  // vertical in local space, so it is stored as two mapped endpoints rather
+  // than a single fixed x.
   const railRef = useRef<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(null);
 
   if (!isSelected) return null;
@@ -106,7 +106,7 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
         const rx2 = displayX + scaledWidth / 2 + hitRectHorizontalMargin * overrideScale;
         const ry2 = displayY + scaledHeight / 2 + hitRectVerticalMargin * overrideScale;
 
-        // A rotated or warped local rect is not an axis-aligned rect on
+        // A rotated local rect is not an axis-aligned rect on
         // canvas, and Konva's Rect cannot express one. Map all four
         // corners and take their bounding box: slightly larger than the
         // true region, which only ever makes the mark easier to hover.
@@ -122,13 +122,6 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
         const moveAt = placement.toCanvas(displayX, displayY);
         const resizeAt = placement.toCanvas(displayX + handleSpacing, displayY);
         const hideAt = placement.toCanvas(displayX - handleSpacing, displayY);
-
-        // A non-invertible warp (Newton's method bailing on a near-singular
-        // Jacobian) would otherwise mount a Circle at NaN, which Konva
-        // silently renders at the origin. Drop the placement instead.
-        if (![...xs, ...ys, moveAt.x, moveAt.y, resizeAt.x, resizeAt.y, hideAt.x, hideAt.y].every(Number.isFinite)) {
-          return null;
-        }
 
         return (
           // The hover handlers live on this Group rather than on the hit

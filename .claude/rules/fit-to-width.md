@@ -35,14 +35,13 @@ Three things are load-bearing:
 - **Outlines are not the whole of what is drawn.** `styledRunWidth` adds the
   italic shear (`ITALIC_SHEAR × run height` — which is why `inkExtentBox`
   reports height at all), the faux-bold stroke, the block's outline
-  `strokeWidth`, and `warpX`'s sideways spread. Without them a fit promised a
-  width that an italic, bold, outlined or warped block then visibly exceeded.
-  `ShapedText` **imports `ITALIC_SHEAR` and `fauxBoldStrokeWidth` from this
-  module** rather than keeping its own copies, so renderer and fitter cannot
-  drift. The four terms are summed rather than composed, and the warp term is
-  the widest the distortion *can* reach rather than what it does reach — both
-  over-estimate slightly, which is the safe direction for a never-overshoot
-  promise.
+  `strokeWidth`, and the width straight-stroke cuts add. Without them a fit
+  promised a width that an italic, bold, outlined or stretched block then
+  visibly exceeded. `ShapedText` **imports `ITALIC_SHEAR` and
+  `fauxBoldStrokeWidth` from this module** rather than keeping its own
+  copies, so renderer and fitter cannot drift. The four terms are summed
+  rather than composed, which over-estimates slightly — the safe direction
+  for a never-overshoot promise.
 - **Candidates are always built from the caller's original text with
   absolute counts**, never added to the current state. That is what makes the
   operation idempotent — fitting an already-fitted run returns it unchanged

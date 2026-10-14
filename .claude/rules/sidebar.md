@@ -39,8 +39,8 @@ panel there:
   most. A plain text block has no type panel; its controls are the shared
   ones.
 - **`Typography` is the shared styling panel** (font family, size,
-  colour, alignment, line height, plus the text-only Letter shapes,
-  Stretch strokes and Warp sections). It is *not* called "Text" precisely because it renders for
+  colour, alignment, line height, plus the text-only Letter shapes and
+  Stretch strokes sections). It is *not* called "Text" precisely because it renders for
   shape and curve blocks too, where a panel named "Text" sitting beside
   one named "Shape Fill" reads as two competing type panels.
 

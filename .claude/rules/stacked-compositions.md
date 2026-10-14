@@ -132,7 +132,7 @@ from the block's own text with just those slots. The status says how many
 were inserted, since the word gets wider (the default font, FatemiMaqala,
 takes this path on مصبح). Otherwise the pair stays unjoined and rigid.
 
-**Convert refuses** warp, italic or faux bold (neither is carried: the stack
+**Convert refuses** italic or faux bold (neither is carried: the stack
 draws the font's own outline), honorific glyphs, and verse lines. A left- or
 right-aligned block is offset so its anchored edge stays put; the stack
 itself always centres its ink on (x, y).

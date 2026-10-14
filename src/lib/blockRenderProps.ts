@@ -51,8 +51,6 @@ export function shapedTextProps(b: Extract<Block, { type: "text" }>) {
     ...typographicProps(b),
     align: b.align ?? ("center" as const),
     lineHeight: b.lineHeight ?? 1.2,
-    warpX: b.warpX ?? 0,
-    warpY: b.warpY ?? 0,
     letterSpacing: b.letterSpacing ?? 0,
     wordSpacing: b.wordSpacing ?? 0,
     diacriticOverrides: b.diacriticOverrides,

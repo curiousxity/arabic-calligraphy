@@ -22,7 +22,6 @@ import {
   inkExtentWidth,
   solveFitToWidth,
   styledRunWidth,
-  WARP_X_SPREAD,
   ITALIC_SHEAR,
   fauxBoldStrokeWidth,
 } from "./fitToWidth";
@@ -459,30 +458,20 @@ describe("styledRunWidth", () => {
     expect(styledRunWidth(box, 50, { strokeWidth: -4 })).toBe(100);
   });
 
-  it("adds the horizontal warp's spread, in either direction", () => {
-    // warp.ts shifts a point by (warpX / 100) * ny * width * 0.25 with ny in
-    // [-1, 1], so the extent grows by twice that quarter-width. The sign of
-    // the slider only picks which way the run leans; it always widens.
-    const expected = 100 + 100 * WARP_X_SPREAD;
-    expect(styledRunWidth(box, 50, { warpX: 100 })).toBeCloseTo(expected);
-    expect(styledRunWidth(box, 50, { warpX: -100 })).toBeCloseTo(expected);
-  });
-
-  it("costs nothing for an unwarped run", () => {
-    expect(styledRunWidth(box, 50, { warpX: 0 })).toBe(100);
-  });
-
   it("sums every contribution rather than picking one", () => {
     expect(
       styledRunWidth(box, 50, {
         italic: true,
         bold: true,
         strokeWidth: 6,
-        warpX: 50,
       })
-    ).toBeCloseTo(
-      100 + ITALIC_SHEAR * 40 + fauxBoldStrokeWidth(50) + 6 + 100 * 0.5 * WARP_X_SPREAD
-    );
+    ).toBeCloseTo(100 + ITALIC_SHEAR * 40 + fauxBoldStrokeWidth(50) + 6);
+  });
+
+  it("sums the four remaining style terms: shear, faux bold, outline, cuts", () => {
+    const box = { width: 100, height: 40 };
+    expect(styledRunWidth(box, 50, { italic: true, bold: true, strokeWidth: 2, cutWidth: 10 }))
+      .toBeCloseTo(100 + 0.25 * 40 + Math.max(50 * 0.035, 0.6) + 2 + 10);
   });
 });
 
