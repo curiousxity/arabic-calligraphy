@@ -9,6 +9,15 @@ paths:
 
 These are capabilities that have been explicitly identified as valuable but deliberately left for a future specification rather than partially supported now:
 
+- **Stacked compositions** — Shipped 2026-10-14 (see
+  [stacked-compositions.md](stacked-compositions.md)); two things left for
+  later:
+  - *Bending letter bodies.* Pieces are rigid; bending a body needs a
+    skeleton plus nib model of the letter, not the outline-and-face-vector
+    one the joins use.
+  - *Font-side stacking alternates.* A font's own stacked or raised letter
+    forms could feed the bake instead of arranging pieces by hand.
+
 - **Drag-based per-glyph tools on text-on-path blocks** (diacritic
   overrides; stretching is declined, below). The open question is what an
   offset means along a curve: along the tangent, or along the arc. Click-only
