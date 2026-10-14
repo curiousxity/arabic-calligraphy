@@ -1134,16 +1134,16 @@ const App: React.FC = () => {
   );
 
   /**
-   * Opens writing on a guide. A double-click passes where it landed, and the
-   * run is anchored at its reading start there so typed letters stay put;
-   * a key press on a selected guide passes null and takes the default place.
-   * `seed` is that first key, which creates the block at once.
+   * Opens writing on a guide. A double-click passes where it landed; a key
+   * press on a selected guide passes null and takes the guide's default
+   * place. Either way the run is anchored at its reading start, so letters
+   * already typed stay put as more arrive. `seed` is that first key, which
+   * creates the block at once.
    */
   const beginWritingOnGuide = useCallback(
     (guideId: number, offset: number | null, seed = "") => {
       if (!blocks.some((b) => b.type === "guide" && b.id === guideId)) return;
-      const attachment =
-        offset === null ? { ...DEFAULT_ATTACHMENT } : { ...DEFAULT_ATTACHMENT, offset, align: "start" as const };
+      const attachment = { ...DEFAULT_ATTACHMENT, align: "start" as const, ...(offset === null ? {} : { offset }) };
       const fontSize = (writtenTextStyle().fontSize as number | undefined) ?? ATTACHED_TEXT_FONT_SIZE;
       const session: WritingSession = { guideId, textId: null, attachment, fontSize };
       if (seed) {
@@ -1207,8 +1207,9 @@ const App: React.FC = () => {
         return;
       }
 
-      // A printable key on a selected guide starts writing on it.
-      if (!typing && !e.altKey && e.key.length === 1 && selectedBlock?.type === "guide" && !writing) {
+      // A printable key on a selected guide starts writing on it. Space is
+      // left to the canvas, where it pans (CanvasStage's handler).
+      if (!typing && !e.altKey && e.key.length === 1 && e.key !== " " && selectedBlock?.type === "guide" && !writing) {
         e.preventDefault();
         beginWritingOnGuide(selectedBlock.id, null, e.key);
         return;

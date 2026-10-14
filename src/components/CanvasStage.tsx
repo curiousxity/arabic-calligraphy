@@ -230,7 +230,11 @@ const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, va
  * not a keydown listener, so Arabic layouts, IMEs and on-screen keyboards
  * all deliver text the way they do everywhere else. It is invisible and
  * takes no pointer events; focus lands on it when writing starts and
- * leaving it (a click anywhere, Escape, Enter) ends the session.
+ * leaving it (a click anywhere, Escape, Enter) ends the session, once: the
+ * blur that follows an Escape must not end it a second time.
+ *
+ * One mount per session, whatever the session's `textId`: remounting when
+ * the first letter creates the block would drop an IME composition mid-word.
  */
 const WritingField: React.FC<{ value: string; onChange: (text: string) => void; onEnd: () => void }> = ({
   value,
@@ -238,6 +242,12 @@ const WritingField: React.FC<{ value: string; onChange: (text: string) => void; 
   onEnd,
 }) => {
   const ref = useRef<HTMLTextAreaElement | null>(null);
+  const endedRef = useRef(false);
+  const end = () => {
+    if (endedRef.current) return;
+    endedRef.current = true;
+    onEnd();
+  };
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -248,14 +258,13 @@ const WritingField: React.FC<{ value: string; onChange: (text: string) => void; 
     <textarea
       ref={ref}
       aria-label="Write on guide"
-      data-testid="guide-writing-field"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      onBlur={onEnd}
+      onBlur={end}
       onKeyDown={(e) => {
         if (e.key === "Escape" || e.key === "Enter") {
           e.preventDefault();
-          onEnd();
+          end();
         }
       }}
       dir="rtl"
@@ -793,7 +802,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       <div style={{ width: viewportWidth, height: stageViewportHeight }}>
         {writing && (
           <WritingField
-            key={writing.textId ?? "pending"}
             value={writingText}
             onChange={(t) => onWriteText?.(t)}
             onEnd={() => onEndWriting?.()}

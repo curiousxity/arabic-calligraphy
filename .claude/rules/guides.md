@@ -64,12 +64,14 @@ of through the sidebar. The session is `WritingSession` in `guides.ts`,
 owned by `App` (`writing`) and drawn by `CanvasStage`.
 
 - **Two ways in.** A printable key with a guide selected (App's window
-  keydown, before the Delete branch) seeds the text with that key. A
+  keydown, before the Delete branch) seeds the text with that key, at the
+  guide's default place. Space is not one: it pans the canvas. A
   double-click (or double-tap) on the guide's line starts an empty session
-  *at the clicked point*, projected with `pointerOffsetOnGuide`, anchored
-  `align: "start"` so letters already typed stay put as more arrive. A
-  double-click on attached text re-opens it (`beginWritingText`); a plain
-  Curve or text block still goes to the sidebar.
+  *at the clicked point*, projected with `pointerOffsetOnGuide`. Both anchor
+  `align: "start"` so letters already typed stay put as more arrive; the
+  centred default is for Add text to guide only. A double-click on attached
+  text re-opens it (`beginWritingText`); a plain Curve or text block still
+  goes to the sidebar.
 - **The block is created by the first letter**, not by opening the session
   (`createWrittenText`). Until then `textId` is null and the caret is drawn
   by `CanvasStage` at the guide, with a stand-in ascent, because no font is
@@ -78,7 +80,9 @@ owned by `App` (`writing`) and drawn by `CanvasStage`.
 - **Input is a real `<textarea>`** (`WritingField`, invisible, no pointer
   events) so Arabic layouts, IMEs and on-screen keyboards deliver text the
   way they do in the sidebar, and `isTypingTarget` keeps Delete, arrows and
-  the guide-key shortcut off the block. Blur, Escape and Enter end it. Each
+  the guide-key shortcut off the block. Blur, Escape and Enter end it, once.
+  It is mounted once per session and never keyed on `textId`: a remount when
+  the first letter creates the block would drop an IME composition. Each
   change goes through `updateBlock`, so keystrokes coalesce in history like
   sidebar typing.
 - **The caret sits at the reading end** (`guideCaret`): the base glyph of

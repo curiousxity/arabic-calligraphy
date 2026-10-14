@@ -193,7 +193,7 @@ async function addSmallCircle(page: Page) {
   return (await guides(page))[0];
 }
 
-const writingField = (page: Page) => page.getByTestId("guide-writing-field");
+const writingField = (page: Page) => page.getByLabel("Write on guide");
 
 /**
  * Starts writing on the selected guide by pressing a key, then types `text`.
@@ -214,7 +214,10 @@ test("typing with a guide selected writes on it; Escape keeps the words", async 
   await expect.poll(async () => (await attached(page)).map((b) => b.text)).toEqual(["سلام"]);
   await page.keyboard.press("Escape");
   await expect(writingField(page)).toHaveCount(0);
-  expect((await attached(page)).map((b) => b.text)).toEqual(["سلام"]);
+  const [t] = await attached(page);
+  expect(t.text).toBe("سلام");
+  // Anchored at the reading start, so what was typed never shifted.
+  expect(t.guide!.align).toBe("start");
 });
 
 test("a double-click on the guide starts writing there; leaving before typing adds nothing", async ({ page }) => {
