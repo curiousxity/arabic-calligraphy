@@ -5,6 +5,7 @@ import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
 import { GuideView } from "./GuideView";
+import { StackView } from "./StackView";
 import { resolveGuidePath } from "../lib/guides";
 import { projectToGuide } from "../lib/guidePlacement";
 import { buildArcTable, type ArcTable } from "../lib/textPath";
@@ -68,6 +69,7 @@ import {
   shapeFillProps,
   shapedTextProps,
   squareKufiProps,
+  stackProps,
   textPathProps,
 } from "../lib/blockRenderProps";
 
@@ -1112,6 +1114,21 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                       />
                     )}
                   </React.Fragment>
+                );
+              }
+
+              if (block.type === "stack") {
+                return (
+                  <StackView
+                    key={block.id}
+                    {...commonProps}
+                    {...stackProps(block)}
+                    x={block.x}
+                    y={block.y}
+                    opacity={block.opacity ?? 1}
+                    locked={block.locked}
+                    isSelected={block.id === selectedId}
+                  />
                 );
               }
 

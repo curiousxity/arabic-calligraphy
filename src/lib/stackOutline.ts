@@ -47,3 +47,7 @@ export function rebasePiece(p: StackPiece, cmds: SvgCmd[]): StackPiece {
   const world = transformPt(pivot, pieceTransform(p));
   return { ...p, cmds, pivot, x: world[0] - pivot[0], y: world[1] - pivot[1] };
 }
+
+/** px per font unit. A hand-edited save without `unitsPerEm` draws at 1000. */
+export const stackScale = (fontSize: number, unitsPerEm: number | undefined) =>
+  fontSize / Math.max(unitsPerEm || 1000, 1);
