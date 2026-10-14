@@ -3014,6 +3014,7 @@ const App: React.FC = () => {
     const { id, fontFamily, fontSize } = source;
     const fontUrl = resolveFontUrl(fontFamily);
     const overrides = source.diacriticOverrides ?? [];
+    const marks = source.detachedMarkOverrides ?? [];
     const baseCuts = source.strokeCuts ?? [];
     const shapeAndConvert = async (text: string, cuts: StrokeCut[]) => {
       const shaped = await shapeText(text, fontUrl, source.glyphAlternates, source.styleSets);
@@ -3023,6 +3024,7 @@ const App: React.FC = () => {
       const result = convertRunToStack({
         glyphs, font: shaped.font, unitsPerEm: upm, shapableText: shaped.shapableText,
         cutPlan, diacriticOverrides: overrides, fontSize,
+        detachedMarkOverrides: marks, fontFamily,
       });
       return { shaped, upm, result };
     };
@@ -3046,7 +3048,9 @@ const App: React.FC = () => {
       let { shaped, upm, result } = await shapeAndConvert(source.text, baseCuts);
       let inserted = 0;
       const before = result.unjoined.length;
-      if (before > 0 && shaped.shapableText === source.text && overrides.length === 0) {
+      // Mark overrides are keyed by cluster like cuts, but the retry re-shapes
+      // from scratch, so it is refused the same way tashkeel overrides are.
+      if (before > 0 && shaped.shapableText === source.text && overrides.length === 0 && marks.length === 0) {
         const all = withTatweels(result.unjoined);
         if (all.edits.length) {
           const trial = await shapeAndConvert(all.text, all.cuts);

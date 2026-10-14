@@ -132,7 +132,8 @@ import { convertRunToStack, runOutline, splitPieceAtCut } from "./stackConvert";
 import { assembleStackOutline, assembleStackOutlineReport, chainOf } from "./stackOutline";
 import { nibFloorFraction, nuqtaUnits } from "./nuqta";
 import type { StackJoin, StackPiece } from "../types";
-import { flattenContours, outlineBounds } from "./strokeCuts";
+import { flattenContours, outlineBounds, toSvgCmds } from "./strokeCuts";
+import { findDetachedMarks, splitContours } from "./detachedMarks";
 import type { SvgCmd } from "./svgPath";
 
 const area = (cmds: SvgCmd[]) =>
@@ -145,7 +146,10 @@ const area = (cmds: SvgCmd[]) =>
 async function convert(text: string, fontFile: string) {
   const { glyphs, font } = await shapeReal(text, fontFile);
   const unitsPerEm = font.unitsPerEm || 1000;
-  const input = { glyphs, font, unitsPerEm, shapableText: text, cutPlan: null, diacriticOverrides: [], fontSize: unitsPerEm };
+  const input = {
+    glyphs, font, unitsPerEm, shapableText: text, cutPlan: null, diacriticOverrides: [], fontSize: unitsPerEm,
+    detachedMarkOverrides: [], fontFamily: fontFile.replace(/\.(ttf|otf)$/, ""),
+  };
   return { input, result: convertRunToStack(input) };
 }
 
@@ -156,15 +160,26 @@ describe("convertRunToStack", () => {
   });
 
   // The measured join/unjoined split of مصبح per font (the review's probe).
+  // Amiri was [1, 2] until a letter's dots left its body before the join
+  // sweep (2026-10-14): the ب's dot sat across the join edge and made the
+  // cut illegal, so removing it is what joins the other two pairs.
   const PINNED: Record<string, [number, number]> = {
-    "UKIJDiwani.ttf": [3, 0], "Amiri.ttf": [1, 2], "NotoSans.ttf": [2, 1],
+    "UKIJDiwani.ttf": [3, 0], "Amiri.ttf": [3, 0], "NotoSans.ttf": [2, 1],
   };
   for (const fontFile of ["UKIJDiwani.ttf", "Amiri.ttf", "NotoSans.ttf"]) {
     it(`${fontFile}: one letter piece per base letter of مصبح, a join per adjacent pair or an unjoined report`, async () => {
-      const { result } = await convert("مصبح", fontFile);
+      const { input, result } = await convert("مصبح", fontFile);
       const letters = result.pieces.filter((p) => p.role === "letter");
       expect(letters).toHaveLength(4);
       expect([result.joins.length, result.unjoined.length]).toEqual(PINNED[fontFile]);
+      // Every join splices and the untouched bake reproduces the run's ink,
+      // dots included — the joins are real cuts, not a detector artefact.
+      const family = fontFile.replace(/\.ttf$/, "");
+      const nib = { width: nuqtaUnits(family, input.unitsPerEm), minFraction: nibFloorFraction(family) };
+      const { cmds: baked, skipped } = assembleStackOutlineReport(result.pieces, result.joins, nib);
+      expect(skipped).toBe(0);
+      const original = runOutline(input);
+      expect(Math.abs(area(baked) - area(original)) / area(original)).toBeLessThan(0.005);
       for (const m of result.pieces.filter((p) => p.role === "mark")) {
         expect(letters.some((l) => l.id === m.parentId)).toBe(true);
       }
@@ -223,7 +238,7 @@ describe("convertRunToStack", () => {
   it("a hidden mark is dropped and a lifted mark is lifted, in font units", async () => {
     const { glyphs, font } = await shapeReal("بَ", "Amiri.ttf");
     const upm = font.unitsPerEm || 1000;
-    const base = { glyphs, font, unitsPerEm: upm, shapableText: "بَ", cutPlan: null, fontSize: 100 };
+    const base = { glyphs, font, unitsPerEm: upm, shapableText: "بَ", cutPlan: null, fontSize: 100, detachedMarkOverrides: [], fontFamily: "Amiri" };
     const markIdx = glyphs.findIndex((g) => (g.ax ?? 0) === 0);
     expect(markIdx).toBeGreaterThanOrEqual(0);
     const plain = convertRunToStack({ ...base, diacriticOverrides: [] });
@@ -243,7 +258,7 @@ describe("convertRunToStack", () => {
   it("carries a tashkeel offsetX into the mark piece's x, in font units", async () => {
     const { glyphs, font } = await shapeReal("بَ", "Amiri.ttf");
     const upm = font.unitsPerEm || 1000;
-    const base = { glyphs, font, unitsPerEm: upm, shapableText: "بَ", cutPlan: null, fontSize: 100 };
+    const base = { glyphs, font, unitsPerEm: upm, shapableText: "بَ", cutPlan: null, fontSize: 100, detachedMarkOverrides: [], fontFamily: "Amiri" };
     const markIdx = glyphs.findIndex((g) => (g.ax ?? 0) === 0);
     const plain = convertRunToStack({ ...base, diacriticOverrides: [] });
     const moved = convertRunToStack({ ...base, diacriticOverrides: [{ glyphIndex: markIdx, offsetX: 10, offsetY: 0 }] });
@@ -253,6 +268,29 @@ describe("convertRunToStack", () => {
       return m.x - parent.x;
     };
     expect(rel(moved) - rel(plain)).toBeCloseTo((10 * upm) / 100, 6);
+  });
+
+  it("splits a letter's dots into mark pieces riding on it, at their moved position", async () => {
+    const { glyphs, font } = await shapeReal("ب", "Amiri.ttf");
+    const upm = font.unitsPerEm || 1000;
+    const detected = findDetachedMarks(glyphs, font, upm, new Set(), "Amiri");
+    const [, [dot]] = [...detected.entries()][0];
+    const input = {
+      glyphs, font, unitsPerEm: upm, shapableText: "ب", cutPlan: null,
+      diacriticOverrides: [], fontSize: 100, fontFamily: "Amiri",
+      detachedMarkOverrides: [{ cluster: dot.cluster, glyphId: dot.glyphId, mark: dot.mark, dx: 80, dy: -60 }],
+    };
+    const plain = convertRunToStack({ ...input, detachedMarkOverrides: [] });
+    const moved = convertRunToStack(input);
+    const letter = (r: typeof plain) => r.pieces.find((p) => p.role === "letter")!;
+    const mark = (r: typeof plain) => r.pieces.find((p) => p.role === "mark")!;
+    expect(plain.pieces.filter((p) => p.role === "mark")).toHaveLength(1);
+    expect(mark(plain).parentId).toBe(letter(plain).id);
+    expect(mark(moved).x - letter(moved).x - (mark(plain).x - letter(plain).x)).toBeCloseTo(80, 6);
+    expect(mark(moved).y - letter(moved).y - (mark(plain).y - letter(plain).y)).toBeCloseTo(-60, 6);
+    // The letter piece keeps only the body.
+    const rawContours = splitContours(toSvgCmds(font.glyphs.get(glyphs[0].g)!.getPath(0, 0, upm).commands)).length;
+    expect(splitContours(letter(plain).cmds)).toHaveLength(rawContours - 1);
   });
 
   const resolves = (pieces: StackPiece[], joins: StackJoin[]) =>
