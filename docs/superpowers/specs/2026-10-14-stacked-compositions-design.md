@@ -224,6 +224,25 @@ glyph fixtures.
 
 Neither pure module imports `./harfbuzz`.
 
+## Amendments made while planning (2026-10-14)
+
+Recorded here so the spec and the plan agree; the plan's header carries the
+reasons.
+
+- **A tail is a split plus a join.** The far fragment of a cut becomes a
+  piece of its own and the ordinary join connects it. `StackJoin` loses
+  `kind`/`end`; the tail tool is a split action.
+- **Pieces rotate about a stored `pivot`** (outline centre at creation),
+  with `homeX`/`homeY` for "Reset layout" and `order` for drag chains.
+- **The block stores `unitsPerEm`.**
+- **Export needs no code**: the stage snapshot and `react-konva-to-svg`
+  replay the renderer's `sceneFunc`.
+- **Fallback tatweel insertion runs only when `shapableText === text`**;
+  other uncuttable pairs stay unjoined and rigid.
+- **Conversion refuses** blocks with warp set or honorific override glyphs.
+- **Marks whose font draws them as separate glyphs** become `role: "mark"`
+  pieces, so they can be nudged on a baked block.
+
 ## Ceiling and future
 
 - **Letter bodies do not bend.** Approach C — skeletonise glyphs into
