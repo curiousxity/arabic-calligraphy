@@ -146,6 +146,7 @@ export type CanvasStageProps = {
   onBeginStackEdit: () => void;
   onSetStackPieces: (blockId: number, patches: { id: string; x?: number; y?: number; rotation?: number }[]) => void;
   onSetStackJoinBow: (blockId: number, joinId: string, bow: number) => void;
+  onSplitStackPiece: (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => void;
   /** Next Shape: the selected text block's letters that have alternates. */
   alternateLetters: LetterAlternates[];
   onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
@@ -217,6 +218,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onBeginStackEdit,
   onSetStackPieces,
   onSetStackJoinBow,
+  onSplitStackPiece,
   onSetStrokeCut,
   alternateLetters,
   onPickGlyphAlternate,
@@ -1147,6 +1149,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                           onBegin={onBeginStackEdit}
                           onSetPieces={(patches) => onSetStackPieces(block.id, patches)}
                           onSetBow={(joinId, bow) => onSetStackJoinBow(block.id, joinId, bow)}
+                          unitsPerEm={block.unitsPerEm}
+                          tailMode={block.stackTailMode ?? false}
+                          onSplit={(pieceId, cut) => onSplitStackPiece(block.id, pieceId, cut)}
                         />
                       ) : null
                     }

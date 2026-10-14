@@ -3,8 +3,8 @@ import { Circle, Group, Line } from "react-konva";
 import type Konva from "konva";
 import type { StackPiece, StackJoin, StackBlock } from "../types";
 import { chainOf, pieceTransform } from "../lib/stackOutline";
-import { transformCmds, transformFace } from "../lib/stackGeometry";
-import { flattenContours } from "../lib/strokeCuts";
+import { transformCmds, transformFace, transformPt } from "../lib/stackGeometry";
+import { flattenContours, findCutZonesSwept, zoneCentre, DEFAULT_DETECT_OPTS } from "../lib/strokeCuts";
 import { joinCenterline } from "../lib/stackJoin";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 
@@ -22,6 +22,10 @@ export type StackEditOverlayProps = {
   onBegin?: () => void;
   onSetPieces?: (patches: { id: string; x?: number; y?: number; rotation?: number }[]) => void;
   onSetBow?: (joinId: string, bow: number) => void;
+  unitsPerEm: number;
+  /** "Split strokes" armed: show split points on straight strokes. */
+  tailMode: boolean;
+  onSplit?: (pieceId: string, cut: { cutX: number; angle: number }) => void;
 };
 
 /**
@@ -34,6 +38,7 @@ export type StackEditOverlayProps = {
  */
 export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   isSelected, pieces, joins, scale, onBegin, onSetPieces, onSetBow,
+  unitsPerEm, tailMode, onSplit,
 }) => {
   const [hovered, setHovered] = useState<string | null>(null);
   const groupRef = useRef<Konva.Group>(null);
@@ -48,6 +53,19 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
       const outer = contours.reduce((a, b) => (b.length > a.length ? b : a), contours[0] ?? []);
       return { id: p.id, points: outer.flatMap(([x, y]) => [x * scale, y * scale]) };
     }), [pieces, scale]);
+
+  // The sweep is fifteen rotations per piece, so it runs only while armed.
+  const zones = useMemo(() => {
+    if (!tailMode) return [];
+    const opts = { ...DEFAULT_DETECT_OPTS, step: unitsPerEm / 100, minZoneWidth: unitsPerEm / 40 };
+    return pieces.filter((p) => p.role === "letter").flatMap((p) =>
+      findCutZonesSwept(flattenContours(p.cmds), { glyphIndex: 0, cluster: 0 }, opts).map((z, i) => {
+        const [lx, ly] = zoneCentre(z);
+        const w = transformPt([lx, ly], pieceTransform(p));
+        return { key: `${p.id}:${i}`, pieceId: p.id, cut: { cutX: (z.fromX + z.toX) / 2, angle: z.angle }, x: w[0] * scale, y: w[1] * scale };
+      })
+    );
+  }, [tailMode, pieces, scale, unitsPerEm]);
 
   const byId = useMemo(() => new Map(pieces.map((p) => [p.id, p])), [pieces]);
 
@@ -120,6 +138,15 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
             );
           })()}
         </Group>
+      ))}
+
+      {zones.map((z) => (
+        <Circle
+          key={z.key} name="stack-split" x={z.x} y={z.y} radius={4} fill="#10b981" stroke="#fff" strokeWidth={1.5}
+          onMouseDown={(e) => { e.cancelBubble = true; }}
+          onClick={(e) => { e.cancelBubble = true; onSplit?.(z.pieceId, z.cut); }}
+          onTap={(e) => { e.cancelBubble = true; onSplit?.(z.pieceId, z.cut); }}
+        />
       ))}
 
       {joins.map((j) => {

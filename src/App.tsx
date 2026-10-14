@@ -170,7 +170,7 @@ import type { TextBlock, VerseLayout, VerseSettings } from "./types";
 import { buildCutPlan, cutAdvanceTotal, remapCutsForEdits } from "./lib/strokeCuts";
 import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
 import { shapeText } from "./lib/harfbuzz";
-import { convertRunToStack } from "./lib/stackConvert";
+import { convertRunToStack, splitPieceAtCut } from "./lib/stackConvert";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import {
   buildComposition,
@@ -732,6 +732,20 @@ const App: React.FC = () => {
       // No push: the overlay's drag start took one through `onBeginStackEdit`.
     },
     []
+  );
+
+  const splitStackPiece = useCallback(
+    (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => {
+      const block = blocks.find((b) => b.id === blockId);
+      if (!block || !isStackBlock(block)) return;
+      const next = splitPieceAtCut(block.pieces, block.joins, pieceId, cut);
+      if (!next) return;
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => (b.id === blockId && isStackBlock(b) ? { ...b, pieces: next.pieces, joins: next.joins } : b))
+      );
+    },
+    [blocks, pushHistory]
   );
 
   const setStackJoinBow = useCallback((blockId: number, joinId: string, bow: number) => {
@@ -3459,6 +3473,7 @@ const App: React.FC = () => {
           onBeginStackEdit={pushHistory}
           onSetStackPieces={setStackPieces}
           onSetStackJoinBow={setStackJoinBow}
+          onSplitStackPiece={splitStackPiece}
           alternateLetters={glyphAlternatesState.letters}
           onPickGlyphAlternate={pickGlyphAlternate}
           onSetStrokeCut={setStrokeCut}
