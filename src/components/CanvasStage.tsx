@@ -5,6 +5,9 @@ import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
 import { GuideView } from "./GuideView";
+import { StackView } from "./StackView";
+import { StackEditOverlay } from "./StackEditOverlay";
+import { stackScale } from "../lib/stackOutline";
 import { resolveGuidePath } from "../lib/guides";
 import { projectToGuide } from "../lib/guidePlacement";
 import { buildArcTable, type ArcTable } from "../lib/textPath";
@@ -68,6 +71,7 @@ import {
   shapeFillProps,
   shapedTextProps,
   squareKufiProps,
+  stackProps,
   textPathProps,
 } from "../lib/blockRenderProps";
 
@@ -139,6 +143,10 @@ export type CanvasStageProps = {
   onToggleDiacriticHidden: (blockId: number, glyphIndex: number) => void;
   /** One `pushHistory()` per stretch-handle drag, taken on drag start. */
   onBeginStrokeCut: () => void;
+  onBeginStackEdit: () => void;
+  onSetStackPieces: (blockId: number, patches: { id: string; x?: number; y?: number; rotation?: number }[]) => void;
+  onSetStackJoinBow: (blockId: number, joinId: string, bend: { bow: number; depth: number }) => void;
+  onSplitStackPiece: (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => void;
   /** Next Shape: the selected text block's letters that have alternates. */
   alternateLetters: LetterAlternates[];
   onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
@@ -207,6 +215,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
   onBeginStrokeCut,
+  onBeginStackEdit,
+  onSetStackPieces,
+  onSetStackJoinBow,
+  onSplitStackPiece,
   onSetStrokeCut,
   alternateLetters,
   onPickGlyphAlternate,
@@ -1112,6 +1124,38 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                       />
                     )}
                   </React.Fragment>
+                );
+              }
+
+              if (block.type === "stack") {
+                return (
+                  <StackView
+                    key={block.id}
+                    {...commonProps}
+                    {...stackProps(block)}
+                    x={block.x}
+                    y={block.y}
+                    opacity={block.opacity ?? 1}
+                    locked={block.locked}
+                    isSelected={block.id === selectedId}
+                    editing={
+                      block.id === selectedId && !effectivePanMode && !block.locked ? (
+                        <StackEditOverlay
+                          isSelected
+                          pieces={block.pieces ?? []}
+                          joins={block.joins ?? []}
+                          nib={block.nib}
+                          scale={stackScale(block.fontSize, block.unitsPerEm)}
+                          onBegin={onBeginStackEdit}
+                          onSetPieces={(patches) => onSetStackPieces(block.id, patches)}
+                          onSetBow={(joinId, bend) => onSetStackJoinBow(block.id, joinId, bend)}
+                          unitsPerEm={block.unitsPerEm}
+                          tailMode={block.stackTailMode ?? false}
+                          onSplit={(pieceId, cut) => onSplitStackPiece(block.id, pieceId, cut)}
+                        />
+                      ) : null
+                    }
+                  />
                 );
               }
 

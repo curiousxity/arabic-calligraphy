@@ -17,6 +17,8 @@ export const GUIDE_DEFAULTS: Record<GuideShape, GuideParams> = {
   wave: { width: 400, amplitude: 40 },
   line: { width: 400 },
   pen: { width: 300 },
+  teardrop: { width: 260, height: 380 },
+  almond: { width: 220, height: 400 },
 };
 
 export const GUIDE_SHAPE_LABELS: Record<GuideShape, string> = {
@@ -26,6 +28,8 @@ export const GUIDE_SHAPE_LABELS: Record<GuideShape, string> = {
   wave: "Wave",
   line: "Line",
   pen: "Pen",
+  teardrop: "Teardrop",
+  almond: "Almond",
 };
 
 const n = (v: number) => Number(v.toFixed(3));
@@ -80,6 +84,31 @@ export function guidePathD(shape: GuideShape, params: GuideParams = GUIDE_DEFAUL
       return `M ${n(-w / 2)} 0 L ${n(w / 2)} 0`;
     case "pen":
       return `M ${n(-w / 2)} 0 C ${n(-w / 6)} ${n(-w / 5)}, ${n(w / 6)} ${n(-w / 5)}, ${n(w / 2)} 0`;
+    case "teardrop": {
+      // A circle of radius w/2 at the bottom, drawn up to a point at the top.
+      const h = Math.max(p.height ?? w * 1.4, w);
+      const r = w / 2, cy = h / 2 - r, k = 0.5523;
+      const ty = -h / 2;
+      return [
+        `M 0 ${n(ty)}`,
+        `C ${n(r * 0.45)} ${n(ty + (cy - ty) * 0.45)}, ${n(r)} ${n(cy - r * 0.6)}, ${n(r)} ${n(cy)}`,
+        `C ${n(r)} ${n(cy + r * k)}, ${n(r * k)} ${n(h / 2)}, 0 ${n(h / 2)}`,
+        `C ${n(-r * k)} ${n(h / 2)}, ${n(-r)} ${n(cy + r * k)}, ${n(-r)} ${n(cy)}`,
+        `C ${n(-r)} ${n(cy - r * 0.6)}, ${n(-r * 0.45)} ${n(ty + (cy - ty) * 0.45)}, 0 ${n(ty)}`,
+        "Z",
+      ].join(" ");
+    }
+    case "almond": {
+      const h = Math.max(p.height ?? w * 1.8, 2);
+      // Both handles at kx put the curve's widest point at 0.75 * kx, i.e. w / 2.
+      const kx = w / 1.5, ky = h * 0.27;
+      return [
+        `M 0 ${n(-h / 2)}`,
+        `C ${n(kx)} ${n(-h / 2 + ky)}, ${n(kx)} ${n(h / 2 - ky)}, 0 ${n(h / 2)}`,
+        `C ${n(-kx)} ${n(h / 2 - ky)}, ${n(-kx)} ${n(-h / 2 + ky)}, 0 ${n(-h / 2)}`,
+        "Z",
+      ].join(" ");
+    }
   }
 }
 

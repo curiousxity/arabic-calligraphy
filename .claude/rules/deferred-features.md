@@ -50,11 +50,9 @@ These are capabilities that have been explicitly identified as valuable but deli
 
 - **Image trace** — Auto-tracing a raster image into a silhouette shape existed on Shape Warp blocks and was removed with that block type. Rebuilding it for Shape Fill means restoring `lib/imageTrace.ts`, `ImageTraceDialog.tsx`, and the `imagetracerjs` dependency from git history; the tracing itself was block-type agnostic, producing the same `{ pathData, w, h }` shape `extractSvgPaths` returns.
 
-- **Stacked compositions (tarkib) — curved joins first** — Decided to build
-  (2026-10-14); design in
-  `docs/superpowers/specs/2026-10-14-stacked-compositions-design.md`. Two
-  things it leaves for later, both operating on the baked stack block it
-  creates:
+- **Stacked compositions (tarkib)** — Shipped 2026-10-14 (see
+  [stacked-compositions.md](stacked-compositions.md)); two things left for
+  later:
   - *Bending letter bodies* ("Approach C"): skeletonise each glyph into a
     centerline plus a nib and re-render with the nib swept along it, so any
     stroke — not only a join or a tail — can bend with correct weight.
@@ -64,60 +62,6 @@ These are capabilities that have been explicitly identified as valuable but deli
   - *Stacking alternates in the Diwani font* (raised ب, the long sweeping
     م tail): font-side glyph design, exposed through Next Shape; see
     [bundled-fonts.md](bundled-fonts.md).
-
-  The goal is the Diwani stacked name: in the
-  reference piece ("Mosbeh", مصبح) the letters sit on separate baselines,
-  the connecting strokes between them are long free curves at constant pen
-  width, and the whole fills a teardrop with the م's tail curling back under
-  the rest. The bar is "competes with the hand-drawn version", not "a
-  stacked-looking effect".
-
-  What that piece *is*, and therefore what the feature is: letter bodies
-  placed freely and barely distorted, **joins redrawn as curves**, and a
-  silhouette aimed at. The joins are where all the difficulty lives; the
-  other two are modest.
-
-  Ruled out, and why:
-  - *A liquify-style displacement field.* It keeps things smooth but changes
-    stroke **weight** — stretch a stem and the pen looks wider, pinch it and
-    it goes hairline. Weight is the one property a calligrapher never varies
-    arbitrarily; it is what separates calligraphy from warped type. The
-    removed Shape Warp block was this idea with four preset fields (its
-    removal commit, f29e469, records no reason; see CLAUDE.md);
-    `warpPoint` in `src/lib/warp.ts` is the surviving block-level form.
-  - *A packing solver that fits a word into a shape.* It has no notion of
-    which letter should rise and which should sweep, so its fits are
-    geometrically right and calligraphically wrong. The container is a
-    **guide** the user arranges against, not a target the app solves for.
-  - *Scaling letters*, per [removed-subsystems.md](removed-subsystems.md).
-    Letters translate; they do not resize.
-  - *Skeletonising glyphs into centerline + nib* so whole letters can bend
-    with correct weight. Right in principle, but open research on Diwani's
-    overlapping forms. Not where to start.
-
-  The plan, in order:
-  1. **Curved join between two cut faces.** Stroke cuts
-     ([stroke-cuts.md](stroke-cuts.md)) already find a straight stroke,
-     measure it perpendicular to the pen, and cut it in font units. Extend
-     that: cut a join, and draw a bezier between the two cut faces swept
-     with a nib whose width and angle come from the cut. A curved,
-     nib-width kashida. Worth building on its own — calligraphers draw this
-     constantly and no font can supply it.
-  2. **Free vertical placement of letters** falls out of (1): once a join is
-     a synthesised curve, the letters on either side can sit on different
-     baselines and the join follows.
-  3. **Container guide.** A teardrop/medallion preset in the ornament or
-     guide library to arrange against. Cheap once (1) and (2) exist.
-
-  Known ceiling: fonts do not ship the alternate letterforms a Diwani master
-  chooses when stacking (raised ب, the long sweeping م tail), and Next Shape
-  can only expose what a font carries. Closing that gap is a font-side
-  problem (drawing stacking alternates into the bundled Diwani fonts, see
-  [bundled-fonts.md](bundled-fonts.md)), not a renderer one.
-
-  Today's nearest substitute is splitting the word into tatweel-joined
-  pieces (`مـ`, `ـصـ`, …) in separate text blocks, arranging them by hand
-  and grouping them.
 
 - **Free movement of nuqtas and diacritics** — Wanted (2026-10-13, after
   looking at Qalam Studio, which splits every glyph into body, dots and marks

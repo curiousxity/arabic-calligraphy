@@ -31,6 +31,7 @@ import { VerseButton } from "./VerseDialog";
 import { VersePanel } from "./sidebar/VersePanel";
 import { AddGuideButton } from "./GuideDialog";
 import { GuidePanel } from "./sidebar/GuidePanel";
+import { StackPanel } from "./sidebar/StackPanel";
 import { GuideAttachmentPanel } from "./sidebar/GuideAttachmentPanel";
 import { GUIDE_SHAPE_LABELS } from "../lib/guideShapes";
 import { attachedTo, guidesIn } from "../lib/guides";
@@ -167,6 +168,9 @@ export type SidebarProps = {
   /** The user's uploaded fonts, appended to the built-in picker list. */
   customFonts?: CustomFont[];
   onAddCustomFont?: (file: File, label?: string) => Promise<CustomFont | { error: string }>;
+  /** Bake the selected text block into a stacked composition. */
+  onConvertToStack?: () => void;
+  onResetStackLayout?: () => void;
   onRemoveCustomFont?: (key: string) => void;
   /** Set when the selected block names a font this browser cannot resolve. */
   missingFontKey?: string | null;
@@ -499,6 +503,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // ---- STREAM-G: font upload — destructure ----
   customFonts = [],
   onAddCustomFont,
+  onConvertToStack,
+  onResetStackLayout,
   onRemoveCustomFont,
   missingFontKey = null,
   // ---- /STREAM-G ----
@@ -640,6 +646,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showContent, setShowContent] = useState(true);
   const [showVerse, setShowVerse] = useState(true);
   const [showGuide, setShowGuide] = useState(true);
+  const [showStack, setShowStack] = useState(true);
 
   /**
    * The font list the picker shows: the bundled fonts, then uploads. An
@@ -2243,7 +2250,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* A mirror has no content or typography of its own — both come from
             its source — so it hides these two panels the way image already
             does. (STREAM-B edit outside its anchors; see the stream report.) */}
-        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && (
+        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && selectedBlock.type !== "stack" && (
           <div className="sidebarPanel">
             <CollapsibleSection
               title="Content"
@@ -2296,6 +2303,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }
                     onApply={onApplyComposition}
                   />
+                )}
+
+                {selectedBlock.type === "text" && onConvertToStack && (
+                  <button
+                    type="button"
+                    className="sidebarSmallAction"
+                    aria-label="Convert to stacked composition"
+                    title="Bake the letters into movable pieces joined by curves. One-way; undo restores the text."
+                    onClick={onConvertToStack}
+                  >
+                    Convert to stacked composition
+                  </button>
                 )}
 
                 {/* Bend this block along a guide on the canvas. It becomes a
@@ -2858,6 +2877,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
+        {selectedBlock?.type === "stack" && onResetStackLayout && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Stacked composition" isOpen={showStack} onToggle={() => setShowStack((v) => !v)}>
+              <StackPanel block={selectedBlock} onUpdate={onUpdateSelectedBlock} onReset={onResetStackLayout} />
+            </CollapsibleSection>
+          </div>
+        )}
+
         {selectedBlock && selectedBlock.type === "textPath" && (
           <div className="sidebarPanel">
             <CollapsibleSection title="Curve" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
@@ -3047,7 +3074,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     selected slot (which lives in App.tsx). Written as an IIFE
                     rather than a helper component because this stream owns
                     only the region between these two anchors. */}
-                {selectedBlock.type !== "squareKufi" && (() => {
+                {selectedBlock.type !== "squareKufi" && selectedBlock.type !== "stack" && (() => {
                   const slots = findKashidaSlots(selectedBlock.text);
                   if (slots.length === 0) {
                     return (
@@ -3250,7 +3277,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     only surface for doing so, so hiding them made uploading or
                     removing a font impossible whenever a square-kufi block
                     happened to be selected. */}
-                {selectedBlock.type !== "squareKufi" && (
+                {selectedBlock.type !== "squareKufi" && selectedBlock.type !== "stack" && (
                 <>
                 {/* ---- STREAM-G: font upload — unavailable-font notice ---- */}
                 {missingFontKey && (

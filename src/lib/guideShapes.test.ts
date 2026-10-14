@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseSvgPath } from "./svgPath";
+import { parseSvgPath, pathToPolygon } from "./svgPath";
 import { buildArcTable, pathBoundingBox, pathLength, pointAtArcLengthFromTable } from "./textPath";
 import { GUIDE_DEFAULTS, guidePathD, isClosedPath } from "./guideShapes";
 import type { GuideShape } from "../types";
 
-const SHAPES: GuideShape[] = ["circle", "ellipse", "arc", "wave", "line", "pen"];
+const SHAPES: GuideShape[] = ["circle", "ellipse", "arc", "wave", "line", "pen", "teardrop", "almond"];
 
 describe("guidePathD", () => {
   it("builds a parseable path for every shape", () => {
@@ -57,5 +57,20 @@ describe("guidePathD", () => {
     const box = pathBoundingBox(parseSvgPath(guidePathD("wave", { width: 400, amplitude: 50 })));
     expect(box.height).toBeGreaterThan(80);
     expect(box.height).toBeLessThan(110);
+  });
+
+  it("teardrop and almond are closed, centred, start at the top, and match their size", () => {
+    for (const s of ["teardrop", "almond"] as const) {
+      const cmds = parseSvgPath(guidePathD(s, GUIDE_DEFAULTS[s]));
+      expect(isClosedPath(cmds)).toBe(true);
+      const first = cmds[0];
+      expect(first.type).toBe("M");
+      if (first.type === "M") { expect(first.x).toBeCloseTo(0, 6); expect(first.y).toBeCloseTo(-(GUIDE_DEFAULTS[s].height ?? 0) / 2, 6); }
+      const poly = pathToPolygon(cmds, 16);
+      const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]);
+      expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(GUIDE_DEFAULTS[s].width ?? 0, 0);
+      expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(GUIDE_DEFAULTS[s].height ?? 0, 0);
+      expect((Math.max(...xs) + Math.min(...xs)) / 2).toBeCloseTo(0, 0);
+    }
   });
 });

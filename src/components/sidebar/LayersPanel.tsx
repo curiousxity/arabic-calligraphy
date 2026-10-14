@@ -32,7 +32,9 @@ const blockTypeIcon = (b: Block) =>
 
 /** A block's default label; a guide names its shape so a list of them is readable. */
 const defaultLabel = (b: Block) =>
-  b.type === "guide" ? `Guide · ${GUIDE_SHAPE_LABELS[b.guideShape]}` : `Block ${b.id}`;
+  b.type === "guide" ? `Guide · ${GUIDE_SHAPE_LABELS[b.guideShape]}`
+  : b.type === "stack" ? `Stack · ${b.source.text}`
+  : `Block ${b.id}`;
 
 export type LayersPanelProps = {
   blocks: Block[];

@@ -117,3 +117,13 @@ export function imageProps(b: Extract<Block, { type: "image" }>) {
     rotation: b.rotation ?? 0,
   };
 }
+
+export const stackProps = (b: Extract<Block, { type: "stack" }>) => ({
+  ...typographicProps(b),
+  // `?? []`: a hand-edited save can drop either list; this build does not
+  // validate stack blocks on load.
+  pieces: b.pieces ?? [],
+  joins: b.joins ?? [],
+  nib: b.nib,
+  unitsPerEm: b.unitsPerEm,
+});

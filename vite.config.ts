@@ -54,7 +54,11 @@ export default defineConfig({
     // files and roughly double the test count, which looks like the merge
     // you just made broke something rather than like a second checkout
     // being scanned. Hit and fixed on 2026-08-21.
-    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
+    //
+    // `.claude/worktrees/**` is excluded outright for the same reason: a
+    // worktree's whole `src/` tree is a second copy of every suite, and a
+    // stale copy fails against the current assertions (2026-10-14).
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/.claude/worktrees/**'],
   },
   build: {
     chunkSizeWarningLimit: 1200,

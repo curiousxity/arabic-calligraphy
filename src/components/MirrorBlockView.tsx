@@ -6,6 +6,7 @@ import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
 import { SquareKufiText } from "./SquareKufiText";
 import { ImageBlockView } from "./ImageBlockView";
+import { StackView } from "./StackView";
 import { radialCopyTransforms, type MirrorSource } from "../lib/mirror";
 import type { MirrorMode } from "../types";
 import {
@@ -13,6 +14,7 @@ import {
   shapeFillProps,
   shapedTextProps,
   squareKufiProps,
+  stackProps,
   textPathProps,
 } from "../lib/blockRenderProps";
 
@@ -141,6 +143,7 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
     if (source.type === "textPath") {
       return <TextOnPathText {...common} {...textPathProps(source)} guidePath={sourceGuideD !== undefined ? { d: sourceGuideD, closed: sourceGuideClosed } : undefined} />;
     }
+    if (source.type === "stack") return <StackView {...common} {...stackProps(source)} />;
     return <ShapedText {...common} {...shapedTextProps(source)} />;
   }, [source, sourceGuideD, sourceGuideClosed]);
 

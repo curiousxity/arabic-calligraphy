@@ -18,6 +18,9 @@
 4. **The block stores `unitsPerEm`.** Font units mean nothing without it, and the font may be gone later.
 5. **Fallback tatweel insertion runs only when `shapableText === text`.** Cluster offsets index the shapable text; a block whose unsupported marks were stripped has offsets the kashida code cannot use. Such pairs stay unjoined (rigid, no curve) rather than mis-inserted.
 6. **Conversion refuses** a block with `warpX`/`warpY` set, or whose text contains an honorific override glyph (`isOverrideGlyphChar`), with a status message. Both draw something other than the font's outline.
+7. **No medallion guide** (recorded after the final review). The existing circle guide stands in for it; only Teardrop and Almond were added.
+8. **No "selected join's bow" field in the panel** (recorded after the final review). There is no join selection: a join is bent only by its on-canvas handle.
+9. **Tails come from split dots, not from clicking a non-join rail** (recorded after the final review). Arming "Split strokes" shows a dot on every cuttable straight stroke; clicking one splits there.
 
 ## Global Constraints
 

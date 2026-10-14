@@ -6,7 +6,7 @@ import { parseSvgPath } from "../lib/svgPath";
 import { pathBoundingBox } from "../lib/textPath";
 import { CloseIcon } from "./Icons";
 
-const SHAPES: GuideShape[] = ["circle", "ellipse", "arc", "wave", "line", "pen"];
+const SHAPES: GuideShape[] = ["circle", "ellipse", "arc", "wave", "line", "pen", "teardrop", "almond"];
 
 /** A small dashed preview of a shape, drawn from the same path the guide gets. */
 const ShapePreview: React.FC<{ shape: GuideShape }> = ({ shape }) => {

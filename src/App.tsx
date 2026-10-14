@@ -31,6 +31,7 @@ import {
   supportsGlyphAlternates,
   supportsStrokeCuts,
   supportsStyleSets,
+  isStackBlock,
 } from "./lib/blockCapabilities";
 import { useGlyphAlternates, useStyleSets } from "./hooks/useGlyphAlternates";
 import {
@@ -54,7 +55,7 @@ import {
   syncAttachedToGuides,
 } from "./lib/guides";
 import type { GuideAttachment, GuideBlock, GuideParams, GuideShape } from "./types";
-import type { Block, DiacriticOverride, StrokeCut } from "./types";
+import type { Block, DiacriticOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
   isCloudConfigured,
@@ -151,10 +152,10 @@ import {
   type KufiCellEdit,
 } from "./lib/squareKufi";
 import type { MirrorMode, SquareKufiBlock } from "./types";
-import { applyKashida, type KashidaSlot } from "./lib/tatweel";
+import { applyKashida, findKashidaSlots, readKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
-import { spacingForBlock } from "./lib/spacing";
+import { applySpacing, spacingForBlock } from "./lib/spacing";
 import { layoutVerse, verseAnchor, DEFAULT_LINE_GAP, DEFAULT_COLUMN_GAP } from "./lib/verseLayout";
 import {
   justifyLine,
@@ -166,8 +167,12 @@ import {
   type LineMeasure,
 } from "./lib/verseJustify";
 import type { TextBlock, VerseLayout, VerseSettings } from "./types";
-import { cutAdvanceTotal, remapCutsForEdits } from "./lib/strokeCuts";
-import { nuqtaUnits } from "./lib/nuqta";
+import { buildCutPlan, cutAdvanceTotal, outlineBounds, remapCutsForEdits } from "./lib/strokeCuts";
+import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
+import { shapeText } from "./lib/harfbuzz";
+import { convertRunToStack, splitPieceAtCut, type UnjoinedPair } from "./lib/stackConvert";
+import { assembleStackOutline } from "./lib/stackOutline";
+import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import {
   buildComposition,
   describeComposition,
@@ -715,6 +720,43 @@ const App: React.FC = () => {
     },
     []
   );
+
+  const setStackPieces = useCallback(
+    (blockId: number, patches: { id: string; x?: number; y?: number; rotation?: number }[]) => {
+      const byId = new Map(patches.map((p) => [p.id, p]));
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || !isStackBlock(b)) return b;
+          return { ...b, pieces: b.pieces.map((p) => { const q = byId.get(p.id); return q ? { ...p, ...q, id: p.id } : p; }) };
+        })
+      );
+      // No push: the overlay's drag start took one through `onBeginStackEdit`.
+    },
+    []
+  );
+
+  const splitStackPiece = useCallback(
+    (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => {
+      const block = blocks.find((b) => b.id === blockId);
+      if (!block || !isStackBlock(block)) return;
+      const next = splitPieceAtCut(block.pieces, block.joins, pieceId, cut);
+      if (!next) return;
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => (b.id === blockId && isStackBlock(b) ? { ...b, pieces: next.pieces, joins: next.joins } : b))
+      );
+    },
+    [blocks, pushHistory]
+  );
+
+  const setStackJoinBow = useCallback((blockId: number, joinId: string, bend: { bow: number; depth: number }) => {
+    setBlocks((prev) =>
+      prev.map((b) =>
+        b.id !== blockId || !isStackBlock(b) ? b
+          : { ...b, joins: b.joins.map((j) => (j.id === joinId ? { ...j, bow: bend.bow, depth: bend.depth } : j)) }
+      )
+    );
+  }, []);
 
   const toggleStrokeCutMode = useCallback(
     (blockId: number) => {
@@ -1895,6 +1937,15 @@ const App: React.FC = () => {
     updateSelectedBlock({ guideParams: next, guideD: guidePathD(selectedBlock.guideShape, next) });
   };
 
+  /** Stack layout back to its home arrangement. updateSelectedBlock pushes the one history step. */
+  const resetStackLayout = () => {
+    if (!selectedBlock || !isStackBlock(selectedBlock)) return;
+    updateSelectedBlock({
+      pieces: selectedBlock.pieces.map((p) => ({ ...p, x: p.homeX, y: p.homeY, rotation: 0 })),
+      joins: selectedBlock.joins.map((j) => ({ ...j, bow: 0, depth: 0 })),
+    });
+  };
+
   /** Pen-guide point edits; the overlay's onBeginChange already pushed history. */
   const updateGuideD = (id: number, d: string) => {
     setBlocks((prev) => prev.map((b) => (b.id === id && b.type === "guide" ? { ...b, guideD: d } : b)));
@@ -2881,6 +2932,138 @@ const App: React.FC = () => {
     setExportStatus(describeComposition(plan));
   };
 
+  /**
+   * Bake the selected text block into a stack block. One-way (undo restores
+   * the text block). Captured by id like `applyComposition`: shaping is
+   * async and the selection can change meanwhile.
+   *
+   * Joins the detector cannot cut get a tatweel inserted and are cut there
+   * instead — only when the shaped text equals the block text (the cluster
+   * offsets index the shaped text) and the block has no diacritic overrides
+   * (they are keyed by glyph index, which an insertion shifts). A tatweel is
+   * kept only at a slot it actually made joinable; the status says how many.
+   */
+  const convertSelectedBlockToStack = async () => {
+    const source = selectedBlock;
+    if (!source || source.type !== "text") return;
+    if (source.text.trim() === "") { setExportStatus("Type some text into this block first."); return; }
+    if (source.verse) {
+      setExportStatus("Verse lines cannot be converted to a stacked composition yet. Remove the line from its verse first.");
+      return;
+    }
+    if ((source.warpX ?? 0) !== 0 || (source.warpY ?? 0) !== 0) {
+      setExportStatus("Set Warp to 0 before converting to a stacked composition.");
+      return;
+    }
+    if (source.fontStyle && source.fontStyle !== "normal") {
+      setExportStatus("Turn off italic and bold before converting to a stacked composition.");
+      return;
+    }
+    if ([...source.text].some((ch) => isOverrideGlyphChar(ch.codePointAt(0)))) {
+      setExportStatus("Honorific glyphs cannot be converted to a stacked composition.");
+      return;
+    }
+    const { id, fontFamily, fontSize } = source;
+    const fontUrl = resolveFontUrl(fontFamily);
+    const overrides = source.diacriticOverrides ?? [];
+    const baseCuts = source.strokeCuts ?? [];
+    const shapeAndConvert = async (text: string, cuts: StrokeCut[]) => {
+      const shaped = await shapeText(text, fontUrl, source.glyphAlternates, source.styleSets);
+      const upm = Math.max(shaped.unitsPerEm || 1000, 1);
+      const glyphs = applySpacing(shaped.glyphs, shaped.shapableText, spacingForBlock(source), upm);
+      const cutPlan = cuts.length ? buildCutPlan(glyphs, cuts, nuqtaUnits(fontFamily, upm)) : null;
+      const result = convertRunToStack({
+        glyphs, font: shaped.font, unitsPerEm: upm, shapableText: shaped.shapableText,
+        cutPlan, diacriticOverrides: overrides, fontSize,
+      });
+      return { shaped, upm, result };
+    };
+    /** One tatweel at the slot of each pair, always from the block's own text,
+     *  highest offset first so earlier insertions do not move later ones. */
+    const withTatweels = (pairs: readonly UnjoinedPair[]) => {
+      let text = source.text;
+      const slots = findKashidaSlots(text);
+      const counts = readKashida(text, slots);
+      const edits: { index: number; delta: number; pair: UnjoinedPair }[] = [];
+      for (const u of [...pairs].sort((a, b) => b.laterCl - a.laterCl)) {
+        const slot = slots.find((sl) => sl.index > u.earlierCl && sl.index <= u.laterCl);
+        if (!slot) continue;
+        const next = applyKashida(text, slot, (counts.get(slot.index) ?? 0) + 1);
+        edits.push({ index: slot.index, delta: next.length - text.length, pair: u });
+        text = next;
+      }
+      return { text, edits, cuts: remapCutsForEdits(baseCuts, edits) };
+    };
+    try {
+      let { shaped, upm, result } = await shapeAndConvert(source.text, baseCuts);
+      let inserted = 0;
+      const before = result.unjoined.length;
+      if (before > 0 && shaped.shapableText === source.text && overrides.length === 0) {
+        const all = withTatweels(result.unjoined);
+        if (all.edits.length) {
+          const trial = await shapeAndConvert(all.text, all.cuts);
+          // An original offset in the retried text: every insertion at or
+          // before it pushed it along.
+          const moved = (p: number) => p + all.edits.reduce((n, e) => n + (e.index <= p ? e.delta : 0), 0);
+          const still = new Set(trial.result.unjoined.map((u) => u.earlierCl));
+          const helped = all.edits.filter((e) => !still.has(moved(e.pair.earlierCl))).map((e) => e.pair);
+          if (helped.length === all.edits.length) {
+            if (trial.result.unjoined.length < before) {
+              ({ shaped, upm, result } = trial);
+              inserted = all.edits.length;
+            }
+          } else if (helped.length > 0) {
+            // Again from the block's own text, with only the tatweels that
+            // helped, so none is left at a slot that stayed unjoined.
+            const some = withTatweels(helped);
+            const kept = await shapeAndConvert(some.text, some.cuts);
+            if (kept.result.unjoined.length < before) {
+              ({ shaped, upm, result } = kept);
+              inserted = some.edits.length;
+            }
+          }
+        }
+      }
+      const nib = { width: nuqtaUnits(fontFamily, upm), minFraction: nibFloorFraction(fontFamily) };
+      // The stack centres its ink on (x, y); a left- or right-aligned text
+      // block anchors an edge there instead (ShapedText's `bx`). Keep that
+      // edge where it was, along the block's own rotated x axis.
+      const align = source.align ?? "center";
+      let { x, y } = source;
+      if (align !== "center") {
+        const ink = outlineBounds(assembleStackOutline(result.pieces, result.joins, nib));
+        const bw = Math.max((ink.x2 - ink.x1) * (fontSize / upm), 20);
+        const dx = align === "left" ? bw / 2 : -bw / 2;
+        const r = ((source.rotation ?? 0) * Math.PI) / 180;
+        x += dx * Math.cos(r);
+        y += dx * Math.sin(r);
+      }
+      const stack: StackBlock = {
+        id, type: "stack", name: source.name, text: source.text, x, y,
+        fontSize, color: source.color, fontFamily, fontStyle: source.fontStyle, opacity: source.opacity,
+        stroke: source.stroke, strokeWidth: source.strokeWidth, shadowColor: source.shadowColor,
+        shadowBlur: source.shadowBlur, shadowOffsetX: source.shadowOffsetX, shadowOffsetY: source.shadowOffsetY,
+        shadowOpacity: source.shadowOpacity, locked: source.locked, rotation: source.rotation,
+        ornamental: source.ornamental, groupId: source.groupId, fill: source.fill,
+        source: { text: source.text, fontFamily },
+        unitsPerEm: upm,
+        nib,
+        pieces: result.pieces, joins: result.joins,
+      };
+      replaceBlockWithHistory(id, stack);
+      const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+      const parts: string[] = [];
+      if (inserted > 0) parts.push(`${plural(inserted, "tatweel")} inserted to make joins`);
+      if (result.unjoined.length > 0) {
+        parts.push(`${plural(result.unjoined.length, "join")} could not be cut and stay rigid`);
+      }
+      setExportStatus(parts.length ? `Converted; ${parts.join("; ")}.` : "Converted to a stacked composition.");
+    } catch (err) {
+      console.error("stack conversion failed", err);
+      setExportStatus("Could not convert this block.");
+    }
+  };
+
   const p1dSidebarProps: Partial<SidebarProps> = {
     kashidaSlotOrdinal,
     onSelectKashidaSlot: setKashidaSlotOrdinal,
@@ -3118,7 +3301,7 @@ const App: React.FC = () => {
     const missing = [
       ...new Set(
         blocks
-          .filter((b) => b.type !== "image" && b.type !== "mirror" && b.type !== "guide")
+          .filter((b) => b.type !== "image" && b.type !== "mirror" && b.type !== "guide" && b.type !== "stack")
           .map((b) => b.fontFamily)
           .filter((key) => key && isFontUnavailable(key, FONT_URLS))
       ),
@@ -3145,6 +3328,7 @@ const App: React.FC = () => {
     !!selectedBlock &&
     selectedBlock.type !== "image" &&
     selectedBlock.type !== "guide" &&
+    selectedBlock.type !== "stack" &&
     isFontUnavailable(selectedBlock.fontFamily, FONT_URLS);
 
   const p2gSidebarProps: Partial<SidebarProps> = {
@@ -3169,6 +3353,8 @@ const App: React.FC = () => {
       }}
     >
       <Sidebar
+        onConvertToStack={convertSelectedBlockToStack}
+        onResetStackLayout={resetStackLayout}
         blocks={blocks}
         selectedBlock={selectedBlock}
         selectedIds={selectedIds}
@@ -3337,6 +3523,10 @@ const App: React.FC = () => {
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
           onBeginStrokeCut={pushHistory}
+          onBeginStackEdit={pushHistory}
+          onSetStackPieces={setStackPieces}
+          onSetStackJoinBow={setStackJoinBow}
+          onSplitStackPiece={splitStackPiece}
           alternateLetters={glyphAlternatesState.letters}
           onPickGlyphAlternate={pickGlyphAlternate}
           onSetStrokeCut={setStrokeCut}
