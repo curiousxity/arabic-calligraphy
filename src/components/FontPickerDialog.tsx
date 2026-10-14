@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CloseIcon } from "./Icons";
-import { groupByGenre, SAMPLE_FALLBACK, visibleFonts, type FontChoice } from "../lib/fontCatalog";
+import { SAMPLE_FALLBACK, visibleFonts, type FontChoice } from "../lib/fontCatalog";
+import { FontGallery } from "./FontGallery";
 
 export type { FontChoice };
 
@@ -37,9 +38,7 @@ export const FontPickerDialog: React.FC<FontPickerDialogProps> = ({
   onPick,
   onClose,
 }) => {
-  const activeRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const sample = text.trim() || SAMPLE_FALLBACK;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -49,15 +48,11 @@ export const FontPickerDialog: React.FC<FontPickerDialogProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Open on the current font, so the choice starts from where the block is.
+  // The gallery focuses the current font's card; with no such card (an upload
+  // missing from this browser) focus falls back to the close button.
   useEffect(() => {
-    const active = activeRef.current;
-    if (active) {
-      active.scrollIntoView({ block: "center" });
-      active.focus({ preventScroll: true });
-    } else {
-      closeRef.current?.focus();
-    }
+    if (!fonts.some((f) => f.value === value)) closeRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return createPortal(
@@ -92,39 +87,7 @@ export const FontPickerDialog: React.FC<FontPickerDialogProps> = ({
           </button>
         </div>
 
-        <div className="fontPickerBody" data-testid="font-picker">
-          {groupByGenre(visibleFonts(fonts, value)).map((group) => (
-            <section key={group.genre} aria-label={group.genre}>
-              <h3 className="fontPickerGenre">{group.genre}</h3>
-              <div className="fontPickerGrid">
-                {group.fonts.map((font) => {
-                  const active = font.value === value;
-                  return (
-                    <button
-                      key={font.value}
-                      ref={active ? activeRef : undefined}
-                      type="button"
-                      className={active ? "fontPickerCard fontPickerCard--active" : "fontPickerCard"}
-                      data-font-key={font.value}
-                      aria-pressed={active}
-                      onClick={() => onPick(font.value)}
-                    >
-                      <span
-                        className="fontPickerSample"
-                        style={{ fontFamily: font.cssFamily }}
-                        dir="rtl"
-                        lang="ar"
-                      >
-                        {sample}
-                      </span>
-                      <span className="fontPickerLabel">{font.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
+        <FontGallery text={text} value={value} fonts={visibleFonts(fonts, value)} onPick={onPick} />
       </div>
     </div>,
     document.body
