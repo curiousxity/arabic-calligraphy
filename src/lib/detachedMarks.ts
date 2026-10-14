@@ -8,7 +8,7 @@ import type { SvgCmd } from "./svgPath";
 import type { HarfBuzzGlyph } from "./normalizeGlyphs";
 import { pointInPolygon } from "./svgPath";
 import { toSegments, fromSegments } from "./stackGeometry";
-import { outlineBounds, flattenContours, toSvgCmds } from "./strokeCuts";
+import { outlineBounds, flattenContours, toSvgCmds, remapCutsForEdits } from "./strokeCuts";
 
 export type Bounds = { x1: number; y1: number; x2: number; y2: number };
 export type DetachedContour = { mark: number; cmds: SvgCmd[]; bounds: Bounds };
@@ -244,3 +244,77 @@ export function findDetachedMarks(
   }
   return out;
 }
+
+/** Where a detached mark has been moved to. Keyed like a stroke cut: the
+ *  cluster survives a re-shape that changes the glyph count, the glyph id
+ *  checksums the letter, and `mark` picks the contour (>= 0, raw index in
+ *  the glyph's path) or the whole mark glyph (< 0, see findDetachedMarks).
+ *  `dx`/`dy` are unscaled font units, so a font-size change scales them.
+ *  Tashkeel offsets are in px by history; the two are deliberately not the
+ *  same convention. */
+export type DetachedMarkOverride = {
+  cluster: number;
+  glyphId: number;
+  mark: number;
+  dx: number;
+  dy: number;
+};
+
+export type DetachedMarkPlan = {
+  /** glyph index -> contour index -> [dx, dy], font units. */
+  contours: Map<number, Map<number, [number, number]>>;
+  /** glyph index -> [dx, dy] for whole-glyph marks. */
+  glyphs: Map<number, [number, number]>;
+};
+
+export const EMPTY_MARK_PLAN: DetachedMarkPlan = { contours: new Map(), glyphs: new Map() };
+
+/** Resolve stored overrides against this run's detected marks. Anything
+ *  whose cluster + glyph id no longer names a glyph, or whose mark index is
+ *  no longer detected on it, is dropped silently — the guard tashkeel
+ *  overrides already get. */
+export function buildDetachedMarkPlan(
+  overrides: readonly DetachedMarkOverride[],
+  glyphs: HarfBuzzGlyph[],
+  detected: ReadonlyMap<number, DetachedMark[]>
+): DetachedMarkPlan {
+  const plan: DetachedMarkPlan = { contours: new Map(), glyphs: new Map() };
+  for (const o of overrides) {
+    if (o.dx === 0 && o.dy === 0) continue;
+    // A whole-glyph mark (mark < 0) names the (-1 - mark)th glyph with this
+    // cluster and id, so two identical dot glyphs in one cluster stay
+    // distinct; a contour mark names the first such glyph. findDetachedMarks
+    // counts the same ordinal in the same glyph order.
+    const wanted = o.mark < 0 ? -1 - o.mark : 0;
+    let seen = 0;
+    for (let i = 0; i < glyphs.length; i++) {
+      const g = glyphs[i];
+      if ((g.cl ?? 0) !== o.cluster || g.g !== o.glyphId) continue;
+      if (seen++ !== wanted) continue;
+      const list = detected.get(i);
+      if (!list?.some((m) => m.mark === o.mark)) break;
+      if (o.mark < 0) plan.glyphs.set(i, [o.dx, o.dy]);
+      else {
+        const per = plan.contours.get(i) ?? new Map<number, [number, number]>();
+        per.set(o.mark, [o.dx, o.dy]);
+        plan.contours.set(i, per);
+      }
+      break;
+    }
+  }
+  return plan;
+}
+
+/** Glyph indices named by any override — the `only` argument for
+ *  findDetachedMarks when the tool is not armed. */
+export function glyphIndicesWithOverrides(overrides: readonly DetachedMarkOverride[], glyphs: HarfBuzzGlyph[]): Set<number> {
+  const out = new Set<number>();
+  for (const o of overrides) glyphs.forEach((g, i) => { if ((g.cl ?? 0) === o.cluster && g.g === o.glyphId) out.add(i); });
+  return out;
+}
+
+/** Cluster keys shift when a tatweel is inserted; same remap as stroke cuts. */
+export const remapMarksForEdits = (
+  marks: DetachedMarkOverride[],
+  edits: readonly { index: number; delta: number }[]
+): DetachedMarkOverride[] => remapCutsForEdits(marks, edits);

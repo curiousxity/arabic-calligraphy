@@ -18,7 +18,10 @@ import type { HarfBuzzGlyph } from "./harfbuzz";
 // app itself loads it (the app is bundled by Vite/Rolldown, which
 // doesn't have this issue).
 const hbjsModule = createRequire(import.meta.url)("harfbuzzjs");
-import { findDetachedContours, splitContours, translateContours, MAX_MARK_FRACTION, findDetachedMarks } from "./detachedMarks";
+import {
+  findDetachedContours, splitContours, translateContours, MAX_MARK_FRACTION, findDetachedMarks,
+  buildDetachedMarkPlan, remapMarksForEdits,
+} from "./detachedMarks";
 import { findDiacriticGlyphIndices } from "./diacritics";
 import { toSvgCmds, outlineBounds } from "./strokeCuts";
 import { normalizeGlyphs } from "./normalizeGlyphs";
@@ -256,5 +259,45 @@ describe("UNSUPPORTED_FONTS", () => {
     // detached from the bowl by more than a touch, so the detector cannot
     // tell it from a dot.
     expect(findDetachedMarks(glyphs, font, upm, new Set(), "NotWessam").size).toBeGreaterThan(0);
+  });
+});
+
+describe("buildDetachedMarkPlan", () => {
+  it("resolves a contour override by cluster + glyph id + mark, and drops a stale glyph id or mark", async () => {
+    const { glyphs, font } = await shapeReal("ثبت", "FatemiMaqala.ttf");
+    const detected = findDetachedMarks(glyphs, font, font.unitsPerEm || 1000, new Set(), "FatemiMaqala");
+    const [gi, list] = [...detected.entries()][0];
+    const m = list[0];
+    const plan = buildDetachedMarkPlan(
+      [
+        { cluster: m.cluster, glyphId: m.glyphId, mark: m.mark, dx: 30, dy: -40 },
+        { cluster: m.cluster, glyphId: m.glyphId + 9999, mark: m.mark, dx: 1, dy: 1 },
+        { cluster: m.cluster, glyphId: m.glyphId, mark: 999, dx: 1, dy: 1 },
+      ],
+      glyphs, detected
+    );
+    expect(plan.contours.get(gi)?.get(m.mark)).toEqual([30, -40]);
+    expect(plan.contours.get(gi)?.size).toBe(1);
+    expect(plan.glyphs.size).toBe(0);
+  });
+
+  it("resolves a whole-glyph override (NotoSans dot)", async () => {
+    const { glyphs, font } = await shapeReal("حرف", "NotoSans.ttf");
+    const dia = findDiacriticGlyphIndices(glyphs, font, "حرف");
+    const detected = findDetachedMarks(glyphs, font, font.unitsPerEm || 1000, dia, "NotoSans");
+    const [gi, [m]] = [...detected.entries()][0];
+    const plan = buildDetachedMarkPlan([{ cluster: m.cluster, glyphId: m.glyphId, mark: m.mark, dx: 5, dy: 6 }], glyphs, detected);
+    expect(plan.glyphs.get(gi)).toEqual([5, 6]);
+  });
+});
+
+describe("remapMarksForEdits", () => {
+  it("shifts clusters after an insertion and leaves the one at the slot", () => {
+    const marks = [
+      { cluster: 0, glyphId: 1, mark: 0, dx: 1, dy: 1 },
+      { cluster: 2, glyphId: 1, mark: 0, dx: 1, dy: 1 },
+      { cluster: 3, glyphId: 1, mark: 0, dx: 1, dy: 1 },
+    ];
+    expect(remapMarksForEdits(marks, [{ index: 2, delta: 1 }]).map((m) => m.cluster)).toEqual([0, 2, 4]);
   });
 });
