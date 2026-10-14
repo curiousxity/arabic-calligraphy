@@ -44,3 +44,4 @@ src/data/strokeSpines/*-sheet.png
 # repo. Scoped to `worktrees/` rather than all of `.claude/`, which is where
 # repo-level skills would legitimately live.
 /.claude/worktrees/
+.superpowers/
