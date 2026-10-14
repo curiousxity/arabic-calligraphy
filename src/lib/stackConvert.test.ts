@@ -230,6 +230,7 @@ describe("convertRunToStack", () => {
     expect(split).not.toBeNull();
     expect(split!.pieces.length).toBe(result.pieces.length + 1);
     expect(split!.joins.length).toBe(result.joins.length + 1);
-    expect(area(assembleStackOutline(split!.pieces, split!.joins, nib))).toBeCloseTo(before, 0);
+    const after = area(assembleStackOutline(split!.pieces, split!.joins, nib));
+    expect(Math.abs(after - before) / before).toBeLessThan(1e-4);
   });
 });
