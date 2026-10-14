@@ -86,6 +86,12 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-14 — Stacked compositions shipped
+
+A finished text block converts to a `stack` block: rigid letter pieces joined
+by nib-shaped curves, with split-stroke tails and Teardrop/Almond guides. See
+[stacked-compositions.md](.claude/rules/stacked-compositions.md).
+
 ### 2026-10-13 — UKIJ Diwani replaces Layla Diwani in the picker
 
 Layla Diwani (`HarfCanvasDiwani`) draws its medial meem and hah so small
