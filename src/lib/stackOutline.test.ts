@@ -67,6 +67,14 @@ describe("chainOf", () => {
   it("a mark moves by itself", () => {
     expect(chainOf(ps, "mb", false)).toEqual(["mb"]);
   });
+  it("a chain move is a pure translation: rotations and relative placement are untouched", () => {
+    const rs = [piece("a", BAR, 0), { ...piece("b", BAR, 1), rotation: 0.7, x: 40, y: -30 }];
+    const ids = chainOf(rs, "a", false);
+    const moved = rs.map((p) => (ids.includes(p.id) ? { ...p, x: p.x + 10, y: p.y - 20 } : p));
+    expect(moved[1].rotation).toBe(0.7);
+    expect(moved[1].x - moved[0].x).toBe(40);
+    expect(moved[1].y - moved[0].y).toBe(-30);
+  });
 });
 
 describe("rebasePiece", () => {

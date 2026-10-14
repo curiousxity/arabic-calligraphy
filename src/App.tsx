@@ -30,6 +30,7 @@ import {
   supportsKufiCellEdits,
   supportsGlyphAlternates,
   supportsStrokeCuts,
+  isStackBlock,
   supportsStyleSets,
 } from "./lib/blockCapabilities";
 import { useGlyphAlternates, useStyleSets } from "./hooks/useGlyphAlternates";
@@ -718,6 +719,29 @@ const App: React.FC = () => {
     },
     []
   );
+
+  const setStackPieces = useCallback(
+    (blockId: number, patches: { id: string; x?: number; y?: number; rotation?: number }[]) => {
+      const byId = new Map(patches.map((p) => [p.id, p]));
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || !isStackBlock(b)) return b;
+          return { ...b, pieces: b.pieces.map((p) => { const q = byId.get(p.id); return q ? { ...p, ...q, id: p.id } : p; }) };
+        })
+      );
+      // No push: the overlay's drag start took one through `onBeginStackEdit`.
+    },
+    []
+  );
+
+  const setStackJoinBow = useCallback((blockId: number, joinId: string, bow: number) => {
+    setBlocks((prev) =>
+      prev.map((b) =>
+        b.id !== blockId || !isStackBlock(b) ? b
+          : { ...b, joins: b.joins.map((j) => (j.id === joinId ? { ...j, bow } : j)) }
+      )
+    );
+  }, []);
 
   const toggleStrokeCutMode = useCallback(
     (blockId: number) => {
@@ -3422,6 +3446,9 @@ const App: React.FC = () => {
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
           onBeginStrokeCut={pushHistory}
+          onBeginStackEdit={pushHistory}
+          onSetStackPieces={setStackPieces}
+          onSetStackJoinBow={setStackJoinBow}
           alternateLetters={glyphAlternatesState.letters}
           onPickGlyphAlternate={pickGlyphAlternate}
           onSetStrokeCut={setStrokeCut}
