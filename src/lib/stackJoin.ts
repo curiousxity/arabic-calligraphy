@@ -39,11 +39,14 @@ export function joinCenterline(A: CutFace, B: CutFace, bow: number, depth = 0): 
 }
 
 /** Ridge on the 2×2 normal equations (whose entries are ~0.14). Dimensionless,
- *  like the matrix; on an S it costs under 1% of pointer travel. It only
- *  matters where the tangents are nearly parallel and the asymmetric mode
- *  has almost no effect on the midpoint, so it keeps that mode from running
- *  away on a pointer component the curve cannot follow. */
-const DRAG_RIDGE = 2e-3;
+ *  like the matrix; on an exact S it costs ~3.4% of pointer travel. Alone it
+ *  does not stop a join a few degrees off an exact S or U from running away
+ *  (its near-null mode still has gain up to 1/(2√λ)), so `DRAG_GAIN_CAP`
+ *  bounds the response as well. */
+const DRAG_RIDGE = 1e-2;
+/** No handle length changes by more than this × the pointer's travel. The
+ *  step is scaled down as a whole, so the two handles keep their ratio. */
+const DRAG_GAIN_CAP = 3;
 
 /**
  * The (bow, depth) that puts the curve's midpoint as close as it can get to
@@ -65,7 +68,10 @@ export function solveJoinDrag(
   const ab = a[0] * b[0] + a[1] * b[1];
   const ra = a[0] * delta[0] + a[1] * delta[1], rb = b[0] * delta[0] + b[1] * delta[1];
   const det = aa * bb - ab * ab;
-  const d0 = (bb * ra - ab * rb) / det, d1 = (aa * rb - ab * ra) / det;
+  let d0 = (bb * ra - ab * rb) / det, d1 = (aa * rb - ab * ra) / det;
+  const cap = DRAG_GAIN_CAP * Math.hypot(delta[0], delta[1]);
+  const big = Math.max(Math.abs(d0), Math.abs(d1));
+  if (big > cap) { d0 *= cap / big; d1 *= cap / big; }
   const lo = MIN_HANDLE * chord, k = chord / 3;
   const h0 = Math.max(lo, s0 + d0), h1 = Math.max(lo, s1 + d1);
   return { bow: (h0 - h1) / (2 * k), depth: (h0 + h1) / (2 * k) - 1 };

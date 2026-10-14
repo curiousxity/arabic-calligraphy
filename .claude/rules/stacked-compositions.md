@@ -54,7 +54,7 @@ chord/4 deep. `depth` is optional; old saves read as 0.
 
 **The bow handle is a 2-D target.** It sits at the cubic's midpoint, and a
 drag solves `(3/8)[t̂A t̂B]·Δh = Δpointer` by ridge-regularised least squares
-(`solveJoinDrag`, dimensionless ridge 2e-3, under 1% lag on an S) from the
+(`solveJoinDrag`, dimensionless ridge 1e-2, ~3.4% lag on an S; no handle moves more than 3× the pointer, so a join a few degrees off an exact S or U cannot run away) from the
 handle lengths at the press, then converts back to `(bow, depth)`. The
 handle therefore follows the pointer along every direction the two tangents
 can reach and ignores the rest: on an exact S or U the midpoint can only move

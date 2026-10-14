@@ -99,13 +99,13 @@ describe("solveJoinDrag: the bow handle is a 2-D target", () => {
   };
   it("follows the pointer along A's tangent on an S (opposed tangents)", () => {
     const [dx, dy] = moved(S_B, { bow: 0, depth: 0 }, [12, 0]);
-    expect(dx).toBeGreaterThan(12 * 0.99);
+    expect(dx).toBeGreaterThan(12 * 0.95);   // the ridge costs ~3.4%
     expect(dx).toBeLessThanOrEqual(12 + 1e-9);
     expect(Math.abs(dy)).toBeLessThan(1e-9);
   });
   it("follows the pointer along A's tangent on a U (parallel tangents), which bow alone could not", () => {
     const [dx, dy] = moved(U_B, { bow: 0, depth: 0 }, [20, 0]);
-    expect(dx).toBeGreaterThan(20 * 0.99);
+    expect(dx).toBeGreaterThan(20 * 0.95);
     expect(Math.abs(dy)).toBeLessThan(1e-9);
     // A pull no handle length can follow (along the chord) moves nothing.
     const [ex, ey] = moved(U_B, { bow: 0, depth: 0 }, [0, 20]);
@@ -114,8 +114,24 @@ describe("solveJoinDrag: the bow handle is a 2-D target", () => {
   it("follows a 2-D pull on a quarter turn (perpendicular tangents)", () => {
     const turn: CutFace = { a: [90, -100], b: [110, -100], tangent: Math.PI / 2 };
     const [dx, dy] = moved(turn, { bow: 0, depth: 0 }, [6, 4]);
-    // Within 2% of the pointer: the ridge costs a little travel.
-    expect(Math.hypot(dx - 6, dy - 4)).toBeLessThan(0.02 * Math.hypot(6, 4));
+    // Within 10% of the pointer: the ridge costs ~6.6% here. (A quarter turn
+    // needs Δh ≈ 2.7 × the pointer's travel, which is why the gain cap is 3.)
+    expect(Math.hypot(dx - 6, dy - 4)).toBeLessThan(0.1 * Math.hypot(6, 4));
+  });
+  it("does not run away a few degrees off an exact S: a pull along the chord stays bounded", () => {
+    // Opposed tangents tilted by 0.06 rad; chord 100 (vertical); pull 10 along it.
+    const tilted: CutFace = { a: [0, -110], b: [0, -90], tangent: Math.PI + 0.06 };
+    const start = { bow: 0, depth: 0 };
+    const r = solveJoinDrag(start, A.tangent, tilted.tangent, 100, [0, 10]);
+    const [s0, s1] = joinHandles(100, 0, 0), [h0, h1] = joinHandles(100, r.bow, r.depth);
+    expect(Math.abs(h0 - s0)).toBeLessThanOrEqual(15 + 1e-9);
+    expect(Math.abs(h1 - s1)).toBeLessThanOrEqual(15 + 1e-9);
+    const m0 = midpoint(joinCenterline(A, tilted, 0, 0)), m1 = midpoint(joinCenterline(A, tilted, r.bow, r.depth));
+    expect(Math.hypot(m1[0] - m0[0], m1[1] - m0[1])).toBeLessThanOrEqual(2);
+  });
+  it("on an exact S follows a 10 px pull across the chord to within 1 px", () => {
+    const [dx, dy] = moved(S_B, { bow: 0, depth: 0 }, [10, 0]);
+    expect(Math.hypot(dx - 10, dy)).toBeLessThan(1);
   });
   it("starts from the drag-start bend, so zero travel changes nothing", () => {
     const r = solveJoinDrag({ bow: 0.3, depth: -0.2 }, 0, Math.PI, 100, [0, 0]);
