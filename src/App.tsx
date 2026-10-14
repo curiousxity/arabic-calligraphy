@@ -749,11 +749,11 @@ const App: React.FC = () => {
     [blocks, pushHistory]
   );
 
-  const setStackJoinBow = useCallback((blockId: number, joinId: string, bow: number) => {
+  const setStackJoinBow = useCallback((blockId: number, joinId: string, bend: { bow: number; depth: number }) => {
     setBlocks((prev) =>
       prev.map((b) =>
         b.id !== blockId || !isStackBlock(b) ? b
-          : { ...b, joins: b.joins.map((j) => (j.id === joinId ? { ...j, bow } : j)) }
+          : { ...b, joins: b.joins.map((j) => (j.id === joinId ? { ...j, bow: bend.bow, depth: bend.depth } : j)) }
       )
     );
   }, []);

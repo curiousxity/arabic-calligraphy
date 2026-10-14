@@ -6,14 +6,23 @@ import { chainOf, pieceTransform } from "../lib/stackOutline";
 import { transformCmds, transformFace, transformPt } from "../lib/stackGeometry";
 import { flattenContours, findCutZonesSwept, zoneCentre, DEFAULT_DETECT_OPTS, type CutZone } from "../lib/strokeCuts";
 import type { SvgCmd } from "../lib/svgPath";
-import { joinCenterline } from "../lib/stackJoin";
+import { joinCenterline, joinHandles, solveJoinDrag } from "../lib/stackJoin";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 
 const ROTATE_HANDLE_COLOR = "#8b5cf6";
 const BOW_HANDLE_COLOR = "#f59e0b";
 /** Keyed on a piece's `cmds` identity (a render-pure cache; refs may not be read in render). */
 const sweepCache = new WeakMap<SvgCmd[], CutZone[]>();
-const BOW_MIN = -0.9, BOW_MAX = 0.9;
+/** px: while the pointer is this close to the hovered piece's tilt handle,
+ *  crossing another letter on the way does not take the handle away. */
+const HANDLE_HOLD_PX = 12;
+const ROTATE_HANDLE_R = 36;
+
+/** The tilt handle of a piece, in block px: its pivot and the handle point. */
+function rotateHandleOf(p: StackPiece, scale: number) {
+  const cx = (p.pivot[0] + p.x) * scale, cy = (p.pivot[1] + p.y) * scale;
+  return { cx, cy, hx: cx + ROTATE_HANDLE_R * Math.sin(p.rotation), hy: cy - ROTATE_HANDLE_R * Math.cos(p.rotation) };
+}
 
 export type StackEditOverlayProps = {
   isSelected: boolean;
@@ -24,7 +33,8 @@ export type StackEditOverlayProps = {
   scale: number;
   onBegin?: () => void;
   onSetPieces?: (patches: { id: string; x?: number; y?: number; rotation?: number }[]) => void;
-  onSetBow?: (joinId: string, bow: number) => void;
+  /** The bend of a join: `bow` (asymmetry) and `depth` (both handles longer). */
+  onSetBow?: (joinId: string, bend: { bow: number; depth: number }) => void;
   unitsPerEm: number;
   /** "Split strokes" armed: show split points on straight strokes. */
   tailMode: boolean;
@@ -47,7 +57,8 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   const groupRef = useRef<Konva.Group>(null);
   const dragStart = useRef<{ ids: string[]; at: Map<string, { x: number; y: number }>; pointer: { x: number; y: number } } | null>(null);
   const rotateStart = useRef<{ id: string; centre: { x: number; y: number } } | null>(null);
-  const bowStart = useRef<{ id: string; bow: number; t: { x: number; y: number }; chord: number; pointer: { x: number; y: number } } | null>(null);
+  const bowDownAt = useRef<{ x: number; y: number } | null>(null);
+  const bowStart = useRef<{ id: string; bow: number; depth: number; tA: number; tB: number; chord: number; pointer: { x: number; y: number } } | null>(null);
 
   const polygons = useMemo(() =>
     pieces.map((p) => {
@@ -63,7 +74,8 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   // the dots still follow a moved piece.
   const zones = useMemo(() => {
     if (!tailMode) return [];
-    const opts = { ...DEFAULT_DETECT_OPTS, step: unitsPerEm / 100, minZoneWidth: unitsPerEm / 40 };
+    const upm = unitsPerEm || 1000;   // as stackScale: a save without it is 1000
+    const opts = { ...DEFAULT_DETECT_OPTS, step: upm / 100, minZoneWidth: upm / 40 };
     return pieces.filter((p) => p.role === "letter").flatMap((p) => {
       let found = sweepCache.get(p.cmds);
       if (!found) {
@@ -86,11 +98,24 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   // read the pointer from the overlay Group itself rather than counting parents.
   const pointerIn = () => groupRef.current?.getRelativePointerPosition() ?? { x: 0, y: 0 };
 
+  // Letters overlap in a stack, so the way to a tilt handle often crosses a
+  // neighbour: hold the current hover while the pointer is near its handle.
+  const hover = (id: string) => {
+    if (id === hovered) return;
+    const cur = hovered ? byId.get(hovered) : undefined;
+    if (cur && cur.role === "letter") {
+      const { hx, hy } = rotateHandleOf(cur, scale);
+      const at = pointerIn();
+      if (Math.hypot(at.x - hx, at.y - hy) <= HANDLE_HOLD_PX) return;
+    }
+    setHovered(id);
+  };
+
   return (
     <Group ref={groupRef} name={EXPORT_HIDDEN}>
       {polygons.map(({ id, points }) => (
         // No mouseleave: the last-hovered piece keeps its tilt handle until another is hovered.
-        <Group key={id} onMouseEnter={() => setHovered(id)}>
+        <Group key={id} onMouseEnter={() => hover(id)} onMouseMove={() => hover(id)}>
           <Line
             name="stack-piece"
             points={points}
@@ -127,11 +152,7 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
 
       {hovered && byId.get(hovered)?.role === "letter" && (() => {
         const id = hovered;
-        const p = byId.get(id)!;
-        const t = pieceTransform(p);
-        const cx = (p.pivot[0] + p.x) * scale, cy = (p.pivot[1] + p.y) * scale;
-        const r = 36;
-        const hx = cx + r * Math.sin(t.rotation), hy = cy - r * Math.cos(t.rotation);
+        const { cx, cy, hx, hy } = rotateHandleOf(byId.get(id)!, scale);
         return (
           <>
             <Line points={[cx, cy, hx, hy]} stroke={ROTATE_HANDLE_COLOR} strokeWidth={1} dash={[3, 3]} listening={false} />
@@ -168,30 +189,49 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
         const fa = from?.faces[j.from.faceIndex], fb = to?.faces[j.to.faceIndex];
         if (!from || !to || !fa || !fb) return null;
         const A = transformFace(fa, pieceTransform(from)), B = transformFace(fb, pieceTransform(to));
-        const [p0, p1, p2, p3] = joinCenterline(A, B, j.bow);
+        const depth = j.depth ?? 0;
+        const [p0, p1, p2, p3] = joinCenterline(A, B, j.bow, depth);
         const m = { x: (p0[0] + 3 * p1[0] + 3 * p2[0] + p3[0]) / 8 * scale, y: (p0[1] + 3 * p1[1] + 3 * p2[1] + p3[1]) / 8 * scale };
         const chord = Math.hypot(p3[0] - p0[0], p3[1] - p0[1]) * scale;
         if (chord < 4) return null;   // nothing to bend yet
-        // A's unit tangent in block px: the direction the midpoint moves as bow changes.
-        const t = { x: Math.cos(A.tangent), y: Math.sin(A.tangent) };
         return (
           <Circle
             key={j.id}
             name="stack-bow"
             x={m.x} y={m.y} radius={4.5} fill={BOW_HANDLE_COLOR} stroke="#fff" strokeWidth={1.5}
             draggable
-            onMouseDown={(e) => { e.cancelBubble = true; }}
-            onDblClick={(e) => { e.cancelBubble = true; if (j.bow === 0) return; onBegin?.(); onSetBow?.(j.id, 0); }}
-            onDragStart={(e) => { e.cancelBubble = true; bowStart.current = { id: j.id, bow: j.bow, t, chord, pointer: pointerIn() }; onBegin?.(); }}
+            // The press, not dragstart, is the baseline: Konva starts a drag a
+            // few px into the move, and measuring from there left the handle
+            // that far behind the pointer for the whole drag.
+            onMouseDown={(e) => { e.cancelBubble = true; bowDownAt.current = pointerIn(); }}
+            onTouchStart={() => { bowDownAt.current = pointerIn(); }}
+            onDblClick={(e) => {
+              e.cancelBubble = true;
+              if (j.bow === 0 && depth === 0) return;
+              onBegin?.();
+              onSetBow?.(j.id, { bow: 0, depth: 0 });
+            }}
+            onDragStart={(e) => {
+              e.cancelBubble = true;
+              // The bow and depth the clamped handles actually draw, so the
+              // first drag frame does not jump.
+              const [h0, h1] = joinHandles(chord, j.bow, depth);
+              const k = chord / 3;
+              bowStart.current = {
+                id: j.id, bow: (h0 - h1) / (2 * k), depth: (h0 + h1) / (2 * k) - 1,
+                tA: A.tangent, tB: B.tangent, chord, pointer: bowDownAt.current ?? pointerIn(),
+              };
+              onBegin?.();
+            }}
             onDragMove={(e) => {
               e.cancelBubble = true;
               const s = bowStart.current; if (!s) return;
               const now = pointerIn();
-              // Moving the midpoint by d along A's tangent changes bow by d / (chord/4).
-              const along = ((now.x - s.pointer.x) * s.t.x + (now.y - s.pointer.y) * s.t.y) / (s.chord / 4);
-              onSetBow?.(s.id, Math.min(BOW_MAX, Math.max(BOW_MIN, s.bow + along)));
+              // A 2-D target: both handle lengths move so the midpoint lands
+              // as near the pointer as the two tangents allow (block px).
+              onSetBow?.(s.id, solveJoinDrag(s, s.tA, s.tB, s.chord, [now.x - s.pointer.x, now.y - s.pointer.y]));
             }}
-            onDragEnd={(e) => { e.cancelBubble = true; bowStart.current = null; e.target.position({ x: m.x, y: m.y }); }}
+            onDragEnd={(e) => { e.cancelBubble = true; bowStart.current = null; bowDownAt.current = null; e.target.position({ x: m.x, y: m.y }); }}
           />
         );
       })}

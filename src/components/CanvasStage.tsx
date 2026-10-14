@@ -145,7 +145,7 @@ export type CanvasStageProps = {
   onBeginStrokeCut: () => void;
   onBeginStackEdit: () => void;
   onSetStackPieces: (blockId: number, patches: { id: string; x?: number; y?: number; rotation?: number }[]) => void;
-  onSetStackJoinBow: (blockId: number, joinId: string, bow: number) => void;
+  onSetStackJoinBow: (blockId: number, joinId: string, bend: { bow: number; depth: number }) => void;
   onSplitStackPiece: (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => void;
   /** Next Shape: the selected text block's letters that have alternates. */
   alternateLetters: LetterAlternates[];
@@ -1142,13 +1142,13 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                       block.id === selectedId && !effectivePanMode && !block.locked ? (
                         <StackEditOverlay
                           isSelected
-                          pieces={block.pieces}
-                          joins={block.joins}
+                          pieces={block.pieces ?? []}
+                          joins={block.joins ?? []}
                           nib={block.nib}
                           scale={stackScale(block.fontSize, block.unitsPerEm)}
                           onBegin={onBeginStackEdit}
                           onSetPieces={(patches) => onSetStackPieces(block.id, patches)}
-                          onSetBow={(joinId, bow) => onSetStackJoinBow(block.id, joinId, bow)}
+                          onSetBow={(joinId, bend) => onSetStackJoinBow(block.id, joinId, bend)}
                           unitsPerEm={block.unitsPerEm}
                           tailMode={block.stackTailMode ?? false}
                           onSplit={(pieceId, cut) => onSplitStackPiece(block.id, pieceId, cut)}

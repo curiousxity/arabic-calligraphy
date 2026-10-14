@@ -55,7 +55,7 @@ export default defineConfig({
     // you just made broke something rather than like a second checkout
     // being scanned. Hit and fixed on 2026-08-21.
     //
-    //  is excluded outright for the same reason: a
+    // `.claude/worktrees/**` is excluded outright for the same reason: a
     // worktree's whole `src/` tree is a second copy of every suite, and a
     // stale copy fails against the current assertions (2026-10-14).
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/.claude/worktrees/**'],

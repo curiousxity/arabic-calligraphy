@@ -109,6 +109,8 @@ export const StackView: React.FC<StackViewProps> = (p) => {
           if (p.strokeWidth > 0) {
             ctx.strokeStyle = p.stroke ?? "#000";
             ctx.lineWidth = p.strokeWidth;
+            // Round, not miter: a join is a sampled polyline whose vertices (and the
+            // corners where it meets a face) would throw miter spikes past the ink.
             ctx.lineJoin = "round";
             ctx.stroke();
           }

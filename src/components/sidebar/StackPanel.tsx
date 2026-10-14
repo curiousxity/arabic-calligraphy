@@ -28,8 +28,10 @@ export const StackPanel: React.FC<{
       label="Thinnest stroke"
       value={block.nib.minFraction}
       min={0.05}
-      max={0.5}
+      max={1}
       step={0.01}
+      // A fraction of each join's own thinner face; per-font defaults reach 1.
+      suffix={block.nib.minFraction.toFixed(2)}
       onChange={(v) => onUpdate({ nib: { ...block.nib, minFraction: v } })}
     />
     <button type="button" className="sidebarSmallAction" aria-label="Reset layout" onClick={onReset}>
