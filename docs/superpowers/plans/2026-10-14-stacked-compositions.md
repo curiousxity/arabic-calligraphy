@@ -150,14 +150,14 @@ import { describe, it, expect } from "vitest";
 import {
   isStackBlock, supportsStrokeCuts, supportsGlyphAlternates, supportsDiacriticOverrides,
 } from "./blockCapabilities";
-import type { Block } from "../types";
+import type { StackBlock } from "../types";
 
-const stack = {
+const stack: StackBlock = {
   id: 1, type: "stack", text: "مصبح", x: 0, y: 0, fontSize: 53, color: "#000",
   fontFamily: "UKIJDiwani", stroke: "#000", shadowColor: "#000",
   source: { text: "مصبح", fontFamily: "UKIJDiwani" }, unitsPerEm: 1000,
   nib: { width: 110, minFraction: 0.15 }, pieces: [], joins: [],
-} as Block;
+};
 
 describe("stack capability", () => {
   it("is its own kind and has none of the live-text capabilities", () => {
@@ -568,10 +568,21 @@ describe("joinEdges", () => {
     // the S-curve between them runs vertically — along the nib — mid-way.
     const up: CutFace = { a: [0, -110], b: [0, -90], tangent: Math.PI };
     const { edgeA, edgeB } = joinEdges(A, up, 0, 4, 40);
-    const widths = edgeA.map((p, i) => dist(p, edgeB[i]));
-    expect(widths[0]).toBeCloseTo(20, 6);
-    expect(Math.min(...widths)).toBeGreaterThanOrEqual(4 - 1e-9);
-    expect(Math.min(...widths)).toBeLessThan(20);   // it does thin on the climb
+    // Thickness is what the eye sees: the edge-to-edge vector projected onto
+    // the curve's normal, not its raw length (which stays ~20 on a vertical
+    // nib however the curve turns).
+    const thick: number[] = [];
+    for (let i = 1; i < edgeA.length - 1; i++) {
+      const c = (k: number): [number, number] => [(edgeA[k][0] + edgeB[k][0]) / 2, (edgeA[k][1] + edgeB[k][1]) / 2];
+      const d = [c(i + 1)[0] - c(i - 1)[0], c(i + 1)[1] - c(i - 1)[1]];
+      const len = Math.hypot(d[0], d[1]);
+      const n = [-d[1] / len, d[0] / len];
+      const v = [edgeB[i][0] - edgeA[i][0], edgeB[i][1] - edgeA[i][1]];
+      thick.push(Math.abs(v[0] * n[0] + v[1] * n[1]));
+    }
+    expect(dist(edgeA[0], edgeB[0])).toBeCloseTo(20, 6);
+    expect(Math.min(...thick)).toBeGreaterThanOrEqual(4 - 1e-6);
+    expect(Math.min(...thick)).toBeLessThan(20);   // it does thin on the climb
   });
   it("collapses to the face points when the faces coincide", () => {
     const { edgeA, edgeB } = joinEdges(A, { ...A, tangent: Math.PI }, 0, 3, 8);
@@ -599,9 +610,12 @@ describe("spliceJoin", () => {
     const out = spliceJoin(pool, r.nearFace, r.farFace, edges)!;
     expect(out).toHaveLength(1);
     expect(area(fromSegments(out))).toBeCloseTo(2000, 6);
-    // No bridge edge survives.
-    const bridges = out[0].filter((s) => s.type === "L" && s.p[0][0] === 40 && s.p[1][0] === 40);
-    expect(bridges).toHaveLength(0);
+    // No bridge edge survives: nothing spans (40,−10)↔(40,10) any more. (The
+    // zero-chord join also emits zero-length L's at x≈40; those are not bridges.)
+    const spansFace = (s: { type: string; p: [number, number][] }) =>
+      s.type === "L" && dist(s.p[0], s.p[1]) > 19 &&
+      Math.abs(s.p[0][0] - 40) < 1e-6 && Math.abs(s.p[1][0] - 40) < 1e-6;
+    expect(out[0].some(spansFace)).toBe(false);
   });
   it("makes one closed contour when the far half has moved", () => {
     const r = splitAtCut(BAR, { cutX: 40, angle: 0 })!;
@@ -1033,7 +1047,7 @@ describe("convertRunToStack", () => {
       const original = runOutline(input);
       const baked = assembleStackOutline(result.pieces, result.joins, { width: 100, minFraction: 0.15 });
       expect(flattenContours(baked)).toHaveLength(flattenContours(original).length);
-      expect(area(baked)).toBeCloseTo(area(original), -Math.log10(area(original) * 0.005));
+      expect(Math.abs(area(baked) - area(original)) / area(original)).toBeLessThan(0.005);
     });
   }
 
@@ -1067,8 +1081,14 @@ describe("convertRunToStack", () => {
     const hidden = convertRunToStack({ ...base, diacriticOverrides: [{ glyphIndex: markIdx, hidden: true }] });
     const lifted = convertRunToStack({ ...base, diacriticOverrides: [{ glyphIndex: markIdx, offsetY: -10 }] });
     expect(hidden.pieces.filter((p) => p.role === "mark")).toHaveLength(plain.pieces.filter((p) => p.role === "mark").length - 1);
-    const my = (r: typeof plain) => r.pieces.find((p) => p.role === "mark")!.y;
-    expect(my(lifted) - my(plain)).toBeCloseTo((-10 * upm) / 100, 6);
+    // Conversion re-centres on the ink, and the mark is the topmost ink, so
+    // compare the mark to its parent rather than to the block origin.
+    const rel = (r: typeof plain) => {
+      const m = r.pieces.find((p) => p.role === "mark")!;
+      const parent = r.pieces.find((p) => p.id === m.parentId)!;
+      return m.y - parent.y;
+    };
+    expect(rel(lifted) - rel(plain)).toBeCloseTo((-10 * upm) / 100, 6);
   });
 
   it("splitPieceAtCut turns one piece into two joined pieces with the same outline", async () => {
@@ -1342,6 +1362,8 @@ git commit -m "Stack convert: shaped run to letter pieces, marks, and cut-face j
 ### Task 6: The convert action in `App.tsx` and its button
 
 **Files:**
+- Create: `scripts/measureNibFloor.mjs`
+- Modify: `src/lib/nuqta.ts` (`NIB_FLOOR_RATIO`, `nibFloorFraction`)
 - Modify: `src/App.tsx` (near `applyComposition`, ~line 2814; `replaceBlockWithHistory` ~line 1903; the missing-font effects ~lines 3121 and 3144; the `<Sidebar>` props)
 - Modify: `src/components/Sidebar.tsx` (Content panel, ~line 2246; `SidebarProps` ~line 131)
 - Modify: `src/components/sidebar/LayersPanel.tsx` (lines 22–35)
@@ -1349,6 +1371,56 @@ git commit -m "Stack convert: shaped run to letter pieces, marks, and cut-face j
 **Interfaces:**
 - Consumes: `shapeText` (`./lib/harfbuzz`), `applySpacing` (`./lib/spacing`), `spacingForBlock`, `buildCutPlan`, `nuqtaUnits`, `convertRunToStack`, `findKashidaSlots`, `applyKashida`, `readKashida`, `remapCutsForEdits`, `isOverrideGlyphChar`, `resolveFontUrl`.
 - Produces: `convertSelectedBlockToStack(): Promise<void>` in App; Sidebar prop `onConvertToStack?: () => void`; a button with `aria-label="Convert to stacked composition"`.
+
+- [ ] **Step 0: The nib floor is the nib's slant — measure it per font**
+
+The face vector is the stroke's perpendicular cross-section, not the pen. A real Diwani reed is held at roughly 45°, so a vertical stroke in the font is nearly as heavy as a horizontal one; the model would thin a 90° climb all the way to the floor. So `minFraction` is doing the nib angle's job, and one universal `0.15` gives hairline upstrokes. Measure it: the ratio of a vertical stem's thickness to a horizontal connector's.
+
+Create `scripts/measureNibFloor.mjs` (kept, like `measureStrokeZones.mjs`; run with `npx --yes tsx scripts/measureNibFloor.mjs`). Copy that script's font loading, `resolveHb`, and `shape` helpers verbatim (its lines 55–144), then:
+
+```js
+const { toSvgCmds, flattenContours, rotateContours, crossingsAt, findCutZones, DEFAULT_DETECT_OPTS } =
+  await import("../src/lib/strokeCuts.ts");
+
+// Horizontal: a lone tatweel is a straight horizontal stroke; its zone thickness.
+// Vertical: an isolated alef, rotated 90° so its stem lies along x, crossed at its middle.
+for (const file of fs.readdirSync(FONT_DIR).filter((f) => /\.(ttf|otf)$/i.test(f)).sort()) {
+  const bytes = fs.readFileSync(path.join(FONT_DIR, file));
+  const parsed = opentype.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  const upm = parsed.unitsPerEm || 1000;
+  const opts = { ...DEFAULT_DETECT_OPTS, step: upm / 100, minZoneWidth: upm / 40 };
+  const outline = async (text) => {
+    const [g] = await shape(hb, bytes, upm, text);
+    return flattenContours(toSvgCmds(parsed.glyphs.get(g.g).getPath(0, 0, upm).commands));
+  };
+  const tat = findCutZones(await outline("ـ"), { glyphIndex: 0, cluster: 0 }, opts);
+  const horizontal = tat.length ? tat.reduce((a, z) => a + z.thickness, 0) / tat.length : NaN;
+  const alef = rotateContours(await outline("ا"), Math.PI / 2);
+  const xs = alef.flat().map((p) => p[0]);
+  const mid = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cr = crossingsAt(alef, mid);
+  const vertical = cr.length >= 2 ? cr[cr.length - 1].y - cr[0].y : NaN;
+  const ratio = vertical / horizontal;
+  console.log(`${file.replace(/\.(ttf|otf)$/i, "")}: ${Number.isFinite(ratio) ? ratio.toFixed(3) : "—"}  (v ${vertical.toFixed(0)} / h ${horizontal.toFixed(0)})`);
+}
+```
+
+Run it, and put the numbers in `src/lib/nuqta.ts` beside `NUQTA_RATIO`, clamped to `[0.1, 1]` and rounded to two places; leave out any font that printed `—`:
+
+```ts
+/** Thickness of a vertical stem over a horizontal connector — the floor a
+ *  stack join thins to on a climb, which is what the pen's slant does.
+ *  Measured by scripts/measureNibFloor.mjs. */
+const NIB_FLOOR_RATIO: Record<string, number> = {
+  // filled from the script's output
+};
+export const FALLBACK_NIB_FLOOR = 0.15;
+export function nibFloorFraction(fontFamily: string): number {
+  return NIB_FLOOR_RATIO[fontFamily] ?? FALLBACK_NIB_FLOOR;
+}
+```
+
+The convert handler below uses `nibFloorFraction(fontFamily)` for `nib.minFraction`; the Stack panel's slider still lets the user move it.
 
 - [ ] **Step 1: The handler**
 
@@ -1420,7 +1492,7 @@ In `src/App.tsx`, directly after `applyComposition`, add:
         ornamental: source.ornamental, groupId: source.groupId, fill: source.fill,
         source: { text: source.text, fontFamily },
         unitsPerEm: upm,
-        nib: { width: nuqtaUnits(fontFamily, upm), minFraction: 0.15 },
+        nib: { width: nuqtaUnits(fontFamily, upm), minFraction: nibFloorFraction(fontFamily) },
         pieces: result.pieces, joins: result.joins,
       };
       replaceBlockWithHistory(id, stack);
@@ -1462,7 +1534,11 @@ Add `onConvertToStack={convertSelectedBlockToStack}` in the `<Sidebar>` props. I
 )}
 ```
 
-Then exclude `stack` from the Content and Typography panels: extend both conditions (`selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide"`) with `&& selectedBlock.type !== "stack"`.
+Then exclude `stack` from the **Content** panel only: extend its condition (`selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide"`) with `&& selectedBlock.type !== "stack"`.
+
+**Typography stays mounted for a stack** — it holds font size (the block's only scale), colour, Ink, stroke and shadow, all of which a stack needs. Gate only the rows that re-shape text, the way Square Kufi's `!== "squareKufi"` gates do (Sidebar.tsx ~lines 3050, 3253): font family, font style, kashida, letter/word spacing, Fit to width, Alternate letter shapes, Stretch strokes, and the diacritics checkbox each get `&& selectedBlock.type !== "stack"`. Before writing the conditions, confirm where the colour and Ink rows actually sit (they may be in Typography or in Effects) so none of them is lost.
+
+Note on ordering: this task lands before the renderer (Task 7), so for one commit the button produces a block that `CanvasStage` draws as nothing. That is expected and is why Task 7 follows immediately.
 
 - [ ] **Step 4: Layers label**
 
@@ -1483,8 +1559,8 @@ Expected: all pass. (The block renders as nothing yet — `CanvasStage` falls th
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/App.tsx src/components/Sidebar.tsx src/components/sidebar/LayersPanel.tsx
-git commit -m "Convert a text block to a stacked composition (handler and button)"
+git add scripts/measureNibFloor.mjs src/lib/nuqta.ts src/App.tsx src/components/Sidebar.tsx src/components/sidebar/LayersPanel.tsx
+git commit -m "Convert a text block to a stacked composition (handler, button, per-font nib floor)"
 ```
 
 ---
@@ -1630,6 +1706,8 @@ export const StackView: React.FC<StackViewProps> = (p) => {
 ```
 
 Check `createBlockFillPainter`'s signature in `src/lib/blockFill.ts` and match it (it returns `null` for a flat colour in `ShapedText`'s usage — mirror that exactly).
+
+**Shadows:** Konva's `shadow*` props on a `<Shape>` do not apply to a manual `ctx.fill()` inside `sceneFunc`. Open `ShapedText.tsx`'s `sceneFunc` (~line 758) and copy exactly what it does for shadows (whether it sets `ctx.shadowColor`/`ctx.shadowBlur`/offsets on the context before filling, or draws a shadow pass) — the stack block must shadow the way a text block does. Drop the `shadow*` props from `<Shape>` if they are not what ShapedText uses.
 
 - [ ] **Step 3: Dispatch in CanvasStage and MirrorBlockView**
 
@@ -2357,7 +2435,12 @@ interpolated between its two faces, so the stroke thins where the curve
 runs along the pen and is full width across it. No per-font nib angle
 exists or is needed. `nib.minFraction` floors the perpendicular thickness,
 never at the two ends — the ends must land on the faces exactly or the
-seam shows.
+seam shows. **The floor is the pen's slant**: a face vector is the
+stroke's perpendicular cross-section, so on a 90° climb the model would
+thin to nothing; a real reed held at ~45° draws a vertical stroke nearly
+as heavy as a horizontal one. `nibFloorFraction` in `nuqta.ts` holds the
+measured vertical/horizontal ratio per font
+(`scripts/measureNibFloor.mjs`); 0.15 is only the fallback.
 
 **A join is a splice, not a second shape.** `spliceJoin` finds each face's
 straight bridge edge (left by `splitAtCut`), removes both, and threads the
