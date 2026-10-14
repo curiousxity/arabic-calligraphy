@@ -152,8 +152,11 @@ fused; the script reports it separately rather than scoring it.
 Two halves, both numeric, both recorded in `docs/archive/` the way
 `stroke-zone-coverage.md` is:
 
-- **Dotted letters:** detected equals expected on at least 95% of
-  (letter, form, font) cells across the bundled fonts.
+- **Dotted letters:** detected is between 1 and expected on at least 95%
+  of (letter, form, font) cells across the bundled fonts. Many faces draw
+  ث's three dots or ت's two as one merged contour; that is one movable
+  mark, which is what a composer wants, so it passes. The script counts
+  merges separately so the archive records which fonts do it.
 - **Undotted letters:** zero detections on at least 99% of cells. This is
   the half that matters. A false hit here is a handle on a piece of a
   letter's body, and dragging it tears the letter.

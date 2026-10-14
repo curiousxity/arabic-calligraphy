@@ -290,7 +290,10 @@ describe("findDetachedContours (real fonts)", () => {
     expect(findDetachedContours(await isolatedCmds("أ", "Amiri.ttf"))).toHaveLength(1);
   });
 
-  it("an empty outline yields nothing (Qahiri base codepoints are empty)", async () => {
+  it("a letter whose dots are a separate glyph yields nothing on the contour route (Qahiri)", async () => {
+    // HarfBuzz substitutes the isolated form, so the outline is not empty;
+    // it has no detached contour because Qahiri draws the dot as its own
+    // zero-advance glyph, which Task 3's separate-glyph route handles.
     expect(findDetachedContours(await isolatedCmds("ب", "Qahiri.ttf"))).toHaveLength(0);
   });
 
@@ -638,7 +641,7 @@ const fraction = Number((process.argv.find((a) => a.startsWith("--fraction=")) ?
 
 for (const file of fs.readdirSync(FONT_DIR).filter((f) => /\.(ttf|otf)$/.test(f)).sort()) {
   const family = file.replace(/\.(ttf|otf)$/, "");
-  let dottedOk = 0, dottedN = 0, undottedOk = 0, undottedN = 0;
+  let dottedOk = 0, dottedN = 0, undottedOk = 0, undottedN = 0, merged = 0;
   const misses = [];
   for (const [letter, expected] of Object.entries(EXPECTED)) {
     for (const text of FORMS(letter)) {
@@ -650,8 +653,16 @@ for (const file of fs.readdirSync(FONT_DIR).filter((f) => /\.(ttf|otf)$/.test(f)
       const letterCl = [...text].findIndex((ch) => ch === letter);
       let n = 0;
       for (const list of marks.values()) for (const m of list) if (m.cluster === letterCl) n++;
+      // Dotted half: 1..expected passes. Many faces draw ث's three dots or
+      // ت's two as one merged contour; that is one movable mark, which is
+      // what the user wants, not a size problem. Merges are counted so the
+      // archive records which fonts do it. Undotted half: exactly zero.
       if (expected === 0) { undottedN++; if (n === 0) undottedOk++; else misses.push(`${text}:${n}`); }
-      else { dottedN++; if (n === expected) dottedOk++; else misses.push(`${text}:${n}/${expected}`); }
+      else {
+        dottedN++;
+        if (n >= 1 && n <= expected) { dottedOk++; if (n < expected) merged++; }
+        else misses.push(`${text}:${n}/${expected}`);
+      }
     }
   }
   const kaf = await (async () => {
@@ -661,7 +672,7 @@ for (const file of fs.readdirSync(FONT_DIR).filter((f) => /\.(ttf|otf)$/.test(f)
   })();
   const d = (100 * dottedOk / dottedN).toFixed(1), u = (100 * undottedOk / undottedN).toFixed(1);
   const pass = dottedOk / dottedN >= 0.95 && undottedOk / undottedN >= 0.99;
-  console.log(`${family.padEnd(18)} dotted ${d.padStart(5)}%  undotted ${u.padStart(5)}%  kaf ${kaf}  ${pass ? "PASS" : "FAIL"}  ${misses.slice(0, 6).join(" ")}`);
+  console.log(`${family.padEnd(18)} dotted ${d.padStart(5)}%  undotted ${u.padStart(5)}%  merged ${merged}  kaf ${kaf}  ${pass ? "PASS" : "FAIL"}  ${misses.slice(0, 6).join(" ")}`);
 }
 ```
 
@@ -691,8 +702,8 @@ Gate: dotted letters detected == expected on >= 95% of (letter, form)
 cells; undotted letters zero detections on >= 99%. A font failing the
 second half is listed in `UNSUPPORTED_FONTS` rather than the bar loosened.
 
-| font | dotted % | undotted % | kaf stroke | result |
-|---|---|---|---|---|
+| font | dotted % | undotted % | merged groups | kaf stroke | result |
+|---|---|---|---|---|---|
 <one row per font, pasted from the script output>
 
 ## Residue
@@ -1045,7 +1056,7 @@ Add props next to the diacritic ones:
 
 with a stable default `const NO_MARK_OVERRIDES: DetachedMarkOverride[] = [];` beside `NO_DIACRITIC_OVERRIDES`, and destructure `detachedMarkOverrides = NO_MARK_OVERRIDES, detachedMarkEditMode = false, onBeginDetachedMarkDrag, onSetDetachedMark`.
 
-After `diacriticGlyphIndices` add:
+Directly after `diacriticGlyphIndices` (line ~406, which is above both the metrics memo at ~530 and the placements at ~627 that read these) add:
 
 ```ts
   // Detection walks every contour with point-in-polygon tests, so it runs
@@ -1235,7 +1246,7 @@ Destructure them, import the type, and in the `ShapedText` render (near line 976
                     onSetDetachedMark={(o) => onSetDetachedMark(block.id, o)}
 ```
 
-Pass the same four into the `ShapeFillText` render too (its props arrive in Task 8; add them there if TypeScript complains now, or add the props to `ShapeFillText` in this task as unused). In `App.tsx` where `CanvasStage` is rendered (~line 3522):
+Wire `ShapedText` only in this task. `ShapeFillText` gets the props and its wiring in Task 8. In `App.tsx` where `CanvasStage` is rendered (~line 3522):
 
 ```tsx
           onBeginDetachedMarkDrag={pushHistory}
@@ -1375,9 +1386,11 @@ export const DetachedMarkHoverHandles: React.FC<DetachedMarkHoverHandlesProps> =
                 }}
                 onDragStart={(e) => {
                   e.cancelBubble = true;
-                  const pos = e.target.position();
-                  const local = p.toLocal(pos.x, pos.y);
-                  startRef.current = { x: local.x, y: local.y, dx: p.dx, dy: p.dy };
+                  // The handle rests at (cx, cy) before any move. Konva fires
+                  // dragstart a few px in, so reading the position here would
+                  // leave every drag lagging by that threshold (the stack
+                  // join handle needed the same fix).
+                  startRef.current = { x: cx, y: cy, dx: p.dx, dy: p.dy };
                   setDraggingKey(p.key);
                   onBeginDrag?.();
                 }}
@@ -1587,9 +1600,9 @@ git commit -m "Detached marks: hover overlay, sidebar arming, e2e"
 - Consumes: Task 5 plan helpers, Task 6 placement type, Task 7 overlay.
 - Produces: `ShapeFillText` props `detachedMarkOverrides`, `detachedMarkEditMode`, `onBeginDetachedMarkDrag`, `onSetDetachedMark` (same names as `ShapedText`).
 
-- [ ] **Step 1: Props, detection, plan**
+- [ ] **Step 1: Props, detection, plan, and the declaration order**
 
-Add the four props with the same defaults as `ShapedText`. After `diacriticGlyphIndices` add the same `detectedMarks` and `markPlan` memos as Task 6 Step 4, verbatim, using `shapeData.unitsPerEm`.
+Add the four props with the same defaults as `ShapedText`. Then **move the `diacriticGlyphIndices` memo (line ~313) up to just below `parsedCmds`/`polygon` (line ~249), above `glyphCache`**, and add the same `detectedMarks` and `markPlan` memos as Task 6 Step 4 directly under it, verbatim, using `shapeData.unitsPerEm`. They depend only on `shapeData` and props, so the move is safe; it is required because Step 2 makes `glyphCache` read `markPlan`, and a `const` read before its declaration in the same function body throws at runtime (the trap CLAUDE.md records for `App.tsx`).
 
 - [ ] **Step 2: Apply the plan once per glyph in glyphCache**
 
@@ -1731,7 +1744,10 @@ In `src/lib/stackConvert.ts`:
 
 ```ts
 import { findDetachedMarks, buildDetachedMarkPlan, splitContours, type DetachedMarkOverride } from "./detachedMarks";
+import { findDiacriticGlyphIndices } from "./diacritics";
 ```
+
+(`diacritics.ts` has no harfbuzz import, so `stackConvert.ts` stays Vitest-loadable.)
 
 Extend `ConvertInput`:
 
@@ -1745,11 +1761,8 @@ Extend `Placed` with `detached: { cmds: SvgCmd[]; dx: number; dy: number }[]` an
 ```ts
 function placeGlyphs(input: ConvertInput): Placed[] {
   const { glyphs, font, unitsPerEm: upm, cutPlan, shapableText } = input;
-  // Tashkeel are excluded by advance below (kind "mark"), so the detector
-  // gets an empty diacritic set here; the convert handler refuses blocks
-  // whose tashkeel are PUA-and-zero-advance only in fonts that also draw
-  // dots that way, which the kind rule already separates.
-  const detected = findDetachedMarks(glyphs, font, upm, new Set(), input.fontFamily);
+  const diacritics = findDiacriticGlyphIndices(glyphs, font, shapableText);
+  const detected = findDetachedMarks(glyphs, font, upm, diacritics, input.fontFamily);
   const plan = buildDetachedMarkPlan(input.detachedMarkOverrides, glyphs, detected);
   const out: Placed[] = [];
   let penX = 0;
