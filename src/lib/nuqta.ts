@@ -17,16 +17,21 @@
 const NUQTA_RATIO: Record<string, number> = {
   AlFatemi: 0.0973,
   Amiri: 0.135,
+  Blaka: 0.167,
   FatemiMaqala: 0.1138,
+  Gulzar: 0.189,
+  HarfCanvasDiwani: 0.0586,
   Kufi: 0.121,
   Kufi2: 0.116,
   Lateef: 0.1016,
   NotoSans: 0.099,
   Qahiri: 0.1067,
+  Rabat: 0.092,
   Scheherazade: 0.1118,
   TahaNaskhRegular: 0.1157,
   Thuluth: 0.0918,
   ThuluthDeco: 0.0918,
+  UKIJDiwani: 0.1172,
   Urdu: 0.1538,
   Wessam: 0.0762,
   Yekan: 0.1348,
@@ -66,9 +71,10 @@ export function nibFloorFraction(fontFamily: string): number {
 }
 
 /**
- * For the bundled faces the archive does not cover (HarfCanvasDiwani and
- * UKIJDiwani, which postdate it, and Ruqaa) and for every uploaded font, which can
- * never have a measured entry. The library's own median.
+ * For the bundled faces whose two measurements disagree or look wrong
+ * (Ruqaa, RanaKufi, Raqq — see the 2026-10-14 run in the archive; they need
+ * a look by eye) and for every uploaded font, which can never have a
+ * measured entry. The library's own median.
  */
 export const FALLBACK_RATIO = 0.11;
 

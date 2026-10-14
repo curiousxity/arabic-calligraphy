@@ -58,11 +58,33 @@ Stored as a dot/em **ratio**: nuqta in pixels is `ratio * fontSize`.
 | Wessam | 0.0762 |
 | Yekan | 0.1348 |
 
-**Deliberately absent:** `Ruqaa` and `HarfCanvasDiwani`. They were scoped
-out of per-stroke editing — every stroke schema declared
-`calligraphicModel: "naskh"`, which fits Diwani's sloped letterforms worst,
-and Ruq'ah merges dot pairs into strokes, making its measured nuqta the
-least reliable figure available. Do not fill these in with a guess.
+**Deliberately absent from the original table:** `Ruqaa` and
+`HarfCanvasDiwani`. They were scoped out of per-stroke editing — every
+stroke schema declared `calligraphicModel: "naskh"`, which fits Diwani's
+sloped letterforms worst, and Ruq'ah merges dot pairs into strokes, making
+its measured nuqta the least reliable figure available. HarfCanvasDiwani
+has since been measured (below, both methods agree); Ruqaa still has not
+been settled. Do not fill a missing row in with a guess.
+
+## 2026-10-14 run on the eight fonts added since
+
+`python -I scripts/measureNuqta.py` on the fonts that postdate the table
+above, for the free-marks-and-dots work (which does not need the nuqta —
+its size test is relative to the body — but extends the table while the
+tooling is out). The five rows where both methods agree are in
+`src/lib/nuqta.ts`; the three flagged rows stay on `FALLBACK_RATIO` until
+someone looks by eye.
+
+| font | upm | beh w×h | modal w×h | dot/em | alif/dot | agree |
+|---|---|---|---|---|---|---|
+| HarfCanvasDiwani | 2048 | 120×152 | 120×150 | 0.0586 | 5.22 | yes |
+| UKIJDiwani | 2048 | 240×224 | 240×220 | 0.1172 | 1.78 | yes |
+| Rabat | 1000 | 92×93 | 90×95 | 0.0920 | 2.04 | yes |
+| Blaka | 1000 | 167×113 | 165×115 | 0.1670 | 1.29 | yes |
+| Gulzar | 1000 | 189×196 | 195×185 | 0.1890 | 0.37 | yes |
+| Ruqaa | 1000 | 153×169 | 120×115 | 0.1530 | 0.67 | **no — check by hand** |
+| RanaKufi | 1000 | 100×100 | 250×170 | 0.1000 | 1.50 | **no — check by hand** |
+| Raqq | 800 | — | 60×60 | 0.0750 | 11.33 | modal only; alif 11 dots wide looks wrong |
 
 Full derivation, per-font confidence notes, and the measurement narrative
 live in `docs/superpowers/specs/2026-08-12-per-stroke-editing-design.md`.
