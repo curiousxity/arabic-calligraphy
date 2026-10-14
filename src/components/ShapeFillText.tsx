@@ -618,7 +618,7 @@ export const ShapeFillText: React.FC<ShapeFillTextProps> = ({
                   // keeps being scaled with its row, and pivoted on the
                   // glyph's pen origin — the same meaning offsetY has on
                   // plain text.
-                  targetCtx.translate(0, diacriticOverride.offsetY ?? 0);
+                  targetCtx.translate(diacriticOverride.offsetX ?? 0, diacriticOverride.offsetY ?? 0);
                   const ds = diacriticOverride.scale ?? 1;
                   targetCtx.scale(ds, ds);
                 }

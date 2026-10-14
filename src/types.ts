@@ -20,6 +20,8 @@ export type DiacriticOverride = {
   glyphIndex: number;
   /** Multiplier on the diacritic's natural size. Default 1. */
   scale?: number;
+  /** Extra horizontal shift in local (unscaled) units. Default 0. */
+  offsetX?: number;
   /** Extra vertical shift in local (unscaled) units. Default 0. */
   offsetY?: number;
   /** When true, this instance is skipped entirely during drawing. */

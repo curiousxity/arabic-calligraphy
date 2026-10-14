@@ -213,7 +213,7 @@ function drawWarpedGlyphRun(
     let localScale = 1;
 
     if (diacriticOverride) {
-      ctx.translate(0, diacriticOverride.offsetY ?? 0);
+      ctx.translate(diacriticOverride.offsetX ?? 0, diacriticOverride.offsetY ?? 0);
       const diacScale = diacriticOverride.scale ?? 1;
       ctx.scale(diacScale, diacScale);
       localScale *= diacScale;

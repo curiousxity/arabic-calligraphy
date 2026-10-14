@@ -240,6 +240,21 @@ describe("convertRunToStack", () => {
     expect(rel(lifted) - rel(plain)).toBeCloseTo((-10 * upm) / 100, 6);
   });
 
+  it("carries a tashkeel offsetX into the mark piece's x, in font units", async () => {
+    const { glyphs, font } = await shapeReal("بَ", "Amiri.ttf");
+    const upm = font.unitsPerEm || 1000;
+    const base = { glyphs, font, unitsPerEm: upm, shapableText: "بَ", cutPlan: null, fontSize: 100 };
+    const markIdx = glyphs.findIndex((g) => (g.ax ?? 0) === 0);
+    const plain = convertRunToStack({ ...base, diacriticOverrides: [] });
+    const moved = convertRunToStack({ ...base, diacriticOverrides: [{ glyphIndex: markIdx, offsetX: 10, offsetY: 0 }] });
+    const rel = (r: typeof plain) => {
+      const m = r.pieces.find((p) => p.role === "mark")!;
+      const parent = r.pieces.find((p) => p.id === m.parentId)!;
+      return m.x - parent.x;
+    };
+    expect(rel(moved) - rel(plain)).toBeCloseTo((10 * upm) / 100, 6);
+  });
+
   const resolves = (pieces: StackPiece[], joins: StackJoin[]) =>
     joins.every((j) => [j.from, j.to].every((r) => {
       const pc = pieces.find((x) => x.id === r.pieceId);

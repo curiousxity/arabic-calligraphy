@@ -62,7 +62,7 @@ export function runOutline(input: ConvertInput): SvgCmd[] {
   for (const p of placeGlyphs(input)) {
     const o = input.diacriticOverrides.find((d) => d.glyphIndex === p.index);
     if (o?.hidden) continue;
-    out.push(...translateCmds(markAdjusted(p.cmds, o), p.px, p.py + (o?.offsetY ?? 0) * scale));
+    out.push(...translateCmds(markAdjusted(p.cmds, o), p.px + (o?.offsetX ?? 0) * scale, p.py + (o?.offsetY ?? 0) * scale));
   }
   return out;
 }
@@ -162,7 +162,7 @@ export function convertRunToStack(input: ConvertInput): ConvertResult {
     if (!parent) continue;
     const cmds = markAdjusted(m.cmds, o);
     markPieces.push({
-      id: `m${m.index}`, cmds, x: m.px, y: m.py + (o?.offsetY ?? 0) * scale, rotation: 0,
+      id: `m${m.index}`, cmds, x: m.px + (o?.offsetX ?? 0) * scale, y: m.py + (o?.offsetY ?? 0) * scale, rotation: 0,
       pivot: cmdsCentre(cmds), homeX: 0, homeY: 0, order: parent.order, role: "mark", parentId: parent.id, faces: [],
     });
   }

@@ -62,13 +62,14 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
   // alone can't be trusted mid-gesture — this keeps the handle mounted
   // regardless of pointer position until the drag ends.
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
-  // The move handle's rail, in absolute (stage) space, captured once at
-  // drag start. Konva's dragBoundFunc receives and returns absolute
-  // coordinates while everything else here is local, and mixing the two
-  // previously teleported this handle sideways under any block
-  // offset/pan/zoom. Under a warp the rail is not vertical on screen even
-  // though it is vertical in local space, so it is stored as two mapped
-  // endpoints rather than a single fixed x.
+  // The move handle's rail, in absolute (stage) space, captured at drag
+  // start only while Shift is held — a plain drag is free in both axes.
+  // Konva's dragBoundFunc receives and returns absolute coordinates while
+  // everything else here is local, and mixing the two previously
+  // teleported this handle sideways under any block offset/pan/zoom. Under
+  // a warp the rail is not vertical on screen even though it is vertical in
+  // local space, so it is stored as two mapped endpoints rather than a
+  // single fixed x.
   const railRef = useRef<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(null);
 
   if (!isSelected) return null;
@@ -90,6 +91,7 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
         const cx = box.x + box.width / 2;
         const cy = box.y + box.height / 2;
         const overrideScale = override?.scale ?? 1;
+        const displayX = cx + (override?.offsetX ?? 0);
         const displayY = cy + (override?.offsetY ?? 0);
         const isHovered = hoveredKey === placement.key || draggingKey === placement.key;
 
@@ -99,9 +101,9 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
         // enlarged via scale drifts out from under its own hit area.
         const scaledWidth = box.width * overrideScale;
         const scaledHeight = box.height * overrideScale;
-        const rx1 = cx - scaledWidth / 2 - hitRectHorizontalMargin * overrideScale;
+        const rx1 = displayX - scaledWidth / 2 - hitRectHorizontalMargin * overrideScale;
         const ry1 = displayY - scaledHeight / 2 - hitRectVerticalMargin * overrideScale;
-        const rx2 = cx + scaledWidth / 2 + hitRectHorizontalMargin * overrideScale;
+        const rx2 = displayX + scaledWidth / 2 + hitRectHorizontalMargin * overrideScale;
         const ry2 = displayY + scaledHeight / 2 + hitRectVerticalMargin * overrideScale;
 
         // A rotated or warped local rect is not an axis-aligned rect on
@@ -117,9 +119,9 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
         const xs = corners.map((c) => c.x);
         const ys = corners.map((c) => c.y);
 
-        const moveAt = placement.toCanvas(cx, displayY);
-        const resizeAt = placement.toCanvas(cx + handleSpacing, displayY);
-        const hideAt = placement.toCanvas(cx - handleSpacing, displayY);
+        const moveAt = placement.toCanvas(displayX, displayY);
+        const resizeAt = placement.toCanvas(displayX + handleSpacing, displayY);
+        const hideAt = placement.toCanvas(displayX - handleSpacing, displayY);
 
         // A non-invertible warp (Newton's method bailing on a near-singular
         // Jacobian) would otherwise mount a Circle at NaN, which Konva
@@ -181,19 +183,23 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                   onDragStart={(e) => {
                     e.cancelBubble = true;
                     const parent = e.target.getParent();
-                    if (parent) {
+                    // Shift holds the old vertical rail; otherwise the drag
+                    // is free in both axes.
+                    if (parent && e.evt.shiftKey) {
                       // The rail is "hold local x, vary local y". Two local
                       // points a font-size apart define it; mapping both
                       // through toCanvas and then the parent's absolute
                       // transform expresses it in the space dragBoundFunc
                       // actually speaks.
                       const transform = parent.getAbsoluteTransform();
-                      const lo = placement.toCanvas(cx, displayY - fontSize);
-                      const hi = placement.toCanvas(cx, displayY + fontSize);
+                      const lo = placement.toCanvas(displayX, displayY - fontSize);
+                      const hi = placement.toCanvas(displayX, displayY + fontSize);
                       railRef.current = {
                         a: transform.point(lo),
                         b: transform.point(hi),
                       };
+                    } else {
+                      railRef.current = null;
                     }
                     setDraggingKey(placement.key);
                     onBeginDiacriticDrag?.();
@@ -202,8 +208,9 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                     e.cancelBubble = true;
                     const pos = e.target.position();
                     const local = placement.toLocal(pos.x, pos.y);
-                    if (!Number.isFinite(local.y)) return;
+                    if (!Number.isFinite(local.x) || !Number.isFinite(local.y)) return;
                     onDragDiacriticOverride?.(placement.glyphIndex, {
+                      offsetX: railRef.current ? (override?.offsetX ?? 0) : local.x - cx,
                       offsetY: local.y - cy,
                     });
                   }}
@@ -235,7 +242,7 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                     const pos = e.target.position();
                     const local = placement.toLocal(pos.x, pos.y);
                     if (!Number.isFinite(local.x) || !Number.isFinite(local.y)) return;
-                    const dist = Math.hypot(local.x - cx, local.y - displayY);
+                    const dist = Math.hypot(local.x - displayX, local.y - displayY);
                     const nextScale = Math.max(
                       0.3,
                       Math.min(3, dist / Math.max(handleSpacing, 1))
