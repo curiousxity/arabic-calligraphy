@@ -21,24 +21,72 @@ export const MAX_MARK_FRACTION = 0.35;
 
 /** Second admission path, in square em: anything this small is a mark
  *  whatever its body. Needed because a thin alif's box is small and its
- *  hamza is 0.8 of it and 0.055 em² (Amiri), which no body fraction can admit without
- *  also admitting a two-stroke letter's smaller half. Also tuned by the
- *  gate script. */
+ *  hamza is 0.8 of it and 0.055 em² (Amiri), which no body fraction can
+ *  admit without also admitting a two-stroke letter's smaller half. Also
+ *  tuned by the gate script. */
 export const MAX_MARK_EM_AREA = 0.07;
+
+/** Below this a contour is a stray speck, not a mark (Yekan's medial ح
+ *  carries a 5×11-unit fragment). Dots start around 0.004 em². */
+export const MIN_MARK_EM_AREA = 0.001;
+
+/** A candidate closer than this to the body, in em, is a piece of the body
+ *  (a stem, a connector, a decorative segment) drawn as its own contour,
+ *  not a mark: a dot never touches its letter. */
+export const TOUCH_EPS_EM = 0.01;
 
 /** One command list per contour, in raw order (the index is the mark key). */
 export function splitContours(cmds: SvgCmd[]): SvgCmd[][] {
   return toSegments(cmds).map((segs) => fromSegments([segs]));
 }
 
+type Poly = Array<[number, number]>;
 const area = (b: Bounds) => Math.max(b.x2 - b.x1, 0) * Math.max(b.y2 - b.y1, 0);
 
+/** Most of `a`'s vertices lie inside `b`. A counter is entirely inside its
+ *  body; a dot is entirely outside. The bounding-box centre is not usable
+ *  here: a jeem's own centre falls inside its dot. */
+function mostlyInside(a: Poly, b: Poly): boolean {
+  if (a.length === 0 || b.length < 3) return false;
+  let n = 0;
+  for (const [x, y] of a) if (pointInPolygon(x, y, b)) n++;
+  return n * 2 > a.length;
+}
+
+function segDist2(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const vx = bx - ax, vy = by - ay;
+  const len2 = vx * vx + vy * vy;
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / len2));
+  const dx = px - (ax + t * vx), dy = py - (ay + t * vy);
+  return dx * dx + dy * dy;
+}
+
+/** `a` overlaps or touches `b`: a vertex of either inside the other, or a
+ *  vertex of `a` within `eps` of an edge of `b`. */
+function touches(a: Poly, b: Poly, eps: number): boolean {
+  if (a.length < 3 || b.length < 3) return false;
+  for (const [x, y] of a) if (pointInPolygon(x, y, b)) return true;
+  for (const [x, y] of b) if (pointInPolygon(x, y, a)) return true;
+  const eps2 = eps * eps;
+  for (const [x, y] of a) {
+    for (let j = 0, k = b.length - 1; j < b.length; k = j++) {
+      if (segDist2(x, y, b[k][0], b[k][1], b[j][0], b[j][1]) <= eps2) return true;
+    }
+  }
+  return false;
+}
+
 /**
- * Rules, in order: (1) the contour's centre lies inside no other contour
- * (a counter fails here; winding is not used because TrueType and CFF
- * disagree); (2) it is not the body, the largest contour passing (1);
- * (3) its area is at most `maxFraction` of the body's, or at most
- * `maxEmArea` square em.
+ * Rules, in order: (1) a contour most of whose vertices lie inside another
+ * is a counter, not a candidate (winding is not used because TrueType and
+ * CFF disagree); (2) the remaining contours are grouped into components by
+ * overlap or touch (`TOUCH_EPS_EM`), and the component holding the largest
+ * contour is the body — a stem, a tooth or a connector drawn as its own
+ * contour touches the body or a piece that does (NotoSans ط, Lateef س,
+ * Raqq's pieced connectors), a dot never does; (3) every contour outside
+ * the body component whose area is at most `maxFraction` of the body's or
+ * at most `maxEmArea` square em, and at least `MIN_MARK_EM_AREA`, is a
+ * mark.
  */
 export function findDetachedContours(
   cmds: SvgCmd[],
@@ -48,23 +96,45 @@ export function findDetachedContours(
 ): DetachedContour[] {
   const parts = splitContours(cmds);
   if (parts.length < 2) return [];
-  const polys = parts.map((p) => flattenContours(p)[0] ?? []);
+  const polys: Poly[] = parts.map((p) => flattenContours(p)[0] ?? []);
   const bounds = parts.map((p) => outlineBounds(p));
+  const upm = Math.max(unitsPerEm || 1000, 1);
+  const eps = TOUCH_EPS_EM * upm;
+
+  // (1) counters out.
   const outer: number[] = [];
   for (let i = 0; i < parts.length; i++) {
-    const cx = (bounds[i].x1 + bounds[i].x2) / 2, cy = (bounds[i].y1 + bounds[i].y2) / 2;
     let inside = false;
     for (let j = 0; j < parts.length && !inside; j++) {
-      if (j !== i && polys[j].length >= 3 && pointInPolygon(cx, cy, polys[j])) inside = true;
+      if (j !== i && mostlyInside(polys[i], polys[j])) inside = true;
     }
     if (!inside && area(bounds[i]) > 0) outer.push(i);
   }
   if (outer.length < 2) return [];
-  const body = outer.reduce((best, i) => (area(bounds[i]) > area(bounds[best]) ? i : best), outer[0]);
-  const upm = Math.max(unitsPerEm || 1000, 1);
-  const limit = Math.max(maxFraction * area(bounds[body]), maxEmArea * upm * upm);
+
+  // (2) components by touch; the body is the largest contour's component.
+  const comp = new Map<number, number>(outer.map((i) => [i, i]));
+  const find = (i: number): number => {
+    let r = i;
+    while (comp.get(r) !== r) r = comp.get(r)!;
+    comp.set(i, r);
+    return r;
+  };
+  for (let a = 0; a < outer.length; a++) {
+    for (let b = a + 1; b < outer.length; b++) {
+      const i = outer[a], j = outer[b];
+      if (find(i) !== find(j) && touches(polys[i], polys[j], eps)) comp.set(find(i), find(j));
+    }
+  }
+  const largest = outer.reduce((best, i) => (area(bounds[i]) > area(bounds[best]) ? i : best), outer[0]);
+  const bodyRoot = find(largest);
+  const bodyArea = outer.filter((i) => find(i) === bodyRoot).reduce((s, i) => s + area(bounds[i]), 0);
+
+  // (3) size.
+  const limit = Math.max(maxFraction * bodyArea, maxEmArea * upm * upm);
+  const floor = MIN_MARK_EM_AREA * upm * upm;
   return outer
-    .filter((i) => i !== body && area(bounds[i]) <= limit)
+    .filter((i) => find(i) !== bodyRoot && area(bounds[i]) <= limit && area(bounds[i]) >= floor)
     .map((i) => ({ mark: i, cmds: parts[i], bounds: bounds[i] }));
 }
 
@@ -97,8 +167,14 @@ export type DetachedMark = DetachedContour & {
 };
 
 /** Fonts the coverage gate failed (scripts/measureDetachedMarks.mjs); the
- *  detector returns nothing for them rather than the bar being loosened. */
-export const UNSUPPORTED_FONTS: ReadonlySet<string> = new Set<string>([]);
+ *  detector returns nothing for them rather than the bar being loosened.
+ *  All five build letters from pieces that do not touch — Kufi2, Qahiri and
+ *  RanaKufi from cells, ThuluthDeco from decorative segments, Wessam with a
+ *  ط stem floating above its bowl — so a piece of the body is
+ *  indistinguishable from a dot. Numbers: docs/archive/detached-mark-coverage.md. */
+export const UNSUPPORTED_FONTS: ReadonlySet<string> = new Set<string>([
+  "Kufi2", "Qahiri", "RanaKufi", "ThuluthDeco", "Wessam",
+]);
 
 const glyphCmds = (font: opentype.Font, g: HarfBuzzGlyph, upm: number): SvgCmd[] | null => {
   const obj = font.glyphs.get(g.g);
@@ -151,9 +227,12 @@ export function findDetachedMarks(
       const cmds = glyphCmds(font, g, upm);
       const baseCmds = glyphCmds(font, glyphs[baseIdx], upm);
       if (!cmds || !baseCmds) continue;
+      // A dot *group* glyph (Gulzar, Urdu) holds several contours whose
+      // union is larger than any mark; each contour is sized on its own.
       const mb = outlineBounds(cmds), bb = outlineBounds(baseCmds);
       const limit = Math.max(MAX_MARK_FRACTION * area(bb), MAX_MARK_EM_AREA * upm * upm);
-      if (area(mb) === 0 || area(mb) > limit) continue;
+      const partAreas = splitContours(cmds).map((p) => area(outlineBounds(p)));
+      if (partAreas.length === 0 || partAreas.some((a) => a === 0 || a > limit)) continue;
       out.set(i, [{ mark: -1 - n, cmds, bounds: mb, glyphIndex: i, cluster, glyphId: g.g }]);
       continue;
     }

@@ -246,3 +246,15 @@ describe("findDetachedMarks (shaped runs)", () => {
     expect([...marks.keys()]).toEqual([0]);
   });
 });
+
+describe("UNSUPPORTED_FONTS", () => {
+  it("a font that failed the gate's undotted half yields nothing (Wessam ط has a floating stem)", async () => {
+    const { glyphs, font } = await shapeReal("ط", "Wessam.ttf");
+    const upm = font.unitsPerEm || 1000;
+    expect(findDetachedMarks(glyphs, font, upm, new Set(), "Wessam").size).toBe(0);
+    // The same outline under another family name shows why: the stem is
+    // detached from the bowl by more than a touch, so the detector cannot
+    // tell it from a dot.
+    expect(findDetachedMarks(glyphs, font, upm, new Set(), "NotWessam").size).toBeGreaterThan(0);
+  });
+});
