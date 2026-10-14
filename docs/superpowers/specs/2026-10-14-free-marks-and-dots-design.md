@@ -177,9 +177,10 @@ export type DetachedMarkOverride = {
   glyphId: number;
   /**
    * Which mark on that glyph. For a contour-route mark, the contour's raw
-   * index in the glyph's path. For a separate-glyph-route mark, the mark
-   * glyph's offset within its cluster (0 for the first zero-advance glyph
-   * after the base), negated and minus one so the two never collide.
+   * index in the glyph's path (>= 0). For a separate-glyph-route mark,
+   * `-1 - n` where `n` is the mark glyph's ordinal among glyphs in its
+   * cluster with the same glyph id, so two identical dot glyphs stay
+   * distinct and the two routes never collide.
    */
   mark: number;
   /** Translation in unscaled font units. */
