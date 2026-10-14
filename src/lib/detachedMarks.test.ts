@@ -18,7 +18,8 @@ import type { HarfBuzzGlyph } from "./harfbuzz";
 // app itself loads it (the app is bundled by Vite/Rolldown, which
 // doesn't have this issue).
 const hbjsModule = createRequire(import.meta.url)("harfbuzzjs");
-import { findDetachedContours, splitContours, translateContours, MAX_MARK_FRACTION } from "./detachedMarks";
+import { findDetachedContours, splitContours, translateContours, MAX_MARK_FRACTION, findDetachedMarks } from "./detachedMarks";
+import { findDiacriticGlyphIndices } from "./diacritics";
 import { toSvgCmds, outlineBounds } from "./strokeCuts";
 import { normalizeGlyphs } from "./normalizeGlyphs";
 
@@ -200,5 +201,48 @@ describe("findDetachedContours (real fonts)", () => {
     expect(b.y1).toBeCloseTo(dot.bounds.y1 - 70, 6);
     const before = splitContours(cmds);
     before.forEach((c, i) => { if (i !== dot.mark) expect(outlineBounds(after[i])).toEqual(outlineBounds(c)); });
+  });
+});
+
+describe("findDetachedMarks (shaped runs)", () => {
+  it("NotoSans: ف's separate dot glyph is a mark here and not a diacritic", async () => {
+    const { glyphs, font } = await shapeReal("حرف", "NotoSans.ttf");
+    const upm = font.unitsPerEm || 1000;
+    const dia = findDiacriticGlyphIndices(glyphs, font, "حرف");
+    const marks = findDetachedMarks(glyphs, font, upm, dia, "NotoSans");
+    const dotIdx = glyphs.findIndex((g, i) => (g.ax ?? 0) === 0 && !dia.has(i));
+    expect(dotIdx).toBeGreaterThanOrEqual(0);
+    expect(marks.get(dotIdx)?.[0].mark).toBe(-1);
+    expect(marks.get(dotIdx)?.[0].glyphId).toBe(glyphs[dotIdx].g);
+  });
+
+  it("FatemiMaqala: contour-route marks are keyed to their letter's cluster and glyph id", async () => {
+    const { glyphs, font } = await shapeReal("ثبت", "FatemiMaqala.ttf");
+    const upm = font.unitsPerEm || 1000;
+    const marks = findDetachedMarks(glyphs, font, upm, new Set(), "FatemiMaqala");
+    let total = 0;
+    for (const [gi, list] of marks) {
+      for (const m of list) {
+        expect(m.glyphIndex).toBe(gi);
+        expect(m.cluster).toBe(glyphs[gi].cl ?? 0);
+        expect(m.glyphId).toBe(glyphs[gi].g);
+        expect(m.mark).toBeGreaterThanOrEqual(0);
+        total++;
+      }
+    }
+    expect(total).toBe(6);
+  });
+
+  it("a tashkeel glyph is never a detached mark", async () => {
+    const { glyphs, font } = await shapeReal("بَ", "Amiri.ttf");
+    const dia = findDiacriticGlyphIndices(glyphs, font, "بَ");
+    const marks = findDetachedMarks(glyphs, font, font.unitsPerEm || 1000, dia, "Amiri");
+    for (const i of dia) expect(marks.has(i)).toBe(false);
+  });
+
+  it("`only` restricts the walk", async () => {
+    const { glyphs, font } = await shapeReal("ثبت", "FatemiMaqala.ttf");
+    const marks = findDetachedMarks(glyphs, font, font.unitsPerEm || 1000, new Set(), "FatemiMaqala", new Set([0]));
+    expect([...marks.keys()]).toEqual([0]);
   });
 });
