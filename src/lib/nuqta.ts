@@ -32,6 +32,34 @@ const NUQTA_RATIO: Record<string, number> = {
   Yekan: 0.1348,
 };
 
+/** Thickness of a vertical stem over a horizontal connector — the floor a
+ *  stack join thins to on a climb, which is what the pen's slant does.
+ *  Measured by scripts/measureNibFloor.mjs. */
+const NIB_FLOOR_RATIO: Record<string, number> = {
+  AlFatemi: 0.65,
+  FatemiMaqala: 0.6,
+  HarfCanvasDiwani: 0.39,
+  Kufi: 0.97,
+  Kufi2: 1,
+  Lateef: 0.58,
+  NotoSans: 0.99,
+  Qahiri: 1,
+  Rabat: 0.58,
+  RanaKufi: 1,
+  Raqq: 0.87,
+  Scheherazade: 0.58,
+  TahaNaskhRegular: 0.61,
+  Thuluth: 0.56,
+  ThuluthDeco: 0.56,
+  UKIJDiwani: 1,
+  Wessam: 0.95,
+  Yekan: 0.83,
+};
+export const FALLBACK_NIB_FLOOR = 0.15;
+export function nibFloorFraction(fontFamily: string): number {
+  return NIB_FLOOR_RATIO[fontFamily] ?? FALLBACK_NIB_FLOOR;
+}
+
 /**
  * For the bundled faces the archive does not cover (HarfCanvasDiwani and
  * UKIJDiwani, which postdate it, and Ruqaa) and for every uploaded font, which can
