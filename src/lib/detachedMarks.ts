@@ -318,3 +318,14 @@ export const remapMarksForEdits = (
   marks: DetachedMarkOverride[],
   edits: readonly { index: number; delta: number }[]
 ): DetachedMarkOverride[] => remapCutsForEdits(marks, edits);
+
+/** The glyph's outline with this run's plan applied, `scale` px per font
+ *  unit (1 when the commands are already in font units). Returns the same
+ *  array when the glyph has no entry, so memos can test identity. */
+export function applyMarkPlanToGlyph(cmds: SvgCmd[], plan: DetachedMarkPlan, glyphIndex: number, scale: number): SvgCmd[] {
+  const per = plan.contours.get(glyphIndex);
+  if (!per || per.size === 0) return cmds;
+  const scaled = new Map<number, readonly [number, number]>();
+  for (const [i, [dx, dy]] of per) scaled.set(i, [dx * scale, dy * scale]);
+  return translateContours(cmds, scaled);
+}

@@ -32,6 +32,7 @@ import {
   supportsStrokeCuts,
   supportsStyleSets,
   isStackBlock,
+  supportsDetachedMarks,
 } from "./lib/blockCapabilities";
 import { useGlyphAlternates, useStyleSets } from "./hooks/useGlyphAlternates";
 import {
@@ -55,7 +56,7 @@ import {
   syncAttachedToGuides,
 } from "./lib/guides";
 import type { GuideAttachment, GuideBlock, GuideParams, GuideShape } from "./types";
-import type { Block, DiacriticOverride, StackBlock, StrokeCut } from "./types";
+import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
   isCloudConfigured,
@@ -168,6 +169,7 @@ import {
 } from "./lib/verseJustify";
 import type { TextBlock, VerseLayout, VerseSettings } from "./types";
 import { buildCutPlan, cutAdvanceTotal, outlineBounds, remapCutsForEdits } from "./lib/strokeCuts";
+import { remapMarksForEdits } from "./lib/detachedMarks";
 import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
 import { shapeText } from "./lib/harfbuzz";
 import { convertRunToStack, splitPieceAtCut, type UnjoinedPair } from "./lib/stackConvert";
@@ -757,6 +759,49 @@ const App: React.FC = () => {
       )
     );
   }, []);
+
+  const setDetachedMark = useCallback(
+    (blockId: number, o: DetachedMarkOverride) => {
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== blockId || !supportsDetachedMarks(b)) return b;
+          const rest = (b.detachedMarkOverrides ?? []).filter(
+            (m) => !(m.cluster === o.cluster && m.glyphId === o.glyphId && m.mark === o.mark)
+          );
+          const keep = o.dx !== 0 || o.dy !== 0;
+          return { ...b, detachedMarkOverrides: keep ? [...rest, o] : rest };
+        })
+      );
+      // No push: the drag start took one through `onBeginDetachedMarkDrag`.
+    },
+    []
+  );
+
+  const toggleDetachedMarkMode = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && supportsDetachedMarks(b)
+            ? { ...b, detachedMarkEditMode: !b.detachedMarkEditMode }
+            : b
+        )
+      );
+    },
+    [pushHistory]
+  );
+
+  const clearDetachedMarks = useCallback(
+    (blockId: number) => {
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && supportsDetachedMarks(b) ? { ...b, detachedMarkOverrides: [] } : b
+        )
+      );
+    },
+    [pushHistory]
+  );
 
   const toggleStrokeCutMode = useCallback(
     (blockId: number) => {
@@ -2550,9 +2595,12 @@ const App: React.FC = () => {
   const kashidaTextPatch = useCallback(
     (block: Block, text: string, edits: readonly { index: number; delta: number }[]) => {
       const cuts = block.strokeCuts;
-      return cuts?.length
-        ? { text, strokeCuts: remapCutsForEdits(cuts, edits) }
-        : { text };
+      const marks = block.detachedMarkOverrides;
+      return {
+        text,
+        ...(cuts?.length ? { strokeCuts: remapCutsForEdits(cuts, edits) } : {}),
+        ...(marks?.length ? { detachedMarkOverrides: remapMarksForEdits(marks, edits) } : {}),
+      };
     },
     []
   );
@@ -3444,6 +3492,8 @@ const App: React.FC = () => {
         styleSetsState={styleSetsState}
         onToggleStyleSet={toggleStyleSet}
         onClearStrokeCuts={clearStrokeCuts}
+        onToggleDetachedMarkMode={toggleDetachedMarkMode}
+        onClearDetachedMarks={clearDetachedMarks}
         onFitShapeFillSpacing={fitShapeFillSpacing}
         onAlignSelected={alignSelectedBlocks}
         onDistributeSelected={distributeSelectedBlocks}
@@ -3523,6 +3573,8 @@ const App: React.FC = () => {
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}
           onBeginStrokeCut={pushHistory}
+          onBeginDetachedMarkDrag={pushHistory}
+          onSetDetachedMark={setDetachedMark}
           onBeginStackEdit={pushHistory}
           onSetStackPieces={setStackPieces}
           onSetStackJoinBow={setStackJoinBow}

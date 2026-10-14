@@ -20,7 +20,7 @@ import type { HarfBuzzGlyph } from "./harfbuzz";
 const hbjsModule = createRequire(import.meta.url)("harfbuzzjs");
 import {
   findDetachedContours, splitContours, translateContours, MAX_MARK_FRACTION, findDetachedMarks,
-  buildDetachedMarkPlan, remapMarksForEdits,
+  buildDetachedMarkPlan, remapMarksForEdits, applyMarkPlanToGlyph,
 } from "./detachedMarks";
 import { findDiacriticGlyphIndices } from "./diacritics";
 import { toSvgCmds, outlineBounds } from "./strokeCuts";
@@ -299,5 +299,17 @@ describe("remapMarksForEdits", () => {
       { cluster: 3, glyphId: 1, mark: 0, dx: 1, dy: 1 },
     ];
     expect(remapMarksForEdits(marks, [{ index: 2, delta: 1 }]).map((m) => m.cluster)).toEqual([0, 2, 4]);
+  });
+});
+
+describe("applyMarkPlanToGlyph", () => {
+  it("translates the contour at the given px scale and leaves other glyphs alone", async () => {
+    const { cmds, upm } = await isolated("ب", "Amiri.ttf");
+    const [dot] = findDetachedContours(cmds, upm);
+    const plan = { contours: new Map([[3, new Map([[dot.mark, [100, 0] as [number, number]]])]]), glyphs: new Map() };
+    const same = applyMarkPlanToGlyph(cmds, plan, 0, 0.1);
+    expect(same).toBe(cmds);
+    const moved = applyMarkPlanToGlyph(cmds, plan, 3, 0.1);
+    expect(outlineBounds(splitContours(moved)[dot.mark]).x1).toBeCloseTo(dot.bounds.x1 + 10, 6);
   });
 });

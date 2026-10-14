@@ -313,6 +313,8 @@ export type SidebarProps = {
   onToggleDiacriticEditMode?: () => void;
   onToggleStrokeCutMode?: (blockId: number) => void;
   onClearStrokeCuts?: (blockId: number) => void;
+  onToggleDetachedMarkMode?: (blockId: number) => void;
+  onClearDetachedMarks?: (blockId: number) => void;
   /** Next Shape: discovery for the selected block, and the last letter clicked. */
   glyphAlternatesState?: GlyphAlternatesState;
   alternateTarget?: AlternateTarget | null;
@@ -609,6 +611,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleDiacriticEditMode,
   onToggleStrokeCutMode,
   onClearStrokeCuts,
+  onToggleDetachedMarkMode,
+  onClearDetachedMarks,
   glyphAlternatesState,
   alternateTarget,
   onToggleGlyphAlternateMode,
@@ -3562,6 +3566,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         style={{ background: "var(--bg-input)", marginTop: 8 }}
                       >
                         Reset stroke stretches
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Text and Shape Fill: the two renderers that split a glyph's
+                    contours (supportsDetachedMarks). */}
+                {(selectedBlock.type === "text" || selectedBlock.type === "shapeFill") && (
+                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
+                    <div className="sidebarSectionTitle">Dots & marks</div>
+
+                    <CheckboxRow
+                      id={makeId("detached-mark-mode", selectedId)}
+                      label="Move dots & marks"
+                      checked={!!selectedBlock.detachedMarkEditMode}
+                      onChange={() => onToggleDetachedMarkMode?.(selectedBlock.id)}
+                    />
+
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                      Hover a letter's dot, hamza or kaf stroke and drag it anywhere.
+                      Double-click the handle to put it back. Dots keep their size;
+                      a dot drawn touching its letter cannot be moved.
+                    </div>
+
+                    {(selectedBlock.detachedMarkOverrides?.length ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => onClearDetachedMarks?.(selectedBlock.id)}
+                        className="sidebarSmallAction"
+                        style={{ background: "var(--bg-input)", marginTop: 8 }}
+                      >
+                        Reset dots & marks
                       </button>
                     )}
                   </div>
