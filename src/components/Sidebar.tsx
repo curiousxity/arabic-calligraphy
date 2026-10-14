@@ -31,6 +31,7 @@ import { VerseButton } from "./VerseDialog";
 import { VersePanel } from "./sidebar/VersePanel";
 import { AddGuideButton } from "./GuideDialog";
 import { GuidePanel } from "./sidebar/GuidePanel";
+import { StackPanel } from "./sidebar/StackPanel";
 import { GuideAttachmentPanel } from "./sidebar/GuideAttachmentPanel";
 import { GUIDE_SHAPE_LABELS } from "../lib/guideShapes";
 import { attachedTo, guidesIn } from "../lib/guides";
@@ -169,6 +170,7 @@ export type SidebarProps = {
   onAddCustomFont?: (file: File, label?: string) => Promise<CustomFont | { error: string }>;
   /** Bake the selected text block into a stacked composition. */
   onConvertToStack?: () => void;
+  onResetStackLayout?: () => void;
   onRemoveCustomFont?: (key: string) => void;
   /** Set when the selected block names a font this browser cannot resolve. */
   missingFontKey?: string | null;
@@ -502,6 +504,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   customFonts = [],
   onAddCustomFont,
   onConvertToStack,
+  onResetStackLayout,
   onRemoveCustomFont,
   missingFontKey = null,
   // ---- /STREAM-G ----
@@ -643,6 +646,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showContent, setShowContent] = useState(true);
   const [showVerse, setShowVerse] = useState(true);
   const [showGuide, setShowGuide] = useState(true);
+  const [showStack, setShowStack] = useState(true);
 
   /**
    * The font list the picker shows: the bundled fonts, then uploads. An
@@ -2869,6 +2873,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onSelect={(id) => onSelectBlock(id)}
                 onToggleEdit={() => onUpdateSelectedBlock({ guideEditMode: !selectedBlock.guideEditMode })}
               />
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock?.type === "stack" && onResetStackLayout && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Stacked composition" isOpen={showStack} onToggle={() => setShowStack((v) => !v)}>
+              <StackPanel block={selectedBlock} onUpdate={onUpdateSelectedBlock} onReset={onResetStackLayout} />
             </CollapsibleSection>
           </div>
         )}
