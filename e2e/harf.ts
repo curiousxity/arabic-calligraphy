@@ -225,12 +225,55 @@ export async function openTypography(page: Page): Promise<void> {
   await openPanel(page, /^Typography/);
 }
 
+/** Opens the Font panel (first in the selected tier; open on boot, so this is usually a no-op). */
+export async function openFontPanel(page: Page): Promise<void> {
+  // CollapsibleSection renders the title span and the −/+ span with no
+  // whitespace between them, so the name may be "Font−" or "Font −".
+  await openPanel(page, /^Font\s?[−+]$/);
+}
+
 /**
- * Picks a font by its label in Typography's font picker.
+ * A real font from `public/fonts/` is the upload fixture: the whole feature
+ * is "bytes HarfBuzz can shape", so a synthesized file would only exercise
+ * the rejection path. Lateef is deliberately *not* the default block font,
+ * which is what makes "the canvas changed" observable.
+ */
+export const FIXTURE_FONT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../public/fonts/Lateef.ttf"
+);
+
+/** The label `uploadFixtureFont` gives the fixture unless told otherwise. */
+export const UPLOAD_LABEL = "E2E Naskh";
+
+/**
+ * Uploads `FIXTURE_FONT` through the Font panel's "Upload a font…" dialog
+ * under `label`. The panel must already be open (it is, on boot).
+ */
+export async function uploadFixtureFont(page: Page, label = UPLOAD_LABEL): Promise<void> {
+  await page.getByRole("button", { name: "Upload a font…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Upload a font" });
+  await expect(dialog).toBeVisible();
+
+  await dialog.locator('input[type="file"]').setInputFiles(FIXTURE_FONT);
+  // The label field appears only once the file has parsed, prefilled from the
+  // font's own name table.
+  const name = dialog.locator(".fontUploadLabelInput");
+  await expect(name).toBeVisible();
+  await expect(name).not.toHaveValue("");
+
+  await name.fill(label);
+  await dialog.getByRole("button", { name: "Add font" }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
+/**
+ * Picks a font by its label in the Font panel's full gallery.
  *
- * Typography starts collapsed, and the picker is a dialog of preview cards
- * rather than a native `<select>`, so this is three clicks: the section
- * header, the trigger, then the card. The dialog closes on the pick.
+ * The Font panel starts open, but a spec may have collapsed it, so the
+ * helper opens it first; the gallery is a dialog of preview cards rather
+ * than a native `<select>`, so the pick is the trigger then the card. The
+ * dialog closes on the pick.
  *
  * `uploaded` appends the suffix the picker gives a user-uploaded family
  * (`Sidebar.tsx` builds it as `${label} (uploaded)`); keeping that here
@@ -242,7 +285,7 @@ export async function chooseFont(
   label: string,
   opts: { uploaded?: boolean } = {}
 ): Promise<void> {
-  await openTypography(page);
+  await openFontPanel(page);
   // The trigger is named by its label and then the current font, so anchor
   // on the label alone.
   await page.getByRole("button", { name: /^Font family\b/ }).click();

@@ -1,15 +1,24 @@
 import { test, expect, type Page } from "@playwright/test";
-import { chooseFont, getBlocks, gotoApp, openTypography, setBlockText } from "./harf";
+import {
+  chooseFont,
+  getBlocks,
+  gotoApp,
+  openFontPanel,
+  setBlockText,
+  UPLOAD_LABEL,
+  uploadFixtureFont,
+} from "./harf";
 
 /**
- * Typography's font picker: a button that opens a gallery of the block's
- * own text in every font, grouped by genre. One click applies and closes.
+ * The Font panel's full gallery: a button that opens a gallery of the
+ * block's own text in every font, grouped by genre. One click applies and
+ * closes. The panel's strip is the one-click shortcut beside it.
  */
 
 const PICKER = '[data-testid="font-picker"]';
 
 async function openPicker(page: Page): Promise<void> {
-  await openTypography(page);
+  await openFontPanel(page);
   await page.getByRole("button", { name: /^Font family\b/ }).click();
   await expect(page.locator(PICKER)).toBeVisible();
 }
@@ -66,7 +75,7 @@ test("Escape closes the picker without changing the font", async ({ page }) => {
 
 test("the dropdown is gone", async ({ page }) => {
   await gotoApp(page);
-  await openTypography(page);
+  await openFontPanel(page);
   await expect(page.getByRole("listbox")).toHaveCount(0);
   await expect(page.locator(".fontSelectTrigger")).toHaveCount(0);
 });
@@ -113,7 +122,7 @@ test("a saved block on the retired Layla Diwani still opens on it, and can leave
 
   // The row still names the font the block is on, and the gallery shows it
   // as the current choice.
-  await openTypography(page);
+  await openFontPanel(page);
   await expect(page.getByRole("button", { name: /^Font family Layla Diwani \(retired\)/ })).toBeVisible();
   await openPicker(page);
   await expect(page.locator(`${PICKER} [data-font-key="HarfCanvasDiwani"]`)).toHaveAttribute(
@@ -126,4 +135,36 @@ test("a saved block on the retired Layla Diwani still opens on it, and can leave
   await expect.poll(async () => (await getBlocks(page))[0].fontFamily).toBe("UKIJDiwani");
   await openPicker(page);
   await expect(page.locator(`${PICKER} [data-font-key="HarfCanvasDiwani"]`)).toHaveCount(0);
+});
+
+test("the Font panel's strip applies a font in one click and highlights it", async ({ page }) => {
+  await gotoApp(page);
+  await setBlockText(page, "محمد");
+  const strip = page.getByTestId("font-strip");
+  await expect(strip).toBeVisible(); // the panel starts open
+  await expect(strip.locator('[data-font-key="Amiri"] .fontStripSample')).toHaveText("محمد");
+
+  await strip.locator('[data-font-key="Amiri"]').click();
+  await expect.poll(async () => (await getBlocks(page))[0].fontFamily).toBe("Amiri");
+  await expect(strip.locator('[data-font-key="Amiri"]')).toHaveAttribute("aria-pressed", "true");
+
+  await page.keyboard.press("Control+z");
+  await expect.poll(async () => (await getBlocks(page))[0].fontFamily).not.toBe("Amiri");
+});
+
+test("a block on a font this browser lacks still shows the strip and the notice", async ({ page }) => {
+  // The bridge is read-only, so reach the state through the UI: upload a
+  // font, put the block on it, then remove the upload. The block now names a
+  // key the catalogue no longer knows.
+  await gotoApp(page);
+  await uploadFixtureFont(page);
+  await chooseFont(page, UPLOAD_LABEL, { uploaded: true });
+  await page.getByRole("button", { name: `Remove uploaded font ${UPLOAD_LABEL}` }).click();
+  await expect(page.getByTestId("font-strip")).toBeVisible();
+  // Scoped to the notice itself: the sidebar has other `role="status"` rows
+  // (the export status), and an unscoped role query would trip strict mode
+  // whenever one of them is showing.
+  const notice = page.locator(".fontMissingNotice");
+  await expect(notice).toHaveAttribute("role", "status");
+  await expect(notice).toContainText("isn't available");
 });

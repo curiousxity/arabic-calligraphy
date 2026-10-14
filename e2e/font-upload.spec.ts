@@ -1,41 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { chooseFont, getBlocks, gotoApp, inkPixels, openPanel, openTypography } from "./harf";
-
-/**
- * A real font from `public/fonts/` is the upload fixture: the whole feature
- * is "bytes HarfBuzz can shape", so a synthesized file would only exercise
- * the rejection path. Lateef is deliberately *not* the default block font,
- * which is what makes "the canvas changed" observable.
- */
-const FIXTURE_FONT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../public/fonts/Lateef.ttf"
-);
-
-const UPLOAD_LABEL = "E2E Naskh";
+import {
+  chooseFont,
+  getBlocks,
+  gotoApp,
+  inkPixels,
+  openFontPanel,
+  openPanel,
+  UPLOAD_LABEL,
+  uploadFixtureFont,
+} from "./harf";
 
 async function openFontPicker(page: Page): Promise<void> {
-  await openTypography(page);
-  await expect(page.getByRole("button", { name: "Font family" })).toBeVisible();
-}
-
-async function uploadFixtureFont(page: Page, label = UPLOAD_LABEL): Promise<void> {
-  await page.getByRole("button", { name: "Upload a font…" }).click();
-  const dialog = page.getByRole("dialog", { name: "Upload a font" });
-  await expect(dialog).toBeVisible();
-
-  await dialog.locator('input[type="file"]').setInputFiles(FIXTURE_FONT);
-  // The label field appears only once the file has parsed, prefilled from the
-  // font's own name table.
-  const name = dialog.locator(".fontUploadLabelInput");
-  await expect(name).toBeVisible();
-  await expect(name).not.toHaveValue("");
-
-  await name.fill(label);
-  await dialog.getByRole("button", { name: "Add font" }).click();
-  await expect(dialog).toHaveCount(0);
+  await openFontPanel(page);
+  await expect(page.getByRole("button", { name: /^Font family\b/ })).toBeVisible();
 }
 
 test("an uploaded font joins the picker and re-renders the block", async ({ page }) => {

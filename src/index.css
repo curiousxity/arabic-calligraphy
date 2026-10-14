@@ -452,6 +452,14 @@ html, body, #root { height: 100%; margin: 0; }
 .fontPickerTriggerLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fontPickerTriggerHint { flex-shrink: 0; color: var(--text-muted); font-size: 11px; }
 
+/* Font panel strip: scrolls sideways inside the sidebar, never widens it. */
+.fontStrip { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 6px; scroll-snap-type: x proximity; }
+.fontStrip > * { min-width: 0; flex: 0 0 auto; }
+.fontStripCard { scroll-snap-align: center; width: 112px; padding: 8px 6px; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--overlay-hover); color: var(--text-primary); cursor: pointer; }
+.fontStripCard:hover { border-color: var(--border); }
+.fontStripCard--active { border-color: var(--accent); outline: 1px solid var(--accent); }
+.fontStripSample { display: block; font-size: 24px; line-height: 1.5; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 
 .nameLayoutCard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 10px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--overlay-hover); cursor: pointer; text-align: center; }
 .nameLayoutCard--active { border-color: var(--accent); outline: 1px solid var(--accent); }

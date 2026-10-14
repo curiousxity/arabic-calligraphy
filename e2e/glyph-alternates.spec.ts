@@ -9,6 +9,7 @@ import {
   hitTargetAt,
   inkPixels,
   namedNodeCount,
+  openTypography,
   nodeClientBox,
   placeAtCanvas,
   setBlockText,
@@ -19,6 +20,7 @@ import {
 async function armAlternates(page: Page, font: string, text: string) {
   await setBlockText(page, text);
   await chooseFont(page, font);
+  await openTypography(page);
   await page.getByLabel("Alternate letter shapes").check();
 }
 
@@ -114,6 +116,7 @@ test("ticking a style set restyles every matching letter, and undo restores it",
   await gotoApp(page);
   await setBlockText(page, "هههه");
   await chooseFont(page, "Ruqaa");
+  await openTypography(page);
   const toggle = page.getByLabel("Looped Haa");
   await expect(toggle).toBeVisible();
   const box = await nodeClientBox(page, "#block-1");
@@ -131,6 +134,7 @@ test("a font without style sets says so", async ({ page }) => {
   await gotoApp(page);
   await setBlockText(page, "هههه");
   await chooseFont(page, "Thuluth");
+  await openTypography(page);
   await expect(page.getByText("No style sets in this font")).toBeVisible();
 });
 
@@ -167,6 +171,7 @@ test("on a Shape Fill block one pick changes the letter in every tile, through o
   const id = await addShapeFillFromSvg(page);
   await setBlockText(page, "هههه", id);
   await chooseFont(page, "Ruqaa");
+  await openTypography(page);
   await page.getByLabel("Alternate letter shapes").check();
   await expect.poll(async () => (await alternateTargetCenters(page)).length).toBeGreaterThan(4);
   // The whole silhouette's letters, resolved through a single listening node.
@@ -205,6 +210,7 @@ test("on a Curve block a click changes the letter, and undo restores it", async 
   const id = (await getBlocks(page)).find((b) => b.type === "textPath")!.id;
   await setBlockText(page, "هههه", id);
   await chooseFont(page, "Ruqaa");
+  await openTypography(page);
   await page.getByLabel("Alternate letter shapes").check();
   await expect.poll(async () => (await alternateTargetCenters(page)).length).toBeGreaterThan(0);
   await settleFrames(page);
@@ -226,6 +232,7 @@ test("on a Shape Fill block a mark is part of its letter's target, not one of it
   await gotoApp(page);
   const id = await addShapeFillFromSvg(page);
   await chooseFont(page, "Ruqaa");
+  await openTypography(page);
   await page.getByLabel("Alternate letter shapes").check();
 
   const countFor = async (text: string) => {

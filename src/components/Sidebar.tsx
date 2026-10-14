@@ -24,7 +24,7 @@ import { STARTER_TEMPLATES } from "../lib/templates";
 import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
 import { CompositionButton } from "./CompositionDialog";
-import { FontPickerField } from "./FontPickerDialog";
+import { FontPanel } from "./sidebar/FontPanel";
 import { fontChoicesWith, type FontChoice } from "../lib/fontCatalog";
 import type { CompositionSelection } from "../lib/composition";
 import type { GuideAttachment, GuideParams, GuideShape, VerseLayout, VerseSettings } from "../types";
@@ -105,7 +105,6 @@ import { fillToCss, resolveFill, type BlockFill, type FillStop } from "../lib/bl
 import type { ArtboardSurface, TextureDef } from "../data/textures";
 // ---- /STREAM-F ----
 // ---- STREAM-G: font upload — imports ----
-import { FontUploadButton } from "./FontUploadDialog";
 import { PracticeSheetButton } from "./PracticeSheetDialog";
 import { describeFontKey, type CustomFont } from "../lib/customFonts";
 import { supportsGlyphAlternates, supportsStyleSets } from "../lib/blockCapabilities";
@@ -572,6 +571,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showText, setShowText] = useState(false);
   const [showEffects, setShowEffects] = useState(false);
   const [effectsTab, setEffectsTab] = useState<"outline" | "shadow">("outline");
+  const [showFont, setShowFont] = useState(true);
   const [showContent, setShowContent] = useState(true);
   const [showVerse, setShowVerse] = useState(true);
   const [showGuide, setShowGuide] = useState(true);
@@ -2049,6 +2049,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <SidebarTier label="selected" />
 
+        {/* Font comes first: picking a face is the decision everything else
+            in this tier is styled around. Hidden where the block has no font
+            of its own — a mirror draws its source, a guide is a path, and a
+            stacked composition is a bake nothing re-shapes. */}
+        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && selectedBlock.type !== "stack" && (
+          <FontPanel
+            id={makeId("font-family", selectedId)}
+            text={selectedText}
+            value={selectedBlock.fontFamily}
+            fonts={fontChoices}
+            missingFontKey={missingFontKey}
+            describeFontKey={describeFontKey}
+            customFonts={customFonts}
+            onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
+            onAddCustomFont={onAddCustomFont}
+            onRemoveCustomFont={onRemoveCustomFont}
+            isOpen={showFont}
+            onToggle={() => setShowFont((v) => !v)}
+          />
+        )}
+
         {/* A mirror has no content or typography of its own — both come from
             its source — so it hides these two panels. (STREAM-B edit outside its anchors; see the stream report.) */}
         {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && selectedBlock.type !== "stack" && (
@@ -2833,62 +2854,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </>
                   );
                 })()}
-                {/* A stacked composition is a bake — its pieces are outlines
-                    captured at conversion, and nothing re-shapes them — so the
-                    picker and the unavailable-font notice are hidden rather
-                    than left to set values nothing reads.
-
-                    The upload entry and the uploaded-font list below are
-                    deliberately *outside* this guard: they manage the browser's
-                    font store rather than this block, and they are the app's
-                    only surface for doing so. */}
-                {selectedBlock.type !== "stack" && (
-                <>
-                {/* ---- STREAM-G: font upload — unavailable-font notice ---- */}
-                {missingFontKey && (
-                  <div className="fontMissingNotice" role="status">
-                    Font '{describeFontKey(missingFontKey)}' isn't available in this
-                    browser — using Noto Sans. Upload the font file to get it back,
-                    or pick another font below.
-                  </div>
-                )}
-                {/* ---- /STREAM-G ---- */}
-                <FontPickerField
-                  id={makeId("font-family", selectedId)}
-                  label="Font family"
-                  value={selectedBlock.fontFamily}
-                  text={selectedText}
-                  fonts={fontChoices}
-                  onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
-                />
-                </>
-                )}
-
-                {/* ---- STREAM-G: font upload — upload entry + custom font list ---- */}
-                <div className="customFontRow">
-                  <FontUploadButton onAdd={onAddCustomFont} />
-                  {customFonts.length > 0 && (
-                    <ul className="customFontList">
-                      {customFonts.map((f) => (
-                        <li className="customFontItem" key={f.key} data-font-key={f.key}>
-                          <span className="customFontName" style={{ fontFamily: `'${f.key}'` }}>
-                            {f.label}
-                          </span>
-                          <button
-                            type="button"
-                            className="sidebarCircleButton"
-                            aria-label={`Remove uploaded font ${f.label}`}
-                            onClick={() => onRemoveCustomFont?.(f.key)}
-                          >
-                            <TrashIcon size={12} />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                {/* ---- /STREAM-G ---- */}
-
                 {selectedBlock.type === "textPath" && !selectedBlock.guide ? (
                   <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                     Letter size on a text-path block is set by the curve's length — drag the
