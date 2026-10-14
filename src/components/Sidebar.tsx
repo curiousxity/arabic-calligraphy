@@ -570,7 +570,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteExportPreset,
 }) => {
   const [showText, setShowText] = useState(false);
-  const [showTransform, setShowTransform] = useState(false);
   const [showEffects, setShowEffects] = useState(false);
   const [effectsTab, setEffectsTab] = useState<"outline" | "shadow">("outline");
   const [showContent, setShowContent] = useState(true);
@@ -2439,6 +2438,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onAddText={onAddTextToGuide}
                 onSelect={(id) => onSelectBlock(id)}
                 onToggleEdit={() => onUpdateSelectedBlock({ guideEditMode: !selectedBlock.guideEditMode })}
+                rotation={selectedRotation}
+                onRotation={(v) => onUpdateSelectedBlock({ rotation: v })}
               />
             </CollapsibleSection>
           </div>
@@ -3163,34 +3164,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
 
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {/* Attached text draws at its guide, so its own rotation is inert:
-            the guide's Transform is the one that turns it. */}
-        {selectedBlock && !(selectedBlock.type === "textPath" && selectedBlock.guide) && (
-          <div className="sidebarPanel">
-            <CollapsibleSection
-              title="Transform"
-              isOpen={showTransform}
-              onToggle={() => setShowTransform((v) => !v)}
-            >
-              <div className="sectionPanel">
-                <RangeRow
-                  id={makeId("rotation", selectedId)}
-                  name={makeId("rotation", selectedId)}
-                  label="Rotation"
-                  value={selectedRotation}
-                  min={-180}
-                  max={180}
-                  step={1}
-                  onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
-                  suffix={`${selectedRotation}°`}
-                  fieldKey="rotation"
-                />
-
+                {/* Attached text draws at its guide, so its own rotation is
+                    inert: the guide's Rotation row is the one that turns it. */}
+                {!(selectedBlock.type === "textPath" && selectedBlock.guide) && (
+                  <RangeRow
+                    id={makeId("rotation", selectedId)}
+                    name={makeId("rotation", selectedId)}
+                    label="Rotation"
+                    value={selectedRotation}
+                    min={-180}
+                    max={180}
+                    step={1}
+                    onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
+                    suffix={`${selectedRotation}°`}
+                    fieldKey="rotation"
+                  />
+                )}
               </div>
             </CollapsibleSection>
           </div>

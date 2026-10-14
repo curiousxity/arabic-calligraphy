@@ -17,7 +17,7 @@ panel title so it groups without competing):
 |---|---|
 | `document` | Start from a Template · Background & Grid · Project & Export |
 | `canvas` | Block Controls · Layers · Align & Arrange |
-| `selected` | Content · *type panel* · Typography · Transform · Effects |
+| `selected` | Content · *type panel* · Typography · Effects |
 
 Then Shortcuts, outside any tier. The point of the split is that every
 panel which appears and disappears with the selection sits in one
@@ -44,9 +44,10 @@ panel there:
   shape and curve blocks too, where a panel named "Text" sitting beside
   one named "Shape Fill" reads as two competing type panels.
 
-`Transform` is therefore left holding only rotation — the one transform
-every type shares. Anything type-specific that lands there belongs in the
-type panel instead.
+**Rotation has no panel of its own** (the Transform panel was folded away
+2026-10-14). It is the last row of Typography; Mirror and Guide hide
+Typography, so each carries its own Rotation row in its type panel. Attached
+Curve text has none, because the guide turns it.
 
 **The font family row is a button, not a dropdown** (since 2026-10-13).
 `FontPickerField` in `FontPickerDialog.tsx` shows the current font's name in

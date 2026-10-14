@@ -33,8 +33,8 @@ export const section: GuideSection = {
         Choose <strong>Add guide</strong> in <strong>Block Controls</strong>{" "}
         and pick a circle, ellipse, arc, wave, straight line, or a pen curve you
         draw yourself, then click where it should go. Its size is set in the{" "}
-        <strong>Guide</strong> panel. To angle a straight line, use{" "}
-        <strong>Transform</strong>.
+        <strong>Guide</strong> panel. To angle a straight line, use the{" "}
+        <strong>Rotation</strong> slider in the same panel.
       </p>
 
       <h4>Putting words on it</h4>

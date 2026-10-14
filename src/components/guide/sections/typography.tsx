@@ -109,10 +109,11 @@ export const section: GuideSection = {
         Double-clicking any slider in the sidebar resets it to its default.
       </p>
 
-      <h4>Transform and Effects</h4>
+      <h4>Rotation and Effects</h4>
       <p>
-        <strong>Transform</strong> holds rotation — the one control every block
-        type shares. <strong>Effects</strong> holds the outline (colour and
+        <strong>Rotation</strong> is the last slider in{" "}
+        <strong>Typography</strong> (Mirror and Guide have their own, in their
+        panels). <strong>Effects</strong> holds the outline (colour and
         width) and the shadow (colour, blur, horizontal and vertical offset,
         and opacity), on two tabs.
       </p>

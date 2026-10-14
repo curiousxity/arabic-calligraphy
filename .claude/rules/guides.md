@@ -118,7 +118,7 @@ owned by `App` (`writing`) and drawn by `CanvasStage`.
 - **The hit box reaches the font's full extent** (`guideInkBox`, ascender to
   descender). A freeform export crops to the client rect, so a box sized to one
   em would clip tall letters and stacked marks.
-- **Transform is hidden for attached text.** Its rotation comes from the guide.
+- **Rotation is hidden for attached text.** Its rotation comes from the guide.
 
 - **Hit areas.**
   - The guide's `Path` has `fillEnabled={false}`. Otherwise a closed guide
