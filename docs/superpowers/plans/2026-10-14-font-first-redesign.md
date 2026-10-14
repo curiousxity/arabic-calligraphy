@@ -25,11 +25,11 @@
 
 Inputs the spec implies but no task's tests would otherwise exercise. Each has a test pinned to the task that owns it.
 
-1. **An old save with a mirror whose source was an image block.** After the image filter the mirror is orphaned; `dropOrphanedMirrors` must remove it. Test in Task 6.
-2. **A saved block carrying `warpX: 40`.** Must load with the field gone and render straight, not throw. Test in Task 6.
+1. **An old save with a mirror whose source was an image block.** After the image filter the mirror is orphaned; `dropOrphanedMirrors` must remove it. Test in Task 5, Step 0 (composes the two passes).
+2. **A saved block carrying `warpX: 40`.** Must load with the field gone and render straight, not throw. Test in Task 4, Step 0.
 3. **Start screen with an empty text field.** Picking a card must create the block with the starter word, never an empty string. Test in Task 9 (unit) and Task 10 (e2e).
 4. **A block whose font is an uploaded family missing from this browser.** The strip has no card for it; the strip must still render and the missing-font notice must still show. Test in Task 8.
-5. **Compositions dialog opened on an old `framed` saved preference.** `CompositionLayoutId` narrows to two values; a stale `"framed"` must fall back to `"muthanna"`, not crash. Test in Task 5.
+5. **A fresh e2e context always has the start screen up.** Every existing spec must still reach the editor; `gotoApp` dismisses the overlay after the stage mounts. Test: the full `npm run e2e` run in Task 10.
 
 ---
 
@@ -287,6 +287,97 @@ git commit -m "Font gallery: extract the grid from the picker dialog"
 
 ---
 
+### Task 2b: Move the old-save sanitizer into a tested module
+
+**Files:**
+- Modify: `src/App.tsx:332-351` (`REMOVED_BLOCK_FIELDS`, `stripRemovedFields`), `src/App.tsx:1770-1775` (filter)
+- Create: `src/lib/legacySaves.ts`, `src/lib/legacySaves.test.ts`
+
+The filter and stripper currently live inline in `App.tsx`, which Vitest cannot import (it pulls in harfbuzz). Move them to a pure module **now, before any removal**, so Tasks 3, 4 and 5 each append their own type and fields with a test case in the same commit, and no commit leaves an old save loading blocks nothing renders. This task moves only what exists today.
+
+**Interfaces:**
+- Produces:
+  ```ts
+  export const REMOVED_BLOCK_TYPES: readonly string[];   // today: ["shapeWarp"]; Tasks 3 and 5 append "squareKufi", "image"
+  export const REMOVED_BLOCK_FIELDS: readonly string[];  // today's nine fields; Tasks 3, 4, 5 append theirs
+  export function sanitizeLegacyBlocks(blocks: unknown[]): Block[]; // drop removed types, strip removed fields
+  ```
+
+- [ ] **Step 1: Write the failing test**
+
+`src/lib/legacySaves.test.ts`:
+```ts
+import { describe, it, expect } from "vitest";
+import { sanitizeLegacyBlocks } from "./legacySaves";
+
+export const legacyText = { id: 1, type: "text", text: "حرف", fontFamily: "Amiri", fontSize: 72, color: "#000", x: 0, y: 0 };
+
+describe("sanitizeLegacyBlocks", () => {
+  it("drops shapeWarp blocks", () => {
+    const out = sanitizeLegacyBlocks([legacyText, { ...legacyText, id: 4, type: "shapeWarp" }]);
+    expect(out.map((b) => b.id)).toEqual([1]);
+  });
+
+  it("strips the Morph Glyph Editor and glyph-transform fields", () => {
+    const [out] = sanitizeLegacyBlocks([{ ...legacyText, glyphEdits: [], glyphTransforms: [] }]);
+    expect(out).toEqual(legacyText);
+  });
+});
+```
+(Tasks 3, 4 and 5 add their own `it` blocks to this file.)
+
+- [ ] **Step 2: Run, expect failure**
+
+Run: `npx vitest run src/lib/legacySaves.test.ts` — FAIL, module missing.
+
+- [ ] **Step 3: Create the module and call it from App**
+
+`src/lib/legacySaves.ts`:
+```ts
+import type { Block } from "../types";
+
+/**
+ * Block types that no longer exist. A save from before each removal can still
+ * carry them; nothing renders them, so they are dropped on load rather than
+ * left to occupy the layer list. See .claude/rules/removed-subsystems.md.
+ */
+export const REMOVED_BLOCK_TYPES = ["shapeWarp"] as const;
+
+/** Per-block fields of removed subsystems, stripped so old saves load byte-clean. */
+export const REMOVED_BLOCK_FIELDS = [
+  // Morph Glyph Editor, removed 2026-08-14.
+  "glyphEdits", "glyphRigValues", "glyphMaskEdit", "glyphEditTool", "selectedGlyphIndex", "kashidaAmount", "kashidaEditMode",
+  // Per-glyph move, scale & rotate, removed 2026-10-10.
+  "glyphTransforms", "glyphTransformMode",
+] as const;
+
+export function sanitizeLegacyBlocks(blocks: unknown[]): Block[] {
+  return blocks
+    .filter((b): b is Record<string, unknown> => !!b && typeof b === "object")
+    .filter((b) => !(REMOVED_BLOCK_TYPES as readonly string[]).includes(String(b.type)))
+    .map((b) => {
+      const next = { ...b };
+      for (const field of REMOVED_BLOCK_FIELDS) delete next[field];
+      return next as unknown as Block;
+    });
+}
+```
+In `App.tsx`: delete `REMOVED_BLOCK_FIELDS` and `stripRemovedFields` (≈325-351) and their comment; import `sanitizeLegacyBlocks`; replace the `.filter(...shapeWarp).map(stripRemovedFields)` chain (≈1771-1775) with `sanitizeLegacyBlocks(parsed.blocks as unknown[])`. Trim the long comment above it to one sentence pointing at `legacySaves.ts`.
+
+- [ ] **Step 4: Verify**
+
+Run: `npx vitest run src/lib/legacySaves.test.ts && npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test`
+Expected: green.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/lib/legacySaves.ts src/lib/legacySaves.test.ts src/App.tsx
+git commit -m "Old saves: drop removed block types and fields through one tested sanitizer"
+```
+
+---
+
 ### Task 3: Remove Square Kufi
 
 **Files:**
@@ -294,7 +385,22 @@ git commit -m "Font gallery: extract the grid from the picker dialog"
 - Modify: `src/types.ts:7, 49, 52, 344-388, 397`, `src/App.tsx:30, 150-158, 316-317, 903-925, 2186-2280, 3578-3580, 3701-3702`, `src/components/Sidebar.tsx:61-66, 271-281, 471, 583-585, 673-730, 1919-1935, 2558-2735, 3081, 3272-3284`, `src/components/CanvasStage.tsx:60, 62, 92, 102, 169-173, 311-312, 1110-1145`, `src/lib/blockRenderProps.ts:85-110`, `src/lib/blockCapabilities.ts:53-67` (+ test), `src/components/guide/sections/blocks.tsx:16, 72-80`, `src/components/guide/sections/typography.tsx` (any Square Kufi mention), `e2e/demos/record.spec.ts:193-198`, `.claude/rules/deferred-features.md:5, 41-47`, `src/lib/blockRenderProps.test.ts` (kufi case if any)
 
 **Interfaces:**
-- Produces: `Block` union without `SquareKufiBlock`; `applyParsedLayoutPayload` filter for `type === "squareKufi"` (tested in Task 6).
+- Consumes: `REMOVED_BLOCK_TYPES`, `REMOVED_BLOCK_FIELDS`, `sanitizeLegacyBlocks` from Task 2b.
+- Produces: `Block` union without `SquareKufiBlock`; old saves drop `squareKufi` blocks.
+
+- [ ] **Step 0: Write the failing save-file test**
+
+Append to `src/lib/legacySaves.test.ts`:
+```ts
+it("drops squareKufi blocks and strips kufi fields from survivors", () => {
+  const out = sanitizeLegacyBlocks([
+    { ...legacyText, kufiColumns: 3 },
+    { ...legacyText, id: 2, type: "squareKufi", kufiColumns: 4, kufiCellEdits: [] },
+  ]);
+  expect(out).toEqual([legacyText]);
+});
+```
+Run `npx vitest run src/lib/legacySaves.test.ts` — FAIL. Then in `legacySaves.ts` append `"squareKufi"` to `REMOVED_BLOCK_TYPES` and `// Square Kufi, removed 2026-10-14.` + `"kufiColumns", "kufiComposition", "kufiLineGap", "kufiWordGap", "kufiCellEdits", "kufiCellEditMode",` to `REMOVED_BLOCK_FIELDS`. Re-run — PASS.
 
 - [ ] **Step 1: Delete the files listed above**
 
@@ -345,25 +451,35 @@ git commit -m "Remove Square Kufi"
 **Interfaces:**
 - Produces: `RunStyle` without `warpX`; `runStyleForBlock(block, cutWidth)` no longer reads `warpX`; `styledRunWidth` sums shear + bold + outline + cuts.
 
-- [ ] **Step 1: Update the fit-to-width test first**
+- [ ] **Step 0: Write the failing save-file test**
 
-In `src/lib/fitToWidth.test.ts` delete the two warp tests (462-473) and remove `warpX: 50,` from the combined case (≈481), updating its expected sum accordingly. Add:
+Append to `src/lib/legacySaves.test.ts`:
 ```ts
-it("has no warp term: the four style terms sum alone", () => {
+it("strips warpX and warpY", () => {
+  const [out] = sanitizeLegacyBlocks([{ ...legacyText, warpX: 40, warpY: -10 }]);
+  expect(out).toEqual(legacyText);
+});
+```
+Run `npx vitest run src/lib/legacySaves.test.ts` — FAIL. Append `// Warp, removed 2026-10-14.` + `"warpX", "warpY",` to `REMOVED_BLOCK_FIELDS`. Re-run — PASS.
+
+- [ ] **Step 1: Make the fit-to-width solver red by removing `warpX` from `RunStyle`**
+
+In `fitToWidth.ts` delete `warpX?` from `RunStyle` (229-230) only. Run `npx tsc --noEmit -p tsconfig.app.json`: the two warp tests at `fitToWidth.test.ts:462-473` and the combined case (≈481) now fail to compile, as does `runStyleForBlock`. That is the red step.
+
+- [ ] **Step 2: Rewrite the tests**
+
+In `src/lib/fitToWidth.test.ts` delete the two warp tests (462-473) and remove `warpX: 50,` from the combined case (≈481), updating its expected sum. Add a characterisation of the remaining terms:
+```ts
+it("sums the four remaining style terms: shear, faux bold, outline, cuts", () => {
   const box = { width: 100, height: 40 };
   expect(styledRunWidth(box, 50, { italic: true, bold: true, strokeWidth: 2, cutWidth: 10 }))
     .toBeCloseTo(100 + 0.25 * 40 + Math.max(50 * 0.035, 0.6) + 2 + 10);
 });
 ```
 
-- [ ] **Step 2: Run it, expect a type error or failure**
-
-Run: `npx vitest run src/lib/fitToWidth.test.ts`
-Expected: the combined-case expectation fails (or tsc complains later). Proceed.
-
 - [ ] **Step 3: Remove warp from the solver**
 
-In `fitToWidth.ts` delete `WARP_X_SPREAD` and its comment (215-222), `warpX` from `RunStyle` (229-230), from `runStyleForBlock`'s parameter type and return (261, 268), the `warp` term and its two doc paragraphs in `styledRunWidth` (≈278-300). The return becomes `box.width + shear + bold + outline + cuts`.
+In `fitToWidth.ts` delete `WARP_X_SPREAD` and its comment (215-222), `warpX` from `runStyleForBlock`'s parameter type and return (261, 268), and the `warp` term with its two doc paragraphs in `styledRunWidth` (≈278-300). The return becomes `box.width + shear + bold + outline + cuts`.
 
 - [ ] **Step 4: Remove warp everywhere else**
 
@@ -410,6 +526,31 @@ Done together because a frame *is* an image block; splitting them leaves an inte
   export async function addShapeFillFromSvg(page: Page, at?: { fx: number; fy: number }): Promise<number>
   ```
 
+- [ ] **Step 0: Write the failing save-file tests**
+
+Append to `src/lib/legacySaves.test.ts` (add `import { dropOrphanedMirrors } from "./mirror";` at the top):
+```ts
+it("drops image blocks and strips image and ornament fields from survivors", () => {
+  const out = sanitizeLegacyBlocks([
+    { ...legacyText, ornamental: true, imageScale: 2 },
+    { ...legacyText, id: 2, type: "image", imageDataUrl: "data:," },
+  ]);
+  expect(out).toEqual([legacyText]);
+});
+
+it("a mirror of a removed image block is dropped by the orphan pass App runs next", () => {
+  const out = dropOrphanedMirrors(
+    sanitizeLegacyBlocks([
+      legacyText,
+      { ...legacyText, id: 2, type: "image", imageDataUrl: "data:," },
+      { ...legacyText, id: 3, type: "mirror", sourceId: 2, mirrorMode: "horizontal" },
+    ])
+  );
+  expect(out.map((b) => b.id)).toEqual([1]);
+});
+```
+Run — FAIL. Append `"image"` to `REMOVED_BLOCK_TYPES` and `// Image blocks and the ornament library, removed 2026-10-14.` + `"imageDataUrl", "imageScale", "ornamental",` to `REMOVED_BLOCK_FIELDS`. Re-run — PASS. (Check `dropOrphanedMirrors`'s mirror field names at `src/lib/mirror.ts:98` and match the fixture to them.)
+
 - [ ] **Step 1: Write the composition test for the narrowed layout list**
 
 In `src/lib/composition.test.ts` delete imports and cases for `frameBoxFor`, `frameOrnaments`, `framePadding`, `FRAME_TAG`, `DEFAULT_FRAME_ID`, `buildFrameBlock`, and the `"framed"` plan case. Add:
@@ -417,27 +558,18 @@ In `src/lib/composition.test.ts` delete imports and cases for `frameBoxFor`, `fr
 it("offers exactly muthanna and medallion", () => {
   expect(COMPOSITION_LAYOUTS.map((l) => l.id)).toEqual(["muthanna", "medallion"]);
 });
-
-it("normalises an unknown layout id (an old 'framed' preference) to muthanna", () => {
-  expect(normalizeCompositionLayout("framed")).toBe("muthanna");
-  expect(normalizeCompositionLayout("medallion")).toBe("medallion");
-});
 ```
-(`COMPOSITION_LAYOUTS` is the existing exported array at `composition.ts:≈40-60`; confirm the name when editing.)
+(`COMPOSITION_LAYOUTS` is the exported array at `composition.ts:41`.) The dialog's layout choice is plain `useState`, never persisted, so no normaliser for a stale `"framed"` value is needed.
 
 - [ ] **Step 2: Run, expect failure**
 
 Run: `npx vitest run src/lib/composition.test.ts`
-Expected: FAIL, `normalizeCompositionLayout` not exported.
+Expected: FAIL, three layouts.
 
 - [ ] **Step 3: Narrow compositions**
 
-In `composition.ts`: delete the `./ornaments` import (5-9); set `export type CompositionLayoutId = "muthanna" | "medallion";`; delete the `framed` entry from the layouts array (≈55-60); delete `framePadding`, `frameBoxFor`, `FRAME_TAG`, `DEFAULT_FRAME_ID`, `DEFAULT_FRAME_COLOR`, `frameOrnaments`, `buildFrameBlock` and the `case "framed"` branch; delete `frameId`/`frameColor` from the request type (188-189); change the "Nothing was added" message at 321 to `"Nothing was added."`. Add:
-```ts
-export const normalizeCompositionLayout = (id: string | undefined): CompositionLayoutId =>
-  id === "medallion" ? "medallion" : "muthanna";
-```
-In `CompositionDialog.tsx`: delete `frameOrnaments`, `DEFAULT_FRAME_ID`, `DEFAULT_FRAME_COLOR` imports and the `OrnamentDef` type import (7, 17); the `frameId`/`frameColor` state and `frames`/`frame` memo (58-63); pass only `{ layout, radialCount }` to `onApply` (79); the `frame`/`frameColor` props on the preview (142-143); the `layout === "framed"` block (177-199); `OrnamentFillSwatches`; and the `frame?: OrnamentDef` preview prop (227). Wrap the initial `layout` state in `normalizeCompositionLayout(...)`.
+In `composition.ts`: delete the `./ornaments` import (5-9); set `export type CompositionLayoutId = "muthanna" | "medallion";`; delete the `framed` entry from the layouts array (≈55-60); delete `framePadding`, `frameBoxFor`, `FRAME_TAG`, `DEFAULT_FRAME_ID`, `DEFAULT_FRAME_COLOR`, `frameOrnaments`, `buildFrameBlock` and the `case "framed"` branch; delete `frameId`/`frameColor` from the request type (188-189); change the "Nothing was added" message at 321 to `"Nothing was added."`.
+In `CompositionDialog.tsx`: delete `frameOrnaments`, `DEFAULT_FRAME_ID`, `DEFAULT_FRAME_COLOR` imports and the `OrnamentDef` type import (7, 17); the `frameId`/`frameColor` state and `frames`/`frame` memo (58-63); pass only `{ layout, radialCount }` to `onApply` (79); the `frame`/`frameColor` props on the preview (142-143); the `layout === "framed"` block (177-199); `OrnamentFillSwatches`; and the `frame?: OrnamentDef` preview prop (227).
 
 - [ ] **Step 4: Remove image blocks and ornaments**
 
@@ -507,119 +639,6 @@ Expected: green. `grep -rni "ornament\|imageDataUrl\|ImageBlock" src e2e` return
 ```bash
 git add -A
 git commit -m "Remove image blocks and the ornament & frame library"
-```
-
----
-
-### Task 6: Old saves load clean
-
-**Files:**
-- Modify: `src/App.tsx:332-351` (`REMOVED_BLOCK_FIELDS`, `stripRemovedFields`), `src/App.tsx:1770-1775` (filter)
-- Create: `src/lib/legacySaves.ts`, `src/lib/legacySaves.test.ts`
-
-The filter and stripper currently live inline in `App.tsx`, which Vitest cannot import (it pulls in harfbuzz). Move them to a pure module so they can be tested, and have `App.tsx` call it.
-
-**Interfaces:**
-- Produces:
-  ```ts
-  export const REMOVED_BLOCK_TYPES: readonly string[];   // ["shapeWarp", "squareKufi", "image"]
-  export const REMOVED_BLOCK_FIELDS: readonly string[];  // existing list + "warpX", "warpY", "ornamental", "imageDataUrl", "imageScale", "kufiColumns", "kufiComposition", "kufiLineGap", "kufiWordGap", "kufiCellEdits", "kufiCellEditMode"
-  export function sanitizeLegacyBlocks(blocks: unknown[]): Block[]; // drop removed types, strip removed fields
-  ```
-
-- [ ] **Step 1: Write the failing test**
-
-`src/lib/legacySaves.test.ts`:
-```ts
-import { describe, it, expect } from "vitest";
-import { sanitizeLegacyBlocks } from "./legacySaves";
-
-const text = { id: 1, type: "text", text: "حرف", fontFamily: "Amiri", fontSize: 72, color: "#000", x: 0, y: 0 };
-
-describe("sanitizeLegacyBlocks", () => {
-  it("drops squareKufi, image and shapeWarp blocks", () => {
-    const out = sanitizeLegacyBlocks([
-      text,
-      { ...text, id: 2, type: "squareKufi", kufiColumns: 4 },
-      { ...text, id: 3, type: "image", imageDataUrl: "data:," },
-      { ...text, id: 4, type: "shapeWarp" },
-    ]);
-    expect(out.map((b) => b.id)).toEqual([1]);
-  });
-
-  it("strips warp, ornamental and image fields from surviving blocks", () => {
-    const [out] = sanitizeLegacyBlocks([{ ...text, warpX: 40, warpY: -10, ornamental: true, imageScale: 2 }]);
-    expect(out).toEqual(text);
-  });
-
-  it("leaves a mirror whose source was an image for dropOrphanedMirrors to remove", () => {
-    // The sanitizer only knows types and fields; orphan removal is App's existing pass.
-    const out = sanitizeLegacyBlocks([
-      text,
-      { ...text, id: 2, type: "image", imageDataUrl: "data:," },
-      { ...text, id: 3, type: "mirror", sourceId: 2, mirrorMode: "horizontal" },
-    ]);
-    expect(out.map((b) => b.id)).toEqual([1, 3]);
-  });
-});
-```
-
-- [ ] **Step 2: Run, expect failure**
-
-Run: `npx vitest run src/lib/legacySaves.test.ts` — FAIL, module missing.
-
-- [ ] **Step 3: Create the module and call it from App**
-
-`src/lib/legacySaves.ts`:
-```ts
-import type { Block } from "../types";
-
-/**
- * Block types that no longer exist. A save from before each removal can still
- * carry them; nothing renders them, so they are dropped on load rather than
- * left to occupy the layer list. See .claude/rules/removed-subsystems.md.
- */
-export const REMOVED_BLOCK_TYPES = ["shapeWarp", "squareKufi", "image"] as const;
-
-/** Per-block fields of removed subsystems, stripped so old saves load byte-clean. */
-export const REMOVED_BLOCK_FIELDS = [
-  // Morph Glyph Editor, removed 2026-08-14.
-  "glyphEdits", "glyphRigValues", "glyphMaskEdit", "glyphEditTool", "selectedGlyphIndex", "kashidaAmount", "kashidaEditMode",
-  // Per-glyph move, scale & rotate, removed 2026-10-10.
-  "glyphTransforms", "glyphTransformMode",
-  // Warp, removed 2026-10-14.
-  "warpX", "warpY",
-  // Ornament library, removed 2026-10-14.
-  "ornamental",
-  // Image blocks, removed 2026-10-14 (fields could linger on a mirror copy).
-  "imageDataUrl", "imageScale",
-  // Square Kufi, removed 2026-10-14.
-  "kufiColumns", "kufiComposition", "kufiLineGap", "kufiWordGap", "kufiCellEdits", "kufiCellEditMode",
-] as const;
-
-export function sanitizeLegacyBlocks(blocks: unknown[]): Block[] {
-  return blocks
-    .filter((b): b is Record<string, unknown> => !!b && typeof b === "object")
-    .filter((b) => !(REMOVED_BLOCK_TYPES as readonly string[]).includes(String(b.type)))
-    .map((b) => {
-      const next = { ...b };
-      for (const field of REMOVED_BLOCK_FIELDS) delete next[field];
-      return next as unknown as Block;
-    });
-}
-```
-In `App.tsx`: delete `REMOVED_BLOCK_FIELDS` and `stripRemovedFields` (≈325-351) and their comment; import `sanitizeLegacyBlocks`; replace the `.filter(...shapeWarp).map(stripRemovedFields)` chain (≈1771-1775) with `sanitizeLegacyBlocks(parsed.blocks as unknown[])`. Trim the long comment above it to one sentence pointing at `legacySaves.ts`.
-
-- [ ] **Step 4: Verify**
-
-Run: `npx vitest run src/lib/legacySaves.test.ts && npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test`
-Expected: green.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/lib/legacySaves.ts src/lib/legacySaves.test.ts src/App.tsx
-git commit -m "Old saves: drop removed block types and fields through one tested sanitizer"
 ```
 
 ---
@@ -820,7 +839,9 @@ In `Sidebar.tsx`: add `const [showFont, setShowFont] = useState(true);`. Directl
 ```ts
 /** Opens the Font panel (first in the selected tier; open on boot, so this is usually a no-op). */
 export async function openFontPanel(page: Page): Promise<void> {
-  await openPanel(page, /^Font [−+]$/);
+  // CollapsibleSection renders the title span and the −/+ span with no
+  // whitespace between them, so the name may be "Font−" or "Font −".
+  await openPanel(page, /^Font\s?[−+]$/);
 }
 ```
 In `chooseFont` replace `await openTypography(page);` with `await openFontPanel(page);` and fix its doc comment. In `font-upload.spec.ts:19-22` `openFontPicker` → call `openFontPanel`. In `font-picker.spec.ts` `openPicker` → `openFontPanel`. Keep `openTypography` for the specs that still need Typography.
@@ -986,9 +1007,7 @@ git commit -m "Start screen component: a word in every face, pick one to begin"
 `e2e/start-screen.spec.ts`:
 ```ts
 import { test, expect, type Page } from "@playwright/test";
-import { getBlocks, inkPixels } from "./harf";
-
-const STAGE_CANVAS = ".konvajs-content canvas";
+import { getBlocks, inkPixels, STAGE_CANVAS } from "./harf";
 
 /** Loads the app without dismissing the start screen (gotoApp does dismiss it). */
 async function gotoFresh(page: Page): Promise<void> {
@@ -1070,20 +1089,26 @@ In `App.tsx`:
 
 - [ ] **Step 4: Teach gotoApp to dismiss it**
 
-`e2e/harf.ts:40-47`:
+`e2e/harf.ts:40-47`. Also change `const STAGE_CANVAS` to `export const STAGE_CANVAS` so `start-screen.spec.ts` imports it rather than redefining it.
 ```ts
 export async function gotoApp(page: Page): Promise<void> {
   await page.goto("/");
+  // Wait for the stage first: StartScreen and CanvasStage mount in the same
+  // React tree, so once the canvas exists the overlay is either present or
+  // never will be. Checking for Skip before this races React's first render
+  // and leaves the overlay intercepting every later click.
+  await page.locator(STAGE_CANVAS).first().waitFor();
   // A fresh browser context has no quick-save, so the start screen is up.
   // Every spec here wants the editor; start-screen.spec.ts loads its own way.
-  const skip = page.getByRole("button", { name: "Skip", exact: true });
-  if (await skip.isVisible().catch(() => false)) await skip.click();
-  await page.locator(STAGE_CANVAS).first().waitFor();
+  const start = page.getByTestId("start-screen");
+  if ((await start.count()) > 0) {
+    await page.getByRole("button", { name: "Skip", exact: true }).click();
+    await start.waitFor({ state: "detached" });
+  }
   await page.waitForFunction(() => !!window.__HARF__?.getStage());
   await expect.poll(() => inkPixels(page)).toBeGreaterThan(0);
 }
 ```
-If the overlay renders a frame after `goto` resolves, change the check to `await page.getByTestId("start-screen").waitFor({ timeout: 2000 }).catch(() => null)` before looking for Skip.
 
 - [ ] **Step 5: Verify the whole e2e suite**
 
@@ -1111,20 +1136,46 @@ Pure moves. Each new file receives exactly the JSX between its `<div className="
 
 For each: create the file with a `Props` type listing only what the JSX references; cut the JSX; render `<XPanel {...} />` in place. After each move run `npx tsc --noEmit -p tsconfig.app.json`.
 
-- [ ] **Step 2: Fix the Add grid**
-
-In `BlockControlsPanel.tsx` the Add grid is now five buttons (text, shape fill, curved text, guide, mirror). Change its CSS grid to five columns (`gridTemplateColumns: "repeat(5, minmax(0, 1fr))"`) and delete the "Add medallion" button and its demo entry (`BLOCK_DEMOS.medallion`, `public/demos/add-medallion.gif`, the recorder test). `e2e/mirror.spec.ts:15,153` clicks "Add medallion" (`ADD_RADIAL`) to create a radial mirror; rewrite that test to create the radial mirror through the Compositions dialog's medallion layout instead (see `e2e/composition.spec.ts` for how that dialog is driven), keeping the test's assertions about the resulting mirror block. `App.tsx`'s `addMirrorBlock("radial")` handler stays, since the composition builder calls it.
-
-- [ ] **Step 3: Verify**
+- [ ] **Step 2: Verify**
 
 Run: `npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm test && npm run build && npm run e2e`
-Expected: green. `wc -l src/components/Sidebar.tsx` well under 2000.
+Expected: green with no spec edited. `wc -l src/components/Sidebar.tsx` well under 2000.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add -A
-git commit -m "Sidebar: type, Typography and Effects panels in their own files; five Add buttons"
+git commit -m "Sidebar: type, Typography and Effects panels in their own files"
+```
+
+---
+
+### Task 11b: Five Add buttons; medallion lives in Compositions only
+
+Kept apart from Task 11 because it changes behaviour and a spec, where Task 11 must not.
+
+**Files:**
+- Modify: `src/components/sidebar/BlockControlsPanel.tsx` (Add grid), `e2e/mirror.spec.ts:15, 153`, `e2e/demos/record.spec.ts` ("add medallion" test)
+- Delete: `public/demos/add-medallion.gif`
+
+- [ ] **Step 1: Rewrite the mirror spec's radial case first**
+
+`e2e/mirror.spec.ts:153` creates a radial mirror through `ADD_RADIAL`. Rewrite that test to open the Compositions dialog and apply the medallion layout (see `e2e/composition.spec.ts` for how the dialog is driven), keeping every assertion about the resulting mirror block. Delete `ADD_RADIAL`. Run `npx playwright test e2e/mirror.spec.ts` — it must pass against the current UI before the button goes.
+
+- [ ] **Step 2: Remove the button**
+
+In `BlockControlsPanel.tsx` delete the "Add medallion" button and `BLOCK_DEMOS.medallion`; set the grid to `gridTemplateColumns: "repeat(5, minmax(0, 1fr))"` so text, shape fill, curved text, guide, mirror sit on one row. `git rm public/demos/add-medallion.gif`; delete the recorder test. `App.tsx`'s `addMirrorBlock("radial")` stays, since the composition builder calls it.
+
+- [ ] **Step 3: Browser pass by eye**
+
+`npm run dev`, open the app in a browser at 1440×900 and again with the sidebar dragged to its minimum width. Check: the start screen's cards and input lay out without horizontal overflow; after Skip, the Font panel is open with the active card scrolled into view and the strip scrolls horizontally without pushing the sidebar wider; the Add row is one line of five. Fix any `min-width` overflow found before committing.
+
+- [ ] **Step 4: Verify and commit**
+
+Run: `npx tsc --noEmit -p tsconfig.app.json && npx tsc --noEmit -p e2e/tsconfig.json && npm run lint && npm run build && npx playwright test e2e/mirror.spec.ts e2e/composition.spec.ts`
+```bash
+git add -A
+git commit -m "Add grid: five buttons; medallion is made from Compositions"
 ```
 
 ---
@@ -1178,6 +1229,6 @@ git commit -m "Docs: font-first redesign — removals recorded, sidebar and CLAU
 
 ## Self-review notes
 
-- Spec §1 start screen → Tasks 9, 10. §2 strip and catalogue → Tasks 1, 8. §3 removals and protocol → Tasks 3-6, 12. §4 sidebar → Tasks 7, 11. §5 testing → each task's verify step, plus `npm run e2e` in Tasks 10 and 11.
-- The spec said `chooseFont` is unchanged; it changes one line (opens the Font panel instead of Typography). The spec's claim that `styles.spec.ts` has a Square Kufi case was wrong: its "Kufi" is the Janna font key, and it stays.
-- Review Focus items: 1 and 2 → Task 6 tests; 3 → Task 9 unit + Task 10 e2e; 4 → Task 8 second e2e; 5 → Task 5 `normalizeCompositionLayout` test.
+- Spec §1 start screen → Tasks 9, 10. §2 strip and catalogue → Tasks 1, 8. §3 removals and protocol → Tasks 2b, 3-5, 12. §4 sidebar → Tasks 7, 11, 11b. §5 testing → each task's verify step, `npm run e2e` in Tasks 10 and 11, the by-eye pass in Task 11b.
+- The spec said `chooseFont` is unchanged; it changes one line (opens the Font panel instead of Typography). The spec's claim that `styles.spec.ts` has a Square Kufi case was wrong: its "Kufi" is the Janna font key, and it stays. The spec's order of work put the save-file filter after the removals; the plan moves it first (Task 2b) so no commit loads unrenderable blocks.
+- Review Focus items: 1 → Task 5 Step 0; 2 → Task 4 Step 0; 3 → Task 9 unit + Task 10 e2e; 4 → Task 8 second e2e; 5 → Task 10 full e2e run.
