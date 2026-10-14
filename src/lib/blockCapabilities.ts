@@ -65,3 +65,6 @@ export const supportsStyleSets = (
 export const supportsKufiCellEdits = (
   b: Block
 ): b is Extract<Block, { type: "squareKufi" }> => b.type === "squareKufi";
+
+export const isStackBlock = (b: Block): b is Extract<Block, { type: "stack" }> =>
+  b.type === "stack";

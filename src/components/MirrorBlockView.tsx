@@ -141,6 +141,8 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
     if (source.type === "textPath") {
       return <TextOnPathText {...common} {...textPathProps(source)} guidePath={sourceGuideD !== undefined ? { d: sourceGuideD, closed: sourceGuideClosed } : undefined} />;
     }
+    // No stack renderer yet (a later task adds it and `stackProps` goes here).
+    if (source.type === "stack") return null;
     return <ShapedText {...common} {...shapedTextProps(source)} />;
   }, [source, sourceGuideD, sourceGuideClosed]);
 

@@ -5,7 +5,8 @@ export type BlockType =
   | "textPath"
   | "mirror"
   | "squareKufi"
-  | "guide";
+  | "guide"
+  | "stack";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 
@@ -46,6 +47,8 @@ export type { KufiCellEdit, KufiComposition } from "./lib/squareKufi";
 import type { StrokeCut } from "./lib/strokeCuts";
 import type { KufiCellEdit, KufiComposition } from "./lib/squareKufi";
 import type { BlockFill } from "./lib/blockFill";
+import type { SvgCmd } from "./lib/svgPath";
+import type { Pt } from "./lib/strokeCuts";
 // ---- /STREAM-F ----
 
 type BlockCommon = {
@@ -224,6 +227,57 @@ export type GuideBlock = BlockCommon & {
   guideEditMode?: boolean;
 };
 
+/** The two outline points on a cut line and the stroke's outward direction
+ *  there (radians, pointing away from the piece), piece-local font units. */
+export type CutFace = { a: Pt; b: Pt; tangent: number };
+
+export type StackPiece = {
+  id: string;
+  /** Closed contours, piece-local font units, cut faces closed by a straight
+   *  bridge edge between `face.a` and `face.b`. */
+  cmds: SvgCmd[];
+  /** Placement relative to the block origin, font units. */
+  x: number;
+  y: number;
+  /** Radians, about `pivot`. */
+  rotation: number;
+  /** Piece-local point the rotation turns about — the outline centre when
+   *  the piece was made. Stored, not derived: a later split would move it. */
+  pivot: Pt;
+  /** Where "Reset layout" returns the piece to. */
+  homeX: number;
+  homeY: number;
+  /** Reading order; a drag carries every piece with a greater order. */
+  order: number;
+  role: "letter" | "mark";
+  /** Marks: the letter they ride with. */
+  parentId?: string;
+  faces: CutFace[];
+};
+
+export type StackJoin = {
+  id: string;
+  from: { pieceId: string; faceIndex: number };
+  to: { pieceId: string; faceIndex: number };
+  /** Scales the curve's handles: 0 is the tangent-matched default. */
+  bow: number;
+  /** Made from an inserted tatweel rather than a cut in the letter. */
+  fallback?: true;
+};
+
+/** A text block baked into movable letter pieces joined by synthesised
+ *  curves. One-way; the spelling cannot be edited. */
+export type StackBlock = BlockCommon & {
+  type: "stack";
+  source: { text: string; fontFamily: string };
+  unitsPerEm: number;
+  nib: { width: number; minFraction: number };
+  pieces: StackPiece[];
+  joins: StackJoin[];
+  /** Arms the split handles on cuttable strokes. */
+  stackTailMode?: boolean;
+};
+
 export type GuideAttachment = {
   /** The guide block's id. */
   id: number;
@@ -325,4 +379,5 @@ export type Block =
   | TextPathBlock
   | MirrorBlock
   | SquareKufiBlock
-  | GuideBlock;
+  | GuideBlock
+  | StackBlock;

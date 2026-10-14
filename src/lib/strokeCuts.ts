@@ -496,7 +496,7 @@ export type ResolvedCut = {
 };
 
 /** Split a cubic at t, returning [left, right] control points. */
-function splitCubic(
+export function splitCubic(
   p0: Pt, p1: Pt, p2: Pt, p3: Pt, t: number
 ): [[Pt, Pt, Pt, Pt], [Pt, Pt, Pt, Pt]] {
   const lerp = (a: Pt, b: Pt): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
@@ -507,7 +507,7 @@ function splitCubic(
 }
 
 /** Split a quadratic at t, returning [left, right] control points. */
-function splitQuad(p0: Pt, p1: Pt, p2: Pt, t: number): [[Pt, Pt, Pt], [Pt, Pt, Pt]] {
+export function splitQuad(p0: Pt, p1: Pt, p2: Pt, t: number): [[Pt, Pt, Pt], [Pt, Pt, Pt]] {
   const lerp = (a: Pt, b: Pt): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   const a = lerp(p0, p1), b = lerp(p1, p2);
   const c = lerp(a, b);
@@ -517,7 +517,7 @@ function splitQuad(p0: Pt, p1: Pt, p2: Pt, t: number): [[Pt, Pt, Pt], [Pt, Pt, P
 /** Bisect for the parameter where a curve crosses x=cutX. Monotone x is
  *  assumed, which validity guarantees: a legal crossing runs along the
  *  stroke rather than doubling back across it. */
-function tAtX(cutX: number, at: (t: number) => number): number {
+export function tAtX(cutX: number, at: (t: number) => number): number {
   let lo = 0, hi = 1;
   const rising = at(1) >= at(0);
   for (let i = 0; i < 40; i++) {
