@@ -17,8 +17,10 @@ export const section: GuideSection = {
         That bakes the letters into pieces you can move. Drag a letter and the letters
         after it come along; hold <kbd>Alt</kbd> to move one by itself. Hover a letter for
         its tilt handle. The strokes between letters are redrawn as curves as you go, with
-        the pen's own thick-and-thin; drag the orange handle on a curve to bend it, and
-        double-click it to straighten it again.
+        the pen's own thick-and-thin. Drag the orange handle on a curve to bend it: it
+        follows the pointer as far as the curve can go, swinging an S or rounding out a
+        U-turn. Double-click it to go back to the natural curve, the one that leaves and
+        arrives along the strokes it joins.
       </p>
       <h4>Tails</h4>
       <p>
