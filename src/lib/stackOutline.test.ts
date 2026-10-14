@@ -81,3 +81,12 @@ describe("rebasePiece", () => {
     expect(q.pivot).toEqual(cmdsCentre(r.far));
   });
 });
+
+import { stackScale } from "./stackOutline";
+describe("stackScale", () => {
+  it("falls back to 1000 units per em when the block has none", () => {
+    expect(stackScale(50, undefined)).toBeCloseTo(0.05, 12);
+    expect(stackScale(50, 0)).toBeCloseTo(0.05, 12);
+    expect(stackScale(50, 2048)).toBeCloseTo(50 / 2048, 12);
+  });
+});
