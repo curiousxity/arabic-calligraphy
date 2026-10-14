@@ -21,7 +21,6 @@ const SLIDER_DEFAULTS: Record<string, number> = {
   shapeFillScaleY: 1,
   shapeFillTextRotation: 0,
   shapeScale: 1,
-  imageScale: 1,
 };
 
 export const SelectRow = ({

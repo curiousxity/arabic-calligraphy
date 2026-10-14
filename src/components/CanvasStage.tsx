@@ -1322,6 +1322,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
             {ghostBlock && (
               <Group
+                name="placement-ghost"
                 x={ghostBlock.x - ghostBlock.width / 2}
                 y={ghostBlock.y - ghostBlock.height / 2}
                 listening={false}

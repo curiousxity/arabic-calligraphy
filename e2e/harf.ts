@@ -264,6 +264,10 @@ export async function chooseFont(
  * The Add button opens a native file chooser; Playwright intercepts it, so no
  * dialog is shown. The circle is drawn with curves — SVG `A` commands don't
  * survive the shape-fill importer.
+ *
+ * The file is read asynchronously after `setFiles` resolves, so the helper
+ * waits for the placement ghost to mount before clicking; a click that lands
+ * first would commit nothing.
  */
 export async function addShapeFillFromSvg(
   page: Page,
@@ -273,6 +277,7 @@ export async function addShapeFillFromSvg(
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: "Add shape fill" }).click();
   await (await chooser).setFiles(path.join(FIXTURES, "circle.svg"));
+  await expect.poll(() => namedNodeCount(page, "placement-ghost")).toBeGreaterThan(0);
   await placeAtCanvas(page, at.fx, at.fy);
 
   await expect

@@ -128,7 +128,6 @@ describe("buildComposition", () => {
       { source: block, layout: "muthanna", run },
       ids()
     );
-    expect(plan.placement).toBe("front");
     expect(plan.added).toHaveLength(1);
     const mirror = plan.added[0];
     expect(mirror.type).toBe("mirror");

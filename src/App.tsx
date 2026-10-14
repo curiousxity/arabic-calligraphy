@@ -2836,11 +2836,8 @@ const App: React.FC = () => {
       // The block was deleted while we were measuring; there is nothing to
       // build the composition around any more.
       if (index < 0) return prev;
-      // Blocks render in array order: a plan placed behind is spliced before
-      // the source; a reflection is a peer and goes on top.
-      return plan.placement === "behind"
-        ? [...prev.slice(0, index), ...plan.added, ...prev.slice(index)]
-        : [...prev, ...plan.added];
+      // A reflection is a peer and goes on top, where every new block goes.
+      return [...prev, ...plan.added];
     });
     setExportStatus(describeComposition(plan));
   };

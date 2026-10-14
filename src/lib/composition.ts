@@ -144,12 +144,6 @@ export type CompositionPlan = {
   layout: CompositionLayoutId;
   /** Companion blocks to insert, in order. */
   added: Block[];
-  /**
-   * Where `added` belongs in z-order relative to the source. A reflection is
-   * a peer and goes `front`, where every other newly created block goes;
-   * `behind` is the slot for a companion that must not cover the name.
-   */
-  placement: "behind" | "front";
 };
 
 /**
@@ -176,7 +170,7 @@ export function buildComposition(
         ...buildMirrorBlock(nextId(), source, "mirrorX", muthannaOffset(run)),
         name: "Muthanna",
       };
-      return { layout, added: [mirror], placement: "front" };
+      return { layout, added: [mirror] };
     }
 
     case "medallion": {
@@ -189,7 +183,7 @@ export function buildComposition(
         radialRadius: medallionRadius(run, count),
         name: "Medallion",
       };
-      return { layout, added: [mirror], placement: "front" };
+      return { layout, added: [mirror] };
     }
   }
 }

@@ -218,26 +218,22 @@ const LayoutPreview: React.FC<LayoutPreviewProps> = ({
     );
   }
 
-  if (layout === "medallion") {
-    // The canvas's own clamp, so the preview and the block it creates can
-    // never disagree about how many copies a ring has.
-    const count = resolveRadialCount(radialCount);
-    return (
-      <span className="namePreview">
-        {Array.from({ length: count }, (_, i) => (
-          <span
-            key={i}
-            className="namePreviewSpoke"
-            style={{ transform: `rotate(${(i * 360) / count}deg) translateX(${PREVIEW_RADIUS}px)` }}
-          >
-            {sample}
-          </span>
-        ))}
-      </span>
-    );
-  }
-
-  return <span className="namePreview">{sample}</span>;
+  // Medallion. The canvas's own clamp, so the preview and the block it
+  // creates can never disagree about how many copies a ring has.
+  const count = resolveRadialCount(radialCount);
+  return (
+    <span className="namePreview">
+      {Array.from({ length: count }, (_, i) => (
+        <span
+          key={i}
+          className="namePreviewSpoke"
+          style={{ transform: `rotate(${(i * 360) / count}deg) translateX(${PREVIEW_RADIUS}px)` }}
+        >
+          {sample}
+        </span>
+      ))}
+    </span>
+  );
 };
 
 export type CompositionButtonProps = Omit<CompositionDialogProps, "onClose">;
