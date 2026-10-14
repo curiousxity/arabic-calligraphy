@@ -19,7 +19,8 @@ export const GuideView: React.FC<{
   draggable: boolean;
   onClick?: () => void;
   onTap?: () => void;
-  onDblClick?: () => void;
+  onDblClick?: (e: Konva.KonvaEventObject<MouseEvent>) => void;
+  onDblTap?: (e: Konva.KonvaEventObject<TouchEvent>) => void;
   onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
 }> = ({ id, x, y, rotation = 0, d, stageScale, selected, ...handlers }) => (

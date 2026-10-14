@@ -273,7 +273,7 @@ export function curveGlyphPlacements(args: {
  * Fill diacritic adapter makes.
  */
 export function curvePlacementToGroup(
-  placement: CurveGlyphPlacement,
+  placement: Pick<CurveGlyphPlacement, "x" | "y" | "angle">,
   local: { x: number; y: number },
   baselineOffset: number
 ): { x: number; y: number } {

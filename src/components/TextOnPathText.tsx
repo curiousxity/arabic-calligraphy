@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { Group, Shape, Rect } from "react-konva";
+import { Group, Shape, Rect, Line } from "react-konva";
 import type Konva from "konva";
 import { parseSvgPath, replayPath } from "../lib/svgPath";
 import {
@@ -17,7 +17,8 @@ import {
   type LetterAlternates,
 } from "../lib/glyphAlternates";
 import type { GlyphAlternate, GuideAttachment } from "../types";
-import { guideGlyphPlacements, guideInkBox } from "../lib/guidePlacement";
+import { guideCaret, guideGlyphPlacements, guideInkBox, type GuideLayout } from "../lib/guidePlacement";
+import { EXPORT_HIDDEN } from "../lib/exportChrome";
 import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
 
 export type TextOnPathTextProps = {
@@ -52,6 +53,8 @@ export type TextOnPathTextProps = {
   guideAttachment?: GuideAttachment;
   /** Renderer feedback for the panel's shrink note; never saved. */
   onGuideLayout?: (info: { shrink: number }) => void;
+  /** Draws a typing caret at the run's reading end (attached text only). */
+  caret?: boolean;
   /** Block-level OpenType style sets, e.g. ["ss01"]. */
   styleSets?: string[];
   /** Per-letter alternates (Next Shape). */
@@ -107,6 +110,7 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   guidePath,
   guideAttachment,
   onGuideLayout,
+  caret = false,
   styleSets,
   glyphAlternates = NO_GLYPH_ALTERNATES,
   glyphAlternateMode = false,
@@ -219,10 +223,33 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   // letters' extent, not the whole guide's box: a circle guide's box would
   // otherwise swallow every click inside the medallion.
   const hitBox = useMemo(() => {
-    if (!attached || !layout || !font || layout.placements.length === 0) return curveBox;
+    if (!attached) return curveBox;
+    // Nothing drawn yet (being typed, or still shaping): no hit area at all,
+    // or a closed guide's box would claim the whole medallion.
+    if (!layout || !font || layout.placements.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
     const extentEm = (font.ascender - font.descender) / Math.max(unitsPerEm || 1000, 1);
     return guideInkBox(layout.placements, layout.placements[0].size, extentEm, baselineOffset);
   }, [attached, layout, font, unitsPerEm, curveBox, baselineOffset]);
+  // The caret, in group space: a line from the baseline up the font's ascent,
+  // tilted to the tangent where the next letter will go.
+  const caretPoints = useMemo(() => {
+    if (!caret || !attached || !font || !hbLoaded || parsedCmds.length < 2) return null;
+    const c = guideCaret({
+      glyphs,
+      // The attached branch above is what produced it, so this is a GuideLayout.
+      layout: layout as GuideLayout | null,
+      fontSize,
+      unitsPerEm,
+      ascender: font.ascender,
+      arcTable,
+      closed: guideClosed,
+      attachment: attached,
+    });
+    const ascent = (font.ascender * c.size) / Math.max(unitsPerEm || 1000, 1);
+    const a = curvePlacementToGroup(c, { x: 0, y: 0 }, c.baselineOffset);
+    const b = curvePlacementToGroup(c, { x: 0, y: -ascent }, c.baselineOffset);
+    return [a.x, a.y, b.x, b.y];
+  }, [caret, attached, font, hbLoaded, parsedCmds.length, glyphs, layout, fontSize, unitsPerEm, arcTable, guideClosed]);
   const pad = attached ? 0 : Math.max(fontSize, 24);
   const hitX = hitBox.x - pad;
   const hitY = hitBox.y - pad;
@@ -319,6 +346,17 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
           }
         }}
       />
+
+      {caretPoints && (
+        <Line
+          name={EXPORT_HIDDEN}
+          points={caretPoints}
+          stroke="#d4af37"
+          strokeWidth={2}
+          lineCap="round"
+          listening={false}
+        />
+      )}
 
       <AlternateHoverHandles
         isSelected={isSelected}

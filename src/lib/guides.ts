@@ -1,4 +1,4 @@
-import type { Block, GuideBlock, TextBlock, TextPathBlock } from "../types";
+import type { Block, GuideAttachment, GuideBlock, TextBlock, TextPathBlock } from "../types";
 import { DEFAULT_ATTACHMENT } from "./guidePlacement";
 import { isClosedPath } from "./guideShapes";
 import { parseSvgPath } from "./svgPath";
@@ -12,6 +12,24 @@ import { parseSvgPath } from "./svgPath";
 /** Ascent used when baking a hang offset without font metrics (see guides.md). */
 export const DETACH_ASCENT = 0.8;
 export const ATTACHED_TEXT_DEFAULT = "نص على الدليل";
+
+/** The font size a text written on a guide opens with when no text block exists to copy. */
+export const ATTACHED_TEXT_FONT_SIZE = 53;
+
+/**
+ * Typing on a guide. Opened by a double-click on a guide or a key pressed
+ * with one selected; the text block is created by the first letter, so an
+ * abandoned session leaves nothing behind. Until then `textId` is null and
+ * the caret is drawn at `attachment` on the guide. See .claude/rules/guides.md.
+ */
+export type WritingSession = {
+  guideId: number;
+  textId: number | null;
+  /** Where a new run grows from. */
+  attachment: Omit<GuideAttachment, "id">;
+  /** The size the new text will open with, for the pre-text caret. */
+  fontSize: number;
+};
 
 /** A shallow copy of `obj` without `keys` — removes them, which a spread patch cannot. */
 function omit<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Omit<T, K> {
@@ -106,7 +124,7 @@ export function attachTextToGuide(
 export function newAttachedText(id: number, guide: GuideBlock, style: Partial<Block>): TextPathBlock {
   return {
     text: ATTACHED_TEXT_DEFAULT,
-    fontSize: 53,
+    fontSize: ATTACHED_TEXT_FONT_SIZE,
     color: "#1e3a5f",
     fontFamily: "FatemiMaqala",
     stroke: "#000000",

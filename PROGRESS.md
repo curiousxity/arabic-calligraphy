@@ -93,6 +93,14 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-14 — Writing on a guide
+
+Type with a guide selected, or double-click a point on it, and the letters
+appear along the guide as you type, with a caret at the reading end. The
+block is created by the first letter, so leaving before typing adds nothing.
+Double-click words on a guide to keep writing them. Add text to guide and the
+sidebar still work as before. Details in [guides.md](.claude/rules/guides.md).
+
 ### 2026-10-14 — Free movement of tashkeel and dots
 
 Tashkeel drag in two dimensions (Shift for the old vertical rail). A

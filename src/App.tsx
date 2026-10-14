@@ -54,7 +54,10 @@ import {
   newAttachedText,
   reorderDetachingGuides,
   syncAttachedToGuides,
+  ATTACHED_TEXT_FONT_SIZE,
+  type WritingSession,
 } from "./lib/guides";
+import { DEFAULT_ATTACHMENT } from "./lib/guidePlacement";
 import type { GuideAttachment, GuideBlock, GuideParams, GuideShape } from "./types";
 import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
@@ -1099,6 +1102,63 @@ const App: React.FC = () => {
     setSelectedIds([]);
   }, [effectiveSelectedIds, blocks, pushHistory]);
 
+  // Writing on a guide (see guides.md). The text block is created by the
+  // first letter, not by opening the session, so Escape before typing leaves
+  // no block and no undo entry.
+  const [writing, setWriting] = useState<WritingSession | null>(null);
+
+  /** The style a text written on a guide opens with: the first text block's, like Add text to guide. */
+  const writtenTextStyle = useCallback((): Partial<Block> => {
+    const styleSource = blocks.find((b) => b.type === "text");
+    return styleSource ? styleToPatch(captureStyle(styleSource, "guide")) : {};
+  }, [blocks]);
+
+  /** Creates the attached text a session writes into, with its first letters; selects it. */
+  const createWrittenText = useCallback(
+    (session: WritingSession, text: string): number | null => {
+      const guide = blocks.find((b): b is GuideBlock => b.type === "guide" && b.id === session.guideId);
+      if (!guide) return null;
+      const id = nextIdRef.current++;
+      pushHistory();
+      const block: Block = {
+        ...newAttachedText(id, guide, writtenTextStyle()),
+        text,
+        guide: { id: guide.id, ...session.attachment },
+      };
+      setBlocks((prev) => [...prev, block]);
+      setSelectedIds([]);
+      setSelectedId(id);
+      return id;
+    },
+    [blocks, pushHistory, writtenTextStyle]
+  );
+
+  /**
+   * Opens writing on a guide. A double-click passes where it landed, and the
+   * run is anchored at its reading start there so typed letters stay put;
+   * a key press on a selected guide passes null and takes the default place.
+   * `seed` is that first key, which creates the block at once.
+   */
+  const beginWritingOnGuide = useCallback(
+    (guideId: number, offset: number | null, seed = "") => {
+      if (!blocks.some((b) => b.type === "guide" && b.id === guideId)) return;
+      const attachment =
+        offset === null ? { ...DEFAULT_ATTACHMENT } : { ...DEFAULT_ATTACHMENT, offset, align: "start" as const };
+      const fontSize = (writtenTextStyle().fontSize as number | undefined) ?? ATTACHED_TEXT_FONT_SIZE;
+      const session: WritingSession = { guideId, textId: null, attachment, fontSize };
+      if (seed) {
+        const id = createWrittenText(session, seed);
+        if (id === null) return;
+        setWriting({ ...session, textId: id });
+        return;
+      }
+      setSelectedIds([]);
+      setSelectedId(guideId);
+      setWriting(session);
+    },
+    [blocks, writtenTextStyle, createWrittenText]
+  );
+
   useEffect(() => {
     if (!isBrowser) return;
     const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
@@ -1147,6 +1207,13 @@ const App: React.FC = () => {
         return;
       }
 
+      // A printable key on a selected guide starts writing on it.
+      if (!typing && !e.altKey && e.key.length === 1 && selectedBlock?.type === "guide" && !writing) {
+        e.preventDefault();
+        beginWritingOnGuide(selectedBlock.id, null, e.key);
+        return;
+      }
+
       if ((e.key === "Delete" || e.key === "Backspace") && !typing) {
         if (effectiveSelectedIds.length > 0) {
           e.preventDefault();
@@ -1186,6 +1253,8 @@ const App: React.FC = () => {
     updateBlockPositionWithHistory,
     pushHistory,
     deleteSelectedBlock,
+    writing,
+    beginWritingOnGuide,
   ]);
 
   const createNextId = () => {
@@ -1246,6 +1315,58 @@ const App: React.FC = () => {
     },
     [pushHistory]
   );
+
+  /** Every change of the writing field: the first letters create the block, later ones update it. */
+  const writeText = useCallback(
+    (text: string) => {
+      if (!writing) return;
+      if (writing.textId !== null) {
+        updateBlock(writing.textId, { text });
+        return;
+      }
+      if (!text) return;
+      const id = createWrittenText(writing, text);
+      setWriting(id === null ? null : { ...writing, textId: id });
+    },
+    [writing, updateBlock, createWrittenText]
+  );
+
+  /** Double-click on attached text: keep writing it where it is. */
+  const beginWritingText = useCallback(
+    (textId: number) => {
+      const block = blocks.find((b) => b.id === textId);
+      if (block?.type !== "textPath" || !block.guide) return;
+      const { id: guideId, ...attachment } = block.guide;
+      setSelectedIds([]);
+      setSelectedId(textId);
+      setWriting({ guideId, textId, attachment, fontSize: block.fontSize });
+    },
+    [blocks]
+  );
+
+  /** Ends writing. A text emptied by the user is removed; the guide is selected in its place. */
+  const endWriting = useCallback(() => {
+    if (!writing) return;
+    if (writing.textId !== null) {
+      const block = blocks.find((b) => b.id === writing.textId);
+      if (block && block.text === "") {
+        pushHistory();
+        setBlocks((prev) => prev.filter((b) => b.id !== writing.textId));
+        setSelectedIds([]);
+        setSelectedId(writing.guideId);
+      }
+    }
+    setWriting(null);
+  }, [writing, blocks, pushHistory]);
+
+  // A session whose block or guide is gone (undo, a delete from Layers, a
+  // load) closes on its own. Derived, like the orphan passes: no history.
+  useEffect(() => {
+    if (!writing) return;
+    const guideGone = !blocks.some((b) => b.type === "guide" && b.id === writing.guideId);
+    const textGone = writing.textId !== null && !blocks.some((b) => b.id === writing.textId);
+    if (guideGone || textGone) setWriting(null);
+  }, [writing, blocks]);
 
   const resizeShapeFillBlock = useCallback(
     (id: number, scale: number) => {
@@ -3570,6 +3691,11 @@ const App: React.FC = () => {
           onUpdateGuideD={updateGuideD}
           onGuideLayout={reportGuideLayout}
           onSlideAlongGuide={slideAlongGuide}
+          writing={writing}
+          onBeginWritingOnGuide={beginWritingOnGuide}
+          onBeginWritingText={beginWritingText}
+          onWriteText={writeText}
+          onEndWriting={endWriting}
           onBeginTextPathEdit={pushHistory}
           onBeginKufiCellEdit={pushHistory}
           onSetKufiCell={setKufiCell}
