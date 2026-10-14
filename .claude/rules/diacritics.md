@@ -129,6 +129,13 @@ overlay in this app. Live handle drags follow the same debounced-history
 pattern (`useDebouncedHistoryPush`) block dragging already established;
 the hide-button click is a discrete, immediate `pushHistory()` mutation.
 
+**The move handle drags freely; Shift holds the old vertical rail.**
+`offsetX` joined `offsetY` on 2026-10-14. The rail is captured only when
+Shift is down at drag start, so a plain drag writes both offsets. Every
+consumer that reads `offsetY` reads `offsetX` (both renderers, the overlay,
+`stackConvert`). A letter's dots are not diacritics and are not handled
+here — see [detached-marks.md](detached-marks.md).
+
 This feature covers plain text and Shape Fill blocks.
 `DiacriticHoverHandles.tsx` takes a list of `DiacriticPlacement`s
 (`src/lib/diacriticPlacement.ts`) rather than raw hit boxes — each carries
