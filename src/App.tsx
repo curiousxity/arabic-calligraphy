@@ -31,6 +31,7 @@ import {
   supportsGlyphAlternates,
   supportsStrokeCuts,
   supportsStyleSets,
+  isStackBlock,
 } from "./lib/blockCapabilities";
 import { useGlyphAlternates, useStyleSets } from "./hooks/useGlyphAlternates";
 import {
@@ -1898,6 +1899,15 @@ const App: React.FC = () => {
     updateSelectedBlock({ guideParams: next, guideD: guidePathD(selectedBlock.guideShape, next) });
   };
 
+  /** Stack layout back to its home arrangement. updateSelectedBlock pushes the one history step. */
+  const resetStackLayout = () => {
+    if (!selectedBlock || !isStackBlock(selectedBlock)) return;
+    updateSelectedBlock({
+      pieces: selectedBlock.pieces.map((p) => ({ ...p, x: p.homeX, y: p.homeY, rotation: 0 })),
+      joins: selectedBlock.joins.map((j) => ({ ...j, bow: 0 })),
+    });
+  };
+
   /** Pen-guide point edits; the overlay's onBeginChange already pushed history. */
   const updateGuideD = (id: number, d: string) => {
     setBlocks((prev) => prev.map((b) => (b.id === id && b.type === "guide" ? { ...b, guideD: d } : b)));
@@ -3254,6 +3264,7 @@ const App: React.FC = () => {
     >
       <Sidebar
         onConvertToStack={convertSelectedBlockToStack}
+        onResetStackLayout={resetStackLayout}
         blocks={blocks}
         selectedBlock={selectedBlock}
         selectedIds={selectedIds}
