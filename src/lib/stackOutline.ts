@@ -5,7 +5,7 @@ import type { SvgCmd } from "./svgPath";
 import {
   type PieceTransform, transformCmds, transformFace, transformPt, toSegments, fromSegments, cmdsCentre,
 } from "./stackGeometry";
-import { joinEdges, spliceJoin } from "./stackJoin";
+import { joinEdges, joinFloor, spliceJoin } from "./stackJoin";
 
 export const pieceTransform = (p: StackPiece): PieceTransform =>
   ({ x: p.x, y: p.y, rotation: p.rotation, pivot: p.pivot });
@@ -13,19 +13,36 @@ export const pieceTransform = (p: StackPiece): PieceTransform =>
 export function assembleStackOutline(
   pieces: readonly StackPiece[], joins: readonly StackJoin[], nib: { width: number; minFraction: number }
 ): SvgCmd[] {
-  const byId = new Map(pieces.map((p) => [p.id, p]));
-  let pool = pieces.flatMap((p) => toSegments(transformCmds(p.cmds, pieceTransform(p))));
-  const floor = nib.width * nib.minFraction;
-  for (const j of joins) {
+  return assembleStackOutlineReport(pieces, joins, nib).cmds;
+}
+
+/**
+ * `assembleStackOutline`, plus how many joins could not be spliced (a missing
+ * piece or face, or a bridge edge that is not in the pool). Each join's floor
+ * is `nib.minFraction` of its thinner face's own thickness (`joinFloor`);
+ * `nib.width` is provenance only and is not read.
+ */
+export function assembleStackOutlineReport(
+  pieces: readonly StackPiece[] | undefined, joins: readonly StackJoin[] | undefined,
+  nib: { width: number; minFraction: number }
+): { cmds: SvgCmd[]; skipped: number } {
+  // `?? []`: a hand-edited save can drop either list.
+  const ps = pieces ?? [], js = joins ?? [];
+  const byId = new Map(ps.map((p) => [p.id, p]));
+  let pool = ps.flatMap((p) => toSegments(transformCmds(p.cmds, pieceTransform(p))));
+  let skipped = 0;
+  for (const j of js) {
     const from = byId.get(j.from.pieceId), to = byId.get(j.to.pieceId);
     const fa = from?.faces[j.from.faceIndex], fb = to?.faces[j.to.faceIndex];
-    if (!from || !to || !fa || !fb) continue;
+    if (!from || !to || !fa || !fb) { skipped++; continue; }
     const A = transformFace(fa, pieceTransform(from));
     const B = transformFace(fb, pieceTransform(to));
-    const spliced = spliceJoin(pool, A, B, joinEdges(A, B, j.bow, floor));
+    const edges = joinEdges(A, B, j.bow, joinFloor(A, B, nib.minFraction), 24, j.depth ?? 0);
+    const spliced = spliceJoin(pool, A, B, edges);
     if (spliced) pool = spliced;
+    else skipped++;
   }
-  return fromSegments(pool);
+  return { cmds: fromSegments(pool), skipped };
 }
 
 /** The piece ids a drag of `pieceId` carries: the piece and the pieces riding

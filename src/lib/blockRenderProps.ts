@@ -120,8 +120,10 @@ export function imageProps(b: Extract<Block, { type: "image" }>) {
 
 export const stackProps = (b: Extract<Block, { type: "stack" }>) => ({
   ...typographicProps(b),
-  pieces: b.pieces,
-  joins: b.joins,
+  // `?? []`: a hand-edited save can drop either list; this build does not
+  // validate stack blocks on load.
+  pieces: b.pieces ?? [],
+  joins: b.joins ?? [],
   nib: b.nib,
   unitsPerEm: b.unitsPerEm,
 });

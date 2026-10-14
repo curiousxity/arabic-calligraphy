@@ -129,7 +129,8 @@ async function shapeReal(
 }
 
 import { convertRunToStack, runOutline, splitPieceAtCut } from "./stackConvert";
-import { assembleStackOutline, chainOf } from "./stackOutline";
+import { assembleStackOutline, assembleStackOutlineReport, chainOf } from "./stackOutline";
+import { nibFloorFraction, nuqtaUnits } from "./nuqta";
 import type { StackJoin, StackPiece } from "../types";
 import { flattenContours, outlineBounds } from "./strokeCuts";
 import type { SvgCmd } from "./svgPath";
@@ -154,25 +155,48 @@ describe("convertRunToStack", () => {
     expect(typeof hb.shape).toBe("function");
   });
 
+  // The measured join/unjoined split of مصبح per font (the review's probe).
+  const PINNED: Record<string, [number, number]> = {
+    "UKIJDiwani.ttf": [3, 0], "Amiri.ttf": [1, 2], "NotoSans.ttf": [2, 1],
+  };
   for (const fontFile of ["UKIJDiwani.ttf", "Amiri.ttf", "NotoSans.ttf"]) {
     it(`${fontFile}: one letter piece per base letter of مصبح, a join per adjacent pair or an unjoined report`, async () => {
       const { result } = await convert("مصبح", fontFile);
       const letters = result.pieces.filter((p) => p.role === "letter");
       expect(letters).toHaveLength(4);
-      expect(result.joins.length + result.unjoined.length).toBe(3);
+      expect([result.joins.length, result.unjoined.length]).toEqual(PINNED[fontFile]);
       for (const m of result.pieces.filter((p) => p.role === "mark")) {
         expect(letters.some((l) => l.id === m.parentId)).toBe(true);
       }
       // Reading order is text order.
       expect(letters.map((l) => l.order).sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
     });
+  }
 
-    it(`${fontFile}: converting and touching nothing reproduces the run's outline`, async () => {
+  // Kufi is one of the faces whose nuqta-scaled floor used to exceed its
+  // connector (review I1); the floor now comes from the faces themselves.
+  for (const fontFile of ["UKIJDiwani.ttf", "Amiri.ttf", "NotoSans.ttf", "Kufi.ttf"]) {
+    it(`${fontFile}: converting and touching nothing reproduces the run's outline, with the real nib`, async () => {
       const { input, result } = await convert("محمد", fontFile);
+      const family = fontFile.replace(/\.ttf$/, "");
+      const nib = { width: nuqtaUnits(family, input.unitsPerEm), minFraction: nibFloorFraction(family) };
       const original = runOutline(input);
-      const baked = assembleStackOutline(result.pieces, result.joins, { width: 100, minFraction: 0.15 });
+      const { cmds: baked, skipped } = assembleStackOutlineReport(result.pieces, result.joins, nib);
+      // Every join's faces resolved to a bridge and spliced.
+      // (Amiri's محمد has no cuttable join — its joins are the accepted
+      // per-font limitation in stroke-cuts.md — so only its pieces are checked.)
+      if (fontFile !== "Amiri.ttf") expect(result.joins.length).toBeGreaterThan(0);
+      expect(skipped).toBe(0);
       expect(flattenContours(baked)).toHaveLength(flattenContours(original).length);
       expect(Math.abs(area(baked) - area(original)) / area(original)).toBeLessThan(0.005);
+      // No spikes: with the floor taken from the faces, an untouched join
+      // adds no points at all — the same count as with no floor.
+      const points = (cmds: SvgCmd[]) => flattenContours(cmds).reduce((n, c) => n + c.length, 0);
+      const unfloored = assembleStackOutlineReport(result.pieces, result.joins, { ...nib, minFraction: 0 }).cmds;
+      expect(points(baked)).toBe(points(unfloored));
+      // (Not the run's own count: splitting subdivides the segment a cut
+      // crosses, so the baked outline can carry a few more points — UKIJ
+      // 1047 vs 1027 — without any of them leaving the outline.)
     });
   }
 

@@ -259,8 +259,12 @@ export type StackJoin = {
   id: string;
   from: { pieceId: string; faceIndex: number };
   to: { pieceId: string; faceIndex: number };
-  /** Scales the curve's handles: 0 is the tangent-matched default. */
+  /** Asymmetry of the curve's two handles (A's is chord/3·(1+depth+bow), B's
+   *  chord/3·(1+depth−bow)): swings an S-shaped join. 0 is the tangent-matched
+   *  default. */
   bow: number;
+  /** Common lengthening of both handles: rounds out a U-shaped join. Absent = 0. */
+  depth?: number;
   /** Made from an inserted tatweel rather than a cut in the letter. */
   fallback?: true;
 };

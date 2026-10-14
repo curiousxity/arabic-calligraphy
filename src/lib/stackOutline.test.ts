@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assembleStackOutline, chainOf, rebasePiece, pieceTransform } from "./stackOutline";
+import { assembleStackOutline, assembleStackOutlineReport, chainOf, rebasePiece, pieceTransform } from "./stackOutline";
 import { splitAtCut, transformPt, cmdsCentre } from "./stackGeometry";
 import { flattenContours } from "./strokeCuts";
 import type { StackPiece, StackJoin } from "../types";
@@ -47,9 +47,13 @@ describe("assembleStackOutline", () => {
     const out = assembleStackOutline([right, left], [], NIB);
     expect(flattenContours(out)).toHaveLength(2);
   });
-  it("skips a join whose piece is missing rather than throwing", () => {
+  it("skips a join whose piece is missing rather than throwing, and reports it", () => {
     const { left, join } = splitBar();
     expect(() => assembleStackOutline([left], [join], NIB)).not.toThrow();
+    expect(assembleStackOutlineReport([left], [join], NIB).skipped).toBe(1);
+  });
+  it("draws nothing rather than crashing when a hand-edited save drops its lists", () => {
+    expect(assembleStackOutlineReport(undefined, undefined, NIB)).toEqual({ cmds: [], skipped: 0 });
   });
 });
 
@@ -67,13 +71,20 @@ describe("chainOf", () => {
   it("a mark moves by itself", () => {
     expect(chainOf(ps, "mb", false)).toEqual(["mb"]);
   });
-  it("a chain move is a pure translation: rotations and relative placement are untouched", () => {
-    const rs = [piece("a", BAR, 0), { ...piece("b", BAR, 1), rotation: 0.7, x: 40, y: -30 }];
-    const ids = chainOf(rs, "a", false);
-    const moved = rs.map((p) => (ids.includes(p.id) ? { ...p, x: p.x + 10, y: p.y - 20 } : p));
-    expect(moved[1].rotation).toBe(0.7);
-    expect(moved[1].x - moved[0].x).toBe(40);
-    expect(moved[1].y - moved[0].y).toBe(-30);
+  it("moving a whole chain translates its assembled outline and nothing else", () => {
+    const { left, right, join } = splitBar();
+    const lifted = { ...left, y: -60, rotation: 0.3 };
+    const ps = [right, lifted];
+    const ids = chainOf(ps, "R", false);   // R is first in reading order: carries L
+    expect([...ids].sort()).toEqual(["L", "R"]);
+    const moved = ps.map((p) => (ids.includes(p.id) ? { ...p, x: p.x + 10, y: p.y - 20 } : p));
+    const before = flattenContours(assembleStackOutline(ps, [join], NIB));
+    const after = flattenContours(assembleStackOutline(moved, [join], NIB));
+    expect(after.length).toBe(before.length);
+    after.forEach((c, ci) => c.forEach(([x, y], k) => {
+      expect(x - before[ci][k][0]).toBeCloseTo(10, 9);
+      expect(y - before[ci][k][1]).toBeCloseTo(-20, 9);
+    }));
   });
 });
 
