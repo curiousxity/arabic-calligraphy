@@ -13,4 +13,12 @@ describe("sanitizeLegacyBlocks", () => {
     const [out] = sanitizeLegacyBlocks([{ ...legacyText, glyphEdits: [], glyphTransforms: [] }]);
     expect(out).toEqual(legacyText);
   });
+
+  it("drops squareKufi blocks and strips kufi fields from survivors", () => {
+    const out = sanitizeLegacyBlocks([
+      { ...legacyText, kufiColumns: 3 },
+      { ...legacyText, id: 2, type: "squareKufi", kufiColumns: 4, kufiCellEdits: [] },
+    ]);
+    expect(out).toEqual([legacyText]);
+  });
 });

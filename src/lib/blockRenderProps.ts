@@ -82,18 +82,6 @@ export function shapeFillProps(b: Extract<Block, { type: "shapeFill" }>) {
   };
 }
 
-/** A square-kufi block, for `SquareKufiText`. */
-export function squareKufiProps(b: Extract<Block, { type: "squareKufi" }>) {
-  return {
-    ...typographicProps(b),
-    kufiColumns: b.kufiColumns,
-    kufiComposition: b.kufiComposition,
-    kufiLineGap: b.kufiLineGap,
-    kufiWordGap: b.kufiWordGap,
-    kufiCellEdits: b.kufiCellEdits,
-  };
-}
-
 /** A text-on-path block, for `TextOnPathText`. */
 export function textPathProps(b: Extract<Block, { type: "textPath" }>) {
   return {

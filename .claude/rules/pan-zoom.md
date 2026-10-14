@@ -77,8 +77,4 @@ the hook and `touch-action` removed:
   browser the others do not. Only `touch-action` is exercised by the
   Chromium e2e suite.
 
-**Known edge, not handled:** `KufiCellEditOverlay` ends its cell drag on a
-Konva-level `touchend` rather than through `DD`, so a pinch that starts in the
-middle of a cell drag swallows that `touchend` and the overlay stays in drag
-state until the next tap Konva sees. Every other on-canvas drag goes through
-`DD` and is ended by `stopDrag()`.
+Every on-canvas drag goes through `DD` and is ended by `stopDrag()`.

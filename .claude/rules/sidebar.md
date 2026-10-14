@@ -32,9 +32,9 @@ Two naming rules in the `selected` tier are worth knowing before adding a
 panel there:
 
 - **The *type panel* is named after the block type** — `Shape Fill`,
-  `Curve`, `Image`, `Square Kufi` — and holds only what is specific to it (a
+  `Curve`, `Image` — and holds only what is specific to it (a
   Shape Fill block's scale/spacing/rotation rows, a Curve block's preset and
-  pen-tool controls, a Square Kufi block's panel width and gaps). It renders directly under Content, above the
+  pen-tool controls). It renders directly under Content, above the
   shared panels, because for those types it is the panel that matters
   most. A plain text block has no type panel; its controls are the shared
   ones.
@@ -84,11 +84,10 @@ deliberate action and a second confirmation on top was redundant
 friction.
 
 **Block Controls is three labelled groups on fixed grids**, not one
-wrapping row. `Add` (text, shape fill, curved text, guide, square kufi,
-image, ornament, mirror, medallion) sits on a 4-column grid. Nine buttons
-since guides arrived (2026-10-13), so medallion sits alone on a third row —
-accepted in the guides spec, but it is exactly the orphan described below, so
-the next Add button should fill that row rather than start a fourth; `Selected` (duplicate, delete) and
+wrapping row. `Add` (text, shape fill, curved text, guide,
+image, ornament, mirror, medallion) sits on a 4-column grid — eight buttons,
+two full rows since Square Kufi's button went (2026-10-14), so the next Add
+button would start an orphan third row, exactly the shape described below; `Selected` (duplicate, delete) and
 `History` (undo, redo, history) share a line below it. The row this replaced
 was a centred `flex-wrap` of twelve identical chips, which at the sidebar's
 own width wrapped **8 / 1 / 3** — stranding the ornament button alone on a

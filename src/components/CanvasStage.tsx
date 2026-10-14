@@ -57,9 +57,7 @@ function guideArcTable(d: string): ArcTable {
   }
   return t;
 }
-import { SquareKufiText } from "./SquareKufiText";
 import { TextPathEditOverlay } from "./TextPathEditOverlay";
-import { KufiCellEditOverlay } from "./KufiCellEditOverlay";
 import { useTouchPinch } from "../hooks/useTouchPinch";
 import { ImageBlockView } from "./ImageBlockView";
 // STREAM-B (muthanna/radial): the file has no anchored import region, so
@@ -89,7 +87,7 @@ import {
   type SnapTarget,
 } from "../lib/snapping";
 import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
-import type { Block, DiacriticOverride, DetachedMarkOverride, StrokeCut, KufiCellEdit } from "../types";
+import type { Block, DiacriticOverride, DetachedMarkOverride, StrokeCut } from "../types";
 import type { AlternateChoice, LetterAlternates } from "../lib/glyphAlternates";
 
 /** Stable empty list, so unselected blocks' memos do not re-run. */
@@ -99,7 +97,6 @@ import {
   imageProps,
   shapeFillProps,
   shapedTextProps,
-  squareKufiProps,
   stackProps,
   textPathProps,
 } from "../lib/blockRenderProps";
@@ -164,13 +161,6 @@ export type CanvasStageProps = {
   /** Every change of the hidden field while writing. */
   onWriteText?: (text: string) => void;
   onEndWriting?: () => void;
-  /**
-   * One `pushHistory()` per painting stroke, taken on mousedown. App passes
-   * `pushHistory` itself — see `setKufiCell` there for why the per-cell write
-   * must not push.
-   */
-  onBeginKufiCellEdit: () => void;
-  onSetKufiCell: (blockId: number, edit: KufiCellEdit, generatedOn: boolean) => void;
   /** One `pushHistory()` per diacritic handle drag, taken on drag start. */
   onBeginDiacriticDrag: () => void;
   onDragDiacriticOverride: (
@@ -308,8 +298,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onBeginWritingText,
   onWriteText,
   onEndWriting,
-  onBeginKufiCellEdit,
-  onSetKufiCell,
   onBeginDiacriticDrag,
   onDragDiacriticOverride,
   onToggleDiacriticHidden,
@@ -1104,46 +1092,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     locked={block.locked}
                     debugBounds={false}
                   />
-                );
-              }
-
-              if (block.type === "squareKufi") {
-                return (
-                  <React.Fragment key={block.id}>
-                  <SquareKufiText
-                    {...commonProps}
-                    {...squareKufiProps(block)}
-                    x={block.x}
-                    y={block.y}
-                    opacity={block.opacity ?? 1}
-                    locked={block.locked}
-                  />
-                  {/* Mounted here rather than from inside SquareKufiText, so a
-                      mirror — which renders the source's own renderer — can
-                      never grow an editor of its own. */}
-                  {block.kufiCellEditMode &&
-                    block.id === selectedId &&
-                    !effectivePanMode && (
-                      <KufiCellEditOverlay
-                        id={`kufi-cell-edit-layer-${block.id}`}
-                        x={block.x}
-                        y={block.y}
-                        rotation={block.rotation ?? 0}
-                        text={block.text}
-                        fontSize={block.fontSize}
-                        kufiColumns={block.kufiColumns}
-                        kufiComposition={block.kufiComposition}
-                        kufiLineGap={block.kufiLineGap}
-                        kufiWordGap={block.kufiWordGap}
-                        kufiCellEdits={block.kufiCellEdits}
-                        stageScale={stageScale}
-                        onBeginStroke={onBeginKufiCellEdit}
-                        onPaintCell={(edit, generatedOn) =>
-                          onSetKufiCell(block.id, edit, generatedOn)
-                        }
-                      />
-                    )}
-                  </React.Fragment>
                 );
               }
 

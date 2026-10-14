@@ -190,13 +190,6 @@ test("add curved text", async ({ browser }) => {
   });
 });
 
-test("add square kufi", async ({ browser }) => {
-  await record(browser, "add-square-kufi", clearCanvas, async (page) => {
-    await page.getByRole("button", { name: "Add square kufi" }).click();
-    await place(page);
-  });
-});
-
 test("add image", async ({ browser }) => {
   await record(browser, "add-image", clearCanvas, async (page) => {
     const chooser = page.waitForEvent("filechooser");

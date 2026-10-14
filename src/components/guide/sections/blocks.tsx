@@ -13,7 +13,6 @@ export const section: GuideSection = {
     "image",
     "svg",
     "silhouette",
-    "square kufi",
     "mirror",
     "muthanna",
     "radial",
@@ -24,7 +23,7 @@ export const section: GuideSection = {
   Body: () => (
     <>
       <p>
-        There are six kinds of block, all added from{" "}
+        There are five kinds of block, all added from{" "}
         <strong>Block Controls</strong>. Every one of them can be dragged,
         rotated, coloured, and given an outline or shadow; what differs is how
         the text is laid out.
@@ -67,16 +66,6 @@ export const section: GuideSection = {
         curve, tick <strong>Flip direction</strong>.{" "}
         <strong>Baseline offset</strong> lifts the letters off the line or
         drops them below it.
-      </p>
-
-      <h4>Square Kufi</h4>
-      <p>
-        Your text set as strokes on a woven lattice — الكوفي المربع — rather
-        than shaped from a font; this is the one block type that loads no font
-        at all. Type Arabic into Content as with any block and press{" "}
-        <strong>Fit to square</strong> to wrap it into the panel. See{" "}
-        <strong>Square kufi</strong> in this guide for laying it out and
-        painting individual cells by hand.
       </p>
 
       <h4>Mirror</h4>

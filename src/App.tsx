@@ -27,7 +27,6 @@ import {
 } from "./lib/canvasBounds";
 import {
   supportsDiacriticOverrides,
-  supportsKufiCellEdits,
   supportsGlyphAlternates,
   supportsStrokeCuts,
   supportsStyleSets,
@@ -145,17 +144,7 @@ import {
   hasOrphanedMirrors,
   isMirrorSourceCandidate,
 } from "./lib/mirror";
-import {
-  squareFitColumns,
-  layoutSquareKufi,
-  kufiCellSize,
-  kufiOptionsFor,
-  upsertCellEdit,
-  DEFAULT_KUFI_OPTIONS,
-  normalizeKufiComposition,
-  type KufiCellEdit,
-} from "./lib/squareKufi";
-import type { MirrorMode, SquareKufiBlock } from "./types";
+import type { MirrorMode } from "./types";
 import { applyKashida, findKashidaSlots, readKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
@@ -314,9 +303,6 @@ const isBrowser = typeof window !== "undefined";
  * because summing them needs the nuqta table that module deliberately keeps
  * out; `runStyleForBlock` takes the result as a required argument.
  */
-/** The text a new square-kufi block starts with, and what its placement ghost is measured from. */
-const SQUARE_KUFI_DEFAULT_TEXT = "كوفي مربع";
-
 const cutWidthForBlock = (block: Block): number =>
   cutAdvanceTotal(block.strokeCuts ?? [], nuqtaUnits(block.fontFamily, block.fontSize));
 
@@ -867,36 +853,6 @@ const App: React.FC = () => {
       );
     },
     [pushHistory]
-  );
-
-  /**
-   * Paint or erase one cell. `setBlocks` directly, no history.
-   *
-   * History for a painting stroke is **one** `pushHistory()` taken on
-   * mousedown — `CanvasStage`'s `onBeginKufiCellEdit`, which is `pushHistory`
-   * itself. This write deliberately pushes none of its own: `updateBlock` and
-   * `updateSelectedBlock` both push unconditionally, so routing paint through
-   * either would leave one undo entry per *cell* — a fifty-cell drag costing
-   * fifty presses of Ctrl+Z to undo.
-   *
-   * `generatedOn` comes from the overlay, which already holds the un-composed
-   * layout; it is what makes a cell painted back to what the alphabet draws a
-   * *removal* rather than a stored no-op (`upsertCellEdit` owns that rule, the
-   * same one `setStrokeCut` follows for a zero-nuqta cut).
-   */
-  const setKufiCell = useCallback(
-    (blockId: number, edit: KufiCellEdit, generatedOn: boolean) => {
-      setBlocks((prev) =>
-        prev.map((b) => {
-          if (b.id !== blockId || !supportsKufiCellEdits(b)) return b;
-          return {
-            ...b,
-            kufiCellEdits: upsertCellEdit(b.kufiCellEdits ?? [], edit, generatedOn),
-          };
-        })
-      );
-    },
-    []
   );
 
   const fitShapeFillSpacing = useCallback(
@@ -2145,106 +2101,6 @@ const App: React.FC = () => {
   const reportGuideLayout = useCallback((id: number, shrink: number) => {
     setGuideShrink((prev) => (prev.get(id) === shrink ? prev : new Map(prev).set(id, shrink)));
   }, []);
-
-  /**
-   * A square-kufi block. It opens as a running band (`kufiColumns: 0`) rather
-   * than as a panel: the wrap width that squares a given text is not something
-   * to guess on the user's behalf, and "Fit to square" below computes it once
-   * the text is theirs.
-   */
-  const addSquareKufiBlock = () => {
-    const newId = createNextId();
-    // Measured, not guessed. A square-kufi block draws down-right from its
-    // origin at `cols x rows` cells, so a hardcoded ghost is both the wrong
-    // size and — because the commit offset is half of it — the wrong place:
-    // the default text laid out at ~245x40px under a 320x160 ghost dropped its
-    // ink about 60 document-px above the rectangle the user aimed. The layout
-    // is pure lattice arithmetic with no font to load, which is what makes
-    // measuring it here as cheap as the constants it replaces.
-    const cell = kufiCellSize(DEFAULT_BLOCK.fontSize);
-    const preview = layoutSquareKufi(
-      SQUARE_KUFI_DEFAULT_TEXT,
-      kufiOptionsFor({
-        kufiColumns: 0,
-        kufiLineGap: DEFAULT_KUFI_OPTIONS.lineGap,
-        kufiWordGap: DEFAULT_KUFI_OPTIONS.wordGap,
-      })
-    );
-    const width = Math.max(preview.cols * cell, cell);
-    const height = Math.max(preview.rows * cell, cell);
-
-    beginPlacement(
-      {
-        ...DEFAULT_BLOCK,
-        id: newId,
-        text: SQUARE_KUFI_DEFAULT_TEXT,
-        type: "squareKufi",
-        kufiColumns: 0,
-        kufiLineGap: DEFAULT_KUFI_OPTIONS.lineGap,
-        kufiWordGap: DEFAULT_KUFI_OPTIONS.wordGap,
-        x: 0,
-        y: 0,
-      },
-      width,
-      height,
-      -width / 2,
-      -height / 2,
-      "New Square Kufi"
-    );
-  };
-
-  /**
-   * Wrap the selected square-kufi block to the width whose panel comes out
-   * closest to square — the composition the style is named for.
-   *
-   * Skips the write when the answer is what the block already carries, so
-   * clicking it twice costs one undo step rather than two. That is the same
-   * no-op rule `fitSelectedBlockToWidth` follows beside it; unlike that one
-   * this is synchronous, the solver being plain arithmetic over a lattice
-   * rather than a font measurement, so there is no captured-by-id hazard here.
-   */
-  const fitSelectedKufiToSquare = useCallback(() => {
-    const block = selectedBlock;
-    if (!block || block.type !== "squareKufi") return;
-    const columns = squareFitColumns(block);
-    if (columns <= 0 || columns === (block.kufiColumns ?? 0)) return;
-    updateSelectedBlock({ kufiColumns: columns });
-  }, [selectedBlock, updateSelectedBlock]);
-
-  /**
-   * Switch the selected square-kufi block between plain lines and
-   * boustrophedon.
-   *
-   * **The wrap width has to come with it.** Every block is created with
-   * `kufiColumns: 0` and `breakIntoLines` reads that as `Infinity`, so a fresh
-   * block is one unbroken line — and a single line has nothing to turn into.
-   * Switching to a snaking composition on such a block would visibly do
-   * nothing at all, which reads as a broken control rather than as a text that
-   * happens not to wrap. So the width `squareColumnTarget` would have chosen is
-   * set in the **same patch**, which is what keeps the whole switch one
-   * `pushHistory()` and therefore one undo.
-   *
-   * It lives here rather than in the Sidebar because it is two document fields
-   * moving together — the Sidebar owns no history and would have to make two
-   * calls, costing the user two undos for one click.
-   */
-  const setKufiComposition = useCallback(
-    (value: string) => {
-      const block = selectedBlock;
-      if (!block || block.type !== "squareKufi") return;
-      const composition = normalizeKufiComposition(value);
-      const current = normalizeKufiComposition(block.kufiComposition);
-      if (composition === current) return;
-
-      const patch: Partial<SquareKufiBlock> = { kufiComposition: composition };
-      if (composition !== "lines" && (block.kufiColumns ?? 0) === 0) {
-        const columns = squareFitColumns(block);
-        if (columns > 0) patch.kufiColumns = columns;
-      }
-      updateSelectedBlock(patch);
-    },
-    [selectedBlock, updateSelectedBlock]
-  );
 
   const addImageBlock = (dataUrl: string, naturalWidth: number, naturalHeight: number) => {
     const newId = createNextId();
@@ -3539,9 +3395,6 @@ const App: React.FC = () => {
         onDetachFromGuide={detachSelectedFromGuide}
         onUpdateGuideAttachment={updateGuideAttachment}
         guideShrink={guideShrink}
-        onAddSquareKufiBlock={addSquareKufiBlock}
-        onFitKufiToSquare={fitSelectedKufiToSquare}
-        onSetKufiComposition={setKufiComposition}
         onAddImageBlock={uploadImageBlock}
         onGenerateFromTemplate={generateFromTemplate}
         onRandomizeLayout={randomizeLayout}
@@ -3662,8 +3515,6 @@ const App: React.FC = () => {
           onWriteText={writeText}
           onEndWriting={endWriting}
           onBeginTextPathEdit={pushHistory}
-          onBeginKufiCellEdit={pushHistory}
-          onSetKufiCell={setKufiCell}
           onBeginDiacriticDrag={pushHistory}
           onDragDiacriticOverride={dragDiacriticOverride}
           onToggleDiacriticHidden={toggleDiacriticHidden}

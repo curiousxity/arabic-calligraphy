@@ -29,7 +29,7 @@ export type StrokeCutHoverHandlesProps = {
   /**
    * Called once when a handle drag starts, before any `onSetCut`. App passes
    * `pushHistory` itself, so a drag is exactly one undo step however long it
-   * pauses midway — the `onBeginKufiCellEdit` pattern.
+   * pauses midway — the `onBeginDiacriticDrag` pattern.
    */
   onBeginCut?: () => void;
   onSetCut?: (cut: StrokeCut) => void;

@@ -4,7 +4,6 @@ export type BlockType =
   | "image"
   | "textPath"
   | "mirror"
-  | "squareKufi"
   | "guide"
   | "stack";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
@@ -46,10 +45,8 @@ export type GlyphAlternate = {
 export type { BlockFill, FillStop } from "./lib/blockFill";
 export type { StrokeCut } from "./lib/strokeCuts";
 export type { DetachedMarkOverride } from "./lib/detachedMarks";
-export type { KufiCellEdit, KufiComposition } from "./lib/squareKufi";
 import type { StrokeCut } from "./lib/strokeCuts";
 import type { DetachedMarkOverride } from "./lib/detachedMarks";
-import type { KufiCellEdit, KufiComposition } from "./lib/squareKufi";
 import type { BlockFill } from "./lib/blockFill";
 import type { SvgCmd } from "./lib/svgPath";
 import type { Pt } from "./lib/strokeCuts";
@@ -340,60 +337,11 @@ export type MirrorBlock = BlockCommon & {
   radialRadius?: number;
 };
 
-/**
- * Square kufi (كوفي مربع): the block's text drawn as strokes on a lattice
- * rather than as shaped glyph outlines.
- *
- * It is the one block type that loads no font — a square-kufi letter *is* its
- * cells, so `fontFamily` is inert here (as `fontSize` already is on a curve),
- * and `fontSize` is read only for how large one lattice cell comes out. The
- * layout, the alphabet and the reasoning behind both live in
- * `lib/squareKufi.ts` and `lib/squareKufiAlphabet.ts`.
- *
- * The three dials below are spacing, not grammar: stroke width and the gap
- * between two joined letters are fixed at one cell, which is what square kufi
- * *is*. `columns` is what turns a running band into a square panel.
- */
-export type SquareKufiBlock = BlockCommon & {
-  type: "squareKufi";
-  /** Wrap width in cells. 0 or absent runs the text as one unbroken band. */
-  kufiColumns?: number;
-  /**
-   * How stacked lines are arranged: plain lines, or boustrophedon — every
-   * other line turned 180° so the reading snakes back and the stroke turns the
-   * corner with it.
-   *
-   * Absent is `"lines"`, which is what this block type has always drawn, so a
-   * project saved before the feature needs no payload version bump; the value
-   * is whitelisted on the way in (`normalizeKufiComposition`) rather than
-   * trusted, it being a string union rather than a clamped number.
-   */
-  kufiComposition?: KufiComposition;
-  /** Blank lattice rows between wrapped lines. */
-  kufiLineGap?: number;
-  /** Blank lattice columns between two words. */
-  kufiWordGap?: number;
-  /**
-   * Cells painted or erased by hand over the generated grid. Anchored to a
-   * letter rather than to a grid coordinate — see `KufiCellEdit`. Absent means
-   * today's rendering exactly, so a project saved before this feature needs no
-   * payload version bump.
-   *
-   * Lives here and not on `BlockCommon`, following `textPathEditMode` and
-   * `diacriticEditMode`: a cell is a square-kufi idea, and no other renderer
-   * could do anything with one.
-   */
-  kufiCellEdits?: KufiCellEdit[];
-  /** True while the on-canvas cell painter is armed for this block. */
-  kufiCellEditMode?: boolean;
-};
-
 export type Block =
   | TextBlock
   | ShapeFillBlock
   | ImageBlock
   | TextPathBlock
   | MirrorBlock
-  | SquareKufiBlock
   | GuideBlock
   | StackBlock;

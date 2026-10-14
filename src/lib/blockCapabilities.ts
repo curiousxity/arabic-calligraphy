@@ -50,21 +50,12 @@ export const supportsGlyphAlternates = (
 /**
  * Block-level style sets need no on-canvas hit-testing, only shaping, so
  * every renderer that shapes through `useShapedGlyphs` honours them: text,
- * Shape Fill and Curve. Square kufi draws no font glyphs.
+ * Shape Fill and Curve.
  */
 export const supportsStyleSets = (
   b: Block
 ): b is Extract<Block, { type: "text" | "shapeFill" | "textPath" }> =>
   b.type === "text" || b.type === "shapeFill" || b.type === "textPath";
-
-/**
- * Square-kufi blocks only — the fields live on `SquareKufiBlock` rather than
- * on `BlockCommon`, so this is the guard that makes the cell mutators
- * type-check against the one variant that can draw a cell.
- */
-export const supportsKufiCellEdits = (
-  b: Block
-): b is Extract<Block, { type: "squareKufi" }> => b.type === "squareKufi";
 
 /**
  * Text and Shape Fill: the two renderers that split a glyph's contours and

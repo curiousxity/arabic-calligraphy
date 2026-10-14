@@ -78,7 +78,7 @@ dimension in every per-letter tool.
 
 - Rows of more than two half-lines.
 - Bayt columns of unequal width.
-- Shape Fill, Curve or square kufi lines.
+- Shape Fill or Curve lines.
 - The practice sheet.
 - Turning existing blocks into a verse. Only **New verse…** in Block Controls
   makes one.

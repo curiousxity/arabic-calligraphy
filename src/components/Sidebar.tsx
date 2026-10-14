@@ -59,13 +59,6 @@ import {
   type KashidaSlot,
 } from "../lib/tatweel";
 import {
-  layoutSquareKufi,
-  applyCellEdits,
-  kufiOptionsFor,
-  normalizeKufiComposition,
-  DEFAULT_KUFI_OPTIONS,
-} from "../lib/squareKufi";
-import {
   TrashIcon,
   CopyIcon,
   PlusIcon,
@@ -269,17 +262,6 @@ export type SidebarProps = {
   onUpdateGuideAttachment?: (patch: Partial<GuideAttachment>) => void;
   /** Renderer-measured shrink per attached text; never saved. */
   guideShrink?: ReadonlyMap<number, number>;
-  onAddSquareKufiBlock?: () => void;
-  /** Wrap the selected square-kufi block to the width closest to square. */
-  onFitKufiToSquare?: () => void;
-  /**
-   * Switch the selected square-kufi block's composition.
-   *
-   * Not a plain `onUpdateSelectedBlock` patch: a zero-column block is one
-   * unbroken line and has nothing to turn into, so App sets a wrap width in
-   * the same history entry. See `setKufiComposition`.
-   */
-  onSetKufiComposition?: (composition: string) => void;
   onAddImageBlock?: () => void;
   onGenerateFromTemplate?: (templateId: string, values: string[]) => void;
   onRandomizeLayout?: () => void;
@@ -425,7 +407,6 @@ const BLOCK_DEMOS = {
   text: { src: "/demos/add-text.gif", alt: "Placing a new text block on the canvas", width: 400 },
   shapeFill: { src: "/demos/add-shape-fill.gif", alt: "A shape filled with rows of text", width: 400 },
   curvedText: { src: "/demos/add-curved-text.gif", alt: "Placing text that follows a curve", width: 400 },
-  squareKufi: { src: "/demos/add-square-kufi.gif", alt: "Placing a square kufi block", width: 400 },
   image: { src: "/demos/add-image.gif", alt: "Placing an image on the canvas", width: 400 },
   ornament: { src: "/demos/add-ornament.gif", alt: "Choosing an ornament and placing it", width: 400 },
   mirror: { src: "/demos/add-mirror.gif", alt: "Adding a mirrored copy of a block", width: 400 },
@@ -537,9 +518,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDetachFromGuide,
   onUpdateGuideAttachment,
   guideShrink,
-  onAddSquareKufiBlock,
-  onFitKufiToSquare,
-  onSetKufiComposition,
   onAddImageBlock,
   onGenerateFromTemplate,
   onRandomizeLayout,
@@ -615,66 +593,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
    * picker could not show or offer the family a block is actually on.
    */
   const fontChoices = useMemo<FontChoice[]>(() => fontChoicesWith(customFonts), [customFonts]);
-  /**
-   * The Square Kufi panel's readout, laid out once per change rather than
-   * once per render.
-   *
-   * The panel needs its own layout — it reports the panel's size, what the
-   * alphabet could not draw, and the width slider's upper bound — and doing
-   * it here rather than threading the renderer's result up through App.tsx
-   * is the deliberate trade CLAUDE.md records. What is *not* deliberate is
-   * paying for it on every render: this component re-renders on every stage
-   * pan/zoom frame, every block-drag frame and every painted cell, while
-   * children passed to `CollapsibleSection` are evaluated whether or not the
-   * section is open. Two layouts plus a cell-edit composite measured ~4ms at
-   * 1800 characters — two-thirds of a frame, for a text readout.
-   */
-  const kufiBlock = selectedBlock?.type === "squareKufi" ? selectedBlock : null;
-  const kufiReadout = useMemo(() => {
-    if (!kufiBlock) return null;
-    const cellEdits = kufiBlock.kufiCellEdits ?? [];
-    const options = kufiOptionsFor(kufiBlock);
-    // Placements cost per-unit allocation, so they are asked for only when
-    // there is a hand edit to resolve — and it is only the resolution that
-    // this panel reports.
-    const layout = layoutSquareKufi(kufiBlock.text, options, {
-      placements: cellEdits.length > 0,
-    });
-    // The unwrapped band is the whole useful domain of the width slider: any
-    // width at or past it puts the text on one line, and `squareColumnTarget`
-    // searches no further either, so a fitted value always lands inside this
-    // range. A fixed cap of 80 could not represent one — "Fit to square"
-    // returns 119 at 383 characters and 249 at 1800 — leaving the thumb
-    // pinned at max while the readout showed the real number, and the first
-    // touch of the track silently collapsed the fitted panel. Derived from
-    // the text rather than from the slider's own value, so dragging cannot
-    // move the end of the track.
-    const bandColumns = Math.max(
-      1,
-      layoutSquareKufi(kufiBlock.text, { ...options, columns: 0 }).cols
-    );
-    return {
-      composed: applyCellEdits(layout, cellEdits),
-      missing: Array.from(new Set(layout.unsupported)),
-      bandColumns,
-      /** The generated grid's own width — 0 when there is nothing to draw. */
-      cols: layout.cols,
-      hardBreaks: layout.hardBreaks,
-      cellEdits,
-    };
-    // Keyed on the layout inputs, not on the block: dragging a square-kufi
-    // panel around the canvas replaces the block object on every frame
-    // without changing a single thing this readout depends on. That is the
-    // whole point of the memo, so `kufiBlock` is deliberately not a dep.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    kufiBlock?.text,
-    kufiBlock?.kufiCellEdits,
-    kufiBlock?.kufiColumns,
-    kufiBlock?.kufiComposition,
-    kufiBlock?.kufiLineGap,
-    kufiBlock?.kufiWordGap,
-  ]);
 
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(!isMobile);
@@ -1862,30 +1780,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
           {onAddGuide && <AddGuideButton onAdd={onAddGuide} />}
 
-              {onAddSquareKufiBlock && (
-                <DemoHover
-                  className="blockControlDemo"
-                  delay={BLOCK_DEMO_DELAY}
-                  demo={{ ...BLOCK_DEMOS.squareKufi, caption: "Add square kufi — text woven on a grid" }}
-                >
-                  <button
-                    type="button"
-                    className="sidebarCircleButton"
-                    aria-label="Add square kufi"
-                    onClick={onAddSquareKufiBlock}
-                  >
-                    {/* Inline rather than an entry in Icons.tsx, matching the
-                        mirror and medallion buttons below. */}
-                    <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
-                      <path
-                        d="M2 2h12v2H6v2h6v2H8v2h6v4H2v-2h4v-2H2V8h4V6H2z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  </button>
-                </DemoHover>
-              )}
-
               {onAddImageBlock && (
                 <DemoHover
                   className="blockControlDemo"
@@ -2501,184 +2395,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {selectedBlock && selectedBlock.type === "squareKufi" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection
-              title="Square Kufi"
-              isOpen={showText}
-              onToggle={() => setShowText((v) => !v)}
-            >
-              <div className="sectionPanel">
-                {kufiReadout && (() => {
-                  // Laid out here as well as in the renderer — see
-                  // `kufiReadout` above for why, and for why it is memoised.
-                  const { composed, missing, bandColumns, cellEdits, cols, hardBreaks } =
-                    kufiReadout;
-                  return (
-                    <>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                        Every stroke is one cell wide and every gap one cell —
-                        that grammar is what square kufi is, so it is fixed. The
-                        dials below are spacing. Dots and tashkeel are not
-                        drawn, as the style has always left them out.
-                      </div>
-
-                      <SelectRow
-                        id={makeId("kufi-composition", selectedId)}
-                        name={makeId("kufiComposition", selectedId)}
-                        label="Composition"
-                        value={normalizeKufiComposition(selectedBlock.kufiComposition)}
-                        onChange={(v) => onSetKufiComposition?.(v)}
-                      >
-                        <option value="lines">Lines — each reads right to left</option>
-                        <option value="boustrophedon">
-                          Boustrophedon — the reading snakes back
-                        </option>
-                      </SelectRow>
-
-                      {normalizeKufiComposition(selectedBlock.kufiComposition) ===
-                        "boustrophedon" && (
-                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                          Every second line is turned upside down and the stroke
-                          turns the corner into it, so the panel reads as one
-                          continuous band. Turn the panel to read a return line.
-                          Two columns down each side are kept clear for the turn.
-                        </div>
-                      )}
-
-                      <div className="field">
-                        <span className="fieldTitle">Panel</span>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <button
-                            type="button"
-                            className="sidebarPillButton"
-                            onClick={onFitKufiToSquare}
-                            disabled={!onFitKufiToSquare || cols === 0}
-                            title="Wrap the text to the width that comes out closest to square"
-                          >
-                            Fit to square
-                          </button>
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                          {cols === 0
-                            ? "Nothing to draw yet — type Arabic text under Content."
-                            : `${composed.cols} × ${composed.rows} cells.`}
-                          {hardBreaks > 0 &&
-                            " A word was too wide for the panel and had to be split, so its join across the break is lost — widen the panel to close it up."}
-                        </div>
-                      </div>
-
-                      <RangeRow
-                        id={makeId("kufi-columns", selectedId)}
-                        name={makeId("kufiColumns", selectedId)}
-                        label="Panel width"
-                        value={selectedBlock.kufiColumns ?? 0}
-                        min={0}
-                        max={Math.max(bandColumns, selectedBlock.kufiColumns ?? 0)}
-                        step={1}
-                        onChange={(v) => onUpdateSelectedBlock({ kufiColumns: v })}
-                        suffix={
-                          (selectedBlock.kufiColumns ?? 0) === 0
-                            ? "one line"
-                            : `${selectedBlock.kufiColumns} cells`
-                        }
-                        fieldKey="kufiColumns"
-                      />
-
-                      <RangeRow
-                        id={makeId("kufi-line-gap", selectedId)}
-                        name={makeId("kufiLineGap", selectedId)}
-                        label="Line gap"
-                        value={selectedBlock.kufiLineGap ?? DEFAULT_KUFI_OPTIONS.lineGap}
-                        min={1}
-                        max={8}
-                        step={1}
-                        onChange={(v) => onUpdateSelectedBlock({ kufiLineGap: v })}
-                        suffix="cells"
-                        fieldKey="kufiLineGap"
-                      />
-
-                      <RangeRow
-                        id={makeId("kufi-word-gap", selectedId)}
-                        name={makeId("kufiWordGap", selectedId)}
-                        label="Word gap"
-                        value={selectedBlock.kufiWordGap ?? DEFAULT_KUFI_OPTIONS.wordGap}
-                        min={1}
-                        max={10}
-                        step={1}
-                        onChange={(v) => onUpdateSelectedBlock({ kufiWordGap: v })}
-                        suffix="cells"
-                        fieldKey="kufiWordGap"
-                      />
-
-                      <div className="field">
-                        <span className="fieldTitle">Hand edits</span>
-                        <CheckboxRow
-                          id={makeId("kufi-cell-edit-mode", selectedId)}
-                          label="Paint cells"
-                          checked={selectedBlock.kufiCellEditMode ?? false}
-                          onChange={(v) =>
-                            onUpdateSelectedBlock({ kufiCellEditMode: v })
-                          }
-                        />
-                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                          {selectedBlock.kufiCellEditMode
-                            ? "Click or drag on the lattice to fill cells; click ink to cut it away. The panel cannot be dragged while this is on."
-                            : "Fill or cut single cells by hand — how a panel is finished."}
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 6,
-                            alignItems: "center",
-                            marginTop: 6,
-                          }}
-                        >
-                          <button
-                            type="button"
-                            className="sidebarPillButton"
-                            onClick={() => onUpdateSelectedBlock({ kufiCellEdits: [] })}
-                            disabled={cellEdits.length === 0}
-                            title="Remove every hand-painted cell and go back to the generated grid"
-                          >
-                            Clear hand edits
-                          </button>
-                          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                            {cellEdits.length === 0
-                              ? "none"
-                              : `${cellEdits.length} cell${cellEdits.length === 1 ? "" : "s"}`}
-                          </span>
-                        </div>
-                        {composed.dropped > 0 && (
-                          <div
-                            className="fontMissingNotice"
-                            role="status"
-                            style={{ marginTop: 6 }}
-                          >
-                            {composed.dropped} hand-edited{" "}
-                            {composed.dropped === 1 ? "cell is" : "cells are"} no longer
-                            drawn: the letter each was painted onto has been retyped or
-                            has changed shape. Undo the text edit to bring them back, or
-                            clear the hand edits.
-                          </div>
-                        )}
-                      </div>
-
-                      {missing.length > 0 && (
-                        <div className="fontMissingNotice" role="status">
-                          Left out of the grid: {missing.join(" ")}. The square-kufi
-                          alphabet covers Arabic letters only — digits, Latin and
-                          punctuation have no square form here.
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
         {selectedBlock && selectedBlock.type === "shapeFill" && (
           <div className="sidebarPanel">
             <CollapsibleSection
@@ -3024,7 +2740,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     selected slot (which lives in App.tsx). Written as an IIFE
                     rather than a helper component because this stream owns
                     only the region between these two anchors. */}
-                {selectedBlock.type !== "squareKufi" && selectedBlock.type !== "stack" && (() => {
+                {selectedBlock.type !== "stack" && (() => {
                   const slots = findKashidaSlots(selectedBlock.text);
                   if (slots.length === 0) {
                     return (
@@ -3215,19 +2931,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </>
                   );
                 })()}
-                {/* A square-kufi block loads no font — its letters are cells
-                    on a lattice, not outlines — so the picker and the
-                    unavailable-font notice are hidden rather than left to set
-                    values nothing reads. Same reasoning that hides `fontSize`
-                    for a curve just below.
+                {/* A stacked composition is a bake — its pieces are outlines
+                    captured at conversion, and nothing re-shapes them — so the
+                    picker and the unavailable-font notice are hidden rather
+                    than left to set values nothing reads.
 
                     The upload entry and the uploaded-font list below are
                     deliberately *outside* this guard: they manage the browser's
                     font store rather than this block, and they are the app's
-                    only surface for doing so, so hiding them made uploading or
-                    removing a font impossible whenever a square-kufi block
-                    happened to be selected. */}
-                {selectedBlock.type !== "squareKufi" && selectedBlock.type !== "stack" && (
+                    only surface for doing so. */}
+                {selectedBlock.type !== "stack" && (
                 <>
                 {/* ---- STREAM-G: font upload — unavailable-font notice ---- */}
                 {missingFontKey && (

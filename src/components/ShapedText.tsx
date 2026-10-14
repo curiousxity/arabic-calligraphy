@@ -349,7 +349,7 @@ function drawWarpedGlyphRun(
  * *every* caller — `CanvasStage` and `MirrorBlockView` previously each had
  * to hoist a constant of their own to protect this component's memos, and a
  * caller that forgot got a silent per-frame re-walk with nothing to see.
- * `ShapeFillText` and `SquareKufiText` already follow this pattern.
+ * `ShapeFillText` already follows this pattern.
  */
 const NO_DIACRITIC_OVERRIDES: DiacriticOverride[] = [];
 const NO_MARK_OVERRIDES: DetachedMarkOverride[] = [];
