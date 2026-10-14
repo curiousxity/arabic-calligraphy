@@ -76,8 +76,20 @@ export function translateCmds(cmds: SvgCmd[], dx: number, dy: number): SvgCmd[] 
 }
 
 export function transformCmds(cmds: SvgCmd[], t: PieceTransform): SvgCmd[] {
-  const [px, py] = t.pivot;
-  return translateCmds(rotateCmds(translateCmds(cmds, -px, -py), t.rotation), px + t.x, py + t.y);
+  // Per point through transformPt, so an edge and a CutFace transformed
+  // separately land on bit-identical coordinates (they are matched by equality).
+  const m = (x: number, y: number) => transformPt([x, y], t);
+  return cmds.map((c) => {
+    switch (c.type) {
+      case "M": case "L": { const [x, y] = m(c.x, c.y); return { ...c, x, y }; }
+      case "Q": { const [x, y] = m(c.x, c.y); const [x1, y1] = m(c.x1, c.y1); return { ...c, x, y, x1, y1 }; }
+      case "C": {
+        const [x, y] = m(c.x, c.y); const [x1, y1] = m(c.x1, c.y1); const [x2, y2] = m(c.x2, c.y2);
+        return { ...c, x, y, x1, y1, x2, y2 };
+      }
+      default: return c;
+    }
+  });
 }
 
 export function transformFace(f: CutFace, t: PieceTransform): CutFace {

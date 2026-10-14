@@ -42,6 +42,17 @@ describe("transform", () => {
   it("keeps the area of a transformed outline", () => {
     expect(area(transformCmds(BAR, t))).toBeCloseTo(2000, 6);
   });
+  it("transforms a bridge edge and the matching face to bit-identical points", () => {
+    const u = { x: 13.7, y: -9.1, rotation: 0.7, pivot: [33, -4] as [number, number] };
+    const r = splitAtCut(BAR, { cutX: 40, angle: 0 })!;
+    const segs = toSegments(r.near)[0];
+    const idx = segs.findIndex((s) => s.type === "L" && s.p[0][0] === 40 && s.p[1][0] === 40);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const moved = toSegments(transformCmds(r.near, u))[0][idx].p;
+    const f = transformFace(r.nearFace, u);
+    const aFirst = segs[idx].p[0][1] === r.nearFace.a[1];
+    expect(moved).toEqual(aFirst ? [f.a, f.b] : [f.b, f.a]);
+  });
   it("centres on the outline's bounds", () => {
     expect(cmdsCentre(BAR)).toEqual([50, 0]);
   });
@@ -69,6 +80,17 @@ describe("splitAtCut", () => {
       s.type === "L" && s.p[0][0] === 40 && s.p[1][0] === 40;
     expect(toSegments(r.near)[0].some(isBridge)).toBe(true);
     expect(toSegments(r.far)[0].some(isBridge)).toBe(true);
+  });
+  it("puts the bridge edge's endpoints exactly on the face points of a tilted cut", () => {
+    const tilted = transformCmds(BAR, { x: 0, y: 0, rotation: 0.3, pivot: [0, 0] });
+    const r = splitAtCut(tilted, { cutX: 40, angle: 0.3 })!;
+    const isFace = (q: [number, number]) =>
+      [r.nearFace.a, r.nearFace.b].some((f) => f[0] === q[0] && f[1] === q[1]);
+    const bridge = toSegments(r.near)[0].find(
+      (s) => s.type === "L" && isFace(s.p[0]) && isFace(s.p[1])
+    );
+    expect(bridge).toBeDefined();
+    expect(bridge!.p[0]).not.toEqual(bridge!.p[1]);
   });
   it("cuts an inclined bar in its own frame", () => {
     const tilted = transformCmds(BAR, { x: 0, y: 0, rotation: 0.3, pivot: [0, 0] });
