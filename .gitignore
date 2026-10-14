@@ -45,3 +45,4 @@ src/data/strokeSpines/*-sheet.png
 # repo-level skills would legitimately live.
 /.claude/worktrees/
 .superpowers/
+.playwright-mcp/
