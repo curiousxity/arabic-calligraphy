@@ -3,7 +3,7 @@ import { gotoApp, getBlocks, inkPixels, setBlockText } from "./harf";
 
 /**
  * Compositions — the wizard reached from the Content panel that sets the
- * block's text into a pair, a medallion or a frame. Driven the way a user
+ * block's text into a pair or a medallion. Driven the way a user
  * drives it (sidebar button, dialog cards) and checked against the blocks the
  * bridge reports.
  */
@@ -72,23 +72,6 @@ test.describe("compositions", () => {
     expect(mirror.mode).toBe("radial");
     expect(mirror.radialCount).toBe(8);
     expect(mirror.radialRadius).toBeGreaterThan(0);
-  });
-
-  test("a frame is inserted behind the text, not over it", async ({ page }) => {
-    await gotoApp(page);
-    await setBlockText(page, "محمد");
-    await openWizard(page);
-    await compose(page, "framed");
-
-    await expect.poll(async () => (await getBlocks(page)).length).toBe(2);
-    const blocks = await getBlocks(page);
-    // Z-order is array order, so the frame must come first or it covers the
-    // text it is meant to surround.
-    expect(blocks[0].type).toBe("image");
-    expect(blocks[1].id).toBe(SOURCE_ID);
-    const frame = blocks[0] as { shapeWidth?: number; shapeHeight?: number };
-    expect(frame.shapeWidth ?? 0).toBeGreaterThan(0);
-    expect(frame.shapeHeight ?? 0).toBeGreaterThan(0);
   });
 
   test("a whole composition is a single undo", async ({ page }) => {

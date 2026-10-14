@@ -1,22 +1,13 @@
-import type { Block, ImageBlock } from "../types";
+import type { Block } from "../types";
 import { buildMirrorBlock, resolveRadialCount, type MirrorSource } from "./mirror";
-import {
-  DEFAULT_ORNAMENT_FILL,
-  getOrnament,
-  listOrnaments,
-  ornamentSvgDataUrl,
-  type OrnamentDef,
-} from "./ornaments";
 
 /**
  * The pure half of Compositions: given a block and how wide its text
- * actually draws, decide what a muthanna / medallion / framed composition of
- * it looks like.
+ * actually draws, decide what a muthanna / medallion composition of it looks
+ * like.
  *
  * It builds **no new primitives**. A muthanna and a medallion are both
- * `buildMirrorBlock` with a measured offset or radius; a frame is an ordinary
- * image block carrying an ornament's own SVG, exactly as the ornament picker
- * already inserts one. All this module adds is the arithmetic that turns a
+ * `buildMirrorBlock` with a measured offset or radius. All this module adds is the arithmetic that turns a
  * measured run into placements that don't collide — which is the entire
  * difference between "add a mirror" (a fixed 180px nudge the user then drags)
  * and "compose this text", and the reason it is worth a module of its own.
@@ -28,7 +19,7 @@ import {
  * Vitest's Node ESM loader before any test code runs).
  */
 
-export type CompositionLayoutId = "muthanna" | "medallion" | "framed";
+export type CompositionLayoutId = "muthanna" | "medallion";
 
 export type CompositionLayout = {
   id: CompositionLayoutId;
@@ -50,12 +41,6 @@ export const COMPOSITION_LAYOUTS: CompositionLayout[] = [
     name: "Medallion",
     nameAr: "شمسة",
     description: "Copies of the name turned evenly around a centre.",
-  },
-  {
-    id: "framed",
-    name: "Framed",
-    nameAr: "مؤطر",
-    description: "The name inside a decorative frame from the shape library.",
   },
 ];
 
@@ -135,49 +120,6 @@ export const medallionRadius = (run: RunBox, count?: number): number => {
   return Math.max(tangential, run.width * 0.6);
 };
 
-/**
- * Clearance left between the name and the frame around it.
- *
- * Generous on purpose: the ornaments tagged as frames carry their own border
- * band inside their box (the `border-frame` ring's is ~11% of its width), and
- * the padding has to swallow that band before it starts being clearance. Too
- * tight reads as a mistake; too loose is a drag away from right.
- */
-export const framePadding = (run: RunBox): number => Math.max(run.height * 0.9, 48);
-
-/**
- * The size to insert a frame ornament at so the name sits inside it.
- *
- * Aspect is preserved rather than stretched — these are drawn assets, the
- * same reason the ornament picker passes `preserveAspect` to the SVG
- * importer — so the box is scaled by whichever axis needs more.
- */
-export const frameBoxFor = (viewBox: { w: number; h: number }, run: RunBox): RunBox => {
-  const pad = framePadding(run);
-  const neededWidth = run.width + pad * 2;
-  const neededHeight = run.height + pad * 2;
-  const scale = Math.max(neededWidth / viewBox.w, neededHeight / viewBox.h);
-  return { width: viewBox.w * scale, height: viewBox.h * scale };
-};
-
-/** The library's own tag for an ornament that reads as a frame. */
-export const FRAME_TAG = "frame";
-export const DEFAULT_FRAME_ID = "border-frame";
-/**
- * The ornament palette's own default, read from `lib/ornaments.ts` rather
- * than restated — a second copy of the hex drifted the moment either the
- * shape picker's palette or this one was edited.
- */
-export const DEFAULT_FRAME_COLOR = DEFAULT_ORNAMENT_FILL;
-
-/**
- * The frames on offer — filtered by the library's own tag rather than a
- * hand-kept list here, so an ornament added to `src/data/ornaments/` shows up
- * in this wizard by dropping the file in, exactly as it does in the picker.
- */
-export const frameOrnaments = (): OrnamentDef[] =>
-  listOrnaments().filter((o) => o.tags.includes(FRAME_TAG));
-
 export type CompositionRequest = {
   /** The block the design is built around. Never a mirror. */
   source: MirrorSource;
@@ -185,8 +127,6 @@ export type CompositionRequest = {
   /** The source's measured extent, already through `normalizeRunBox`. */
   run: RunBox;
   radialCount?: number;
-  frameId?: string;
-  frameColor?: string;
 };
 
 /**
@@ -205,55 +145,12 @@ export type CompositionPlan = {
   /** Companion blocks to insert, in order. */
   added: Block[];
   /**
-   * Where `added` belongs in z-order relative to the source. A frame must be
-   * drawn *before* the name or it covers it; a reflection is a peer and goes
-   * on top, where every other newly created block goes.
+   * Where `added` belongs in z-order relative to the source. A reflection is
+   * a peer and goes `front`, where every other newly created block goes;
+   * `behind` is the slot for a companion that must not cover the name.
    */
   placement: "behind" | "front";
 };
-
-/**
- * An image block holding an ornament's own SVG, sized and centred on the name.
- *
- * Built explicitly rather than by patching a template block, for the reason
- * `buildMirrorBlock` beside it is: the fields a block needs are not optional,
- * and spreading a caller's block would carry text/glyph fields that mean
- * nothing on an image and would then be saved with it.
- */
-const buildFrameBlock = (
-  id: number,
-  source: MirrorSource,
-  def: OrnamentDef,
-  box: RunBox,
-  color: string
-): ImageBlock => ({
-  id,
-  type: "image",
-  name: def.name,
-  text: "",
-  imageDataUrl: ornamentSvgDataUrl(def, color),
-  imageScale: 1,
-  shapeWidth: box.width,
-  shapeHeight: box.height,
-  // An image block's x/y is its top-left corner, while a centre-aligned text
-  // block is centred on its own x/y — so centring the frame on the name is a
-  // half-box shift, not a copy of the source's position.
-  x: source.x - box.width / 2,
-  y: source.y - box.height / 2,
-  fontSize: source.fontSize,
-  color,
-  fontFamily: source.fontFamily,
-  opacity: source.opacity ?? 1,
-  stroke: source.stroke,
-  strokeWidth: 0,
-  shadowColor: source.shadowColor,
-  shadowBlur: 0,
-  shadowOffsetX: 0,
-  shadowOffsetY: 0,
-  shadowOpacity: 0,
-  locked: false,
-  rotation: 0,
-});
 
 /**
  * The whole composition: the blocks to add around the source, which itself is
@@ -294,30 +191,12 @@ export function buildComposition(
       };
       return { layout, added: [mirror], placement: "front" };
     }
-
-    case "framed": {
-      // An unknown id falls back to the first tagged frame rather than
-      // failing: the id can only come from a stale UI state or a hand-edited
-      // call, and dropping the composition silently would be worse.
-      const def =
-        getOrnament(request.frameId ?? DEFAULT_FRAME_ID) ?? getOrnament(DEFAULT_FRAME_ID);
-      if (!def) return { layout, added: [], placement: "behind" };
-      const box = frameBoxFor(def.viewBox, run);
-      const frame = buildFrameBlock(
-        nextId(),
-        source,
-        def,
-        box,
-        request.frameColor ?? DEFAULT_FRAME_COLOR
-      );
-      return { layout, added: [frame], placement: "behind" };
-    }
   }
 }
 
 /** One-line report of what was created, for the sidebar's status row. */
 export const describeComposition = (plan: CompositionPlan): string => {
   const label = COMPOSITION_LAYOUTS.find((l) => l.id === plan.layout)?.name ?? "Composition";
-  if (plan.added.length === 0) return "Nothing was added — that frame is not available.";
+  if (plan.added.length === 0) return "Nothing was added.";
   return `Created a ${label.toLowerCase()} composition.`;
 };

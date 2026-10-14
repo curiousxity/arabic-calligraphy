@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   DETACHED_MARK_HANDLE_FILL,
-  addOrnamentShapeFill,
+  addShapeFillFromSvg,
   detachedMarkHitCenters,
   dotCentersWithFill,
   dragFromHere,
@@ -77,7 +77,7 @@ test("a diagonal drag records dx and dy, and the ink moves without a hole", asyn
 
 test("a Shape Fill block arms a hit rect per dot in every tile", async ({ page }) => {
   await gotoApp(page);
-  const id = await addOrnamentShapeFill(page);
+  const id = await addShapeFillFromSvg(page);
   await setBlockText(page, WORD, id);
   await openTypography(page);
   await page.getByLabel("Move dots & marks").check();

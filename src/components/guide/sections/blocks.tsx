@@ -10,7 +10,6 @@ export const section: GuideSection = {
     "shape fill",
     "curve",
     "path",
-    "image",
     "svg",
     "silhouette",
     "mirror",
@@ -23,7 +22,7 @@ export const section: GuideSection = {
   Body: () => (
     <>
       <p>
-        There are five kinds of block, all added from{" "}
+        There are four kinds of block, all added from{" "}
         <strong>Block Controls</strong>. Every one of them can be dragged,
         rotated, coloured, and given an outline or shadow; what differs is how
         the text is laid out.
@@ -75,13 +74,6 @@ export const section: GuideSection = {
         exactly one other block selected; it stays in sync as you keep editing
         the source. See <strong>Mirrored and radial compositions</strong> in
         this guide.
-      </p>
-
-      <h4>Image</h4>
-      <p>
-        A picture placed on the canvas — a background texture, a seal, a
-        reference to trace over. It has scale, opacity, and rotation, and a
-        small handle on its corner when selected for resizing by hand.
       </p>
 
       <h4>Working with blocks</h4>

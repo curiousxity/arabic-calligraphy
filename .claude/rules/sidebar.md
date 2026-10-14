@@ -32,7 +32,7 @@ Two naming rules in the `selected` tier are worth knowing before adding a
 panel there:
 
 - **The *type panel* is named after the block type** — `Shape Fill`,
-  `Curve`, `Image` — and holds only what is specific to it (a
+  `Curve` — and holds only what is specific to it (a
   Shape Fill block's scale/spacing/rotation rows, a Curve block's preset and
   pen-tool controls). It renders directly under Content, above the
   shared panels, because for those types it is the panel that matters
@@ -84,13 +84,12 @@ deliberate action and a second confirmation on top was redundant
 friction.
 
 **Block Controls is three labelled groups on fixed grids**, not one
-wrapping row. `Add` (text, shape fill, curved text, guide,
-image, ornament, mirror, medallion) sits on a 4-column grid — eight buttons,
-two full rows since Square Kufi's button went (2026-10-14), so the next Add
-button would start an orphan third row, exactly the shape described below; `Selected` (duplicate, delete) and
+wrapping row. `Add` (text, shape fill, curved text, guide, mirror,
+medallion) sits on a 4-column grid — six buttons, a full row and a half since
+the Square Kufi, image and ornament buttons went (2026-10-14); `Selected` (duplicate, delete) and
 `History` (undo, redo, history) share a line below it. The row this replaced
 was a centred `flex-wrap` of twelve identical chips, which at the sidebar's
-own width wrapped **8 / 1 / 3** — stranding the ornament button alone on a
+own width wrapped **8 / 1 / 3** — stranding one button alone on a
 line, which reads as a bug rather than a layout. Columns are fixed so the
 shape is chosen rather than emergent. The split also moves the destructive
 `Delete` out of the leading position, where it sat immediately beside
@@ -101,7 +100,7 @@ mechanism: `Add shape fill`, not "Upload SVG for Shape Fill". The `title`
 tooltip carries a trailing `…` when the button opens a picker or a file
 dialog; the `aria-label` stays clean, which is also what keeps the e2e
 selectors plain. Renaming one means updating `e2e/` in the same commit —
-`mirror.spec.ts`, `ornaments.spec.ts` and `ink-surface.spec.ts` all address
+`mirror.spec.ts` and `ink-surface.spec.ts` both address
 these buttons by accessible name.
 
 `PresetKeyboard` takes a `collapsible` flag and renders as a native
@@ -135,12 +134,11 @@ are disabled most of the time. It is used in two places:
 - **Checkbox rows.** `CheckboxRow`'s optional `demo` adds a `DemoHint` play
   icon beside the label, never inside it, because a button inside a
   `<label>` toggles the checkbox. It is used by the Diacritic tool row.
-- **The eight Add buttons.** Each button is its own anchor (the 4-column grid
+- **The six Add buttons.** Each button is its own anchor (the 4-column grid
   has no room for icons) with a 400 ms hover-intent delay, so sweeping across
-  the row doesn't flash eight popovers. Their `title`s were removed and the
+  the row doesn't flash six popovers. Their `title`s were removed and the
   same text now shows as the popover caption, since a native tooltip would
-  stack on top of it; `OrnamentPickerButton` takes `showTitle={false}` for the
-  same reason. `aria-label`s are unchanged, and the e2e specs use them.
+  stack on top of it. `aria-label`s are unchanged, and the e2e specs use them.
 
 The GIFs live in `public/demos/` and are separate from the README's
 full-window GIFs in `docs/media/`, which the app can't serve. The Add-button

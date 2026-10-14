@@ -1,7 +1,6 @@
 export type BlockType =
   | "text"
   | "shapeFill"
-  | "image"
   | "textPath"
   | "mirror"
   | "guide"
@@ -72,14 +71,13 @@ type BlockCommon = {
   shadowOpacity?: number;
   locked?: boolean;
   rotation?: number;
-  ornamental?: boolean;
   groupId?: number;
 
   /**
    * Per-instance diacritic adjustments. Lives on BlockCommon rather than
    * TextBlock because plain text and shapeFill blocks both support the
-   * on-canvas diacritic handles; image and textPath blocks inherit it
-   * unused, an intentional simplification BlockCommon makes throughout.
+   * on-canvas diacritic handles; textPath blocks inherit it unused, an
+   * intentional simplification BlockCommon makes throughout.
    */
   diacriticOverrides?: DiacriticOverride[];
 
@@ -194,12 +192,6 @@ export type ShapeFillBlock = BlockCommon & {
   shapeFillTextRotation?: number;
   /** Arms the on-canvas diacritic hover handles. Opt-in on shapeFill only: a fill tiles its glyph run across the whole silhouette, so the handles' scanline layout pass and their per-instance hit rects are real cost. */
   diacriticEditMode?: boolean;
-};
-
-export type ImageBlock = BlockCommon & {
-  type: "image";
-  imageDataUrl: string;
-  imageScale?: number;
 };
 
 export type TextPathBlock = BlockCommon & {
@@ -319,7 +311,7 @@ export type MirrorMode = "mirrorX" | "mirrorY" | "radial";
  *
  * Like every other variant it carries the whole of `BlockCommon`, including
  * the text/font fields no mirror renderer reads. That is the same deliberate
- * simplification `ImageBlock` already makes.
+ * simplification `BlockCommon` makes throughout.
  *
  * A mirror's source may never itself be a mirror — rejected at creation, and
  * re-checked when resolving, which is what keeps the renderer from recursing.
@@ -338,7 +330,6 @@ export type MirrorBlock = BlockCommon & {
 export type Block =
   | TextBlock
   | ShapeFillBlock
-  | ImageBlock
   | TextPathBlock
   | MirrorBlock
   | GuideBlock

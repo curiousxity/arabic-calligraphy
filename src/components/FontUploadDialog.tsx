@@ -12,7 +12,7 @@ export type FontUploadDialogProps = {
 /**
  * Upload your own font.
  *
- * Portaled to `document.body` for the same reason `OrnamentPicker` and
+ * Portaled to `document.body` for the same reason `FontPickerDialog` and
  * `GuideDrawer` are: the sidebar is an overflow-hidden scrolling column that
  * would clip a modal, and nothing that is not artwork may live inside the
  * Konva stage or it risks being baked into an export.
@@ -168,7 +168,7 @@ export type FontUploadButtonProps = Omit<FontUploadDialogProps, "onClose">;
 
 /**
  * Launcher + dialog as one element, so the mount site needs no open/closed
- * state — the `OrnamentPickerButton` / `GuideLauncher` shape, and for the
+ * state — the `FontPickerField` / `GuideLauncher` shape, and for the
  * same reason: opening a dialog is not an edit and must never reach
  * `App.tsx`'s state, the undo stack, or a saved layout.
  */

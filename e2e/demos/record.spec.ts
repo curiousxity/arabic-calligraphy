@@ -190,23 +190,6 @@ test("add curved text", async ({ browser }) => {
   });
 });
 
-test("add image", async ({ browser }) => {
-  await record(browser, "add-image", clearCanvas, async (page) => {
-    const chooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Add image" }).click();
-    await (await chooser).setFiles(path.join(ROOT, "public/logo-icon.png"));
-    await place(page);
-  });
-});
-
-test("add ornament", async ({ browser }) => {
-  await record(browser, "add-ornament", clearCanvasAt(4), async (page) => {
-    await page.getByRole("button", { name: "Add ornament" }).click();
-    await page.getByRole("button", { name: /^Fill with text: / }).first().click();
-    await place(page);
-  });
-});
-
 test("add mirror", async ({ browser }) => {
   await record(browser, "add-mirror", roomForCopy, async (page) => {
     await page.getByRole("button", { name: "Add mirror" }).click();

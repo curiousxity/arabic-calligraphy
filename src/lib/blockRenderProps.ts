@@ -95,17 +95,6 @@ export function textPathProps(b: Extract<Block, { type: "textPath" }>) {
   };
 }
 
-/** An image block, for `ImageBlockView`. */
-export function imageProps(b: Extract<Block, { type: "image" }>) {
-  return {
-    imageDataUrl: b.imageDataUrl,
-    imageWidth: b.shapeWidth ?? 300,
-    imageHeight: b.shapeHeight ?? 300,
-    imageScale: b.imageScale ?? 1,
-    rotation: b.rotation ?? 0,
-  };
-}
-
 export const stackProps = (b: Extract<Block, { type: "stack" }>) => ({
   ...typographicProps(b),
   // `?? []`: a hand-edited save can drop either list; this build does not

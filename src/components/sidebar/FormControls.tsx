@@ -420,8 +420,8 @@ export const DemoHover = ({
     setPos({ left, top });
   };
   const open = (e: React.SyntheticEvent) => {
-    // React routes events from portalled children (the ornament picker's
-    // dialog) through this span too; only the anchor itself counts.
+    // React routes events from portalled children (a dialog opened from the
+    // wrapped control) through this span too; only the anchor itself counts.
     if (!anchorRef.current?.contains(e.target as Node)) return;
     window.clearTimeout(timer.current);
     if (delay > 0) timer.current = window.setTimeout(show, delay);

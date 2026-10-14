@@ -1,5 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import type Konva from "konva";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 // Type-only, so it is erased before Playwright ever loads this file — but it
 // puts `src/lib/testBridge.ts` into the program, which is what makes the
 // `window.__HARF__` global augmentation visible to every `page.evaluate`
@@ -9,6 +11,8 @@ import type { HarfTestBridge } from "../src/lib/testBridge";
 export type Bridge = HarfTestBridge;
 export type Point = { x: number; y: number };
 export type Box = { x: number; y: number; width: number; height: number };
+
+const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
 
 /** Konva mounts its scene canvas inside this wrapper; the stage has one layer. */
 const STAGE_CANVAS = ".konvajs-content canvas";
@@ -256,34 +260,25 @@ export async function chooseFont(
 }
 
 /**
- * Adds a Shape Fill block from the ornament picker and returns its id.
- *
- * The picker is the one route to a `shapeFill` block that needs no file
- * dialog, which is why three specs already reach for it; this is that
- * sequence with the placement click and the settle poll folded in, so a
- * caller gets a block that is on the canvas and has actually shaped.
+ * Adds a Shape Fill block from the bundled circle fixture and returns its id.
+ * The Add button opens a native file chooser; Playwright intercepts it, so no
+ * dialog is shown. The circle is drawn with curves — SVG `A` commands don't
+ * survive the shape-fill importer.
  */
-export async function addOrnamentShapeFill(
+export async function addShapeFillFromSvg(
   page: Page,
   at: { fx: number; fy: number } = { fx: 0.5, fy: 0.5 }
 ): Promise<number> {
   const before = new Set((await getBlocks(page)).map((b) => b.id));
-  await page.getByRole("button", { name: "Add ornament" }).click();
-  await page
-    .getByRole("button", { name: /^Fill with text: / })
-    .first()
-    .click();
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Add shape fill" }).click();
+  await (await chooser).setFiles(path.join(FIXTURES, "circle.svg"));
   await placeAtCanvas(page, at.fx, at.fy);
 
   await expect
-    .poll(async () =>
-      (await getBlocks(page)).some((b) => b.type === "shapeFill" && !before.has(b.id))
-    )
+    .poll(async () => (await getBlocks(page)).some((b) => b.type === "shapeFill" && !before.has(b.id)))
     .toBe(true);
-
-  const block = (await getBlocks(page)).find(
-    (b) => b.type === "shapeFill" && !before.has(b.id)
-  )!;
+  const block = (await getBlocks(page)).find((b) => b.type === "shapeFill" && !before.has(b.id))!;
   const box = await blockClientBox(page, block.id);
   await expect.poll(() => inkPixels(page, box)).toBeGreaterThan(0);
   return block.id;

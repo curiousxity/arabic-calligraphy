@@ -11,7 +11,7 @@ edges and centres, and the user's ruler guides. This is distinct from the
 origin-to-origin snapping that came before it and which still runs
 alongside: a block's origin is not its visual edge (`ShapedText` offsets
 its box by `align`), so two blocks with coinciding origins can look
-unaligned, and "this text's right edge against that image's left edge"
+unaligned, and "this text's right edge against that shape's left edge"
 was not expressible at all.
 
 `src/lib/snapping.ts` is pure — plain rectangles, no React and no Konva —

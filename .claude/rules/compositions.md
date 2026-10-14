@@ -8,7 +8,7 @@ paths:
 # Compositions (`src/lib/composition.ts`, `CompositionDialog.tsx`)
 
 Content → **Compositions** opens a one-step wizard that sets the selected
-text block into a muthanna pair, a medallion, or a frame, previewed with the
+text block into a muthanna pair or a medallion, previewed with the
 block's own text in the font it already has.
 
 **History.** This was "Name designs" until 2026-10-13: a two-step wizard
@@ -18,13 +18,11 @@ panel's font picker (`FontPickerDialog.tsx`, see [sidebar.md](sidebar.md)),
 and with it went `single`, the request's `fontFamily` and the plan's
 `patch`. The wizard never changes the source block now; it only adds blocks
 around it. Saves are unaffected — a composition was always ordinary mirror
-and image blocks.
+blocks.
 
 **It introduces no new primitive.** A muthanna and a medallion are both
-`buildMirrorBlock`; a frame is an ordinary image block carrying an ornament's
-own SVG, the same way `OrnamentPicker` already inserts one. What
-`lib/composition.ts` adds is the arithmetic that turns a *measured* run into
-placements that don't collide — which is the whole difference between "add a
+`buildMirrorBlock`. What `lib/composition.ts` adds is the arithmetic that
+turns a *measured* run into placements that don't collide — which is the whole difference between "add a
 mirror" (a fixed 180px nudge the user then drags) and "compose this text".
 
 - **Pure, with measurement injected**, exactly as `fitToWidth.ts` is and for
@@ -42,12 +40,6 @@ mirror" (a fixed 180px nudge the user then drags) and "compose this text".
   keeps the copies' inner ends clear of the centre, where the source block is
   still drawn. Getting this backwards produces rings that overlap at high
   counts and look fine at low ones.
-- **Frames go behind, reflections in front.** `CompositionPlan.placement`
-  says which, and `App.tsx` splices accordingly — blocks render in array
-  order, so a frame appended at the end covers the text it is meant to
-  surround. The frame's colour is **baked in at insert** (it is a rasterized
-  image), which is why the wizard offers the swatches before Create rather
-  than after.
 - **Previews are CSS, not canvas**, in the block's own font's CSS family
   (`Sidebar.tsx` resolves it from the same `fontChoices` list the font picker
   uses, so an uploaded font previews in itself too).
@@ -55,8 +47,7 @@ mirror" (a fixed 180px nudge the user then drags) and "compose this text".
   single undo. The block is captured **by id** — measuring is async and the
   selection can change while it runs, the same hazard
   `fitSelectedBlockToWidth` documents beside it. A plan that adds nothing
-  (only possible when no frame ornament exists at all) skips the write and
-  costs no undo step.
+  skips the write and costs no undo step.
 - **`normalizeRunBox` is the only place the run floors are applied.**
   `buildComposition` runs it over its input — it is idempotent, so App's own
   normalize costs nothing — and the placement formulas then read

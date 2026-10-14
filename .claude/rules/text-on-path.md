@@ -54,8 +54,7 @@ fit) instead of `curveGlyphPlacements`' stretch-to-span. Its hit box is its
 letters' extent, not the curve's. See [guides.md](guides.md).
 
 **Drag-based** per-glyph tools (diacritic overrides, stroke stretching) do
-not apply to `textPath` blocks. Their guards exclude `"textPath"` the same
-way they exclude `"image"`. A drag needs an answer to "what does an offset
+not apply to `textPath` blocks. Their guards exclude `"textPath"`. A drag needs an answer to "what does an offset
 mean along a curve": along the tangent, or along the arc? That is left for a
 future spec.
 

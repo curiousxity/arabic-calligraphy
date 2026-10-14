@@ -1,10 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  DEFAULT_FRAME_COLOR,
-  DEFAULT_FRAME_ID,
   COMPOSITION_LAYOUTS,
-  frameOrnaments,
   type CompositionSelection,
   type CompositionLayoutId,
 } from "../lib/composition";
@@ -14,8 +11,6 @@ import {
   RADIAL_COUNT_MIN,
   resolveRadialCount,
 } from "../lib/mirror";
-import type { OrnamentDef } from "../lib/ornaments";
-import { OrnamentFillSwatches } from "./OrnamentPicker";
 import { CloseIcon } from "./Icons";
 
 export type CompositionDialogProps = {
@@ -36,8 +31,8 @@ export type CompositionDialogProps = {
 const PREVIEW_RADIUS = 30;
 
 /**
- * Compositions: set the block's text into a muthanna pair, a medallion or a
- * frame, in the font the block already has. (Choosing the font is the font
+ * Compositions: set the block's text into a muthanna pair or a medallion, in
+ * the font the block already has. (Choosing the font is the font
  * picker's job — this wizard was once "Name designs" and opened on a style
  * gallery, which now lives in `FontPickerDialog`.)
  *
@@ -55,12 +50,8 @@ export const CompositionDialog: React.FC<CompositionDialogProps> = ({
 }) => {
   const [layout, setLayout] = useState<CompositionLayoutId>("muthanna");
   const [radialCount, setRadialCount] = useState(DEFAULT_RADIAL_COUNT);
-  const [frameId, setFrameId] = useState(DEFAULT_FRAME_ID);
-  const [frameColor, setFrameColor] = useState(DEFAULT_FRAME_COLOR);
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  const frames = useMemo(() => frameOrnaments(), []);
-  const frame = frames.find((f) => f.id === frameId) ?? frames[0];
   const name = text.trim();
 
   useEffect(() => {
@@ -76,7 +67,7 @@ export const CompositionDialog: React.FC<CompositionDialogProps> = ({
   }, []);
 
   const apply = () => {
-    onApply({ layout, radialCount, frameId, frameColor });
+    onApply({ layout, radialCount });
   };
 
   return createPortal(
@@ -139,8 +130,6 @@ export const CompositionDialog: React.FC<CompositionDialogProps> = ({
                 name={name || "أبجد"}
                 cssFamily={cssFamily}
                 radialCount={radialCount}
-                frame={frame}
-                frameColor={frameColor}
               />
               <span className="nameLayoutName">
                 {option.name}
@@ -174,31 +163,6 @@ export const CompositionDialog: React.FC<CompositionDialogProps> = ({
           </div>
         )}
 
-        {layout === "framed" && (
-          <div className="nameDesignOptionRow nameDesignOptionRow--wrap">
-            <label htmlFor="composition-frame">Frame</label>
-            <select
-              id="composition-frame"
-              className="nameDesignSelect"
-              value={frame?.id ?? ""}
-              onChange={(e) => setFrameId(e.target.value)}
-            >
-              {frames.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-            <OrnamentFillSwatches value={frameColor} onChange={setFrameColor} />
-            {/* A frame is inserted as a rasterized image, so its colour is
-                baked in at insert time — hence choosing it here rather
-                than leaving the user to discover the limitation. */}
-            <span className="nameDesignHint">
-              A frame's colour is fixed when it is inserted.
-            </span>
-          </div>
-        )}
-
         <div className="nameDesignActions">
           <span className="nameDesignSpacer" />
           <button type="button" className="sidebarSmallAction" onClick={onClose}>
@@ -224,8 +188,6 @@ type LayoutPreviewProps = {
   name: string;
   cssFamily: string;
   radialCount: number;
-  frame?: OrnamentDef;
-  frameColor: string;
 };
 
 /**
@@ -240,8 +202,6 @@ const LayoutPreview: React.FC<LayoutPreviewProps> = ({
   name,
   cssFamily,
   radialCount,
-  frame,
-  frameColor,
 }) => {
   const sample = (
     <span className="namePreviewText" style={{ fontFamily: cssFamily }} dir="rtl" lang="ar">
@@ -277,31 +237,13 @@ const LayoutPreview: React.FC<LayoutPreviewProps> = ({
     );
   }
 
-  if (layout === "framed" && frame) {
-    return (
-      <span className="namePreview">
-        <svg
-          className="namePreviewFrame"
-          viewBox={`0 0 ${frame.viewBox.w} ${frame.viewBox.h}`}
-          aria-hidden="true"
-        >
-          {frame.paths.map((d, i) => (
-            <path key={i} d={d} fill={frameColor} fillRule="evenodd" />
-          ))}
-        </svg>
-        <span className="namePreviewOverlay">{sample}</span>
-      </span>
-    );
-  }
-
   return <span className="namePreview">{sample}</span>;
 };
 
 export type CompositionButtonProps = Omit<CompositionDialogProps, "onClose">;
 
 /**
- * Launcher plus dialog as one element, the way `OrnamentPickerButton` and
- * `GuideLauncher` are: the open state stays local, so opening the wizard
+ * Launcher plus dialog as one element, the way `GuideLauncher` is: the open state stays local, so opening the wizard
  * never reaches `App.tsx`, the undo stack, or a saved layout.
  */
 export const CompositionButton: React.FC<CompositionButtonProps> = ({

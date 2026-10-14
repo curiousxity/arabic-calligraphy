@@ -59,7 +59,6 @@ function guideArcTable(d: string): ArcTable {
 }
 import { TextPathEditOverlay } from "./TextPathEditOverlay";
 import { useTouchPinch } from "../hooks/useTouchPinch";
-import { ImageBlockView } from "./ImageBlockView";
 // STREAM-B (muthanna/radial): the file has no anchored import region, so
 // these two sit with the other renderer imports. Used only by the STREAM-B
 // render case further down.
@@ -94,7 +93,6 @@ import type { AlternateChoice, LetterAlternates } from "../lib/glyphAlternates";
 const NO_ALTERNATE_LETTERS: LetterAlternates[] = [];
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 import {
-  imageProps,
   shapeFillProps,
   shapedTextProps,
   stackProps,
@@ -183,7 +181,6 @@ export type CanvasStageProps = {
   onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
   onSetStrokeCut: (blockId: number, cut: StrokeCut) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
-  onResizeImageBlock: (id: number, scale: number) => void;
   showRulers: boolean;
   guides: { horizontal: number[]; vertical: number[] };
   onAddGuide: (axis: "horizontal" | "vertical", position: number) => void;
@@ -312,7 +309,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   alternateLetters,
   onPickGlyphAlternate,
   onResizeShapeFillBlock,
-  onResizeImageBlock,
   showRulers,
   guides,
   onAddGuide,
@@ -1018,22 +1014,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                   />
                 );
               }
-              if (block.type === "image") {
-                return (
-                  <ImageBlockView
-                    key={block.id}
-                    {...commonProps}
-                    {...imageProps(block)}
-                    x={block.x}
-                    y={block.y}
-                    opacity={block.opacity ?? 1}
-                    locked={block.locked}
-                    isSelected={block.id === selectedId}
-                    onResizeScale={(scale) => onResizeImageBlock(block.id, scale)}
-                  />
-                );
-              }
-
               if (block.type === "shapeFill") {
                 return (
                   <ShapeFillText

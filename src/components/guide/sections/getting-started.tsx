@@ -27,7 +27,7 @@ export const section: GuideSection = {
       <p>
         HarfCanvas is a workspace for composing Arabic calligraphy. Everything
         you place on the canvas is a <strong>block</strong> — a piece of text, a
-        shape filled with text, an image — and the sidebar on the left always
+        shape filled with text — and the sidebar on the left always
         shows the controls for whatever block is currently selected.
       </p>
 

@@ -74,8 +74,8 @@ tatweel never moves, so neither a kashida step nor a Fit to width solve owes
 it a remap — see [glyph-alternates.md](glyph-alternates.md).
 
 Visible for every block type whose text is shaped for joining — the section
-sits inside Typography's existing `type !== "image"` guard, so text, shapeFill
-and textPath all get it with no separate gate.
+sits inside Typography, which text, shapeFill and textPath all show, so they
+all get it with no separate gate.
 
 Known and correct: some fonts substitute differently across a tatweel (الله
 decomposes when interrupted). That is the font doing its job; offering only

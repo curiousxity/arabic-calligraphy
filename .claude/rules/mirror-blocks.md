@@ -16,7 +16,7 @@ shamsa). It is the one primitive both compositions reduce to.
 - **It has no content of its own.** `sourceId` is resolved against `blocks`
   inside `CanvasStage`'s render map on every render, and `MirrorBlockView`
   mounts the *source's own renderer* (`ShapedText` / `ShapeFillText` /
-  `TextOnPathText` / `ImageBlockView`) inside transform wrapper groups. That
+  `TextOnPathText`) inside transform wrapper groups. That
   lookup is the entire "stays live as the source is edited" mechanism — there
   is no sync machinery, and nothing to keep in step. It also means every
   block type is mirrorable without touching the four render algorithms this
@@ -69,4 +69,4 @@ shamsa). It is the one primitive both compositions reduce to.
 - **Sidebar.** The type panel is `Mirror` (mode select, radial count/radius,
   and a "Select source" button that moves the selection to the source).
   Content and Typography are hidden for this type — a mirror has neither of
-  its own — the same way `image` already hides them.
+  its own.

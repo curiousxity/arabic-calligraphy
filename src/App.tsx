@@ -240,7 +240,7 @@ type EditorSnapshot = {
  * follows the cursor as a ghost (rendered by CanvasStage, never part of
  * `blocks`) until a click inside the canvas area commits it at that
  * position. `block.x`/`block.y` here track the raw cursor position; the
- * per-type placement convention (text is center-anchored, shape/image
+ * per-type placement convention (text is center-anchored, shape
  * blocks are top-left-anchored) is reconciled via commitOffsetX/Y only at
  * commit time.
  */
@@ -285,7 +285,6 @@ const DEFAULT_BLOCK: Block = {
   shadowOpacity: 0.35,
   locked: false,
   rotation: 0,
-  ornamental: false,
   type: "text",
 };
 
@@ -1220,7 +1219,7 @@ const App: React.FC = () => {
     setBackgroundColor(bg);
     setBlocks((prev) =>
       prev.map((b) =>
-        b.type === "image" || b.type === "guide" ? b : ({ ...b, fontFamily: font, color: textColor } as Block)
+        b.type === "guide" ? b : ({ ...b, fontFamily: font, color: textColor } as Block)
       )
     );
   };
@@ -1299,13 +1298,6 @@ const App: React.FC = () => {
   const resizeShapeFillBlock = useCallback(
     (id: number, scale: number) => {
       updateBlock(id, { shapeScale: clamp(scale, 0.2, 3) });
-    },
-    [updateBlock]
-  );
-
-  const resizeImageBlock = useCallback(
-    (id: number, scale: number) => {
-      updateBlock(id, { imageScale: clamp(scale, 0.05, 10) });
     },
     [updateBlock]
   );
@@ -2100,57 +2092,6 @@ const App: React.FC = () => {
     setGuideShrink((prev) => (prev.get(id) === shrink ? prev : new Map(prev).set(id, shrink)));
   }, []);
 
-  const addImageBlock = (dataUrl: string, naturalWidth: number, naturalHeight: number) => {
-    const newId = createNextId();
-    const maxDim = (Math.max(canvasWidth, stageViewportHeight) / stageScale) * 0.6;
-    const fitScale = Math.min(1, maxDim / Math.max(naturalWidth, naturalHeight, 1));
-    const displayWidth = naturalWidth * fitScale;
-    const displayHeight = naturalHeight * fitScale;
-
-    beginPlacement(
-      {
-        ...DEFAULT_BLOCK,
-        id: newId,
-        text: "",
-        type: "image",
-        imageDataUrl: dataUrl,
-        imageScale: 1,
-        shapeWidth: displayWidth,
-        shapeHeight: displayHeight,
-        x: 0,
-        y: 0,
-      },
-      displayWidth,
-      displayHeight,
-      -displayWidth / 2,
-      -displayHeight / 2,
-      "New Image"
-    );
-  };
-
-  const uploadImageBlock = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        const img = new window.Image();
-        img.onload = () => {
-          addImageBlock(dataUrl, img.naturalWidth || 300, img.naturalHeight || 300);
-        };
-        img.src = dataUrl;
-      };
-      reader.readAsDataURL(file);
-    };
-
-    input.click();
-  };
-
   const startSidebarResize = (e: React.MouseEvent) => {
     resizeStartX.current = e.clientX;
     resizeStartWidth.current = sidebarWidth;
@@ -2502,22 +2443,6 @@ const App: React.FC = () => {
       : undefined,
   };
   const p1bCanvasProps: Partial<CanvasStageProps> = {};
-  // Both actions deliberately delegate to the existing creation paths rather
-  // than building a block themselves: a built-in ornament must land on the
-  // canvas in exactly the state an uploaded SVG or image does, placement
-  // flow and all.
-  const insertOrnamentShapeFill = (pathData: string, w: number, h: number) => {
-    addShapeFillBlock(pathData, w, h);
-  };
-
-  const insertOrnamentFrame = (dataUrl: string, w: number, h: number) => {
-    addImageBlock(dataUrl, w, h);
-  };
-
-  const p1cSidebarProps: Partial<SidebarProps> = {
-    onInsertOrnamentShapeFill: insertOrnamentShapeFill,
-    onInsertOrnamentFrame: insertOrnamentFrame,
-  };
   /**
    * The patch a tatweel-inserting text edit owes: the new text, plus every
    * field keyed by a source-text offset carried across the insertions.
@@ -2899,7 +2824,7 @@ const App: React.FC = () => {
     // only this handler can supply, so spreading it cannot leave one behind.
     const plan = buildComposition({ source, run, ...selection }, createNextId);
 
-    // Only an unavailable frame adds nothing; that must not cost an undo step.
+    // A plan that adds nothing must not cost an undo step.
     if (plan.added.length === 0) {
       setExportStatus(describeComposition(plan));
       return;
@@ -2911,8 +2836,8 @@ const App: React.FC = () => {
       // The block was deleted while we were measuring; there is nothing to
       // build the composition around any more.
       if (index < 0) return prev;
-      // A frame must be drawn before the name or it covers it; a reflection
-      // is a peer and goes on top, where every new block goes.
+      // Blocks render in array order: a plan placed behind is spliced before
+      // the source; a reflection is a peer and goes on top.
       return plan.placement === "behind"
         ? [...prev.slice(0, index), ...plan.added, ...prev.slice(index)]
         : [...prev, ...plan.added];
@@ -3032,7 +2957,7 @@ const App: React.FC = () => {
         stroke: source.stroke, strokeWidth: source.strokeWidth, shadowColor: source.shadowColor,
         shadowBlur: source.shadowBlur, shadowOffsetX: source.shadowOffsetX, shadowOffsetY: source.shadowOffsetY,
         shadowOpacity: source.shadowOpacity, locked: source.locked, rotation: source.rotation,
-        ornamental: source.ornamental, groupId: source.groupId, fill: source.fill,
+        groupId: source.groupId, fill: source.fill,
         source: { text: source.text, fontFamily },
         unitsPerEm: upm,
         nib,
@@ -3289,7 +3214,7 @@ const App: React.FC = () => {
     const missing = [
       ...new Set(
         blocks
-          .filter((b) => b.type !== "image" && b.type !== "mirror" && b.type !== "guide" && b.type !== "stack")
+          .filter((b) => b.type !== "mirror" && b.type !== "guide" && b.type !== "stack")
           .map((b) => b.fontFamily)
           .filter((key) => key && isFontUnavailable(key, FONT_URLS))
       ),
@@ -3314,7 +3239,6 @@ const App: React.FC = () => {
 
   const selectedFontUnavailable =
     !!selectedBlock &&
-    selectedBlock.type !== "image" &&
     selectedBlock.type !== "guide" &&
     selectedBlock.type !== "stack" &&
     isFontUnavailable(selectedBlock.fontFamily, FONT_URLS);
@@ -3389,7 +3313,6 @@ const App: React.FC = () => {
         onDetachFromGuide={detachSelectedFromGuide}
         onUpdateGuideAttachment={updateGuideAttachment}
         guideShrink={guideShrink}
-        onAddImageBlock={uploadImageBlock}
         onGenerateFromTemplate={generateFromTemplate}
         onRandomizeLayout={randomizeLayout}
         onToggleGrid={setShowGrid}
@@ -3440,7 +3363,6 @@ const App: React.FC = () => {
         {...streamDSidebarProps}
         {...p1aSidebarProps}
         {...p1bSidebarProps}
-        {...p1cSidebarProps}
         {...p1dSidebarProps}
         {...p2eSidebarProps}
         {...p2fSidebarProps}
@@ -3523,7 +3445,6 @@ const App: React.FC = () => {
           onPickGlyphAlternate={pickGlyphAlternate}
           onSetStrokeCut={setStrokeCut}
           onResizeShapeFillBlock={resizeShapeFillBlock}
-          onResizeImageBlock={resizeImageBlock}
           ghostBlock={
             pendingPlacement
               ? {

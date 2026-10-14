@@ -95,7 +95,6 @@ import {
   type ArtboardConfig,
   type ArtboardUnit,
 } from "../lib/artboard";
-import { OrnamentPickerButton } from "./OrnamentPicker";
 // ---- STREAM-E: styles & palettes — imports ----
 import { PaletteSwatches } from "./PaletteSwatches";
 import type { TextStyle } from "../lib/textStyles";
@@ -196,8 +195,6 @@ export type SidebarProps = {
   onSelectMirrorSource?: () => void;
   /** What to call that source in the Mirror panel. */
   mirrorSourceLabel?: string;
-  onInsertOrnamentShapeFill?: (pathData: string, w: number, h: number) => void;
-  onInsertOrnamentFrame?: (dataUrl: string, w: number, h: number) => void;
   kashidaSlotOrdinal?: number;
   onSelectKashidaSlot?: (ordinal: number) => void;
   onSetKashidaAtSlot?: (slot: KashidaSlot, count: number) => void;
@@ -262,7 +259,6 @@ export type SidebarProps = {
   onUpdateGuideAttachment?: (patch: Partial<GuideAttachment>) => void;
   /** Renderer-measured shrink per attached text; never saved. */
   guideShrink?: ReadonlyMap<number, number>;
-  onAddImageBlock?: () => void;
   onGenerateFromTemplate?: (templateId: string, values: string[]) => void;
   onRandomizeLayout?: () => void;
 
@@ -407,8 +403,6 @@ const BLOCK_DEMOS = {
   text: { src: "/demos/add-text.gif", alt: "Placing a new text block on the canvas", width: 400 },
   shapeFill: { src: "/demos/add-shape-fill.gif", alt: "A shape filled with rows of text", width: 400 },
   curvedText: { src: "/demos/add-curved-text.gif", alt: "Placing text that follows a curve", width: 400 },
-  image: { src: "/demos/add-image.gif", alt: "Placing an image on the canvas", width: 400 },
-  ornament: { src: "/demos/add-ornament.gif", alt: "Choosing an ornament and placing it", width: 400 },
   mirror: { src: "/demos/add-mirror.gif", alt: "Adding a mirrored copy of a block", width: 400 },
   medallion: { src: "/demos/add-medallion.gif", alt: "Repeating a block radially as a medallion", width: 400 },
 } satisfies Record<string, DemoMedia>;
@@ -466,8 +460,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   canAddMirrorBlock,
   onSelectMirrorSource,
   mirrorSourceLabel,
-  onInsertOrnamentShapeFill,
-  onInsertOrnamentFrame,
   kashidaSlotOrdinal = 0,
   onSelectKashidaSlot,
   onSetKashidaAtSlot,
@@ -518,7 +510,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDetachFromGuide,
   onUpdateGuideAttachment,
   guideShrink,
-  onAddImageBlock,
   onGenerateFromTemplate,
   onRandomizeLayout,
   onToggleGrid,
@@ -1722,7 +1713,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Three labelled groups rather than one wrapping row of identical
               chips. The old row let flex-wrap choose the shape, and at the
-              sidebar's width it broke 8 / 1 / 3 — leaving the ornament button
+              sidebar's width it broke 8 / 1 / 3 — leaving one button
               stranded alone on a line of its own, which reads as a bug rather
               than a layout. A fixed four-column grid cannot orphan anything.
               Splitting Add from the destructive pair also moves Delete out of
@@ -1779,38 +1770,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </DemoHover>
               )}
           {onAddGuide && <AddGuideButton onAdd={onAddGuide} />}
-
-              {onAddImageBlock && (
-                <DemoHover
-                  className="blockControlDemo"
-                  delay={BLOCK_DEMO_DELAY}
-                  demo={{ ...BLOCK_DEMOS.image, caption: "Add an image…" }}
-                >
-                  <button
-                    type="button"
-                    className="sidebarCircleButton"
-                    aria-label="Add image"
-                    onClick={onAddImageBlock}
-                  >
-                    <ImageIcon size={15} />
-                  </button>
-                </DemoHover>
-              )}
-
-              {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
-                <DemoHover
-                  className="blockControlDemo"
-                  delay={BLOCK_DEMO_DELAY}
-                  demo={{ ...BLOCK_DEMOS.ornament, caption: "Add an ornament or frame…" }}
-                >
-                  <OrnamentPickerButton
-                    variant="circle"
-                    showTitle={false}
-                    onInsertShapeFill={onInsertOrnamentShapeFill}
-                    onInsertFrame={onInsertOrnamentFrame}
-                  />
-                </DemoHover>
-              )}
 
               {/* Inline SVGs rather than entries in Icons.tsx: that file is not
                   this stream's to edit during the Phase 1 parallel run. */}
@@ -2092,9 +2051,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <SidebarTier label="selected" />
 
         {/* A mirror has no content or typography of its own — both come from
-            its source — so it hides these two panels the way image already
-            does. (STREAM-B edit outside its anchors; see the stream report.) */}
-        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && selectedBlock.type !== "stack" && (
+            its source — so it hides these two panels. (STREAM-B edit outside its anchors; see the stream report.) */}
+        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && selectedBlock.type !== "stack" && (
           <div className="sidebarPanel">
             <CollapsibleSection
               title="Content"
@@ -2253,56 +2211,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {selectedBlock && selectedBlock.type === "image" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Image" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
-              <div className="sectionPanel">
-                <RangeRow
-                  id={makeId("image-scale", selectedId)}
-                  name={makeId("imageScale", selectedId)}
-                  label="Scale"
-                  value={selectedBlock.imageScale ?? 1}
-                  min={0.05}
-                  max={10}
-                  step={0.05}
-                  onChange={(v) => onUpdateSelectedBlock({ imageScale: v })}
-                  suffix={(selectedBlock.imageScale ?? 1).toFixed(2)}
-                  fieldKey="imageScale"
-                />
-
-                <RangeRow
-                  id={makeId("opacity", selectedId)}
-                  name={makeId("opacity", selectedId)}
-                  label="Opacity"
-                  value={selectedOpacity}
-                  min={0.1}
-                  max={1}
-                  step={0.05}
-                  onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
-                  suffix={`${Math.round(selectedOpacity * 100)}%`}
-                  fieldKey="opacity"
-                />
-
-                <RangeRow
-                  id={makeId("rotation", selectedId)}
-                  name={makeId("rotation", selectedId)}
-                  label="Rotation"
-                  value={selectedRotation}
-                  min={-180}
-                  max={180}
-                  onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
-                  suffix={`${selectedRotation}°`}
-                  fieldKey="rotation"
-                />
-
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  Tip: drag the gold handle on the image's corner (canvas) to resize.
-                </div>
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
         {selectedBlock && selectedBlock.type === "mirror" && (
           <div className="sidebarPanel">
             <CollapsibleSection
@@ -2403,13 +2311,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onToggle={() => setShowText((v) => !v)}
             >
               <div className="sectionPanel">
-                {(onInsertOrnamentShapeFill || onInsertOrnamentFrame) && (
-                  <OrnamentPickerButton
-                    variant="wide"
-                    onInsertShapeFill={onInsertOrnamentShapeFill}
-                    onInsertFrame={onInsertOrnamentFrame}
-                  />
-                )}
                   <div>
                     <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
                       Tip: drag the gold handle on the shape's corner (canvas) to resize.
@@ -2641,7 +2542,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && (
+        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && (
           <div className="sidebarPanel">
             <CollapsibleSection title="Typography" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
               <div className="sectionPanel">
@@ -3269,7 +3170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Attached text draws at its guide, so its own rotation is inert:
             the guide's Transform is the one that turns it. */}
-        {selectedBlock && selectedBlock.type !== "image" && !(selectedBlock.type === "textPath" && selectedBlock.guide) && (
+        {selectedBlock && !(selectedBlock.type === "textPath" && selectedBlock.guide) && (
           <div className="sidebarPanel">
             <CollapsibleSection
               title="Transform"
@@ -3295,7 +3196,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {selectedBlock && selectedBlock.type !== "image" && selectedBlock.type !== "guide" && (
+        {selectedBlock && selectedBlock.type !== "guide" && (
           <div className="sidebarPanel">
             <CollapsibleSection title="Effects" isOpen={showEffects} onToggle={() => setShowEffects((v) => !v)}>
               <div className="sectionPanel">

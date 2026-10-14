@@ -3,8 +3,8 @@
  * turning a `TextureDef` into a tile image the canvas can repeat.
  *
  * The glob is eager and dropping a module into `defs/` is the entire
- * integration step — the same convention `lib/ornaments.ts` and the guide's
- * section registry already use, and for the same reason: there is no list to
+ * integration step — the same convention the guide's section registry
+ * already uses, and for the same reason: there is no list to
  * forget to update. Anything in `defs/` that does not default-export a
  * well-formed texture is skipped rather than trusted.
  */

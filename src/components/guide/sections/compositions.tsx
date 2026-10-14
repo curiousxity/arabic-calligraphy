@@ -18,9 +18,6 @@ export const section: GuideSection = {
     "mirror",
     "medallion",
     "shamsa",
-    "frame",
-    "framed",
-    "cartouche",
     "layout",
   ],
   Body: () => (
@@ -29,7 +26,7 @@ export const section: GuideSection = {
         A name or a short phrase often wants more than a single line. Type it
         into a text block, choose its font, then open{" "}
         <strong>Compositions</strong> in the <strong>Content</strong> panel to
-        set it into one of three classical arrangements, each previewed with
+        set it into one of two classical arrangements, each previewed with
         your own text in the font the block already has:
       </p>
       <ul>
@@ -44,24 +41,17 @@ export const section: GuideSection = {
           want; the ring opens out as you add them, so they never crowd each
           other.
         </li>
-        <li>
-          <strong>Framed</strong> — the text inside a frame from the shape
-          library, sized around it with room to breathe.
-        </li>
       </ul>
 
       <h4>Afterwards</h4>
       <p>
         Everything a composition creates is an ordinary block. Drag the two
         halves of a muthanna closer, change the medallion's radius in its own
-        panel, resize the frame from its corner handle, or delete any part of
-        it. One <strong>Ctrl+Z</strong> undoes the whole composition at once.
+        panel, or delete any part of it. One <strong>Ctrl+Z</strong> undoes the whole composition at once.
       </p>
       <p>
         A reflection and a medallion stay <em>live</em>: edit the original
-        text, font or colour and every copy follows. A frame is a picture, so
-        its colour is fixed when it is inserted — pick it in the wizard before
-        you create the composition.
+        text, font or colour and every copy follows.
       </p>
       <p>
         Compositions are offered for plain text blocks. A shape-filled block

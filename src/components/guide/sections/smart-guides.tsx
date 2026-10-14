@@ -32,8 +32,8 @@ export const section: GuideSection = {
       <p>
         Alignment follows what you can actually see: the left, right, top and
         bottom of a block's ink, and its middle in both directions. So you can
-        set one line of text flush against the edge of a photograph, centre a
-        title over an ornament, or rest two blocks on a shared baseline —
+        set one line of text flush against the edge of another, centre a
+        title over a shape, or rest two blocks on a shared baseline —
         including when one is centred and the other is not, which used to
         refuse to line up because the two were being measured from their
         anchor points rather than their visible extents.

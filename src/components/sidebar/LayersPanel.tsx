@@ -4,7 +4,6 @@ import type { Block } from "../../types";
 import { makeId } from "./utils";
 import {
   ShapesIcon,
-  ImageIcon,
   LockIcon,
   UnlockIcon,
   ChevronUpIcon,
@@ -22,8 +21,6 @@ const groupColor = (groupId: number) => `hsl(${(groupId * GROUP_HUE_STEP) % 360}
 const blockTypeIcon = (b: Block) =>
   b.type === "shapeFill" ? (
     <ShapesIcon size={13} />
-  ) : b.type === "image" ? (
-    <ImageIcon size={13} />
   ) : b.type === "guide" ? (
     "◯"
   ) : (

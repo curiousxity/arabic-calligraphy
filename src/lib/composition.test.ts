@@ -2,23 +2,16 @@ import { describe, it, expect } from "vitest";
 import type { TextBlock } from "../types";
 import { RADIAL_COUNT_MAX, RADIAL_COUNT_MIN, resolveRadialCount } from "./mirror";
 import {
-  DEFAULT_FRAME_COLOR,
-  DEFAULT_FRAME_ID,
-  FRAME_TAG,
   MIN_RUN_HEIGHT,
   MIN_RUN_WIDTH,
   COMPOSITION_LAYOUTS,
   buildComposition,
   describeComposition,
   estimateRunBox,
-  frameBoxFor,
-  frameOrnaments,
-  framePadding,
   medallionRadius,
   muthannaOffset,
   normalizeRunBox,
 } from "./composition";
-import { getOrnament } from "./ornaments";
 
 const source = (patch: Partial<TextBlock> = {}): TextBlock => ({
   id: 7,
@@ -46,6 +39,10 @@ describe("layout catalogue", () => {
   it("has unique ids", () => {
     const seen = new Set(COMPOSITION_LAYOUTS.map((l) => l.id));
     expect(seen.size).toBe(COMPOSITION_LAYOUTS.length);
+  });
+
+  it("offers exactly muthanna and medallion", () => {
+    expect(COMPOSITION_LAYOUTS.map((l) => l.id)).toEqual(["muthanna", "medallion"]);
   });
 });
 
@@ -124,41 +121,6 @@ describe("medallionRadius", () => {
   });
 });
 
-describe("frameBoxFor", () => {
-  const viewBox = { w: 300, h: 220 };
-
-  it("preserves the ornament's aspect ratio", () => {
-    const box = frameBoxFor(viewBox, run);
-    expect(box.width / box.height).toBeCloseTo(viewBox.w / viewBox.h, 6);
-  });
-
-  it("holds the run plus padding on both axes", () => {
-    const pad = framePadding(run);
-    const box = frameBoxFor(viewBox, run);
-    expect(box.width).toBeGreaterThanOrEqual(run.width + pad * 2 - 1e-6);
-    expect(box.height).toBeGreaterThanOrEqual(run.height + pad * 2 - 1e-6);
-  });
-
-  it("holds a run that is taller than it is wide", () => {
-    const tall = { width: 60, height: 600 };
-    const pad = framePadding(tall);
-    const box = frameBoxFor(viewBox, tall);
-    expect(box.height).toBeGreaterThanOrEqual(tall.height + pad * 2 - 1e-6);
-  });
-});
-
-describe("frameOrnaments", () => {
-  it("offers only ornaments the library itself tags as frames", () => {
-    const frames = frameOrnaments();
-    expect(frames.length).toBeGreaterThan(0);
-    for (const frame of frames) expect(frame.tags).toContain(FRAME_TAG);
-  });
-
-  it("includes the default frame", () => {
-    expect(frameOrnaments().some((f) => f.id === DEFAULT_FRAME_ID)).toBe(true);
-  });
-});
-
 describe("buildComposition", () => {
   it("muthanna adds one mirrored reflection at the measured offset", () => {
     const block = source();
@@ -207,53 +169,6 @@ describe("buildComposition", () => {
     expect(mirror.radialCount).toBe(resolveRadialCount(99));
   });
 
-  it("framed inserts a centred image frame behind the name", () => {
-    const block = source();
-    const plan = buildComposition(
-      {
-        source: block,
-        layout: "framed",
-        run,
-        frameId: DEFAULT_FRAME_ID,
-        frameColor: "#8c1c13",
-      },
-      ids()
-    );
-    expect(plan.placement).toBe("behind");
-    const frame = plan.added[0];
-    expect(frame.type).toBe("image");
-    if (frame.type !== "image") return;
-
-    const def = getOrnament(DEFAULT_FRAME_ID);
-    if (!def) throw new Error("the default frame ornament is missing");
-    const box = frameBoxFor(def.viewBox, run);
-    expect(frame.shapeWidth).toBeCloseTo(box.width, 6);
-    expect(frame.shapeHeight).toBeCloseTo(box.height, 6);
-    // An image block's x/y is its top-left corner while a centre-aligned text
-    // block is centred on its own — so the frame is offset by half its box.
-    expect(frame.x).toBeCloseTo(block.x - box.width / 2, 6);
-    expect(frame.y).toBeCloseTo(block.y - box.height / 2, 6);
-    expect(frame.imageDataUrl.startsWith("data:image/svg+xml;base64,")).toBe(true);
-    expect(frame.color).toBe("#8c1c13");
-  });
-
-  it("framed falls back to the default frame for an unknown id", () => {
-    const plan = buildComposition(
-      { source: source(), layout: "framed", run, frameId: "no-such-frame" },
-      ids()
-    );
-    expect(plan.added).toHaveLength(1);
-    expect(plan.added[0].name).toBe(getOrnament(DEFAULT_FRAME_ID)?.name);
-  });
-
-  it("framed defaults its colour rather than leaving it unset", () => {
-    const plan = buildComposition(
-      { source: source(), layout: "framed", run },
-      ids()
-    );
-    expect(plan.added[0].color).toBe(DEFAULT_FRAME_COLOR);
-  });
-
   it("takes every new id from the injected allocator", () => {
     const nextId = ids(500);
     const first = buildComposition(
@@ -261,7 +176,7 @@ describe("buildComposition", () => {
       nextId
     );
     const second = buildComposition(
-      { source: source(), layout: "framed", run },
+      { source: source(), layout: "medallion", run },
       nextId
     );
     expect(first.added[0].id).toBe(500);

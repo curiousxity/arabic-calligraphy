@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
-  addOrnamentShapeFill,
+  addShapeFillFromSvg,
   alternateTargetCenters,
   centerOf,
   chooseFont,
@@ -164,7 +164,7 @@ test("the block can still be dragged from a gap between outlined letters", async
 
 test("on a Shape Fill block one pick changes the letter in every tile, through one hit node", async ({ page }) => {
   await gotoApp(page);
-  const id = await addOrnamentShapeFill(page);
+  const id = await addShapeFillFromSvg(page);
   await setBlockText(page, "هههه", id);
   await chooseFont(page, "Ruqaa");
   await page.getByLabel("Alternate letter shapes").check();
@@ -175,8 +175,8 @@ test("on a Shape Fill block one pick changes the letter in every tile, through o
 
   const box = await nodeClientBox(page, `#block-${id}`);
   const inkBefore = await inkPixels(page, box!);
-  // The ornament's silhouette is larger than the viewport, so its first
-  // tiles are off screen; aim at the tile nearest the block's centre.
+  // Aim at the tile nearest the block's centre so the pick is on a fully
+  // visible letter.
   const mid = centerOf(box!);
   const at = (await alternateTargetCenters(page)).reduce((best, c) =>
     Math.hypot(c.x - mid.x, c.y - mid.y) < Math.hypot(best.x - mid.x, best.y - mid.y) ? c : best
@@ -224,7 +224,7 @@ test("on a Curve block a click changes the letter, and undo restores it", async 
 
 test("on a Shape Fill block a mark is part of its letter's target, not one of its own", async ({ page }) => {
   await gotoApp(page);
-  const id = await addOrnamentShapeFill(page);
+  const id = await addShapeFillFromSvg(page);
   await chooseFont(page, "Ruqaa");
   await page.getByLabel("Alternate letter shapes").check();
 

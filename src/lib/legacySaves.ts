@@ -5,7 +5,7 @@ import type { Block } from "../types";
  * carry them; nothing renders them, so they are dropped on load rather than
  * left to occupy the layer list. See .claude/rules/removed-subsystems.md.
  */
-export const REMOVED_BLOCK_TYPES = ["shapeWarp", "squareKufi"] as const;
+export const REMOVED_BLOCK_TYPES = ["shapeWarp", "squareKufi", "image"] as const;
 
 /** Per-block fields of removed subsystems, stripped so old saves load byte-clean. */
 export const REMOVED_BLOCK_FIELDS = [
@@ -17,6 +17,8 @@ export const REMOVED_BLOCK_FIELDS = [
   "kufiColumns", "kufiComposition", "kufiLineGap", "kufiWordGap", "kufiCellEdits", "kufiCellEditMode",
   // Warp, removed 2026-10-14.
   "warpX", "warpY",
+  // Image blocks and the ornament library, removed 2026-10-14.
+  "imageDataUrl", "imageScale", "ornamental",
 ] as const;
 
 export function sanitizeLegacyBlocks(blocks: unknown[]): Block[] {

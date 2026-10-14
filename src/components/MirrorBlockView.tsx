@@ -4,12 +4,10 @@ import type Konva from "konva";
 import { ShapedText } from "./ShapedText";
 import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
-import { ImageBlockView } from "./ImageBlockView";
 import { StackView } from "./StackView";
 import { radialCopyTransforms, type MirrorSource } from "../lib/mirror";
 import type { MirrorMode } from "../types";
 import {
-  imageProps,
   shapeFillProps,
   shapedTextProps,
   stackProps,
@@ -121,9 +119,6 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
       locked: true,
       draggable: false,
     };
-    if (source.type === "image") {
-      return <ImageBlockView {...common} {...imageProps(source)} />;
-    }
     if (source.type === "shapeFill") {
       return (
         <ShapeFillText

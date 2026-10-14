@@ -1,6 +1,6 @@
 import { expect, test, type Download, type Page } from "@playwright/test";
 import {
-  addOrnamentShapeFill,
+  addShapeFillFromSvg,
   blockClientBox,
   collectConsoleErrors,
   getBlocks,
@@ -251,8 +251,7 @@ test("a gradient reaches a Shape Fill block", async ({ page }) => {
   // surface inflates the baseline until the gradient can no longer clear it.
   await chooseSurface(page, "");
 
-  // The ornament picker builds a shapeFill block with no file dialog.
-  const blockId = await addOrnamentShapeFill(page, { fx: 0.5, fy: 0.62 });
+  const blockId = await addShapeFillFromSvg(page, { fx: 0.5, fy: 0.62 });
   const block = (await getBlocks(page)).find((b) => b.id === blockId)!;
   const box = await blockClientBox(page, blockId);
   const before = await distinctColors(page, box);
