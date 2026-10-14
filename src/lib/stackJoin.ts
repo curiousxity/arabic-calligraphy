@@ -85,6 +85,51 @@ function bezierAt([p0, p1, p2, p3]: [Pt, Pt, Pt, Pt], t: number): Pt {
   ];
 }
 
+function bezierTangent([p0, p1, p2, p3]: [Pt, Pt, Pt, Pt], t: number): Pt {
+  const u = 1 - t;
+  return [
+    3 * u * u * (p1[0] - p0[0]) + 6 * u * t * (p2[0] - p1[0]) + 3 * t * t * (p3[0] - p2[0]),
+    3 * u * u * (p1[1] - p0[1]) + 6 * u * t * (p2[1] - p1[1]) + 3 * t * t * (p3[1] - p2[1]),
+  ];
+}
+
+/** The most the curve's direction may turn between two neighbouring samples
+ *  before the gap is split. A hairpin (a face pointing away from its partner
+ *  makes the curve overshoot and hook back) turns 180° in a sliver of `t`;
+ *  at `samples` even steps its apex falls between two samples, and the
+ *  offset points computed there sit sideways and cross. */
+const MAX_TURN = Math.PI / 12;
+/** Halvings of a sample gap before giving up on a turn (a true cusp). */
+const MAX_SPLIT = 8;
+
+/** Direction of travel at `t` (unit), or null at a cusp. */
+function directionAt(cl: [Pt, Pt, Pt, Pt], t: number): Pt | null {
+  const d = bezierTangent(cl, t);
+  const len = Math.hypot(d[0], d[1]);
+  return len < EPS ? null : [d[0] / len, d[1] / len];
+}
+
+const turnBetween = (p: Pt | null, q: Pt | null) =>
+  p && q ? Math.acos(Math.max(-1, Math.min(1, p[0] * q[0] + p[1] * q[1]))) : 0;
+
+/** `samples` even steps of t, with every gap the curve turns through more
+ *  than `MAX_TURN` halved until it does not. */
+function sampleParams(cl: [Pt, Pt, Pt, Pt], samples: number): number[] {
+  const out: number[] = [];
+  const push = (t0: number, t1: number, d0: Pt | null, depth: number) => {
+    const d1 = directionAt(cl, t1);
+    if (depth < MAX_SPLIT && turnBetween(d0, d1) > MAX_TURN) {
+      const tm = (t0 + t1) / 2;
+      const dm = directionAt(cl, tm);
+      push(t0, tm, d0, depth + 1);
+      push(tm, t1, dm, depth + 1);
+    } else out.push(t1);
+  };
+  out.push(0);
+  for (let i = 0; i < samples; i++) push(i / samples, (i + 1) / samples, directionAt(cl, i / samples), 0);
+  return out;
+}
+
 /**
  * The join's two edges. The face vector (a→b) is the pen's cross-section
  * where the stroke was cut, so the edges are the centerline ± half of a
@@ -94,6 +139,11 @@ function bezierAt([p0, p1, p2, p3]: [Pt, Pt, Pt, Pt], t: number): Pt {
  * the edges land on the faces exactly. Take it from the faces
  * (`joinFloor`): a floor above the thinner face's own thickness bulges the
  * join in the middle and, at identity, pushes spikes out of the seam.
+ *
+ * The curve is sampled at `samples` even steps of t plus wherever it turns
+ * sharply (`sampleParams`), the rungs stand on the curve's own tangent, and
+ * no two neighbouring rungs cross (`clipRungs`) — the three together are
+ * what keep a hairpin from pinching to a point.
  */
 export function joinEdges(
   A: CutFace, B: CutFace, bow: number, minWidth: number, samples = 24, depth = 0
@@ -102,22 +152,32 @@ export function joinEdges(
   const vA: Pt = [A.b[0] - A.a[0], A.b[1] - A.a[1]];
   const vB: Pt = [B.b[0] - B.a[0], B.b[1] - B.a[1]];
   const edgeA: Pt[] = [], edgeB: Pt[] = [];
-  const centers: Pt[] = [];
+  const ts = sampleParams(cl, samples);
+  const centers = ts.map((t) => bezierAt(cl, t));
+  const last = ts.length - 1;
+  // Direction of travel at each sample: the curve's own, or where it has
+  // none (a cusp) the drawn polyline's.
+  const dirs: Pt[] = ts.map((t, i) => {
+    const own = directionAt(cl, t);
+    if (own) return own;
+    const p = centers[Math.max(0, i - 1)], q = centers[Math.min(last, i + 1)];
+    const dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy);
+    return len < EPS ? [Math.cos(A.tangent), Math.sin(A.tangent)] : [dx / len, dy / len];
+  });
+  // Half of each rung's component across the direction of travel: where the
+  // stroke's edge would be with no nib slant, which is what decides whether
+  // the inner edge of a turn runs backwards (`clipRungs`).
+  const half: Pt[] = [];
   let side = 0;
-  for (let i = 0; i <= samples; i++) centers.push(bezierAt(cl, i / samples));
-  for (let i = 0; i <= samples; i++) {
-    const t = i / samples;
+  for (let i = 0; i <= last; i++) {
+    const t = ts[i];
     const c = centers[i];
     let v: Pt = [vA[0] + (vB[0] - vA[0]) * t, vA[1] + (vB[1] - vA[1]) * t];
-    if (i > 0 && i < samples) {
-      // The drawn polyline's own direction (neighbouring samples), so the
-      // floor holds on what is actually rendered, not on the ideal curve.
-      let dx = centers[i + 1][0] - centers[i - 1][0], dy = centers[i + 1][1] - centers[i - 1][1];
-      const len = Math.hypot(dx, dy);
-      if (len < EPS) { dx = Math.cos(A.tangent); dy = Math.sin(A.tangent); }
-      else { dx /= len; dy /= len; }
-      const n: Pt = [-dy, dx];
-      const along = v[0] * n[0] + v[1] * n[1];
+    const [dx, dy] = dirs[i];
+    const n: Pt = [-dy, dx];
+    const along = v[0] * n[0] + v[1] * n[1];
+    half.push([(along / 2) * n[0], (along / 2) * n[1]]);
+    if (i > 0 && i < last) {
       const tang = v[0] * dx + v[1] * dy;
       // One side for the whole join, from the first sample that has one. When
       // the pen's cross-section passes through the direction of travel the
@@ -125,12 +185,86 @@ export function joinEdges(
       // swaps its two edges (a ribbon twist).
       if (side === 0 && Math.abs(along) > EPS) side = along > 0 ? 1 : -1;
       const normal = (side || 1) * Math.max(Math.abs(along), minWidth);
+      half[i] = [(normal / 2) * n[0], (normal / 2) * n[1]];
       v = [normal * n[0] + tang * dx, normal * n[1] + tang * dy];
     }
     edgeA.push([c[0] - v[0] / 2, c[1] - v[1] / 2]);
     edgeB.push([c[0] + v[0] / 2, c[1] + v[1] / 2]);
   }
-  return { edgeA, edgeB };
+  clipRungs(edgeA, edgeB, centers, half, dirs);
+  return { edgeA: clipFolds(edgeA), edgeB: clipFolds(edgeB) };
+}
+
+/** Where segments p1→p2 and q1→q2 properly cross, or null. */
+function crossing(p1: Pt, p2: Pt, q1: Pt, q2: Pt): Pt | null {
+  const rx = p2[0] - p1[0], ry = p2[1] - p1[1], sx = q2[0] - q1[0], sy = q2[1] - q1[1];
+  const den = rx * sy - ry * sx;
+  if (Math.abs(den) < EPS) return null;
+  const qx = q1[0] - p1[0], qy = q1[1] - p1[1];
+  const t = (qx * sy - qy * sx) / den, u = (qx * ry - qy * rx) / den;
+  if (t <= 0 || t >= 1 || u <= 0 || u >= 1) return null;
+  return [p1[0] + t * rx, p1[1] + t * ry];
+}
+
+/**
+ * Snaps the inner edge to where neighbouring rungs cross. Where the
+ * centerline turns tighter than the edge's offset from it (a hairpin: a face
+ * pointing away from its partner makes the curve overshoot and hook back),
+ * the inner edge runs backwards against the direction of travel, its rung
+ * crosses the one before, and the sliver between them sweeps against the
+ * ribbon — under nonzero fill it cancels the ink it overlaps and the stroke
+ * pinches to a point. Moving the later rung's inner end to the crossing
+ * (the earlier rung's, at the far face, which cannot move) makes the sweep
+ * one-way, so overlaps only add: ink over ink, the corner a real pen leaves.
+ *
+ * Backwards is judged on the edge the rung's *across* component alone would
+ * draw (`centers ± half`), not on the drawn edge: where the nib lies along
+ * the stroke the drawn rungs are long needles that cross one another at a
+ * grazing angle on any bend, and their edge points step back by the slant
+ * alone. Those slivers draw as nothing; clipping them would notch the band.
+ */
+function clipRungs(edgeA: Pt[], edgeB: Pt[], centers: Pt[], half: Pt[], dirs: Pt[]): void {
+  const last = edgeA.length - 1;
+  const backwards = (sign: 1 | -1, i: number) => {
+    const d = dirs[i];
+    const dx = centers[i + 1][0] + sign * half[i + 1][0] - centers[i][0] - sign * half[i][0];
+    const dy = centers[i + 1][1] + sign * half[i + 1][1] - centers[i][1] - sign * half[i][1];
+    return dx * d[0] + dy * d[1] < 0;
+  };
+  for (let i = 0; i < last; i++) {
+    const x = crossing(edgeA[i], edgeB[i], edgeA[i + 1], edgeB[i + 1]);
+    if (!x) continue;
+    const inner = backwards(-1, i) ? edgeA : backwards(1, i) ? edgeB : null;
+    if (!inner) continue;
+    inner[i + 1 === last ? i : i + 1] = x;
+  }
+}
+
+/**
+ * An edge with its folds cut out: each loop the polyline makes by crossing
+ * itself is replaced by the crossing point. Where the nib lies along the
+ * stroke, a rung's slant pushes its two end points far apart along the
+ * curve, and on a bend the end points of neighbouring rungs step back past
+ * one another — a zigzag whose loops wind against the ribbon and notch the
+ * edge. The two end points are never inside a loop, so they stay put.
+ */
+export function clipFolds(pts: Pt[]): Pt[] {
+  // The loop's points all become the crossing, so the edge keeps one point
+  // per rung; `spliceJoin`'s polyline drops the zero-length segments.
+  const out = [...pts];
+  for (let found = true; found; ) {
+    found = false;
+    for (let i = 0; i + 1 < out.length && !found; i++) {
+      for (let j = i + 2; j + 1 < out.length; j++) {
+        const x = crossing(out[i], out[i + 1], out[j], out[j + 1]);
+        if (!x) continue;
+        for (let k = i + 1; k <= j; k++) out[k] = x;
+        found = true;
+        break;
+      }
+    }
+  }
+  return out;
 }
 
 /** A face's thickness across its own stroke: |(b − a) × t̂|. */

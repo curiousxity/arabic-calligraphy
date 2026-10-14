@@ -64,6 +64,26 @@ measuring from there left the handle ~3 px behind for the whole gesture.
 Double-click resets both to 0, the tangent-matched default (not a straight
 line).
 
+**A hairpin must not pinch.** Swing a piece so its face points away from
+its partner (the ح lifted up and left of a ر whose face still looks right)
+and the tangent-matched cubic has to overshoot and hook back — a hairpin
+whose apex turns tighter than half the stroke. Three things in `joinEdges`
+keep that from drawing as a twist: the curve is sampled at `samples` even
+steps *plus* every gap it turns through more than `MAX_TURN` (halved up to
+`MAX_SPLIT` times), so the apex is never between two samples; rungs stand on
+the curve's own tangent, not the polyline's; and `clipRungs` snaps the inner
+end of a rung to where it crosses the rung before, so no rung-to-rung quad
+sweeps backwards — a backwards sweep cancels the ink it overlaps under
+nonzero fill, which is what the pinch (and the white crescent behind it)
+was. Backwards is judged on the *across* component only (`half`): where the
+nib lies along the stroke the drawn rungs are long needles that cross one
+another at a grazing angle on any bend, and clipping those notches the band
+instead. `clipFolds` then cuts the zigzag those needles leave on an edge.
+The ribbon may still overlap itself — ink over ink is the correct result
+when the legs of a hairpin are closer than the stroke is wide. The test
+probes the spine, not the width: with the nib slanted along the stroke the
+across thickness on the inside of a bend is below the floor by the model.
+
 **The floor is the pen's slant**: a face vector is the stroke's perpendicular
 cross-section, so on a 90° climb the model would thin to nothing; a real reed
 held at ~45° draws a vertical stroke nearly as heavy as a horizontal one.

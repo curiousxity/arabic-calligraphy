@@ -12,6 +12,43 @@ const A: CutFace = { a: [0, -10], b: [0, 10], tangent: 0 };
 const B: CutFace = { a: [100, -60], b: [100, -40], tangent: Math.PI };
 const dist = (p: [number, number], q: [number, number]) => Math.hypot(p[0] - q[0], p[1] - q[1]);
 
+type P = [number, number];
+const cross = (o: P, a: P, b: P) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+/** Nonzero winding number of `p` in the closed polygon. */
+function winding(poly: P[], p: P): number {
+  let w = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    if (a[1] <= p[1]) { if (b[1] > p[1] && cross(a, b, p) > 0) w++; }
+    else if (b[1] <= p[1] && cross(a, b, p) < 0) w--;
+  }
+  return w;
+}
+/**
+ * What a join's ribbon must satisfy to read as a pen stroke under nonzero
+ * fill: the whole centerline is inked, away from the two faces. A pinch (a
+ * twist, or a backwards sweep cancelling the ink it overlaps) opens a gap
+ * on the stroke's own spine; a ribbon that merely overlaps itself does not.
+ * (The band either side is not probed: with the nib slanted along the
+ * stroke the across thickness on the inside of a bend is below the floor,
+ * by the model, so a width assertion here would measure the nib, not the
+ * splice.)
+ */
+function expectInked(A: CutFace, B: CutFace, bow: number, depth: number, floor: number, label: string) {
+  const { edgeA, edgeB } = joinEdges(A, B, bow, floor, 24, depth);
+  expect(edgeA.length).toBe(edgeB.length);
+  const poly = [...edgeA, ...[...edgeB].reverse()];
+  const cl = joinCenterline(A, B, bow, depth);
+  for (let k = 6; k < 195; k++) {
+    const t = k / 200, u = 1 - t;
+    const c: P = [
+      u * u * u * cl[0][0] + 3 * u * u * t * cl[1][0] + 3 * u * t * t * cl[2][0] + t * t * t * cl[3][0],
+      u * u * u * cl[0][1] + 3 * u * u * t * cl[1][1] + 3 * u * t * t * cl[2][1] + t * t * t * cl[3][1],
+    ];
+    expect(winding(poly, c), `${label}: no ink on the spine at t=${t}`).not.toBe(0);
+  }
+}
+
 describe("joinCenterline", () => {
   it("starts and ends at the face midpoints, leaving and arriving along the tangents", () => {
     const [p0, p1, p2, p3] = joinCenterline(A, B, 0);
@@ -216,6 +253,28 @@ describe("joinEdges", () => {
     expect(thick[0]).toBeGreaterThan(thick[k] * 2);   // a real dip, not noise
     for (let i = 1; i <= k; i++) expect(thick[i]).toBeLessThanOrEqual(thick[i - 1] + 1e-9);
     for (let i = k + 1; i < thick.length; i++) expect(thick[i]).toBeGreaterThanOrEqual(thick[i - 1] - 1e-9);
+  });
+  it("keeps the stroke inked through a hairpin (a face pointing away from its partner)", () => {
+    // FatemiMaqala's ح→ر faces (179 units tall) with the ح swung up and to the
+    // left of the ر and tilted so it leaves down-right. The ر's face still
+    // faces right, so the curve must overshoot and hook back into it: a
+    // hairpin whose apex turns tighter than half the stroke. The inner edge
+    // then folds over itself and the ribbon pinches to a point.
+    const upm = 2048;
+    const rB: CutFace = { a: [0, 0], b: [0, -179], tangent: 0 };
+    const phi = -(3 * Math.PI) / 4;
+    const place = (p: [number, number]): [number, number] =>
+      [p[0] * Math.cos(phi) - p[1] * Math.sin(phi) - 0.15 * upm, p[0] * Math.sin(phi) + p[1] * Math.cos(phi) - 0.15 * upm];
+    const hA: CutFace = { a: place([0, 0]), b: place([0, -179]), tangent: Math.PI + phi };
+    for (const [bow, depth] of [[0, 0], [0.5, 0], [-0.5, 0], [0, 0.5]]) {
+      const floor = joinFloor(hA, rB, 0.5);
+      expectInked(hA, rB, bow, depth, floor, `bow ${bow} depth ${depth}`);
+      const { edgeA, edgeB } = joinEdges(hA, rB, bow, floor, 24, depth);
+      expect(dist(edgeA[0], hA.a)).toBeLessThan(1e-9);
+      expect(dist(edgeB[0], hA.b)).toBeLessThan(1e-9);
+      expect(dist(edgeA[edgeA.length - 1], rB.a)).toBeLessThan(1e-9);
+      expect(dist(edgeB[edgeB.length - 1], rB.b)).toBeLessThan(1e-9);
+    }
   });
   it("collapses to the face points when the faces coincide", () => {
     const { edgeA, edgeB } = joinEdges(A, { ...A, tangent: Math.PI }, 0, 3, 8);

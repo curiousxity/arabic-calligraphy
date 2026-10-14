@@ -30,6 +30,12 @@ regression, and what it would take to fix.
 - **A dot dragged across a stroke cut on the same letter gets cut**: mark
   translation runs before cut surgery. See
   [detached-marks.md](.claude/rules/detached-marks.md).
+- **A stack join thins below its floor on the inside of a tight bend when
+  the nib lies along the stroke**, and an outline drawn over a join that
+  overlaps itself (a hairpin whose legs are closer than the stroke is wide)
+  shows the overlap's edge through the ink. Both are the slanted-nib model,
+  not the splice; see the hairpin paragraph in
+  [stacked-compositions.md](.claude/rules/stacked-compositions.md).
 - **Five fonts show no dot handles** (Kufi2, Qahiri, RanaKufi, ThuluthDeco,
   Wessam — they build letters from loose pieces, and the detector cannot
   tell a piece from a dot); a dot fused to its stem has no handle in any
@@ -115,6 +121,12 @@ detector's per-font gate numbers are in
 A finished text block converts to a `stack` block: rigid letter pieces joined
 by nib-shaped curves, with split-stroke tails and Teardrop/Almond guides. See
 [stacked-compositions.md](.claude/rules/stacked-compositions.md).
+
+Later the same day: a join whose far face pointed away from its partner
+(the ح swung up and left of the ر) drew a twist, the ribbon pinching to a
+point at the hairpin's apex. `joinEdges` now samples sharp turns densely,
+stands rungs on the curve's tangent, and clips rungs and folds so no part of
+the ribbon sweeps backwards; the hairpin paragraph in the note has the why.
 
 ### 2026-10-13 — UKIJ Diwani replaces Layla Diwani in the picker
 
