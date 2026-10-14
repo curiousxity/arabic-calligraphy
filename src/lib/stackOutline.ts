@@ -28,16 +28,26 @@ export function assembleStackOutline(
   return fromSegments(pool);
 }
 
-/** The piece ids a drag of `pieceId` carries: the piece and its marks, plus
- *  — unless `alone` — every piece later in reading order and their marks. */
+/** The piece ids a drag of `pieceId` carries: the piece and the pieces riding
+ *  on it (`parentId`, transitively), plus — unless `alone` — every letter later
+ *  in reading order. A rider (a mark, or an end cap split off a letter) carries
+ *  only what rides on it. */
 export function chainOf(pieces: readonly StackPiece[], pieceId: string, alone: boolean): string[] {
   const p = pieces.find((x) => x.id === pieceId);
   if (!p) return [];
-  if (p.role === "mark") return [p.id];
-  const letters = new Set(
-    pieces.filter((x) => x.role === "letter" && (x.id === p.id || (!alone && x.order > p.order))).map((x) => x.id)
+  const isRider = p.role === "mark" || p.parentId !== undefined;
+  const ids = new Set<string>(
+    isRider
+      ? [p.id]
+      : pieces.filter((x) => x.role === "letter" && (x.id === p.id || (!alone && x.order > p.order))).map((x) => x.id)
   );
-  return pieces.filter((x) => letters.has(x.id) || (x.parentId !== undefined && letters.has(x.parentId))).map((x) => x.id);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const x of pieces) {
+      if (!ids.has(x.id) && x.parentId !== undefined && ids.has(x.parentId)) { ids.add(x.id); grew = true; }
+    }
+  }
+  return pieces.filter((x) => ids.has(x.id)).map((x) => x.id);
 }
 
 /** The same piece with new local commands, placed so nothing on it moves:

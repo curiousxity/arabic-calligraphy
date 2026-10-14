@@ -129,8 +129,9 @@ async function shapeReal(
 }
 
 import { convertRunToStack, runOutline, splitPieceAtCut } from "./stackConvert";
-import { assembleStackOutline } from "./stackOutline";
-import { flattenContours } from "./strokeCuts";
+import { assembleStackOutline, chainOf } from "./stackOutline";
+import type { StackJoin, StackPiece } from "../types";
+import { flattenContours, outlineBounds } from "./strokeCuts";
 import type { SvgCmd } from "./svgPath";
 
 const area = (cmds: SvgCmd[]) =>
@@ -215,22 +216,70 @@ describe("convertRunToStack", () => {
     expect(rel(lifted) - rel(plain)).toBeCloseTo((-10 * upm) / 100, 6);
   });
 
-  it("splitPieceAtCut turns one piece into two joined pieces with the same outline", async () => {
+  const resolves = (pieces: StackPiece[], joins: StackJoin[]) =>
+    joins.every((j) => [j.from, j.to].every((r) => {
+      const pc = pieces.find((x) => x.id === r.pieceId);
+      return !!pc && r.faceIndex >= 0 && r.faceIndex < pc.faces.length;
+    }));
+
+  async function zonesOf(target: StackPiece) {
+    const { findCutZonesSwept, DEFAULT_DETECT_OPTS } = await import("./strokeCuts");
+    return findCutZonesSwept(flattenContours(target.cmds), { glyphIndex: 0, cluster: 0 },
+      { ...DEFAULT_DETECT_OPTS, step: 10, minZoneWidth: 25 });
+  }
+
+  it("splitPieceAtCut makes a rider end cap with the same outline and valid joins", async () => {
     const { result } = await convert("مصبح", "UKIJDiwani.ttf");
     const nib = { width: 100, minFraction: 0.15 };
     const before = area(assembleStackOutline(result.pieces, result.joins, nib));
+    expect(resolves(result.pieces, result.joins)).toBe(true);
     const target = result.pieces.find((p) => p.role === "letter")!;
-    // Any legal zone on the piece works; take the first the detector offers.
-    const { findCutZonesSwept, DEFAULT_DETECT_OPTS } = await import("./strokeCuts");
-    const zones = findCutZonesSwept(flattenContours(target.cmds), { glyphIndex: 0, cluster: 0 },
-      { ...DEFAULT_DETECT_OPTS, step: 10, minZoneWidth: 25 });
+    const zones = await zonesOf(target);
     expect(zones.length).toBeGreaterThan(0);
     const z = zones[0];
     const split = splitPieceAtCut(result.pieces, result.joins, target.id, { cutX: (z.fromX + z.toX) / 2, angle: z.angle });
     expect(split).not.toBeNull();
     expect(split!.pieces.length).toBe(result.pieces.length + 1);
     expect(split!.joins.length).toBe(result.joins.length + 1);
+    expect(resolves(split!.pieces, split!.joins)).toBe(true);
     const after = area(assembleStackOutline(split!.pieces, split!.joins, nib));
     expect(Math.abs(after - before) / before).toBeLessThan(1e-4);
+
+    const body = split!.pieces.find((p) => p.id === target.id)!;
+    const cap = split!.pieces.find((p) => p.parentId === body.id && p.role === "letter")!;
+    expect(cap).toBeDefined();
+    expect(cap.order).toBe(body.order);
+    // The cap is the smaller fragment.
+    const bb = (p: StackPiece) => { const b = outlineBounds(p.cmds); return (b.x2 - b.x1) * (b.y2 - b.y1); };
+    expect(bb(cap)).toBeLessThanOrEqual(bb(body));
+    // Chains: body carries cap and later letters; alone carries the cap; cap carries only itself.
+    const ps = split!.pieces;
+    const withBody = chainOf(ps, body.id, false);
+    expect(withBody).toContain(cap.id);
+    for (const l of ps.filter((p) => p.role === "letter" && p.order > body.order)) expect(withBody).toContain(l.id);
+    expect(chainOf(ps, body.id, true)).toContain(cap.id);
+    expect(chainOf(ps, body.id, true).filter((id) => ps.find((p) => p.id === id)!.role === "letter").sort())
+      .toEqual([body.id, cap.id].sort());
+    expect(chainOf(ps, cap.id, false)).toEqual([cap.id]);
+  });
+
+  it("splitting the same body twice keeps piece and join ids unique", async () => {
+    const { result } = await convert("مصبح", "UKIJDiwani.ttf");
+    const target = result.pieces.find((p) => p.role === "letter")!;
+    const zones = await zonesOf(target);
+    let cur: { pieces: StackPiece[]; joins: StackJoin[] } = { pieces: result.pieces, joins: result.joins };
+    let done = 0;
+    for (const z of zones) {
+      const cutX = (z.fromX + z.toX) / 2;
+      const body = cur.pieces.find((p) => p.id === target.id)!;
+      const next = splitPieceAtCut(cur.pieces, cur.joins, body.id, { cutX, angle: z.angle });
+      if (!next) continue;
+      cur = next;
+      if (++done === 2) break;
+    }
+    expect(done).toBe(2);
+    expect(new Set(cur.pieces.map((p) => p.id)).size).toBe(cur.pieces.length);
+    expect(new Set(cur.joins.map((j) => j.id)).size).toBe(cur.joins.length);
+    expect(resolves(cur.pieces, cur.joins)).toBe(true);
   });
 });

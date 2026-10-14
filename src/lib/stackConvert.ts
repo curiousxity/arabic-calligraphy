@@ -99,10 +99,10 @@ export function convertRunToStack(input: ConvertInput): ConvertResult {
   const letters = placed.filter((p) => p.kind === "letter").sort((a, b) => a.cl - b.cl);
   type Draft = { placed: Placed; cmds: SvgCmd[]; faces: CutFace[]; id: string; order: number };
   const drafts: Draft[] = letters.map((p, order) => ({ placed: p, cmds: [...p.cmds], faces: [], id: `p${p.index}`, order }));
-  const ownerOf = (cl: number) => {
+  const ownerOf = (cl: number): Draft | undefined => {
     let best: Draft | null = null;
     for (const d of drafts) if (d.placed.cl <= cl && (!best || d.placed.cl > best.placed.cl)) best = d;
-    return best ?? drafts[0];
+    return best ?? (drafts[0] as Draft | undefined);
   };
 
   // Tatweels ride with the letter before them in the text.
@@ -159,6 +159,7 @@ export function convertRunToStack(input: ConvertInput): ConvertResult {
     const o = input.diacriticOverrides.find((d) => d.glyphIndex === m.index);
     if (o?.hidden) continue;
     const parent = ownerOf(m.cl);
+    if (!parent) continue;
     const cmds = markAdjusted(m.cmds, o);
     markPieces.push({
       id: `m${m.index}`, cmds, x: m.px, y: m.py + (o?.offsetY ?? 0) * scale, rotation: 0,
@@ -173,14 +174,18 @@ export function convertRunToStack(input: ConvertInput): ConvertResult {
 
   // Centre the composition on the run's ink so the block does not jump.
   const all = [...letterPieces, ...markPieces];
+  if (all.length === 0) return { pieces: [], joins, unjoined };
   const b = outlineBounds(all.flatMap((p) => translateCmds(p.cmds, p.x, p.y)));
   const cx = (b.x1 + b.x2) / 2, cy = (b.y1 + b.y2) / 2;
   const pieces = all.map((p) => ({ ...p, x: p.x - cx, y: p.y - cy, homeX: p.x - cx, homeY: p.y - cy }));
   return { pieces, joins, unjoined };
 }
 
-/** Cut a piece's stroke; the far fragment becomes its own piece joined to
- *  the near one. Orders are renumbered so the new piece follows its parent. */
+/** Cut a piece's stroke. The fragment with the smaller bounds is the end cap:
+ *  it becomes its own letter piece riding on the body (`parentId`, same
+ *  order) and is joined to it. The body keeps the original id whichever side
+ *  of the cut it is on, so existing joins on the body stay valid; faces and
+ *  join references follow whichever fragment now holds them. */
 export function splitPieceAtCut(
   pieces: readonly StackPiece[], joins: readonly StackJoin[], pieceId: string, cut: { cutX: number; angle: number }
 ): { pieces: StackPiece[]; joins: StackJoin[] } | null {
@@ -188,35 +193,38 @@ export function splitPieceAtCut(
   if (!p || p.role !== "letter") return null;
   const split = splitAtCut(p.cmds, cut);
   if (!split) return null;
-  const nearPiece = rebasePiece(p, split.near);
-  const farId = `${p.id}t${p.faces.length}`;
-  const farPiece = rebasePiece({ ...p, id: farId, order: p.order + 0.5, parentId: undefined }, split.far);
-  // Faces on the old piece that now live in the far fragment: a face whose
-  // points sit on the far side of the cut moves with it.
-  const inFar = (f: CutFace) => {
-    const c = Math.cos(-cut.angle), s = Math.sin(-cut.angle);
-    return f.a[0] * c - f.a[1] * s >= cut.cutX;
+  const boundsArea = (cmds: SvgCmd[]) => { const b = outlineBounds(cmds); return (b.x2 - b.x1) * (b.y2 - b.y1); };
+  const capIsNear = boundsArea(split.near) <= boundsArea(split.far);
+  const bodyCmds = capIsNear ? split.far : split.near;
+  const capCmds = capIsNear ? split.near : split.far;
+  const bodyNewFace = capIsNear ? split.farFace : split.nearFace;
+  const capNewFace = capIsNear ? split.nearFace : split.farFace;
+
+  const n = 1 + pieces.filter((x) => x.id.startsWith(`${p.id}t`)).length;
+  const capId = `${p.id}t${n}`;
+
+  // Which fragment holds an existing face: decided by its midpoint in the cut's frame.
+  const c = Math.cos(-cut.angle), sn = Math.sin(-cut.angle);
+  const isNearSide = (f: CutFace) => {
+    const mx = (f.a[0] + f.b[0]) / 2, my = (f.a[1] + f.b[1]) / 2;
+    return mx * c - my * sn < cut.cutX;
   };
-  const movedFaces: number[] = [];
-  const nearFaces: CutFace[] = [];
-  p.faces.forEach((f, i) => (inFar(f) ? movedFaces.push(i) : nearFaces.push(f)));
-  const near: StackPiece = { ...nearPiece, faces: [...nearFaces, split.nearFace] };
-  const far: StackPiece = { ...farPiece, faces: [...movedFaces.map((i) => p.faces[i]), split.farFace] };
-  const nearIdx = (i: number) => nearFaces.indexOf(p.faces[i]);
-  const farIdx = (i: number) => movedFaces.indexOf(i);
+  const bodyIdxs: number[] = [], capIdxs: number[] = [];
+  p.faces.forEach((f, i) => (isNearSide(f) === capIsNear ? capIdxs : bodyIdxs).push(i));
+
+  const body: StackPiece = { ...rebasePiece(p, bodyCmds), faces: [...bodyIdxs.map((i) => p.faces[i]), bodyNewFace] };
+  const cap: StackPiece = {
+    ...rebasePiece({ ...p, id: capId }, capCmds),
+    role: "letter", parentId: p.id, order: p.order,
+    faces: [...capIdxs.map((i) => p.faces[i]), capNewFace],
+  };
   const remap = (ref: { pieceId: string; faceIndex: number }) =>
     ref.pieceId !== p.id ? ref
-      : movedFaces.includes(ref.faceIndex) ? { pieceId: farId, faceIndex: farIdx(ref.faceIndex) }
-      : { pieceId: p.id, faceIndex: nearIdx(ref.faceIndex) };
+      : capIdxs.includes(ref.faceIndex) ? { pieceId: capId, faceIndex: capIdxs.indexOf(ref.faceIndex) }
+      : { pieceId: p.id, faceIndex: bodyIdxs.indexOf(ref.faceIndex) };
   const newJoins: StackJoin[] = [
     ...joins.map((j) => ({ ...j, from: remap(j.from), to: remap(j.to) })),
-    { id: `j${p.id}-${farId}`, from: { pieceId: p.id, faceIndex: near.faces.length - 1 }, to: { pieceId: farId, faceIndex: far.faces.length - 1 }, bow: 0 },
+    { id: `j${p.id}-${capId}`, from: { pieceId: p.id, faceIndex: body.faces.length - 1 }, to: { pieceId: capId, faceIndex: cap.faces.length - 1 }, bow: 0 },
   ];
-  const withNew = pieces.map((x) => (x.id === p.id ? near : x)).concat(far);
-  const letters = withNew.filter((x) => x.role === "letter").sort((a, b) => a.order - b.order);
-  const orderOf = new Map(letters.map((x, i) => [x.id, i]));
-  const renumbered = withNew.map((x) =>
-    x.role === "letter" ? { ...x, order: orderOf.get(x.id)! } : { ...x, order: orderOf.get(x.parentId ?? "") ?? x.order }
-  );
-  return { pieces: renumbered, joins: newJoins };
+  return { pieces: pieces.map((x) => (x.id === p.id ? body : x)).concat(cap), joins: newJoins };
 }
