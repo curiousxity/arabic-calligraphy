@@ -1106,6 +1106,9 @@ const App: React.FC = () => {
     const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // The start overlay hides the editor; its shortcuts (delete, nudge,
+      // paste, undo) must not act on the block underneath it.
+      if (showStart) return;
       const meta = e.ctrlKey || e.metaKey;
       const typing = isTypingTarget(e.target);
 
@@ -1198,6 +1201,7 @@ const App: React.FC = () => {
     deleteSelectedBlock,
     writing,
     beginWritingOnGuide,
+    showStart,
   ]);
 
   const createNextId = () => {

@@ -17,7 +17,17 @@ export type StartScreenProps = {
 export const StartScreen: React.FC<StartScreenProps> = ({ fonts, onPick, onSkip }) => {
   const [text, setText] = useState(STARTER_TEXT);
   return (
-    <div className="startScreen" data-testid="start-screen" role="dialog" aria-modal="true" aria-label="Choose a font to begin">
+    // Keys pressed inside the overlay stay inside it: the editor's window
+    // listeners (CanvasStage's Space-to-pan calls preventDefault) would
+    // otherwise swallow Space before it can activate a card or Skip.
+    <div
+      className="startScreen"
+      data-testid="start-screen"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Choose a font to begin"
+      onKeyDown={(e) => e.stopPropagation()}
+    >
       <header className="startScreenHeader">
         <div>
           <h1 className="startScreenTitle">HarfCanvas</h1>

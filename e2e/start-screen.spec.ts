@@ -13,6 +13,7 @@ test("a fresh load shows the start screen and typing updates every card", async 
   expect(await gallery.locator(".fontPickerCard").count()).toBeGreaterThan(10);
   await page.getByLabel("Your text").fill("محمد");
   await expect(gallery.locator('[data-font-key="Amiri"] .fontPickerSample')).toHaveText("محمد");
+  await expect(gallery.locator('[data-font-key="Thuluth"] .fontPickerSample')).toHaveText("محمد");
   await expect(gallery.getByRole("heading", { name: "Naskh", exact: true })).toBeVisible();
 });
 
@@ -54,4 +55,38 @@ test("a quick-save bypasses the start screen", async ({ page }) => {
   await page.reload();
   await page.locator(STAGE_CANVAS).first().waitFor();
   await expect(page.getByTestId("start-screen")).toHaveCount(0);
+});
+
+test("editor shortcuts do not act on the hidden block while the start screen is up", async ({ page }) => {
+  await gotoFresh(page);
+  await page.getByTestId("start-gallery").locator('[data-font-key="Amiri"]').focus();
+  await page.keyboard.press("Delete");
+  await page.keyboard.press("ArrowLeft");
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await expect(page.getByTestId("start-screen")).toHaveCount(0);
+  const blocks = await getBlocks(page);
+  expect(blocks).toHaveLength(1);
+  expect(blocks[0].x).toBe(0);
+});
+
+test("undo after picking a font does not bring back the default block", async ({ page }) => {
+  await gotoFresh(page);
+  const card = page.getByTestId("start-gallery").locator('[data-font-key="Thuluth"]');
+  // A shortcut pressed on the overlay must not leave a history entry behind.
+  await card.focus();
+  await page.keyboard.press("Delete");
+  await card.click();
+  await expect(page.getByTestId("start-screen")).toHaveCount(0);
+  await page.keyboard.press("Control+z");
+  const blocks = await getBlocks(page);
+  expect(blocks).toHaveLength(1);
+  expect(blocks[0].fontFamily).toBe("Thuluth");
+});
+
+test("Space on a focused card picks it", async ({ page }) => {
+  await gotoFresh(page);
+  await page.getByTestId("start-gallery").locator('[data-font-key="Thuluth"]').focus();
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("start-screen")).toHaveCount(0);
+  expect((await getBlocks(page))[0].fontFamily).toBe("Thuluth");
 });
