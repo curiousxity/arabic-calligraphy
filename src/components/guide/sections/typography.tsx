@@ -71,9 +71,12 @@ export const section: GuideSection = {
       </p>
       <ul>
         <li>
-          <strong>Font family</strong> — sixteen faces, from formal Thuluth and
-          Naskh to Kufi and Ruqaa. The list previews each name in its own
-          typeface, so browse it rather than reading it.
+          <strong>Font family</strong> — click it to see your own text written
+          in every font at once, grouped by style, from formal Thuluth and
+          Naskh to Kufi and Ruqaa, with any font you have uploaded at the end.
+          Click one to use it; Esc closes without changing anything. The
+          previews are drawn by the browser, so a font may sit very slightly
+          differently on the canvas, where the text is shaped properly.
         </li>
         <li>
           <strong>Font size</strong> — hidden for curve blocks, where the

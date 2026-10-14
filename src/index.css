@@ -152,16 +152,6 @@ html, body, #root { height: 100%; margin: 0; }
 .floatingKeyboard { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 1000; width: min(560px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; background: var(--bg-panel-floating); border: 1px solid var(--border-soft); border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); padding: 10px; box-sizing: border-box; }
 .floatingKeyboardHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--text-primary); }
 
-.fontSelectShell { position: relative; padding: 0; }
-.fontSelectTrigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; text-align: left; }
-.fontSelectTriggerLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fontSelectCaret { flex-shrink: 0; color: var(--text-muted); font-size: 11px; }
-.fontSelectList { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; margin: 0; padding: 6px; list-style: none; max-height: 260px; overflow-y: auto; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
-.fontSelectGroup { padding: 10px 10px 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
-.fontSelectGroup:first-child { padding-top: 4px; }
-.fontSelectOption { display: block; width: 100%; text-align: left; padding: 8px 10px; border: none; border-radius: 8px; background: transparent; color: var(--text-primary); font-size: 14px; cursor: pointer; }
-.fontSelectOption:hover { background: var(--overlay-hover); }
-.fontSelectOption--active { background: var(--accent-soft); color: var(--accent); }
 
 .historyPopoverShell { position: relative; display: inline-flex; }
 .historyPopoverList { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 30; display: flex; flex-direction: column; gap: 4px; width: 170px; max-height: 320px; overflow-y: auto; margin: 0; padding: 6px; background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
@@ -446,20 +436,37 @@ html, body, #root { height: 100%; margin: 0; }
 .fontMissingNotice { margin-bottom: 8px; padding: 8px 10px; border-radius: 8px; font-size: 11px; line-height: 1.5; background: var(--danger-soft); color: var(--danger); }
 /* ---- /STREAM-G ---- */
 
-/* ---- Name designs — style gallery + composition wizard ---- */
-/* Reuses .confirmDialogOverlay, the ornament picker's dialog chrome (box,
-   header, title, subtitle, grid) and its swatch controls; only the wider
-   preview cards and the composition previews below are new. */
+/* ---- Compositions wizard and font picker ---- */
+/* Compositions (CompositionDialog), and the dialog chrome the font picker,
+   verse and guide dialogs share. Reuses .confirmDialogOverlay, the ornament
+   picker's dialog chrome (box, header, title, subtitle, grid) and its swatch
+   controls; only the composition previews below are new. */
 .nameDesignDialog { max-height: 88vh; }
 .nameDesignGrid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 .nameDesignEmpty { padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; background: var(--overlay-hover); color: var(--text-muted); }
 
 .nameDesignGrid--layouts { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 
-.nameStyleCard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 8px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--overlay-hover); cursor: pointer; }
-.nameStyleCard--active { border-color: var(--accent); outline: 1px solid var(--accent); }
-.nameStyleSample { display: block; width: 100%; min-width: 0; font-size: 30px; line-height: 1.6; color: var(--text-primary); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nameStyleLabel { font-size: 11px; color: var(--text-muted); }
+/* Font picker (FontPickerDialog): the same dialog chrome, a scrolling body
+   of genre sections, each a heading over a grid of cards. The cards are the
+   old name-design style cards, renamed with the gallery that now owns them. */
+.fontPickerBody { flex: 1; min-height: 0; overflow-y: auto; padding: 2px; }
+.fontPickerGenre { margin: 14px 2px 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.fontPickerBody > section:first-child .fontPickerGenre { margin-top: 2px; }
+.fontPickerGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.fontPickerGrid > * { min-width: 0; }
+.fontPickerCard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 8px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--overlay-hover); color: var(--text-primary); cursor: pointer; }
+.fontPickerCard:hover { border-color: var(--border); }
+.fontPickerCard--active { border-color: var(--accent); outline: 1px solid var(--accent); }
+.fontPickerSample { display: block; width: 100%; min-width: 0; font-size: 30px; line-height: 1.6; color: var(--text-primary); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fontPickerLabel { font-size: 11px; color: var(--text-muted); }
+
+/* The Typography row that opens it: the current font's name, in that font. */
+.fontPickerShell { padding: 0; }
+.fontPickerTrigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; text-align: left; cursor: pointer; }
+.fontPickerTriggerLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fontPickerTriggerHint { flex-shrink: 0; color: var(--text-muted); font-size: 11px; }
+
 
 .nameLayoutCard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 10px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--overlay-hover); cursor: pointer; text-align: center; }
 .nameLayoutCard--active { border-color: var(--accent); outline: 1px solid var(--accent); }

@@ -224,9 +224,9 @@ export async function openTypography(page: Page): Promise<void> {
 /**
  * Picks a font by its label in Typography's font picker.
  *
- * Typography starts collapsed, and the picker is a custom listbox rather
- * than a native `<select>` (it previews each family in itself), so this is
- * three clicks: the section header, the trigger, then the option.
+ * Typography starts collapsed, and the picker is a dialog of preview cards
+ * rather than a native `<select>`, so this is three clicks: the section
+ * header, the trigger, then the card. The dialog closes on the pick.
  *
  * `uploaded` appends the suffix the picker gives a user-uploaded family
  * (`Sidebar.tsx` builds it as `${label} (uploaded)`); keeping that here
@@ -239,21 +239,20 @@ export async function chooseFont(
   opts: { uploaded?: boolean } = {}
 ): Promise<void> {
   await openTypography(page);
-  await page.getByRole("button", { name: /^Font family$/ }).click();
-  // Every option's accessible name is its label plus the picker's preview
-  // suffix ("Noto Sans — أبجد"). Anchoring on that suffix's own dash rather
-  // than matching a bare prefix is what keeps "Thuluth" from also matching
-  // "Thuluth Deco"; escaping the label is what lets one carry parentheses.
+  // The trigger is named by its label and then the current font, so anchor
+  // on the label alone.
+  await page.getByRole("button", { name: /^Font family\b/ }).click();
+  const picker = page.getByTestId("font-picker");
+  await picker.waitFor();
+  // Matching the card's label exactly is what keeps "Thuluth" from also
+  // matching "Thuluth Deco" — the card's full accessible name also holds the
+  // Arabic sample, so a name match would have to anchor around it.
   const option = opts.uploaded ? `${label} (uploaded)` : label;
-  await page
-    .getByRole("option", { name: new RegExp(`^${escapeRegExp(option)} —`) })
-    .getByRole("button")
+  await picker
+    .locator(".fontPickerCard")
+    .filter({ has: page.getByText(option, { exact: true }) })
     .click();
-}
-
-/** Escapes a literal for embedding in a RegExp, so a label like "Kufi (2)" cannot mis-match. */
-function escapeRegExp(literal: string): string {
-  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  await picker.waitFor({ state: "detached" });
 }
 
 /**

@@ -86,6 +86,16 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-13 — Font picker gallery; Name designs renamed Compositions
+
+Typography's font family dropdown is gone. Its row is now a button that
+opens the block's own text written in every font, grouped by genre; one
+click applies. That gallery used to be step one of Name designs, which is
+now **Compositions**: it opens straight on muthanna / medallion / frame, in
+the font the block already has, and no longer changes the font or offers a
+"Single" layout. Old saves are unaffected. Details:
+[sidebar.md](.claude/rules/sidebar.md), [compositions.md](.claude/rules/compositions.md).
+
 ### 2026-10-13 — Touch: pinch zoom, two-finger pan
 
 On a phone or tablet a pinch used to zoom the whole page. Now one finger
@@ -96,7 +106,7 @@ Chromium). How it works and its traps:
 
 ### 2026-10-13 — Font picker grouped by genre; five new styles
 
-The font picker and Name designs gallery are grouped by calligraphic genre
+The font picker and Name designs gallery (now one font picker) are grouped by calligraphic genre
 (Naskh, Thuluth, Nastaliq, Diwani, Ruqaa, Maghribi, Kufi, Mushaf Kufi,
 Decorated Kufi, Wide Kufi, Modern). New: Gulzar (Nastaliq), Rabat
 (Maghribi), Raqq (Mushaf Kufi), Rana Kufi (Decorated Kufi), Blaka (Wide
@@ -470,6 +480,8 @@ all 54 tests time out against someone else's app — which is exactly what
 happened during this work.
 
 ### 2026-08-20 — Name designs
+
+*Renamed Compositions on 2026-10-13, and its style gallery became the font picker — see the entry above.*
 
 Content → **Name designs**: see the selected block's text written in every
 calligraphic style at once, pick one, and set it into a composition — a

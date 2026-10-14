@@ -8,7 +8,7 @@ import * as opentype from "opentype.js";
  * just "bytes HarfBuzz can shape plus a display name" — which is exactly what
  * an upload can supply at runtime. This module is the whole registry: it
  * stores the bytes, hands out a URL `shapeText` can fetch, and registers a
- * `FontFace` so the sidebar's dropdown can preview the family in itself.
+ * `FontFace` so the font picker can preview the family in itself.
  *
  * Deliberately free of any dependency on `./harfbuzz`: that module statically
  * imports `harfbuzzjs`, whose CJS/ESM shape throws under Vitest's Node loader
@@ -205,7 +205,7 @@ function revokeObjectUrl(url: string): void {
 
 /**
  * Registers the bytes as a CSS `FontFace` under the font's own key, which is
- * what makes an uploaded font previewable in the sidebar dropdown. This is
+ * what makes an uploaded font previewable in the font picker. This is
  * the runtime replacement for the `@font-face` rule in `index.css` that a
  * bundled font needs.
  */

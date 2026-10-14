@@ -169,12 +169,12 @@ import type { TextBlock, VerseLayout, VerseSettings } from "./types";
 import { cutAdvanceTotal, remapCutsForEdits } from "./lib/strokeCuts";
 import { nuqtaUnits } from "./lib/nuqta";
 import {
-  buildNameDesign,
-  describeNameDesign,
+  buildComposition,
+  describeComposition,
   estimateRunBox,
   normalizeRunBox,
-  type NameDesignSelection,
-} from "./lib/nameDesign";
+  type CompositionSelection,
+} from "./lib/composition";
 
 /**
  * The status-row line for a finished fit. Each outcome says what actually
@@ -2812,72 +2812,57 @@ const App: React.FC = () => {
   };
 
   /**
-   * "Name designs": write the selected name in the style picked from the
-   * gallery, and add whatever companion blocks the chosen layout needs.
+   * Compositions: add the companion blocks the chosen layout needs around the
+   * selected text, in the font it already has.
    *
    * Modeled on `fitSelectedBlockToWidth` directly above, for the same reason:
-   * it has to shape the text to find out how wide the name draws, so it is
-   * async, and the selection can change while it runs. The block is therefore
-   * **captured by id** — patching "the selected block" on the way out would
-   * rewrite whatever the user selected in the meantime.
+   * it has to shape the text to find out how wide it draws, so it is async,
+   * and the selection can change while it runs. The block is therefore
+   * **captured by id** — inserting around "the selected block" on the way
+   * out would build around whatever the user selected in the meantime. When
+   * shaping fails the composition still happens, on a rough estimate — a
+   * loose arrangement the user can drag into place beats no arrangement.
    *
-   * The measurement is taken in the *new* font, not the current one: every
-   * layout spaces itself by how wide the name draws, and that is a property
-   * of the style just chosen. When shaping fails the composition still
-   * happens, on a rough estimate — a loose arrangement the user can drag into
-   * place beats no arrangement at all.
-   *
-   * One `pushHistory()` covers the style change and the added blocks
-   * together, so a whole design is a single undo.
+   * One `pushHistory()` covers the added blocks, so a whole composition is a
+   * single undo.
    */
-  const applyNameDesign = async (selection: NameDesignSelection) => {
+  const applyComposition = async (selection: CompositionSelection) => {
     const source = selectedBlock;
     if (!source || source.type !== "text") return;
     if (source.text.trim() === "") {
-      setExportStatus("Type a name into this block first.");
+      setExportStatus("Type some text into this block first.");
       return;
     }
 
-    const { id, text, fontSize, lineHeight } = source;
+    const { id, text, fontSize, lineHeight, fontFamily } = source;
 
-    // Only the compositions that place a companion block space themselves by
-    // the run, so `single` skips the measurement entirely — on a first-use
-    // font that is a multi-megabyte download the style change would otherwise
-    // wait behind for nothing.
     let run = estimateRunBox(text, fontSize);
-    if (selection.layout !== "single") {
-      try {
-        const measured = await measureShapedRun(
-          text,
-          resolveFontUrl(selection.fontFamily),
-          fontSize,
-          // The same terms `fitSelectedBlockToWidth` measures with: the
-          // outlines are not the whole of what is drawn, and a composition
-          // spaced by outlines alone sets an italic, outlined or stretched
-          // name too close to its own reflection.
-          runStyleForBlock(source, cutWidthForBlock(source)),
-          undefined,
-          undefined,
-          spacingForBlock(source)
-        );
-        run = normalizeRunBox(measured, fontSize, lineHeight);
-      } catch (err) {
-        // A font that will not load still gets a composition, on the rough
-        // estimate above — a loose arrangement the user can drag into place
-        // beats no arrangement at all.
-        console.error("name design measurement failed", err);
-      }
+    try {
+      const measured = await measureShapedRun(
+        text,
+        resolveFontUrl(fontFamily),
+        fontSize,
+        // The same terms `fitSelectedBlockToWidth` measures with: the
+        // outlines are not the whole of what is drawn, and a composition
+        // spaced by outlines alone sets an italic, outlined or stretched
+        // text too close to its own reflection.
+        runStyleForBlock(source, cutWidthForBlock(source)),
+        undefined,
+        undefined,
+        spacingForBlock(source)
+      );
+      run = normalizeRunBox(measured, fontSize, lineHeight);
+    } catch (err) {
+      console.error("composition measurement failed", err);
     }
 
-    // `NameDesignSelection` is `NameDesignRequest` minus the two fields only
-    // this handler can supply, so spreading it cannot leave one behind.
-    const plan = buildNameDesign({ source, run, ...selection }, createNextId);
+    // `CompositionSelection` is `CompositionRequest` minus the two fields
+    // only this handler can supply, so spreading it cannot leave one behind.
+    const plan = buildComposition({ source, run, ...selection }, createNextId);
 
-    // Choosing Single in the font the block already carries changes nothing;
-    // that must not cost an undo step, the same rule `fitSelectedBlockToWidth`
-    // follows when a fitted run comes back unchanged.
-    if (plan.added.length === 0 && source.fontFamily === selection.fontFamily) {
-      setExportStatus(describeNameDesign(plan));
+    // Only an unavailable frame adds nothing; that must not cost an undo step.
+    if (plan.added.length === 0) {
+      setExportStatus(describeComposition(plan));
       return;
     }
 
@@ -2885,17 +2870,15 @@ const App: React.FC = () => {
     setBlocks((prev) => {
       const index = prev.findIndex((b) => b.id === id);
       // The block was deleted while we were measuring; there is nothing to
-      // build the design around any more.
+      // build the composition around any more.
       if (index < 0) return prev;
-      const patched = prev.map((b) => (b.id === id ? ({ ...b, ...plan.patch } as Block) : b));
-      if (plan.added.length === 0) return patched;
       // A frame must be drawn before the name or it covers it; a reflection
       // is a peer and goes on top, where every new block goes.
       return plan.placement === "behind"
-        ? [...patched.slice(0, index), ...plan.added, ...patched.slice(index)]
-        : [...patched, ...plan.added];
+        ? [...prev.slice(0, index), ...plan.added, ...prev.slice(index)]
+        : [...prev, ...plan.added];
     });
-    setExportStatus(describeNameDesign(plan));
+    setExportStatus(describeComposition(plan));
   };
 
   const p1dSidebarProps: Partial<SidebarProps> = {
@@ -3289,7 +3272,7 @@ const App: React.FC = () => {
         {...p2eSidebarProps}
         {...p2fSidebarProps}
         {...p2gSidebarProps}
-        onApplyNameDesign={applyNameDesign}
+        onApplyComposition={applyComposition}
       />
 
       {!isMobile && !sidebarCollapsed && (

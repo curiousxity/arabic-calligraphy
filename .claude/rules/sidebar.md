@@ -48,6 +48,17 @@ panel there:
 every type shares. Anything type-specific that lands there belongs in the
 type panel instead.
 
+**The font family row is a button, not a dropdown** (since 2026-10-13).
+`FontPickerField` in `FontPickerDialog.tsx` shows the current font's name in
+that font and opens a dialog of the block's own text in every font, under
+genre headings derived from consecutive runs of `FontChoice.genre` (so
+`FONT_OPTIONS` must keep a genre's fonts together). One click applies and
+closes; picking the font the block already has makes no change and costs no
+undo step. Its accessible name is the label then the current font
+("Font family Amiri — أبجد"), which is why `e2e/harf.ts`'s `chooseFont`
+anchors on `/^Font family\b/`. A key the list does not know shows the key
+itself, never another family's name.
+
 `Content` owns everything that puts characters into the block: the RTL
 textarea, the Arabic Keyboard toggle, and the `PresetKeyboard` rows
 (إعراب, Presets, Specials, Urdu-Farsi) that were once a separate "Arabic

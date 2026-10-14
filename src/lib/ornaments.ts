@@ -106,7 +106,7 @@ export function ornamentSvgDataUrl(def: OrnamentDef, fill: string): string {
  * accents up front rather than leaving the user to discover the limitation.
  *
  * It lives here, beside `ornamentSvgDataUrl`, because both surfaces that bake
- * a colour into an ornament read it: the shape picker and the name-design
+ * a colour into an ornament read it: the shape picker and the Compositions
  * wizard's frame step. Two copies drifted the moment either was edited.
  */
 export const ORNAMENT_FILL_SWATCHES = [

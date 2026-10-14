@@ -18,7 +18,7 @@ const INSERT_SIZE = 500;
  * The swatch strip that picks an ornament's baked-in colour.
  *
  * Shared rather than restated because both surfaces that insert an ornament
- * offer it — this picker and the name-design wizard's frame step — and the
+ * offer it — this picker and the Compositions wizard's frame step — and the
  * two were byte-identical markup over two copies of one palette.
  */
 export const OrnamentFillSwatches: React.FC<{

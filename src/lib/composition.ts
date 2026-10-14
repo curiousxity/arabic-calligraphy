@@ -9,7 +9,7 @@ import {
 } from "./ornaments";
 
 /**
- * The pure half of "name designs": given a block and how wide its text
+ * The pure half of Compositions: given a block and how wide its text
  * actually draws, decide what a muthanna / medallion / framed composition of
  * it looks like.
  *
@@ -19,7 +19,7 @@ import {
  * already inserts one. All this module adds is the arithmetic that turns a
  * measured run into placements that don't collide — which is the entire
  * difference between "add a mirror" (a fixed 180px nudge the user then drags)
- * and "compose this name", and the reason it is worth a module of its own.
+ * and "compose this text", and the reason it is worth a module of its own.
  *
  * Pure by the same discipline as `tatweel.ts` and `fitToWidth.ts`: no React,
  * no Konva, and crucially no `harfbuzz.ts` — the measurement arrives as a
@@ -28,23 +28,17 @@ import {
  * Vitest's Node ESM loader before any test code runs).
  */
 
-export type NameLayoutId = "single" | "muthanna" | "medallion" | "framed";
+export type CompositionLayoutId = "muthanna" | "medallion" | "framed";
 
-export type NameLayout = {
-  id: NameLayoutId;
+export type CompositionLayout = {
+  id: CompositionLayoutId;
   name: string;
   nameAr: string;
   description: string;
 };
 
 /** The compositions offered, in the order the wizard shows them. */
-export const NAME_LAYOUTS: NameLayout[] = [
-  {
-    id: "single",
-    name: "Single",
-    nameAr: "مفرد",
-    description: "The name on its own, in the style you chose.",
-  },
+export const COMPOSITION_LAYOUTS: CompositionLayout[] = [
   {
     id: "muthanna",
     name: "Muthanna",
@@ -75,7 +69,7 @@ export type RunBox = { width: number; height: number };
  * medallion on one point.
  *
  * They are applied in exactly one place, `normalizeRunBox`, which
- * `buildNameDesign` runs over its input (the operation is idempotent, so a
+ * `buildComposition` runs over its input (the operation is idempotent, so a
  * caller that already normalized pays nothing). The placement formulas below
  * therefore read `run.width`/`run.height` directly and say what they mean.
  */
@@ -184,12 +178,10 @@ export const DEFAULT_FRAME_COLOR = DEFAULT_ORNAMENT_FILL;
 export const frameOrnaments = (): OrnamentDef[] =>
   listOrnaments().filter((o) => o.tags.includes(FRAME_TAG));
 
-export type NameDesignRequest = {
+export type CompositionRequest = {
   /** The block the design is built around. Never a mirror. */
   source: MirrorSource;
-  layout: NameLayoutId;
-  /** The style chosen in the gallery; applied to the source. */
-  fontFamily: string;
+  layout: CompositionLayoutId;
   /** The source's measured extent, already through `normalizeRunBox`. */
   run: RunBox;
   radialCount?: number;
@@ -202,16 +194,14 @@ export type NameDesignRequest = {
  * is built around and its measurement, which only `App.tsx` can supply.
  *
  * Declared here rather than in the dialog so the state layer does not import
- * a domain type back out of a component, and so a new `NameDesignRequest`
+ * a domain type back out of a component, and so a new `CompositionRequest`
  * field is a type error at the wizard rather than a silent omission.
  */
-export type NameDesignSelection = Omit<NameDesignRequest, "source" | "run">;
+export type CompositionSelection = Omit<CompositionRequest, "source" | "run">;
 
-export type NameDesignPlan = {
+export type CompositionPlan = {
   /** The composition that was built, so a describer needs no second argument. */
-  layout: NameLayoutId;
-  /** Patch for the source block — always at least the chosen style. */
-  patch: Partial<Block>;
+  layout: CompositionLayoutId;
   /** Companion blocks to insert, in order. */
   added: Block[];
   /**
@@ -266,23 +256,18 @@ const buildFrameBlock = (
 });
 
 /**
- * The whole composition, as a patch plus the blocks to add.
+ * The whole composition: the blocks to add around the source, which itself is
+ * left untouched — the composition is set in the font the block already has.
  *
  * `nextId` is injected rather than called from a module counter so the caller
  * keeps owning id allocation (`App.tsx`'s `createNextId`), and so a test can
  * hand in a deterministic sequence.
- *
- * The mirror is built from the source **with the new font already applied**:
- * `buildMirrorBlock` copies the source's styling fields for the layer list,
- * and building it from the pre-patch block would label the reflection with
- * the font the user just replaced.
  */
-export function buildNameDesign(
-  request: NameDesignRequest,
+export function buildComposition(
+  request: CompositionRequest,
   nextId: () => number
-): NameDesignPlan {
-  const patch: Partial<Block> = { fontFamily: request.fontFamily };
-  const source = { ...request.source, fontFamily: request.fontFamily } as MirrorSource;
+): CompositionPlan {
+  const source = request.source;
   // The one place the run floors are enforced. Idempotent, so a caller that
   // already normalized (App.tsx does) pays nothing.
   const run = normalizeRunBox(request.run);
@@ -294,7 +279,7 @@ export function buildNameDesign(
         ...buildMirrorBlock(nextId(), source, "mirrorX", muthannaOffset(run)),
         name: "Muthanna",
       };
-      return { layout, patch, added: [mirror], placement: "front" };
+      return { layout, added: [mirror], placement: "front" };
     }
 
     case "medallion": {
@@ -307,7 +292,7 @@ export function buildNameDesign(
         radialRadius: medallionRadius(run, count),
         name: "Medallion",
       };
-      return { layout, patch, added: [mirror], placement: "front" };
+      return { layout, added: [mirror], placement: "front" };
     }
 
     case "framed": {
@@ -316,7 +301,7 @@ export function buildNameDesign(
       // call, and dropping the composition silently would be worse.
       const def =
         getOrnament(request.frameId ?? DEFAULT_FRAME_ID) ?? getOrnament(DEFAULT_FRAME_ID);
-      if (!def) return { layout, patch, added: [], placement: "behind" };
+      if (!def) return { layout, added: [], placement: "behind" };
       const box = frameBoxFor(def.viewBox, run);
       const frame = buildFrameBlock(
         nextId(),
@@ -325,18 +310,14 @@ export function buildNameDesign(
         box,
         request.frameColor ?? DEFAULT_FRAME_COLOR
       );
-      return { layout, patch, added: [frame], placement: "behind" };
+      return { layout, added: [frame], placement: "behind" };
     }
-
-    case "single":
-    default:
-      return { layout, patch, added: [], placement: "front" };
   }
 }
 
 /** One-line report of what was created, for the sidebar's status row. */
-export const describeNameDesign = (plan: NameDesignPlan): string => {
-  const label = NAME_LAYOUTS.find((l) => l.id === plan.layout)?.name ?? "Design";
-  if (plan.added.length === 0) return `Applied the ${label.toLowerCase()} style.`;
-  return `Created a ${label.toLowerCase()} design.`;
+export const describeComposition = (plan: CompositionPlan): string => {
+  const label = COMPOSITION_LAYOUTS.find((l) => l.id === plan.layout)?.name ?? "Composition";
+  if (plan.added.length === 0) return "Nothing was added — that frame is not available.";
+  return `Created a ${label.toLowerCase()} composition.`;
 };

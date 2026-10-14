@@ -42,7 +42,7 @@ export async function measureShapedWidth(
  * The height comes from the ink box untouched by `styledRunWidth`, which
  * folds the italic shear and the outline into the width alone; callers that
  * want the line height a block is actually drawn on run it through
- * `normalizeRunBox` in `lib/nameDesign.ts`.
+ * `normalizeRunBox` in `lib/composition.ts`.
  *
  * Repeated calls stay cheap for the same reason `measureShapedWidth`'s do:
  * `shapeText` caches by `text|fontUrl`.

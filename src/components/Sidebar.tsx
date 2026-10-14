@@ -23,8 +23,9 @@ import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
-import { NameDesignButton, type FontChoice } from "./NameDesignDialog";
-import type { NameDesignSelection } from "../lib/nameDesign";
+import { CompositionButton } from "./CompositionDialog";
+import { FontPickerField, type FontChoice } from "./FontPickerDialog";
+import type { CompositionSelection } from "../lib/composition";
 import type { GuideAttachment, GuideParams, GuideShape, VerseLayout, VerseSettings } from "../types";
 import { VerseButton } from "./VerseDialog";
 import { VersePanel } from "./sidebar/VersePanel";
@@ -41,7 +42,6 @@ import {
   ColorRow,
   RangeRow,
   PresetKeyboard,
-  FontSelectRow,
   CollapsibleSection,
   CheckboxRow,
   DemoHover,
@@ -171,8 +171,8 @@ export type SidebarProps = {
   /** Set when the selected block names a font this browser cannot resolve. */
   missingFontKey?: string | null;
   // ---- /STREAM-G ----
-  /** Name designs: apply a style from the gallery and compose the chosen layout. */
-  onApplyNameDesign?: (selection: NameDesignSelection) => void;
+  /** Compositions: add the chosen layout's companion blocks around the selected text. */
+  onApplyComposition?: (selection: CompositionSelection) => void;
   onCreateVerse?: (lines: string[], layout: VerseLayout) => void;
   onJustifyVerse?: (overrides?: Partial<VerseSettings>) => void;
   isJustifyingVerse?: boolean;
@@ -356,8 +356,8 @@ export type SidebarProps = {
 
 /**
  * The bundled fonts, grouped by calligraphic genre and listed in picker
- * order — `FontSelectRow` and the name-design gallery start a new heading
- * wherever `genre` changes, so a genre's fonts must sit together here.
+ * order — the font picker starts a new heading wherever `genre` changes, so
+ * a genre's fonts must sit together here.
  *
  * `value` is persisted in every saved block; never rename one. Labels are
  * free to change (the "Kufi" key is Janna LT, a modern sans, and "Urdu" is
@@ -492,7 +492,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRemoveCustomFont,
   missingFontKey = null,
   // ---- /STREAM-G ----
-  onApplyNameDesign,
+  onApplyComposition,
   onCreateVerse,
   onJustifyVerse,
   isJustifyingVerse,
@@ -632,9 +632,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showGuide, setShowGuide] = useState(true);
 
   /**
-   * The font list both the Typography picker and the name-design gallery
-   * show. Hoisted so the two cannot drift: a family missing from either
-   * renders under a name that is not the one being previewed.
+   * The font list the picker shows: the bundled fonts, then uploads. An
+   * uploaded font has to reach this list, not only the shaping seam, or the
+   * picker could not show or offer the family a block is actually on.
    */
   const fontChoices = useMemo<FontChoice[]>(
     () => [
@@ -2271,17 +2271,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span>{showKeyboard ? "Hide" : "Show"}</span>
                 </button>
 
-                {/* Name designs: see this block's text in every style, then
-                    compose it. Plain text only — a Shape Fill run is scaled to
-                    its silhouette and a Curve run to its curve, so the measured
-                    run these layouts space themselves by is meaningless there,
-                    the same reason Fit to width is text-only. */}
-                {selectedBlock?.type === "text" && onApplyNameDesign && (
-                  <NameDesignButton
+                {/* Compositions: set this block's text into a pair, a
+                    medallion or a frame. Plain text only — a Shape Fill run is
+                    scaled to its silhouette and a Curve run to its curve, so the
+                    measured run these layouts space themselves by is
+                    meaningless there, the same reason Fit to width is
+                    text-only. */}
+                {selectedBlock?.type === "text" && onApplyComposition && (
+                  <CompositionButton
                     text={selectedText}
-                    fontFamily={selectedBlock.fontFamily}
-                    fonts={fontChoices}
-                    onApply={onApplyNameDesign}
+                    cssFamily={
+                      fontChoices.find((f) => f.value === selectedBlock.fontFamily)?.cssFamily ??
+                      `'${selectedBlock.fontFamily}'`
+                    }
+                    onApply={onApplyComposition}
                   />
                 )}
 
@@ -3248,18 +3251,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
                 {/* ---- /STREAM-G ---- */}
-                <FontSelectRow
+                <FontPickerField
                   id={makeId("font-family", selectedId)}
                   label="Font family"
                   value={selectedBlock.fontFamily}
-                  // Built-ins stay the static hand-ordered list; uploads are
-                  // appended so the trigger can show the family a block is
-                  // actually on. A key the picker doesn't know falls back to
-                  // showing the *first* option, which is why an uploaded font
-                  // has to reach this list rather than only the shaping seam.
-                  options={fontChoices}
+                  text={selectedText}
+                  fonts={fontChoices}
                   onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
-                  previewSuffix="— أبجد"
                 />
                 </>
                 )}

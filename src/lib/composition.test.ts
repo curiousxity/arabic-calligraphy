@@ -7,9 +7,9 @@ import {
   FRAME_TAG,
   MIN_RUN_HEIGHT,
   MIN_RUN_WIDTH,
-  NAME_LAYOUTS,
-  buildNameDesign,
-  describeNameDesign,
+  COMPOSITION_LAYOUTS,
+  buildComposition,
+  describeComposition,
   estimateRunBox,
   frameBoxFor,
   frameOrnaments,
@@ -17,7 +17,7 @@ import {
   medallionRadius,
   muthannaOffset,
   normalizeRunBox,
-} from "./nameDesign";
+} from "./composition";
 import { getOrnament } from "./ornaments";
 
 const source = (patch: Partial<TextBlock> = {}): TextBlock => ({
@@ -44,8 +44,8 @@ const run = { width: 400, height: 90 };
 
 describe("layout catalogue", () => {
   it("has unique ids", () => {
-    const seen = new Set(NAME_LAYOUTS.map((l) => l.id));
-    expect(seen.size).toBe(NAME_LAYOUTS.length);
+    const seen = new Set(COMPOSITION_LAYOUTS.map((l) => l.id));
+    expect(seen.size).toBe(COMPOSITION_LAYOUTS.length);
   });
 });
 
@@ -159,20 +159,11 @@ describe("frameOrnaments", () => {
   });
 });
 
-describe("buildNameDesign", () => {
-  it("single applies the style and adds nothing", () => {
-    const plan = buildNameDesign(
-      { source: source(), layout: "single", fontFamily: "Thuluth", run },
-      ids()
-    );
-    expect(plan.patch).toEqual({ fontFamily: "Thuluth" });
-    expect(plan.added).toEqual([]);
-  });
-
+describe("buildComposition", () => {
   it("muthanna adds one mirrored reflection at the measured offset", () => {
     const block = source();
-    const plan = buildNameDesign(
-      { source: block, layout: "muthanna", fontFamily: "Diwani", run },
+    const plan = buildComposition(
+      { source: block, layout: "muthanna", run },
       ids()
     );
     expect(plan.placement).toBe("front");
@@ -185,14 +176,14 @@ describe("buildNameDesign", () => {
     expect(mirror.mode).toBe("mirrorX");
     expect(mirror.x).toBeCloseTo(block.x + muthannaOffset(run), 6);
     expect(mirror.y).toBe(block.y);
-    // The reflection carries the style just chosen, not the one replaced.
-    expect(mirror.fontFamily).toBe("Diwani");
+    // Set in the font the block already carries.
+    expect(mirror.fontFamily).toBe(block.fontFamily);
   });
 
   it("medallion turns the requested number of copies around the source", () => {
     const block = source();
-    const plan = buildNameDesign(
-      { source: block, layout: "medallion", fontFamily: "Kufi", run, radialCount: 9 },
+    const plan = buildComposition(
+      { source: block, layout: "medallion", run, radialCount: 9 },
       ids()
     );
     const mirror = plan.added[0];
@@ -207,8 +198,8 @@ describe("buildNameDesign", () => {
   });
 
   it("medallion clamps an out-of-range count to what the block supports", () => {
-    const plan = buildNameDesign(
-      { source: source(), layout: "medallion", fontFamily: "Kufi", run, radialCount: 99 },
+    const plan = buildComposition(
+      { source: source(), layout: "medallion", run, radialCount: 99 },
       ids()
     );
     const mirror = plan.added[0];
@@ -218,11 +209,10 @@ describe("buildNameDesign", () => {
 
   it("framed inserts a centred image frame behind the name", () => {
     const block = source();
-    const plan = buildNameDesign(
+    const plan = buildComposition(
       {
         source: block,
         layout: "framed",
-        fontFamily: "Amiri",
         run,
         frameId: DEFAULT_FRAME_ID,
         frameColor: "#8c1c13",
@@ -248,8 +238,8 @@ describe("buildNameDesign", () => {
   });
 
   it("framed falls back to the default frame for an unknown id", () => {
-    const plan = buildNameDesign(
-      { source: source(), layout: "framed", fontFamily: "Amiri", run, frameId: "no-such-frame" },
+    const plan = buildComposition(
+      { source: source(), layout: "framed", run, frameId: "no-such-frame" },
       ids()
     );
     expect(plan.added).toHaveLength(1);
@@ -257,8 +247,8 @@ describe("buildNameDesign", () => {
   });
 
   it("framed defaults its colour rather than leaving it unset", () => {
-    const plan = buildNameDesign(
-      { source: source(), layout: "framed", fontFamily: "Amiri", run },
+    const plan = buildComposition(
+      { source: source(), layout: "framed", run },
       ids()
     );
     expect(plan.added[0].color).toBe(DEFAULT_FRAME_COLOR);
@@ -266,42 +256,34 @@ describe("buildNameDesign", () => {
 
   it("takes every new id from the injected allocator", () => {
     const nextId = ids(500);
-    const first = buildNameDesign(
-      { source: source(), layout: "muthanna", fontFamily: "Kufi", run },
+    const first = buildComposition(
+      { source: source(), layout: "muthanna", run },
       nextId
     );
-    const second = buildNameDesign(
-      { source: source(), layout: "framed", fontFamily: "Kufi", run },
+    const second = buildComposition(
+      { source: source(), layout: "framed", run },
       nextId
     );
     expect(first.added[0].id).toBe(500);
     expect(second.added[0].id).toBe(501);
   });
 
-  it("never patches anything but the style", () => {
-    // The design must not move, rename or retype the block it is built around
-    // — the user's text and position are theirs.
-    for (const layout of NAME_LAYOUTS) {
-      const plan = buildNameDesign(
-        { source: source(), layout: layout.id, fontFamily: "Ruqaa", run },
-        ids()
-      );
-      expect(Object.keys(plan.patch)).toEqual(["fontFamily"]);
+  it("adds companion blocks and leaves the source alone", () => {
+    // The composition must not move, rename, retype or restyle the block it
+    // is built around — the user's text, position and font are theirs.
+    for (const layout of COMPOSITION_LAYOUTS) {
+      const block = source();
+      const before = structuredClone(block);
+      const plan = buildComposition({ source: block, layout: layout.id, run }, ids());
+      expect(plan.added).toHaveLength(1);
+      expect(block).toEqual(before);
     }
   });
 });
 
-describe("describeNameDesign", () => {
-  it("distinguishes a style change from a composition", () => {
-    const single = buildNameDesign(
-      { source: source(), layout: "single", fontFamily: "Kufi", run },
-      ids()
-    );
-    const muthanna = buildNameDesign(
-      { source: source(), layout: "muthanna", fontFamily: "Kufi", run },
-      ids()
-    );
-    expect(describeNameDesign(single)).toMatch(/style/i);
-    expect(describeNameDesign(muthanna)).toMatch(/muthanna/i);
+describe("describeComposition", () => {
+  it("names the composition that was created", () => {
+    const muthanna = buildComposition({ source: source(), layout: "muthanna", run }, ids());
+    expect(describeComposition(muthanna)).toMatch(/muthanna composition/i);
   });
 });

@@ -10,7 +10,7 @@ import { CloseIcon } from "./Icons";
  * Portaled to `document.body` for the reason every modal here is — the
  * sidebar is an overflow-hidden scrolling column that would clip it, and
  * nothing that is not artwork may live inside the Konva stage. Reuses the
- * Name designs dialog's classes rather than adding a second modal style.
+ * Compositions dialog's classes rather than adding a second modal style.
  */
 export const VerseDialog: React.FC<{
   onCreate: (lines: string[], layout: VerseLayout) => void;

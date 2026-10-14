@@ -29,12 +29,11 @@ four* of these or it half-works in a way that is easy to misdiagnose:
 
 1. the file itself in `public/fonts/`;
 2. an `@font-face` rule at the top of `src/index.css` — this is what the
-   sidebar's dropdown uses to preview each font's own name;
+   font picker uses to preview the block's text in each font;
 3. `FONT_OPTIONS` in `src/components/Sidebar.tsx` — a hand-ordered array of
    `{ genre, value, label, cssFamily }`, and **the only thing that decides whether
    a font appears in the picker at all**. It is ordered by `genre`: the
-   picker and the name-design gallery start a heading wherever the genre
-   changes, so a font placed away from its genre's block makes that heading
+   font picker starts a heading wherever the genre changes, so a font placed away from its genre's block makes that heading
    appear twice. `value` is persisted in saved blocks and must never be
    renamed; `label` is free (the `Kufi` key is labelled Janna, `Urdu` is
    Jameel Noori, `Kufi2` is Reem Kufi);

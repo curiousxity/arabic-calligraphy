@@ -243,11 +243,11 @@ export type RunStyle = {
  *
  * Each caller that measures a block's drawn width needs exactly this
  * derivation, and it had been written out twice in `App.tsx` (the fit-to-width
- * handler and the name-design one). One helper is what keeps a term joining
+ * handler and the composition one). One helper is what keeps a term joining
  * `styledRunWidth` from reaching one call site and silently not the other —
  * both would still compile and both would still produce a plausible number.
  * That is not hypothetical: `cutWidth` landed inline at the fit handler alone
- * while the name-design one went on measuring without it.
+ * while the composition one went on measuring without it.
  *
  * `cutWidth` is a **required argument** rather than another field read off the
  * block, for the reason `RunStyle` documents above: summing the cuts needs

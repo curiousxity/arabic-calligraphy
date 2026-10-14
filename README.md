@@ -55,9 +55,10 @@ than a text box
   boustrophedon that snakes down the panel, turning at the corner.
 - **Muthanna and radial mirrors.** Reflect or repeat any block — a mirrored
   pair or an N-copy medallion — staying live as the source is edited.
-- **Name designs.** See a block's text rendered in every bundled style at
-  once and drop the one you like into a mirrored pair, a medallion, or a
-  decorative frame.
+- **A font picker that shows your own text** in every bundled and uploaded
+  style at once, grouped by genre.
+- **Compositions.** Drop a block's text into a mirrored pair, a medallion,
+  or a decorative frame, spaced to the width it actually draws.
 - **Saveable text styles and colour palettes**, applied to any selection in
   one step.
 - **Gradient fills** (including gold/silver/copper/lapis metallic presets)

@@ -16,7 +16,7 @@ const relativeLabel = (steps: number) =>
  * Popover anchored to a small history-icon button, listing thumbnails for
  * every earlier recorded point (most recent first) plus a live "Current"
  * row at the top. Clicking a thumbnail jumps directly there via
- * `onJumpTo`. Modeled on FontSelectRow's outside-click/Escape-to-close
+ * `onJumpTo`. Modeled on the old font dropdown's outside-click/Escape-to-close
  * anchored-popover pattern in `sidebar/FormControls.tsx`.
  */
 export const HistoryPopover: React.FC<HistoryPopoverProps> = ({
