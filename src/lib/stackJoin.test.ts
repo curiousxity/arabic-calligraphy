@@ -58,12 +58,18 @@ describe("joinEdges", () => {
     expect(dist(edgeA[0], edgeB[0])).toBeCloseTo(20, 6);
     expect(Math.min(...thick)).toBeGreaterThanOrEqual(4 - 1e-6);
     expect(Math.min(...thick)).toBeLessThan(20);   // it does thin on the climb
-    // No ribbon twist: consecutive edge vectors never reverse.
-    for (let i = 0; i + 1 < edgeA.length; i++) {
-      const u = [edgeB[i][0] - edgeA[i][0], edgeB[i][1] - edgeA[i][1]];
-      const w = [edgeB[i + 1][0] - edgeA[i + 1][0], edgeB[i + 1][1] - edgeA[i + 1][1]];
-      expect(u[0] * w[0] + u[1] * w[1]).toBeGreaterThan(0);
+    // No ribbon twist: the normal component of the rung keeps one sign for the
+    // whole join and never drops below the floor.
+    const alongs: number[] = [];
+    for (let i = 1; i < edgeA.length - 1; i++) {
+      const c = (k: number): [number, number] => [(edgeA[k][0] + edgeB[k][0]) / 2, (edgeA[k][1] + edgeB[k][1]) / 2];
+      const d = [c(i + 1)[0] - c(i - 1)[0], c(i + 1)[1] - c(i - 1)[1]];
+      const len = Math.hypot(d[0], d[1]);
+      const n = [-d[1] / len, d[0] / len];
+      alongs.push((edgeB[i][0] - edgeA[i][0]) * n[0] + (edgeB[i][1] - edgeA[i][1]) * n[1]);
     }
+    expect(new Set(alongs.map(Math.sign)).size).toBe(1);
+    for (const a of alongs) expect(Math.abs(a)).toBeGreaterThanOrEqual(4 - 1e-6);
   });
   it("collapses to the face points when the faces coincide", () => {
     const { edgeA, edgeB } = joinEdges(A, { ...A, tangent: Math.PI }, 0, 3, 8);

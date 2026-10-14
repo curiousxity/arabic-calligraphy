@@ -47,7 +47,7 @@ export function joinEdges(
   const vB: Pt = [B.b[0] - B.a[0], B.b[1] - B.a[1]];
   const edgeA: Pt[] = [], edgeB: Pt[] = [];
   const centers: Pt[] = [];
-  let prevSign = 0;
+  let side = 0;
   for (let i = 0; i <= samples; i++) centers.push(bezierAt(cl, i / samples));
   for (let i = 0; i <= samples; i++) {
     const t = i / samples;
@@ -62,16 +62,14 @@ export function joinEdges(
       else { dx /= len; dy /= len; }
       const n: Pt = [-dy, dx];
       const along = v[0] * n[0] + v[1] * n[1];
-      const w = Math.abs(along);
-      if (prevSign === 0) prevSign = along >= 0 ? 1 : -1;
-      if (w >= minWidth) prevSign = along > 0 ? 1 : -1;
-      else {
-        // While the floor is engaged the push direction is carried over from
-        // the previous sample: the raw sign flips when `along` crosses 0,
-        // which would twist the ribbon. Set thickness to exactly the floor.
-        const d = prevSign * minWidth - along;
-        v = [v[0] + n[0] * d, v[1] + n[1] * d];
-      }
+      const tang = v[0] * dx + v[1] * dy;
+      // One side for the whole join, from the first sample that has one. When
+      // the pen's cross-section passes through the direction of travel the
+      // stroke thins to the nib's edge and stays on the same side; it never
+      // swaps its two edges (a ribbon twist).
+      if (side === 0 && Math.abs(along) > EPS) side = along > 0 ? 1 : -1;
+      const normal = (side || 1) * Math.max(Math.abs(along), minWidth);
+      v = [normal * n[0] + tang * dx, normal * n[1] + tang * dy];
     }
     edgeA.push([c[0] - v[0] / 2, c[1] - v[1] / 2]);
     edgeB.push([c[0] + v[0] / 2, c[1] + v[1] / 2]);
