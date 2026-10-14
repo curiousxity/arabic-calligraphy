@@ -32,10 +32,21 @@ export type FontPanelProps = {
  * because it is the app's only surface for managing the browser's font store.
  */
 export const FontPanel: React.FC<FontPanelProps> = (p) => {
+  const stripRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
   const sample = p.text.trim() || SAMPLE_FALLBACK;
+  // Centre the current face by scrolling the strip itself, horizontally only.
+  // `scrollIntoView` would also scroll every scrollable ancestor, so a font
+  // change made while the sidebar is scrolled down (a style applied from
+  // Typography, an undo, selecting another block) would jump the sidebar.
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
+    const strip = stripRef.current;
+    const card = activeRef.current;
+    if (!strip || !card) return;
+    // Measured as rects so the arithmetic holds whatever the offsetParent is.
+    const s = strip.getBoundingClientRect();
+    const c = card.getBoundingClientRect();
+    strip.scrollLeft += c.left - s.left - (s.width - c.width) / 2;
   }, [p.value]);
 
   return (
@@ -48,7 +59,7 @@ export const FontPanel: React.FC<FontPanelProps> = (p) => {
               Upload the font file to get it back, or pick another font below.
             </div>
           )}
-          <div className="fontStrip" data-testid="font-strip" role="group" aria-label="Fonts">
+          <div ref={stripRef} className="fontStrip" data-testid="font-strip" role="group" aria-label="Fonts">
             {visibleFonts(p.fonts, p.value).map((font) => {
               const active = font.value === p.value;
               return (

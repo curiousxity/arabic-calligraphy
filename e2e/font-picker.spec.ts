@@ -143,13 +143,15 @@ test("the Font panel's strip applies a font in one click and highlights it", asy
   const strip = page.getByTestId("font-strip");
   await expect(strip).toBeVisible(); // the panel starts open
   await expect(strip.locator('[data-font-key="Amiri"] .fontStripSample')).toHaveText("محمد");
+  const before = (await getBlocks(page))[0].fontFamily;
+  expect(before).not.toBe("Amiri");
 
   await strip.locator('[data-font-key="Amiri"]').click();
   await expect.poll(async () => (await getBlocks(page))[0].fontFamily).toBe("Amiri");
   await expect(strip.locator('[data-font-key="Amiri"]')).toHaveAttribute("aria-pressed", "true");
 
   await page.keyboard.press("Control+z");
-  await expect.poll(async () => (await getBlocks(page))[0].fontFamily).not.toBe("Amiri");
+  await expect.poll(async () => (await getBlocks(page))[0].fontFamily).toBe(before);
 });
 
 test("a block on a font this browser lacks still shows the strip and the notice", async ({ page }) => {

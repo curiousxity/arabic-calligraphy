@@ -217,8 +217,9 @@ export async function openPanel(page: Page, name: string | RegExp): Promise<void
 }
 
 /**
- * Opens the Typography panel, which is collapsed on boot and holds the font
- * picker, the Styles row, and the Kashida controls. Specs that want a
+ * Opens the Typography panel, which is collapsed on boot and holds the
+ * Styles row, the Kashida controls and the letter-shape toggles (the font
+ * picker lives in the Font panel — see `openFontPanel`). Specs that want a
  * particular control assert its visibility themselves after calling this.
  */
 export async function openTypography(page: Page): Promise<void> {

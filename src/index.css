@@ -446,14 +446,14 @@ html, body, #root { height: 100%; margin: 0; }
 .fontPickerSample { display: block; width: 100%; min-width: 0; font-size: 30px; line-height: 1.6; color: var(--text-primary); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fontPickerLabel { font-size: 11px; color: var(--text-muted); }
 
-/* The Typography row that opens it: the current font's name, in that font. */
+/* The Font panel row that opens it: the current font's name, in that font. */
 .fontPickerShell { padding: 0; }
 .fontPickerTrigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; text-align: left; cursor: pointer; }
 .fontPickerTriggerLabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fontPickerTriggerHint { flex-shrink: 0; color: var(--text-muted); font-size: 11px; }
 
 /* Font panel strip: scrolls sideways inside the sidebar, never widens it. */
-.fontStrip { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 6px; scroll-snap-type: x proximity; }
+.fontStrip { min-width: 0; display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 6px; scroll-snap-type: x proximity; }
 .fontStrip > * { min-width: 0; flex: 0 0 auto; }
 .fontStripCard { scroll-snap-align: center; width: 112px; padding: 8px 6px; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--overlay-hover); color: var(--text-primary); cursor: pointer; }
 .fontStripCard:hover { border-color: var(--border); }
