@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { joinCenterline, joinEdges, spliceJoin } from "./stackJoin";
-import { splitAtCut, toSegments, fromSegments } from "./stackGeometry";
+import { splitAtCut, toSegments, fromSegments, type Seg } from "./stackGeometry";
 import { flattenContours } from "./strokeCuts";
 import type { CutFace } from "../types";
 import type { SvgCmd } from "./svgPath";
@@ -58,6 +58,12 @@ describe("joinEdges", () => {
     expect(dist(edgeA[0], edgeB[0])).toBeCloseTo(20, 6);
     expect(Math.min(...thick)).toBeGreaterThanOrEqual(4 - 1e-6);
     expect(Math.min(...thick)).toBeLessThan(20);   // it does thin on the climb
+    // No ribbon twist: consecutive edge vectors never reverse.
+    for (let i = 0; i + 1 < edgeA.length; i++) {
+      const u = [edgeB[i][0] - edgeA[i][0], edgeB[i][1] - edgeA[i][1]];
+      const w = [edgeB[i + 1][0] - edgeA[i + 1][0], edgeB[i + 1][1] - edgeA[i + 1][1]];
+      expect(u[0] * w[0] + u[1] * w[1]).toBeGreaterThan(0);
+    }
   });
   it("collapses to the face points when the faces coincide", () => {
     const { edgeA, edgeB } = joinEdges(A, { ...A, tangent: Math.PI }, 0, 3, 8);
@@ -84,6 +90,10 @@ describe("spliceJoin", () => {
     const edges = joinEdges(r.nearFace, r.farFace, 0, 3, 4);
     const out = spliceJoin(pool, r.nearFace, r.farFace, edges)!;
     expect(out).toHaveLength(1);
+    // The bar's 4 edges, two of them split at the cut: 6 segments, and none of
+    // them the zero-length join edges.
+    expect(out[0]).toHaveLength(6);
+    expect(out[0].every((s) => dist(s.p[0], s.p[s.p.length - 1]) > 1e-9)).toBe(true);
     expect(area(fromSegments(out))).toBeCloseTo(2000, 6);
     // No bridge edge survives: nothing spans (40,−10)↔(40,10) any more. (The
     // zero-chord join also emits zero-length L's at x≈40; those are not bridges.)
@@ -91,6 +101,14 @@ describe("spliceJoin", () => {
       s.type === "L" && dist(s.p[0], s.p[1]) > 19 &&
       Math.abs(s.p[0][0] - 40) < 1e-6 && Math.abs(s.p[1][0] - 40) < 1e-6;
     expect(out[0].some(spansFace)).toBe(false);
+  });
+  it("splices when the two bridges run the same direction", () => {
+    const r = splitAtCut(BAR, { cutX: 40, angle: 0 })!;
+    const flip = (c: Seg[]): Seg[] => c.map((s) => ({ ...s, p: [...s.p].reverse() })).reverse();
+    const pool = [...toSegments(r.near), ...toSegments(r.far).map(flip)];
+    const out = spliceJoin(pool, r.nearFace, r.farFace, joinEdges(r.nearFace, r.farFace, 0, 3, 4))!;
+    expect(out).toHaveLength(1);
+    expect(area(fromSegments(out))).toBeCloseTo(2000, 6);
   });
   it("makes one closed contour when the far half has moved", () => {
     const r = splitAtCut(BAR, { cutX: 40, angle: 0 })!;

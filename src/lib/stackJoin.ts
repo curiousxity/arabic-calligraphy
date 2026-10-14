@@ -47,6 +47,7 @@ export function joinEdges(
   const vB: Pt = [B.b[0] - B.a[0], B.b[1] - B.a[1]];
   const edgeA: Pt[] = [], edgeB: Pt[] = [];
   const centers: Pt[] = [];
+  let prevSign = 0;
   for (let i = 0; i <= samples; i++) centers.push(bezierAt(cl, i / samples));
   for (let i = 0; i <= samples; i++) {
     const t = i / samples;
@@ -62,9 +63,14 @@ export function joinEdges(
       const n: Pt = [-dy, dx];
       const along = v[0] * n[0] + v[1] * n[1];
       const w = Math.abs(along);
-      if (w < minWidth) {
-        const sign = along >= 0 ? 1 : -1;
-        v = [v[0] + n[0] * sign * (minWidth - w), v[1] + n[1] * sign * (minWidth - w)];
+      if (prevSign === 0) prevSign = along >= 0 ? 1 : -1;
+      if (w >= minWidth) prevSign = along > 0 ? 1 : -1;
+      else {
+        // While the floor is engaged the push direction is carried over from
+        // the previous sample: the raw sign flips when `along` crosses 0,
+        // which would twist the ribbon. Set thickness to exactly the floor.
+        const d = prevSign * minWidth - along;
+        v = [v[0] + n[0] * d, v[1] + n[1] * d];
       }
     }
     edgeA.push([c[0] - v[0] / 2, c[1] - v[1] / 2]);
@@ -102,7 +108,7 @@ function reversed(segs: Seg[]): Seg[] {
 
 const polyline = (pts: Pt[]): Seg[] => {
   const out: Seg[] = [];
-  for (let i = 0; i + 1 < pts.length; i++) out.push({ type: "L", p: [pts[i], pts[i + 1]] });
+  for (let i = 0; i + 1 < pts.length; i++) if (!near(pts[i], pts[i + 1])) out.push({ type: "L", p: [pts[i], pts[i + 1]] });
   return out;
 };
 
