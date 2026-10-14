@@ -4,7 +4,7 @@ import type Konva from "konva";
 import type { stackProps } from "../lib/blockRenderProps";
 import { assembleStackOutline, stackScale } from "../lib/stackOutline";
 import { outlineBounds } from "../lib/strokeCuts";
-import { replayPath } from "../lib/svgPath";
+import { replayPath, type SvgCmd } from "../lib/svgPath";
 import { createBlockFillPainter } from "../lib/blockFill";
 
 export type StackViewProps = ReturnType<typeof stackProps> & {
@@ -37,6 +37,35 @@ export const StackView: React.FC<StackViewProps> = (p) => {
     [p.pieces, p.joins, p.nib]
   );
   const b = useMemo(() => outlineBounds(outline), [outline]);
+  // Pre-scaled to px so the sceneFunc needs no ctx.scale: react-konva-to-svg
+  // opens a <g> for a transform and then loses the path (and its stroke/fill)
+  // when the scope closes. Stroke width is then screen px for free.
+  const pxOutline = useMemo<SvgCmd[]>(
+    () =>
+      outline.map((c): SvgCmd => {
+        switch (c.type) {
+          case "M":
+          case "L":
+            return { type: c.type, x: c.x * scale, y: c.y * scale };
+          case "C":
+            return {
+              type: "C",
+              x1: c.x1 * scale, y1: c.y1 * scale,
+              x2: c.x2 * scale, y2: c.y2 * scale,
+              x: c.x * scale, y: c.y * scale,
+            };
+          case "Q":
+            return {
+              type: "Q",
+              x1: c.x1 * scale, y1: c.y1 * scale,
+              x: c.x * scale, y: c.y * scale,
+            };
+          default:
+            return c;
+        }
+      }),
+    [outline, scale]
+  );
   const px = {
     x: b.x1 * scale,
     y: b.y1 * scale,
@@ -70,18 +99,13 @@ export const StackView: React.FC<StackViewProps> = (p) => {
         shadowOffsetY={p.shadowOffsetY}
         shadowOpacity={p.shadowOpacity}
         sceneFunc={(ctx) => {
-          if (outline.length === 0) return;
+          if (pxOutline.length === 0) return;
           ctx.save();
-          // Built in block space (before the font-unit scale) so a gradient
-          // spans the whole composition rather than restarting per piece.
+          // Block space is px, so a gradient spans the whole composition.
           const painter = createBlockFillPainter(ctx, p.fill, p.color, px);
           ctx.fillStyle = painter.style;
-          // The path is stored in device space as it is traced, so scaling
-          // only around the tracing leaves strokeWidth in screen px.
-          ctx.save();
-          ctx.scale(scale, scale);
-          replayPath(ctx as unknown as CanvasRenderingContext2D, outline);
-          ctx.restore();
+          // Trace, stroke and fill in one scope (outline before fill).
+          replayPath(ctx as unknown as CanvasRenderingContext2D, pxOutline);
           if (p.strokeWidth > 0) {
             ctx.strokeStyle = p.stroke ?? "#000";
             ctx.lineWidth = p.strokeWidth;
