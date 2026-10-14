@@ -6,20 +6,8 @@ import {
   URDU,
   PRESETS,
 } from "../lib/presets";
-import type { Block, MirrorMode, TextAlign } from "../types";
-// STREAM-B (muthanna/radial): the file has no anchored import region, so this
-// sits with the other lib imports. Used only by the STREAM-B regions below.
-import { RADIAL_COUNT_MIN, RADIAL_COUNT_MAX, DEFAULT_RADIAL_COUNT, DEFAULT_RADIAL_RADIUS } from "../lib/mirror";
-import {
-  LETTER_SPACING_MAX,
-  LETTER_SPACING_MIN,
-  WORD_SPACING_MAX,
-  WORD_SPACING_MIN,
-} from "../lib/spacing";
+import type { Block, MirrorMode } from "../types";
 import type { NamedProjectMeta } from "../App";
-import { extractSvgPaths } from "../lib/svgImport";
-import { arcPathD, wavePathD, circlePathD } from "../lib/textPath";
-import { parseSvgPath, type SvgCmd } from "../lib/svgPath";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
@@ -28,16 +16,19 @@ import { FontPanel } from "./sidebar/FontPanel";
 import { fontChoicesWith, type FontChoice } from "../lib/fontCatalog";
 import type { CompositionSelection } from "../lib/composition";
 import type { GuideAttachment, GuideParams, GuideShape, VerseLayout, VerseSettings } from "../types";
-import { VerseButton } from "./VerseDialog";
 import { VersePanel } from "./sidebar/VersePanel";
-import { AddGuideButton } from "./GuideDialog";
 import { GuidePanel } from "./sidebar/GuidePanel";
 import { StackPanel } from "./sidebar/StackPanel";
-import { GuideAttachmentPanel } from "./sidebar/GuideAttachmentPanel";
+import { MirrorPanel } from "./sidebar/MirrorPanel";
+import { CurvePanel } from "./sidebar/CurvePanel";
+import { ShapeFillPanel } from "./sidebar/ShapeFillPanel";
+import { BlockControlsPanel } from "./sidebar/BlockControlsPanel";
+import { TypographyPanel } from "./sidebar/TypographyPanel";
+import { EffectsPanel } from "./sidebar/EffectsPanel";
 import { GUIDE_SHAPE_LABELS } from "../lib/guideShapes";
 import { attachedTo, guidesIn } from "../lib/guides";
 import { LayersPanel } from "./sidebar/LayersPanel";
-import { HistoryPopover, type HistoryTimelineEntry } from "./sidebar/HistoryPopover";
+import type { HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
 import {
   SelectRow,
@@ -46,26 +37,11 @@ import {
   PresetKeyboard,
   CollapsibleSection,
   CheckboxRow,
-  DemoHover,
-  type DemoMedia,
 } from "./sidebar/FormControls";
 import { FloatingArabicKeyboard } from "./sidebar/FloatingKeyboard";
 import { GuideLauncher } from "./guide/GuideLauncher";
+import type { KashidaSlot } from "../lib/tatweel";
 import {
-  findKashidaSlots,
-  readKashida,
-  MAX_KASHIDA_PER_SLOT,
-  TATWEEL,
-  type KashidaSlot,
-} from "../lib/tatweel";
-import {
-  TrashIcon,
-  CopyIcon,
-  PlusIcon,
-  ShapesIcon,
-  PathTextIcon,
-  UndoIcon,
-  RedoIcon,
   SaveIcon,
   FolderOpenIcon,
   DownloadIcon,
@@ -96,29 +72,18 @@ import {
   type ArtboardUnit,
 } from "../lib/artboard";
 // ---- STREAM-E: styles & palettes — imports ----
-import { PaletteSwatches } from "./PaletteSwatches";
 import type { TextStyle } from "../lib/textStyles";
 import type { Palette } from "../lib/palettes";
 // ---- /STREAM-E ----
 // ---- STREAM-F: ink & surface — imports ----
-import { fillToCss, resolveFill, type BlockFill, type FillStop } from "../lib/blockFill";
+import type { BlockFill } from "../lib/blockFill";
 import type { ArtboardSurface, TextureDef } from "../data/textures";
 // ---- /STREAM-F ----
 // ---- STREAM-G: font upload — imports ----
 import { PracticeSheetButton } from "./PracticeSheetDialog";
 import { describeFontKey, type CustomFont } from "../lib/customFonts";
-import { supportsGlyphAlternates, supportsStyleSets } from "../lib/blockCapabilities";
-import {
-  activeStyleSets,
-  alternatePanelView,
-  currentChoice,
-  fallbackFeatureLabel,
-  resolveAlternateTarget,
-  type AlternateChoice,
-  type AlternateTarget,
-} from "../lib/glyphAlternates";
+import type { AlternateChoice, AlternateTarget } from "../lib/glyphAlternates";
 import type { GlyphAlternatesState, StyleSetsState } from "../hooks/useGlyphAlternates";
-import { AlternateStrip } from "./sidebar/AlternateStrip";
 // ---- /STREAM-G ----
 
 export type SidebarProps = {
@@ -338,36 +303,6 @@ export type SidebarProps = {
   onDeleteExportPreset?: () => void;
 };
 
-/** Serializes parsed SVG path commands back into a `d` string (module-local, one-off — mirrors ShapedText.tsx's commandsToSvgPath). */
-function cmdsToD(cmds: SvgCmd[]): string {
-  const parts: string[] = [];
-  for (const c of cmds) {
-    switch (c.type) {
-      case "M": parts.push(`M ${c.x} ${c.y}`); break;
-      case "L": parts.push(`L ${c.x} ${c.y}`); break;
-      case "C": parts.push(`C ${c.x1} ${c.y1}, ${c.x2} ${c.y2}, ${c.x} ${c.y}`); break;
-      case "Q": parts.push(`Q ${c.x1} ${c.y1}, ${c.x} ${c.y}`); break;
-      case "Z": parts.push("Z"); break;
-    }
-  }
-  return parts.join(" ");
-}
-
-/**
- * Keeps only the first subpath of an SVG path `d` string (everything up to,
- * but not including, the second `M` command). `extractSvgPaths` legitimately
- * concatenates every shape in an uploaded SVG into one `d` string for
- * shapeFill's union-silhouette use case, but a text-path curve
- * needs a single open path — the phantom jump between subpaths would
- * otherwise inflate arc length and route glyphs through empty space.
- */
-function firstSubpath(d: string): { d: string; hadMultiple: boolean } {
-  const cmds = parseSvgPath(d);
-  const secondMoveIndex = cmds.findIndex((c, i) => i > 0 && c.type === "M");
-  if (secondMoveIndex === -1) return { d, hadMultiple: false };
-  return { d: cmdsToD(cmds.slice(0, secondMoveIndex)), hadMultiple: true };
-}
-
 /**
  * A quiet rule between the sidebar's three tiers — what you set once per
  * project, what acts on the canvas, and what belongs to the selected block.
@@ -393,18 +328,6 @@ const SidebarTier: React.FC<{ label: string }> = ({ label }) => (
     <span style={{ flex: 1, height: 1, background: "var(--border-soft)", minWidth: 0 }} />
   </div>
 );
-
-/** How long the pointer must rest on an Add button before its demo opens. */
-const BLOCK_DEMO_DELAY = 400;
-
-/** Recordings shown on hover over the Add buttons; captions are set at the call site. */
-const BLOCK_DEMOS = {
-  text: { src: "/demos/add-text.gif", alt: "Placing a new text block on the canvas", width: 400 },
-  shapeFill: { src: "/demos/add-shape-fill.gif", alt: "A shape filled with rows of text", width: 400 },
-  curvedText: { src: "/demos/add-curved-text.gif", alt: "Placing text that follows a curve", width: 400 },
-  mirror: { src: "/demos/add-mirror.gif", alt: "Adding a mirrored copy of a block", width: 400 },
-  medallion: { src: "/demos/add-medallion.gif", alt: "Repeating a block radially as a medallion", width: 400 },
-} satisfies Record<string, DemoMedia>;
 
 export const Sidebar: React.FC<SidebarProps> = ({
   // ---- STREAM-E: styles & palettes — destructure ----
@@ -681,73 +604,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleRename = (id: number, name: string) => {
     if (onUpdateBlock) onUpdateBlock(id, { name });
     else if (selectedBlock?.id === id) onUpdateSelectedBlock({ name });
-  };
-
-  const handleSvgUpload = () => {
-    const onAdd = onAddShapeFillBlock;
-    if (!onAdd) return;
-
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".svg,image/svg+xml";
-
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = extractSvgPaths(e.target?.result as string);
-        if (!result) {
-          alert(
-            "No supported shape elements found in SVG (path, rect, circle, ellipse, polygon, polyline)."
-          );
-          return;
-        }
-        onAdd(result.pathData, result.w, result.h);
-      };
-      reader.readAsText(file);
-    };
-
-    input.click();
-  };
-
-  const handleTextPathSvgUpload = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".svg,image/svg+xml";
-
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = extractSvgPaths(e.target?.result as string, undefined, true);
-        if (!result) {
-          alert(
-            "No supported shape elements found in SVG (path, rect, circle, ellipse, polygon, polyline)."
-          );
-          return;
-        }
-
-        // extractSvgPaths concatenates every matched shape into one `d`
-        // string, which is correct for shapeFill (it wants the
-        // union silhouette) but wrong for a text-path curve: the jump from
-        // one subpath's end to the next subpath's `M` would be treated as a
-        // real curve segment. Keep only the first subpath here.
-        const { d: firstSubpathD, hadMultiple } = firstSubpath(result.pathData);
-        if (hadMultiple) {
-          alert(
-            "This SVG has multiple shapes/subpaths — only the first one was used as the text path."
-          );
-        }
-        onUpdateSelectedBlock({ textPathD: firstSubpathD });
-      };
-      reader.readAsText(file);
-    };
-
-    input.click();
   };
 
   if (!isMobile && isCollapsed) {
@@ -1707,202 +1563,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <SidebarTier label="canvas" />
 
-        <div className="sidebarPanel">
-          <div className="sidebarSectionTitle">Block Controls</div>
-
-          {/* Three labelled groups rather than one wrapping row of identical
-              chips. The old row let flex-wrap choose the shape, and at the
-              sidebar's width it broke 8 / 1 / 3 — leaving one button
-              stranded alone on a line of its own, which reads as a bug rather
-              than a layout. A fixed four-column grid cannot orphan anything.
-              Splitting Add from the destructive pair also moves Delete out of
-              the leading position, where it sat immediately beside Duplicate. */}
-          <div className="blockControlGroup">
-            <div className="blockControlGroupLabel">Add</div>
-            <div className="blockControlGrid">
-              <DemoHover
-                className="blockControlDemo"
-                delay={BLOCK_DEMO_DELAY}
-                demo={{ ...BLOCK_DEMOS.text, caption: "Add a text block" }}
-              >
-                <button
-                  type="button"
-                  onClick={onAddBlock}
-                  className="sidebarCircleButton"
-                  aria-label="Add text"
-                >
-                  <PlusIcon size={15} />
-                </button>
-              </DemoHover>
-
-              {onAddShapeFillBlock && (
-                <DemoHover
-                  className="blockControlDemo"
-                  delay={BLOCK_DEMO_DELAY}
-                  demo={{ ...BLOCK_DEMOS.shapeFill, caption: "Add a shape filled with text, from an SVG…" }}
-                >
-                  <button
-                    type="button"
-                    className="sidebarCircleButton"
-                    aria-label="Add shape fill"
-                    onClick={() => handleSvgUpload()}
-                  >
-                    <ShapesIcon size={15} />
-                  </button>
-                </DemoHover>
-              )}
-
-              {onAddTextPathBlock && (
-                <DemoHover
-                  className="blockControlDemo"
-                  delay={BLOCK_DEMO_DELAY}
-                  demo={{ ...BLOCK_DEMOS.curvedText, caption: "Add text on a curve" }}
-                >
-                  <button
-                    type="button"
-                    className="sidebarCircleButton"
-                    aria-label="Add curved text"
-                    onClick={onAddTextPathBlock}
-                  >
-                    <PathTextIcon size={15} />
-                  </button>
-                </DemoHover>
-              )}
-          {onAddGuide && <AddGuideButton onAdd={onAddGuide} />}
-
-              {/* Inline SVGs rather than entries in Icons.tsx: that file is not
-                  this stream's to edit during the Phase 1 parallel run. */}
-              {onAddMirrorBlock && (
-                <>
-                  <DemoHover
-                    className="blockControlDemo"
-                    delay={BLOCK_DEMO_DELAY}
-                    demo={{
-                      ...BLOCK_DEMOS.mirror,
-                      caption: canAddMirrorBlock
-                        ? "Add a mirror (muthanna) of the selected block"
-                        : "Select exactly one non-mirror block to mirror it",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="sidebarCircleButton"
-                      disabled={!canAddMirrorBlock}
-                      aria-label="Add mirror"
-                      onClick={() => onAddMirrorBlock("mirrorX")}
-                    >
-                      <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
-                        <path d="M8 1v14" stroke="currentColor" strokeWidth={1.2} strokeDasharray="2 2" />
-                        <path d="M6.5 4 2 8l4.5 4z" fill="currentColor" />
-                        <path
-                          d="M9.5 4 14 8l-4.5 4z"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={1.2}
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
-                  </DemoHover>
-
-                  <DemoHover
-                    className="blockControlDemo"
-                    delay={BLOCK_DEMO_DELAY}
-                    demo={{
-                      ...BLOCK_DEMOS.medallion,
-                      caption: canAddMirrorBlock
-                        ? "Add a medallion: radial copies of the selected block"
-                        : "Select exactly one non-mirror block to repeat it radially",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="sidebarCircleButton"
-                      disabled={!canAddMirrorBlock}
-                      aria-label="Add medallion"
-                      onClick={() => onAddMirrorBlock("radial")}
-                    >
-                      <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
-                        <g stroke="currentColor" strokeWidth={1.2} strokeLinecap="round">
-                          <path d="M8 1.5v3.2M8 11.3v3.2M1.5 8h3.2M11.3 8h3.2" />
-                          <path d="M3.4 3.4l2.3 2.3M10.3 10.3l2.3 2.3M12.6 3.4l-2.3 2.3M5.7 10.3l-2.3 2.3" />
-                        </g>
-                        <circle cx={8} cy={8} r={1.6} fill="currentColor" />
-                      </svg>
-                    </button>
-                  </DemoHover>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="blockControlSplit">
-            <div className="blockControlGroup">
-              <div className="blockControlGroupLabel">Selected</div>
-              <div className="blockControlGrid blockControlGrid--inline">
-                <button
-                  type="button"
-                  onClick={onDuplicateBlock}
-                  disabled={!selectedBlock}
-                  className="sidebarCircleButton"
-                  title="Duplicate selected block"
-                  aria-label="Duplicate block"
-                >
-                  <CopyIcon size={15} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={onDeleteBlock}
-                  disabled={!selectedBlock || blocks.length === 0}
-                  className="sidebarCircleButton sidebarCircleButton--danger"
-                  title="Delete selected block"
-                  aria-label="Delete block"
-                >
-                  <TrashIcon size={15} />
-                </button>
-              </div>
-            </div>
-
-            <div className="blockControlGroup">
-              <div className="blockControlGroupLabel">History</div>
-              <div className="blockControlGrid blockControlGrid--inline">
-                <button
-                  type="button"
-                  onClick={onUndo}
-                  disabled={!canUndo}
-                  className="sidebarCircleButton"
-                  title="Undo (Ctrl+Z)"
-                  aria-label="Undo"
-                >
-                  <UndoIcon size={15} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={onRedo}
-                  disabled={!canRedo}
-                  className="sidebarCircleButton"
-                  title="Redo (Ctrl+Y)"
-                  aria-label="Redo"
-                >
-                  <RedoIcon size={15} />
-                </button>
-
-                <HistoryPopover
-                  historyEntries={historyEntries}
-                  onJumpTo={onJumpToHistory}
-                  onCaptureCurrentThumbnail={onCaptureCurrentThumbnail}
-                />
-              </div>
-            </div>
-          </div>
-          {onCreateVerse && (
-            <div style={{ marginTop: 10 }}>
-              <VerseButton onCreate={onCreateVerse} disabled={isJustifyingVerse} />
-            </div>
-          )}
-        </div>
+        <BlockControlsPanel
+          blocks={blocks}
+          selectedBlock={selectedBlock}
+          onAddBlock={onAddBlock}
+          onAddShapeFillBlock={onAddShapeFillBlock}
+          onAddTextPathBlock={onAddTextPathBlock}
+          onAddGuide={onAddGuide}
+          onAddMirrorBlock={onAddMirrorBlock}
+          canAddMirrorBlock={canAddMirrorBlock}
+          onDuplicateBlock={onDuplicateBlock}
+          onDeleteBlock={onDeleteBlock}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          historyEntries={historyEntries}
+          onJumpToHistory={onJumpToHistory}
+          onCaptureCurrentThumbnail={onCaptureCurrentThumbnail}
+          onCreateVerse={onCreateVerse}
+          isJustifyingVerse={isJustifyingVerse}
+        />
 
         <div className="sidebarPanel">
           <CollapsibleSection title="Layers" isOpen={showLayers} onToggle={() => setShowLayers((v) => !v)}>
@@ -2232,221 +1913,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {selectedBlock && selectedBlock.type === "mirror" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection
-              title="Mirror"
-              isOpen={showText}
-              onToggle={() => setShowText((v) => !v)}
-            >
-              <div className="sectionPanel">
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
-                  This block draws {mirrorSourceLabel ?? "another block"}'s content. Edit the
-                  text and typography on the source — every copy follows.
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onSelectMirrorSource?.()}
-                  className="sidebarSmallAction"
-                  style={{ background: "var(--bg-input)" }}
-                  title="Select the block this mirror reflects"
-                >
-                  Select source
-                </button>
-
-                <SelectRow
-                  id={makeId("mirror-mode", selectedId)}
-                  name={makeId("mirrorMode", selectedId)}
-                  label="Mode"
-                  value={selectedBlock.mode}
-                  onChange={(v) => onUpdateSelectedBlock({ mode: v as MirrorMode })}
-                >
-                  <option value="mirrorX">Mirror across a vertical axis</option>
-                  <option value="mirrorY">Mirror across a horizontal axis</option>
-                  <option value="radial">Radial (around a centre)</option>
-                </SelectRow>
-
-                {selectedBlock.mode === "radial" && (
-                  <>
-                    <RangeRow
-                      id={makeId("radial-count", selectedId)}
-                      name={makeId("radialCount", selectedId)}
-                      label="Copies"
-                      value={selectedBlock.radialCount ?? DEFAULT_RADIAL_COUNT}
-                      min={RADIAL_COUNT_MIN}
-                      max={RADIAL_COUNT_MAX}
-                      step={1}
-                      onChange={(v) => onUpdateSelectedBlock({ radialCount: v })}
-                      suffix={selectedBlock.radialCount ?? DEFAULT_RADIAL_COUNT}
-                    />
-
-                    <RangeRow
-                      id={makeId("radial-radius", selectedId)}
-                      name={makeId("radialRadius", selectedId)}
-                      label="Radius"
-                      value={selectedBlock.radialRadius ?? DEFAULT_RADIAL_RADIUS}
-                      min={0}
-                      max={600}
-                      step={2}
-                      onChange={(v) => onUpdateSelectedBlock({ radialRadius: v })}
-                      suffix={`${Math.round(selectedBlock.radialRadius ?? DEFAULT_RADIAL_RADIUS)}px`}
-                    />
-                  </>
-                )}
-
-                <RangeRow
-                  id={makeId("opacity", selectedId)}
-                  name={makeId("opacity", selectedId)}
-                  label="Opacity"
-                  value={selectedOpacity}
-                  min={0.1}
-                  max={1}
-                  step={0.05}
-                  onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
-                  suffix={`${Math.round(selectedOpacity * 100)}%`}
-                  fieldKey="opacity"
-                />
-
-                <RangeRow
-                  id={makeId("rotation", selectedId)}
-                  name={makeId("rotation", selectedId)}
-                  label="Rotation"
-                  value={selectedRotation}
-                  min={-180}
-                  max={180}
-                  onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
-                  suffix={`${selectedRotation}°`}
-                  fieldKey="rotation"
-                />
-              </div>
-            </CollapsibleSection>
-          </div>
+          <MirrorPanel
+            selectedBlock={selectedBlock}
+            selectedId={selectedId}
+            selectedOpacity={selectedOpacity}
+            selectedRotation={selectedRotation}
+            mirrorSourceLabel={mirrorSourceLabel}
+            onSelectMirrorSource={onSelectMirrorSource}
+            onUpdateSelectedBlock={onUpdateSelectedBlock}
+            isOpen={showText}
+            onToggle={() => setShowText((v) => !v)}
+          />
         )}
 
         {selectedBlock && selectedBlock.type === "shapeFill" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection
-              title="Shape Fill"
-              isOpen={showText}
-              onToggle={() => setShowText((v) => !v)}
-            >
-              <div className="sectionPanel">
-                  <div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
-                      Tip: drag the gold handle on the shape's corner (canvas) to resize.
-                    </div>
-
-                    <CheckboxRow
-                      id={makeId("diacritic-edit-mode", selectedId)}
-                      label="Diacritic tool"
-                      checked={!!selectedBlock.diacriticEditMode}
-                      onChange={() => onToggleDiacriticEditMode?.()}
-                      demo={{
-                        src: "/demos/diacritic-hover-handles.gif",
-                        alt: "Hovering a diacritic mark shows reposition, resize and hide handles",
-                      }}
-                    />
-
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
-                      Hover a tashkeel mark on the canvas to move, resize, or hide it. One
-                      change applies to every repetition of that mark in the fill.
-                    </div>
-
-                    <RangeRow
-                      id={makeId("shape-scale", selectedId)}
-                      name={makeId("shapeScale", selectedId)}
-                      label="Shape scale"
-                      value={selectedBlock.shapeScale ?? 1}
-                      min={0.2}
-                      max={3}
-                      step={0.05}
-                      onChange={(v) => onUpdateSelectedBlock({ shapeScale: v })}
-                      suffix={(selectedBlock.shapeScale ?? 1).toFixed(2)}
-                      fieldKey="shapeScale"
-                    />
-
-                    <RangeRow
-                      id={makeId("fill-spacing", selectedId)}
-                      name={makeId("shapeFillSpacing", selectedId)}
-                      label="Text spacing"
-                      value={selectedBlock.shapeFillSpacing ?? 1.3}
-                      min={0.5}
-                      max={4}
-                      step={0.05}
-                      onChange={(v) =>
-                        onUpdateSelectedBlock({ shapeFillSpacing: v })
-                      }
-                      suffix={(selectedBlock.shapeFillSpacing ?? 1.3).toFixed(2)}
-                      fieldKey="shapeFillSpacing"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => onFitShapeFillSpacing?.(selectedBlock.id)}
-                      className="sidebarSmallAction"
-                      style={{ marginTop: 4 }}
-                      title="Adjust row spacing so rows evenly fill the shape's height"
-                    >
-                      Fit exactly
-                    </button>
-
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                        gap: 10,
-                        marginTop: 8,
-                      }}
-                    >
-                      <RangeRow
-                        id={makeId("fill-scale-x", selectedId)}
-                        name={makeId("shapeFillScaleX", selectedId)}
-                        label="Scale X"
-                        value={selectedBlock.shapeFillScaleX ?? 1}
-                        min={0.1}
-                        max={3}
-                        step={0.05}
-                        onChange={(v) =>
-                          onUpdateSelectedBlock({ shapeFillScaleX: v })
-                        }
-                        suffix={(selectedBlock.shapeFillScaleX ?? 1).toFixed(2)}
-                        fieldKey="shapeFillScaleX"
-                      />
-
-                      <RangeRow
-                        id={makeId("fill-scale-y", selectedId)}
-                        name={makeId("shapeFillScaleY", selectedId)}
-                        label="Scale Y"
-                        value={selectedBlock.shapeFillScaleY ?? 1}
-                        min={0.1}
-                        max={3}
-                        step={0.05}
-                        onChange={(v) =>
-                          onUpdateSelectedBlock({ shapeFillScaleY: v })
-                        }
-                        suffix={(selectedBlock.shapeFillScaleY ?? 1).toFixed(2)}
-                        fieldKey="shapeFillScaleY"
-                      />
-                    </div>
-
-                    <RangeRow
-                      id={makeId("fill-text-rotation", selectedId)}
-                      name={makeId("shapeFillTextRotation", selectedId)}
-                      label="Text rotation"
-                      value={selectedBlock.shapeFillTextRotation ?? 0}
-                      min={-180}
-                      max={180}
-                      step={1}
-                      onChange={(v) =>
-                        onUpdateSelectedBlock({ shapeFillTextRotation: v })
-                      }
-                      suffix={selectedBlock.shapeFillTextRotation ?? 0}
-                      fieldKey="shapeFillTextRotation"
-                    />
-                  </div>
-              </div>
-            </CollapsibleSection>
-          </div>
+          <ShapeFillPanel
+            selectedBlock={selectedBlock}
+            selectedId={selectedId}
+            isMobile={isMobile}
+            onUpdateSelectedBlock={onUpdateSelectedBlock}
+            onToggleDiacriticEditMode={onToggleDiacriticEditMode}
+            onFitShapeFillSpacing={onFitShapeFillSpacing}
+            isOpen={showText}
+            onToggle={() => setShowText((v) => !v)}
+          />
         )}
 
         {selectedBlock?.type === "guide" && onUpdateGuideParams && onAddTextToGuide && (
@@ -2475,981 +1965,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {selectedBlock && selectedBlock.type === "textPath" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Curve" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
-              {/* Attached to a guide: the guide owns the curve, so the
-                  curve-editing rows give way to the On guide controls. */}
-              {selectedBlock.guide && onUpdateGuideAttachment && onDetachFromGuide ? (
-                <GuideAttachmentPanel
-                  blockId={selectedBlock.id}
-                  attachment={selectedBlock.guide}
-                  shrink={guideShrink?.get(selectedBlock.id)}
-                  onChange={onUpdateGuideAttachment}
-                  onDetach={onDetachFromGuide}
-                />
-              ) : (
-              <div className="sectionPanel">
-                <button
-                  type="button"
-                  className="sidebarPillButton"
-                  style={
-                    selectedBlock.textPathEditMode
-                      ? { background: "var(--accent)", color: "var(--text-on-accent)" }
-                      : undefined
-                  }
-                  onClick={() =>
-                    onUpdateSelectedBlock({ textPathEditMode: !selectedBlock.textPathEditMode })
-                  }
-                >
-                  {selectedBlock.textPathEditMode ? "Done Editing Curve" : "Edit Curve"}
-                </button>
-
-                <SelectRow
-                  id={makeId("text-path-preset", selectedId)}
-                  name={makeId("textPathPreset", selectedId)}
-                  label="Preset"
-                  value="custom"
-                  onChange={(v) => {
-                    if (v === "arc") {
-                      onUpdateSelectedBlock({ textPathD: arcPathD(400, 120) });
-                    } else if (v === "wave") {
-                      onUpdateSelectedBlock({ textPathD: wavePathD(400, 120) });
-                    } else if (v === "circle") {
-                      onUpdateSelectedBlock({ textPathD: circlePathD(300, 300) });
-                    }
-                  }}
-                >
-                  <option value="custom">Custom</option>
-                  <option value="arc">Arc</option>
-                  <option value="wave">Wave</option>
-                  <option value="circle">Circle</option>
-                </SelectRow>
-
-                <button
-                  type="button"
-                  className="sidebarPillButton"
-                  onClick={handleTextPathSvgUpload}
-                >
-                  Upload SVG Path
-                </button>
-
-                <label className="field">
-                  <span className="fieldTitle">
-                    <input
-                      type="checkbox"
-                      checked={selectedBlock.textPathReversed ?? false}
-                      onChange={(e) =>
-                        onUpdateSelectedBlock({ textPathReversed: e.target.checked })
-                      }
-                      style={{ marginRight: 6 }}
-                    />
-                    Flip direction
-                  </span>
-                </label>
-
-                <RangeRow
-                  id={makeId("text-path-baseline-offset", selectedId)}
-                  name={makeId("textPathBaselineOffset", selectedId)}
-                  label="Baseline offset"
-                  value={selectedBlock.textPathBaselineOffset ?? 0}
-                  min={-60}
-                  max={60}
-                  onChange={(v) => onUpdateSelectedBlock({ textPathBaselineOffset: v })}
-                  suffix={selectedBlock.textPathBaselineOffset ?? 0}
-                  fieldKey="textPathBaselineOffset"
-                />
-              </div>
-              )}
-            </CollapsibleSection>
-          </div>
+          <CurvePanel
+            selectedBlock={selectedBlock}
+            selectedId={selectedId}
+            onUpdateSelectedBlock={onUpdateSelectedBlock}
+            onDetachFromGuide={onDetachFromGuide}
+            onUpdateGuideAttachment={onUpdateGuideAttachment}
+            guideShrink={guideShrink}
+            isOpen={showText}
+            onToggle={() => setShowText((v) => !v)}
+          />
         )}
 
         {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Typography" isOpen={showText} onToggle={() => setShowText((v) => !v)}>
-              <div className="sectionPanel">
-                {/* ---- STREAM-E: styles & palettes — Styles row ---- */}
-                {/* Written inline rather than as a helper component because
-                    this stream owns only the region between these anchors —
-                    the same constraint the Kashida IIFE below records. It holds
-                    no state: the list, the selection and the name draft all
-                    live in App.tsx beside the other local stores. */}
-                <div className="field">
-                  <span className="fieldTitle">Style</span>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <select
-                      value={selectedTextStyleId}
-                      onChange={(e) => onSelectTextStyle?.(e.target.value)}
-                      className="select"
-                      aria-label="Text style"
-                      style={{ minWidth: 0, flex: 1 }}
-                    >
-                      <option value="">
-                        {textStyles.length === 0 ? "No saved styles" : "Style…"}
-                      </option>
-                      {textStyles.map((style) => (
-                        <option key={style.id} value={style.id}>
-                          {style.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={onApplyTextStyle}
-                      disabled={!selectedTextStyleId}
-                      className="sidebarPillButton"
-                      style={{ flex: "0 0 auto", padding: "0 10px" }}
-                      title="Apply this style to every selected block"
-                    >
-                      Apply
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onDeleteTextStyle}
-                      disabled={!selectedTextStyleId}
-                      className="layerIconBtn"
-                      title="Delete this style"
-                      aria-label="Delete this style"
-                      style={{ color: "var(--danger)", flex: "0 0 auto" }}
-                    >
-                      <CloseIcon size={13} />
-                    </button>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <input
-                      type="text"
-                      value={newTextStyleName}
-                      onChange={(e) => onChangeNewTextStyleName?.(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newTextStyleName.trim()) onSaveTextStyle?.();
-                      }}
-                      placeholder="Style name…"
-                      aria-label="New text style name"
-                      className="hexInput"
-                      style={{ minWidth: 0, fontFamily: "inherit", letterSpacing: 0 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={onSaveTextStyle}
-                      disabled={!newTextStyleName.trim()}
-                      className="sidebarPillButton"
-                      style={{ flex: "0 0 auto" }}
-                      title="Save this block's font, colour, outline and shadow as a style"
-                    >
-                      Save style
-                    </button>
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                    A style carries font, colour, outline and shadow — never the
-                    text or where the block sits. Styles stay in this browser.
-                  </div>
-                </div>
-
-                {palettes.length > 0 && (
-                  <PaletteSwatches
-                    palettes={palettes}
-                    selectedId={selectedPaletteId}
-                    onSelect={(id) => onSelectPalette?.(id)}
-                    value={selectedBlock.color}
-                    onPick={(color) => onPickPaletteColor?.(color)}
-                    onSaveFromCanvas={onSavePaletteFromCanvas}
-                    onDelete={onDeletePalette}
-                    canDelete={canDeletePalette}
-                  />
-                )}
-                {/* ---- /STREAM-E ---- */}
-                {/* Everything this section needs is derived from the block's
-                    own text, so it holds no state of its own beyond the
-                    selected slot (which lives in App.tsx). Written as an IIFE
-                    rather than a helper component because this stream owns
-                    only the region between these two anchors. */}
-                {selectedBlock.type !== "stack" && (() => {
-                  const slots = findKashidaSlots(selectedBlock.text);
-                  if (slots.length === 0) {
-                    return (
-                      <div className="field">
-                        <span className="fieldTitle">Kashida</span>
-                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                          No stretchable joins in this text — a kashida needs two
-                          letters that join to each other.
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // The ordinal is clamped rather than reset, so editing the
-                  // text (which changes how many slots there are) can never
-                  // point the stepper past the end of the list.
-                  const ordinal = Math.min(Math.max(0, kashidaSlotOrdinal), slots.length - 1);
-                  const slot = slots[ordinal];
-                  const counts = readKashida(selectedBlock.text, slots);
-                  const count = counts.get(slot.index) ?? 0;
-                  const setCount = (n: number) =>
-                    onSetKashidaAtSlot?.(slot, Math.min(MAX_KASHIDA_PER_SLOT, Math.max(0, n)));
-                  const slotLabel = (s: KashidaSlot) => `${s.before} ${TATWEEL} ${s.after}`;
-
-                  return (
-                    <>
-                      <SelectRow
-                        id={makeId("kashida-slot", selectedId)}
-                        name={makeId("kashidaSlot", selectedId)}
-                        label="Kashida join"
-                        value={String(ordinal)}
-                        onChange={(v) => onSelectKashidaSlot?.(Number(v))}
-                      >
-                        {slots.map((s, i) => (
-                          <option key={`${s.index}-${i}`} value={String(i)}>
-                            {`${i + 1}. ${slotLabel(s)}`}
-                            {(counts.get(s.index) ?? 0) > 0 ? ` (${counts.get(s.index)})` : ""}
-                          </option>
-                        ))}
-                      </SelectRow>
-
-                      <div className="field">
-                        <span className="fieldTitle">Stretch this join</span>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            minWidth: 0,
-                          }}
-                        >
-                          <button
-                            type="button"
-                            className="sidebarCircleButton"
-                            aria-label="Shorten kashida"
-                            disabled={count === 0}
-                            onClick={() => setCount(count - 1)}
-                          >
-                            −
-                          </button>
-                          <span
-                            aria-label="Kashida length"
-                            style={{
-                              minWidth: 24,
-                              textAlign: "center",
-                              fontVariantNumeric: "tabular-nums",
-                            }}
-                          >
-                            {count}
-                          </span>
-                          <button
-                            type="button"
-                            className="sidebarCircleButton"
-                            aria-label="Lengthen kashida"
-                            disabled={count >= MAX_KASHIDA_PER_SLOT}
-                            onClick={() => setCount(count + 1)}
-                          >
-                            +
-                          </button>
-                          <span
-                            dir="rtl"
-                            style={{ flex: 1, minWidth: 0, fontSize: 16, textAlign: "center" }}
-                          >
-                            {slot.before}
-                            {TATWEEL.repeat(Math.max(1, count))}
-                            {slot.after}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-                          Adds tatweel characters to the text itself, so the letters
-                          really connect. Apply kashida before fine-tuning marks.
-                        </div>
-                      </div>
-
-                      {/* Plain text only. A Shape Fill run is auto-scaled to
-                          span its silhouette and a Curve run to span its
-                          curve, so on those types a width target has nothing
-                          to act on — the same reason `fontSize` is hidden for
-                          a curve. */}
-                      {selectedBlock.type === "text" && (() => {
-                        // The effective target is derived here rather than
-                        // threaded in, so "what the box shows" and "what Fit
-                        // uses" cannot disagree.
-                        const effectiveTarget =
-                          fitTargetOverride ?? fitTargetPageDefault;
-                        const isFromPage =
-                          fitTargetOverride === null && fitTargetPageDefault !== null;
-                        return (
-                        <div className="field">
-                          <span className="fieldTitle">Fit to width</span>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              minWidth: 0,
-                            }}
-                          >
-                            <input
-                              id={makeId("fit-target", selectedId)}
-                              type="number"
-                              min={1}
-                              step={1}
-                              className="hexInput artboardNumberInput"
-                              aria-label="Target width in pixels"
-                              placeholder={
-                                fitTargetPageDefault !== null
-                                  ? String(fitTargetPageDefault)
-                                  : "width in px"
-                              }
-                              value={fitTargetOverride ?? ""}
-                              onChange={(e) => {
-                                // A number input reports "" for most partial
-                                // entries, but a paste can still produce
-                                // something `Number` reads as NaN — which
-                                // `??` would carry straight through to the
-                                // value, stranding the field. Anything not a
-                                // real number means "track the page" instead.
-                                const value = Number(e.target.value.trim());
-                                onChangeFitTargetWidth?.(
-                                  Number.isFinite(value) && value > 0 ? value : null
-                                );
-                              }}
-                              style={{ flex: 1, minWidth: 0 }}
-                            />
-                            <button
-                              type="button"
-                              className="sidebarPillButton"
-                              disabled={isFittingWidth || !effectiveTarget}
-                              onClick={() => {
-                                if (effectiveTarget) onFitToWidth?.(effectiveTarget);
-                              }}
-                            >
-                              {isFittingWidth ? "Fitting…" : "Fit"}
-                            </button>
-                          </div>
-
-                          {fitTargetPageDefault !== null && !isFromPage && (
-                            <button
-                              type="button"
-                              className="sidebarSectionButton"
-                              style={{ marginTop: 6 }}
-                              onClick={() => onChangeFitTargetWidth?.(null)}
-                            >
-                              Use page margin box
-                            </button>
-                          )}
-
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: "var(--text-muted)",
-                              marginTop: 4,
-                            }}
-                          >
-                            {isFromPage
-                              ? "Tracking the page's margin box. "
-                              : fitTargetPageDefault !== null
-                                ? ""
-                                : "No page is set, so type a target. "}
-                            Spreads kashida evenly across every join above until the
-                            text spans the target — never past it. Replaces any
-                            kashida already set.
-                          </div>
-                        </div>
-                        );
-                      })()}
-                    </>
-                  );
-                })()}
-                {selectedBlock.type === "textPath" && !selectedBlock.guide ? (
-                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                    Letter size on a text-path block is set by the curve's length — drag the
-                    curve longer or shorter in Edit Curve mode, or change the text.
-                  </div>
-                ) : (
-                  <RangeRow
-                    id={makeId("font-size", selectedId)}
-                    name={makeId("fontSize", selectedId)}
-                    label="Font size"
-                    value={selectedBlock.fontSize}
-                    min={selectedBlock.type === "shapeFill" ? 4 : 12}
-                    max={selectedBlock.type === "shapeFill" ? 400 : 200}
-                    onChange={(v) => onUpdateSelectedBlock({ fontSize: v })}
-                    suffix={`${Math.round(selectedBlock.fontSize)}px`}
-                    fieldKey="fontSize"
-                  />
-                )}
-
-                <ColorRow
-                  id={makeId("text-color", selectedId)}
-                  name={makeId("textColor", selectedId)}
-                  label="Text color"
-                  value={selectedBlock.color}
-                  onChange={(v) => onUpdateSelectedBlock({ color: v })}
-                />
-
-                <RangeRow
-                  id={makeId("opacity", selectedId)}
-                  name={makeId("opacity", selectedId)}
-                  label="Opacity"
-                  value={selectedOpacity}
-                  min={0.1}
-                  max={1}
-                  step={0.05}
-                  onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
-                  suffix={`${Math.round(selectedOpacity * 100)}%`}
-                  fieldKey="opacity"
-                />
-
-                {selectedBlock.type === "text" && (
-                  <SelectRow
-                    id={makeId("text-align", selectedId)}
-                    name={makeId("textAlign", selectedId)}
-                    label="Alignment"
-                    value={selectedBlock.align ?? "center"}
-                    onChange={(v) =>
-                      onUpdateSelectedBlock({ align: v as TextAlign })
-                    }
-                  >
-                    <option value="left">Left</option>
-                    <option value="center">Center</option>
-                    <option value="right">Right</option>
-                  </SelectRow>
-                )}
-
-                {selectedBlock.type === "text" && (
-                  <RangeRow
-                    id={makeId("line-height", selectedId)}
-                    name={makeId("lineHeight", selectedId)}
-                    label="Line height"
-                    value={selectedBlock.lineHeight ?? 1.2}
-                    min={0.8}
-                    max={3}
-                    step={0.05}
-                    onChange={(v) => onUpdateSelectedBlock({ lineHeight: v })}
-                    suffix={(selectedBlock.lineHeight ?? 1.2).toFixed(2)}
-                    fieldKey="lineHeight"
-                  />
-                )}
-
-                {selectedBlock.type === "text" && (
-                  <RangeRow
-                    id={makeId("letter-spacing", selectedId)}
-                    name={makeId("letterSpacing", selectedId)}
-                    label="Letter spacing"
-                    value={selectedBlock.letterSpacing ?? 0}
-                    min={LETTER_SPACING_MIN}
-                    max={LETTER_SPACING_MAX}
-                    step={0.01}
-                    onChange={(v) => onUpdateSelectedBlock({ letterSpacing: v })}
-                    suffix={(selectedBlock.letterSpacing ?? 0).toFixed(2)}
-                    fieldKey="letterSpacing"
-                  />
-                )}
-
-                {selectedBlock.type === "text" && (
-                  <RangeRow
-                    id={makeId("word-spacing", selectedId)}
-                    name={makeId("wordSpacing", selectedId)}
-                    label="Word spacing"
-                    value={selectedBlock.wordSpacing ?? 0}
-                    min={WORD_SPACING_MIN}
-                    max={WORD_SPACING_MAX}
-                    step={0.01}
-                    onChange={(v) => onUpdateSelectedBlock({ wordSpacing: v })}
-                    suffix={(selectedBlock.wordSpacing ?? 0).toFixed(2)}
-                    fieldKey="wordSpacing"
-                  />
-                )}
-
-                {supportsStyleSets(selectedBlock) && (
-                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Letter shapes</div>
-
-                    {/* Block-wide style sets: every matching letter at once.
-                        A set that is on stays listed even if the text no
-                        longer uses it, so it can always be switched off. */}
-                    {(() => {
-                      const state = styleSetsState;
-                      const on = activeStyleSets(selectedBlock.styleSets);
-                      const listed = [
-                        ...(state?.sets ?? []),
-                        ...on
-                          .filter((t) => !(state?.sets ?? []).some((x) => x.feature === t))
-                          .map((t) => ({ feature: t, label: fallbackFeatureLabel({ feature: t, value: 1 }) })),
-                      ];
-                      const note = (text: string) => (
-                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>{text}</div>
-                      );
-                      if (listed.length === 0) {
-                        if (!state || state.loading) return note("Looking for style sets…");
-                        return note(
-                          state.fontHasStyleSets
-                            ? "No style set in this font changes this text"
-                            : "No style sets in this font"
-                        );
-                      }
-                      return (
-                        <div style={{ marginBottom: 8 }}>
-                          <div style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 4px" }}>
-                            Style sets — applied to every matching letter
-                          </div>
-                          {listed.map((set) => (
-                            <CheckboxRow
-                              key={set.feature}
-                              id={makeId(`style-set-${set.feature}`, selectedId)}
-                              label={set.label}
-                              checked={on.includes(set.feature)}
-                              onChange={() => onToggleStyleSet?.(selectedBlock.id, set.feature)}
-                            />
-                          ))}
-                        </div>
-                      );
-                    })()}
-
-                    {supportsGlyphAlternates(selectedBlock) && (<>
-                    <CheckboxRow
-                      id={makeId("glyph-alternate-mode", selectedId)}
-                      label="Alternate letter shapes"
-                      checked={!!selectedBlock.glyphAlternateMode}
-                      onChange={() => onToggleGlyphAlternateMode?.(selectedBlock.id)}
-                    />
-
-                    {selectedBlock.glyphAlternateMode && (() => {
-                      const state = glyphAlternatesState;
-                      const letter = resolveAlternateTarget(
-                        alternateTarget,
-                        selectedBlock.id,
-                        selectedBlock.text
-                      );
-                      const note = (text: string) => (
-                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>{text}</div>
-                      );
-                      const view = alternatePanelView(
-                        state && { ...state, hasFont: state.font !== null },
-                        letter
-                      );
-                      if (view.kind === "loading") return note("Looking for alternate shapes…");
-                      if (view.kind === "noFontAlternates") return note("No alternate shapes in this font");
-                      if (view.kind === "noTextAlternates")
-                        return note("No letter in this text has alternate shapes");
-                      if (view.kind === "prompt")
-                        return note(
-                          "Click an outlined letter to step through its shapes; Shift-click goes back."
-                        );
-                      if (view.kind === "noLetterAlternates" || !state?.font)
-                        return note("This letter has no alternates");
-                      const { target } = view;
-                      return (
-                        <>
-                          <AlternateStrip
-                            font={state.font}
-                            unitsPerEm={state.unitsPerEm}
-                            options={target.options}
-                            current={currentChoice(selectedBlock.glyphAlternates, target.letter)}
-                            onPick={(choice: AlternateChoice | null) =>
-                              onPickGlyphAlternate?.(selectedBlock.id, target.letter, choice)
-                            }
-                          />
-                          {note("Changing a letter's shape removes any stroke stretch on it.")}
-                        </>
-                      );
-                    })()}
-
-                    {(selectedBlock.glyphAlternates?.length ?? 0) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => onResetGlyphAlternates?.(selectedBlock.id)}
-                        className="sidebarSmallAction"
-                        style={{ background: "var(--bg-input)", marginTop: 8 }}
-                      >
-                        Reset letter shapes
-                      </button>
-                    )}
-                    </>)}
-                  </div>
-                )}
-
-                {/* Plain text only: only ShapedText performs the outline
-                    surgery, so arming it elsewhere would show handles that
-                    stretch nothing. */}
-                {selectedBlock.type === "text" && (
-                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Stretch strokes</div>
-
-                    <CheckboxRow
-                      id={makeId("stroke-cut-mode", selectedId)}
-                      label="Stretch strokes"
-                      checked={!!selectedBlock.strokeCutEditMode}
-                      onChange={() => onToggleStrokeCutMode?.(selectedBlock.id)}
-                    />
-
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                      Hover a letter to find a straight stroke, then drag along it to
-                      lengthen the letter itself. Hold Alt to drag off the half-nuqta
-                      steps. Not every letter has one — it depends on how the font
-                      draws it.
-                    </div>
-
-                    {(selectedBlock.strokeCuts?.length ?? 0) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => onClearStrokeCuts?.(selectedBlock.id)}
-                        className="sidebarSmallAction"
-                        style={{ background: "var(--bg-input)", marginTop: 8 }}
-                      >
-                        Reset stroke stretches
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Text and Shape Fill: the two renderers that split a glyph's
-                    contours (supportsDetachedMarks). */}
-                {(selectedBlock.type === "text" || selectedBlock.type === "shapeFill") && (
-                  <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 12 }}>
-                    <div className="sidebarSectionTitle">Dots & marks</div>
-
-                    <CheckboxRow
-                      id={makeId("detached-mark-mode", selectedId)}
-                      label="Move dots & marks"
-                      checked={!!selectedBlock.detachedMarkEditMode}
-                      onChange={() => onToggleDetachedMarkMode?.(selectedBlock.id)}
-                    />
-
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                      Hover a letter's dot, hamza or kaf stroke and drag it anywhere.
-                      Double-click the handle to put it back. Dots keep their size;
-                      a dot drawn touching its letter cannot be moved.
-                    </div>
-
-                    {(selectedBlock.detachedMarkOverrides?.length ?? 0) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => onClearDetachedMarks?.(selectedBlock.id)}
-                        className="sidebarSmallAction"
-                        style={{ background: "var(--bg-input)", marginTop: 8 }}
-                      >
-                        Reset dots & marks
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Attached text draws at its guide, so its own rotation is
-                    inert: the guide's Rotation row is the one that turns it. */}
-                {!(selectedBlock.type === "textPath" && selectedBlock.guide) && (
-                  <RangeRow
-                    id={makeId("rotation", selectedId)}
-                    name={makeId("rotation", selectedId)}
-                    label="Rotation"
-                    value={selectedRotation}
-                    min={-180}
-                    max={180}
-                    step={1}
-                    onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
-                    suffix={`${selectedRotation}°`}
-                    fieldKey="rotation"
-                  />
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
+          <TypographyPanel
+            selectedBlock={selectedBlock}
+            selectedId={selectedId}
+            selectedOpacity={selectedOpacity}
+            selectedRotation={selectedRotation}
+            onUpdateSelectedBlock={onUpdateSelectedBlock}
+            textStyles={textStyles}
+            selectedTextStyleId={selectedTextStyleId}
+            onSelectTextStyle={onSelectTextStyle}
+            onApplyTextStyle={onApplyTextStyle}
+            newTextStyleName={newTextStyleName}
+            onChangeNewTextStyleName={onChangeNewTextStyleName}
+            onSaveTextStyle={onSaveTextStyle}
+            onDeleteTextStyle={onDeleteTextStyle}
+            palettes={palettes}
+            selectedPaletteId={selectedPaletteId}
+            onSelectPalette={onSelectPalette}
+            onPickPaletteColor={onPickPaletteColor}
+            onSavePaletteFromCanvas={onSavePaletteFromCanvas}
+            onDeletePalette={onDeletePalette}
+            canDeletePalette={canDeletePalette}
+            kashidaSlotOrdinal={kashidaSlotOrdinal}
+            onSelectKashidaSlot={onSelectKashidaSlot}
+            onSetKashidaAtSlot={onSetKashidaAtSlot}
+            fitTargetOverride={fitTargetOverride}
+            fitTargetPageDefault={fitTargetPageDefault}
+            isFittingWidth={isFittingWidth}
+            onChangeFitTargetWidth={onChangeFitTargetWidth}
+            onFitToWidth={onFitToWidth}
+            styleSetsState={styleSetsState}
+            onToggleStyleSet={onToggleStyleSet}
+            glyphAlternatesState={glyphAlternatesState}
+            alternateTarget={alternateTarget}
+            onToggleGlyphAlternateMode={onToggleGlyphAlternateMode}
+            onResetGlyphAlternates={onResetGlyphAlternates}
+            onPickGlyphAlternate={onPickGlyphAlternate}
+            onToggleStrokeCutMode={onToggleStrokeCutMode}
+            onClearStrokeCuts={onClearStrokeCuts}
+            onToggleDetachedMarkMode={onToggleDetachedMarkMode}
+            onClearDetachedMarks={onClearDetachedMarks}
+            isOpen={showText}
+            onToggle={() => setShowText((v) => !v)}
+          />
         )}
 
         {selectedBlock && selectedBlock.type !== "guide" && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Effects" isOpen={showEffects} onToggle={() => setShowEffects((v) => !v)}>
-              <div className="sectionPanel">
-                {/* ---- STREAM-F: ink & surface — Fill section ---- */}
-                {/*
-                  An IIFE rather than a component: this stream owns no file to
-                  put one in, and the same shape the Kashida controls already
-                  use. It holds no state — the editor reads the block's own
-                  fill and writes a whole new one on every change.
-                */}
-                {(() => {
-                  const flat = blockColor ?? "#000000";
-                  const current = resolveFill(blockFill, flat);
-                  const stops: FillStop[] =
-                    current.type === "solid"
-                      ? [
-                          { offset: 0, color: flat },
-                          { offset: 1, color: "#ffffff" },
-                        ]
-                      : current.stops;
-                  const angle = current.type === "linear" ? current.angle : 90;
-
-                  const write = (next: BlockFill) => onSetBlockFill?.(next);
-                  const writeStops = (nextStops: FillStop[]) =>
-                    write(
-                      current.type === "radial"
-                        ? { type: "radial", stops: nextStops }
-                        : { type: "linear", angle, stops: nextStops }
-                    );
-
-                  return (
-                    <>
-                      <SelectRow
-                        id="block-fill-type"
-                        name="blockFillType"
-                        label="Fill"
-                        value={current.type}
-                        onChange={(v) => {
-                          if (v === "solid") write({ type: "solid", color: flat });
-                          else if (v === "radial") write({ type: "radial", stops });
-                          else write({ type: "linear", angle, stops });
-                        }}
-                      >
-                        <option value="solid">Flat colour</option>
-                        <option value="linear">Linear gradient</option>
-                        <option value="radial">Radial gradient</option>
-                      </SelectRow>
-
-                      <div className="field">
-                        <span className="fieldTitle">Metallics</span>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 6,
-                            flexWrap: "wrap",
-                            // Grid/flex children default to min-width:auto and
-                            // refuse to shrink — see CLAUDE.md's note on the
-                            // sidebar's narrow width.
-                            minWidth: 0,
-                          }}
-                        >
-                          {fillPresets.map((preset) => (
-                            <button
-                              key={preset.id}
-                              type="button"
-                              title={preset.name}
-                              aria-label={preset.name}
-                              style={{
-                                background: fillToCss(preset.fill),
-                                width: 34,
-                                height: 22,
-                                minWidth: 0,
-                                borderRadius: 4,
-                                border: "1px solid var(--border-soft)",
-                                cursor: "pointer",
-                                padding: 0,
-                              }}
-                              onClick={() => write(preset.fill)}
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      {current.type === "solid" ? (
-                        <div style={{ fontSize: 12, opacity: 0.7 }}>
-                          Flat ink uses the block's colour, set under Typography.
-                        </div>
-                      ) : (
-                        <>
-                          {current.type === "linear" && (
-                            <RangeRow
-                              id="block-fill-angle"
-                              name="blockFillAngle"
-                              label="Gradient angle"
-                              value={angle}
-                              min={0}
-                              max={360}
-                              step={1}
-                              onChange={(v) => write({ type: "linear", angle: v, stops })}
-                              suffix={`${angle}°`}
-                            />
-                          )}
-
-                          <div className="field">
-                            <span className="fieldTitle">Stops</span>
-                            {stops.map((stop, i) => (
-                              <div
-                                key={i}
-                                style={{
-                                  display: "flex",
-                                  gap: 6,
-                                  alignItems: "center",
-                                  minWidth: 0,
-                                }}
-                              >
-                                <input
-                                  type="color"
-                                  aria-label={`Stop ${i + 1} colour`}
-                                  value={stop.color}
-                                  onChange={(e) =>
-                                    writeStops(
-                                      stops.map((s, j) =>
-                                        j === i ? { ...s, color: e.target.value } : s
-                                      )
-                                    )
-                                  }
-                                />
-                                <input
-                                  type="range"
-                                  aria-label={`Stop ${i + 1} position`}
-                                  style={{ flex: 1, minWidth: 0 }}
-                                  min={0}
-                                  max={100}
-                                  value={Math.round(stop.offset * 100)}
-                                  onChange={(e) =>
-                                    writeStops(
-                                      stops.map((s, j) =>
-                                        j === i
-                                          ? { ...s, offset: Number(e.target.value) / 100 }
-                                          : s
-                                      )
-                                    )
-                                  }
-                                />
-                                <button
-                                  type="button"
-                                  className="sidebarPillButton"
-                                  aria-label={`Remove stop ${i + 1}`}
-                                  disabled={stops.length <= 2}
-                                  onClick={() =>
-                                    writeStops(stops.filter((_, j) => j !== i))
-                                  }
-                                >
-                                  −
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              type="button"
-                              className="sidebarPillButton"
-                              disabled={stops.length >= 4}
-                              onClick={() =>
-                                writeStops([
-                                  ...stops,
-                                  {
-                                    offset: 1,
-                                    color: stops[stops.length - 1]?.color ?? flat,
-                                  },
-                                ])
-                              }
-                            >
-                              Add stop
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </>
-                  );
-                })()}
-                {/* ---- /STREAM-F ---- */}
-                <div style={{ display: "flex", gap: 6 }}>
-                  {(
-                    [
-                      { key: "outline", label: "Outline" },
-                      { key: "shadow", label: "Shadow" },
-                    ] as const
-                  ).map((tab) => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => setEffectsTab(tab.key)}
-                      className="sidebarPillButton"
-                      style={
-                        effectsTab === tab.key
-                          ? { background: "var(--accent)", color: "var(--text-on-accent)" }
-                          : undefined
-                      }
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {effectsTab === "outline" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-                    <ColorRow
-                      id={makeId("stroke-color", selectedId)}
-                      name={makeId("strokeColor", selectedId)}
-                      label="Outline color"
-                      value={selectedBlock.stroke}
-                      onChange={(v) => onUpdateSelectedBlock({ stroke: v })}
-                    />
-
-                    <RangeRow
-                      id={makeId("stroke-width", selectedId)}
-                      name={makeId("strokeWidth", selectedId)}
-                      label="Outline width"
-                      value={selectedBlock.strokeWidth ?? 0}
-                      min={0}
-                      max={20}
-                      onChange={(v) => onUpdateSelectedBlock({ strokeWidth: v })}
-                      suffix={selectedBlock.strokeWidth ?? 0}
-                      fieldKey="strokeWidth"
-                    />
-                  </div>
-                )}
-
-                {effectsTab === "shadow" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-                    <ColorRow
-                      id={makeId("shadow-color", selectedId)}
-                      name={makeId("shadowColor", selectedId)}
-                      label="Shadow color"
-                      value={selectedBlock.shadowColor}
-                      onChange={(v) => onUpdateSelectedBlock({ shadowColor: v })}
-                    />
-
-                    <RangeRow
-                      id={makeId("shadow-blur", selectedId)}
-                      name={makeId("shadowBlur", selectedId)}
-                      label="Shadow blur"
-                      value={selectedBlock.shadowBlur ?? 0}
-                      min={0}
-                      max={60}
-                      onChange={(v) => onUpdateSelectedBlock({ shadowBlur: v })}
-                      suffix={selectedBlock.shadowBlur ?? 0}
-                      fieldKey="shadowBlur"
-                    />
-
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                        gap: 10,
-                        marginTop: 8,
-                      }}
-                    >
-                      <RangeRow
-                        id={makeId("shadow-offset-x", selectedId)}
-                        name={makeId("shadowOffsetX", selectedId)}
-                        label="Shadow X"
-                        value={selectedBlock.shadowOffsetX ?? 0}
-                        min={-60}
-                        max={60}
-                        onChange={(v) => onUpdateSelectedBlock({ shadowOffsetX: v })}
-                        suffix={selectedBlock.shadowOffsetX ?? 0}
-                        fieldKey="shadowOffsetX"
-                      />
-
-                      <RangeRow
-                        id={makeId("shadow-offset-y", selectedId)}
-                        name={makeId("shadowOffsetY", selectedId)}
-                        label="Shadow Y"
-                        value={selectedBlock.shadowOffsetY ?? 0}
-                        min={-60}
-                        max={60}
-                        onChange={(v) => onUpdateSelectedBlock({ shadowOffsetY: v })}
-                        suffix={selectedBlock.shadowOffsetY ?? 0}
-                        fieldKey="shadowOffsetY"
-                      />
-                    </div>
-
-                    <RangeRow
-                      id={makeId("shadow-opacity", selectedId)}
-                      name={makeId("shadowOpacity", selectedId)}
-                      label="Shadow opacity"
-                      value={selectedShadowOpacity}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      onChange={(v) => onUpdateSelectedBlock({ shadowOpacity: v })}
-                      suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
-                      fieldKey="shadowOpacity"
-                    />
-                  </div>
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
+          <EffectsPanel
+            selectedBlock={selectedBlock}
+            selectedId={selectedId}
+            selectedShadowOpacity={selectedShadowOpacity}
+            isMobile={isMobile}
+            onUpdateSelectedBlock={onUpdateSelectedBlock}
+            blockFill={blockFill}
+            blockColor={blockColor}
+            onSetBlockFill={onSetBlockFill}
+            fillPresets={fillPresets}
+            effectsTab={effectsTab}
+            setEffectsTab={setEffectsTab}
+            isOpen={showEffects}
+            onToggle={() => setShowEffects((v) => !v)}
+          />
         )}
 
 
