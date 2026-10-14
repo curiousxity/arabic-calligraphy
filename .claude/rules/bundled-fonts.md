@@ -82,6 +82,33 @@ Two traps when merging those PUA glyphs into a third-party font:
   `LaylaDiwani` among others), the modified file **must be renamed** — its
   `name` table included — or redistribution breaches the licence.
 
+**Retired from the picker on 2026-10-13, in favour of `UKIJDiwani`.**
+Layla Diwani's own medial meem and medial hah are drawn so small and flat
+that محمد reads as نصر (احمد, محمود likewise). That is the upstream design,
+not our modification: compared against an upstream copy, all 459 original
+glyphs and the GSUB are byte-identical, and HarfBuzz picks the right forms
+(meem.init, hah.medi, meem.medi, dal.fina) in the browser and on the canvas
+alike. The file, `FONT_URLS` entry and `@font-face` stay so saved blocks
+still render; its `FONT_OPTIONS` entry carries `retired: true`, which keeps
+it out of the font picker unless it is the selected block's current font
+(see [sidebar.md](sidebar.md)).
+
+**`UKIJDiwani.ttf` replaces it** — UKIJ Diwani Tom (`UKIJDiT.ttf`, v3.10,
+Uyghur Computer Science Association) with the ten honorifics merged in;
+nothing else touched (all 628 original glyphs and GSUB/GPOS/GDEF verified
+byte-identical after the merge). Licence: upstream offers OFL-1.1 or
+LGPL-3 — that is how Debian's audited `fonts-ukij-uyghur` copyright records
+every UKIJ file — and we take the OFL. The font's own name table says
+"LGPL" and "all rights reserved", which is why the audited reading is
+recorded in `public/fonts/UKIJDiwani-OFL.txt`. No Reserved Font Name, so the
+family name is kept. Chosen over the other UKIJ cuts and the OFL
+alternatives on 2026-10-13: plain `UKIJDi` drops letters (فاطمة) and
+tashkeel, `DiK`/`DiY` are shadowed/outlined and cover only the Uyghur
+subset, and Mirza and Katibeh read well but are Naskh-like display faces,
+not Diwani. It has full Arabic, tashkeel, Persian and digits, real GPOS and
+GDEF, and no colour tables. Its only optional features are UKIJ's own
+`zz01`–`zz08`, which Next Shape does not offer, so it has no alternates.
+
 `Diwani.ttf` was **deleted** on 2026-08-12. It mapped **zero Arabic
 codepoints**: its cmaps were 8-bit legacy tables of the old "Arabic
 letterforms on Latin byte positions" kind, so HarfBuzz could not shape with

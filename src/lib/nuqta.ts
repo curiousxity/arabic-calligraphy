@@ -33,8 +33,8 @@ const NUQTA_RATIO: Record<string, number> = {
 };
 
 /**
- * For the two bundled faces the archive does not cover (HarfCanvasDiwani,
- * which postdates it, and Ruqaa) and for every uploaded font, which can
+ * For the bundled faces the archive does not cover (HarfCanvasDiwani and
+ * UKIJDiwani, which postdate it, and Ruqaa) and for every uploaded font, which can
  * never have a measured entry. The library's own median.
  */
 export const FALLBACK_RATIO = 0.11;

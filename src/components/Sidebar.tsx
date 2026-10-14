@@ -374,7 +374,17 @@ const FONT_OPTIONS: FontChoice[] = [
   { genre: "Thuluth", value: "ThuluthDeco", label: "Thuluth Deco", cssFamily: "ThuluthDeco" },
   { genre: "Nastaliq", value: "Urdu", label: "Jameel Noori", cssFamily: "Urdu" },
   { genre: "Nastaliq", value: "Gulzar", label: "Gulzar", cssFamily: "Gulzar" },
-  { genre: "Diwani", value: "HarfCanvasDiwani", label: "Diwani", cssFamily: "HarfCanvasDiwani" },
+  { genre: "Diwani", value: "UKIJDiwani", label: "UKIJ Diwani", cssFamily: "UKIJDiwani" },
+  // Retired 2026-10-13: Layla Diwani's own medial meem and hah are drawn so
+  // small that محمد reads as نصر. Kept so a saved block on it still renders
+  // and still shows its name; hidden from the picker otherwise.
+  {
+    genre: "Diwani",
+    value: "HarfCanvasDiwani",
+    label: "Layla Diwani (retired)",
+    cssFamily: "HarfCanvasDiwani",
+    retired: true,
+  },
   { genre: "Diwani", value: "Wessam", label: "Wessam", cssFamily: "Wessam" },
   { genre: "Ruqaa", value: "Ruqaa", label: "Ruqaa", cssFamily: "Ruqaa" },
   { genre: "Maghribi", value: "Rabat", label: "Rabat", cssFamily: "Rabat" },

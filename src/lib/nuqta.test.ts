@@ -44,11 +44,11 @@ describe("nuqtaUnits", () => {
     );
   });
 
-  it("falls back for the two faces the archive does not cover", () => {
-    // HarfCanvasDiwani postdates the measurement; Ruqaa was never measured.
+  it("falls back for the faces the archive does not cover", () => {
+    // The two Diwanis postdate the measurement; Ruqaa was never measured.
     // Pinned so that if either is measured later, this test is the reminder
     // that the fallback is no longer what they should use.
-    for (const family of ["HarfCanvasDiwani", "Ruqaa"]) {
+    for (const family of ["HarfCanvasDiwani", "UKIJDiwani", "Ruqaa"]) {
       expect(nuqtaUnits(family, 1000)).toBeCloseTo(FALLBACK_RATIO * 1000, 6);
     }
   });

@@ -29,6 +29,10 @@ export const FONT_URLS: Record<string, string> = {
   // OFL requires, with the honorific PUA glyphs merged in. Provenance and
   // licence: public/fonts/HarfCanvasDiwani-OFL.txt.
   HarfCanvasDiwani: "/fonts/HarfCanvasDiwani.ttf",
+  // UKIJ Diwani Tom (OFL-1.1 option of OFL/LGPL, Uyghur Computer Science
+  // Association) with the honorifics merged in. Replaced HarfCanvasDiwani in
+  // the picker on 2026-10-13; licence: public/fonts/UKIJDiwani-OFL.txt.
+  UKIJDiwani: "/fonts/UKIJDiwani.ttf",
   Gulzar: "/fonts/Gulzar.ttf",
   // The next three are not OFL and ship without the honorific PUA glyphs —
   // licences and modifications in public/fonts/<Name>-LICENSE.txt.

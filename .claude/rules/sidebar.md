@@ -57,7 +57,11 @@ closes; picking the font the block already has makes no change and costs no
 undo step. Its accessible name is the label then the current font
 ("Font family Amiri — أبجد"), which is why `e2e/harf.ts`'s `chooseFont`
 anchors on `/^Font family\b/`. A key the list does not know shows the key
-itself, never another family's name.
+itself, never another family's name. A `FontChoice` marked `retired` (Layla Diwani,
+2026-10-13) stays in `FONT_OPTIONS` — the font tests require every
+`FONT_URLS` key there, and the trigger needs its label — but the gallery
+filters it out unless it is the selected block's current font, so an old
+project still sees and keeps it while nobody new can pick it.
 
 `Content` owns everything that puts characters into the block: the RTL
 textarea, the Arabic Keyboard toggle, and the `PresetKeyboard` rows

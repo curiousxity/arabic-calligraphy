@@ -9,6 +9,12 @@ export type FontChoice = {
   cssFamily: string;
   /** Calligraphic genre (Naskh, Kufi…) — the picker heads a group with it. */
   genre?: string;
+  /**
+   * No longer offered. Kept in the list so a saved block on it still renders
+   * and the trigger can still name it; the gallery shows it only when it is
+   * the selected block's current font.
+   */
+  retired?: boolean;
 };
 
 /** Shown when the block has no text yet, so every card still has letters. */
@@ -114,7 +120,7 @@ export const FontPickerDialog: React.FC<FontPickerDialogProps> = ({
         </div>
 
         <div className="fontPickerBody" data-testid="font-picker">
-          {groupByGenre(fonts).map((group) => (
+          {groupByGenre(fonts.filter((f) => !f.retired || f.value === value)).map((group) => (
             <section key={group.genre} aria-label={group.genre}>
               <h3 className="fontPickerGenre">{group.genre}</h3>
               <div className="fontPickerGrid">

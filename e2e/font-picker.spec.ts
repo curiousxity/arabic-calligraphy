@@ -77,3 +77,53 @@ test("closing the picker hands focus back to the font row", async ({ page }) => 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: /^Font family\b/ })).toBeFocused();
 });
+
+test("UKIJ Diwani is offered and the retired Layla Diwani is not", async ({ page }) => {
+  await gotoApp(page);
+  await openPicker(page);
+  await expect(page.locator(`${PICKER} [data-font-key="UKIJDiwani"]`)).toBeVisible();
+  await expect(page.locator(`${PICKER} [data-font-key="HarfCanvasDiwani"]`)).toHaveCount(0);
+});
+
+test("a saved block on the retired Layla Diwani still opens on it, and can leave it", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  // Quick-save, then point the saved block at the retired key, as a project
+  // saved before the retirement would be.
+  await page.getByRole("button", { name: /^Project & Export/ }).click();
+  await page.getByRole("button", { name: "Quick save" }).click();
+  await page.evaluate(() => {
+    const key = "calligraphy-layout-v2";
+    const payload = JSON.parse(localStorage.getItem(key)!);
+    const retarget = (node: unknown): void => {
+      if (Array.isArray(node)) node.forEach(retarget);
+      else if (node && typeof node === "object") {
+        const rec = node as Record<string, unknown>;
+        if (typeof rec.fontFamily === "string") rec.fontFamily = "HarfCanvasDiwani";
+        Object.values(rec).forEach(retarget);
+      }
+    };
+    retarget(payload);
+    localStorage.setItem(key, JSON.stringify(payload));
+  });
+  await page.reload();
+  await gotoApp(page);
+  expect((await getBlocks(page))[0].fontFamily).toBe("HarfCanvasDiwani");
+
+  // The row still names the font the block is on, and the gallery shows it
+  // as the current choice.
+  await openTypography(page);
+  await expect(page.getByRole("button", { name: /^Font family Layla Diwani \(retired\)/ })).toBeVisible();
+  await openPicker(page);
+  await expect(page.locator(`${PICKER} [data-font-key="HarfCanvasDiwani"]`)).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+
+  // Once the block moves off it, it is gone from the gallery.
+  await page.locator(`${PICKER} [data-font-key="UKIJDiwani"]`).click();
+  await expect.poll(async () => (await getBlocks(page))[0].fontFamily).toBe("UKIJDiwani");
+  await openPicker(page);
+  await expect(page.locator(`${PICKER} [data-font-key="HarfCanvasDiwani"]`)).toHaveCount(0);
+});

@@ -86,6 +86,16 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-13 — UKIJ Diwani replaces Layla Diwani in the picker
+
+Layla Diwani (`HarfCanvasDiwani`) draws its medial meem and hah so small
+that محمد reads as نصر — the upstream design, verified identical to the
+original. **UKIJ Diwani** (UKIJ Diwani Tom, OFL-1.1 option, honorifics
+merged) takes its place in the Diwani group beside Wessam. Layla is retired
+rather than removed: saved blocks on it still render and the picker shows it
+only to a block already using it. Details:
+[bundled-fonts.md](.claude/rules/bundled-fonts.md).
+
 ### 2026-10-13 — Font picker gallery; Name designs renamed Compositions
 
 Typography's font family dropdown is gone. Its row is now a button that
