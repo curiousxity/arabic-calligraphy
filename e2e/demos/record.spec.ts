@@ -197,9 +197,3 @@ test("add mirror", async ({ browser }) => {
   }, { frameAll: true });
 });
 
-test("add medallion", async ({ browser }) => {
-  await record(browser, "add-medallion", roomForCopy, async (page) => {
-    await page.getByRole("button", { name: "Add medallion" }).click();
-    await expect.poll(async () => (await getBlocks(page)).length).toBe(2);
-  }, { frameAll: true });
-});

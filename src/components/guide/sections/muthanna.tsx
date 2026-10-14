@@ -31,10 +31,12 @@ export const section: GuideSection = {
         centre, the way a medallion or <em>shamsa</em> is built.
       </p>
       <p>
-        Both are made the same way here. Select a block, then press{" "}
-        <strong>Add mirror</strong> or <strong>Add medallion</strong> under{" "}
-        <strong>Block Controls &rarr; Add</strong>. A new block appears that draws the
-        selected block's writing again, reflected or repeated around a circle.
+        For a mirror, select a block, then press <strong>Add mirror</strong>{" "}
+        under <strong>Block Controls &rarr; Add</strong>. For a medallion, open{" "}
+        <strong>Compositions</strong> in the <strong>Content</strong> panel and
+        choose <strong>Medallion</strong>. Either way a new block appears that
+        draws the selected block's writing again, reflected or repeated around
+        a circle.
       </p>
 
       <h4>The copy stays alive</h4>

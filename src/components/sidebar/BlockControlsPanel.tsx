@@ -23,7 +23,6 @@ const BLOCK_DEMOS = {
   shapeFill: { src: "/demos/add-shape-fill.gif", alt: "A shape filled with rows of text", width: 400 },
   curvedText: { src: "/demos/add-curved-text.gif", alt: "Placing text that follows a curve", width: 400 },
   mirror: { src: "/demos/add-mirror.gif", alt: "Adding a mirrored copy of a block", width: 400 },
-  medallion: { src: "/demos/add-medallion.gif", alt: "Repeating a block radially as a medallion", width: 400 },
 } satisfies Record<string, DemoMedia>;
 
 export type BlockControlsPanelProps = {
@@ -112,12 +111,21 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
           chips. The old row let flex-wrap choose the shape, and at the
           sidebar's width it broke 8 / 1 / 3 — leaving one button
           stranded alone on a line of its own, which reads as a bug rather
-          than a layout. A fixed four-column grid cannot orphan anything.
+          than a layout. A fixed grid of five — text, shape fill, curved text,
+          guide, mirror — cannot orphan anything; a medallion is made from
+          Compositions, not here.
           Splitting Add from the destructive pair also moves Delete out of
           the leading position, where it sat immediately beside Duplicate. */}
       <div className="blockControlGroup">
         <div className="blockControlGroupLabel">Add</div>
-        <div className="blockControlGrid">
+        {/* No column gap: at the sidebar's 220px minimum the row is 171px,
+            and five 34px buttons only fit if the columns take all of it. With
+            the shared 8px gap the columns drop to ~28px and the flex-item
+            buttons squash into ovals. Wider, the 1fr columns space them out. */}
+        <div
+          className="blockControlGrid"
+          style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))", columnGap: 0 }}
+        >
           <DemoHover
             className="blockControlDemo"
             delay={BLOCK_DEMO_DELAY}
@@ -166,70 +174,41 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
               </button>
             </DemoHover>
           )}
-      {onAddGuide && <AddGuideButton onAdd={onAddGuide} />}
+          {onAddGuide && <AddGuideButton onAdd={onAddGuide} />}
 
           {/* Inline SVGs rather than entries in Icons.tsx: that file is not
               this stream's to edit during the Phase 1 parallel run. */}
           {onAddMirrorBlock && (
-            <>
-              <DemoHover
-                className="blockControlDemo"
-                delay={BLOCK_DEMO_DELAY}
-                demo={{
-                  ...BLOCK_DEMOS.mirror,
-                  caption: canAddMirrorBlock
-                    ? "Add a mirror (muthanna) of the selected block"
-                    : "Select exactly one non-mirror block to mirror it",
-                }}
+            <DemoHover
+              className="blockControlDemo"
+              delay={BLOCK_DEMO_DELAY}
+              demo={{
+                ...BLOCK_DEMOS.mirror,
+                caption: canAddMirrorBlock
+                  ? "Add a mirror (muthanna) of the selected block"
+                  : "Select exactly one non-mirror block to mirror it",
+              }}
+            >
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                disabled={!canAddMirrorBlock}
+                aria-label="Add mirror"
+                onClick={() => onAddMirrorBlock("mirrorX")}
               >
-                <button
-                  type="button"
-                  className="sidebarCircleButton"
-                  disabled={!canAddMirrorBlock}
-                  aria-label="Add mirror"
-                  onClick={() => onAddMirrorBlock("mirrorX")}
-                >
-                  <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M8 1v14" stroke="currentColor" strokeWidth={1.2} strokeDasharray="2 2" />
-                    <path d="M6.5 4 2 8l4.5 4z" fill="currentColor" />
-                    <path
-                      d="M9.5 4 14 8l-4.5 4z"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.2}
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              </DemoHover>
-
-              <DemoHover
-                className="blockControlDemo"
-                delay={BLOCK_DEMO_DELAY}
-                demo={{
-                  ...BLOCK_DEMOS.medallion,
-                  caption: canAddMirrorBlock
-                    ? "Add a medallion: radial copies of the selected block"
-                    : "Select exactly one non-mirror block to repeat it radially",
-                }}
-              >
-                <button
-                  type="button"
-                  className="sidebarCircleButton"
-                  disabled={!canAddMirrorBlock}
-                  aria-label="Add medallion"
-                  onClick={() => onAddMirrorBlock("radial")}
-                >
-                  <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
-                    <g stroke="currentColor" strokeWidth={1.2} strokeLinecap="round">
-                      <path d="M8 1.5v3.2M8 11.3v3.2M1.5 8h3.2M11.3 8h3.2" />
-                      <path d="M3.4 3.4l2.3 2.3M10.3 10.3l2.3 2.3M12.6 3.4l-2.3 2.3M5.7 10.3l-2.3 2.3" />
-                    </g>
-                    <circle cx={8} cy={8} r={1.6} fill="currentColor" />
-                  </svg>
-                </button>
-              </DemoHover>
-            </>
+                <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M8 1v14" stroke="currentColor" strokeWidth={1.2} strokeDasharray="2 2" />
+                  <path d="M6.5 4 2 8l4.5 4z" fill="currentColor" />
+                  <path
+                    d="M9.5 4 14 8l-4.5 4z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.2}
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </DemoHover>
           )}
         </div>
       </div>

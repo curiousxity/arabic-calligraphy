@@ -12,7 +12,6 @@ import {
  */
 
 const ADD_MIRROR = 'button[aria-label="Add mirror"]';
-const ADD_RADIAL = 'button[aria-label="Add medallion"]';
 
 /** The one block a fresh session starts with, and the mirror added next to it. */
 const SOURCE_ID = 1;
@@ -66,6 +65,23 @@ async function addMirror(page: Page, selector: string): Promise<number> {
   await expect.poll(async () => (await getBlocks(page)).length).toBe(before + 1);
   const blocks = await getBlocks(page);
   return blocks[blocks.length - 1].id;
+}
+
+/**
+ * Makes a radial mirror of the (already selected) starter block the one way
+ * the app offers: the Compositions dialog's medallion layout. Returns its id.
+ */
+async function addMedallion(page: Page): Promise<number> {
+  const before = (await getBlocks(page)).length;
+  await page.locator('[data-testid="composition-open"]').click();
+  await page.locator('[data-layout-id="medallion"]').click();
+  await page.getByRole("button", { name: "Create composition" }).click();
+  await expect.poll(async () => (await getBlocks(page)).length).toBe(before + 1);
+  const blocks = await getBlocks(page);
+  const radial = blocks[blocks.length - 1] as { id: number; type: string; mode?: string };
+  expect(radial.type).toBe("mirror");
+  expect(radial.mode).toBe("radial");
+  return radial.id;
 }
 
 test.describe("mirror blocks", () => {
@@ -150,7 +166,13 @@ test.describe("mirror blocks", () => {
 
   test("a radial block with 8 copies puts ink on all eight spokes", async ({ page }) => {
     await gotoApp(page);
-    const radialId = await addMirror(page, ADD_RADIAL);
+    const radialId = await addMedallion(page);
+    // A composition leaves its source selected; the radial controls are on
+    // the mirror's own panel, so walk over to it through Layers, where the
+    // composition names its block after the layout.
+    await openPanel(page, /^Layers/);
+    await page.getByTitle("Double-click to rename").getByText("Medallion", { exact: true }).click();
+    await expect.poll(getSelectedId(page)).toBe(radialId);
     await openMirrorPanel(page);
 
     const COUNT = 8;

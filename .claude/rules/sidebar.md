@@ -7,7 +7,7 @@ paths:
 
 # Sidebar structure
 
-`Sidebar.tsx` is a large single component that reads/writes through props from `App.tsx`. Shared low-level form pieces (`SelectRow`, `ColorRow`, `RangeRow`, `CheckboxRow`, `PresetKeyboard`) live in `src/components/sidebar/FormControls.tsx`; the layer list is `src/components/sidebar/LayersPanel.tsx`. `src/components/sidebar/utils.ts` has one helper (`makeId`).
+`Sidebar.tsx` reads/writes through props from `App.tsx` and is being split: its panels now live in their own files under `src/components/sidebar/` (`BlockControlsPanel`, `FontPanel`, `TypographyPanel`, `EffectsPanel`, `LayersPanel`, `MirrorPanel`, `CurvePanel`, `ShapeFillPanel`, `GuidePanel`, `GuideAttachmentPanel`, `VersePanel`, `StackPanel`, …). Shared low-level form pieces (`SelectRow`, `ColorRow`, `RangeRow`, `CheckboxRow`, `PresetKeyboard`) live in `src/components/sidebar/FormControls.tsx`; the layer list is `src/components/sidebar/LayersPanel.tsx`. `src/components/sidebar/utils.ts` has one helper (`makeId`).
 
 Its panels are ordered in **three tiers by scope**, each introduced by a
 `SidebarTier` rule (a quiet labelled divider, deliberately lighter than a
@@ -85,9 +85,10 @@ deliberate action and a second confirmation on top was redundant
 friction.
 
 **Block Controls is three labelled groups on fixed grids**, not one
-wrapping row. `Add` (text, shape fill, curved text, guide, mirror,
-medallion) sits on a 4-column grid — six buttons, a full row and a half since
-the Square Kufi, image and ornament buttons went (2026-10-14); `Selected` (duplicate, delete) and
+wrapping row. `Add` (text, shape fill, curved text, guide, mirror) sits on
+a 5-column grid — five buttons, one row, since the Square Kufi, image and
+ornament buttons went and the medallion moved to Compositions only
+(2026-10-14); `Selected` (duplicate, delete) and
 `History` (undo, redo, history) share a line below it. The row this replaced
 was a centred `flex-wrap` of twelve identical chips, which at the sidebar's
 own width wrapped **8 / 1 / 3** — stranding one button alone on a
@@ -129,15 +130,15 @@ control and shows a GIF in a popover while it is hovered or focused. The
 popover is portalled to `<body>` with fixed positioning, opens beside the
 sidebar's right edge, and mounts its `<img>` only while open, so no recording
 loads until someone asks. The handlers sit on a wrapping `<span>`, because a
-disabled `<button>` fires no mouse events in Chrome and Add mirror/medallion
-are disabled most of the time. It is used in two places:
+disabled `<button>` fires no mouse events in Chrome and Add mirror
+is disabled most of the time. It is used in two places:
 
 - **Checkbox rows.** `CheckboxRow`'s optional `demo` adds a `DemoHint` play
   icon beside the label, never inside it, because a button inside a
   `<label>` toggles the checkbox. It is used by the Diacritic tool row.
-- **The six Add buttons.** Each button is its own anchor (the 4-column grid
+- **The five Add buttons.** Each button is its own anchor (the 5-column grid
   has no room for icons) with a 400 ms hover-intent delay, so sweeping across
-  the row doesn't flash six popovers. Their `title`s were removed and the
+  the row doesn't flash five popovers. Their `title`s were removed and the
   same text now shows as the popover caption, since a native tooltip would
   stack on top of it. `aria-label`s are unchanged, and the e2e specs use them.
 
