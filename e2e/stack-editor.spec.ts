@@ -156,24 +156,25 @@ const draftMinFraction = (page: Page) => page.evaluate(() => window.__HARF__!.ge
 
 test("re-picking Teardrop at 100% lands on the same size, and the slider returns to it", async ({ page }) => {
   await openByDoubleClick(page);
+  const opened = await draftFontSize(page);
+  // Arranges are async (font load + bisection), so poll for each result
+  // rather than sleeping: a fixed wait read the size early under parallel load.
   await page.getByRole("button", { name: "Teardrop", exact: true }).click();
   await expect.poll(() => namedNodeCount(page, "stack-template-outline", { editor: true })).toBe(1);
-  await page.waitForTimeout(400);
+  await expect.poll(() => draftFontSize(page)).not.toBe(opened);
   const first = await draftFontSize(page);
+  const nearFirst = async () => Math.abs((await draftFontSize(page)) - first) / first;
   await page.getByRole("button", { name: "Teardrop", exact: true }).click();
   await page.waitForTimeout(400);
-  const second = await draftFontSize(page);
   // The template is sized from the composition as opened, not from the last arrange.
-  expect(Math.abs(second - first) / first).toBeLessThan(0.02);
+  await expect.poll(nearFirst).toBeLessThan(0.02);
   // Slide to 150% and back to 100%: the size is back where it was.
   const slider = page.getByLabel(/Template size/);
   await slider.focus();
   for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowRight");
-  await page.waitForTimeout(600);
-  expect(await draftFontSize(page)).toBeGreaterThan(first * 1.2);
+  await expect.poll(() => draftFontSize(page)).toBeGreaterThan(first * 1.2);
   for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowLeft");
-  await page.waitForTimeout(600);
-  expect(Math.abs((await draftFontSize(page)) - first) / first).toBeLessThan(0.02);
+  await expect.poll(nearFirst).toBeLessThan(0.02);
 });
 
 test("a run of Join thickness ticks is one undo step", async ({ page }) => {
