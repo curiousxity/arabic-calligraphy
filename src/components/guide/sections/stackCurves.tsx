@@ -4,7 +4,7 @@ export const section: GuideSection = {
   id: "stack-curves",
   title: "Bending a curve",
   order: 40,
-  keywords: ["curve", "bowl", "radius", "bend", "widen", "round", "stacked", "stack", "join", "double-click"],
+  keywords: ["curve", "bowl", "radius", "bend", "widen", "round", "stacked", "stack", "join", "double-click", "bigger", "larger", "grow", "scale", "size", "shift"],
   Body: () => (
     <>
       <p>
@@ -18,6 +18,15 @@ export const section: GuideSection = {
         Once freed, the curve behaves like the joins between letters: drag it
         again to bend it further, and <strong>double-click</strong> it to put
         it back exactly as the font drew it. Undo also restores the letter.
+      </p>
+      <p>
+        To make a curve <strong>bigger or smaller</strong>, hold{" "}
+        <strong>Shift</strong> and drag it. One end stays where it is and the
+        tail slides outward, so the whole curve grows like a larger copy of
+        itself — same shape, same pen weight, wider radius. Drag back toward
+        the fixed end to tighten it. On a curve between two letters, the later
+        letter moves (with the letters after it, if "Move letters together" is
+        on). Undo puts it back.
       </p>
       <p>
         Not every curve is offered. A stroke that runs into another, or whose

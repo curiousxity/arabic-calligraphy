@@ -64,6 +64,24 @@ measuring from there left the handle ~3 px behind for the whole gesture.
 Double-click resets both to 0, the tangent-matched default (not a straight
 line).
 
+**Shift-drag on a join grows its radius** (`radiusEnds`, `radiusFactor`,
+`radiusOffset`, `stackOutline.ts`). It changes no join field: one end stays,
+and the other end's piece is *translated* by `(k − 1)(free − fixed)` between
+the face midpoints. With no rotation the tangents are unchanged, and both
+handles are proportional to the chord (the 0.05 floor too), so the cubic is
+an exact copy scaled by `k` about the fixed end while the faces — the pen —
+keep their size (the test pins every control point). The rider end moves (a
+freed curve's far fragment rides on its body); between two letters the later
+one moves with `chainOf`'s carry, so Alt and "Move letters together" mean
+what they mean for a body drag. Either way everything *joined* beyond the
+moving end (through any other join, plus riders) comes along: freeing ح's
+hook in Amiri's نحن leaves the far fragment joined to the final ن, and moving
+that fragment alone stretched the ح–ن join instead of growing the hook. `k` is the pointer's travel along fixed →
+curve midpoint over that distance, clamped 0.2–5; sideways travel does
+nothing. A rotation would turn the tangents and change the shape, which is
+why this is not a scale about the curve's own centre. Double-click resets the
+bend only; undo restores the radius.
+
 **A hairpin must not pinch.** Swing a piece so its face points away from
 its partner (the ح lifted up and left of a ر whose face still looks right)
 and the tangent-matched cubic has to overshoot and hook back — a hairpin

@@ -439,3 +439,106 @@ test("pressing a bowl's apex frees the curve and the same drag bends it; double-
   await page.keyboard.press("Control+z");
   await expect.poll(async () => (await fullPiecesOf(page)).length).toBe(before.length);
 });
+
+test("Shift-dragging a freed bowl grows its radius: the tail slides out, the bend is kept, undo restores", async ({ page }) => {
+  await gotoApp(page);
+  await chooseFont(page, "Amiri");
+  await setBlockText(page, "نحن");
+  await settleFrames(page);
+  await convert(page);
+  const before = await fullPiecesOf(page);
+  const joinCount = () => page.evaluate(() => (window.__HARF__!.getBlocks()[0] as unknown as { joins: unknown[] }).joins.length);
+  const joinsBefore = await joinCount();
+
+  // Free a bowl with a bare press, as in the test above.
+  let at: Point | null = null;
+  const letterIdx = before.map((p, i) => (p.role === "letter" && !p.parentId ? i : -1)).filter((i) => i >= 0);
+  for (const i of letterIdx) {
+    const c = await pieceCentre(page, i);
+    await page.mouse.move(c.x, c.y);
+    await settleFrames(page);
+    if ((await namedNodeCount(page, "stack-curve")) === 0) continue;
+    at = await page.evaluate(() => {
+      const stage = window.__HARF__!.getStage()!;
+      const r = stage.find(".stack-curve")[0].getClientRect();
+      const box = stage.container().getBoundingClientRect();
+      return { x: box.left + r.x + r.width / 2, y: box.top + r.y + r.height / 2 };
+    });
+    break;
+  }
+  expect(at, "a curve apex was offered").not.toBeNull();
+  await page.mouse.move(at!.x, at!.y);
+  await settleFrames(page);
+  await page.mouse.down();
+  await expect.poll(joinCount).toBe(joinsBefore + 1);
+  await page.mouse.up();
+  await settleFrames(page);
+
+  // The freed join, in page px: its curve's midpoint and its fixed end (the
+  // body's face; the far fragment rides on the body), plus its chord in font units.
+  const geom = () => page.evaluate((n) => {
+    type Face = { a: [number, number]; b: [number, number] };
+    type P = { id: string; x: number; y: number; rotation: number; pivot: [number, number]; parentId?: string; faces: Face[] };
+    type J = { id: string; bow: number; depth?: number; from: { pieceId: string; faceIndex: number }; to: { pieceId: string; faceIndex: number } };
+    const blk = window.__HARF__!.getBlocks()[0] as unknown as { pieces: P[]; joins: J[]; fontSize: number; unitsPerEm: number };
+    const j = blk.joins[n];
+    const world = (pid: string, fi: number): [number, number] => {
+      const p = blk.pieces.find((q) => q.id === pid)!;
+      const f = p.faces[fi];
+      const lx = (f.a[0] + f.b[0]) / 2 - p.pivot[0], ly = (f.a[1] + f.b[1]) / 2 - p.pivot[1];
+      const c = Math.cos(p.rotation), s = Math.sin(p.rotation);
+      return [c * lx - s * ly + p.pivot[0] + p.x, s * lx + c * ly + p.pivot[1] + p.y];
+    };
+    const from = blk.pieces.find((p) => p.id === j.from.pieceId)!;
+    const fixedIsFrom = from.parentId !== j.to.pieceId;
+    const A = world(j.from.pieceId, j.from.faceIndex), B = world(j.to.pieceId, j.to.faceIndex);
+    const F = fixedIsFrom ? A : B;
+    const stage = window.__HARF__!.getStage()!;
+    const box = stage.container().getBoundingClientRect();
+    const scale = blk.fontSize / (blk.unitsPerEm || 1000);
+    const nodes = stage.find(".stack-join") as unknown as { points(): number[]; getAbsoluteTransform(): { point(p: { x: number; y: number }): { x: number; y: number } } }[];
+    // The freed join's node is the one whose curve starts or ends at its faces.
+    const node = nodes.find((nd) => {
+      const pts = nd.points();
+      const ends = [[pts[0], pts[1]], [pts[pts.length - 2], pts[pts.length - 1]]];
+      return ends.some(([x, y]) => Math.hypot(x - A[0] * scale, y - A[1] * scale) < 0.5)
+        && ends.some(([x, y]) => Math.hypot(x - B[0] * scale, y - B[1] * scale) < 0.5);
+    })!;
+    const tr = node.getAbsoluteTransform();
+    const pts = node.points();
+    const mid = tr.point({ x: pts[24], y: pts[25] });
+    const fixed = tr.point({ x: F[0] * scale, y: F[1] * scale });
+    return {
+      mid: { x: box.left + mid.x, y: box.top + mid.y }, fixed: { x: box.left + fixed.x, y: box.top + fixed.y },
+      chord: Math.hypot(B[0] - A[0], B[1] - A[1]), F, bow: j.bow, depth: j.depth ?? 0,
+    };
+  }, joinsBefore);
+
+  const g0 = await geom();
+  const len = Math.hypot(g0.mid.x - g0.fixed.x, g0.mid.y - g0.fixed.y);
+  const ux = (g0.mid.x - g0.fixed.x) / len, uy = (g0.mid.y - g0.fixed.y) / len;
+  await page.mouse.move(g0.mid.x, g0.mid.y);
+  await settleFrames(page);
+  expect(await hitTargetAt(page, g0.mid)).toBe("Line.stack-join");
+
+  // Drag outward by half the fixed-end-to-midpoint distance: radius × 1.5.
+  await page.keyboard.down("Shift");
+  await page.mouse.down();
+  await page.mouse.move(g0.mid.x + ux * 2, g0.mid.y + uy * 2);
+  await page.mouse.move(g0.mid.x + ux * len * 0.5, g0.mid.y + uy * len * 0.5, { steps: 10 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await settleFrames(page);
+
+  const g1 = await geom();
+  expect(g1.chord / g0.chord, JSON.stringify({ g0, g1 })).toBeGreaterThan(1.4);
+  expect(g1.chord / g0.chord).toBeLessThan(1.6);
+  // Same shape: the bend is untouched and the fixed end stayed put.
+  expect(g1.bow).toBeCloseTo(g0.bow, 9);
+  expect(g1.depth).toBeCloseTo(g0.depth, 9);
+  expect(Math.hypot(g1.F[0] - g0.F[0], g1.F[1] - g0.F[1])).toBeLessThan(1e-6);
+
+  // One undo step.
+  await page.keyboard.press("Control+z");
+  await expect.poll(async () => (await geom()).chord).toBeCloseTo(g0.chord, 6);
+});

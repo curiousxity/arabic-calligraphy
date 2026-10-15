@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Line } from "react-konva";
 import type Konva from "konva";
 import type { StackPiece, StackJoin, StackBlock } from "../types";
-import { chainOf, pieceTransform } from "../lib/stackOutline";
+import { chainOf, pieceTransform, radiusEnds, radiusFactor, radiusOffset } from "../lib/stackOutline";
 import { splitAtCut, transformCmds, transformFace, transformPt } from "../lib/stackGeometry";
 import { flattenContours, findCutZonesSwept, type CutZone, type Pt } from "../lib/strokeCuts";
 import type { SvgCmd } from "../lib/svgPath";
@@ -99,6 +99,7 @@ export type StackEditOverlayProps = {
  *   ink of a letter or mark    → move (the letters after it come along)
  *   the band just outside ink  → tilt about the letter's pivot
  *   a join curve               → bend (double-click returns it to its rest)
+ *   a join curve with Shift    → grow or shrink its radius (the free end moves out)
  *   the free end of a straight stroke → press cuts there, the drag pulls the tail
  *   the apex of a curved stroke → press frees the curve, the drag bends it
  *
@@ -119,6 +120,9 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   const pressAt = useRef<{ x: number; y: number } | null>(null);
   const rotateStart = useRef<{ id: string; centre: { x: number; y: number }; rotation: number; pressAngle: number } | null>(null);
   const bowStart = useRef<{ id: string; bow: number; depth: number; tA: number; tB: number; chord: number; pointer: { x: number; y: number } } | null>(null);
+  // Shift-drag on a join: the fixed end, the curve's midpoint and the free
+  // end in font units, and where each carried piece started.
+  const radiusStart = useRef<{ fixed: Pt; mid: Pt; free: Pt; at: Map<string, { x: number; y: number }>; pointer: { x: number; y: number } } | null>(null);
   // A tail pull is not a Konva drag: the pressed cut span unmounts the moment
   // the split changes the body's commands, and a node drag dies with it.
   const pull = useRef<{ capId: string; cap: { x: number; y: number }; pointer: { x: number; y: number }; end: () => void } | null>(null);
@@ -318,7 +322,7 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
         />
       ))}
 
-      {/* Join curves: drag to bend. */}
+      {/* Join curves: drag to bend; Shift-drag to grow the radius. */}
       {joinGeom.map(({ j, A, B, depth, chord, centre, thick }) => (
         <Line
           key={`join-${j.id}`} name="stack-join" points={centre} strokeEnabled={false}
@@ -339,6 +343,21 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
           }}
           onDragStart={(e) => {
             e.cancelBubble = true;
+            if (e.evt.shiftKey) {
+              // Grow the radius: one end stays, the other end's piece (and
+              // what it carries) slides out so the whole curve scales.
+              const ends = radiusEnds(pieces, joins, j, !moveTogether || e.evt.altKey);
+              if (!ends) return;
+              const faceMid = (f: typeof A): Pt => [(f.a[0] + f.b[0]) / 2, (f.a[1] + f.b[1]) / 2];
+              const [fixedF, freeF] = ends.fixed === "from" ? [A, B] : [B, A];
+              radiusStart.current = {
+                fixed: faceMid(fixedF), free: faceMid(freeF), mid: [centre[24] / scale, centre[25] / scale],
+                at: new Map(ends.moving.map((i) => [i, { x: byId.get(i)!.x, y: byId.get(i)!.y }])),
+                pointer: pressAt.current ?? pointerIn(),
+              };
+              onBegin?.();
+              return;
+            }
             // The bow and depth the clamped handles actually draw, so the
             // first drag frame does not jump.
             const [h0, h1] = joinHandles(chord, j.bow, depth);
@@ -351,13 +370,21 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
           }}
           onDragMove={(e) => {
             e.cancelBubble = true;
+            const r = radiusStart.current;
+            if (r) {
+              const now = pointerIn();
+              const k = radiusFactor(r.fixed, r.mid, [(now.x - r.pointer.x) / scale, (now.y - r.pointer.y) / scale]);
+              const [dx, dy] = radiusOffset(r.fixed, r.free, k);
+              onSetPieces?.([...r.at].map(([id, p]) => ({ id, x: p.x + dx, y: p.y + dy })));
+              return;
+            }
             const s = bowStart.current; if (!s) return;
             const now = pointerIn();
             // A 2-D target: both handle lengths move so the curve's midpoint
             // lands as near the pointer as the two tangents allow (block px).
             onSetBow?.(s.id, solveJoinDrag(s, s.tA, s.tB, s.chord, [now.x - s.pointer.x, now.y - s.pointer.y]));
           }}
-          onDragEnd={(e) => { e.cancelBubble = true; bowStart.current = null; pressAt.current = null; e.target.position({ x: 0, y: 0 }); }}
+          onDragEnd={(e) => { e.cancelBubble = true; bowStart.current = null; radiusStart.current = null; pressAt.current = null; e.target.position({ x: 0, y: 0 }); }}
         />
       ))}
 
