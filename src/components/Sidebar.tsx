@@ -25,9 +25,8 @@ import { ShapeFillPanel } from "./sidebar/ShapeFillPanel";
 import { BlockControlsPanel } from "./sidebar/BlockControlsPanel";
 import { TypographyPanel } from "./sidebar/TypographyPanel";
 import { EffectsPanel } from "./sidebar/EffectsPanel";
-import { GUIDE_SHAPE_LABELS, isClosedPath } from "../lib/guideShapes";
+import { GUIDE_SHAPE_LABELS } from "../lib/guideShapes";
 import { attachedTo, guidesIn } from "../lib/guides";
-import { parseSvgPath } from "../lib/svgPath";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import type { HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
@@ -131,13 +130,8 @@ export type SidebarProps = {
   onAddCustomFont?: (file: File, label?: string) => Promise<CustomFont | { error: string }>;
   /** Bake the selected text block into a stacked composition. */
   onConvertToStack?: () => void;
-  onResetStackLayout?: () => void;
+  onEditStack?: () => void;
   /** Arrange the selected stack's letters inside a closed guide. */
-  onArrangeStackInGuide?: (guideId: number) => void;
-  stackMoveTogether?: boolean;
-  onStackMoveTogether?: (v: boolean) => void;
-  stackFillGaps?: boolean;
-  onStackFillGaps?: (v: boolean) => void;
   onRemoveCustomFont?: (key: string) => void;
   /** Set when the selected block names a font this browser cannot resolve. */
   missingFontKey?: string | null;
@@ -372,12 +366,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   fontChoices = [],
   onAddCustomFont,
   onConvertToStack,
-  onResetStackLayout,
-  onArrangeStackInGuide,
-  stackMoveTogether = true,
-  onStackMoveTogether,
-  stackFillGaps = true,
-  onStackFillGaps,
+  onEditStack,
   onRemoveCustomFont,
   missingFontKey = null,
   // ---- /STREAM-G ----
@@ -1958,22 +1947,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {selectedBlock?.type === "stack" && onResetStackLayout && (
+        {selectedBlock?.type === "stack" && onEditStack && (
           <div className="sidebarPanel">
             <CollapsibleSection title="Stacked composition" isOpen={showStack} onToggle={() => setShowStack((v) => !v)}>
-              <StackPanel
-                block={selectedBlock}
-                onUpdate={onUpdateSelectedBlock}
-                onReset={onResetStackLayout}
-                moveTogether={stackMoveTogether}
-                onMoveTogether={(v) => onStackMoveTogether?.(v)}
-                fillGaps={stackFillGaps}
-                onFillGaps={(v) => onStackFillGaps?.(v)}
-                closedGuides={guidesIn(blocks)
-                  .filter((g) => isClosedPath(parseSvgPath(g.guideD)))
-                  .map((g) => ({ id: g.id, label: g.name ?? `Guide · ${GUIDE_SHAPE_LABELS[g.guideShape]}` }))}
-                onArrangeInGuide={onArrangeStackInGuide}
-              />
+              <StackPanel block={selectedBlock} onEdit={onEditStack} />
             </CollapsibleSection>
           </div>
         )}

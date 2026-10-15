@@ -120,11 +120,19 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
     return () => ro.disconnect();
   }, []);
 
-  const fitView = useCallback(() => {
+  // The fitted extent is the ink plus the template outline (when one is
+  // shown), so a shape taller than the letters is not clipped by the frame.
+  const fitTo = useCallback((d: StackDraft, shape: Array<[number, number]> | null) => {
     if (frame.width === 0 || frame.height === 0) return;
-    const d = draftRef.current;
-    setView(fitTransform(inkBoundsPx(d, block.unitsPerEm), d.rotation, frame, FIT_MARGIN));
+    const b = { ...inkBoundsPx(d, block.unitsPerEm) };
+    for (const [x, y] of shape ?? []) {
+      b.x1 = Math.min(b.x1, x); b.y1 = Math.min(b.y1, y); b.x2 = Math.max(b.x2, x); b.y2 = Math.max(b.y2, y);
+    }
+    setView(fitTransform(b, d.rotation, frame, FIT_MARGIN));
   }, [frame, block.unitsPerEm]);
+  const outlineRef = useRef(outline);
+  useLayoutEffect(() => { outlineRef.current = outline; }, [outline]);
+  const fitView = useCallback(() => fitTo(draftRef.current, outlineRef.current), [fitTo]);
   // Fit on open and whenever the frame changes size.
   useEffect(() => { fitView(); }, [fitView]);
 
@@ -228,10 +236,8 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
       (r.result.stems > 0 ? `, ${plural(r.result.stems, "stem")} lengthened` : "") + note + "."
     );
     // The size changed; refit on the next frame so the new draft is measured.
-    requestAnimationFrame(() => {
-      setView(fitTransform(inkBoundsPx(r!.draft, block.unitsPerEm), r!.draft.rotation, frame, FIT_MARGIN));
-    });
-  }, [block, closedGuides, loadFillers, pushHistory, frame]);
+    requestAnimationFrame(() => fitTo(r!.draft, shapePx));
+  }, [block, closedGuides, loadFillers, pushHistory, fitTo]);
 
   const pick = (c: Choice) => { setChoice(c); void arrange(c, sizeFactor, fillGaps); };
   const changeSize = (v: number) => { setSizeFactor(v); if (choice.kind === "template") void arrange(choice, v, fillGaps); };
