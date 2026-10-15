@@ -2,8 +2,9 @@
 // font units, the shape in px, the scale between them found here. Never
 // imports ./harfbuzz.
 import type { StackPiece, StackJoin } from "../types";
+import { pointInPolygon } from "./svgPath";
 import { outlineBounds } from "./strokeCuts";
-import { translateCmds } from "./stackGeometry";
+import { translateCmds, transformPt } from "./stackGeometry";
 
 type Pt = [number, number];
 type Box = { x1: number; y1: number; x2: number; y2: number };
@@ -43,6 +44,8 @@ const CREEP = 0.02;
 /** Steps either side of zero when an outer letter looks for a wider band
  *  within ±¼ of its own height. */
 const NUDGE_STEPS = 4;
+/** The most an outer letter leans toward the shape's edge. */
+const MAX_TILT = Math.PI / 6;
 
 /** A letter with its riders: moved as one, its bounds measured as one. */
 type Group = {
@@ -228,6 +231,75 @@ function nudge(poly: readonly Pt[], g: Group, y: number): number {
   return bestDy;
 }
 
+export type Placement = { x: number; y: number; rotation: number };
+
+/** The signed angle from vertical of the boundary beside a group at `y`, on
+ *  `side`; positive leans right going up (a positive piece rotation, y-down). */
+function edgeLean(poly: readonly Pt[], g: Group, y: number, side: "left" | "right"): number {
+  const h = height(g.box);
+  const top = y + g.box.y1 + 0.01 * h, bottom = y + g.box.y2 - 0.01 * h;
+  const ct = chordAt(poly, top), cb = chordAt(poly, bottom);
+  if (!ct || !cb) return 0;
+  const i = side === "right" ? 1 : 0;
+  return Math.atan2(ct[i] - cb[i], bottom - top);
+}
+
+/** A group rotated by `rot` about its letter's pivot at (x, y): every box
+ *  corner inside the shape and its rotated bounds clear of `neighbour`. */
+function fitsRotated(poly: readonly Pt[], g: Group, x: number, y: number, rot: number, neighbour: Box | null, gap: number): boolean {
+  const t = { x, y, rotation: rot, pivot: g.letter.pivot };
+  const corners: Pt[] = [[g.box.x1, g.box.y1], [g.box.x2, g.box.y1], [g.box.x1, g.box.y2], [g.box.x2, g.box.y2]];
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  for (const c of corners) {
+    const [wx, wy] = transformPt(c, t);
+    if (!pointInPolygon(wx, wy, poly as Array<[number, number]>)) return false;
+    x1 = Math.min(x1, wx); y1 = Math.min(y1, wy); x2 = Math.max(x2, wx); y2 = Math.max(y2, wy);
+  }
+  if (!neighbour) return true;
+  return x2 + gap <= neighbour.x1 || x1 - gap >= neighbour.x2 || y2 <= neighbour.y1 || y1 >= neighbour.y2;
+}
+
+/** A group's bounds when rotated by `rot` about its letter's pivot, relative
+ *  to the letter's origin. */
+function rotatedExtents(g: Group, rot: number): Box {
+  const t = { x: 0, y: 0, rotation: rot, pivot: g.letter.pivot };
+  const corners: Pt[] = [[g.box.x1, g.box.y1], [g.box.x2, g.box.y1], [g.box.x1, g.box.y2], [g.box.x2, g.box.y2]];
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  for (const c of corners) {
+    const [wx, wy] = transformPt(c, t);
+    x1 = Math.min(x1, wx); y1 = Math.min(y1, wy); x2 = Math.max(x2, wx); y2 = Math.max(y2, wy);
+  }
+  return { x1, y1, x2, y2 };
+}
+
+/**
+ * An outer letter leaning into the edge beside it: the edge's lean, clamped
+ * to `MAX_TILT`, halved until the leaning letter fits. Room for the lean is
+ * reserved, not hoped for: the letter's *rotated* bounds sit one gap inside
+ * the chord, and since a leaning box is taller than an upright one the
+ * letter is lifted by the overhang below its row bottom, which must fit the
+ * `headroom` to the row above. Returns the tilt and the (x, y) it needs.
+ */
+function leanIntoEdge(
+  poly: readonly Pt[], g: Group, y: number, side: "left" | "right", edge: number, gap: number, headroom: number
+): Placement {
+  let rot = Math.max(-MAX_TILT, Math.min(MAX_TILT, edgeLean(poly, g, y, side)));
+  for (let k = 0; k < 7; k++) {
+    if (k === 6) rot = 0;
+    const ext = rotatedExtents(g, rot);
+    const below = Math.max(0, ext.y2 - g.box.y2), above = Math.max(0, g.box.y1 - ext.y1);
+    const yy = y - below;
+    // The chord over the leaning letter's own (taller) band, else the caller's edge.
+    const sp = rot === 0 ? null : bandSpan(poly, yy + ext.y1, yy + ext.y2);
+    const e = sp ? sp[side === "right" ? 1 : 0] : edge;
+    const x = side === "right" ? e - gap - ext.x2 : e + gap - ext.x1;
+    if (rot === 0) return { x, y: yy, rotation: 0 };
+    if (below + above <= headroom && fitsRotated(poly, g, x, yy, rot, null, 0)) return { x, y: yy, rotation: rot };
+    rot /= 2;
+  }
+  return { x: side === "right" ? edge - gap - g.box.x2 : edge + gap - g.box.x1, y, rotation: 0 };
+}
+
 /** The width a row of these groups needs: ink, gaps between, and — for a
  *  row of three or more, which hugs the edges — one gap at each edge. */
 function rowNeed(groups: readonly Group[], gap: number): number {
@@ -242,35 +314,52 @@ function rowNeed(groups: readonly Group[], gap: number): number {
  * (not the row's union band, which a tall neighbour narrows) and slid out to
  * one gap inside the chord there; the inner letters share the rest equally.
  */
-function placeRow(row: Row, poly: readonly Pt[], upm: number): Map<string, Pt> {
-  const out = new Map<string, Pt>();
+function placeRow(row: Row, poly: readonly Pt[], upm: number, headroom: number): Map<string, Placement> {
+  const out = new Map<string, Placement>();
   const b = row.bottom;
   const span = bandSpan(poly, b - height(row.box), b) ?? [row.box.x1, row.box.x2];
   const widths = row.groups.map((g) => width(g.box));
-  const total = widths.reduce((s, w) => s + w, 0);
   const n = row.groups.length;
   const minGap = LETTER_GAP * upm;
   const y0 = b - row.box.y2; // row space y=0 lands here
   const ys = row.dys.map((dy) => y0 + dy);
-  if (n <= 2) {
-    let gap = n > 1 ? (span[1] - span[0] - total) / (n - 1) : 0;
-    gap = Math.max(minGap, Math.min(gap, MAX_SPREAD * upm));
-    const used = total + gap * (n - 1);
-    // Right edge of the row's ink, centred in the span when the spread is capped.
-    let right = (span[0] + span[1]) / 2 + used / 2;
-    row.groups.forEach((g, i) => { out.set(g.letter.id, [right - g.box.x2, ys[i]]); right -= widths[i] + gap; });
+  const first = row.groups[0], last = row.groups[n - 1];
+  if (n === 1) {
+    out.set(first.letter.id, { x: (span[0] + span[1]) / 2 - (first.box.x1 + first.box.x2) / 2, y: ys[0], rotation: 0 });
     return out;
   }
-  const first = row.groups[0], last = row.groups[n - 1];
+  if (n === 2) {
+    // Each letter leans into its edge with room reserved, then both are
+    // drawn toward the centre until they are at most MAX_SPREAD apart.
+    const pf = leanIntoEdge(poly, first, ys[0], "right", span[1], minGap, headroom);
+    const pl = leanIntoEdge(poly, last, ys[1], "left", span[0], minGap, headroom);
+    const ef = rotatedExtents(first, pf.rotation), el = rotatedExtents(last, pl.rotation);
+    const apart = (pf.x + ef.x1) - (pl.x + el.x2);
+    const pull = Math.max(0, (apart - MAX_SPREAD * upm) / 2);
+    out.set(first.letter.id, { ...pf, x: pf.x - pull });
+    out.set(last.letter.id, { ...pl, x: pl.x + pull });
+    return out;
+  }
+  // Three or more: the outer letters hug the shape at their own band, nudged
+  // and leaning; the inner letters share the width between them equally.
   ys[0] += nudge(poly, first, ys[0]);
   ys[n - 1] += nudge(poly, last, ys[n - 1]);
-  const rightEdge = (ownSpan(poly, first, ys[0]) ?? span)[1] - minGap;
-  const leftEdge = (ownSpan(poly, last, ys[n - 1]) ?? span)[0] + minGap;
+  const rightEdge = (ownSpan(poly, first, ys[0]) ?? span)[1];
+  const leftEdge = (ownSpan(poly, last, ys[n - 1]) ?? span)[0];
+  const pf = leanIntoEdge(poly, first, ys[0], "right", rightEdge, minGap, headroom);
+  const pl = leanIntoEdge(poly, last, ys[n - 1], "left", leftEdge, minGap, headroom);
+  out.set(first.letter.id, pf);
+  out.set(last.letter.id, pl);
+  const innerRight = pf.x + rotatedExtents(first, pf.rotation).x1;
+  const innerLeft = pl.x + rotatedExtents(last, pl.rotation).x2;
   const innerTotal = widths.slice(1, n - 1).reduce((s, w) => s + w, 0);
-  const free = rightEdge - widths[0] - (leftEdge + widths[n - 1]) - innerTotal;
-  const gap = Math.max(minGap, free / (n - 1));
-  let right = rightEdge;
-  row.groups.forEach((g, i) => { out.set(g.letter.id, [right - g.box.x2, ys[i]]); right -= widths[i] + gap; });
+  const gap = Math.max(minGap, (innerRight - innerLeft - innerTotal) / (n - 1));
+  let right = innerRight - gap;
+  for (let i = 1; i < n - 1; i++) {
+    const g = row.groups[i];
+    out.set(g.letter.id, { x: right - g.box.x2, y: ys[i], rotation: 0 });
+    right -= widths[i] + gap;
+  }
   return out;
 }
 
@@ -278,13 +367,26 @@ function placeRow(row: Row, poly: readonly Pt[], upm: number): Map<string, Pt> {
  * The arranged layout at one scale, or null when it does not fit. `scale` is
  * px per font unit, so the shape is read in font units as `shapePx / scale`.
  */
-function arrangeAt(groups: Group[], shapePx: readonly Pt[], scale: number, upm: number): { rows: Row[]; pos: Map<string, Pt> } | null {
+function arrangeAt(groups: Group[], shapePx: readonly Pt[], scale: number, upm: number): { rows: Row[]; pos: Map<string, Placement> } | null {
   const poly = shapePx.map((p): Pt => [p[0] / scale, p[1] / scale]);
   const rows = pack(groups, poly, upm);
   if (!rows) return null;
   spreadRows(rows, poly, upm);
-  const pos = new Map<string, Pt>();
-  for (const row of rows) for (const [id, p] of placeRow(row, poly, upm)) pos.set(id, p);
+  const pos = new Map<string, Placement>();
+  rows.forEach((row, i) => {
+    // Room between this row's top and the next row's bottom (the shape bounds the top row).
+    const next = rows[i + 1];
+    const headroom = next ? row.bottom - height(row.box) - next.bottom : Infinity;
+    for (const [id, p] of placeRow(row, poly, upm, headroom)) pos.set(id, p);
+  });
+  // Bisection fits rows plus tilt: a leaning letter must still be inside.
+  // (Upright letters were measured against the chord by bandSpan already,
+  // which samples a hair inside; a point test on the chord itself would
+  // reject a box that exactly fits.)
+  for (const g of groups) {
+    const p = pos.get(g.letter.id)!;
+    if (p.rotation !== 0 && !fitsRotated(poly, g, p.x, p.y, p.rotation, null, 0)) return null;
+  }
   return { rows, pos };
 }
 
@@ -319,9 +421,18 @@ export function arrangeStackInShape(input: ArrangeInput): ArrangeResult | null {
 
   const moved = new Map<string, StackPiece>();
   for (const g of groups) {
-    const [nx, ny] = pos.get(g.letter.id)!;
-    const dx = nx - g.letter.x, dy = ny - g.letter.y;
-    for (const m of g.members) moved.set(m.id, { ...m, x: m.x + dx, y: m.y + dy, rotation: 0 });
+    const pl = pos.get(g.letter.id)!;
+    const dx = pl.x - g.letter.x, dy = pl.y - g.letter.y;
+    const lp: Pt = [g.letter.pivot[0] + pl.x, g.letter.pivot[1] + pl.y];
+    const c = Math.cos(pl.rotation), s = Math.sin(pl.rotation);
+    for (const m of g.members) {
+      const mx = m.x + dx, my = m.y + dy;
+      if (m === g.letter || pl.rotation === 0) { moved.set(m.id, { ...m, x: mx, y: my, rotation: pl.rotation }); continue; }
+      // A rider turns with its letter: its pivot swings about the letter's pivot.
+      const vx = m.pivot[0] + mx - lp[0], vy = m.pivot[1] + my - lp[1];
+      const nx = lp[0] + vx * c - vy * s, ny = lp[1] + vx * s + vy * c;
+      moved.set(m.id, { ...m, x: nx - m.pivot[0], y: ny - m.pivot[1], rotation: pl.rotation });
+    }
   }
   return {
     pieces: input.pieces.map((p) => moved.get(p.id) ?? p),

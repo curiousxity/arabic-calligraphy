@@ -4,7 +4,7 @@ import type { SvgCmd } from "./svgPath";
 import { pointInPolygon } from "./svgPath";
 import { arrangeStackInShape, bandSpan, letterGroups } from "./stackArrange";
 import { outlineBounds } from "./strokeCuts";
-import { translateCmds } from "./stackGeometry";
+import { transformPt, translateCmds } from "./stackGeometry";
 
 // Synthetic pieces are fine here: nothing is shaped, and the solver only
 // reads outlines, positions and the rider tree (see CLAUDE.md's rule, which
@@ -47,6 +47,9 @@ function shortTallShort() {
   const a = letter("q0", 0, 800, 300, 200);
   return { pieces: [c, b, a], joins: [] as StackJoin[] };
 }
+
+/** A parallelogram 1400 wide and 1000 tall whose sides lean right going up (about 27°). */
+const PARALLELOGRAM: Array<[number, number]> = [[-700, 500], [700, 500], [1200, -500], [-200, -500]];
 
 /** A tall ellipse in px, centred on the origin, clockwise. */
 function ellipse(w: number, h: number, n = 64): Array<[number, number]> {
@@ -122,7 +125,8 @@ describe("arrangeStackInShape", () => {
   });
 
   it("moves a letter's riders with it and resets tilt and bends", () => {
-    const inp = input();
+    // A rectangle: no edge leans, so every letter comes out upright.
+    const inp = { ...input(), shapePx: [[-150, -450], [150, -450], [150, 450], [-150, 450]] as Array<[number, number]> };
     inp.pieces = inp.pieces.map((p) => (p.id === "p1" ? { ...p, rotation: 0.3 } : p));
     const r = arrangeStackInShape(inp)!;
     const b = r.pieces.find((p) => p.id === "p1")!, d = r.pieces.find((p) => p.id === "d1")!;
@@ -147,9 +151,17 @@ describe("arrangeStackInShape", () => {
     expect(r.rows).toBe(1);
     const scale = r.fontSize / UPM;
     const poly = ellipse(1600, 500).map(([x, y]) => [x / scale, y / scale] as [number, number]);
-    const right = groupBox(r.pieces, "p0"), left = groupBox(r.pieces, "p3");
+    // An outer letter may lean, so measure its rotated bounds.
+    const rotatedBox = (id: string) => {
+      const p = r.pieces.find((x) => x.id === id)!;
+      const g = letterGroups(r.pieces).find((x) => x.letter.id === id)!;
+      const t = { x: p.x, y: p.y, rotation: p.rotation, pivot: p.pivot };
+      const cs = ([[g.box.x1, g.box.y1], [g.box.x2, g.box.y1], [g.box.x1, g.box.y2], [g.box.x2, g.box.y2]] as const).map((c) => transformPt([c[0], c[1]], t));
+      return { x1: Math.min(...cs.map((c) => c[0])), x2: Math.max(...cs.map((c) => c[0])), y1: Math.min(...cs.map((c) => c[1])), y2: Math.max(...cs.map((c) => c[1])) };
+    };
+    const right = rotatedBox("p0"), left = rotatedBox("p3");
     const rs = bandSpan(poly, right.y1, right.y2)!, ls = bandSpan(poly, left.y1, left.y2)!;
-    // Each outer letter's box sits one letter gap (0.08 em) inside the chord at its own band.
+    // Each outer letter's bounds sit one letter gap (0.08 em) inside the chord over their own band.
     expect(Math.abs(rs[1] - right.x2 - 80)).toBeLessThan(2);
     expect(Math.abs(left.x1 - ls[0] - 80)).toBeLessThan(2);
     // Inner letters sit between them with equal gaps.
@@ -180,6 +192,39 @@ describe("arrangeStackInShape", () => {
     const r2 = arrangeStackInShape({ ...shortTallShort(), shapePx: rect, fontSize: 100, unitsPerEm: UPM })!;
     const a2 = r2.pieces.find((p) => p.id === "q0")!, b2 = r2.pieces.find((p) => p.id === "q1")!;
     expect(Math.abs(a2.y - b2.y)).toBeLessThan(1e-6);
+  });
+
+  it("tilts outer letters toward a leaning edge, never past 30°, and keeps them inside", () => {
+    const r = arrangeStackInShape({ ...input(), shapePx: PARALLELOGRAM })!;
+    const scale = r.fontSize / UPM;
+    const letters = r.pieces.filter((p) => p.role === "letter" && p.parentId === undefined);
+    const tilted = letters.filter((p) => Math.abs(p.rotation) > 0.1);
+    expect(tilted.length).toBeGreaterThan(0);
+    for (const p of letters) {
+      expect(Math.abs(p.rotation)).toBeLessThanOrEqual(Math.PI / 6 + 1e-9);
+      // Leaning right going up is a positive rotation (y-down frame).
+      if (Math.abs(p.rotation) > 0.1) expect(p.rotation).toBeGreaterThan(0);
+      const g = letterGroups(r.pieces).find((x) => x.letter.id === p.id)!;
+      const t = { x: p.x, y: p.y, rotation: p.rotation, pivot: p.pivot };
+      for (const c of [[g.box.x1, g.box.y1], [g.box.x2, g.box.y1], [g.box.x1, g.box.y2], [g.box.x2, g.box.y2]] as const) {
+        const [wx, wy] = transformPt([c[0], c[1]], t);
+        expect(pointInPolygon(wx * scale, wy * scale, PARALLELOGRAM), `${p.id} corner inside`).toBe(true);
+      }
+    }
+  });
+
+  it("does not tilt in a rectangle, and a rider turns with its letter", () => {
+    const rect: Array<[number, number]> = [[-300, -900], [300, -900], [300, 900], [-300, 900]];
+    const r = arrangeStackInShape({ ...input(), shapePx: rect })!;
+    for (const p of r.pieces) expect(p.rotation).toBe(0);
+
+    const r2 = arrangeStackInShape({ ...input(), shapePx: PARALLELOGRAM })!;
+    const b = r2.pieces.find((p) => p.id === "p1")!, d = r2.pieces.find((p) => p.id === "d1")!;
+    expect(d.rotation).toBe(b.rotation);
+    // The dot's pivot stays the same distance from the letter's pivot as at conversion.
+    const bp = [b.pivot[0] + b.x, b.pivot[1] + b.y], dp = [d.pivot[0] + d.x, d.pivot[1] + d.y];
+    const before = Math.hypot(110 + 40 - 150, -500 - 40 + 200); // dot pivot (40,-40)+(110,-500) vs letter pivot (150,-200)
+    expect(Math.hypot(dp[0] - bp[0], dp[1] - bp[1])).toBeCloseTo(before, 3);
   });
 
   it("returns null with no letters or a degenerate shape", () => {
