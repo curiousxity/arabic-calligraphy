@@ -373,10 +373,10 @@ export async function addShapeFillFromSvg(
 }
 
 /** How many nodes of a given Konva `name` are mounted on the stage. */
-export async function namedNodeCount(page: Page, name: string): Promise<number> {
+export async function namedNodeCount(page: Page, name: string, opts: { editor?: boolean } = {}): Promise<number> {
   return page.evaluate(
-    (n) => window.__HARF__!.getStage()?.find(`.${n}`).length ?? 0,
-    name
+    ([n, editor]) => (editor ? window.__HARF__!.getEditorStage() : window.__HARF__!.getStage())?.find(`.${n}`).length ?? 0,
+    [name, opts.editor ?? false] as const
   );
 }
 
@@ -413,14 +413,14 @@ export function settleFrames(page: Page): Promise<void> {
 }
 
 /** The Konva node `stage.getIntersection` reports at a page-space point, as `ClassName.name`. */
-export async function hitTargetAt(page: Page, point: Point): Promise<string | null> {
-  return page.evaluate((pt) => {
-    const stage = window.__HARF__!.getStage();
+export async function hitTargetAt(page: Page, point: Point, opts: { editor?: boolean } = {}): Promise<string | null> {
+  return page.evaluate(([pt, editor]) => {
+    const stage = editor ? window.__HARF__!.getEditorStage() : window.__HARF__!.getStage();
     if (!stage) return null;
     const c = stage.container().getBoundingClientRect();
     const node = stage.getIntersection({ x: pt.x - c.left, y: pt.y - c.top });
     return node ? `${node.getClassName()}.${node.name()}` : null;
-  }, point);
+  }, [point, opts.editor ?? false] as const);
 }
 
 /**

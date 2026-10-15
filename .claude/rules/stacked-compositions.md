@@ -4,7 +4,11 @@ paths:
   - "src/components/StackView.tsx"
   - "src/components/StackEditOverlay.tsx"
   - "src/components/sidebar/StackPanel.tsx"
+  - "src/components/StackEditorDialog.tsx"
+  - "src/lib/stackDraft.ts"
+  - "src/lib/stackTemplates.ts"
   - "e2e/stack.spec.ts"
+  - "e2e/stack-editor.spec.ts"
 ---
 
 # Stacked compositions (`stack` blocks)
@@ -171,6 +175,54 @@ the outline are constant screen px at any zoom without the overlay knowing
 the stage scale. Nothing is drawn at rest, so a selected composition looks
 like its export.
 
+**All editing happens in the editor window** (`StackEditorDialog`, since
+2026-10-15; spec `docs/superpowers/specs/2026-10-15-stack-editor-window-design.md`).
+On the main canvas a stack block is select, move, style, delete; `CanvasStage`
+mounts no `StackEditOverlay`. Double-click (not while panning or locked), or
+the Stack panel's one button, opens a portaled modal with its **own Konva
+stage** that renders the draft through the same `StackView` +
+`StackEditOverlay` (the overlay finds its stage by `getStage()` on its own
+node, so the `.stackpull` / `.stackbend` listeners need nothing). **Edits are
+staged** on a `StackDraft` (`stackDraft.ts`, pure: patch, bend, split, free,
+reset, arrange, measure, fit) with an editor-local `useUndoRedo` run with
+`coalesceMs: 0` — the canvas hook merges pushes within 300 ms for keystrokes,
+but in the window every push is one deliberate gesture, and a press that
+frees a curve followed quickly by a double-click that rests it must stay two
+steps (the bowl e2e pins this). Done is one `updateBlock` only if
+`draftChanged` (arrays by reference: every mutation returns new arrays and an
+undo back to the opening state restores the opening arrays themselves);
+Cancel asks only if it changed; Escape is Cancel. App's global keydown
+returns early while `stackEditorId` is set, like behind the start screen.
+"Move letters together" and "Fill gaps" remain App preferences passed
+through. The view is fit to the *rotated* ink bounds plus the template
+outline with a 12% margin (`fitTransform`) so the tilt ring outside the ink
+stays reachable and a tall shape is not clipped; Fit view refits, and an
+arrange refits on the next frame. The e2e bridge exposes the window's stage
+as `getEditorStage` and its draft as `getEditorDraft` (both set by the dialog
+in an effect; still read-only) — the block does not change until Done, so a
+gesture's effect is read from the draft and the committed result from the
+block after Done.
+
+**Templates** (`stackTemplates.ts`): teardrop and almond are the guide
+formulas (`guidePathD`) scaled uniformly so the shape's *height* equals the
+composition's ink height **as opened (or as last Reset)** × the size slider
+(50–200%), centred on the block's origin, so the block never moves. The
+baseline is a ref, never the current ink: sizing from the last arrange fed
+each arrange into the next (re-clicking a card shrank the letters by a third
+a click, and 100% drifted). The size slider arranges once its ticks settle
+(`SLIDER_SETTLE_MS`), and Join thickness pushes once per run of ticks, since
+the hook's own coalescing is off in the window. A canvas guide is a card too; picking one arranges
+in the guide's frame and sets the draft's `x`/`y`/`rotation` to the guide's,
+so Done moves the block onto it (the old "Fill a guide shape"). The arrange
+is async (fillers load through App's `loadStackFillers`); a token drops a
+result whose card is no longer the current pick, and Free, Reset and
+unmount bump it too, so a slow font load cannot land after the user moved on.
+The window is modal for the keyboard as well: the editor tree behind it is
+`inert` (like behind the start screen) and the close button takes focus on
+open. The outline is a dashed
+`Line` in the ink's complement inside the window only — never saved, never
+exported; re-opening starts at Free. Reset layout clears it.
+
 **A tail pull is not a Konva drag.** The press splits the piece
 (`onSplit` returns the cap), which replaces the body's `cmds`, which
 unmounts the span that was pressed — a node drag would die with it. The
@@ -199,8 +251,8 @@ only, cached per `cmds`. The span's hit area carries 3 screen px of slack
 events keep fractions, and a thin stroke's span can sit between the two.
 
 **Fill a guide shape** (`arrangeStackInShape`, `stackArrange.ts`, pure)
-arranges the letters inside a closed guide chosen in the Stack panel: the
-guide's `containerPolygon` in px, the pieces in font units, and the scale
+arranges the letters inside a closed shape chosen in the editor window (a
+template or a canvas guide; see above): the shape's polygon in px, the pieces in font units, and the scale
 between them found by bisection to the largest at which everything fits.
 Rows run **bottom to top in reading order, right to left within a row**,
 the way a stacked name climbs; the first letter sits bottom-right. A letter
@@ -244,8 +296,8 @@ guide (x, y, rotation) and takes the fitted `fontSize`, one history step.
 The guide never moves a piece afterwards. Tunables are fractions of an em
 at the top of the module.
 
-**Fillers** (`fillGaps`): when the panel's "Fill gaps with tashkeel" is on,
-`App.tsx` loads the block's font through the cached `shapeText` and passes
+**Fillers** (`fillGaps`): when the window's "Fill gaps with tashkeel" is on,
+App's `loadStackFillers` loads the block's font through the cached `shapeText` and passes
 `fillerShapes` (`stackConvert.ts`: the font's fatha, kasra, shadda, damma,
 sukun, tanwin, star and dot, or a nib-width `teardropShape` when fewer than
 two exist — Qahiri and RanaKufi; also the fallback when the font fails to
@@ -260,14 +312,12 @@ overlaps no placed filler. The cell and gap were tuned down from 0.33/0.06
 because a padded dot could not enter the gutters of a composition whose
 letters are as wide as the shape. A filler is `role: "mark"` with no
 parent and `filler: true`: it drags alone, has no ring or cut spans,
-exports with the outline, and is **stripped** by the arranger, the handler
+exports with the outline, and is **stripped** by the arranger, `arrangeDraft`
 and Reset layout, so it never accumulates. The preference is `App.tsx`
 state like "Move letters together", neither saved nor undoable. The
-handler is async: it loads the font first (`arrangeStackInGuide`, which
-reads only the block's source), then arranges and commits through a ref to
-the latest render's `arrangeStackNow`, so the arrange sees current blocks
-and pushes a current history snapshot; a block that changed or vanished
-during the load, or an arrange that throws, ends in a status message.
+arrange is async: the dialog loads the font first, then arranges against
+its draft at completion and pushes one editor-undo step; an arrange that
+cannot fit or throws leaves the draft untouched and reports in the footer.
 
 **Stems** (`pullStemEnds`, after tilt, before fillers; `pullStems: true`
 from the handler): each letter's straight zones are found once with

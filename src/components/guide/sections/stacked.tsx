@@ -4,7 +4,7 @@ export const section: GuideSection = {
   id: "stacked",
   title: "Stacking a word",
   order: 39,
-  keywords: ["stack", "tarkib", "diwani", "name", "composition", "join", "tail", "convert", "teardrop"],
+  keywords: ["stack", "tarkib", "diwani", "name", "composition", "join", "tail", "convert", "teardrop", "editor", "template"],
   Body: () => (
     <>
       <p>
@@ -14,7 +14,11 @@ export const section: GuideSection = {
         <strong>Convert to stacked composition</strong>.
       </p>
       <p>
-        That bakes the letters into pieces you can move. There is nothing to switch on:
+        That bakes the letters into pieces. Double-click the composition (or press{" "}
+        <strong>Edit composition</strong>) to open the editor window: it shows the
+        composition exactly as the canvas will, and every move you make there is held
+        until you press <strong>Done</strong>; <strong>Cancel</strong> puts it back.
+        There is nothing to switch on:
         whatever the pointer rests on lights up with a thin outline, and dragging it does
         what that place means. Drag a letter and the letters after it come along; untick{" "}
         <strong>Move letters together</strong> (or hold <kbd>Alt</kbd>) to move one by
@@ -32,8 +36,11 @@ export const section: GuideSection = {
       </p>
       <h4>Shape</h4>
       <p>
-        Add a <strong>Teardrop</strong> or <strong>Almond</strong> guide and arrange the
-        letters inside it by eye. Guides never print.
+        In the editor window choose <strong>Teardrop</strong> or <strong>Almond</strong>{" "}
+        and the letters are laid in rows inside it, sized to the composition; the{" "}
+        <strong>Template size</strong> slider grows or shrinks the shape. A closed guide
+        you drew on the canvas is offered too, and with that one the composition moves
+        onto the guide when you press Done. Nothing is printed but the letters.
       </p>
       <p>
         Converting is one-way: the spelling can't be edited afterwards. Undo brings the
