@@ -40,6 +40,9 @@ const MAX_SPREAD = 1.0;
 const BAND_SAMPLES = 7;
 /** How far a row creeps upward, per try, looking for a band it fits in. */
 const CREEP = 0.02;
+/** Steps either side of zero when an outer letter looks for a wider band
+ *  within ±¼ of its own height. */
+const NUDGE_STEPS = 4;
 
 /** A letter with its riders: moved as one, its bounds measured as one. */
 type Group = {
@@ -210,6 +213,21 @@ function ownSpan(poly: readonly Pt[], g: Group, y: number): [number, number] | n
   return bandSpan(poly, y + g.box.y1, y + g.box.y2);
 }
 
+/** How far an outer letter should move vertically (± a quarter of its
+ *  height) so its own band is widest; ties keep the smallest move. */
+function nudge(poly: readonly Pt[], g: Group, y: number): number {
+  const quarter = height(g.box) / 4;
+  let bestDy = 0, bestW = -Infinity;
+  for (let k = -NUDGE_STEPS; k <= NUDGE_STEPS; k++) {
+    const dy = (k / NUDGE_STEPS) * quarter;
+    const s = ownSpan(poly, g, y + dy);
+    if (!s) continue;
+    const w = s[1] - s[0];
+    if (w > bestW + 1e-6 || (Math.abs(w - bestW) <= 1e-6 && Math.abs(dy) < Math.abs(bestDy))) { bestW = w; bestDy = dy; }
+  }
+  return bestDy;
+}
+
 /** The width a row of these groups needs: ink, gaps between, and — for a
  *  row of three or more, which hugs the edges — one gap at each edge. */
 function rowNeed(groups: readonly Group[], gap: number): number {
@@ -244,6 +262,8 @@ function placeRow(row: Row, poly: readonly Pt[], upm: number): Map<string, Pt> {
     return out;
   }
   const first = row.groups[0], last = row.groups[n - 1];
+  ys[0] += nudge(poly, first, ys[0]);
+  ys[n - 1] += nudge(poly, last, ys[n - 1]);
   const rightEdge = (ownSpan(poly, first, ys[0]) ?? span)[1] - minGap;
   const leftEdge = (ownSpan(poly, last, ys[n - 1]) ?? span)[0] + minGap;
   const innerTotal = widths.slice(1, n - 1).reduce((s, w) => s + w, 0);

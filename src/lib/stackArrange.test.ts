@@ -40,6 +40,14 @@ function word() {
   return { pieces: [d, c, b, a, bDot], joins };
 }
 
+/** A short, tall, short row on one baseline (order 0 rightmost). */
+function shortTallShort() {
+  const c = letter("q2", 2, 0, 300, 200);
+  const b = letter("q1", 1, 400, 300, 400);
+  const a = letter("q0", 0, 800, 300, 200);
+  return { pieces: [c, b, a], joins: [] as StackJoin[] };
+}
+
 /** A tall ellipse in px, centred on the origin, clockwise. */
 function ellipse(w: number, h: number, n = 64): Array<[number, number]> {
   return Array.from({ length: n }, (_, i) => {
@@ -157,6 +165,21 @@ describe("arrangeStackInShape", () => {
     const r = arrangeStackInShape({ pieces: two, joins, shapePx: ellipse(3000, 300), fontSize: 100, unitsPerEm: UPM })!;
     const a = groupBox(r.pieces, "p0"), b = groupBox(r.pieces, "p1");
     expect(a.x1 - b.x2).toBeLessThanOrEqual(1.0 * UPM + 1);
+  });
+
+  it("nudges a short outer letter into the curve, and never in a rectangle", () => {
+    // A wide, short ellipse forces one row of three (a circle would take two rows).
+    const r = arrangeStackInShape({ ...shortTallShort(), shapePx: ellipse(1800, 600), fontSize: 100, unitsPerEm: UPM })!;
+    expect(r.rows).toBe(1);
+    const a = r.pieces.find((p) => p.id === "q0")!, b = r.pieces.find((p) => p.id === "q1")!, c = r.pieces.find((p) => p.id === "q2")!;
+    // All three share a baseline before; the row is centred, so the short
+    // letters sit in the ellipse's lower half, where the band widens upward.
+    expect(a.y).toBeLessThan(b.y - 1);
+    expect(c.y).toBeLessThan(b.y - 1);
+    const rect: Array<[number, number]> = [[-700, -700], [700, -700], [700, 700], [-700, 700]];
+    const r2 = arrangeStackInShape({ ...shortTallShort(), shapePx: rect, fontSize: 100, unitsPerEm: UPM })!;
+    const a2 = r2.pieces.find((p) => p.id === "q0")!, b2 = r2.pieces.find((p) => p.id === "q1")!;
+    expect(Math.abs(a2.y - b2.y)).toBeLessThan(1e-6);
   });
 
   it("returns null with no letters or a degenerate shape", () => {
