@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { blockClientBox, getBlocks, gotoApp, namedNodeCount, settleFrames, setBlockText } from "./harf";
+import { blockClientBox, getBlocks, gotoApp, namedNodeCount, placeAtCanvas, settleFrames, setBlockText } from "./harf";
 
 /**
  * The stack editor window: opening, staging, templates. Gestures themselves
@@ -151,9 +151,69 @@ test("Done on an untouched window records no history step", async ({ page }) => 
   await expect.poll(async () => (await blockOf(page)).type).toBe("text");
 });
 
-test("only closed guides are offered as cards", async ({ page }) => {
+const draftFontSize = (page: Page) => page.evaluate(() => window.__HARF__!.getEditorDraft()!.fontSize);
+const draftMinFraction = (page: Page) => page.evaluate(() => window.__HARF__!.getEditorDraft()!.nib.minFraction);
+
+test("re-picking Teardrop at 100% lands on the same size, and the slider returns to it", async ({ page }) => {
   await openByDoubleClick(page);
-  // A fresh document has no guides: Free, Teardrop, Almond and nothing else.
+  await page.getByRole("button", { name: "Teardrop", exact: true }).click();
+  await expect.poll(() => namedNodeCount(page, "stack-template-outline", { editor: true })).toBe(1);
+  await page.waitForTimeout(400);
+  const first = await draftFontSize(page);
+  await page.getByRole("button", { name: "Teardrop", exact: true }).click();
+  await page.waitForTimeout(400);
+  const second = await draftFontSize(page);
+  // The template is sized from the composition as opened, not from the last arrange.
+  expect(Math.abs(second - first) / first).toBeLessThan(0.02);
+  // Slide to 150% and back to 100%: the size is back where it was.
+  const slider = page.getByLabel(/Template size/);
+  await slider.focus();
+  for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(600);
+  expect(await draftFontSize(page)).toBeGreaterThan(first * 1.2);
+  for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowLeft");
+  await page.waitForTimeout(600);
+  expect(Math.abs((await draftFontSize(page)) - first) / first).toBeLessThan(0.02);
+});
+
+test("a run of Join thickness ticks is one undo step", async ({ page }) => {
+  await openByDoubleClick(page);
+  const before = await draftMinFraction(page);
+  const slider = page.getByLabel(/Join thickness/);
+  await slider.focus();
+  for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowLeft");
+  await expect.poll(() => draftMinFraction(page)).toBeLessThan(before - 0.03);
+  await page.keyboard.press("Control+z");
+  await expect.poll(() => draftMinFraction(page)).toBeCloseTo(before, 5);
+});
+
+test("the window takes focus and the document behind it is inert", async ({ page }) => {
+  await page.getByRole("button", { name: "Edit composition", exact: true }).click();
+  await page.getByTestId("stack-editor").waitFor();
+  const state = await page.evaluate(() => {
+    const dialog = document.querySelector('[data-testid="stack-editor"]')!;
+    return {
+      focusInside: dialog.contains(document.activeElement),
+      inertBehind: Array.from(document.querySelectorAll("[inert]")).some((el) => !dialog.contains(el) && el.contains(document.querySelector(".konvajs-content"))),
+    };
+  });
+  expect(state).toEqual({ focusInside: true, inertBehind: true });
+});
+
+test("only closed guides are offered as cards", async ({ page }) => {
+  // A closed teardrop and an open line: only the teardrop is a container.
+  for (const [shape, fx, fy] of [["Teardrop", 0.15, 0.2], ["Line", 0.85, 0.8]] as const) {
+    await page.getByRole("button", { name: "Add guide" }).click();
+    await page.getByRole("button", { name: `${shape} guide` }).click();
+    await placeAtCanvas(page, fx, fy);
+    await settleFrames(page);
+  }
+  await expect.poll(async () => (await getBlocks(page)).filter((b) => b.type === "guide").length).toBe(2);
+  // Back to the composition.
+  const box = await blockClientBox(page, 1);
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await openByDoubleClick(page);
   const cards = page.getByRole("group", { name: "Templates" }).getByRole("button");
-  await expect(cards).toHaveCount(3);
+  await expect(cards).toHaveCount(4);
+  await expect(cards.nth(3)).toHaveText(/Teardrop/);
 });

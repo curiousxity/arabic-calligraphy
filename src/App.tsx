@@ -3323,11 +3323,11 @@ const App: React.FC = () => {
         background: "var(--bg-page)",
       }}
     >
-      {/* The start screen is a modal overlay: `inert` takes everything under it
+      {/* The start screen and the stack editor window are modal overlays: `inert` takes everything under them
           out of the tab order and the pointer, so Tab cannot reach Add text or
           Quick save behind it. `display: contents` keeps this wrapper out of the
           root's flex layout. */}
-      <div style={{ display: "contents" }} inert={showStart}>
+      <div style={{ display: "contents" }} inert={showStart || stackEditorId !== null}>
       <Sidebar
         onConvertToStack={convertSelectedBlockToStack}
         onEditStack={selectedBlock && isStackBlock(selectedBlock) ? () => openStackEditor(selectedBlock.id) : undefined}

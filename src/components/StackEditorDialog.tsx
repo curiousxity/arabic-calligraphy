@@ -53,6 +53,9 @@ export type StackEditorDialogProps = {
 type Choice = { kind: "free" } | { kind: "template"; template: StackTemplate } | { kind: "guide"; id: number };
 
 const FIT_MARGIN = 0.12;
+/** Ticks closer than this are one slider drag. */
+const SLIDER_SETTLE_MS = 400;
+const inkHeight = (d: StackDraft, upm: number) => { const b = inkBoundsPx(d, upm); return b.y2 - b.y1; };
 const TEMPLATE_LABELS: Record<StackTemplate, string> = { teardrop: "Teardrop", almond: "Almond" };
 
 /** Card glyphs: schematic, not the formula (the formula is what the arrange uses). */
@@ -102,6 +105,15 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
   const proofRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const arrangeToken = useRef(0);
+  // Templates are sized from the composition as opened (or as last Reset),
+  // never from the last arrange: sizing from the current ink would feed each
+  // arrange into the next, so re-clicking a card shrank the letters by a
+  // third every time and 100% on the slider was never where you started.
+  const baseInkHeight = useRef(0);
+  // A slider fires a change per tick; one undo step per drag, not per tick.
+  const lastSliderPushAt = useRef(0);
+  const sizeTimer = useRef<number | null>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   // Editor-local undo: the draft is the snapshot; there is no thumbnail.
   const getSnapshot = useCallback(() => draftRef.current, []);
@@ -205,7 +217,9 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
 
   // ---- arranging ----
   const arrange = useCallback(async (c: Choice, factor: number, fill: boolean) => {
-    if (c.kind === "free") { setOutline(null); return; }
+    // Free, Reset and unmount also bump the token, so a font load that is
+    // still running cannot land its arrange after the user moved on.
+    if (c.kind === "free") { ++arrangeToken.current; setOutline(null); return; }
     const token = ++arrangeToken.current;
     let fillers: FillerShape[] = [], note = "";
     if (fill) ({ fillers, note } = await loadFillers(block));
@@ -214,8 +228,7 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
     let shapePx: Array<[number, number]>;
     let placement: { x: number; y: number; rotation: number } | undefined;
     if (c.kind === "template") {
-      const ink = inkBoundsPx(d, block.unitsPerEm);
-      shapePx = templatePolygon(c.template, ink.y2 - ink.y1, factor);
+      shapePx = templatePolygon(c.template, baseInkHeight.current, factor);
     } else {
       const g = closedGuides.find((x) => x.id === c.id);
       if (!g) { setStatus("That guide is gone; nothing was arranged."); return; }
@@ -245,22 +258,43 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
   }, [block, closedGuides, loadFillers, pushHistory, fitTo]);
 
   const pick = (c: Choice) => { setChoice(c); void arrange(c, sizeFactor, fillGaps); };
-  const changeSize = (v: number) => { setSizeFactor(v); if (choice.kind === "template") void arrange(choice, v, fillGaps); };
+  /** The size slider arranges once the ticks settle, so a drag is one arrange and one undo step. */
+  const changeSize = (v: number) => {
+    setSizeFactor(v);
+    if (choice.kind !== "template") return;
+    if (sizeTimer.current !== null) window.clearTimeout(sizeTimer.current);
+    sizeTimer.current = window.setTimeout(() => { sizeTimer.current = null; void arrange(choice, v, fillGaps); }, SLIDER_SETTLE_MS);
+  };
   const changeFillGaps = (v: boolean) => { onFillGaps(v); if (choice.kind !== "free") void arrange(choice, sizeFactor, v); };
   const reset = () => {
+    ++arrangeToken.current;
     pushHistory();
     const r = resetDraft(draftRef.current);
     draftRef.current = r;
     setDraft(r);
+    baseInkHeight.current = inkHeight(r, block.unitsPerEm);
     setChoice({ kind: "free" });
     setOutline(null);
     setStatus("Layout reset.");
     requestAnimationFrame(fitView);
   };
+  /** Join thickness: push once per run of ticks (the generic hook's 300 ms
+   *  coalescing is off here because gestures must never merge). */
   const setMinFraction = (v: number) => {
-    pushHistory();
+    const now = Date.now();
+    if (now - lastSliderPushAt.current > SLIDER_SETTLE_MS) pushHistory();
+    lastSliderPushAt.current = now;
     setDraft((d) => ({ ...d, nib: { ...d.nib, minFraction: v } }));
   };
+  // Baseline on open; cancel a pending size arrange and any in-flight load on close.
+  useEffect(() => {
+    baseInkHeight.current = inkHeight(opening, block.unitsPerEm);
+    closeRef.current?.focus();
+    return () => {
+      ++arrangeToken.current;
+      if (sizeTimer.current !== null) window.clearTimeout(sizeTimer.current);
+    };
+  }, [opening, block.unitsPerEm]);
 
   const accent = useMemo(() => complementOf(block.color), [block.color]);
   const scale = stackScale(draft.fontSize, block.unitsPerEm);
@@ -282,7 +316,7 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
             </div>
             <div className="nameDesignSubtitle">What you see here is what the canvas will show when you press Done.</div>
           </div>
-          <button type="button" className="sidebarCircleButton" onClick={requestCancel} aria-label="Close composition editor">
+          <button ref={closeRef} type="button" className="sidebarCircleButton" onClick={requestCancel} aria-label="Close composition editor">
             <CloseIcon size={14} />
           </button>
         </div>

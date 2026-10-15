@@ -205,12 +205,21 @@ block after Done.
 
 **Templates** (`stackTemplates.ts`): teardrop and almond are the guide
 formulas (`guidePathD`) scaled uniformly so the shape's *height* equals the
-draft's ink height × the size slider (50–200%), centred on the block's origin,
-so the block never moves. A canvas guide is a card too; picking one arranges
+composition's ink height **as opened (or as last Reset)** × the size slider
+(50–200%), centred on the block's origin, so the block never moves. The
+baseline is a ref, never the current ink: sizing from the last arrange fed
+each arrange into the next (re-clicking a card shrank the letters by a third
+a click, and 100% drifted). The size slider arranges once its ticks settle
+(`SLIDER_SETTLE_MS`), and Join thickness pushes once per run of ticks, since
+the hook's own coalescing is off in the window. A canvas guide is a card too; picking one arranges
 in the guide's frame and sets the draft's `x`/`y`/`rotation` to the guide's,
 so Done moves the block onto it (the old "Fill a guide shape"). The arrange
 is async (fillers load through App's `loadStackFillers`); a token drops a
-result whose card is no longer the current pick. The outline is a dashed
+result whose card is no longer the current pick, and Free, Reset and
+unmount bump it too, so a slow font load cannot land after the user moved on.
+The window is modal for the keyboard as well: the editor tree behind it is
+`inert` (like behind the start screen) and the close button takes focus on
+open. The outline is a dashed
 `Line` in the ink's complement inside the window only — never saved, never
 exported; re-opening starts at Free. Reset layout clears it.
 

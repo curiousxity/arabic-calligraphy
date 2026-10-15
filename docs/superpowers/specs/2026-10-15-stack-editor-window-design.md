@@ -161,7 +161,11 @@ export function templatePolygon(t: StackTemplate, inkHeightPx: number, sizeFacto
 ```
 
 It builds the path with `guidePathD(t, GUIDE_DEFAULTS[t])`, takes its
-`containerPolygon`, and scales it uniformly. The width follows the shape's
+`containerPolygon`, and scales it uniformly. `inkHeightPx` is the
+composition's ink height **when the window opened** (re-measured on Reset
+layout), not the current draft's: sizing from the current ink would feed
+each arrange into the next, so re-picking a card would shrink the letters
+every time and the slider's 100% would drift (found in review). The width follows the shape's
 default aspect (teardrop 260:380, almond 220:400). Height is matched rather
 than width or area because a stacked name climbs: the user's composition is
 tall, and the template's height is what the rows fill.
