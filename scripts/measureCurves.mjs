@@ -83,7 +83,7 @@ for (const file of fs.readdirSync(FONTS_DIR).filter((f) => /\.(ttf|otf)$/.test(f
         turnSum += r.trace.turn;
         if (!bendCurveAt) continue;
         tried++;
-        const res = bendCurveAt(pieces, joins, p.id, r.apex);
+        const res = bendCurveAt(pieces, joins, p.id, r.trace);   // as the overlay does: the hover's own trace
         if (!res) continue;
         freed++;
         const after = area(assembleStackOutline(res.pieces, res.joins, nib));

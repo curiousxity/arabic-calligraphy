@@ -128,7 +128,11 @@ async function shapeReal(
   }
 }
 
-import { convertRunToStack, runOutline, splitPieceAtCut, fillerShapes, teardropShape } from "./stackConvert";
+import { convertRunToStack, runOutline, splitPieceAtCut, fillerShapes, teardropShape, bendCurveAt } from "./stackConvert";
+import { arcBand } from "./stackCurve";
+import { joinCenterline } from "./stackJoin";
+import { transformFace } from "./stackGeometry";
+import { pieceTransform } from "./stackOutline";
 import { assembleStackOutline, assembleStackOutlineReport, chainOf } from "./stackOutline";
 import { nibFloorFraction, nuqtaUnits } from "./nuqta";
 import type { StackJoin, StackPiece } from "../types";
@@ -405,5 +409,96 @@ describe("stem zones on converted pieces (pins the measured font-dependence)", (
   });
   it("finds none in UKIJ Diwani, whose stems taper", async () => {
     expect((await stemZones("UKIJDiwani.ttf")).length).toBe(0);
+  });
+});
+
+describe("bendCurveAt", () => {
+  /** A bowl (radius 110, 20 thick, 0.15π–0.85π) with a 20-thick bar welded to each end, as one piece. */
+  const bowlWithArms = (): StackPiece => {
+    const band = arcBand(100, 120, Math.PI * 0.15, Math.PI * 0.85);
+    const endR = [Math.cos(Math.PI * 0.15) * 110, Math.sin(Math.PI * 0.15) * 110];
+    const endL = [Math.cos(Math.PI * 0.85) * 110, Math.sin(Math.PI * 0.85) * 110];
+    const arm = (x: number, y: number, dir: 1 | -1): SvgCmd[] => [
+      { type: "M", x, y: y - 10 }, { type: "L", x: x + dir * 150, y: y - 10 }, { type: "L", x: x + dir * 150, y: y + 10 }, { type: "L", x, y: y + 10 }, { type: "Z" },
+    ];
+    const cmds = [...band, ...arm(endR[0] - 5, endR[1], 1), ...arm(endL[0] + 5, endL[1], -1)];
+    return { id: "b", cmds, x: 0, y: 0, rotation: 0, pivot: [0, 60], homeX: 0, homeY: 0, order: 0, role: "letter", faces: [] };
+  };
+  const nib = { width: 20, minFraction: 0.5 };
+
+  it("frees the bowl into a join that reproduces it, with a rest bend and a width profile", () => {
+    const piece = bowlWithArms();
+    const before = area(assembleStackOutline([piece], [], nib));
+    const r = bendCurveAt([piece], [], "b", [0, 110])!;
+    expect(r).not.toBeNull();
+    expect(r.pieces).toHaveLength(2);
+    const body = r.pieces.find((p) => p.id === "b")!, far = r.pieces.find((p) => p.id !== "b")!;
+    expect(far.parentId).toBe("b");
+    expect(r.joins).toHaveLength(1);
+    const j = r.joins[0];
+    expect(j.id).toBe(r.joinId);
+    expect(j.rest).toEqual({ bow: j.bow, depth: j.depth });
+    expect(j.profile).toHaveLength(16);
+    expect(j.profile![0]).toBeCloseTo(1, 6); expect(j.profile![15]).toBeCloseTo(1, 6);
+    const after = area(assembleStackOutline(r.pieces, r.joins, nib));
+    expect(Math.abs(after - before) / before).toBeLessThan(0.05);
+    const A = transformFace(body.faces[j.from.faceIndex], pieceTransform(body)), B = transformFace(far.faces[j.to.faceIndex], pieceTransform(far));
+    const cl = joinCenterline(A, B, j.bow, j.depth ?? 0);
+    const mid = [0.125 * cl[0][0] + 0.375 * cl[1][0] + 0.375 * cl[2][0] + 0.125 * cl[3][0], 0.125 * cl[0][1] + 0.375 * cl[1][1] + 0.375 * cl[2][1] + 0.125 * cl[3][1]];
+    expect(Math.hypot(mid[0] - 0, mid[1] - 110)).toBeLessThan(6);
+  });
+
+  it("widens when depth grows, and the input is untouched", () => {
+    const piece = bowlWithArms();
+    const snapshot = JSON.stringify(piece);
+    const r = bendCurveAt([piece], [], "b", [0, 110])!;
+    expect(JSON.stringify(piece)).toBe(snapshot);
+    const j = r.joins[0];
+    const h = (joins: StackJoin[]) => { const b = outlineBounds(assembleStackOutline(r.pieces, joins, nib)); return b.y2 - b.y1; };
+    expect(h([{ ...j, depth: (j.depth ?? 0) + 0.5 }])).toBeGreaterThan(h(r.joins) + 5);
+  });
+
+  it("keeps the body id off the arc when the arc is the largest fragment", () => {
+    const band = arcBand(100, 120, Math.PI * 0.1, Math.PI * 0.9);
+    const endR = [Math.cos(Math.PI * 0.1) * 110, Math.sin(Math.PI * 0.1) * 110];
+    const endL = [Math.cos(Math.PI * 0.9) * 110, Math.sin(Math.PI * 0.9) * 110];
+    const stub = (x: number, y: number, dir: 1 | -1): SvgCmd[] => [
+      { type: "M", x, y: y - 10 }, { type: "L", x: x + dir * 40, y: y - 10 }, { type: "L", x: x + dir * 40, y: y + 10 }, { type: "L", x, y: y + 10 }, { type: "Z" },
+    ];
+    const piece: StackPiece = { id: "r", cmds: [...band, ...stub(endR[0] - 5, endR[1], 1), ...stub(endL[0] + 5, endL[1], -1)], x: 0, y: 0, rotation: 0, pivot: [0, 60], homeX: 0, homeY: 0, order: 0, role: "letter", faces: [] };
+    const neighbour: StackPiece = { id: "n", cmds: stub(200, 20, 1), x: 0, y: 0, rotation: 0, pivot: [220, 20], homeX: 0, homeY: 0, order: 1, role: "letter", faces: [{ a: [200, 10], b: [200, 30], tangent: Math.PI }] };
+    const r = bendCurveAt([piece, neighbour], [], "r", [0, 110])!;
+    expect(r).not.toBeNull();
+    expect(r.pieces.some((p) => p.id === "r")).toBe(true);
+    const kept = r.pieces.find((p) => p.id === "r")!;
+    expect(area(kept.cmds)).toBeLessThan(2000);
+    expect(r.pieces.some((p) => area(p.cmds) > 5000)).toBe(false);
+  });
+
+  it("holds identity however the two cut faces happen to be ordered", () => {
+    // Mirror and rotate the fixture: the two cuts' point orders then fall
+    // every which way, and a join whose faces disagree twists into a
+    // figure-eight that cancels its own area.
+    const flipX = (cmds: SvgCmd[]): SvgCmd[] => cmds.map((c) => ("x" in c ? { ...c, x: -c.x, ...("x1" in c ? { x1: -c.x1 } : {}), ...("x2" in c ? { x2: -c.x2 } : {}) } : c)) as SvgCmd[];
+    const flipY = (cmds: SvgCmd[]): SvgCmd[] => cmds.map((c) => ("y" in c ? { ...c, y: -c.y, ...("y1" in c ? { y1: -c.y1 } : {}), ...("y2" in c ? { y2: -c.y2 } : {}) } : c)) as SvgCmd[];
+    const base = bowlWithArms();
+    const variants: Array<[string, StackPiece, [number, number]]> = [
+      ["flipX", { ...base, cmds: flipX(base.cmds), pivot: [0, 60] }, [0, 110]],
+      ["flipY", { ...base, cmds: flipY(base.cmds), pivot: [0, -60] }, [0, -110]],
+      ["flipXY", { ...base, cmds: flipY(flipX(base.cmds)), pivot: [0, -60] }, [0, -110]],
+      ["rot", { ...base, rotation: 0.7 }, [0, 110]],
+    ];
+    for (const [name, piece, press] of variants) {
+      const before = area(assembleStackOutline([piece], [], nib));
+      const r = bendCurveAt([piece], [], piece.id, press);
+      expect(r, name).not.toBeNull();
+      const after = area(assembleStackOutline(r!.pieces, r!.joins, nib));
+      expect(Math.abs(after - before) / before, name).toBeLessThan(0.05);
+    }
+  });
+
+  it("returns null off a curve", () => {
+    const bar: StackPiece = { id: "s", cmds: [{ type: "M", x: 0, y: -10 }, { type: "L", x: 300, y: -10 }, { type: "L", x: 300, y: 10 }, { type: "L", x: 0, y: 10 }, { type: "Z" }], x: 0, y: 0, rotation: 0, pivot: [150, 0], homeX: 0, homeY: 0, order: 0, role: "letter", faces: [] };
+    expect(bendCurveAt([bar], [], "s", [150, 0])).toBeNull();
   });
 });

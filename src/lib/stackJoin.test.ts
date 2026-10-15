@@ -190,17 +190,20 @@ describe("joinFloor", () => {
 });
 
 describe("joinEdges", () => {
-  it("a profile scales the width along the curve; 1 everywhere is today's output; the floor still holds", () => {
+  it("a profile sets the width along the curve outright; the ends and the floor still hold", () => {
     const flat = joinEdges(A, B, 0, 3, 24, 0);
+    const w = (e: { edgeA: [number, number][]; edgeB: [number, number][] }, i: number) => dist(e.edgeA[i], e.edgeB[i]);
+    // A profile sets the drawn width outright: ones = the faces' thickness
+    // (20) all along, where the pen model alone thins the S mid-way.
     const ones = joinEdges(A, B, 0, 3, 24, 0, new Array(16).fill(1));
-    expect(ones).toEqual(flat);
-    // Peaks at 1.5 mid-way: the mid rung is 1.5× the linear one; the ends are untouched.
+    expect(ones.edgeA.length).toBe(flat.edgeA.length);
+    for (let i = 1; i < ones.edgeA.length - 1; i++) expect(w(ones, i)).toBeCloseTo(20, 6);
+    // Peaks at 1.5 mid-way: the mid rung is 30; the ends are untouched.
     const peak = Array.from({ length: 16 }, (_, k) => 1 + 0.5 * Math.sin((Math.PI * k) / 15));
     const bulged = joinEdges(A, B, 0, 3, 24, 0, peak);
-    const w = (e: { edgeA: [number, number][]; edgeB: [number, number][] }, i: number) => dist(e.edgeA[i], e.edgeB[i]);
-    const mid = Math.floor(flat.edgeA.length / 2);
-    expect(w(bulged, mid) / w(flat, mid)).toBeGreaterThan(1.4);
-    expect(w(bulged, mid) / w(flat, mid)).toBeLessThan(1.6);
+    const mid = Math.floor(bulged.edgeA.length / 2);
+    expect(w(bulged, mid)).toBeGreaterThan(28);
+    expect(w(bulged, mid)).toBeLessThan(31);
     expect(dist(bulged.edgeA[0], A.a)).toBeLessThan(1e-9);
     expect(dist(bulged.edgeB[bulged.edgeB.length - 1], B.b)).toBeLessThan(1e-9);
     // A profile below the floor's share is floored, not thinned to nothing.

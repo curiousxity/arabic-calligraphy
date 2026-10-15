@@ -196,8 +196,30 @@ UKIJ Diwani ن; see the plan's ledger rulings).
 | Qahiri | 16 | 5 | 0.31 | 95° |
 
 (Full table of 23 fonts in the script's output.) **Tracer: GO** — both
-gate fonts find roughly one curve per letter. The conversion half
-(`freed`, `identity`) is measured after `bendCurveAt` exists, below.
+gate fonts find roughly one curve per letter.
+
+### Measured 2026-10-15 (conversion, `bendCurveAt` on the hover's trace)
+
+| Font | curves | freed | identity < 5% |
+|---|---|---|---|
+| UKIJ Diwani | 11 | 11 | 11 |
+| HarfCanvas Diwani | 15 | 14 | 13 |
+| Amiri | 16 | 16 | 16 |
+| FatemiMaqala | 19 | 19 | 19 |
+| Thuluth | 17 | 17 | 17 |
+| Ruqaa | 11 | 11 | 11 |
+| Scheherazade | 22 | 22 | 22 |
+| ThuluthDeco | 57 | 52 | 49 |
+| Wessam | 20 | 18 | 16 |
+
+Across all 23 fonts, 331 of 346 curves free and 325 hold identity under
+5%; the worst error on a gate font is 0.9%. **Conversion: GO.** Three
+things had to change from the first design to get here (each a ledger
+ruling in the plan): the profile sets the drawn width outright rather
+than scaling the pen model (whose interpolated cross-section vanishes on
+a U), the cut is a bounded segment rather than an infinite line (a U's
+other arm), and the inflection stop is a sustained reversal rather than
+one jittering step.
 
 ## Testing
 

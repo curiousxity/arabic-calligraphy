@@ -10,8 +10,11 @@ import {
   zoneExtentX, zoneCentre, DEFAULT_DETECT_OPTS, outlineBounds,
 } from "./strokeCuts";
 import { findKashidaSlots, TATWEEL } from "./tatweel";
-import { splitAtCut, translateCmds, cmdsCentre } from "./stackGeometry";
-import { rebasePiece } from "./stackOutline";
+import { splitAtCut, translateCmds, cmdsCentre, transformFace, transformPt, transformCmds } from "./stackGeometry";
+import { rebasePiece, pieceTransform } from "./stackOutline";
+import { traceCurve, PROFILE_SAMPLES, type CurveTrace } from "./stackCurve";
+import { joinCenterline, solveJoinDrag, faceThickness } from "./stackJoin";
+import { pointInPolygon } from "./svgPath";
 import { findDetachedMarks, buildDetachedMarkPlan, splitContours, type DetachedMarkOverride } from "./detachedMarks";
 import { findDiacriticGlyphIndices } from "./diacritics";
 
@@ -314,4 +317,142 @@ export function fillerShapes(font: opentype.Font, upm: number, nibWidth: number)
   }
   if (out.length < 2) out.push(teardropShape(nibWidth));
   return out;
+}
+
+type Pt2 = [number, number];
+
+/** Which of `pieces` holds the world point `p` in its ink (odd contour count: counters are holes). */
+function pieceAt(pieces: readonly StackPiece[], p: Pt2): StackPiece | undefined {
+  return pieces.find((q) => {
+    let n = 0;
+    for (const c of flattenContours(transformCmds(q.cmds, pieceTransform(q)))) if (pointInPolygon(p[0], p[1], c)) n++;
+    return n % 2 === 1;
+  });
+}
+
+/** Swap two pieces' ids everywhere: the pieces, their riders' parentIds, and join refs. */
+function swapIds(pieces: StackPiece[], joins: StackJoin[], a: string, b: string): { pieces: StackPiece[]; joins: StackJoin[] } {
+  const sw = (id: string) => (id === a ? b : id === b ? a : id);
+  return {
+    pieces: pieces.map((p) => ({ ...p, id: sw(p.id), ...(p.parentId === undefined ? {} : { parentId: sw(p.parentId) }) })),
+    joins: joins.map((j) => ({ ...j, from: { ...j.from, pieceId: sw(j.from.pieceId) }, to: { ...j.to, pieceId: sw(j.to.pieceId) } })),
+  };
+}
+
+const boxArea = (cmds: SvgCmd[]) => { const b = outlineBounds(cmds); return (b.x2 - b.x1) * (b.y2 - b.y1); };
+
+/**
+ * Free the curved stroke under `press` (piece-local) and replace it with a
+ * join. Two cuts with `splitPieceAtCut`; the fragment holding the trace's
+ * middle is the arc and is dropped (with the joins the splits made to it);
+ * the far fragment rides on the body as a pulled tail does; one join from
+ * the body's new face to the far's, its bend solved so the cubic's midpoint
+ * lands on the traced midpoint (`rest`), its width the trace's own
+ * (`profile`). The body keeps the piece's id — swapped off the arc when the
+ * arc is the largest fragment — so joins to neighbours survive. Null when
+ * nothing under the press is a curve or a cut will not split cleanly.
+ */
+export function bendCurveAt(
+  pieces: readonly StackPiece[], joins: readonly StackJoin[], pieceId: string, pressOrTrace: Pt2 | CurveTrace
+): { pieces: StackPiece[]; joins: StackJoin[]; joinId: string } | null {
+  const piece = pieces.find((p) => p.id === pieceId);
+  if (!piece || piece.role !== "letter") return null;
+  // The hover already traced the curve the press lands on; a bare press traces afresh.
+  const trace = Array.isArray(pressOrTrace) ? traceCurve(piece.cmds, pressOrTrace, { faces: piece.faces }) : pressOrTrace;
+  if (!trace) return null;
+  const T = pieceTransform(piece);
+  const n = trace.centre.length;
+  const midW = transformPt(trace.centre[Math.floor(n / 2)], T);
+  const endW = transformPt(trace.centre[n - 1], T);
+
+  // First cut: the body keeps the id, the far side is a cap riding on it.
+  const r1 = splitPieceAtCut(pieces, joins, pieceId, trace.cuts[0]);
+  if (!r1) return null;
+  const cap1 = r1.pieces[r1.pieces.length - 1];
+  // Second cut on whichever fragment holds the trace's far end.
+  const holder = pieceAt([r1.pieces.find((p) => p.id === pieceId)!, cap1], endW);
+  if (!holder) return null;
+  const r2 = splitPieceAtCut(r1.pieces, r1.joins, holder.id, trace.cuts[1]);
+  if (!r2) return null;
+  const cap2 = r2.pieces[r2.pieces.length - 1];
+  const fragments = [r2.pieces.find((p) => p.id === pieceId)!, r2.pieces.find((p) => p.id === cap1.id)!, cap2];
+  // The arc is the fragment holding the trace's middle.
+  const arc = pieceAt(fragments, midW);
+  if (!arc) return null;
+  let ps = r2.pieces, js = r2.joins;
+  let arcId = arc.id;
+  // The body id must not sit on the arc: give it to the largest other fragment.
+  if (arc.id === pieceId) {
+    const others = fragments.filter((p) => p.id !== arc.id);
+    const biggest = others.reduce((a, b) => (boxArea(b.cmds) > boxArea(a.cmds) ? b : a));
+    ({ pieces: ps, joins: js } = swapIds(ps, js, arc.id, biggest.id));
+    arcId = biggest.id;   // the arc now carries the fragment's old id
+  }
+  // The joins the two splits made to the arc name the faces to join; they go with it.
+  const toArc = js.filter((j) => j.from.pieceId === arcId || j.to.pieceId === arcId);
+  if (toArc.length !== 2) return null;
+  const endRefs = toArc.map((j) => (j.from.pieceId === arcId ? j.to : j.from));
+  js = js.filter((j) => !toArc.includes(j));
+  ps = ps.filter((p) => p.id !== arcId);   // riders of the arc (the far fragment) are re-parented below
+  const bodyRef = endRefs.find((r) => r.pieceId === pieceId) ?? endRefs[0];
+  const farRef = endRefs.find((r) => r !== bodyRef)!;
+  // The far fragment rides on the body, whatever the splits made it ride on.
+  ps = ps.map((p) => (p.id === farRef.pieceId ? { ...p, parentId: pieceId, role: "letter" as const, order: piece.order } : p));
+  const body = ps.find((p) => p.id === pieceId)!;
+  let far = ps.find((p) => p.id === farRef.pieceId)!;
+  const A = transformFace(body.faces[bodyRef.faceIndex], pieceTransform(body));
+  let B = transformFace(far.faces[farRef.faceIndex], pieceTransform(far));
+  // The two faces come from two different cuts, so their point orders are
+  // independent; a join's ribbon runs a→a and b→b, and faces that disagree
+  // about which point is on the left of travel twist it into a figure-eight
+  // that cancels its own ink. Orient the far face to the body's.
+  const leftOf = (f: CutFace, dir: Pt2) => Math.sign(dir[0] * (f.a[1] - (f.a[1] + f.b[1]) / 2) - dir[1] * (f.a[0] - (f.a[0] + f.b[0]) / 2));
+  const travelA: Pt2 = [Math.cos(A.tangent), Math.sin(A.tangent)];
+  const travelB: Pt2 = [-Math.cos(B.tangent), -Math.sin(B.tangent)];   // arriving at B
+  if (leftOf(A, travelA) !== leftOf(B, travelB)) {
+    const f = far.faces[farRef.faceIndex];
+    const swapped: CutFace = { a: f.b, b: f.a, tangent: f.tangent };
+    far = { ...far, faces: far.faces.map((x, i) => (i === farRef.faceIndex ? swapped : x)) };
+    ps = ps.map((p) => (p.id === far.id ? far : p));
+    B = transformFace(swapped, pieceTransform(far));
+  }
+  // Fit the bend: three Gauss–Newton steps of the drag solver toward the traced midpoint.
+  const chord = Math.hypot(B.a[0] + B.b[0] - A.a[0] - A.b[0], B.a[1] + B.b[1] - A.a[1] - A.b[1]) / 2;
+  let bend = { bow: 0, depth: 0 };
+  for (let k = 0; k < 3; k++) {
+    const cl = joinCenterline(A, B, bend.bow, bend.depth);
+    const m: Pt2 = [
+      0.125 * cl[0][0] + 0.375 * cl[1][0] + 0.375 * cl[2][0] + 0.125 * cl[3][0],
+      0.125 * cl[0][1] + 0.375 * cl[1][1] + 0.375 * cl[2][1] + 0.125 * cl[3][1],
+    ];
+    bend = solveJoinDrag(bend, A.tangent, B.tangent, chord, [midW[0] - m[0], midW[1] - m[1]]);
+  }
+  // The width profile: the traced thickness between the two cuts over the
+  // faces' interpolated thickness; `joinEdges` draws profile × that width
+  // square across the travel. The join runs from the body's face to the
+  // far's; the trace runs i0→i1, and when the body sits at the trace's far
+  // end the profile reads backwards.
+  const tA = faceThickness(A), tB = faceThickness(B);
+  const [i0, i1] = trace.cutIndex;
+  const Am: Pt2 = [(A.a[0] + A.b[0]) / 2, (A.a[1] + A.b[1]) / 2];
+  const start0 = transformPt(trace.centre[i0], T), start1 = transformPt(trace.centre[i1], T);
+  const reversed = Math.hypot(Am[0] - start1[0], Am[1] - start1[1]) < Math.hypot(Am[0] - start0[0], Am[1] - start0[1]);
+  const cum: number[] = [0];
+  for (let i = i0 + 1; i <= i1; i++) cum.push(cum[cum.length - 1] + Math.hypot(trace.centre[i][0] - trace.centre[i - 1][0], trace.centre[i][1] - trace.centre[i - 1][1]));
+  const total = cum[cum.length - 1] || 1;
+  const profile = Array.from({ length: PROFILE_SAMPLES }, (_, k) => {
+    if (k === 0 || k === PROFILE_SAMPLES - 1) return 1;
+    const t = k / (PROFILE_SAMPLES - 1), d = (reversed ? 1 - t : t) * total;
+    let s = 1; while (s < cum.length - 1 && cum[s] < d) s++;
+    const f = cum[s] === cum[s - 1] ? 0 : (d - cum[s - 1]) / (cum[s] - cum[s - 1]);
+    const th = trace.thickness[i0 + s - 1] * (1 - f) + trace.thickness[i0 + s] * f;
+    const lin = tA * (1 - t) + tB * t;
+    return lin > 1e-6 ? Math.max(0.2, Math.min(4, th / lin)) : 1;
+  });
+  const joinId = `j${pieceId}-${far.id}c`;
+  js = [...js, {
+    id: joinId, from: { pieceId, faceIndex: bodyRef.faceIndex }, to: { pieceId: far.id, faceIndex: farRef.faceIndex },
+    bow: bend.bow, depth: bend.depth, rest: { ...bend }, profile,
+  }];
+  return { pieces: ps, joins: js, joinId };
 }

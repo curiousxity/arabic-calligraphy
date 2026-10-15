@@ -45,12 +45,17 @@ export type CurveTrace = {
   pressT: number;
   /** Total unsigned turning, radians. */
   turn: number;
+  /** Indices of the samples the two cuts sit at: the join spans these. */
+  cutIndex: [number, number];
 };
 export type TraceOpts = {
   /** Furthest a walk goes each way, font units (default 3 em at 1000 upm). */
   maxLength: number;
   /** Existing faces of the piece: the walk stops a thickness short of one. */
   faces?: readonly CutFace[];
+  /** The most a trace may turn (default π): one cubic cannot follow more,
+   *  so a longer turn is trimmed from the end farther from the press. */
+  maxTurn: number;
 };
 
 const sub = (a: Pt, b: Pt): Pt => [a[0] - b[0], a[1] - b[1]];
@@ -195,8 +200,12 @@ function cutAt(s: Sample): TraceCut {
  * end cut would not split the outline cleanly.
  */
 export function traceCurve(cmds: SvgCmd[], press: Pt, partial: Partial<TraceOpts> = {}): CurveTrace | null {
-  const opts: TraceOpts = { maxLength: MAX_LENGTH_EM * 1000, ...partial };
-  const contours = flattenContours(cmds);
+  return traceContours(flattenContours(cmds), cmds, press, partial);
+}
+
+/** `traceCurve` on an outline already flattened (the hover traces one letter many times). */
+function traceContours(contours: readonly Contour[], cmds: SvgCmd[], press: Pt, partial: Partial<TraceOpts>): CurveTrace | null {
+  const opts: TraceOpts = { maxLength: MAX_LENGTH_EM * 1000, maxTurn: Math.PI, ...partial };
   if (!insideInk(contours, press)) return null;
   const edge = nearestEdge(contours, press);
   if (!edge) return null;
@@ -212,19 +221,25 @@ export function traceCurve(cmds: SvgCmd[], press: Pt, partial: Partial<TraceOpts
   const fwd = walk(contours, seed, seed.tangent, seed.thickness, opts);
   const back = walk(contours, seed, mul(seed.tangent, -1), seed.thickness, opts);
   // Backward samples travel the other way; flip their tangents into stroke order.
-  const samples: Sample[] = [
+  let samples: Sample[] = [
     ...back.map((s) => ({ ...s, tangent: mul(s.tangent, -1) })).reverse(),
     seed,
     ...fwd,
   ];
   if (samples.length < 3) return null;
-  const si = back.length;
+  let si = back.length;
   samples[si] = { ...seed, tangent: unit(sub(samples[Math.min(si + 1, samples.length - 1)].centre, samples[Math.max(si - 1, 0)].centre)) };
-  let turn = 0, length = 0;
-  for (let i = 1; i < samples.length; i++) {
-    turn += Math.abs(signedAngle(samples[i - 1].tangent, samples[i].tangent));
-    length += len(sub(samples[i].centre, samples[i - 1].centre));
+  const stepTurn = (i: number) => Math.abs(signedAngle(samples[i - 1].tangent, samples[i].tangent));
+  let turn = 0;
+  for (let i = 1; i < samples.length; i++) turn += stepTurn(i);
+  // One cubic follows at most `maxTurn`: trim the end farther from the press
+  // first, a sample at a time, until the turn fits.
+  while (turn > opts.maxTurn && samples.length > 3) {
+    if (si >= samples.length - 1 - si) { turn -= stepTurn(1); samples = samples.slice(1); si--; }
+    else { turn -= stepTurn(samples.length - 1); samples = samples.slice(0, -1); }
   }
+  let length = 0;
+  for (let i = 1; i < samples.length; i++) length += len(sub(samples[i].centre, samples[i - 1].centre));
   if (turn < MIN_TURN || length < MIN_LENGTH_THICK * seed.thickness) return null;
   // Cuts half a thickness in from each end.
   const inset = seed.thickness / 2;
@@ -242,6 +257,7 @@ export function traceCurve(cmds: SvgCmd[], press: Pt, partial: Partial<TraceOpts
     cuts,
     pressT: si / (samples.length - 1),
     turn,
+    cutIndex: [fromStart, fromEnd],
   };
 }
 
@@ -272,7 +288,10 @@ export function curveRegions(cmds: SvgCmd[], partial: Partial<TraceOpts> = {}): 
   const verts = contours.reduce((n, c) => n + c.length, 0);
   const stride = Math.max(1, Math.round(verts / 40));
   const traces: CurveTrace[] = [];
+  // A seed within a thickness of a trace already found would retrace it.
+  const covered = (p: Pt) => traces.some((t) => t.centre.some((c, i) => len(sub(c, p)) < t.thickness[i]));
   for (const p of seedPoints(contours, stride)) {
+    if (covered(p)) continue;
     const e = nearestEdge(contours, p);
     if (!e) continue;
     // Step a hair inside along the inward normal, then measure across to
@@ -283,7 +302,8 @@ export function curveRegions(cmds: SvgCmd[], partial: Partial<TraceOpts> = {}): 
     const m = measure(contours, add(e.point, mul(inward, 0.5)), e.dir);
     if (!m) continue;
     const seed = add(e.point, mul(sub(m.centre, e.point), 0.5));
-    const t = traceCurve(cmds, seed, partial);
+    if (covered(seed)) continue;
+    const t = traceContours(contours, cmds, seed, partial);
     if (t) traces.push(t);
   }
   traces.sort((a, b) => b.centre.length - a.centre.length);
