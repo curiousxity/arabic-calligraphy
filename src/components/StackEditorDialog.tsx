@@ -309,8 +309,9 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
   useEffect(() => {
     baseInkHeight.current = inkHeight(opening, block.unitsPerEm);
     closeRef.current?.focus();
+    const token = arrangeToken;
     return () => {
-      ++arrangeToken.current;
+      ++token.current;
       if (sizeTimer.current !== null) window.clearTimeout(sizeTimer.current);
     };
   }, [opening, block.unitsPerEm]);
