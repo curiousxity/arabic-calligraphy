@@ -47,7 +47,9 @@ import {
   type AlternateTarget,
 } from "./lib/glyphAlternates";
 import { arcPathD } from "./lib/textPath";
-import { GUIDE_DEFAULTS, guidePathD } from "./lib/guideShapes";
+import { GUIDE_DEFAULTS, containerPolygon, guidePathD, svgGuidePathD, uploadedGuideSource } from "./lib/guideShapes";
+import { arrangeStackInShape } from "./lib/stackArrange";
+import { parseSvgPath } from "./lib/svgPath";
 import {
   attachTextToGuide,
   deleteBlocksDetachingGuides,
@@ -2048,10 +2050,62 @@ const App: React.FC = () => {
     beginPlacement(guide, w, h, 0, 0, "New Guide");
   };
 
+  /** A guide from an uploaded outline, at its natural size, placed by a click like the others. */
+  const addSvgGuideBlock = (pathData: string) => {
+    const src = uploadedGuideSource(pathData);
+    if (!src) { setExportStatus("That SVG has no outline to use as a guide."); return; }
+    const guide: GuideBlock = {
+      ...DEFAULT_BLOCK,
+      id: createNextId(),
+      text: "",
+      type: "guide",
+      guideShape: "svg",
+      guideParams: { width: src.width, height: src.height },
+      guideSvgD: src.d,
+      guideD: src.d,
+      x: 0,
+      y: 0,
+    };
+    beginPlacement(guide, src.width, src.height, 0, 0, "New Guide");
+  };
+
   const updateGuideParams = (params: GuideParams) => {
     if (selectedBlock?.type !== "guide" || selectedBlock.guideShape === "pen") return;
     const next = { ...selectedBlock.guideParams, ...params };
+    if (selectedBlock.guideShape === "svg") {
+      // One size: the outline scales uniformly to the width, so the height follows.
+      const source = selectedBlock.guideSvgD ?? selectedBlock.guideD;
+      const w = next.width ?? GUIDE_DEFAULTS.svg.width ?? 300;
+      const ratio = (selectedBlock.guideParams?.height ?? w) / Math.max(selectedBlock.guideParams?.width ?? w, 1);
+      updateSelectedBlock({ guideParams: { width: w, height: w * ratio }, guideD: svgGuidePathD(source, w) });
+      return;
+    }
     updateSelectedBlock({ guideParams: next, guideD: guidePathD(selectedBlock.guideShape, next) });
+  };
+
+  /**
+   * Arrange the selected stack's letters to fill a closed guide: rows from
+   * the bottom up in reading order, the block sized to the shape and moved
+   * onto the guide. One history step (updateSelectedBlock). The guide is the
+   * container only; it never moves a piece afterwards.
+   */
+  const arrangeStackInGuide = (guideId: number) => {
+    if (!selectedBlock || !isStackBlock(selectedBlock)) return;
+    const guide = blocks.find((b): b is GuideBlock => b.type === "guide" && b.id === guideId);
+    if (!guide) return;
+    const shapePx = containerPolygon(parseSvgPath(guide.guideD));
+    if (!shapePx) { setExportStatus("That guide is not a closed shape, so there is nothing to fill."); return; }
+    const result = arrangeStackInShape({
+      pieces: selectedBlock.pieces, joins: selectedBlock.joins, shapePx,
+      fontSize: selectedBlock.fontSize, unitsPerEm: selectedBlock.unitsPerEm,
+    });
+    if (!result) { setExportStatus("Could not fit the letters inside that guide."); return; }
+    updateSelectedBlock({
+      pieces: result.pieces, joins: result.joins, fontSize: result.fontSize,
+      x: guide.x, y: guide.y, rotation: guide.rotation ?? 0,
+    });
+    const letters = result.pieces.filter((p) => p.role === "letter" && p.parentId === undefined).length;
+    setExportStatus(`Arranged ${letters} letters in ${result.rows} row${result.rows === 1 ? "" : "s"} inside the guide.`);
   };
 
   /** Stack layout back to its home arrangement. updateSelectedBlock pushes the one history step. */
@@ -3302,6 +3356,7 @@ const App: React.FC = () => {
       <Sidebar
         onConvertToStack={convertSelectedBlockToStack}
         onResetStackLayout={resetStackLayout}
+        onArrangeStackInGuide={arrangeStackInGuide}
         stackMoveTogether={stackMoveTogether}
         onStackMoveTogether={setStackMoveTogether}
         blocks={blocks}
@@ -3344,6 +3399,7 @@ const App: React.FC = () => {
         onAddShapeFillBlock={addShapeFillBlock}
         onAddTextPathBlock={addTextPathBlock}
         onAddGuide={addGuideBlock}
+        onAddSvgGuide={addSvgGuideBlock}
         onUpdateGuideParams={updateGuideParams}
         onAddTextToGuide={addTextToGuide}
         onAttachToGuide={attachSelectedToGuide}

@@ -1,5 +1,5 @@
 import type { GuideParams, GuideShape } from "../types";
-import type { SvgCmd } from "./svgPath";
+import { parseSvgPath, pathToPolygon, type SvgCmd } from "./svgPath";
 
 /**
  * Paths for guide blocks. Pure. Every path is centred on the block origin, so
@@ -19,6 +19,7 @@ export const GUIDE_DEFAULTS: Record<GuideShape, GuideParams> = {
   pen: { width: 300 },
   teardrop: { width: 260, height: 380 },
   almond: { width: 220, height: 400 },
+  svg: { width: 300 },
 };
 
 export const GUIDE_SHAPE_LABELS: Record<GuideShape, string> = {
@@ -30,6 +31,7 @@ export const GUIDE_SHAPE_LABELS: Record<GuideShape, string> = {
   pen: "Pen",
   teardrop: "Teardrop",
   almond: "Almond",
+  svg: "Uploaded SVG",
 };
 
 const n = (v: number) => Number(v.toFixed(3));
@@ -55,10 +57,17 @@ function ellipseArc(rx: number, ry: number, a0: number, a1: number): string {
   return parts.join(" ");
 }
 
+/**
+ * The path for a guide shape. An uploaded SVG has no formula: its path comes
+ * from `svgGuidePathD` and the block's own `guideSvgD`, so this returns ""
+ * for "svg" (the Add-guide preview never asks for it).
+ */
 export function guidePathD(shape: GuideShape, params: GuideParams = GUIDE_DEFAULTS[shape]): string {
   const p = { ...GUIDE_DEFAULTS[shape], ...params };
   const w = Math.max(p.width ?? 300, 2);
   switch (shape) {
+    case "svg":
+      return "";
     case "circle":
       return `${ellipseArc(w / 2, w / 2, -90, 270)} Z`;
     case "ellipse": {
@@ -119,4 +128,92 @@ export function isClosedPath(cmds: SvgCmd[]): boolean {
   const last = [...cmds].reverse().find((c) => c.type !== "Z");
   if (!first || !last || first === last || first.type !== "M" || !("x" in last)) return false;
   return Math.hypot(last.x - first.x, last.y - first.y) < 1e-6;
+}
+
+/** Absolute commands back to a `d` string, 3 decimals like the shapes above. */
+export function cmdsToPathD(cmds: readonly SvgCmd[]): string {
+  return cmds
+    .map((c) => {
+      switch (c.type) {
+        case "M": case "L": return `${c.type} ${n(c.x)} ${n(c.y)}`;
+        case "Q": return `Q ${n(c.x1)} ${n(c.y1)}, ${n(c.x)} ${n(c.y)}`;
+        case "C": return `C ${n(c.x1)} ${n(c.y1)}, ${n(c.x2)} ${n(c.y2)}, ${n(c.x)} ${n(c.y)}`;
+        default: return "Z";
+      }
+    })
+    .join(" ");
+}
+
+function mapPoints(cmds: readonly SvgCmd[], f: (x: number, y: number) => [number, number]): SvgCmd[] {
+  return cmds.map((c) => {
+    switch (c.type) {
+      case "M": case "L": { const [x, y] = f(c.x, c.y); return { ...c, x, y }; }
+      case "Q": { const [x, y] = f(c.x, c.y); const [x1, y1] = f(c.x1, c.y1); return { ...c, x, y, x1, y1 }; }
+      case "C": {
+        const [x, y] = f(c.x, c.y); const [x1, y1] = f(c.x1, c.y1); const [x2, y2] = f(c.x2, c.y2);
+        return { ...c, x, y, x1, y1, x2, y2 };
+      }
+      default: return c;
+    }
+  });
+}
+
+function bounds(cmds: readonly SvgCmd[]): { x1: number; y1: number; x2: number; y2: number } {
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  for (const [x, y] of pathToPolygon([...cmds], 12)) {
+    if (x < x1) x1 = x;
+    if (x > x2) x2 = x;
+    if (y < y1) y1 = y;
+    if (y > y2) y2 = y;
+  }
+  return isFinite(x1) ? { x1, y1, x2, y2 } : { x1: 0, y1: 0, x2: 0, y2: 0 };
+}
+
+/**
+ * An uploaded outline made into a guide's source path: centred on the origin
+ * so x/y/rotation place it like every other guide. Returns null for a path
+ * with no extent. `width`/`height` are its natural size.
+ */
+export function uploadedGuideSource(pathData: string): { d: string; width: number; height: number } | null {
+  const cmds = parseSvgPath(pathData);
+  const b = bounds(cmds);
+  const width = b.x2 - b.x1, height = b.y2 - b.y1;
+  if (!(width > 0) || !(height > 0)) return null;
+  const cx = (b.x1 + b.x2) / 2, cy = (b.y1 + b.y2) / 2;
+  return { d: cmdsToPathD(mapPoints(cmds, (x, y) => [x - cx, y - cy])), width, height };
+}
+
+/** The uploaded source scaled uniformly so it is `width` wide (height follows). */
+export function svgGuidePathD(sourceD: string, width: number): string {
+  const cmds = parseSvgPath(sourceD);
+  const b = bounds(cmds);
+  const natural = b.x2 - b.x1;
+  if (!(natural > 0)) return sourceD;
+  const k = Math.max(width, 2) / natural;
+  return cmdsToPathD(mapPoints(cmds, (x, y) => [x * k, y * k]));
+}
+
+/**
+ * The container a closed guide offers: its largest closed subpath, as a
+ * polygon in the guide's local frame. An uploaded SVG may carry several
+ * subpaths (a ring, a shape with a hole, stray marks); the biggest one is
+ * the outline to fill. Null when nothing closed is there.
+ */
+export function containerPolygon(cmds: readonly SvgCmd[]): Array<[number, number]> | null {
+  const subpaths: SvgCmd[][] = [];
+  for (const c of cmds) {
+    if (c.type === "M" || subpaths.length === 0) subpaths.push([]);
+    subpaths[subpaths.length - 1].push(c);
+  }
+  let best: Array<[number, number]> | null = null;
+  let bestArea = 0;
+  for (const sp of subpaths) {
+    if (!isClosedPath(sp)) continue;
+    const poly = pathToPolygon(sp, 16);
+    if (poly.length < 3) continue;
+    const b = bounds(sp);
+    const area = (b.x2 - b.x1) * (b.y2 - b.y1);
+    if (area > bestArea) { bestArea = area; best = poly; }
+  }
+  return best;
 }

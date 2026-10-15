@@ -35,6 +35,18 @@ A `textPath` block with `guide` set is *attached*:
     Guides build their own closed shapes.
   - The angle of a line guide is the block's rotation.
   - Pen guides reuse `TextPathEditOverlay` unchanged, writing `guideD`.
+  - **Uploaded SVG guides** (`guideShape: "svg"`) have no formula.
+    `uploadedGuideSource` centres the outline on the origin at its natural
+    size and stores it as `guideSvgD`; `guideD` is it scaled uniformly to
+    `guideParams.width` by `svgGuidePathD`, so the panel offers one size and
+    the height follows. `guidePathD("svg")` returns "" on purpose. The file
+    is read by `extractSvgPaths` with the aspect kept (a guide is the user's
+    shape, not a tile to stretch); arcs become straight lines, as everywhere
+    the importer is used.
+  - **A closed guide is a container** for a stacked composition
+    (`containerPolygon`: the largest closed subpath, so a ring or an outline
+    with stray marks still gives one shape). See
+    [stacked-compositions.md](stacked-compositions.md), "Fill a guide shape".
 - **Flip** walks the guide reversed. `offset` is always stored in the
   un-flipped direction, so a flip never moves the text's anchor.
 - **Side.** The text hangs when (side is inside) XOR flip. Walking a flipped
@@ -139,5 +151,5 @@ owned by `App` (`writing`) and drawn by `CanvasStage`.
 
 - Straight, unbent blocks snapping onto a guide.
 - Text continuing from one guide to another.
-- Guides made from an uploaded SVG.
+- Editing the points of an uploaded SVG guide (upload a new file instead).
 - Per-letter drag tools on attached text. Next Shape does work.

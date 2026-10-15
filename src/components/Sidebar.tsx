@@ -25,8 +25,9 @@ import { ShapeFillPanel } from "./sidebar/ShapeFillPanel";
 import { BlockControlsPanel } from "./sidebar/BlockControlsPanel";
 import { TypographyPanel } from "./sidebar/TypographyPanel";
 import { EffectsPanel } from "./sidebar/EffectsPanel";
-import { GUIDE_SHAPE_LABELS } from "../lib/guideShapes";
+import { GUIDE_SHAPE_LABELS, isClosedPath } from "../lib/guideShapes";
 import { attachedTo, guidesIn } from "../lib/guides";
+import { parseSvgPath } from "../lib/svgPath";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import type { HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
@@ -131,6 +132,8 @@ export type SidebarProps = {
   /** Bake the selected text block into a stacked composition. */
   onConvertToStack?: () => void;
   onResetStackLayout?: () => void;
+  /** Arrange the selected stack's letters inside a closed guide. */
+  onArrangeStackInGuide?: (guideId: number) => void;
   stackMoveTogether?: boolean;
   onStackMoveTogether?: (v: boolean) => void;
   onRemoveCustomFont?: (key: string) => void;
@@ -221,6 +224,7 @@ export type SidebarProps = {
   onAddTextPathBlock?: () => void;
   /** Guides — see .claude/rules/guides.md. */
   onAddGuide?: (shape: GuideShape) => void;
+  onAddSvgGuide?: (pathData: string) => void;
   onUpdateGuideParams?: (params: GuideParams) => void;
   onAddTextToGuide?: () => void;
   onAttachToGuide?: (guideId: number) => void;
@@ -367,6 +371,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddCustomFont,
   onConvertToStack,
   onResetStackLayout,
+  onArrangeStackInGuide,
   stackMoveTogether = true,
   onStackMoveTogether,
   onRemoveCustomFont,
@@ -434,6 +439,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddShapeFillBlock,
   onAddTextPathBlock,
   onAddGuide,
+  onAddSvgGuide,
   onUpdateGuideParams,
   onAddTextToGuide,
   onAttachToGuide,
@@ -1567,6 +1573,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onAddShapeFillBlock={onAddShapeFillBlock}
           onAddTextPathBlock={onAddTextPathBlock}
           onAddGuide={onAddGuide}
+          onAddSvgGuide={onAddSvgGuide}
           onAddMirrorBlock={onAddMirrorBlock}
           canAddMirrorBlock={canAddMirrorBlock}
           onDuplicateBlock={onDuplicateBlock}
@@ -1956,6 +1963,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onReset={onResetStackLayout}
                 moveTogether={stackMoveTogether}
                 onMoveTogether={(v) => onStackMoveTogether?.(v)}
+                closedGuides={guidesIn(blocks)
+                  .filter((g) => isClosedPath(parseSvgPath(g.guideD)))
+                  .map((g) => ({ id: g.id, label: g.name ?? `Guide · ${GUIDE_SHAPE_LABELS[g.guideShape]}` }))}
+                onArrangeInGuide={onArrangeStackInGuide}
               />
             </CollapsibleSection>
           </div>

@@ -155,6 +155,30 @@ only, cached per `cmds`. The span's hit area carries 3 screen px of slack
 (`CUT_SLACK_PX`): Chrome rounds mouse positions to whole px while pointer
 events keep fractions, and a thin stroke's span can sit between the two.
 
+**Fill a guide shape** (`arrangeStackInShape`, `stackArrange.ts`, pure)
+arranges the letters inside a closed guide chosen in the Stack panel: the
+guide's `containerPolygon` in px, the pieces in font units, and the scale
+between them found by bisection to the largest at which everything fits.
+Rows run **bottom to top in reading order, right to left within a row**,
+the way a stacked name climbs; the first letter sits bottom-right. A letter
+and its riders (`letterGroups`: marks, split-off caps) move as one, measured
+as one, so a dot above a letter makes its row taller. A row takes letters
+while their widths plus a gap fit the shape's span over the row's band
+(`bandSpan`: the widest chord of each sampled scanline, intersected, both
+ends of the band sampled so a box's corners sit inside a curved edge); the
+band is searched afresh whenever the row grows taller, creeping up from the
+cursor. Rows are then spread over the shape's height with equal margins,
+each lifted only as far as its band still takes it and never past the row
+above; within a row the letters are spread to the span's edges, capped at
+one em (then centred), and letters in a row keep their original vertical
+relation (their baseline). Every tilt goes to 0 and every join back to its
+tangent-matched default, so the result is an arrangement, not a design: the
+user drags, tilts and bends from there. `homeX`/`homeY` are untouched, so
+Reset layout still returns to the conversion. The block moves onto the
+guide (x, y, rotation) and takes the fitted `fontSize`, one history step.
+The guide never moves a piece afterwards. Tunables are fractions of an em
+at the top of the module.
+
 **"Move letters together"** is `App.tsx` state, not a block field: it is a
 preference about the next drag, not part of the design, so it is neither
 saved nor undoable. Alt still moves a letter alone while it is on.

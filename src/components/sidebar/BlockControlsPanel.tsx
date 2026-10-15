@@ -32,6 +32,8 @@ export type BlockControlsPanelProps = {
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddTextPathBlock?: () => void;
   onAddGuide?: (shape: GuideShape) => void;
+  /** A guide from an uploaded SVG outline (see .claude/rules/guides.md). */
+  onAddSvgGuide?: (pathData: string) => void;
   /** Adds a mirror of the selected block. Enabled only while `canAddMirrorBlock`. */
   onAddMirrorBlock?: () => void;
   /** Exactly one block is selected and it is not itself a mirror. */
@@ -59,6 +61,7 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
   onAddShapeFillBlock,
   onAddTextPathBlock,
   onAddGuide,
+  onAddSvgGuide,
   onAddMirrorBlock,
   canAddMirrorBlock,
   onDuplicateBlock,
@@ -166,7 +169,7 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
               </button>
             </DemoHover>
           )}
-          {onAddGuide && <AddGuideButton onAdd={onAddGuide} />}
+          {onAddGuide && <AddGuideButton onAdd={onAddGuide} onAddSvg={onAddSvgGuide} />}
 
           {onAddMirrorBlock && (
             <DemoHover

@@ -99,6 +99,22 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-15 — Stacked compositions fill a shape; guides from an SVG
+
+- **Fill a guide shape.** The Stack panel lists the closed guides on the
+  canvas; choosing one arranges the letters inside it — rows from the
+  bottom up in reading order, right to left in a row, the block sized to
+  the shape and moved onto the guide. Tilt and bends reset; Reset layout
+  still returns to the conversion. The solver is pure
+  (`src/lib/stackArrange.ts`, tested on synthetic pieces) and is a
+  starting arrangement, not a finished design: letters stay rigid, so the
+  user drags, tilts and bends from there. How it packs and its tunables:
+  [stacked-compositions.md](.claude/rules/stacked-compositions.md).
+- **Upload SVG guide.** The Add-guide dialog's ninth tile reads an SVG
+  outline (aspect kept, arcs straightened) and makes a guide of it, with
+  one Width control. A guide's largest closed subpath is its container.
+  See [guides.md](.claude/rules/guides.md).
+
 ### 2026-10-15 — Stacked compositions: no modes, no handles
 
 The stack editor's chrome was replaced. The "Split strokes" checkbox and

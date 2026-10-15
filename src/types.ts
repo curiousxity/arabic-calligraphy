@@ -211,7 +211,7 @@ export type TextPathBlock = BlockCommon & {
   guide?: GuideAttachment;
 };
 
-export type GuideShape = "circle" | "ellipse" | "arc" | "wave" | "line" | "pen" | "teardrop" | "almond";
+export type GuideShape = "circle" | "ellipse" | "arc" | "wave" | "line" | "pen" | "teardrop" | "almond" | "svg";
 export type GuideParams = { width?: number; height?: number; sweep?: number; amplitude?: number };
 
 /** A dashed construction path that Curve text can attach to; never exported. */
@@ -224,6 +224,9 @@ export type GuideBlock = BlockCommon & {
   guideParams?: GuideParams;
   /** Pen point editing active (pen guides only). */
   guideEditMode?: boolean;
+  /** Uploaded-SVG guides: the outline as uploaded, centred on the origin at
+   *  its natural size. `guideD` is it scaled to `guideParams.width`. */
+  guideSvgD?: string;
 };
 
 /** The two outline points on a cut line and the stroke's outward direction
