@@ -22,8 +22,10 @@ their own files under `src/components/sidebar/`:
 The split was file boundaries only: no prop was renamed and no behaviour
 changed, so the e2e suite is its regression check. Shared low-level form
 pieces (`SelectRow`, `ColorRow`, `RangeRow`, `CheckboxRow`, `PresetKeyboard`,
-`DemoHover`) live in `FormControls.tsx`; `utils.ts` has one helper
-(`makeId`). The document-tier panels (Templates, Artboard, Background &
+`DemoHover`, and the `OpacityRow` / `RotationRow` pair built on `RangeRow`)
+live in `FormControls.tsx`; `utils.ts` has one helper (`makeId`). Each panel
+derives its control-id suffix from `selectedBlock.id` itself rather than
+taking it as a prop. The document-tier panels (Templates, Artboard, Background &
 Grid, Project & Export), Content, Align & Arrange and Shortcuts are still
 inline in `Sidebar.tsx`.
 
@@ -68,8 +70,10 @@ panel there:
 
 **Rotation has no panel of its own.** The Transform panel was deleted
 2026-10-14; rotation is the last row of Typography. Mirror and Guide hide
-Typography, so each carries its own Rotation row in its type panel. Attached
-Curve text has none, because the guide turns it.
+Typography, so each carries its own Rotation row in its type panel — all
+three render the shared `RotationRow`, so the range, the id scheme and the
+double-click reset cannot drift. Attached Curve text has none, because the
+guide turns it.
 
 ## Font panel
 
@@ -139,7 +143,7 @@ rather than a layout. Columns are fixed so the shape is chosen rather than
 emergent. The split also moves the destructive `Delete` out of the leading
 position, where it sat immediately beside `Duplicate`.
 
-**The Add grid has `columnGap: 0`** (inline, in `BlockControlsPanel`). At
+**The Add grid has no column gap** (`.blockControlGrid--add` in `index.css`). At
 the sidebar's 220px minimum the row is 171px wide, and five 34px buttons fit
 only if the columns take all of it; with the shared 8px gap the columns drop
 to about 28px and the buttons squash into ovals. Wider, the `1fr` columns

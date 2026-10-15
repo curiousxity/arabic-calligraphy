@@ -84,6 +84,25 @@ export const RedoIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
+/** A dashed axis with a solid shape on one side and its outline on the other. */
+export const MirrorIcon: React.FC<IconProps> = ({ size = 16, className }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.2}
+    className={className}
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path d="M8 1v14" strokeDasharray="2 2" />
+    <path d="M6.5 4 2 8l4.5 4z" fill="currentColor" stroke="none" />
+    <path d="M9.5 4 14 8l-4.5 4z" strokeLinejoin="round" />
+  </svg>
+);
+
 export const HistoryIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>
     <path d="M3 12a9 9 0 1 0 3-6.7" />

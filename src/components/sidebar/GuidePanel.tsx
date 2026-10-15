@@ -1,6 +1,6 @@
 import type { GuideBlock, GuideParams, TextPathBlock } from "../../types";
 import { GUIDE_DEFAULTS } from "../../lib/guideShapes";
-import { RangeRow } from "./FormControls";
+import { RangeRow, RotationRow } from "./FormControls";
 
 type Row = { key: keyof GuideParams; label: string; min: number; max: number; suffix?: string };
 
@@ -35,9 +35,8 @@ export const GuidePanel: React.FC<{
   onAddText: () => void;
   onSelect: (id: number) => void;
   onToggleEdit: () => void;
-  rotation: number;
   onRotation: (degrees: number) => void;
-}> = ({ guide, texts, onParams, onAddText, onSelect, onToggleEdit, rotation, onRotation }) => {
+}> = ({ guide, texts, onParams, onAddText, onSelect, onToggleEdit, onRotation }) => {
   const params = { ...GUIDE_DEFAULTS[guide.guideShape], ...guide.guideParams };
   return (
     <div className="sectionPanel">
@@ -61,17 +60,7 @@ export const GuidePanel: React.FC<{
           />
         ))
       )}
-      <RangeRow
-        id={`guide-${guide.id}-rotation`}
-        name="guiderotation"
-        label="Rotation"
-        value={rotation}
-        min={-180}
-        max={180}
-        step={1}
-        suffix={`${rotation}°`}
-        onChange={onRotation}
-      />
+      <RotationRow selectedId={guide.id} value={guide.rotation} onChange={onRotation} />
       <button type="button" className="sidebarSectionButton" aria-label="Add text to guide" onClick={onAddText}>
         <span>Add text to guide</span>
         <span>+</span>

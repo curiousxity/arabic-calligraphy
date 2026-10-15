@@ -1,4 +1,4 @@
-import type { Block, GuideShape, MirrorMode, VerseLayout } from "../../types";
+import type { Block, GuideShape, VerseLayout } from "../../types";
 import { extractSvgPaths } from "../../lib/svgImport";
 import { AddGuideButton } from "../GuideDialog";
 import { VerseButton } from "../VerseDialog";
@@ -12,6 +12,7 @@ import {
   PathTextIcon,
   UndoIcon,
   RedoIcon,
+  MirrorIcon,
 } from "../Icons";
 
 /** How long the pointer must rest on an Add button before its demo opens. */
@@ -26,14 +27,13 @@ const BLOCK_DEMOS = {
 } satisfies Record<string, DemoMedia>;
 
 export type BlockControlsPanelProps = {
-  blocks: Block[];
   selectedBlock?: Block;
   onAddBlock: () => void;
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddTextPathBlock?: () => void;
   onAddGuide?: (shape: GuideShape) => void;
   /** Adds a mirror of the selected block. Enabled only while `canAddMirrorBlock`. */
-  onAddMirrorBlock?: (mode: MirrorMode) => void;
+  onAddMirrorBlock?: () => void;
   /** Exactly one block is selected and it is not itself a mirror. */
   canAddMirrorBlock?: boolean;
   onDuplicateBlock: () => void;
@@ -54,7 +54,6 @@ export type BlockControlsPanelProps = {
  * pair (duplicate, delete), History (undo, redo, thumbnails) and New verse.
  */
 export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
-  blocks,
   selectedBlock,
   onAddBlock,
   onAddShapeFillBlock,
@@ -118,14 +117,7 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
           the leading position, where it sat immediately beside Duplicate. */}
       <div className="blockControlGroup">
         <div className="blockControlGroupLabel">Add</div>
-        {/* No column gap: at the sidebar's 220px minimum the row is 171px,
-            and five 34px buttons only fit if the columns take all of it. With
-            the shared 8px gap the columns drop to ~28px and the flex-item
-            buttons squash into ovals. Wider, the 1fr columns space them out. */}
-        <div
-          className="blockControlGrid"
-          style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))", columnGap: 0 }}
-        >
+        <div className="blockControlGrid blockControlGrid--add">
           <DemoHover
             className="blockControlDemo"
             delay={BLOCK_DEMO_DELAY}
@@ -176,8 +168,6 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
           )}
           {onAddGuide && <AddGuideButton onAdd={onAddGuide} />}
 
-          {/* Inline SVGs rather than entries in Icons.tsx: that file is not
-              this stream's to edit during the Phase 1 parallel run. */}
           {onAddMirrorBlock && (
             <DemoHover
               className="blockControlDemo"
@@ -194,19 +184,9 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
                 className="sidebarCircleButton"
                 disabled={!canAddMirrorBlock}
                 aria-label="Add mirror"
-                onClick={() => onAddMirrorBlock("mirrorX")}
+                onClick={onAddMirrorBlock}
               >
-                <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M8 1v14" stroke="currentColor" strokeWidth={1.2} strokeDasharray="2 2" />
-                  <path d="M6.5 4 2 8l4.5 4z" fill="currentColor" />
-                  <path
-                    d="M9.5 4 14 8l-4.5 4z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.2}
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <MirrorIcon size={15} />
               </button>
             </DemoHover>
           )}
@@ -231,7 +211,7 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
             <button
               type="button"
               onClick={onDeleteBlock}
-              disabled={!selectedBlock || blocks.length === 0}
+              disabled={!selectedBlock}
               className="sidebarCircleButton sidebarCircleButton--danger"
               title="Delete selected block"
               aria-label="Delete block"

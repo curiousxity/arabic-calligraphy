@@ -3,6 +3,7 @@ import {
   chooseFont,
   getBlocks,
   gotoApp,
+  openFontGallery,
   openFontPanel,
   setBlockText,
   UPLOAD_LABEL,
@@ -18,9 +19,7 @@ import {
 const PICKER = '[data-testid="font-picker"]';
 
 async function openPicker(page: Page): Promise<void> {
-  await openFontPanel(page);
-  await page.getByRole("button", { name: /^Font family\b/ }).click();
-  await expect(page.locator(PICKER)).toBeVisible();
+  await expect(await openFontGallery(page)).toBeVisible();
 }
 
 test("the picker previews the block's own text in every font, under genre headings", async ({

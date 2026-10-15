@@ -29,15 +29,11 @@ import { PaletteSwatches } from "../PaletteSwatches";
 import { CloseIcon } from "../Icons";
 import { AlternateStrip } from "./AlternateStrip";
 import { makeId } from "./utils";
-import { CheckboxRow, CollapsibleSection, ColorRow, RangeRow, SelectRow } from "./FormControls";
+import { CheckboxRow, CollapsibleSection, ColorRow, OpacityRow, RangeRow, RotationRow, SelectRow } from "./FormControls";
 
 export type TypographyPanelProps = {
   /** Mirror and Guide hide Typography. */
   selectedBlock: Exclude<Block, MirrorBlock | GuideBlock>;
-  /** The selected block's id, the suffix of every control id here. */
-  selectedId: number | string;
-  selectedOpacity: number;
-  selectedRotation: number;
   onUpdateSelectedBlock: (patch: Partial<Block>) => void;
   // Styles & palettes
   /** Saved text styles, local-only (never part of a project). */
@@ -94,9 +90,6 @@ export type TypographyPanelProps = {
  */
 export const TypographyPanel: React.FC<TypographyPanelProps> = ({
   selectedBlock,
-  selectedId,
-  selectedOpacity,
-  selectedRotation,
   onUpdateSelectedBlock,
   textStyles,
   selectedTextStyleId,
@@ -134,15 +127,15 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
   onClearDetachedMarks,
   isOpen,
   onToggle,
-}) => (
+}) => {
+  // The suffix of every control id here.
+  const selectedId = selectedBlock.id;
+  return (
     <div className="sidebarPanel">
       <CollapsibleSection title="Typography" isOpen={isOpen} onToggle={onToggle}>
         <div className="sectionPanel">
           {/* ---- STREAM-E: styles & palettes — Styles row ---- */}
-          {/* Written inline rather than as a helper component because
-              this stream owns only the region between these anchors —
-              the same constraint the Kashida IIFE below records. It holds
-              no state: the list, the selection and the name draft all
+          {/* Holds no state: the list, the selection and the name draft all
               live in App.tsx beside the other local stores. */}
           <div className="field">
             <span className="fieldTitle">Style</span>
@@ -230,9 +223,7 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
           {/* ---- /STREAM-E ---- */}
           {/* Everything this section needs is derived from the block's
               own text, so it holds no state of its own beyond the
-              selected slot (which lives in App.tsx). Written as an IIFE
-              rather than a helper component because this stream owns
-              only the region between these two anchors. */}
+              selected slot (which lives in App.tsx). */}
           {selectedBlock.type !== "stack" && (() => {
             const slots = findKashidaSlots(selectedBlock.text);
             if (slots.length === 0) {
@@ -451,17 +442,10 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
             onChange={(v) => onUpdateSelectedBlock({ color: v })}
           />
 
-          <RangeRow
-            id={makeId("opacity", selectedId)}
-            name={makeId("opacity", selectedId)}
-            label="Opacity"
-            value={selectedOpacity}
-            min={0.1}
-            max={1}
-            step={0.05}
+          <OpacityRow
+            selectedId={selectedId}
+            value={selectedBlock.opacity}
             onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
-            suffix={`${Math.round(selectedOpacity * 100)}%`}
-            fieldKey="opacity"
           />
 
           {selectedBlock.type === "text" && (
@@ -702,20 +686,14 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
           {/* Attached text draws at its guide, so its own rotation is
               inert: the guide's Rotation row is the one that turns it. */}
           {!(selectedBlock.type === "textPath" && selectedBlock.guide) && (
-            <RangeRow
-              id={makeId("rotation", selectedId)}
-              name={makeId("rotation", selectedId)}
-              label="Rotation"
-              value={selectedRotation}
-              min={-180}
-              max={180}
-              step={1}
+            <RotationRow
+              selectedId={selectedId}
+              value={selectedBlock.rotation}
               onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
-              suffix={`${selectedRotation}°`}
-              fieldKey="rotation"
             />
           )}
         </div>
       </CollapsibleSection>
     </div>
-);
+  );
+};

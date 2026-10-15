@@ -10,7 +10,7 @@ import { Sidebar, type SidebarProps } from "./components/Sidebar";
 import { CanvasStage, type CanvasStageProps } from "./components/CanvasStage";
 import { ConfirmDialog, type ConfirmDialogRequest } from "./components/ConfirmDialog";
 import { StartScreen } from "./components/StartScreen";
-import { shouldShowStartScreen } from "./lib/startScreen";
+import { shouldShowStartScreen, STARTER_TEXT } from "./lib/startScreen";
 import { fontChoicesWith } from "./lib/fontCatalog";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useDebouncedHistoryPush } from "./hooks/useDebouncedHistoryPush";
@@ -35,6 +35,7 @@ import {
   supportsStyleSets,
   isStackBlock,
   supportsDetachedMarks,
+  hasOwnFont,
 } from "./lib/blockCapabilities";
 import { useGlyphAlternates, useStyleSets } from "./hooks/useGlyphAlternates";
 import {
@@ -147,7 +148,6 @@ import {
   hasOrphanedMirrors,
   isMirrorSourceCandidate,
 } from "./lib/mirror";
-import type { MirrorMode } from "./types";
 import { applyKashida, findKashidaSlots, readKashida, type KashidaSlot } from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
@@ -269,7 +269,7 @@ const DEFAULT_NEW_BLOCK_FONT_SIZE = 53;
 
 const DEFAULT_BLOCK: Block = {
   id: 1,
-  text: "حرف",
+  text: STARTER_TEXT,
   x: 0,
   y: 0,
   fontSize: DEFAULT_TEXT_FONT_SIZE,
@@ -379,7 +379,9 @@ const App: React.FC = () => {
   // saved nor undoable — it is a property of the installation, like the
   // export presets.
   const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
-  const startFonts = useMemo(() => fontChoicesWith(customFonts), [customFonts]);
+  // Built-ins then uploads, for every surface that lists fonts: the start
+  // screen here and, through the Sidebar, the strip and the picker dialog.
+  const fontChoices = useMemo(() => fontChoicesWith(customFonts), [customFonts]);
   // Whether the shared status row is currently showing *this* stream's
   // unavailable-font notice, so clearing it can never wipe an export result.
   const fontNoticeShownRef = useRef(false);
@@ -2413,11 +2415,12 @@ const App: React.FC = () => {
       ? selectedBlock
       : null;
 
-  const addMirrorBlock = (mode: MirrorMode) => {
+  // Always a horizontal mirror: the radial medallion is made from Compositions.
+  const addMirrorBlock = () => {
     if (!mirrorSourceCandidate) return;
     pushHistory();
     const newId = createNextId();
-    const block = buildMirrorBlock(newId, mirrorSourceCandidate, mode);
+    const block = buildMirrorBlock(newId, mirrorSourceCandidate, "mirrorX");
     setBlocks((prev) => [...prev, block]);
     setSelectedIds([]);
     setSelectedId(newId);
@@ -2856,12 +2859,6 @@ const App: React.FC = () => {
     // only this handler can supply, so spreading it cannot leave one behind.
     const plan = buildComposition({ source, run, ...selection }, createNextId);
 
-    // A plan that adds nothing must not cost an undo step.
-    if (plan.added.length === 0) {
-      setExportStatus(describeComposition(plan));
-      return;
-    }
-
     pushHistory();
     setBlocks((prev) => {
       const index = prev.findIndex((b) => b.id === id);
@@ -3243,7 +3240,7 @@ const App: React.FC = () => {
     const missing = [
       ...new Set(
         blocks
-          .filter((b) => b.type !== "mirror" && b.type !== "guide" && b.type !== "stack")
+          .filter(hasOwnFont)
           .map((b) => b.fontFamily)
           .filter((key) => key && isFontUnavailable(key, FONT_URLS))
       ),
@@ -3267,13 +3264,11 @@ const App: React.FC = () => {
   }, [blocks, customFonts]);
 
   const selectedFontUnavailable =
-    !!selectedBlock &&
-    selectedBlock.type !== "guide" &&
-    selectedBlock.type !== "stack" &&
-    isFontUnavailable(selectedBlock.fontFamily, FONT_URLS);
+    !!selectedBlock && hasOwnFont(selectedBlock) && isFontUnavailable(selectedBlock.fontFamily, FONT_URLS);
 
   const p2gSidebarProps: Partial<SidebarProps> = {
     customFonts,
+    fontChoices,
     onAddCustomFont: handleAddCustomFont,
     onRemoveCustomFont: handleRemoveCustomFont,
     missingFontKey: selectedFontUnavailable ? selectedBlock.fontFamily : null,
@@ -3495,7 +3490,7 @@ const App: React.FC = () => {
       </div>
 
       <ConfirmDialog request={confirmRequest} onCancel={() => setConfirmRequest(null)} />
-      {showStart && <StartScreen fonts={startFonts} onPick={beginFromStart} onSkip={() => setShowStart(false)} />}
+      {showStart && <StartScreen fonts={fontChoices} onPick={beginFromStart} onSkip={() => setShowStart(false)} />}
     </div>
   );
 };

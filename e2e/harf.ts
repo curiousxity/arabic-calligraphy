@@ -12,7 +12,8 @@ export type Bridge = HarfTestBridge;
 export type Point = { x: number; y: number };
 export type Box = { x: number; y: number; width: number; height: number };
 
-const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
+const E2E_DIR = path.dirname(fileURLToPath(import.meta.url));
+const FIXTURES = path.join(E2E_DIR, "fixtures");
 
 /** Konva mounts its scene canvas inside this wrapper; the stage has one layer. */
 export const STAGE_CANVAS = ".konvajs-content canvas";
@@ -245,15 +246,47 @@ export async function openFontPanel(page: Page): Promise<void> {
 }
 
 /**
+ * Opens the Font panel's full gallery (the "Font family" button) and returns
+ * the dialog's locator once it is up. The trigger is named by its label and
+ * then the current font, so the match anchors on the label alone.
+ */
+export async function openFontGallery(page: Page) {
+  await openFontPanel(page);
+  await page.getByRole("button", { name: /^Font family\b/ }).click();
+  const picker = page.getByTestId("font-picker");
+  await picker.waitFor();
+  return picker;
+}
+
+/**
+ * Runs the Compositions wizard on the selected block: opens it from the
+ * Content panel, picks `layout`, fills the radial count if given, and
+ * creates. Returns the block it added, once the bridge reports it.
+ */
+export async function composeSelected(
+  page: Page,
+  layout: "muthanna" | "medallion",
+  opts: { radialCount?: number } = {}
+) {
+  const before = (await getBlocks(page)).length;
+  await page.getByTestId("composition-open").click();
+  await page.locator(`[data-layout-id="${layout}"]`).click();
+  if (opts.radialCount !== undefined) {
+    await page.locator("#composition-radial-count").fill(String(opts.radialCount));
+  }
+  await page.getByRole("button", { name: "Create composition" }).click();
+  await expect.poll(async () => (await getBlocks(page)).length).toBe(before + 1);
+  const blocks = await getBlocks(page);
+  return blocks[blocks.length - 1];
+}
+
+/**
  * A real font from `public/fonts/` is the upload fixture: the whole feature
  * is "bytes HarfBuzz can shape", so a synthesized file would only exercise
  * the rejection path. Lateef is deliberately *not* the default block font,
  * which is what makes "the canvas changed" observable.
  */
-export const FIXTURE_FONT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../public/fonts/Lateef.ttf"
-);
+export const FIXTURE_FONT = path.resolve(E2E_DIR, "../public/fonts/Lateef.ttf");
 
 /** The label `uploadFixtureFont` gives the fixture unless told otherwise. */
 export const UPLOAD_LABEL = "E2E Naskh";
@@ -288,7 +321,7 @@ export async function uploadFixtureFont(page: Page, label = UPLOAD_LABEL): Promi
  * dialog closes on the pick.
  *
  * `uploaded` appends the suffix the picker gives a user-uploaded family
- * (`Sidebar.tsx` builds it as `${label} (uploaded)`); keeping that here
+ * (`fontChoicesWith` in `lib/fontCatalog.ts` builds it as `${label} (uploaded)`); keeping that here
  * rather than at each call site is what stops three specs from spelling the
  * app's own label format out for themselves.
  */
@@ -297,12 +330,7 @@ export async function chooseFont(
   label: string,
   opts: { uploaded?: boolean } = {}
 ): Promise<void> {
-  await openFontPanel(page);
-  // The trigger is named by its label and then the current font, so anchor
-  // on the label alone.
-  await page.getByRole("button", { name: /^Font family\b/ }).click();
-  const picker = page.getByTestId("font-picker");
-  await picker.waitFor();
+  const picker = await openFontGallery(page);
   // Matching the card's label exactly is what keeps "Thuluth" from also
   // matching "Thuluth Deco" — the card's full accessible name also holds the
   // Arabic sample, so a name match would have to anchor around it.

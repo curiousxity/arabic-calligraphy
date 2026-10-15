@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { sanitizeLegacyBlocks } from "./legacySaves";
 import { dropOrphanedMirrors } from "./mirror";
 
-export const legacyText = { id: 1, type: "text", text: "حرف", fontFamily: "Amiri", fontSize: 72, color: "#000", x: 0, y: 0 };
+const legacyText = { id: 1, type: "text", text: "حرف", fontFamily: "Amiri", fontSize: 72, color: "#000", x: 0, y: 0 };
 
 describe("sanitizeLegacyBlocks", () => {
   it("drops shapeWarp blocks", () => {

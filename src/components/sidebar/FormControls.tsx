@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PipetteIcon, PlayCircleIcon } from "../Icons";
+import { makeId } from "./utils";
 
 const supportsEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
 
@@ -505,5 +506,63 @@ export const CheckboxRow = ({
       {row}
       <DemoHint demo={demo} />
     </div>
+  );
+};
+
+/**
+ * The Opacity and Rotation rows, shared by every panel that offers them:
+ * Typography for most blocks, and the Mirror and Guide type panels, which
+ * hide Typography and so carry their own. One definition keeps the range,
+ * the id scheme and the double-click reset (`fieldKey`) the same everywhere.
+ */
+export const OpacityRow = ({
+  selectedId,
+  value,
+  onChange,
+}: {
+  selectedId: number | string;
+  value: number | undefined;
+  onChange: (v: number) => void;
+}) => {
+  const opacity = value ?? 1;
+  return (
+    <RangeRow
+      id={makeId("opacity", selectedId)}
+      name={makeId("opacity", selectedId)}
+      label="Opacity"
+      value={opacity}
+      min={0.1}
+      max={1}
+      step={0.05}
+      onChange={onChange}
+      suffix={`${Math.round(opacity * 100)}%`}
+      fieldKey="opacity"
+    />
+  );
+};
+
+export const RotationRow = ({
+  selectedId,
+  value,
+  onChange,
+}: {
+  selectedId: number | string;
+  value: number | undefined;
+  onChange: (v: number) => void;
+}) => {
+  const degrees = value ?? 0;
+  return (
+    <RangeRow
+      id={makeId("rotation", selectedId)}
+      name={makeId("rotation", selectedId)}
+      label="Rotation"
+      value={degrees}
+      min={-180}
+      max={180}
+      step={1}
+      onChange={onChange}
+      suffix={`${degrees}°`}
+      fieldKey="rotation"
+    />
   );
 };

@@ -17,9 +17,22 @@ import type { Block } from "../types";
  */
 
 /**
- * The block types whose renderers mount `DiacriticHoverHandles`. `image` and
- * `textPath` blocks inherit `diacriticOverrides` from `BlockCommon` but have
- * no way to edit or apply it, so the mutators must not write to them.
+ * The block types that shape text in a font of their own: text, Shape Fill
+ * and Curve. A mirror draws its source, a guide is a path, and a stacked
+ * composition is a bake nothing re-shapes — all three carry `fontFamily`
+ * through `BlockCommon` without reading it. Gates the Font and Content
+ * panels and the missing-font notices, so a removed or added block type is
+ * one edit here rather than one per site.
+ */
+export const hasOwnFont = (
+  b: Block
+): b is Extract<Block, { type: "text" | "shapeFill" | "textPath" }> =>
+  b.type === "text" || b.type === "shapeFill" || b.type === "textPath";
+
+/**
+ * The block types whose renderers mount `DiacriticHoverHandles`. `textPath`
+ * blocks inherit `diacriticOverrides` from `BlockCommon` but have no way to
+ * edit or apply it, so the mutators must not write to them.
  */
 export const supportsDiacriticOverrides = (
   b: Block

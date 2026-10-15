@@ -6,9 +6,6 @@ import { CollapsibleSection, ColorRow, RangeRow, SelectRow } from "./FormControl
 export type EffectsPanelProps = {
   /** A guide has no Effects panel. */
   selectedBlock: Exclude<Block, GuideBlock>;
-  /** The selected block's id, the suffix of every control id here. */
-  selectedId: number | string;
-  selectedShadowOpacity: number;
   isMobile: boolean;
   onUpdateSelectedBlock: (patch: Partial<Block>) => void;
   /** The selected block's gradient, if it has one. Undefined = flat `blockColor`. */
@@ -31,8 +28,6 @@ export type EffectsPanelProps = {
  */
 export const EffectsPanel: React.FC<EffectsPanelProps> = ({
   selectedBlock,
-  selectedId,
-  selectedShadowOpacity,
   isMobile,
   onUpdateSelectedBlock,
   blockFill,
@@ -43,17 +38,16 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({
   setEffectsTab,
   isOpen,
   onToggle,
-}) => (
+}) => {
+  // The suffix of every control id here.
+  const selectedId = selectedBlock.id;
+  return (
     <div className="sidebarPanel">
       <CollapsibleSection title="Effects" isOpen={isOpen} onToggle={onToggle}>
         <div className="sectionPanel">
           {/* ---- STREAM-F: ink & surface — Fill section ---- */}
-          {/*
-            An IIFE rather than a component: this stream owns no file to
-            put one in, and the same shape the Kashida controls already
-            use. It holds no state — the editor reads the block's own
-            fill and writes a whole new one on every change.
-          */}
+          {/* Holds no state — the editor reads the block's own fill and
+              writes a whole new one on every change. */}
           {(() => {
             const flat = blockColor ?? "#000000";
             const current = resolveFill(blockFill, flat);
@@ -330,12 +324,12 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({
                 id={makeId("shadow-opacity", selectedId)}
                 name={makeId("shadowOpacity", selectedId)}
                 label="Shadow opacity"
-                value={selectedShadowOpacity}
+                value={selectedBlock.shadowOpacity ?? 0.35}
                 min={0}
                 max={1}
                 step={0.05}
                 onChange={(v) => onUpdateSelectedBlock({ shadowOpacity: v })}
-                suffix={`${Math.round(selectedShadowOpacity * 100)}%`}
+                suffix={`${Math.round((selectedBlock.shadowOpacity ?? 0.35) * 100)}%`}
                 fieldKey="shadowOpacity"
               />
             </div>
@@ -343,4 +337,5 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({
         </div>
       </CollapsibleSection>
     </div>
-);
+  );
+};

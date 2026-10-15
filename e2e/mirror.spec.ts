@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
-  gotoApp, getBlocks, blockClientBox, inkPixels,
+  gotoApp, getBlocks, blockClientBox, composeSelected, inkPixels,
   dragFromHere, openPanel, openTypography, parkOnDot, settleFrames, setBlockText,
   STRETCH_HANDLE_DOT, strokeProbes, type Box,
 } from "./harf";
@@ -72,13 +72,7 @@ async function addMirror(page: Page, selector: string): Promise<number> {
  * the app offers: the Compositions dialog's medallion layout. Returns its id.
  */
 async function addMedallion(page: Page): Promise<number> {
-  const before = (await getBlocks(page)).length;
-  await page.locator('[data-testid="composition-open"]').click();
-  await page.locator('[data-layout-id="medallion"]').click();
-  await page.getByRole("button", { name: "Create composition" }).click();
-  await expect.poll(async () => (await getBlocks(page)).length).toBe(before + 1);
-  const blocks = await getBlocks(page);
-  const radial = blocks[blocks.length - 1] as { id: number; type: string; mode?: string };
+  const radial = (await composeSelected(page, "medallion")) as { id: number; type: string; mode?: string };
   expect(radial.type).toBe("mirror");
   expect(radial.mode).toBe("radial");
   return radial.id;

@@ -4,7 +4,7 @@ import { FontPickerField } from "../FontPickerDialog";
 import { FontUploadButton, type FontUploadButtonProps } from "../FontUploadDialog";
 import { TrashIcon } from "../Icons";
 import { SAMPLE_FALLBACK, visibleFonts, type FontChoice } from "../../lib/fontCatalog";
-import type { CustomFont } from "../../lib/customFonts";
+import { describeFontKey, type CustomFont } from "../../lib/customFonts";
 
 export type FontPanelProps = {
   /** `makeId("font-family", selectedId)` — the gallery trigger's id. */
@@ -16,7 +16,6 @@ export type FontPanelProps = {
   /** `fontChoicesWith(customFonts)`. */
   fonts: FontChoice[];
   missingFontKey: string | null;
-  describeFontKey: (key: string) => string;
   customFonts: CustomFont[];
   onChange: (value: string) => void;
   onAddCustomFont: FontUploadButtonProps["onAdd"];
@@ -55,7 +54,7 @@ export const FontPanel: React.FC<FontPanelProps> = (p) => {
         <div className="sectionPanel">
           {p.missingFontKey && (
             <div className="fontMissingNotice" role="status">
-              Font '{p.describeFontKey(p.missingFontKey)}' isn't available in this browser — using Noto Sans.
+              Font '{describeFontKey(p.missingFontKey)}' isn't available in this browser — using Noto Sans.
               Upload the font file to get it back, or pick another font below.
             </div>
           )}

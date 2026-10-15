@@ -520,6 +520,12 @@ html, body, #root { height: 100%; margin: 0; }
   justify-content: start;
 }
 .blockControlGrid--inline { grid-template-columns: repeat(3, 34px); }
+/* The Add row: five buttons across the full width, no column gap. At the
+   sidebar's 220px minimum the row is 171px, and five 34px buttons only fit
+   if the columns take all of it; with the shared 8px gap the columns drop
+   to ~28px and the buttons squash into ovals. Wider, the 1fr columns space
+   them out. */
+.blockControlGrid--add { grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 0; }
 /* Selected and History sit side by side: two short groups stacked would
    cost a third of a screen in a sidebar that is already four screens tall. */
 .blockControlSplit { display: flex; gap: 20px; flex-wrap: wrap; }

@@ -8,9 +8,8 @@ import {
   inkPixels,
   openPanel,
   placeAtCanvas,
+  STAGE_CANVAS,
 } from "./harf";
-
-const STAGE_CANVAS = ".konvajs-content canvas";
 
 /**
  * How many distinct colours appear in a page-space box of the live stage.

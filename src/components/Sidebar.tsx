@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   DIACRITICS,
   SPECIALS,
@@ -6,14 +6,14 @@ import {
   URDU,
   PRESETS,
 } from "../lib/presets";
-import type { Block, MirrorMode } from "../types";
+import type { Block } from "../types";
 import type { NamedProjectMeta } from "../App";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
 import { CompositionButton } from "./CompositionDialog";
 import { FontPanel } from "./sidebar/FontPanel";
-import { fontChoicesWith, type FontChoice } from "../lib/fontCatalog";
+import type { FontChoice } from "../lib/fontCatalog";
 import type { CompositionSelection } from "../lib/composition";
 import type { GuideAttachment, GuideParams, GuideShape, VerseLayout, VerseSettings } from "../types";
 import { VersePanel } from "./sidebar/VersePanel";
@@ -30,6 +30,7 @@ import { attachedTo, guidesIn } from "../lib/guides";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import type { HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
+import { hasOwnFont } from "../lib/blockCapabilities";
 import {
   SelectRow,
   ColorRow,
@@ -81,7 +82,7 @@ import type { ArtboardSurface, TextureDef } from "../data/textures";
 // ---- /STREAM-F ----
 // ---- STREAM-G: font upload — imports ----
 import { PracticeSheetButton } from "./PracticeSheetDialog";
-import { describeFontKey, type CustomFont } from "../lib/customFonts";
+import type { CustomFont } from "../lib/customFonts";
 import type { AlternateChoice, AlternateTarget } from "../lib/glyphAlternates";
 import type { GlyphAlternatesState, StyleSetsState } from "../hooks/useGlyphAlternates";
 // ---- /STREAM-G ----
@@ -124,6 +125,8 @@ export type SidebarProps = {
   // ---- STREAM-G: font upload — props ----
   /** The user's uploaded fonts, appended to the built-in picker list. */
   customFonts?: CustomFont[];
+  /** `fontChoicesWith(customFonts)`, built once in App for every surface that lists fonts. */
+  fontChoices?: FontChoice[];
   onAddCustomFont?: (file: File, label?: string) => Promise<CustomFont | { error: string }>;
   /** Bake the selected text block into a stacked composition. */
   onConvertToStack?: () => void;
@@ -152,7 +155,7 @@ export type SidebarProps = {
   clipToPage?: boolean;
   onToggleClipToPage?: (value: boolean) => void;
   /** Adds a mirror of the selected block. Enabled only while `canAddMirrorBlock`. */
-  onAddMirrorBlock?: (mode: MirrorMode) => void;
+  onAddMirrorBlock?: () => void;
   /** Exactly one block is selected and it is not itself a mirror. */
   canAddMirrorBlock?: boolean;
   /** Moves the selection to the selected mirror's source, so it can be edited. */
@@ -358,6 +361,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // ---- /STREAM-F ----
   // ---- STREAM-G: font upload — destructure ----
   customFonts = [],
+  fontChoices = [],
   onAddCustomFont,
   onConvertToStack,
   onResetStackLayout,
@@ -500,13 +504,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showGuide, setShowGuide] = useState(true);
   const [showStack, setShowStack] = useState(true);
 
-  /**
-   * The font list the picker shows: the bundled fonts, then uploads. An
-   * uploaded font has to reach this list, not only the shaping seam, or the
-   * picker could not show or offer the family a block is actually on.
-   */
-  const fontChoices = useMemo<FontChoice[]>(() => fontChoicesWith(customFonts), [customFonts]);
-
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(!isMobile);
   const [showAlign, setShowAlign] = useState(false);
@@ -543,9 +540,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [editRequestSignal]);
 
   const selectedText = selectedBlock?.text ?? "";
-  const selectedOpacity = selectedBlock?.opacity ?? 1;
-  const selectedShadowOpacity = selectedBlock?.shadowOpacity ?? 0.35;
-  const selectedRotation = selectedBlock?.rotation ?? 0;
   const selectedId = selectedBlock?.id ?? "none";
 
   const updateText = (text: string) => {
@@ -1564,7 +1558,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <SidebarTier label="canvas" />
 
         <BlockControlsPanel
-          blocks={blocks}
           selectedBlock={selectedBlock}
           onAddBlock={onAddBlock}
           onAddShapeFillBlock={onAddShapeFillBlock}
@@ -1734,14 +1727,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             in this tier is styled around. Hidden where the block has no font
             of its own — a mirror draws its source, a guide is a path, and a
             stacked composition is a bake nothing re-shapes. */}
-        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && selectedBlock.type !== "stack" && (
+        {selectedBlock && hasOwnFont(selectedBlock) && (
           <FontPanel
             id={makeId("font-family", selectedId)}
             text={selectedText}
             value={selectedBlock.fontFamily}
             fonts={fontChoices}
             missingFontKey={missingFontKey}
-            describeFontKey={describeFontKey}
             customFonts={customFonts}
             onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
             onAddCustomFont={onAddCustomFont}
@@ -1752,8 +1744,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* A mirror has no content or typography of its own — both come from
-            its source — so it hides these two panels. (STREAM-B edit outside its anchors; see the stream report.) */}
-        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && selectedBlock.type !== "stack" && (
+            its source — so it hides these two panels. */}
+        {selectedBlock && hasOwnFont(selectedBlock) && (
           <div className="sidebarPanel">
             <CollapsibleSection
               title="Content"
@@ -1915,9 +1907,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {selectedBlock && selectedBlock.type === "mirror" && (
           <MirrorPanel
             selectedBlock={selectedBlock}
-            selectedId={selectedId}
-            selectedOpacity={selectedOpacity}
-            selectedRotation={selectedRotation}
             mirrorSourceLabel={mirrorSourceLabel}
             onSelectMirrorSource={onSelectMirrorSource}
             onUpdateSelectedBlock={onUpdateSelectedBlock}
@@ -1929,7 +1918,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {selectedBlock && selectedBlock.type === "shapeFill" && (
           <ShapeFillPanel
             selectedBlock={selectedBlock}
-            selectedId={selectedId}
             isMobile={isMobile}
             onUpdateSelectedBlock={onUpdateSelectedBlock}
             onToggleDiacriticEditMode={onToggleDiacriticEditMode}
@@ -1949,7 +1937,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onAddText={onAddTextToGuide}
                 onSelect={(id) => onSelectBlock(id)}
                 onToggleEdit={() => onUpdateSelectedBlock({ guideEditMode: !selectedBlock.guideEditMode })}
-                rotation={selectedRotation}
                 onRotation={(v) => onUpdateSelectedBlock({ rotation: v })}
               />
             </CollapsibleSection>
@@ -1967,7 +1954,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {selectedBlock && selectedBlock.type === "textPath" && (
           <CurvePanel
             selectedBlock={selectedBlock}
-            selectedId={selectedId}
             onUpdateSelectedBlock={onUpdateSelectedBlock}
             onDetachFromGuide={onDetachFromGuide}
             onUpdateGuideAttachment={onUpdateGuideAttachment}
@@ -1980,9 +1966,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && (
           <TypographyPanel
             selectedBlock={selectedBlock}
-            selectedId={selectedId}
-            selectedOpacity={selectedOpacity}
-            selectedRotation={selectedRotation}
             onUpdateSelectedBlock={onUpdateSelectedBlock}
             textStyles={textStyles}
             selectedTextStyleId={selectedTextStyleId}
@@ -2026,8 +2009,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {selectedBlock && selectedBlock.type !== "guide" && (
           <EffectsPanel
             selectedBlock={selectedBlock}
-            selectedId={selectedId}
-            selectedShadowOpacity={selectedShadowOpacity}
             isMobile={isMobile}
             onUpdateSelectedBlock={onUpdateSelectedBlock}
             blockFill={blockFill}

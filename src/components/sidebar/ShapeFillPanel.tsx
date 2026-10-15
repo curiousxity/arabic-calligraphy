@@ -4,8 +4,6 @@ import { CheckboxRow, CollapsibleSection, RangeRow } from "./FormControls";
 
 export type ShapeFillPanelProps = {
   selectedBlock: ShapeFillBlock;
-  /** The selected block's id, the suffix of every control id here. */
-  selectedId: number | string;
   isMobile: boolean;
   onUpdateSelectedBlock: (patch: Partial<Block>) => void;
   onToggleDiacriticEditMode?: () => void;
@@ -20,14 +18,16 @@ export type ShapeFillPanelProps = {
  */
 export const ShapeFillPanel: React.FC<ShapeFillPanelProps> = ({
   selectedBlock,
-  selectedId,
   isMobile,
   onUpdateSelectedBlock,
   onToggleDiacriticEditMode,
   onFitShapeFillSpacing,
   isOpen,
   onToggle,
-}) => (
+}) => {
+  // The suffix of every control id here.
+  const selectedId = selectedBlock.id;
+  return (
     <div className="sidebarPanel">
       <CollapsibleSection
         title="Shape Fill"
@@ -151,4 +151,5 @@ export const ShapeFillPanel: React.FC<ShapeFillPanelProps> = ({
         </div>
       </CollapsibleSection>
     </div>
-);
+  );
+};

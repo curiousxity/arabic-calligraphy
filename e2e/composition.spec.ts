@@ -1,5 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
-import { gotoApp, getBlocks, inkPixels, setBlockText } from "./harf";
+import { test, expect } from "@playwright/test";
+import { composeSelected, gotoApp, getBlocks, inkPixels, setBlockText } from "./harf";
 
 /**
  * Compositions — the wizard reached from the Content panel that sets the
@@ -8,21 +8,8 @@ import { gotoApp, getBlocks, inkPixels, setBlockText } from "./harf";
  * bridge reports.
  */
 
-const OPEN = '[data-testid="composition-open"]';
-
 /** The block a fresh session starts with. */
 const SOURCE_ID = 1;
-
-async function openWizard(page: Page): Promise<void> {
-  await page.locator(OPEN).click();
-  // Opens straight on the layouts — choosing the font is the font picker's job.
-  await expect(page.locator('[data-layout-id="muthanna"]')).toBeVisible();
-}
-
-async function compose(page: Page, layout: string): Promise<void> {
-  await page.locator(`[data-layout-id="${layout}"]`).click();
-  await page.getByRole("button", { name: "Create composition" }).click();
-}
 
 test.describe("compositions", () => {
   test("muthanna adds a reflection that draws ink beside the text, in its own font", async ({
@@ -35,10 +22,8 @@ test.describe("compositions", () => {
     const fontBefore = (await getBlocks(page))[0].fontFamily;
     const before = await inkPixels(page);
 
-    await openWizard(page);
-    await compose(page, "muthanna");
+    await composeSelected(page, "muthanna");
 
-    await expect.poll(async () => (await getBlocks(page)).length).toBe(2);
     const blocks = await getBlocks(page);
     const mirror = blocks[1] as { type: string; sourceId?: number; mode?: string; x: number };
     expect(mirror.type).toBe("mirror");
@@ -57,14 +42,7 @@ test.describe("compositions", () => {
   test("a medallion turns the requested number of copies around the text", async ({ page }) => {
     await gotoApp(page);
     await setBlockText(page, "محمد");
-    await openWizard(page);
-
-    await page.locator('[data-layout-id="medallion"]').click();
-    await page.locator("#composition-radial-count").fill("8");
-    await page.getByRole("button", { name: "Create composition" }).click();
-
-    await expect.poll(async () => (await getBlocks(page)).length).toBe(2);
-    const mirror = (await getBlocks(page))[1] as {
+    const mirror = (await composeSelected(page, "medallion", { radialCount: 8 })) as {
       mode?: string;
       radialCount?: number;
       radialRadius?: number;
@@ -78,9 +56,7 @@ test.describe("compositions", () => {
     await gotoApp(page);
     await setBlockText(page, "محمد");
 
-    await openWizard(page);
-    await compose(page, "muthanna");
-    await expect.poll(async () => (await getBlocks(page)).length).toBe(2);
+    await composeSelected(page, "muthanna");
 
     await page.keyboard.press("Control+z");
     await expect.poll(async () => (await getBlocks(page)).length).toBe(1);

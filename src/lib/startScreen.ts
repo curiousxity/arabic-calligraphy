@@ -1,4 +1,4 @@
-/** The word a fresh canvas starts with; also `DEFAULT_BLOCK.text` in App.tsx. */
+/** The word a fresh canvas starts with — `DEFAULT_BLOCK.text` in App.tsx reads it. */
 export const STARTER_TEXT = "حرف";
 
 export const startingText = (typed: string): string => typed.trim() || STARTER_TEXT;

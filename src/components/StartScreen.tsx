@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { FontGallery } from "./FontGallery";
 import { startingText, STARTER_TEXT } from "../lib/startScreen";
 import { visibleFonts, type FontChoice } from "../lib/fontCatalog";
@@ -16,6 +16,9 @@ export type StartScreenProps = {
  */
 export const StartScreen: React.FC<StartScreenProps> = ({ fonts, onPick, onSkip }) => {
   const [text, setText] = useState(STARTER_TEXT);
+  // The field answers every keystroke at once; the twenty-odd previews,
+  // each a native shaping pass, catch up a beat behind.
+  const galleryText = useDeferredValue(startingText(text));
   return (
     // Keys pressed inside the overlay stay inside it: the editor's window
     // listeners (CanvasStage's Space-to-pan calls preventDefault) would
@@ -45,7 +48,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ fonts, onPick, onSkip 
         <button type="button" className="startScreenSkip" onClick={onSkip}>Skip</button>
       </header>
       <FontGallery
-        text={startingText(text)}
+        text={galleryText}
         fonts={visibleFonts(fonts)}
         onPick={(font) => onPick(startingText(text), font)}
         autoFocus={false}

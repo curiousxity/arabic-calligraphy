@@ -1,14 +1,10 @@
 import type { Block, MirrorBlock, MirrorMode } from "../../types";
 import { RADIAL_COUNT_MIN, RADIAL_COUNT_MAX, DEFAULT_RADIAL_COUNT, DEFAULT_RADIAL_RADIUS } from "../../lib/mirror";
 import { makeId } from "./utils";
-import { CollapsibleSection, RangeRow, SelectRow } from "./FormControls";
+import { CollapsibleSection, OpacityRow, RangeRow, RotationRow, SelectRow } from "./FormControls";
 
 export type MirrorPanelProps = {
   selectedBlock: MirrorBlock;
-  /** The selected block's id, the suffix of every control id here. */
-  selectedId: number | string;
-  selectedOpacity: number;
-  selectedRotation: number;
   /** What to call the mirror's source. */
   mirrorSourceLabel?: string;
   onSelectMirrorSource?: () => void;
@@ -24,15 +20,15 @@ export type MirrorPanelProps = {
  */
 export const MirrorPanel: React.FC<MirrorPanelProps> = ({
   selectedBlock,
-  selectedId,
-  selectedOpacity,
-  selectedRotation,
   mirrorSourceLabel,
   onSelectMirrorSource,
   onUpdateSelectedBlock,
   isOpen,
   onToggle,
-}) => (
+}) => {
+  // The suffix of every control id here.
+  const selectedId = selectedBlock.id;
+  return (
     <div className="sidebarPanel">
       <CollapsibleSection
         title="Mirror"
@@ -95,31 +91,19 @@ export const MirrorPanel: React.FC<MirrorPanelProps> = ({
             </>
           )}
 
-          <RangeRow
-            id={makeId("opacity", selectedId)}
-            name={makeId("opacity", selectedId)}
-            label="Opacity"
-            value={selectedOpacity}
-            min={0.1}
-            max={1}
-            step={0.05}
+          <OpacityRow
+            selectedId={selectedId}
+            value={selectedBlock.opacity}
             onChange={(v) => onUpdateSelectedBlock({ opacity: v })}
-            suffix={`${Math.round(selectedOpacity * 100)}%`}
-            fieldKey="opacity"
           />
 
-          <RangeRow
-            id={makeId("rotation", selectedId)}
-            name={makeId("rotation", selectedId)}
-            label="Rotation"
-            value={selectedRotation}
-            min={-180}
-            max={180}
+          <RotationRow
+            selectedId={selectedId}
+            value={selectedBlock.rotation}
             onChange={(v) => onUpdateSelectedBlock({ rotation: v })}
-            suffix={`${selectedRotation}°`}
-            fieldKey="rotation"
           />
         </div>
       </CollapsibleSection>
     </div>
-);
+  );
+};

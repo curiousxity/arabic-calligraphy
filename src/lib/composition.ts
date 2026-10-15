@@ -191,6 +191,5 @@ export function buildComposition(
 /** One-line report of what was created, for the sidebar's status row. */
 export const describeComposition = (plan: CompositionPlan): string => {
   const label = COMPOSITION_LAYOUTS.find((l) => l.id === plan.layout)?.name ?? "Composition";
-  if (plan.added.length === 0) return "Nothing was added.";
   return `Created a ${label.toLowerCase()} composition.`;
 };

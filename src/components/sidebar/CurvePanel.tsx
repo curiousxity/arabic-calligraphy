@@ -38,8 +38,6 @@ function firstSubpath(d: string): { d: string; hadMultiple: boolean } {
 
 export type CurvePanelProps = {
   selectedBlock: TextPathBlock;
-  /** The selected block's id, the suffix of every control id here. */
-  selectedId: number | string;
   onUpdateSelectedBlock: (patch: Partial<Block>) => void;
   onDetachFromGuide?: () => void;
   onUpdateGuideAttachment?: (patch: Partial<GuideAttachment>) => void;
@@ -56,7 +54,6 @@ export type CurvePanelProps = {
  */
 export const CurvePanel: React.FC<CurvePanelProps> = ({
   selectedBlock,
-  selectedId,
   onUpdateSelectedBlock,
   onDetachFromGuide,
   onUpdateGuideAttachment,
@@ -64,6 +61,8 @@ export const CurvePanel: React.FC<CurvePanelProps> = ({
   isOpen,
   onToggle,
 }) => {
+  // The suffix of every control id here.
+  const selectedId = selectedBlock.id;
   const handleTextPathSvgUpload = () => {
     const input = document.createElement("input");
     input.type = "file";
