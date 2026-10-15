@@ -177,6 +177,28 @@ by the thickness-jump stop and by the arc fragment having exactly one
 contour). **No-go** records the numbers in the spec and stops at the
 tracer, as stroke-cuts.md's detector history did.
 
+### Measured 2026-10-15 (tracer, before conversion)
+
+`scripts/measureCurves.mjs`, words الملك مصبح نحن حرف, tracer window
+0.35–3.0× seed thickness, 40% per-step jump, inflection = 0.12 rad
+sustained reversal (the spec's 0.6–1.6 window traced 0 of 66 seeds on the
+UKIJ Diwani ن; see the plan's ledger rulings).
+
+| Font | letters | curves | per letter | mean turn |
+|---|---|---|---|---|
+| UKIJ Diwani | 15 | 13 | 0.87 | 109° |
+| HarfCanvas Diwani | 15 | 13 | 0.87 | 97° |
+| Amiri | 15 | 16 | 1.07 | 94° |
+| FatemiMaqala | 12 | 16 | 1.33 | 105° |
+| Thuluth | 13 | 20 | 1.54 | 79° |
+| Ruqaa | 15 | 11 | 0.73 | 121° |
+| Kufi | 15 | 8 | 0.53 | 129° |
+| Qahiri | 16 | 5 | 0.31 | 95° |
+
+(Full table of 23 fonts in the script's output.) **Tracer: GO** — both
+gate fonts find roughly one curve per letter. The conversion half
+(`freed`, `identity`) is measured after `bendCurveAt` exists, below.
+
 ## Testing
 
 - `stackCurve.test.ts`: `arcBand` (from `strokeCuts.test.ts`, 100–120 radius,
