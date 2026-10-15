@@ -201,7 +201,6 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                     e.cancelBubble = true;
                     const pos = e.target.position();
                     const local = placement.toLocal(pos.x, pos.y);
-                    if (!Number.isFinite(local.x) || !Number.isFinite(local.y)) return;
                     onDragDiacriticOverride?.(placement.glyphIndex, {
                       offsetX: railRef.current ? (override?.offsetX ?? 0) : local.x - cx,
                       offsetY: local.y - cy,
@@ -234,7 +233,6 @@ export const DiacriticHoverHandles: React.FC<DiacriticHoverHandlesProps> = ({
                     e.cancelBubble = true;
                     const pos = e.target.position();
                     const local = placement.toLocal(pos.x, pos.y);
-                    if (!Number.isFinite(local.x) || !Number.isFinite(local.y)) return;
                     const dist = Math.hypot(local.x - displayX, local.y - displayY);
                     const nextScale = Math.max(
                       0.3,

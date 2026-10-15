@@ -13,4 +13,12 @@ describe("startScreen", () => {
     expect(shouldShowStartScreen(empty, "key")).toBe(true);
     expect(shouldShowStartScreen(saved, "key")).toBe(false);
   });
+  it("shows when storage is blocked, since nothing can be restored", () => {
+    const blocked = {
+      getItem: (): string | null => {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      },
+    };
+    expect(shouldShowStartScreen(blocked, "key")).toBe(true);
+  });
 });

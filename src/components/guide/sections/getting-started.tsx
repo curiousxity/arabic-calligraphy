@@ -52,8 +52,9 @@ export const section: GuideSection = {
       <h4>Your first piece</h4>
       <ol>
         <li>
-          Pick a font on the start screen, press <strong>Add text</strong> under{" "}
-          <strong>Block Controls &rarr; Add</strong>, or pick something from{" "}
+          Picking a font on the start screen gives you your first block; to add
+          more, press <strong>Add text</strong> under{" "}
+          <strong>Block Controls &rarr; Add</strong> or pick something from{" "}
           <strong>Start from a Template</strong> at the top of the sidebar.
         </li>
         <li>

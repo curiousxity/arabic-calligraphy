@@ -314,7 +314,16 @@ const App: React.FC = () => {
   const [pendingPlacement, setPendingPlacement] = useState<PendingPlacement | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [showStart, setShowStart] = useState(() => isBrowser && shouldShowStartScreen(localStorage, STORAGE_KEY));
+  const [showStart, setShowStart] = useState(() => {
+    if (!isBrowser) return false;
+    // Touching the `localStorage` global can itself throw when site data is
+    // blocked (see textStyles.ts); shouldShowStartScreen guards the read.
+    try {
+      return shouldShowStartScreen(localStorage, STORAGE_KEY);
+    } catch {
+      return true;
+    }
+  });
   const [showGrid, setShowGrid] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [showRulers, setShowRulers] = useState(false);
@@ -1710,7 +1719,10 @@ const App: React.FC = () => {
     // from the payload would occupy the layer list and the selection while
     // drawing nothing. Dropped on load for the same reason, and by the same
     // precedent, as the removed-type filter above.
-    if (blocksToLoad) blocksToLoad = dropOrphanedAttachments(dropOrphanedMirrors(blocksToLoad));
+    // A block grouped only with a dropped one would keep a lone group badge,
+    // so singleton groups dissolve here as they do after a delete.
+    if (blocksToLoad)
+      blocksToLoad = dissolveSingletonGroups(dropOrphanedAttachments(dropOrphanedMirrors(blocksToLoad)));
     const loadedBlocks: Block[] = blocksToLoad ?? blocks;
     if (blocksToLoad) setBlocks(blocksToLoad);
     if (typeof parsed.selectedId === "number" || parsed.selectedId === null) {
@@ -3281,6 +3293,11 @@ const App: React.FC = () => {
         background: "var(--bg-page)",
       }}
     >
+      {/* The start screen is a modal overlay: `inert` takes everything under it
+          out of the tab order and the pointer, so Tab cannot reach Add text or
+          Quick save behind it. `display: contents` keeps this wrapper out of the
+          root's flex layout. */}
+      <div style={{ display: "contents" }} inert={showStart}>
       <Sidebar
         onConvertToStack={convertSelectedBlockToStack}
         onResetStackLayout={resetStackLayout}
@@ -3474,6 +3491,7 @@ const App: React.FC = () => {
               : null
           }
         />
+      </div>
       </div>
 
       <ConfirmDialog request={confirmRequest} onCancel={() => setConfirmRequest(null)} />

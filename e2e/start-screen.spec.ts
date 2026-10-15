@@ -90,3 +90,32 @@ test("Space on a focused card picks it", async ({ page }) => {
   await expect(page.getByTestId("start-screen")).toHaveCount(0);
   expect((await getBlocks(page))[0].fontFamily).toBe("Thuluth");
 });
+
+test("Tab and Shift+Tab never reach the editor under the start screen", async ({ page }) => {
+  await gotoFresh(page);
+  // Where focus is: "start" inside the overlay, "page" when it has left the
+  // document (Shift+Tab off the first control goes to the browser chrome, and
+  // activeElement falls back to <body>), "editor" anywhere else.
+  const where = () =>
+    page.evaluate(() => {
+      const el = document.activeElement;
+      if (!el || el === document.body) return "page";
+      return el.closest('[data-testid="start-screen"]') ? "start" : "editor";
+    });
+  await page.getByLabel("Your text").focus();
+  await page.keyboard.press("Shift+Tab");
+  expect(await where()).not.toBe("editor");
+  await page.getByLabel("Your text").focus();
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press("Tab");
+    expect(await where()).toBe("start");
+  }
+  await page.getByLabel("Your text").focus();
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press("Shift+Tab");
+    expect(await where()).not.toBe("editor");
+  }
+  // Enter wherever focus landed must not have added a block behind the overlay.
+  await page.keyboard.press("Enter");
+  expect(await getBlocks(page)).toHaveLength(1);
+});

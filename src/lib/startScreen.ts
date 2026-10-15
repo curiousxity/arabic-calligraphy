@@ -3,8 +3,19 @@ export const STARTER_TEXT = "حرف";
 
 export const startingText = (typed: string): string => typed.trim() || STARTER_TEXT;
 
-/** The start screen shows only on a truly fresh load: a quick-save means the user has work to come back to. */
+/**
+ * The start screen shows only on a truly fresh load: a quick-save means the
+ * user has work to come back to. The read is wrapped because localStorage
+ * throws in privacy mode and when site data is blocked; nothing can be
+ * restored then, so the start screen shows.
+ */
 export const shouldShowStartScreen = (
   storage: { getItem(k: string): string | null },
   storageKey: string
-): boolean => storage.getItem(storageKey) === null;
+): boolean => {
+  try {
+    return storage.getItem(storageKey) === null;
+  } catch {
+    return true;
+  }
+};

@@ -4,8 +4,6 @@ import { CloseIcon } from "./Icons";
 import { SAMPLE_FALLBACK, visibleFonts, type FontChoice } from "../lib/fontCatalog";
 import { FontGallery } from "./FontGallery";
 
-export type { FontChoice };
-
 export type FontPickerDialogProps = {
   /** The block's current text — what every card previews. */
   text: string;

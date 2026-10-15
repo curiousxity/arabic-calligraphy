@@ -554,3 +554,11 @@ details:not([open]) > .sidebarPresetKeyboardSummary { margin-bottom: 0; padding-
 .startScreenSkip { flex: 0 0 auto; padding: 8px 14px; border: 1px solid var(--border-soft); border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; }
 .startScreen .fontPickerBody { flex: 1; }
 .startScreen .fontPickerSample { font-size: 40px; line-height: 1.7; }
+/* A wide window would otherwise leave most of the row empty: every genre has
+   two to four faces, and the dialog's grid gives each genre its own row. Here
+   the genres flow side by side and wrap, each sized to its own cards. */
+.startScreen .fontPickerBody { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 12px 28px; }
+.startScreen .fontPickerBody > section { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.startScreen .fontPickerGenre { margin-top: 2px; }
+.startScreen .fontPickerGrid { display: flex; flex-wrap: wrap; }
+.startScreen .fontPickerGrid > * { flex: 0 0 190px; min-width: 0; }

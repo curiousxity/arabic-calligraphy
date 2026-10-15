@@ -86,6 +86,13 @@ Skip just closes it. An empty field falls back to the starter word
   window listener for Space-to-pan calls `preventDefault` and would swallow
   Space before it could activate a focused card or Skip. Keep both: they
   guard different listeners.
+- **Everything under the overlay is `inert` while it is up.** App wraps the
+  sidebar and canvas in a `display: contents` div with `inert={showStart}`;
+  `aria-modal` alone does not stop Tab reaching Add text or Quick save, and
+  dropping `inert` lets Enter or Space act on the hidden editor.
+- **`shouldShowStartScreen` swallows a storage throw and returns `true`**
+  (privacy mode, blocked site data): nothing can be restored, so the screen
+  shows. App's initializer also wraps the `localStorage` global access.
 - **`shouldShowStartScreen` reads only the quick-save key**
   (`STORAGE_KEY`, `calligraphy-layout-v2`): shown when it is absent. Quick
   save is manual, not an autosave, so the screen keeps appearing on every
