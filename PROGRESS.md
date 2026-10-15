@@ -99,6 +99,15 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-15 — Stack arrange follows the silhouette
+
+- **Hug, nudge, tilt.** "Fill a guide shape" now measures the outer letter
+  of each row against its own band, drops it into the curve, and leans it
+  toward the edge up to 30° with the room reserved; inner letters share the
+  rest. Spec: `docs/superpowers/specs/2026-10-15-stack-arrange-fill-design.md`;
+  how it works and its tunables:
+  [stacked-compositions.md](.claude/rules/stacked-compositions.md).
+
 ### 2026-10-15 — Stacked compositions fill a shape; guides from an SVG
 
 - **Fill a guide shape.** The Stack panel lists the closed guides on the

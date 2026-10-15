@@ -169,9 +169,23 @@ ends of the band sampled so a box's corners sit inside a curved edge); the
 band is searched afresh whenever the row grows taller, creeping up from the
 cursor. Rows are then spread over the shape's height with equal margins,
 each lifted only as far as its band still takes it and never past the row
-above; within a row the letters are spread to the span's edges, capped at
-one em (then centred), and letters in a row keep their original vertical
-relation (their baseline). Every tilt goes to 0 and every join back to its
+above. **Within a row of three or more, the outer letters hug the shape**:
+each is measured against its *own* band (`ownSpan`; the row's union band is
+narrowed by a tall neighbour), nudged up or down by up to a quarter of its
+height to where that band is widest (`nudge`), and **leaned toward the
+edge** (`edgeLean`, clamped to `MAX_TILT` = 30°). The lean's room is
+reserved, not hoped for (`leanIntoEdge`): the letter's *rotated* bounds sit
+one gap inside the chord over their own band, the letter is lifted by the
+overhang a leaning box has below its row bottom, and a tilt is accepted only
+if that extra height fits the headroom to the row above — else halved, down
+to upright. At the bisection's tight fit this means small tilts; it never
+means a letter outside the shape. Inner letters share the remaining width
+equally and stay upright; `pack` reserves the two edge gaps a hugging row
+uses (`rowNeed`). A row of two leans both letters the same way, then draws
+them toward the centre until they are at most one em apart; one alone is
+centred upright. A rider turns with its letter about the letter's pivot.
+Letters in a row keep their original vertical relation (their baseline)
+apart from the nudge. Inner tilt goes to 0 and every join back to its
 tangent-matched default, so the result is an arrangement, not a design: the
 user drags, tilts and bends from there. `homeX`/`homeY` are untouched, so
 Reset layout still returns to the conversion. The block moves onto the
