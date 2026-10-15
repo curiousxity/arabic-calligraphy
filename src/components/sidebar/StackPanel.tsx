@@ -16,7 +16,10 @@ export const StackPanel: React.FC<{
   /** The closed guides on the canvas the letters can be arranged inside. */
   closedGuides?: { id: number; label: string }[];
   onArrangeInGuide?: (guideId: number) => void;
-}> = ({ block, onUpdate, onReset, moveTogether, onMoveTogether, closedGuides = [], onArrangeInGuide }) => (
+  /** Busy the gaps with the font's tashkeel when filling a guide. */
+  fillGaps: boolean;
+  onFillGaps: (v: boolean) => void;
+}> = ({ block, onUpdate, onReset, moveTogether, onMoveTogether, closedGuides = [], onArrangeInGuide, fillGaps, onFillGaps }) => (
   <div className="sectionPanel">
     <p className="guideEmpty" dir="rtl">{block.source.text}</p>
     <p className="guideEmpty">
@@ -69,9 +72,17 @@ export const StackPanel: React.FC<{
         uploaded SVG outline), then choose it here.
       </p>
     )}
+    <CheckboxRow
+      id={`stack-${block.id}-fill-gaps`}
+      label="Fill gaps with tashkeel"
+      checked={fillGaps}
+      onChange={onFillGaps}
+    />
     <p className="guideEmpty">
-      Filling a guide lays the letters in rows from the bottom up, in reading order, and sizes the
-      composition to the shape. You can still drag, tilt and bend afterwards.
+      Filling a guide lays the letters in rows from the bottom up, in reading order, leans the
+      outer letters into the edge, and sizes the composition to the shape. With the box above
+      checked, the gaps are busied with the font's own tashkeel. You can still drag, tilt and
+      bend afterwards; Reset layout removes the ornaments.
     </p>
     <button type="button" className="sidebarSmallAction" aria-label="Reset layout" onClick={onReset}>
       Reset layout

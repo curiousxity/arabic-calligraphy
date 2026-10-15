@@ -136,6 +136,8 @@ export type SidebarProps = {
   onArrangeStackInGuide?: (guideId: number) => void;
   stackMoveTogether?: boolean;
   onStackMoveTogether?: (v: boolean) => void;
+  stackFillGaps?: boolean;
+  onStackFillGaps?: (v: boolean) => void;
   onRemoveCustomFont?: (key: string) => void;
   /** Set when the selected block names a font this browser cannot resolve. */
   missingFontKey?: string | null;
@@ -374,6 +376,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onArrangeStackInGuide,
   stackMoveTogether = true,
   onStackMoveTogether,
+  stackFillGaps = true,
+  onStackFillGaps,
   onRemoveCustomFont,
   missingFontKey = null,
   // ---- /STREAM-G ----
@@ -1963,6 +1967,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onReset={onResetStackLayout}
                 moveTogether={stackMoveTogether}
                 onMoveTogether={(v) => onStackMoveTogether?.(v)}
+                fillGaps={stackFillGaps}
+                onFillGaps={(v) => onStackFillGaps?.(v)}
                 closedGuides={guidesIn(blocks)
                   .filter((g) => isClosedPath(parseSvgPath(g.guideD)))
                   .map((g) => ({ id: g.id, label: g.name ?? `Guide · ${GUIDE_SHAPE_LABELS[g.guideShape]}` }))}

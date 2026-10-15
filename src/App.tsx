@@ -48,7 +48,7 @@ import {
 } from "./lib/glyphAlternates";
 import { arcPathD } from "./lib/textPath";
 import { GUIDE_DEFAULTS, containerPolygon, guidePathD, svgGuidePathD, uploadedGuideSource } from "./lib/guideShapes";
-import { arrangeStackInShape } from "./lib/stackArrange";
+import { arrangeStackInShape, type FillerShape } from "./lib/stackArrange";
 import { parseSvgPath } from "./lib/svgPath";
 import {
   attachTextToGuide,
@@ -169,7 +169,7 @@ import { buildCutPlan, cutAdvanceTotal, outlineBounds, remapCutsForEdits } from 
 import { remapMarksForEdits } from "./lib/detachedMarks";
 import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
 import { shapeText } from "./lib/harfbuzz";
-import { convertRunToStack, splitPieceAtCut, type UnjoinedPair } from "./lib/stackConvert";
+import { convertRunToStack, splitPieceAtCut, fillerShapes, teardropShape, type UnjoinedPair } from "./lib/stackConvert";
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
@@ -733,6 +733,8 @@ const App: React.FC = () => {
 
   /** Editor preference, not block state: dragging a stack letter carries the letters after it. */
   const [stackMoveTogether, setStackMoveTogether] = useState(true);
+  /** Editor preference, not block state: "Fill a guide shape" busies the gaps with tashkeel. */
+  const [stackFillGaps, setStackFillGaps] = useState(true);
 
   const setStackJoinBow = useCallback((blockId: number, joinId: string, bend: { bow: number; depth: number }) => {
     setBlocks((prev) =>
@@ -2085,34 +2087,54 @@ const App: React.FC = () => {
 
   /**
    * Arrange the selected stack's letters to fill a closed guide: rows from
-   * the bottom up in reading order, the block sized to the shape and moved
-   * onto the guide. One history step (updateSelectedBlock). The guide is the
-   * container only; it never moves a piece afterwards.
+   * the bottom up in reading order, outer letters hugging and leaning into
+   * the edge, the block sized to the shape and moved onto the guide, and —
+   * when "Fill gaps with tashkeel" is on — the gaps busied with the font's
+   * own marks. Existing fillers are stripped first so a re-run never
+   * accumulates them. One history step (updateBlock, by captured id: the
+   * font load awaits, and the selection may move meanwhile).
    */
-  const arrangeStackInGuide = (guideId: number) => {
+  const arrangeStackInGuide = async (guideId: number) => {
     if (!selectedBlock || !isStackBlock(selectedBlock)) return;
+    const block = selectedBlock;
     const guide = blocks.find((b): b is GuideBlock => b.type === "guide" && b.id === guideId);
     if (!guide) return;
     const shapePx = containerPolygon(parseSvgPath(guide.guideD));
     if (!shapePx) { setExportStatus("That guide is not a closed shape, so there is nothing to fill."); return; }
+    let fillers: FillerShape[] = [];
+    let fontNote = "";
+    if (stackFillGaps) {
+      try {
+        const shaped = await shapeText(block.source.text, resolveFontUrl(block.source.fontFamily));
+        fillers = fillerShapes(shaped.font, block.unitsPerEm, block.nib.width);
+      } catch {
+        fillers = [teardropShape(block.nib.width)];
+        fontNote = " (font unavailable; teardrops used)";
+      }
+    }
     const result = arrangeStackInShape({
-      pieces: selectedBlock.pieces, joins: selectedBlock.joins, shapePx,
-      fontSize: selectedBlock.fontSize, unitsPerEm: selectedBlock.unitsPerEm,
+      pieces: block.pieces.filter((p) => !p.filler), joins: block.joins, shapePx,
+      fontSize: block.fontSize, unitsPerEm: block.unitsPerEm, fillers,
     });
     if (!result) { setExportStatus("Could not fit the letters inside that guide."); return; }
-    updateSelectedBlock({
+    updateBlock(block.id, {
       pieces: result.pieces, joins: result.joins, fontSize: result.fontSize,
       x: guide.x, y: guide.y, rotation: guide.rotation ?? 0,
     });
     const letters = result.pieces.filter((p) => p.role === "letter" && p.parentId === undefined).length;
-    setExportStatus(`Arranged ${letters} letters in ${result.rows} row${result.rows === 1 ? "" : "s"} inside the guide.`);
+    const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+    setExportStatus(
+      `Arranged ${plural(letters, "letter")} in ${plural(result.rows, "row")} inside the guide` +
+      (result.fillers > 0 ? `, ${plural(result.fillers, "ornament")} added` : "") + fontNote + "."
+    );
   };
 
-  /** Stack layout back to its home arrangement. updateSelectedBlock pushes the one history step. */
+  /** Stack layout back to its home arrangement; fillers go (home is the
+   *  conversion, which had none). updateSelectedBlock pushes the one history step. */
   const resetStackLayout = () => {
     if (!selectedBlock || !isStackBlock(selectedBlock)) return;
     updateSelectedBlock({
-      pieces: selectedBlock.pieces.map((p) => ({ ...p, x: p.homeX, y: p.homeY, rotation: 0 })),
+      pieces: selectedBlock.pieces.filter((p) => !p.filler).map((p) => ({ ...p, x: p.homeX, y: p.homeY, rotation: 0 })),
       joins: selectedBlock.joins.map((j) => ({ ...j, bow: 0, depth: 0 })),
     });
   };
@@ -3359,6 +3381,8 @@ const App: React.FC = () => {
         onArrangeStackInGuide={arrangeStackInGuide}
         stackMoveTogether={stackMoveTogether}
         onStackMoveTogether={setStackMoveTogether}
+        stackFillGaps={stackFillGaps}
+        onStackFillGaps={setStackFillGaps}
         blocks={blocks}
         selectedBlock={selectedBlock}
         selectedIds={selectedIds}
