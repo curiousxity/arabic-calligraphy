@@ -7,6 +7,7 @@ import { TextOnPathText } from "./TextOnPathText";
 import { GuideView } from "./GuideView";
 import { StackView } from "./StackView";
 import { StackEditOverlay } from "./StackEditOverlay";
+import type { CurveTrace } from "../lib/stackCurve";
 import { stackScale } from "../lib/stackOutline";
 import { resolveGuidePath, type WritingSession } from "../lib/guides";
 import { isClosedPath } from "../lib/guideShapes";
@@ -176,6 +177,8 @@ export type CanvasStageProps = {
   onSetStackPieces: (blockId: number, patches: { id: string; x?: number; y?: number; rotation?: number }[]) => void;
   onSetStackJoinBow: (blockId: number, joinId: string, bend: { bow: number; depth: number }) => void;
   onSplitStackPiece: (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => { id: string; x: number; y: number } | null;
+  /** Free the curve the overlay traced on a stack piece; returns the new join's id. */
+  onBendStackCurve: (blockId: number, pieceId: string, trace: CurveTrace) => string | null;
   stackMoveTogether: boolean;
   /** Next Shape: the selected text block's letters that have alternates. */
   alternateLetters: LetterAlternates[];
@@ -306,6 +309,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSetStackPieces,
   onSetStackJoinBow,
   onSplitStackPiece,
+  onBendStackCurve,
   stackMoveTogether,
   onSetStrokeCut,
   alternateLetters,
@@ -1232,6 +1236,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                           color={block.color}
                           moveTogether={stackMoveTogether}
                           onSplit={(pieceId, cut) => onSplitStackPiece(block.id, pieceId, cut)}
+                          onBend={(pieceId, trace) => onBendStackCurve(block.id, pieceId, trace)}
                         />
                       ) : null
                     }

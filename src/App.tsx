@@ -169,7 +169,8 @@ import { buildCutPlan, cutAdvanceTotal, outlineBounds, remapCutsForEdits } from 
 import { remapMarksForEdits } from "./lib/detachedMarks";
 import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
 import { shapeText } from "./lib/harfbuzz";
-import { convertRunToStack, splitPieceAtCut, fillerShapes, teardropShape, type UnjoinedPair } from "./lib/stackConvert";
+import { convertRunToStack, splitPieceAtCut, fillerShapes, teardropShape, bendCurveAt, type UnjoinedPair } from "./lib/stackConvert";
+import type { CurveTrace } from "./lib/stackCurve";
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
@@ -727,6 +728,24 @@ const App: React.FC = () => {
       // The cap is the piece the split appended; the overlay pulls it in the same gesture.
       const cap = next.pieces[next.pieces.length - 1];
       return { id: cap.id, x: cap.x, y: cap.y };
+    },
+    [blocks, pushHistory]
+  );
+
+  /** Free the curved stroke the hover traced and replace it with a join; the
+   *  overlay bends that join in the same gesture. One history step for both. */
+  const bendStackCurve = useCallback(
+    (blockId: number, pieceId: string, trace: CurveTrace) => {
+      const block = blocks.find((b) => b.id === blockId);
+      if (!block || !isStackBlock(block)) return null;
+      const next = bendCurveAt(block.pieces, block.joins, pieceId, trace);
+      if (!next) { setExportStatus("That curve could not be freed cleanly."); return null; }
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => (b.id === blockId && isStackBlock(b) ? { ...b, pieces: next.pieces, joins: next.joins } : b))
+      );
+      setExportStatus("Curve freed; drag to bend, double-click to restore.");
+      return next.joinId;
     },
     [blocks, pushHistory]
   );
@@ -3577,6 +3596,7 @@ const App: React.FC = () => {
           onSetStackPieces={setStackPieces}
           onSetStackJoinBow={setStackJoinBow}
           onSplitStackPiece={splitStackPiece}
+          onBendStackCurve={bendStackCurve}
           stackMoveTogether={stackMoveTogether}
           alternateLetters={glyphAlternatesState.letters}
           onPickGlyphAlternate={pickGlyphAlternate}

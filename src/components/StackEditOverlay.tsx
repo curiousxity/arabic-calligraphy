@@ -9,10 +9,13 @@ import type { SvgCmd } from "../lib/svgPath";
 import { joinCenterline, joinEdges, joinFloor, joinHandles, solveJoinDrag } from "../lib/stackJoin";
 import { cutAtPress, invertTransform, pullSpans, spanProbes, stackDetectOpts, zoneRect } from "../lib/stackZones";
 import { complementOf } from "../lib/complementColor";
+import { curveRegions, type CurveRegion, type CurveTrace } from "../lib/stackCurve";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 
 /** Keyed on a piece's `cmds` identity (a render-pure cache; refs may not be read in render). */
 const sweepCache = new WeakMap<SvgCmd[], CutZone[]>();
+/** Curve regions per `cmds` array, like the zone sweep. */
+const curveCache = new WeakMap<SvgCmd[], CurveRegion[]>();
 /** Screen px: the band just outside a letter's edge that tilts it. */
 const RING_PX = 14;
 /** Screen px: the outline drawn on whatever the pointer is over. */
@@ -61,6 +64,7 @@ type Hover =
   | { kind: "ring"; id: string }
   | { kind: "join"; id: string }
   | { kind: "cut"; id: string; pieceId: string }
+  | { kind: "curve"; pieceId: string; index: number }
   | null;
 
 export type StackEditOverlayProps = {
@@ -82,6 +86,9 @@ export type StackEditOverlayProps = {
   /** Cut a piece; returns the new end cap, or null if the cut was not legal.
    *  Pushes history itself (the cut and the pull that follows are one step). */
   onSplit?: (pieceId: string, cut: { cutX: number; angle: number }) => { id: string; x: number; y: number } | null;
+  /** Free the curve the hover traced; returns the new join's id. Pushes
+   *  history itself (the free and the bend that follows are one step). */
+  onBend?: (pieceId: string, trace: CurveTrace) => string | null;
 };
 
 /**
@@ -91,18 +98,20 @@ export type StackEditOverlayProps = {
  *
  *   ink of a letter or mark    → move (the letters after it come along)
  *   the band just outside ink  → tilt about the letter's pivot
- *   a join curve               → bend (double-click straightens)
+ *   a join curve               → bend (double-click returns it to its rest)
  *   the free end of a straight stroke → press cuts there, the drag pulls the tail
+ *   the apex of a curved stroke → press frees the curve, the drag bends it
  *
  * Z-order is the whole dispatch: rings lowest, then join curves, then the
- * body polygons, then the cut spans of the hovered letter. Everything is in
+ * body polygons, then the curve apexes and the cut spans of the hovered
+ * letter. Everything is in
  * the block group's px space: the overlay Group is an untransformed child of
  * StackView's Group, so its relative pointer is the pointer in the frame
  * `pieces` are drawn in.
  */
 export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   isSelected, pieces, joins, nib, scale, color, moveTogether, onBegin, onSetPieces, onSetBow,
-  unitsPerEm, onSplit,
+  unitsPerEm, onSplit, onBend,
 }) => {
   const [hover, setHover] = useState<Hover>(null);
   const groupRef = useRef<Konva.Group>(null);
@@ -113,6 +122,7 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   // A tail pull is not a Konva drag: the pressed cut span unmounts the moment
   // the split changes the body's commands, and a node drag dies with it.
   const pull = useRef<{ capId: string; cap: { x: number; y: number }; pointer: { x: number; y: number }; end: () => void } | null>(null);
+  const bend = useRef<{ joinId: string; pointer: { x: number; y: number }; end: () => void } | null>(null);
 
   const accent = useMemo(() => complementOf(color), [color]);
 
@@ -130,7 +140,7 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   // The sweep is fifteen rotations per piece, so it runs for the hovered
   // letter only, and once per `cmds` array: a drag rebuilds `pieces` every
   // frame but never touches a piece's commands.
-  const hoveredPieceId = hover && hover.kind !== "join" ? (hover.kind === "cut" ? hover.pieceId : hover.id) : null;
+  const hoveredPieceId = hover && hover.kind !== "join" ? (hover.kind === "cut" || hover.kind === "curve" ? hover.pieceId : hover.id) : null;
   const cutSpans = useMemo(() => {
     const p = hoveredPieceId ? byId.get(hoveredPieceId) : undefined;
     if (!p || p.role !== "letter") return [];
@@ -152,6 +162,27 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
         points: zoneRect(z, from, to).flatMap((q) => { const w = transformPt(q, t); return [w[0] * scale, w[1] * scale]; }),
       })));
   }, [hoveredPieceId, byId, unitsPerEm, scale]);
+
+  // The curves a press could free, for the hovered letter only, once per
+  // `cmds` array (a drag rebuilds `pieces` every frame but never its commands).
+  const curves = useMemo(() => {
+    const p = hoveredPieceId ? byId.get(hoveredPieceId) : undefined;
+    if (!p || p.role !== "letter") return [];
+    const upm = unitsPerEm || 1000;
+    let regions = curveCache.get(p.cmds);
+    if (!regions) { regions = curveRegions(p.cmds, { maxLength: 3 * upm, faces: p.faces }); curveCache.set(p.cmds, regions); }
+    const t = pieceTransform(p);
+    return regions.map((r, index) => ({
+      id: `${p.id}:c${index}`, pieceId: p.id, index, trace: r.trace,
+      points: r.polygon.flatMap((q) => { const w = transformPt(q, t); return [w[0] * scale, w[1] * scale]; }),
+    }));
+  }, [hoveredPieceId, byId, unitsPerEm, scale]);
+
+  // The bend gesture reads joins and pieces as they are *now*, not as they
+  // were when the press mounted its listener.
+  const joinsRef = useRef(joins);
+  const byIdRef = useRef(byId);
+  useEffect(() => { joinsRef.current = joins; byIdRef.current = byId; }, [joins, byId]);
 
   const joinGeom = useMemo(() => joins.flatMap((j) => {
     const from = byId.get(j.from.pieceId), to = byId.get(j.to.pieceId);
@@ -184,19 +215,52 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
     style.cursor = !hover ? prev
       : hover.kind === "piece" ? "move"
       : hover.kind === "ring" ? ROTATE_CURSOR
-      : hover.kind === "join" ? "grab"
+      : hover.kind === "join" || hover.kind === "curve" ? "grab"
       : "crosshair";
     return () => { style.cursor = prev; };
   }, [hover]);
 
-  useEffect(() => () => { pull.current?.end(); }, []);
+  useEffect(() => () => { pull.current?.end(); bend.current?.end(); }, []);
 
   if (!isSelected) return null;
 
   // Handles sit at different depths, so read the pointer from the overlay
   // Group itself rather than counting parents.
   const pointerIn = () => groupRef.current?.getRelativePointerPosition() ?? { x: 0, y: 0 };
-  const enter = (h: Hover) => { if (!pull.current) setHover(h); };
+  const enter = (h: Hover) => { if (!pull.current && !bend.current) setHover(h); };
+
+  /**
+   * Press on a curve's apex: free it (the handler pushes history) and bend
+   * the new join through the rest of the drag. Like a tail pull this is a
+   * stage listener, not a node drag: the join's hit node mounts a render
+   * later, and the apex polygon that was pressed unmounts with the letter's
+   * old commands.
+   */
+  const beginBend = (c: typeof curves[number], stage: Konva.Stage | null) => {
+    const p = byId.get(c.pieceId);
+    if (!p || !stage || !onBend) return;
+    const at = pointerIn();
+    const joinId = onBend(p.id, c.trace);
+    if (!joinId) return;
+    const end = () => { bend.current = null; stage.off(".stackbend"); window.removeEventListener("mouseup", end); window.removeEventListener("touchend", end); };
+    bend.current = { joinId, pointer: at, end };
+    setHover({ kind: "join", id: joinId });
+    stage.on("mousemove.stackbend touchmove.stackbend", () => {
+      const s = bend.current; if (!s) return;
+      const j = joinsRef.current.find((x) => x.id === s.joinId); if (!j) return;
+      const from = byIdRef.current.get(j.from.pieceId), to = byIdRef.current.get(j.to.pieceId);
+      const fa = from?.faces[j.from.faceIndex], fb = to?.faces[j.to.faceIndex];
+      if (!from || !to || !fa || !fb) return;
+      const A = transformFace(fa, pieceTransform(from)), B = transformFace(fb, pieceTransform(to));
+      const chord = (Math.hypot(B.a[0] + B.b[0] - A.a[0] - A.b[0], B.a[1] + B.b[1] - A.a[1] - A.b[1]) / 2) * scale;
+      const rest = j.rest ?? { bow: 0, depth: 0 };
+      const now = pointerIn();
+      onSetBow?.(s.joinId, solveJoinDrag(rest, A.tangent, B.tangent, chord, [now.x - s.pointer.x, now.y - s.pointer.y]));
+    });
+    stage.on("mouseup.stackbend touchend.stackbend", end);
+    window.addEventListener("mouseup", end);
+    window.addEventListener("touchend", end);
+  };
 
   const beginPull = (span: typeof cutSpans[number], stage: Konva.Stage | null) => {
     const p = byId.get(span.pieceId);
@@ -268,9 +332,10 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
           onTouchStart={() => { pressAt.current = pointerIn(); }}
           onDblClick={(e) => {
             e.cancelBubble = true;
-            if (j.bow === 0 && depth === 0) return;
+            const rest = j.rest ?? { bow: 0, depth: 0 };
+            if (j.bow === rest.bow && depth === rest.depth) return;
             onBegin?.();
-            onSetBow?.(j.id, { bow: 0, depth: 0 });
+            onSetBow?.(j.id, { ...rest });
           }}
           onDragStart={(e) => {
             e.cancelBubble = true;
@@ -329,6 +394,16 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
         />
       ))}
 
+      {/* The apex of each curve of the hovered letter: press to free it, the drag bends it. */}
+      {curves.map((c) => (
+        <Line
+          key={c.id} name="stack-curve" points={c.points} closed fill="transparent" strokeEnabled={false}
+          onMouseEnter={() => enter({ kind: "curve", pieceId: c.pieceId, index: c.index })}
+          onMouseDown={(e) => { e.cancelBubble = true; beginBend(c, e.target.getStage()); }}
+          onTouchStart={(e) => { e.cancelBubble = true; beginBend(c, e.target.getStage()); }}
+        />
+      ))}
+
       {/* The free ends of the hovered letter's straight strokes: press to cut, pull the tail. */}
       {cutSpans.map((s) => (
         <Line
@@ -356,6 +431,10 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
       {hover?.kind === "join" && (() => {
         const g = joinGeom.find((x) => x.j.id === hover.id); if (!g) return null;
         return <Line points={g.band} closed stroke={accent} strokeWidth={OUTLINE_PX} strokeScaleEnabled={false} listening={false} />;
+      })()}
+      {hover?.kind === "curve" && (() => {
+        const c = curves.find((x) => x.pieceId === hover.pieceId && x.index === hover.index); if (!c) return null;
+        return <Line points={c.points} closed stroke={accent} strokeWidth={OUTLINE_PX} strokeScaleEnabled={false} listening={false} />;
       })()}
       {hover?.kind === "cut" && (() => {
         const s = cutSpans.find((x) => x.id === hover.id); if (!s) return null;
