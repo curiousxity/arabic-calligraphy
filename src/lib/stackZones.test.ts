@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CutZone } from "./strokeCuts";
-import { cutAtPress, fromZoneFrame, invertTransform, pullSpans, spanProbes, toZoneFrame, zoneRect } from "./stackZones";
+import { DEFAULT_DETECT_OPTS, type CutZone } from "./strokeCuts";
+import { cutAtPress, fromZoneFrame, invertTransform, pullSpans, spanProbes, stackDetectOpts, toZoneFrame, zoneRect } from "./stackZones";
 
 const zone = (over: Partial<CutZone> = {}): CutZone => ({
   glyphIndex: 0, cluster: 0, fromX: 100, toX: 500, thickness: 40, angle: 0, fit: 0, centreY: -200, ...over,
@@ -99,5 +99,16 @@ describe("cutAtPress", () => {
     const c = cutAtPress(zone({ angle: a }), local);
     expect(c.angle).toBe(a);
     expect(c.cutX).toBeCloseTo(300, 9);
+  });
+});
+
+describe("stackDetectOpts", () => {
+  it("sweeps both bases with the stack's resolution and an aspect floor", () => {
+    const o = stackDetectOpts(2000);
+    expect(o.baseAngles).toEqual([0, Math.PI / 2]);
+    expect(o.minAspect).toBe(1);
+    expect(o.step).toBe(20);
+    expect(o.minZoneWidth).toBe(50);
+    expect(o.maxSlope).toBe(DEFAULT_DETECT_OPTS.maxSlope);
   });
 });

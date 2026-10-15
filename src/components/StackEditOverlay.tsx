@@ -4,10 +4,10 @@ import type Konva from "konva";
 import type { StackPiece, StackJoin, StackBlock } from "../types";
 import { chainOf, pieceTransform } from "../lib/stackOutline";
 import { splitAtCut, transformCmds, transformFace, transformPt } from "../lib/stackGeometry";
-import { flattenContours, findCutZonesSwept, DEFAULT_DETECT_OPTS, type CutZone, type Pt } from "../lib/strokeCuts";
+import { flattenContours, findCutZonesSwept, type CutZone, type Pt } from "../lib/strokeCuts";
 import type { SvgCmd } from "../lib/svgPath";
 import { joinCenterline, joinEdges, joinFloor, joinHandles, solveJoinDrag } from "../lib/stackJoin";
-import { cutAtPress, invertTransform, pullSpans, spanProbes, zoneRect } from "../lib/stackZones";
+import { cutAtPress, invertTransform, pullSpans, spanProbes, stackDetectOpts, zoneRect } from "../lib/stackZones";
 import { complementOf } from "../lib/complementColor";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 
@@ -135,7 +135,7 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
     const p = hoveredPieceId ? byId.get(hoveredPieceId) : undefined;
     if (!p || p.role !== "letter") return [];
     const upm = unitsPerEm || 1000;   // as stackScale: a save without it is 1000
-    const opts = { ...DEFAULT_DETECT_OPTS, step: upm / 100, minZoneWidth: upm / 40 };
+    const opts = stackDetectOpts(upm);
     let zones = sweepCache.get(p.cmds);
     if (!zones) {
       zones = findCutZonesSwept(flattenContours(p.cmds), { glyphIndex: 0, cluster: 0 }, opts);

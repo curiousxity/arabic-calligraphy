@@ -7,8 +7,15 @@
  * goes into that frame by x′ = x·cos a + y·sin a (the same projection
  * `splitPieceAtCut` uses to decide which side a face is on).
  */
-import type { CutZone, Pt } from "./strokeCuts";
+import { DEFAULT_DETECT_OPTS, type CutZone, type DetectOpts, type Pt } from "./strokeCuts";
 import type { PieceTransform } from "./stackGeometry";
+
+/** The detector options every stack consumer uses: the stack's resolution,
+ *  both stroke directions (so an alif's stem is found), and an aspect floor
+ *  so a sweep never offers a cut across a stroke. */
+export function stackDetectOpts(upm: number): DetectOpts {
+  return { ...DEFAULT_DETECT_OPTS, step: upm / 100, minZoneWidth: upm / 40, baseAngles: [0, Math.PI / 2], minAspect: 1 };
+}
 
 /** Share of a zone, from its free end, that pulls a tail. The rest moves the letter. */
 export const PULL_FRACTION = 0.4;

@@ -186,6 +186,14 @@ export type DetectOpts = {
    *  as a fraction of the stroke's thickness, before the zone is read as a
    *  curve rather than a straight stroke. */
   maxEdgeBow: number;
+  /** Stroke directions to sweep about, radians; each gets ±maxAngle. Default
+   *  [0] (the baseline). Stack consumers add π/2 to find upstrokes. */
+  baseAngles?: number[];
+  /** Zones found about an *added* base (not the baseline, whose short
+   *  connector stubs the stack's tail pull relies on) must be at least this
+   *  many thicknesses long. 0 (default) keeps every zone; 1 drops the zone a
+   *  perpendicular sweep finds *across* a short stroke. */
+  minAspect?: number;
 };
 
 /** Task 3's coverage sweep measured against these starting values and found
@@ -406,14 +414,17 @@ export function findCutZonesSwept(
   opts: DetectOpts = DEFAULT_DETECT_OPTS
 ): CutZone[] {
   const steps = Math.floor(opts.maxAngle / opts.angleStep);
-  const angles = [0];
-  for (let i = 1; i <= steps; i++) {
-    angles.push(i * opts.angleStep, -i * opts.angleStep);
+  const angles: number[] = [];
+  for (const base of opts.baseAngles ?? [0]) {
+    angles.push(base);
+    for (let i = 1; i <= steps; i++) angles.push(base + i * opts.angleStep, base - i * opts.angleStep);
   }
-
+  const minAspect = opts.minAspect ?? 0;
   const found: CutZone[] = [];
   for (const t of angles) {
+    const filtered = Math.abs(t) > opts.maxAngle + 1e-9;   // about an added base, not the baseline
     for (const z of findCutZones(rotateContours(contours, -t), meta, opts)) {
+      if (filtered && z.toX - z.fromX < minAspect * z.thickness) continue;
       found.push({ ...z, angle: t });
     }
   }
@@ -451,7 +462,11 @@ export function zoneCentre(z: CutZone): Pt {
  *  zone centred on ink an earlier one already claims. */
 export function dedupeZones(zones: CutZone[], opts: DetectOpts): CutZone[] {
   const kept: { zone: CutZone; centre: Pt }[] = [];
-  for (const z of [...zones].sort((a, b) => a.fit - b.fit)) {
+  // Best fit first; on a tie the longer zone, so a stem found along its
+  // length beats the zone a perpendicular sweep reads across it.
+  const byFitThenLength = (a: CutZone, b: CutZone) =>
+    Math.abs(a.fit - b.fit) > 1e-6 ? a.fit - b.fit : (b.toX - b.fromX) - (a.toX - a.fromX);
+  for (const z of [...zones].sort(byFitThenLength)) {
     const centre = zoneCentre(z);
     const clash = kept.some(
       (k) => Math.hypot(k.centre[0] - centre[0], k.centre[1] - centre[1]) <

@@ -285,6 +285,41 @@ describe("findCutZonesSwept", () => {
   });
 });
 
+describe("findCutZonesSwept with a second base angle", () => {
+  const meta = { glyphIndex: 3, cluster: 1 };
+
+  it("finds a vertical stem with a second base angle, along its length not across it", () => {
+    // A bar 60 thick and 300 tall. Swept about the baseline alone it yields a
+    // zone *across* the stroke (a 60-wide run of constant 300 "thickness");
+    // the aspect floor drops that, and the second base finds the stem itself.
+    const vbar: SvgCmd[] = [
+      { type: "M", x: 0, y: 0 }, { type: "L", x: 60, y: 0 }, { type: "L", x: 60, y: 300 }, { type: "L", x: 0, y: 300 }, { type: "Z" },
+    ];
+    const contours = flattenContours(vbar);
+    const zones = findCutZonesSwept(contours, meta, { ...DEFAULT_DETECT_OPTS, baseAngles: [0, Math.PI / 2], minAspect: 1 });
+    expect(zones).toHaveLength(1);
+    expect(Math.abs(Math.abs(zones[0].angle) - Math.PI / 2)).toBeLessThanOrEqual(DEFAULT_DETECT_OPTS.angleStep + 1e-9);
+    expect(zones[0].toX - zones[0].fromX).toBeGreaterThan(240);
+    expect(zones[0].thickness).toBeCloseTo(60, 0);
+  });
+
+  it("never filters the baseline sweep: a short stub survives an aspect floor", () => {
+    // A connector stub taller than it is long — UKIJ Diwani's only straight
+    // runs — is what the stack's tail pull offers; the floor must not drop it.
+    const stub: SvgCmd[] = [
+      { type: "M", x: 0, y: 0 }, { type: "L", x: 40, y: 0 }, { type: "L", x: 40, y: 60 }, { type: "L", x: 0, y: 60 }, { type: "Z" },
+    ];
+    const opts = { ...DEFAULT_DETECT_OPTS, minZoneWidth: 20, minAspect: 1 };
+    expect(findCutZonesSwept(flattenContours(stub), meta, opts).length).toBeGreaterThan(0);
+  });
+
+  it("is unchanged for the default options", () => {
+    const t = (12 * Math.PI) / 180;
+    const contours = flattenContours(rotateCmds(BAR, t));
+    expect(findCutZonesSwept(contours, meta)).toHaveLength(1);
+  });
+});
+
 /** A constant-thickness circular band — a bowl, as a font actually draws one.
  *  Its weight holds steady everywhere, so the thickness check cannot reject
  *  it; only the edges' changing inclination distinguishes it from a stroke. */
