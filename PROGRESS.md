@@ -99,6 +99,17 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-15 — Stacked compositions: no modes, no handles
+
+The stack editor's chrome was replaced. The "Split strokes" checkbox and
+the purple, orange and green dot handles are gone; whatever the pointer
+rests on outlines in the ink's complement, and a drag there moves, tilts,
+bends or pulls a tail (press cuts where pressed). The sidebar gained
+"Move letters together" and renamed "Thinnest stroke" to "Join thickness".
+How it dispatches and the traps are in
+[stacked-compositions.md](.claude/rules/stacked-compositions.md). Old
+saves drop `stackTailMode` through `legacySaves.ts`.
+
 ### 2026-10-14 — Font-first redesign
 
 The app was cut back to what it is best at, the fonts

@@ -2,30 +2,39 @@ import type { StackBlock } from "../../types";
 import { CheckboxRow, RangeRow } from "./FormControls";
 
 /**
- * The Stack type panel: the baked spelling (read-only), the split-strokes
- * toggle, the nib's thinnest-stroke floor, and Reset layout.
+ * The Stack type panel: the baked spelling (read-only), how a drag on the
+ * canvas is read, the join thickness floor, and Reset layout. The editing
+ * itself has no modes — every gesture is a drag on the ink (see
+ * StackEditOverlay) — so this panel only explains them.
  */
 export const StackPanel: React.FC<{
   block: StackBlock;
   onUpdate: (patch: Partial<StackBlock>) => void;
   onReset: () => void;
-}> = ({ block, onUpdate, onReset }) => (
+  moveTogether: boolean;
+  onMoveTogether: (v: boolean) => void;
+}> = ({ block, onUpdate, onReset, moveTogether, onMoveTogether }) => (
   <div className="sectionPanel">
     <p className="guideEmpty" dir="rtl">{block.source.text}</p>
     <p className="guideEmpty">
       Baked from {block.source.fontFamily}. The spelling cannot be edited here — undo the
       conversion, or convert a fresh text block.
     </p>
+    <p className="guideEmpty">
+      Drag a letter to move it. Drag just outside its edge to tilt it. Drag a curve to bend
+      it, double-click to straighten. Press near the end of a straight stroke and pull to
+      draw out a tail.
+    </p>
     <CheckboxRow
-      id={`stack-${block.id}-tail`}
-      label="Split strokes"
-      checked={block.stackTailMode ?? false}
-      onChange={(checked) => onUpdate({ stackTailMode: checked })}
+      id={`stack-${block.id}-together`}
+      label="Move letters together"
+      checked={moveTogether}
+      onChange={onMoveTogether}
     />
     <RangeRow
       id={`stack-${block.id}-minFraction`}
       name="stackMinFraction"
-      label="Thinnest stroke"
+      label="Join thickness"
       value={block.nib.minFraction}
       min={0.05}
       max={1}

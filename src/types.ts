@@ -277,8 +277,6 @@ export type StackBlock = BlockCommon & {
   nib: { width: number; minFraction: number };
   pieces: StackPiece[];
   joins: StackJoin[];
-  /** Arms the split handles on cuttable strokes. */
-  stackTailMode?: boolean;
 };
 
 export type GuideAttachment = {

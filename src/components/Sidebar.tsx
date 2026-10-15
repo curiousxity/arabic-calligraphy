@@ -131,6 +131,8 @@ export type SidebarProps = {
   /** Bake the selected text block into a stacked composition. */
   onConvertToStack?: () => void;
   onResetStackLayout?: () => void;
+  stackMoveTogether?: boolean;
+  onStackMoveTogether?: (v: boolean) => void;
   onRemoveCustomFont?: (key: string) => void;
   /** Set when the selected block names a font this browser cannot resolve. */
   missingFontKey?: string | null;
@@ -365,6 +367,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddCustomFont,
   onConvertToStack,
   onResetStackLayout,
+  stackMoveTogether = true,
+  onStackMoveTogether,
   onRemoveCustomFont,
   missingFontKey = null,
   // ---- /STREAM-G ----
@@ -1946,7 +1950,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {selectedBlock?.type === "stack" && onResetStackLayout && (
           <div className="sidebarPanel">
             <CollapsibleSection title="Stacked composition" isOpen={showStack} onToggle={() => setShowStack((v) => !v)}>
-              <StackPanel block={selectedBlock} onUpdate={onUpdateSelectedBlock} onReset={onResetStackLayout} />
+              <StackPanel
+                block={selectedBlock}
+                onUpdate={onUpdateSelectedBlock}
+                onReset={onResetStackLayout}
+                moveTogether={stackMoveTogether}
+                onMoveTogether={(v) => onStackMoveTogether?.(v)}
+              />
             </CollapsibleSection>
           </div>
         )}

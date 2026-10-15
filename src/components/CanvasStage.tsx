@@ -175,7 +175,8 @@ export type CanvasStageProps = {
   onBeginStackEdit: () => void;
   onSetStackPieces: (blockId: number, patches: { id: string; x?: number; y?: number; rotation?: number }[]) => void;
   onSetStackJoinBow: (blockId: number, joinId: string, bend: { bow: number; depth: number }) => void;
-  onSplitStackPiece: (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => void;
+  onSplitStackPiece: (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => { id: string; x: number; y: number } | null;
+  stackMoveTogether: boolean;
   /** Next Shape: the selected text block's letters that have alternates. */
   alternateLetters: LetterAlternates[];
   onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
@@ -305,6 +306,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSetStackPieces,
   onSetStackJoinBow,
   onSplitStackPiece,
+  stackMoveTogether,
   onSetStrokeCut,
   alternateLetters,
   onPickGlyphAlternate,
@@ -1227,7 +1229,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                           onSetPieces={(patches) => onSetStackPieces(block.id, patches)}
                           onSetBow={(joinId, bend) => onSetStackJoinBow(block.id, joinId, bend)}
                           unitsPerEm={block.unitsPerEm}
-                          tailMode={block.stackTailMode ?? false}
+                          color={block.color}
+                          moveTogether={stackMoveTogether}
                           onSplit={(pieceId, cut) => onSplitStackPiece(block.id, pieceId, cut)}
                         />
                       ) : null

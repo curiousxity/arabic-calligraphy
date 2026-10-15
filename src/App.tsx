@@ -715,16 +715,22 @@ const App: React.FC = () => {
   const splitStackPiece = useCallback(
     (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => {
       const block = blocks.find((b) => b.id === blockId);
-      if (!block || !isStackBlock(block)) return;
+      if (!block || !isStackBlock(block)) return null;
       const next = splitPieceAtCut(block.pieces, block.joins, pieceId, cut);
-      if (!next) return;
+      if (!next) return null;
       pushHistory();
       setBlocks((prev) =>
         prev.map((b) => (b.id === blockId && isStackBlock(b) ? { ...b, pieces: next.pieces, joins: next.joins } : b))
       );
+      // The cap is the piece the split appended; the overlay pulls it in the same gesture.
+      const cap = next.pieces[next.pieces.length - 1];
+      return { id: cap.id, x: cap.x, y: cap.y };
     },
     [blocks, pushHistory]
   );
+
+  /** Editor preference, not block state: dragging a stack letter carries the letters after it. */
+  const [stackMoveTogether, setStackMoveTogether] = useState(true);
 
   const setStackJoinBow = useCallback((blockId: number, joinId: string, bend: { bow: number; depth: number }) => {
     setBlocks((prev) =>
@@ -3296,6 +3302,8 @@ const App: React.FC = () => {
       <Sidebar
         onConvertToStack={convertSelectedBlockToStack}
         onResetStackLayout={resetStackLayout}
+        stackMoveTogether={stackMoveTogether}
+        onStackMoveTogether={setStackMoveTogether}
         blocks={blocks}
         selectedBlock={selectedBlock}
         selectedIds={selectedIds}
@@ -3470,6 +3478,7 @@ const App: React.FC = () => {
           onSetStackPieces={setStackPieces}
           onSetStackJoinBow={setStackJoinBow}
           onSplitStackPiece={splitStackPiece}
+          stackMoveTogether={stackMoveTogether}
           alternateLetters={glyphAlternatesState.letters}
           onPickGlyphAlternate={pickGlyphAlternate}
           onSetStrokeCut={setStrokeCut}

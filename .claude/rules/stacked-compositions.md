@@ -114,13 +114,50 @@ at creation. `rebasePiece` recomputes it after a split so nothing moves.
 every piece later in reading order with their marks. A chain move is a
 translation only.
 
-**The zone sweep runs only while "Split strokes" is armed** — fifteen
-rotations per piece is too much for every render.
+**The editing chrome has no modes and no handles** (since 2026-10-15; the
+"Split strokes" checkbox and the purple/orange/green dots went). Whatever
+the pointer is over gets a thin outline in the ink's complement
+(`complementColor.ts`) and a drag there does the one thing that place
+means: ink moves, the band just outside ink tilts, a join curve bends, the
+free end of a straight stroke cuts on press and pulls the tail in the same
+drag. **Z-order is the dispatch** in `StackEditOverlay`: tilt rings lowest,
+then join hit curves, then body polygons, then the hovered letter's cut
+spans — so ink always wins over the ring, and a cut span wins over the
+body. All chrome strokes use `strokeScaleEnabled={false}` so the ring and
+the outline are constant screen px at any zoom without the overlay knowing
+the stage scale. Nothing is drawn at rest, so a selected composition looks
+like its export.
 
-**Hover is held near the tilt handle.** Letters overlap in a stack, so the
-way to a piece's tilt handle often crosses a neighbour's polygon: while the
-pointer is within 12 px of the current handle, entering another piece does
-not take the hover.
+**A tail pull is not a Konva drag.** The press splits the piece
+(`onSplit` returns the cap), which replaces the body's `cmds`, which
+unmounts the span that was pressed — a node drag would die with it. The
+overlay instead listens on the stage under a `.stackpull` namespace and
+sets the cap's position absolutely each frame; hover is frozen on the cap
+until release. `splitStackPiece` pushes history, so the cut and the pull
+are one undo step and the press must not call `onBegin`.
+
+**Where a press cuts** is the press's x in the zone's frame
+(`cutAtPress`, `stackZones.ts`), clamped a little inside the zone. Only
+the outer part of a zone's two ends is a pull target (`pullSpans`: 40% of
+the zone or two thicknesses, whichever is longer, never more than half);
+the middle moves the letter — on a lam the stem is most of the ink, and
+"press on the stroke" has to mean one thing. An end beside a join is
+offered too: a first version refused any end with a face within a
+thickness of it, and that left UKIJ Diwani's مصبح with nothing to pull,
+because its only straight runs *are* the connector stubs and their
+height exceeds their length. **A span is offered only if it will split**:
+zone legality is a stroke-cut notion (an even crossing count), but
+`splitAtCut` needs one contour crossed exactly twice, so each span is
+probed at both clamped ends and its middle (`spanProbes`) before it is
+drawn — the old dots had the same dead spots, they just clicked to
+nothing. The zone sweep (fifteen rotations) runs for the hovered letter
+only, cached per `cmds`. The span's hit area carries 3 screen px of slack
+(`CUT_SLACK_PX`): Chrome rounds mouse positions to whole px while pointer
+events keep fractions, and a thin stroke's span can sit between the two.
+
+**"Move letters together"** is `App.tsx` state, not a block field: it is a
+preference about the next drag, not part of the design, so it is neither
+saved nor undoable. Alt still moves a letter alone while it is on.
 
 **Fallback joins.** Where no zone sits at a join, the convert handler
 inserts a tatweel at that slot and converts again, **only when the shapable

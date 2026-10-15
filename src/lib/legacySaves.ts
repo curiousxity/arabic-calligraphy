@@ -19,6 +19,8 @@ export const REMOVED_BLOCK_FIELDS = [
   "warpX", "warpY",
   // Image blocks and the ornament library, removed 2026-10-14.
   "imageDataUrl", "imageScale", "ornamental",
+  // Stack "Split strokes" mode, removed 2026-10-15: tails are pulled from the stroke itself.
+  "stackTailMode",
 ] as const;
 
 export function sanitizeLegacyBlocks(blocks: unknown[]): Block[] {
