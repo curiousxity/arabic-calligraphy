@@ -108,6 +108,16 @@ The zone sweep in `ShapedText` runs **only while the tool is armed**: it
 rotates every glyph outline through fifteen candidate angles, which is far too
 much to run on every text block on the canvas all the time.
 
+`DetectOpts.baseAngles` (default `[0]`) adds further sweep bases — the stack
+editor and arranger pass `[0, π/2]` (`stackDetectOpts`, `stackZones.ts`) so
+upstrokes are found — and `minAspect` (default 0; stack passes 1) drops the
+zone a sweep about an *added* base finds *across* a short stroke. The
+baseline sweep is never filtered: UKIJ Diwani's only straight runs are
+connector stubs taller than they are long, and the tail pull lives on them.
+`dedupeZones` breaks a fit tie (within 1e-6) by zone length, so a stem found
+along its length beats the zone read across it. Live-text cuts use neither
+option.
+
 `StrokeCutHoverHandles.tsx` is the on-canvas overlay, mounted **before**
 `DiacriticHoverHandles` — Konva routes to the topmost listening shape and
 later siblings sit on top, so the order is largest → smallest (stroke rail,

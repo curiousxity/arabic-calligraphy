@@ -47,6 +47,11 @@ These are capabilities that have been explicitly identified as valuable but deli
     Open research on Diwani's overlapping, variable-width forms; the
     stroke-cut detector's history (stroke-cuts.md) is the cautionary tale
     for predicates that look reasonable on straight strokes.
+    Includes **widening the radius of a curved stroke** (asked 2026-10-15
+    alongside stack arrange fillers; see
+    `docs/superpowers/specs/2026-10-15-stack-arrange-fill-design.md`,
+    "Out of scope"): a bowl has only an outline, no spine, so this is the
+    same skeleton + nib work.
   - *Stacking alternates in the Diwani font* (raised ب, the long sweeping
     م tail): font-side glyph design, exposed through Next Shape; see
     [bundled-fonts.md](bundled-fonts.md).

@@ -110,6 +110,12 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 - **Fill gaps with tashkeel.** A checkbox in the Stack panel; the arranger
   busies the gaps with the font's own marks (teardrop fallback), placed
   off the ink by contour test. Re-runs replace them; Reset removes them.
+- **Upstrokes reach for the edge.** The zone sweep gained a second base
+  angle, so an alif's stem is cut-and-pullable by hand and the arranger
+  pulls free stem ends toward the boundary. Font-dependent: Amiri and
+  FatemiMaqala pull, the Diwani faces and Thuluth taper and do not —
+  pinned in `stackConvert.test.ts`; see
+  [stacked-compositions.md](.claude/rules/stacked-compositions.md).
 
 ### 2026-10-15 — Stacked compositions fill a shape; guides from an SVG
 

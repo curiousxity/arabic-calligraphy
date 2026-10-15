@@ -215,6 +215,30 @@ state like "Move letters together", neither saved nor undoable. The
 handler is async (the font load) and commits by captured block id through
 `updateBlock`.
 
+**Stems** (`pullStemEnds`, after tilt, before fillers; `pullStems: true`
+from the handler): each letter's straight zones are found once with
+`stackDetectOpts` (both sweep bases, aspect floor on the added base); a
+zone's end that splits (`spanProbes`) and has no face within a thickness is
+a free end. A long zone is cut at the inner edge of its end's pull span; a
+short one — under four thicknesses, where `pullSpans` offers one span, and
+an Amiri alif is 3.7 — is cut at its middle, and the cap is kept only if it
+lands on the end's side (`splitPieceAtCut` picks the smaller fragment).
+At the found scale the cap is marched along the stem's axis in `STEM_STEP`
+steps until its `LETTER_GAP`-padded box would leave the shape or touch other
+ink; under `STEM_MIN` the cut is dropped. A letter that already has a cap
+is **slid** along its join axis instead, so re-runs never cut a letter
+twice and a hand-pulled cap is the same thing (a lengthened letter makes its
+row taller, so the block re-sizes and other letters may find room on the
+next run; a third run changes nothing). One pull per letter per run.
+**Font-dependent by design**: the detector wants even thickness, so Amiri
+and FatemiMaqala stems pull while both Diwani faces and Thuluth taper and
+are left alone (`stackConvert.test.ts` pins this); loosening the tolerance
+needs a measurement script first (stroke-cuts.md). A stem that hugs the
+edge often has no headroom and stays put. `splitPieceAtCut` is imported
+from `stackConvert.ts` (harfbuzz-free) rather than moved: `rebasePiece`
+lives in `stackOutline.ts`, which imports `stackGeometry.ts`. Reset returns
+caps to the cut (`rebasePiece` keeps a cap's home at the letter's).
+
 **"Move letters together"** is `App.tsx` state, not a block field: it is a
 preference about the next drag, not part of the design, so it is neither
 saved nor undoable. Alt still moves a letter alone while it is on.
