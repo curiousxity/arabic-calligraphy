@@ -204,18 +204,24 @@ const letter = (id: string, order: number, x: number, w: number, h: number, extr
   id, cmds: rect(w, h), x, y: 0, rotation: 0, pivot: [w / 2, -h / 2], homeX: x, homeY: 0, order, role: "letter", faces: [], ...extra,
 });
 
-const block = (): StackBlock => ({
+// Two fixtures. The join one carries a join whose faces do not exist on the
+// synthetic pieces (`faces: []`): `assembleStackOutline` skips such a join,
+// which is fine for the join-field tests, but measurement and arranging use
+// the joinless fixture so nothing depends on that skip.
+const block = (joins: boolean): StackBlock => ({
   id: 1, type: "stack", x: 100, y: 200, rotation: 15,
   text: "", fontSize: 100, color: "#000", fontFamily: "Amiri",
   source: { text: "اب", fontFamily: "Amiri" }, unitsPerEm: UPM,
   nib: { width: 60, minFraction: 0.5 },
   pieces: [letter("a", 0, 0, 200, 600), letter("b", 1, 300, 300, 400)],
-  joins: [{ id: "j1", from: { pieceId: "a", faceIndex: 0 }, to: { pieceId: "b", faceIndex: 0 }, bow: 0.4, depth: 0.2, rest: { bow: 0.1, depth: 0 } }],
+  joins: joins
+    ? [{ id: "j1", from: { pieceId: "a", faceIndex: 0 }, to: { pieceId: "b", faceIndex: 0 }, bow: 0.4, depth: 0.2, rest: { bow: 0.1, depth: 0 } }]
+    : [],
 } as unknown as StackBlock);
 
 describe("draftOf / draftChanged", () => {
   it("copies the block's editable fields and reports no change until something is patched", () => {
-    const d = draftOf(block());
+    const d = draftOf(block(true));
     expect(d.x).toBe(100); expect(d.rotation).toBe(15); expect(d.pieces.length).toBe(2);
     expect(draftChanged(d, d)).toBe(false);
     expect(draftChanged(d, patchPieces(d, [{ id: "a", y: -50 }]))).toBe(true);
@@ -227,17 +233,17 @@ describe("draftOf / draftChanged", () => {
 
 describe("patchPieces / setJoinBend / resetDraft", () => {
   it("patches by id, keeps ids, and leaves other pieces untouched by reference", () => {
-    const d = draftOf(block());
+    const d = draftOf(block(true));
     const n = patchPieces(d, [{ id: "b", x: 310, rotation: 0.3 }]);
     expect(n.pieces[1]).toMatchObject({ id: "b", x: 310, rotation: 0.3 });
     expect(n.pieces[0]).toBe(d.pieces[0]);
   });
   it("sets a join's bow and depth", () => {
-    const n = setJoinBend(draftOf(block()), "j1", { bow: -0.2, depth: 0.5 });
+    const n = setJoinBend(draftOf(block(true)), "j1", { bow: -0.2, depth: 0.5 });
     expect(n.joins[0]).toMatchObject({ bow: -0.2, depth: 0.5 });
   });
   it("reset returns pieces home, joins to rest, and drops fillers", () => {
-    const d = draftOf(block());
+    const d = draftOf(block(true));
     const moved = patchPieces(d, [{ id: "a", x: 50, y: -90, rotation: 0.4 }]);
     const withFiller = { ...moved, pieces: [...moved.pieces, { ...letter("f", 9, 0, 40, 40), role: "mark" as const, filler: true }] };
     const r = resetDraft(withFiller);
@@ -249,7 +255,7 @@ describe("patchPieces / setJoinBend / resetDraft", () => {
 
 describe("inkBoundsPx", () => {
   it("measures the assembled outline in px at the draft's size, ignoring fillers", () => {
-    const d = draftOf(block());
+    const d = draftOf(block(false));
     const b = inkBoundsPx(d, UPM);
     // 600 font units tall at 100px/1000upm = 60px; x spans 0..600 units = 60px.
     expect(b.y2 - b.y1).toBeCloseTo(60, 0);
@@ -261,7 +267,7 @@ describe("inkBoundsPx", () => {
 
 describe("arrangeDraft", () => {
   it("re-flows the letters into the shape, keeps the block in place unless a placement is given", () => {
-    const d = draftOf(block());
+    const d = draftOf(block(false));
     const tall: Array<[number, number]> = [[-60, -200], [60, -200], [60, 200], [-60, 200]];
     const r = arrangeDraft(d, UPM, tall, []);
     expect(r).not.toBeNull();
@@ -271,16 +277,15 @@ describe("arrangeDraft", () => {
     expect(placed!.draft).toMatchObject({ x: 1, y: 2, rotation: 3 });
   });
   it("strips earlier fillers before arranging", () => {
-    const d = draftOf(block());
+    const d = draftOf(block(false));
     const withFiller = { ...d, pieces: [...d.pieces, { ...letter("f", 9, 0, 40, 40), role: "mark" as const, filler: true }] };
     const tall: Array<[number, number]> = [[-60, -200], [60, -200], [60, 200], [-60, 200]];
     const r = arrangeDraft(withFiller, UPM, tall, []);
     expect(r!.draft.pieces.some((p) => p.filler)).toBe(false);
   });
-  it("returns null when nothing fits", () => {
-    const d = draftOf(block());
-    const dot: Array<[number, number]> = [[0, 0], [1, 0], [1, 1]];
-    expect(arrangeDraft(d, UPM, dot, [])).toBeNull();
+  it("returns null for a degenerate shape (the arranger's own null case)", () => {
+    const d = draftOf(block(false));
+    expect(arrangeDraft(d, UPM, [[0, 0], [1, 1]], [])).toBeNull();
   });
 });
 
@@ -494,6 +499,8 @@ git commit -m "Stack editor: staged draft — patch, bend, split, free, reset, a
   export type StackEditorGuide = { id: number; label: string; polygon: Array<[number, number]>; x: number; y: number; rotation: number };
   export type StackEditorDialogProps = {
     block: StackBlock;
+    /** CSS family of the block's font, for the title (the font key alone is not a CSS name for an uploaded font). */
+    cssFamily: string;
     surfaceColor: string;
     closedGuides: StackEditorGuide[];
     moveTogether: boolean; onMoveTogether: (v: boolean) => void;
@@ -600,6 +607,8 @@ export type StackEditorGuide = {
 
 export type StackEditorDialogProps = {
   block: StackBlock;
+  /** CSS family of the block's font, for the title; App resolves it from the font catalogue. */
+  cssFamily: string;
   /** The canvas surface the composition will sit on (paper or freeform). */
   surfaceColor: string;
   closedGuides: StackEditorGuide[];
@@ -645,7 +654,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
  * artwork may live in the main stage.
  */
 export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
-  block, surfaceColor, closedGuides, moveTogether, onMoveTogether, fillGaps, onFillGaps, loadFillers, onDone, onCancel,
+  block, cssFamily, surfaceColor, closedGuides, moveTogether, onMoveTogether, fillGaps, onFillGaps, loadFillers, onDone, onCancel,
 }) => {
   // Captured once: `draftChanged` compares arrays by reference, so the opening
   // draft must hold the block's own arrays, not a copy made on a later render.
@@ -829,7 +838,7 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
         <div className="nameDesignHeader">
           <div>
             <div id="stackEditorTitle" className="stackEditorTitle">
-              Edit composition · <bdi dir="rtl" style={{ fontFamily: `"${block.source.fontFamily}"` }}>{block.source.text}</bdi>
+              Edit composition · <bdi dir="rtl" style={{ fontFamily: cssFamily }}>{block.source.text}</bdi>
             </div>
             <div className="nameDesignSubtitle">What you see here is what the canvas will show when you press Done.</div>
           </div>
@@ -1014,6 +1023,7 @@ export const StackPanel: React.FC<{
   block: StackBlock;
   onEdit: () => void;
 }> = ({ block, onEdit }) => (
+  // A locked block cannot be edited (the canvas double-click refuses too).
   <div className="sectionPanel">
     <p className="guideEmpty" dir="rtl">{block.source.text}</p>
     <p className="guideEmpty">
@@ -1024,7 +1034,7 @@ export const StackPanel: React.FC<{
       Move, tilt, bend and arrange the letters in the editor window. Double-click the
       composition on the canvas, or press the button below.
     </p>
-    <button type="button" className="sidebarSmallAction" aria-label="Edit composition" onClick={onEdit}>
+    <button type="button" className="sidebarSmallAction" aria-label="Edit composition" disabled={block.locked} onClick={onEdit}>
       Edit composition
     </button>
   </div>
@@ -1063,8 +1073,9 @@ In the props type delete lines 176–182 (`onBeginStackEdit` … `stackMoveToget
                     opacity={block.opacity ?? 1}
                     locked={block.locked}
                     isSelected={block.id === selectedId}
-                    // Editing lives in the editor window; double-click opens it.
-                    onDblClick={() => onEditStack(block.id)}
+                    // Editing lives in the editor window; double-click opens it
+                    // (not while panning or locked — the old overlay's condition).
+                    onDblClick={() => { if (!effectivePanMode && !block.locked) onEditStack(block.id); }}
                   />
                 );
               }
@@ -1146,6 +1157,7 @@ and add `stackEditorId` to that effect's dependency array (the array near line 1
         <StackEditorDialog
           key={stackEditorBlock.id}
           block={stackEditorBlock}
+          cssFamily={fontChoices.find((f) => f.value === stackEditorBlock.source.fontFamily)?.cssFamily ?? `'${stackEditorBlock.source.fontFamily}'`}
           surfaceColor={backgroundColor}
           closedGuides={stackEditorGuides}
           moveTogether={stackMoveTogether}
@@ -1159,7 +1171,7 @@ and add `stackEditorId` to that effect's dependency array (the array near line 1
       )}
 ```
 
-`backgroundColor` is the canvas surface state (line 494). The `key` makes a fresh draft per block.
+`backgroundColor` is the canvas surface state (line 494); `fontChoices` is App's catalogue memo (line 387), resolved the way the Sidebar's composition button resolves its `cssFamily`. The `key` makes a fresh draft per block.
 
 Also: the dialog's `opening` is `useMemo(() => draftOf(block), [block])`, and the mounted `block` object is stable while the dialog is open because nothing changes the block until Done. Do not pass a derived object.
 
@@ -1246,7 +1258,7 @@ async function done(page: Page) {
 
 Then, in every `page.evaluate` in this file that reads `window.__HARF__!.getStage()!` to find `.stack-piece`, `.stack-cut`, `.stack-ring`, `.stack-join` or `.stack-curve` nodes (`pieceCentre`, `grabPoint`, `ringPoint`, `findCutSpan`, `joinPoint`, and the bowl helpers in the last test), replace `getStage()` with `getEditorStage()`. Replace `namedNodeCount(page, "stack-…")` with `namedNodeCount(page, "stack-…", { editor: true })` and `hitTargetAt(page, c)` with `hitTargetAt(page, c, { editor: true })` in those tests. In every test after `await convert(page);` add `await openEditor(page);`, and before the assertions that read `piecesOf`/`fullPiecesOf`/`joinsOf` (block state) add `await done(page);`. Where a test performs a second gesture after reading state (the bend test lifts a letter, then bends; the bowl test frees, then double-clicks, then undoes), keep the gestures inside one open window and call `done` once at the end, and read intermediate state through the window's nodes rather than the block (the block's pieces are untouched until Done). Specifically, for the bend test, the "join exists" wait becomes `await expect.poll(() => namedNodeCount(page, "stack-join", { editor: true })).toBeGreaterThan(0);` and the before/after `joinsOf` comparison moves to after `done`. For the bowl test's undo step, replace the canvas Ctrl+Z with the window's: `await page.keyboard.press("Control+z")` while the window is open (the editor's stack handles it), then `done`, then assert the block equals its converted state.
 
-The first test ("converting bakes…undo brings the text back") does not open the window; leave it.
+The first test ("converting bakes…undo brings the text back") reads only block state and the block's client box, never an overlay node, so it needs no change.
 
 - [ ] **Step 3: Run the retargeted suite**
 
@@ -1364,7 +1376,8 @@ test("Teardrop arranges the letters in place: size changes, origin does not, out
   await openByDoubleClick(page);
   await page.getByRole("button", { name: "Teardrop", exact: true }).click();
   await expect.poll(() => namedNodeCount(page, "stack-template-outline", { editor: true })).toBe(1);
-  await expect(page.getByRole("status")).toContainText(/Arranged \d+ letters? in \d+ rows?/);
+  // Scoped: the sidebar has a status line of its own.
+  await expect(page.getByTestId("stack-editor").getByRole("status")).toContainText(/Arranged \d+ letters? in \d+ rows?/);
   await page.getByRole("button", { name: "Free", exact: true }).click();
   await expect.poll(() => namedNodeCount(page, "stack-template-outline", { editor: true })).toBe(0);
   await page.getByRole("button", { name: "Done", exact: true }).click();
@@ -1377,13 +1390,36 @@ test("Teardrop arranges the letters in place: size changes, origin does not, out
   expect(letters(after.pieces)).toBe(letters(before.pieces));
 });
 
+/** Width over height of the dashed template outline in the window. */
+async function outlineAspect(page: Page): Promise<number | null> {
+  return page.evaluate(() => {
+    const node = window.__HARF__!.getEditorStage()?.findOne(".stack-template-outline");
+    if (!node) return null;
+    const r = node.getClientRect();
+    return r.width / r.height;
+  });
+}
+
 test("a later template pick wins over a slower earlier one", async ({ page }) => {
   await openByDoubleClick(page);
   await page.getByRole("button", { name: "Teardrop", exact: true }).click();
   await page.getByRole("button", { name: "Almond", exact: true }).click();
   await expect.poll(() => namedNodeCount(page, "stack-template-outline", { editor: true })).toBe(1);
+  // The outline that landed is the almond's (220:400 ≈ 0.55), not the
+  // teardrop's (260:380 ≈ 0.68): the slower first arrange was dropped.
+  // Letting the fillers load twice settles both before we read.
+  await page.waitForTimeout(500);
+  await expect.poll(() => outlineAspect(page)).toBeLessThan(0.62);
   await expect(page.getByRole("button", { name: "Almond", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Teardrop", exact: true })).toHaveAttribute("aria-pressed", "false");
+});
+
+test("Done on an untouched window records no history step", async ({ page }) => {
+  await openByDoubleClick(page);
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByTestId("stack-editor").waitFor({ state: "detached" });
+  // The only step on the stack is the conversion: one undo returns the text block.
+  await page.keyboard.press("Control+z");
+  await expect.poll(async () => (await blockOf(page)).type).toBe("text");
 });
 
 test("only closed guides are offered as cards", async ({ page }) => {
