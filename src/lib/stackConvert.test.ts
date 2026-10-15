@@ -136,7 +136,7 @@ import { pieceTransform } from "./stackOutline";
 import { assembleStackOutline, assembleStackOutlineReport, chainOf } from "./stackOutline";
 import { nibFloorFraction, nuqtaUnits } from "./nuqta";
 import type { StackJoin, StackPiece } from "../types";
-import { flattenContours, findCutZonesSwept, outlineBounds, toSvgCmds } from "./strokeCuts";
+import { flattenContours, findCutZonesSwept, outlineBounds, toSvgCmds, DEFAULT_DETECT_OPTS } from "./strokeCuts";
 import { stackDetectOpts } from "./stackZones";
 import { findDetachedMarks, splitContours } from "./detachedMarks";
 import type { SvgCmd } from "./svgPath";
@@ -495,6 +495,80 @@ describe("bendCurveAt", () => {
       const after = area(assembleStackOutline(r!.pieces, r!.joins, nib));
       expect(Math.abs(after - before) / before, name).toBeLessThan(0.05);
     }
+  });
+
+  /** Every face point lies on its own piece's outline (a bridge endpoint). */
+  const facesOnOwnOutline = (pieces: StackPiece[]) =>
+    pieces.every((p) => p.faces.every((f) => {
+      const pts = flattenContours(p.cmds).flat();
+      const on = (q: [number, number]) => pts.some((v) => Math.hypot(v[0] - q[0], v[1] - q[1]) < 1e-6);
+      return on(f.a) && on(f.b);
+    }));
+  /** No parentId names a piece that is gone; the body itself rides on nothing. */
+  const linksSound = (pieces: StackPiece[], bodyId: string) =>
+    pieces.every((p) => p.parentId === undefined || pieces.some((q) => q.id === p.parentId)) &&
+    pieces.find((p) => p.id === bodyId)!.parentId === undefined;
+
+  it("keeps the letter's riders and the body's links sound when the arc held the body id", () => {
+    const band = arcBand(100, 120, Math.PI * 0.1, Math.PI * 0.9);
+    const endR = [Math.cos(Math.PI * 0.1) * 110, Math.sin(Math.PI * 0.1) * 110];
+    const endL = [Math.cos(Math.PI * 0.9) * 110, Math.sin(Math.PI * 0.9) * 110];
+    const stub = (x: number, y: number, dir: 1 | -1): SvgCmd[] => [
+      { type: "M", x, y: y - 10 }, { type: "L", x: x + dir * 40, y: y - 10 }, { type: "L", x: x + dir * 40, y: y + 10 }, { type: "L", x, y: y + 10 }, { type: "Z" },
+    ];
+    const piece: StackPiece = { id: "r", cmds: [...band, ...stub(endR[0] - 5, endR[1], 1), ...stub(endL[0] + 5, endL[1], -1)], x: 0, y: 0, rotation: 0, pivot: [0, 60], homeX: 0, homeY: 0, order: 0, role: "letter", faces: [] };
+    const dot: StackPiece = { id: "d0-0", cmds: stub(-20, 160, 1), x: 0, y: 0, rotation: 0, pivot: [0, 160], homeX: 0, homeY: 0, order: 0, role: "mark", parentId: "r", faces: [] };
+    const r = bendCurveAt([piece, dot], [], "r", [0, 110])!;
+    expect(r).not.toBeNull();
+    expect(linksSound(r.pieces, "r")).toBe(true);
+    expect(r.pieces.find((p) => p.id === "d0-0")!.parentId).toBe("r");
+    const body = r.pieces.find((p) => p.id === "r")!;
+    expect(body.role).toBe("letter");
+    expect(body.order).toBe(0);
+    expect(chainOf(r.pieces, "r", true)).toEqual(expect.arrayContaining(["r", "d0-0"]));
+    // Ids stay unique, and a later split of the same letter keeps them unique.
+    expect(new Set(r.pieces.map((p) => p.id)).size).toBe(r.pieces.length);
+  });
+
+  it("never reuses a cap id after a piece was deleted", () => {
+    const piece = bowlWithArms();
+    const r = bendCurveAt([piece], [], "b", [0, 110])!;
+    // Cut the body's remaining straight arm: the new cap must not collide with any id.
+    const body = r.pieces.find((p) => p.id === "b")!;
+    const zones = findCutZonesSwept(flattenContours(body.cmds), { glyphIndex: 0, cluster: 0 }, { ...DEFAULT_DETECT_OPTS, step: 5, minZoneWidth: 20 });
+    expect(zones.length).toBeGreaterThan(0);
+    const z = zones[0];
+    const again = splitPieceAtCut(r.pieces, r.joins, "b", { cutX: (z.fromX + z.toX) / 2, angle: z.angle })!;
+    expect(again).not.toBeNull();
+    expect(new Set(again.pieces.map((p) => p.id)).size).toBe(again.pieces.length);
+    expect(new Set(again.joins.map((j) => j.id)).size).toBe(again.joins.length);
+  });
+
+  it("keeps a neighbour's face on the fragment that carries it when the cut is windowed", () => {
+    // A U: two vertical arms on a bowl, with a neighbour joined at the right arm's tip.
+    const band = arcBand(100, 120, 0, Math.PI, 60);   // lower half-circle opening upward (y-down: apex at y=110)
+    const arm = (x: number): SvgCmd[] => [
+      { type: "M", x: x - 10, y: 0 }, { type: "L", x: x + 10, y: 0 }, { type: "L", x: x + 10, y: -200 }, { type: "L", x: x - 10, y: -200 }, { type: "Z" },
+    ];
+    const u: StackPiece = {
+      id: "u", cmds: [...band, ...arm(110), ...arm(-110)], x: 0, y: 0, rotation: 0, pivot: [0, 0], homeX: 0, homeY: 0, order: 0, role: "letter",
+      faces: [{ a: [100, -200], b: [120, -200], tangent: -Math.PI / 2 }],
+    };
+    const nb: StackPiece = { id: "n", cmds: [{ type: "M", x: 100, y: -260 }, { type: "L", x: 120, y: -260 }, { type: "L", x: 120, y: -240 }, { type: "L", x: 100, y: -240 }, { type: "Z" }], x: 0, y: 0, rotation: 0, pivot: [110, -250], homeX: 0, homeY: 0, order: 1, role: "letter", faces: [{ a: [100, -240], b: [120, -240], tangent: Math.PI / 2 }] };
+    const joins: StackJoin[] = [{ id: "jun", from: { pieceId: "u", faceIndex: 0 }, to: { pieceId: "n", faceIndex: 0 }, bow: 0 }];
+    const r = bendCurveAt([u, nb], joins, "u", [0, 110])!;
+    expect(r).not.toBeNull();
+    expect(facesOnOwnOutline(r.pieces)).toBe(true);
+    // The neighbour's join still resolves to a face on the right arm's fragment.
+    const jn = r.joins.find((j) => j.id === "jun")!;
+    const ref = jn.from.pieceId === "n" ? jn.to : jn.from;
+    const holder = r.pieces.find((p) => p.id === ref.pieceId)!;
+    const f = holder.faces[ref.faceIndex];
+    expect(f).toBeDefined();
+    expect(Math.abs((f.a[0] + f.b[0]) / 2 - 110)).toBeLessThan(1e-6);
+    // Moving that fragment and the neighbour together keeps the join spliceable.
+    const moved = r.pieces.map((p) => (p.id === holder.id || p.id === "n" ? { ...p, x: p.x + 30 } : p));
+    expect(assembleStackOutlineReport(moved, r.joins, { width: 20, minFraction: 0.5 }).skipped).toBe(0);
   });
 
   it("returns null off a curve", () => {

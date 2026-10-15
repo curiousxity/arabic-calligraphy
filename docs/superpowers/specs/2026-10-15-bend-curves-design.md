@@ -213,7 +213,11 @@ gate fonts find roughly one curve per letter.
 | Wessam | 20 | 18 | 16 |
 
 Across all 23 fonts, 331 of 346 curves free and 325 hold identity under
-5%; the worst error on a gate font is 0.9%. **Conversion: GO.** Three
+5%; the worst error on a gate font is 0.9%. **Conversion: GO.** After the
+branch review (same day) the script also counts dangling `parentId`s and
+faces off their own piece's outline — both read 0 for every font, where
+before the review's fixes 21 fonts had dangling parents (83 id swaps of
+331 frees) and 9 fonts had misplaced faces; frees rose to 334 of 346. Three
 things had to change from the first design to get here (each a ledger
 ruling in the plan): the profile sets the drawn width outright rather
 than scaling the pen model (whose interpolated cross-section vanishes on

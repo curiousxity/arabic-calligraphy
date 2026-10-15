@@ -154,6 +154,10 @@ export function splitAtCut(
   let face: [Pt, Pt] | null = null;
   const isNear = (x: number) => x < cut.cutX;
 
+  // In windowed mode an uncrossed contour (a counter, or one crossed only
+  // outside the window) goes with the half that contains it, not with the
+  // side of the infinite line its first point happens to lie on.
+  const loose: Seg[][] = [];
   for (const segs of contours) {
     const crossing = segs.map((s) => isNear(s.p[0][0]) !== isNear(s.p[s.p.length - 1][0]));
     // A windowed cut is a *segment* of the line, `half` either side of `y`
@@ -168,7 +172,10 @@ export function splitAtCut(
       }
     }
     const n = crossing.filter(Boolean).length;
-    if (n === 0) { (isNear(segs[0].p[0][0]) ? near : far).push(segs); continue; }
+    if (n === 0) {
+      if (cut.window) loose.push(segs); else (isNear(segs[0].p[0][0]) ? near : far).push(segs);
+      continue;
+    }
     if (n !== 2 || face) return null;
     const i1 = crossing.indexOf(true), i2 = crossing.indexOf(true, i1 + 1);
     const [a1, b1] = splitSegAtX(segs[i1], cut.cutX);
@@ -185,6 +192,21 @@ export function splitAtCut(
     face = [c1, c2];
   }
   if (!face) return null;
+  if (loose.length) {
+    const poly = (c: Seg[][]) => c.flatMap((segs) => segs.map((s) => s.p[0]));
+    const nearPoly = poly(near), farPoly = poly(far);
+    const inside = (p: Pt, pg: Pt[]) => {
+      let w = false;
+      for (let i = 0, j = pg.length - 1; i < pg.length; j = i++) {
+        if ((pg[i][1] > p[1]) !== (pg[j][1] > p[1]) && p[0] < ((pg[j][0] - pg[i][0]) * (p[1] - pg[i][1])) / (pg[j][1] - pg[i][1]) + pg[i][0]) w = !w;
+      }
+      return w;
+    };
+    for (const segs of loose) {
+      const q = segs[0].p[0];
+      (inside(q, nearPoly) ? near : inside(q, farPoly) ? far : isNear(q[0]) ? near : far).push(segs);
+    }
+  }
 
   const back = (c: Seg[][]) => rotateCmds(fromSegments(c), cut.angle);
   const rot = (p: Pt): Pt => {

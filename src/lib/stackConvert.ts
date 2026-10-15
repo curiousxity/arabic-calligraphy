@@ -35,6 +35,8 @@ export type ConvertInput = {
 export type UnjoinedPair = { earlierCl: number; laterCl: number };
 export type ConvertResult = { pieces: StackPiece[]; joins: StackJoin[]; unjoined: UnjoinedPair[] };
 
+type Pt2 = [number, number];
+
 type Placed = {
   index: number; cl: number; ax: number;
   /** Pen position in run space (font units, y-down). */
@@ -249,17 +251,33 @@ export function splitPieceAtCut(
   const bodyNewFace = capIsNear ? split.farFace : split.nearFace;
   const capNewFace = capIsNear ? split.nearFace : split.farFace;
 
-  const n = 1 + pieces.filter((x) => x.id.startsWith(`${p.id}t`)).length;
+  // One past the highest cap number ever given to this piece, so a deleted
+  // cap (a freed curve drops its arc) never has its id handed out again.
+  const n = 1 + pieces.reduce((m, x) => {
+    const match = new RegExp(`^${p.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}t(\\d+)`).exec(x.id);
+    return match ? Math.max(m, Number(match[1])) : m;
+  }, 0);
   const capId = `${p.id}t${n}`;
 
-  // Which fragment holds an existing face: decided by its midpoint in the cut's frame.
+  // Which fragment holds an existing face: the one whose outline carries its
+  // points. (The old test — which side of the infinite cut line the face's
+  // midpoint lies on — put a face on the far arm of a U with the wrong
+  // fragment once cuts became windowed segments.)
+  const carries = (cmds: SvgCmd[], f: CutFace) => {
+    const pts = flattenContours(cmds).flat();
+    const on = (q: Pt2) => pts.some((v) => Math.abs(v[0] - q[0]) < 1e-6 && Math.abs(v[1] - q[1]) < 1e-6);
+    return on(f.a) && on(f.b);
+  };
   const c = Math.cos(-cut.angle), sn = Math.sin(-cut.angle);
   const isNearSide = (f: CutFace) => {
     const mx = (f.a[0] + f.b[0]) / 2, my = (f.a[1] + f.b[1]) / 2;
     return mx * c - my * sn < cut.cutX;
   };
   const bodyIdxs: number[] = [], capIdxs: number[] = [];
-  p.faces.forEach((f, i) => (isNearSide(f) === capIsNear ? capIdxs : bodyIdxs).push(i));
+  p.faces.forEach((f, i) => {
+    const onCap = carries(capCmds, f) ? true : carries(bodyCmds, f) ? false : isNearSide(f) === capIsNear;
+    (onCap ? capIdxs : bodyIdxs).push(i);
+  });
 
   const body: StackPiece = { ...rebasePiece(p, bodyCmds), faces: [...bodyIdxs.map((i) => p.faces[i]), bodyNewFace] };
   const cap: StackPiece = {
@@ -319,8 +337,6 @@ export function fillerShapes(font: opentype.Font, upm: number, nibWidth: number)
   return out;
 }
 
-type Pt2 = [number, number];
-
 /** Which of `pieces` holds the world point `p` in its ink (odd contour count: counters are holes). */
 function pieceAt(pieces: readonly StackPiece[], p: Pt2): StackPiece | undefined {
   return pieces.find((q) => {
@@ -330,11 +346,20 @@ function pieceAt(pieces: readonly StackPiece[], p: Pt2): StackPiece | undefined 
   });
 }
 
-/** Swap two pieces' ids everywhere: the pieces, their riders' parentIds, and join refs. */
-function swapIds(pieces: StackPiece[], joins: StackJoin[], a: string, b: string): { pieces: StackPiece[]; joins: StackJoin[] } {
-  const sw = (id: string) => (id === a ? b : id === b ? a : id);
+/**
+ * Swap two pieces' *ids* and the join refs that name them — never their
+ * `parentId`s. The letter's riders point at the body's id and must keep
+ * doing so whichever fragment now carries it; the fragment that takes the
+ * body's id becomes the body (rides on nothing, keeps the letter's order).
+ */
+function swapIds(pieces: StackPiece[], joins: StackJoin[], bodyId: string, other: string, order: number): { pieces: StackPiece[]; joins: StackJoin[] } {
+  const sw = (id: string) => (id === bodyId ? other : id === other ? bodyId : id);
   return {
-    pieces: pieces.map((p) => ({ ...p, id: sw(p.id), ...(p.parentId === undefined ? {} : { parentId: sw(p.parentId) }) })),
+    pieces: pieces.map((p) => {
+      if (p.id === other) return { ...p, id: bodyId, parentId: undefined, role: "letter" as const, order };
+      if (p.id === bodyId) return { ...p, id: other };
+      return p;
+    }),
     joins: joins.map((j) => ({ ...j, from: { ...j.from, pieceId: sw(j.from.pieceId) }, to: { ...j.to, pieceId: sw(j.to.pieceId) } })),
   };
 }
@@ -385,7 +410,7 @@ export function bendCurveAt(
   if (arc.id === pieceId) {
     const others = fragments.filter((p) => p.id !== arc.id);
     const biggest = others.reduce((a, b) => (boxArea(b.cmds) > boxArea(a.cmds) ? b : a));
-    ({ pieces: ps, joins: js } = swapIds(ps, js, arc.id, biggest.id));
+    ({ pieces: ps, joins: js } = swapIds(ps, js, arc.id, biggest.id, piece.order));
     arcId = biggest.id;   // the arc now carries the fragment's old id
   }
   // The joins the two splits made to the arc name the faces to join; they go with it.
@@ -393,7 +418,8 @@ export function bendCurveAt(
   if (toArc.length !== 2) return null;
   const endRefs = toArc.map((j) => (j.from.pieceId === arcId ? j.to : j.from));
   js = js.filter((j) => !toArc.includes(j));
-  ps = ps.filter((p) => p.id !== arcId);   // riders of the arc (the far fragment) are re-parented below
+  // Whatever rode on the arc (the far fragment, a cap cut from it) now rides on the body.
+  ps = ps.filter((p) => p.id !== arcId).map((p) => (p.parentId === arcId ? { ...p, parentId: pieceId } : p));
   const bodyRef = endRefs.find((r) => r.pieceId === pieceId) ?? endRefs[0];
   const farRef = endRefs.find((r) => r !== bodyRef)!;
   // The far fragment rides on the body, whatever the splits made it ride on.

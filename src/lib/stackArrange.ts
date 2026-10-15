@@ -685,7 +685,9 @@ export function arrangeStackInShape(input: ArrangeInput): ArrangeResult | null {
   const polyFU = input.shapePx.map((p): Pt => [p[0] / (base * lo), p[1] / (base * lo)]);
   const maxOrder = groups.reduce((m, g) => Math.max(m, g.letter.order), 0);
   let arrangedPieces = arranged;
-  let arrangedJoins: StackJoin[] = input.joins.map((j) => ({ ...j, bow: 0, depth: 0 }));
+  // Every join back to its rest: the tangent-matched default, or for a curve
+  // freed from a letter the bend that reproduces the letter.
+  let arrangedJoins: StackJoin[] = input.joins.map((j) => ({ ...j, bow: j.rest?.bow ?? 0, depth: j.rest?.depth ?? 0 }));
   let stems = 0;
   if (input.pullStems) {
     const r = pullStemEnds(arrangedPieces, arrangedJoins, groups.map((g) => g.letter.id), polyFU, upm);

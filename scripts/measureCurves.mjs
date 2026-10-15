@@ -5,8 +5,9 @@
 // with the real convertRunToStack, and run the real curveRegions over every
 // letter piece. Reports curves found per letter, the mean turn, and — the
 // gate — for each curve, whether freeing it at the apex succeeds and the
-// outline's area stays within 5% of the original (n/a until bendCurveAt
-// exists).
+// outline's area stays within 5% of the original, and the block data stays
+// sound: no parentId names a missing piece and every face sits on its own
+// piece's outline (the last two columns must read 0).
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -18,9 +19,7 @@ const hbjs = require("harfbuzzjs");
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const FONTS_DIR = path.resolve(DIR, "../public/fonts");
 const { curveRegions } = await import("../src/lib/stackCurve.ts");
-const convertMod = await import("../src/lib/stackConvert.ts");
-const { convertRunToStack } = convertMod;
-const bendCurveAt = convertMod.bendCurveAt ?? null;
+const { convertRunToStack, bendCurveAt } = await import("../src/lib/stackConvert.ts");
 const { normalizeGlyphs } = await import("../src/lib/normalizeGlyphs.ts");
 const { flattenContours } = await import("../src/lib/strokeCuts.ts");
 const { assembleStackOutline } = await import("../src/lib/stackOutline.ts");
@@ -66,7 +65,8 @@ for (const file of fs.readdirSync(FONTS_DIR).filter((f) => /\.(ttf|otf)$/.test(f
   const parsed = opentype.parse(fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength));
   const upm = parsed.unitsPerEm || 1000;
   const family = file.replace(/\.(ttf|otf)$/, "");
-  let letters = 0, curves = 0, turnSum = 0, freed = 0, identityOk = 0, tried = 0;
+  let letters = 0, curves = 0, turnSum = 0, freed = 0, identityOk = 0, tried = 0, danglingParents = 0, facesOff = 0;
+  const onOutline = (p, q) => flattenContours(p.cmds).flat().some((v) => Math.abs(v[0] - q[0]) < 1e-6 && Math.abs(v[1] - q[1]) < 1e-6);
   for (const word of WORDS) {
     const glyphs = normalizeGlyphs(await shape(hb, fontData, upm, word));
     const { pieces, joins } = convertRunToStack({
@@ -81,20 +81,24 @@ for (const file of fs.readdirSync(FONTS_DIR).filter((f) => /\.(ttf|otf)$/.test(f
       curves += regions.length;
       for (const r of regions) {
         turnSum += r.trace.turn;
-        if (!bendCurveAt) continue;
         tried++;
         const res = bendCurveAt(pieces, joins, p.id, r.trace);   // as the overlay does: the hover's own trace
         if (!res) continue;
         freed++;
         const after = area(assembleStackOutline(res.pieces, res.joins, nib));
         if (Math.abs(after - before) / before < 0.05) identityOk++;
+        // Block data must stay sound: every parent exists, every face sits on its own piece.
+        for (const q of res.pieces) {
+          if (q.parentId !== undefined && !res.pieces.some((x) => x.id === q.parentId)) danglingParents++;
+          for (const f of q.faces) if (!onOutline(q, f.a) || !onOutline(q, f.b)) facesOff++;
+        }
       }
     }
   }
   rows.push({
     font: family, letters, curves, perLetter: (curves / Math.max(letters, 1)).toFixed(2),
     meanTurnDeg: curves ? Math.round((turnSum / curves) * 180 / Math.PI) : 0,
-    freed: tried ? `${freed}/${tried}` : "n/a", identity: tried ? `${identityOk}/${tried}` : "n/a",
+    freed: `${freed}/${tried}`, identity: `${identityOk}/${tried}`, danglingParents, facesOff,
   });
 }
 console.table(rows);

@@ -125,9 +125,16 @@ frame are ignored) — the infinite line perpendicular to a U's arm also
 crosses its other arm. `bendCurveAt` takes the hover's `CurveTrace` (a bare
 press re-traces), cuts twice with `splitPieceAtCut`, drops the fragment
 holding the trace's middle and the joins the splits made to it, rides the
-far fragment on the body, swaps the piece id off the arc when the arc was
-the largest fragment, and orients the far face to the body face's side of
-travel. The join's `rest` bend is three Gauss–Newton steps of
+far fragment on the body, swaps the piece *id* off the arc when the arc was
+the largest fragment (ids and join refs only — never `parentId`s, which
+name the body and must keep doing so; whatever rode on the arc is
+re-parented to the body), and orients the far face to the body face's side
+of travel. Because a bend deletes a piece, `splitPieceAtCut` numbers a new
+cap one past the highest number ever used, not by count; and it hands an
+existing face to the fragment whose *outline carries it*, not to the side of
+the infinite cut line (which, windowed, runs through a U's other arm), and
+a windowed `splitAtCut` places an uncrossed contour by containment. Reset
+layout and the arranger return every join to `rest ?? {0, 0}`. The join's `rest` bend is three Gauss–Newton steps of
 `solveJoinDrag` toward the traced midpoint; its `profile` is the traced
 width over the faces' interpolated thickness, read in the join's direction.
 **A profile sets the drawn width outright** (`joinEdges`: profile × the

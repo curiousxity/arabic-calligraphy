@@ -107,6 +107,9 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
   `docs/superpowers/specs/2026-10-15-bend-curves-design.md`; how the tracer
   works and where it stops:
   [stacked-compositions.md](.claude/rules/stacked-compositions.md).
+  Same-day review fixes: id swaps keep parent links sound, cap ids are
+  never reused, windowed cuts hand faces to the fragment that carries
+  them, Reset honours a freed curve's rest; the gate counts all of it.
 
 ### 2026-10-15 — Stack arrange follows the silhouette
 

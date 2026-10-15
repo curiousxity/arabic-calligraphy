@@ -469,3 +469,15 @@ describe("review fixes", () => {
     expect(v[0]).toBeCloseTo(1, 6);
   });
 });
+
+describe("rest bends", () => {
+  it("the arranger returns a join to its rest, not to straight", () => {
+    const inp = { ...word(), shapePx: ellipse(300, 900), fontSize: 100, unitsPerEm: UPM };
+    inp.joins = inp.joins.map((j, i) => (i === 0 ? { ...j, bow: 0.9, depth: 0.7, rest: { bow: 0.2, depth: 0.3 } } : j));
+    const r = arrangeStackInShape(inp)!;
+    expect(r.joins[0].bow).toBe(0.2);
+    expect(r.joins[0].depth).toBe(0.3);
+    expect(r.joins[1].bow).toBe(0);
+    expect(r.joins[1].depth).toBe(0);
+  });
+});

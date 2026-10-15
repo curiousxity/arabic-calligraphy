@@ -2173,7 +2173,7 @@ const App: React.FC = () => {
     if (!selectedBlock || !isStackBlock(selectedBlock)) return;
     updateSelectedBlock({
       pieces: selectedBlock.pieces.filter((p) => !p.filler).map((p) => ({ ...p, x: p.homeX, y: p.homeY, rotation: 0 })),
-      joins: selectedBlock.joins.map((j) => ({ ...j, bow: 0, depth: 0 })),
+      joins: selectedBlock.joins.map((j) => ({ ...j, bow: j.rest?.bow ?? 0, depth: j.rest?.depth ?? 0 })),
     });
   };
 
