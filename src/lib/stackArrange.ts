@@ -4,9 +4,11 @@
 import type { StackPiece, StackJoin } from "../types";
 import type { SvgCmd } from "./svgPath";
 import { pointInPolygon } from "./svgPath";
-import { outlineBounds, flattenContours, type Contour } from "./strokeCuts";
-import { translateCmds, transformPt, transformCmds, scaleCmds, cmdsCentre } from "./stackGeometry";
+import { outlineBounds, flattenContours, findCutZonesSwept, type Contour } from "./strokeCuts";
+import { translateCmds, transformPt, transformCmds, transformFace, scaleCmds, cmdsCentre, splitAtCut } from "./stackGeometry";
 import { pieceTransform } from "./stackOutline";
+import { stackDetectOpts, pullSpans, spanProbes, fromZoneFrame } from "./stackZones";
+import { splitPieceAtCut } from "./stackConvert";
 
 type Pt = [number, number];
 type Box = { x1: number; y1: number; x2: number; y2: number };
@@ -25,6 +27,8 @@ export type ArrangeInput = {
   unitsPerEm: number;
   /** Ornaments for the gaps; omitted = no filler pass. */
   fillers?: readonly FillerShape[];
+  /** Draw straight free stem ends out toward the boundary. Default false. */
+  pullStems?: boolean;
 };
 
 export type ArrangeResult = {
@@ -35,6 +39,8 @@ export type ArrangeResult = {
   rows: number;
   /** Filler pieces added. */
   fillers: number;
+  /** Stems cut and pulled (or existing caps slid). */
+  stems: number;
 };
 
 /**
@@ -60,6 +66,10 @@ const MAX_TILT = Math.PI / 6;
 const FILLER_CELL = 0.2;
 const FILLER_GAP = 0.03;
 const FILLER_SHRINK = 0.6;
+/** Stem pull: march step, the least pull worth a cut, and the most. All ems. */
+const STEM_STEP = 0.02;
+const STEM_MIN = 0.1;
+const STEM_MAX = 3;
 
 /** A letter with its riders: moved as one, its bounds measured as one. */
 type Group = {
@@ -467,6 +477,104 @@ function inkContours(pieces: readonly StackPiece[]): Contour[] {
   return pieces.flatMap((p) => flattenContours(transformCmds(p.cmds, pieceTransform(p))));
 }
 
+/** A straight stroke's free end: where to cut, and which way (piece-local unit) it points. */
+type StemEnd = { cutX: number; angle: number; dir: Pt };
+
+/** The free ends of a letter's straight strokes: each two-span zone's outer
+ *  end that will split and has no face of the letter within a thickness. */
+function freeEnds(letter: StackPiece, upm: number): StemEnd[] {
+  const zones = findCutZonesSwept(flattenContours(letter.cmds), { glyphIndex: 0, cluster: 0 }, stackDetectOpts(upm));
+  const out: StemEnd[] = [];
+  for (const z of zones) {
+    const spans = pullSpans(z);
+    if (spans.length !== 2) continue;   // a stub: no end is clearly the free one
+    const ends: { span: [number, number]; end: "from" | "to" }[] = [{ span: spans[0], end: "from" }, { span: spans[1], end: "to" }];
+    for (const { span, end } of ends) {
+      if (!spanProbes(z, span).every((cx) => splitAtCut(letter.cmds, { cutX: cx, angle: z.angle }) !== null)) continue;
+      const tip = fromZoneFrame([end === "to" ? z.toX : z.fromX, z.centreY], z.angle);
+      const blocked = letter.faces.some((f) => Math.hypot((f.a[0] + f.b[0]) / 2 - tip[0], (f.a[1] + f.b[1]) / 2 - tip[1]) < z.thickness);
+      if (blocked) continue;
+      const o = fromZoneFrame([0, 0], z.angle), u = fromZoneFrame([1, 0], z.angle);
+      const sgn = end === "to" ? 1 : -1;
+      out.push({ cutX: end === "to" ? span[0] : span[1], angle: z.angle, dir: [sgn * (u[0] - o[0]), sgn * (u[1] - o[1])] });
+    }
+  }
+  return out;
+}
+
+const rotateVec = (v: Pt, a: number): Pt => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)];
+const worldBounds = (p: StackPiece): Box => outlineBounds(transformCmds(p.cmds, pieceTransform(p)));
+
+/** How far `cap` can move along `dir` (world unit) before its padded box
+ *  leaves the shape or touches `obstacles`; in font units, capped. */
+function marchDistance(poly: readonly Pt[], cap: StackPiece, dir: Pt, obstacles: readonly Contour[], upm: number): number {
+  const step = STEM_STEP * upm, pad = LETTER_GAP * upm, max = STEM_MAX * upm;
+  const b = worldBounds(cap);
+  const clear = (d: number) => {
+    const x1 = b.x1 - pad + dir[0] * d, x2 = b.x2 + pad + dir[0] * d, y1 = b.y1 - pad + dir[1] * d, y2 = b.y2 + pad + dir[1] * d;
+    const probes: Pt[] = [[x1, y1], [x2, y1], [x1, y2], [x2, y2], [(x1 + x2) / 2, (y1 + y2) / 2]];
+    return probes.every(([px, py]) => pointInPolygon(px, py, poly as Array<[number, number]>) && !obstacles.some((c) => pointInPolygon(px, py, c)));
+  };
+  let d = 0;
+  while (d + step <= max && clear(d + step)) d += step;
+  return d;
+}
+
+/**
+ * Draw straight free stem ends out toward the boundary. For each letter: an
+ * existing cap (a `letter` piece riding on it) is slid along its join's
+ * axis; otherwise each free end is cut (`splitPieceAtCut`) and the cap
+ * marched until a gap short of the shape or of any other ink. A cut that
+ * could not move at least `STEM_MIN` is undone. Returns the new pieces and
+ * joins and how many stems moved.
+ */
+function pullStemEnds(
+  pieces: StackPiece[], joins: StackJoin[], letterIds: readonly string[], poly: readonly Pt[], upm: number
+): { pieces: StackPiece[]; joins: StackJoin[]; stems: number } {
+  let ps = pieces, js = joins, stems = 0;
+  const contoursOf = (ids: Set<string>) => inkContours(ps.filter((p) => !ids.has(p.id)));
+  for (const id of letterIds) {
+    const letter = ps.find((p) => p.id === id)!;
+    const caps = ps.filter((p) => p.parentId === id && p.role === "letter");
+    if (caps.length > 0) {
+      for (const cap of caps) {
+        const j = js.find((x) => (x.from.pieceId === id && x.to.pieceId === cap.id) || (x.to.pieceId === id && x.from.pieceId === cap.id));
+        if (!j) continue;
+        const bodyRef = j.from.pieceId === id ? j.from : j.to, capRef = j.from.pieceId === id ? j.to : j.from;
+        const fa = letter.faces[bodyRef.faceIndex], fb = cap.faces[capRef.faceIndex];
+        if (!fa || !fb) continue;
+        const A = transformFace(fa, pieceTransform(letter)), B = transformFace(fb, pieceTransform(cap));
+        const vx = (B.a[0] + B.b[0] - A.a[0] - A.b[0]) / 2, vy = (B.a[1] + B.b[1] - A.a[1] - A.b[1]) / 2;
+        const len = Math.hypot(vx, vy);
+        const dir: Pt = len > 1e-6 ? [vx / len, vy / len] : rotateVec([0, -1], letter.rotation);
+        const d = marchDistance(poly, cap, dir, contoursOf(new Set([id, cap.id])), upm);
+        if (d < STEM_MIN * upm) continue;
+        ps = ps.map((p) => (p.id === cap.id ? { ...p, x: p.x + dir[0] * d, y: p.y + dir[1] * d } : p));
+        stems++;
+      }
+      continue;
+    }
+    for (const end of freeEnds(letter, upm)) {
+      const split = splitPieceAtCut(ps, js, id, { cutX: end.cutX, angle: end.angle });
+      if (!split) continue;
+      const cap = split.pieces[split.pieces.length - 1];
+      const body = split.pieces.find((p) => p.id === id)!;
+      const dir = rotateVec(end.dir, letter.rotation);
+      // The cap must be the fragment on the end's side; `splitPieceAtCut` picks by area.
+      const cc = transformPt(cap.pivot, pieceTransform(cap)), bc = transformPt(body.pivot, pieceTransform(body));
+      if ((cc[0] - bc[0]) * dir[0] + (cc[1] - bc[1]) * dir[1] <= 0) continue;
+      const others = inkContours(split.pieces.filter((p) => p.id !== id && p.id !== cap.id));
+      const d = marchDistance(poly, cap, dir, others, upm);
+      if (d < STEM_MIN * upm) continue;
+      ps = split.pieces.map((p) => (p.id === cap.id ? { ...p, x: p.x + dir[0] * d, y: p.y + dir[1] * d } : p));
+      js = split.joins;
+      stems++;
+      break;   // one pull per letter per run; the next run slides it further
+    }
+  }
+  return { pieces: ps, joins: js, stems };
+}
+
 /**
  * Arrange the stack's letters inside `shapePx`. Rows run bottom to top in
  * reading order, right to left within a row (the way a stacked Diwani name
@@ -516,12 +624,20 @@ export function arrangeStackInShape(input: ArrangeInput): ArrangeResult | null {
   const arranged = input.pieces.filter((p) => !p.filler).map((p) => moved.get(p.id) ?? p);
   const polyFU = input.shapePx.map((p): Pt => [p[0] / (base * lo), p[1] / (base * lo)]);
   const maxOrder = groups.reduce((m, g) => Math.max(m, g.letter.order), 0);
-  const fills = fillGaps(polyFU, inkContours(arranged), input.fillers ?? [], upm, maxOrder);
+  let arrangedPieces = arranged;
+  let arrangedJoins: StackJoin[] = input.joins.map((j) => ({ ...j, bow: 0, depth: 0 }));
+  let stems = 0;
+  if (input.pullStems) {
+    const r = pullStemEnds(arrangedPieces, arrangedJoins, groups.map((g) => g.letter.id), polyFU, upm);
+    arrangedPieces = r.pieces; arrangedJoins = r.joins; stems = r.stems;
+  }
+  const fills = fillGaps(polyFU, inkContours(arrangedPieces), input.fillers ?? [], upm, maxOrder);
   return {
-    pieces: [...arranged, ...fills],
-    joins: input.joins.map((j) => ({ ...j, bow: 0, depth: 0 })),
+    pieces: [...arrangedPieces, ...fills],
+    joins: arrangedJoins,
     fontSize: input.fontSize * lo,
     rows: rows.length,
     fillers: fills.length,
+    stems,
   };
 }

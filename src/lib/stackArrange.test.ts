@@ -59,6 +59,33 @@ const FILLERS: FillerShape[] = [
 /** Flattened world-space contours of a piece. */
 const worldContours = (p: StackPiece) => flattenContours(transformCmds(p.cmds, { x: p.x, y: p.y, rotation: p.rotation, pivot: p.pivot }));
 
+/** A 1400×700 room with a 340-wide, 800-tall chimney over its middle (px):
+ *  too narrow for a letter's foot (300 units at the row's 1.1475 scale is
+ *  344 px), wide enough for a padded stem cap. */
+const CHIMNEY: Array<[number, number]> = [
+  [-700, 350], [700, 350], [700, -350], [170, -350], [170, -1150], [-170, -1150], [-170, -350], [-700, -350],
+];
+
+/** An L-shaped letter: a 300×103 foot with an 80-wide stem rising to 597
+ *  above its middle, meeting the foot through a short diagonal shoulder.
+ *  The shoulder matters: a square corner keeps the cut's crossing count at
+ *  two while the thickness jumps, and the detector refuses that whole run
+ *  as one uneven stroke; a real glyph's junction curves, which is what
+ *  breaks the run between stem and bowl. */
+function stemLetter(id: string, order: number, x: number): StackPiece {
+  const cmds: SvgCmd[] = [
+    { type: "M", x: 3, y: 0 }, { type: "L", x: 303, y: 0 }, { type: "L", x: 303, y: -103 }, { type: "L", x: 203, y: -103 },
+    { type: "L", x: 193, y: -113 }, { type: "L", x: 193, y: -597 }, { type: "L", x: 113, y: -597 }, { type: "L", x: 113, y: -113 },
+    { type: "L", x: 103, y: -103 }, { type: "L", x: 3, y: -103 }, { type: "Z" },
+  ];
+  return { id, cmds, x, y: 0, rotation: 0, pivot: [153, -300], homeX: x, homeY: 0, order, role: "letter", faces: [] };
+}
+
+/** Three stem letters on one baseline (order 0 rightmost). */
+function threeStems() {
+  return { pieces: [stemLetter("a2", 2, 0), stemLetter("a1", 1, 400), stemLetter("a0", 0, 800)], joins: [] as StackJoin[] };
+}
+
 /** A tall ellipse in px, centred on the origin, clockwise. */
 function ellipse(w: number, h: number, n = 64): Array<[number, number]> {
   return Array.from({ length: n }, (_, i) => {
@@ -284,5 +311,60 @@ describe("fillers", () => {
     const r = arrangeStackInShape({ ...base(), fillers: undefined })!;
     expect(r.fillers).toBe(0);
     expect(r.pieces.some((p) => p.filler)).toBe(false);
+  });
+});
+
+describe("stem pull", () => {
+  const base = () => ({ ...threeStems(), shapePx: CHIMNEY, fontSize: 1000, unitsPerEm: UPM, pullStems: true });
+
+  it("draws the middle letter's stem up into the chimney and stops a gap short of its top", () => {
+    const r = arrangeStackInShape(base())!;
+    expect(r.stems).toBe(1);
+    const cap = r.pieces.find((p) => p.parentId === "a1" && p.role === "letter")!;
+    expect(cap).toBeDefined();
+    expect(r.joins.some((j) => (j.from.pieceId === "a1" && j.to.pieceId === cap.id) || (j.to.pieceId === "a1" && j.from.pieceId === cap.id))).toBe(true);
+    const scale = r.fontSize / UPM;
+    const b = outlineBounds(transformCmds(cap.cmds, { x: cap.x, y: cap.y, rotation: cap.rotation, pivot: cap.pivot }));
+    // Well into the chimney (its mouth is at y = -350 px), and inside it with its gap.
+    expect(b.y1 * scale).toBeLessThan(-350 - 400);
+    expect(b.y1 * scale).toBeGreaterThan(-1150);
+    expect(pointInPolygon(b.x1 * scale, b.y1 * scale, CHIMNEY)).toBe(true);
+    expect(pointInPolygon(b.x2 * scale, b.y1 * scale, CHIMNEY)).toBe(true);
+    // The outer letters, under the roof, are untouched.
+    expect(r.pieces.filter((p) => p.parentId === "a0" || p.parentId === "a2")).toHaveLength(0);
+  });
+
+  it("is idempotent: a second run slides a cap rather than cutting the letter again", () => {
+    const first = arrangeStackInShape(base())!;
+    const second = arrangeStackInShape({ ...base(), pieces: first.pieces, joins: first.joins, fontSize: first.fontSize })!;
+    // The lengthened letter makes its row taller, so the block re-sizes and
+    // other letters may now find room; but no letter is ever cut twice.
+    expect(second.pieces.filter((p) => p.parentId === "a1" && p.role === "letter")).toHaveLength(1);
+    for (const id of ["a0", "a1", "a2"]) {
+      expect(second.pieces.filter((p) => p.parentId === id && p.role === "letter").length).toBeLessThanOrEqual(1);
+    }
+    const third = arrangeStackInShape({ ...base(), pieces: second.pieces, joins: second.joins, fontSize: second.fontSize })!;
+    expect(third.pieces.length).toBe(second.pieces.length);
+    expect(third.joins.length).toBe(second.joins.length);
+  });
+
+  it("never pulls through ink or when stems are off", () => {
+    // A rider slab above the middle letter blocks the chimney's mouth.
+    const { pieces, joins } = threeStems();
+    const mid = pieces.find((p) => p.id === "a1")!;
+    const slab: StackPiece = { ...letter("slab", 1, mid.x, 300, 100), y: -700, role: "mark", parentId: "a1", pivot: [150, -50] };
+    const r = arrangeStackInShape({ pieces: [...pieces, slab], joins, shapePx: CHIMNEY, fontSize: 1000, unitsPerEm: UPM, pullStems: true })!;
+    // The blocked letter is not cut at all; any other cap stays clear of every other piece's ink.
+    expect(r.pieces.filter((p) => p.parentId === "a1" && p.role === "letter")).toHaveLength(0);
+    for (const cap of r.pieces.filter((p) => p.role === "letter" && p.parentId !== undefined)) {
+      const b = outlineBounds(transformCmds(cap.cmds, { x: cap.x, y: cap.y, rotation: cap.rotation, pivot: cap.pivot }));
+      const others = r.pieces.filter((p) => p.id !== cap.id && p.id !== cap.parentId).flatMap(worldContours);
+      for (const [x, y] of [[b.x1, b.y1], [b.x2, b.y1], [b.x1, b.y2], [b.x2, b.y2]] as const) {
+        expect(others.some((c) => pointInPolygon(x, y, c)), `${cap.id} clear of ink`).toBe(false);
+      }
+    }
+    const off = arrangeStackInShape({ ...base(), pullStems: false })!;
+    expect(off.stems).toBe(0);
+    expect(off.pieces.some((p) => p.parentId !== undefined)).toBe(false);
   });
 });
