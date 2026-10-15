@@ -93,7 +93,6 @@ const TEXT_ONLY_FIELDS = [
   "letterSpacing",
   "wordSpacing",
   "verse",
-  "diacriticOverrides",
   "strokeCuts",
   "strokeCutEditMode",
   "detachedMarkOverrides",
@@ -105,7 +104,6 @@ export function attachTextToGuide(
   guide: GuideBlock
 ): { block: TextPathBlock; dropped: string[] } {
   const dropped: string[] = [];
-  if (text.diacriticOverrides?.length) dropped.push("diacritic moves");
   if (text.strokeCuts?.length) dropped.push("stroke cuts");
   if (text.detachedMarkOverrides?.length) dropped.push("dot and mark moves");
   if (text.letterSpacing || text.wordSpacing) dropped.push("letter and word spacing");

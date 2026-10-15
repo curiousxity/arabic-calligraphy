@@ -129,7 +129,7 @@ async function shapeReal(
 }
 
 import { parseSvgPath } from "./svgPath";
-import { buildArcTable, pointAtArcLengthFromTable, type ArcTable } from "./textPath";
+import { buildArcTable, curveGlyphPlacements, pointAtArcLengthFromTable, type ArcTable } from "./textPath";
 import { guidePathD, isClosedPath } from "./guideShapes";
 import { DEFAULT_ATTACHMENT, guideCaret, guideGlyphPlacements, guideInkBox, projectToGuide } from "./guidePlacement";
 import type { GuideAttachment } from "../types";
@@ -316,5 +316,37 @@ describe("guideInkBox", () => {
   it("never reaches less than one em", () => {
     const box = guideInkBox([{ glyphIndex: 0, x: 0, y: 0, angle: 0, size: 10 }], 10, 0.5, 0);
     expect(box.width).toBeCloseTo(20, 6);
+  });
+});
+
+describe("marks on a curve sit where the font puts them (real HarfBuzz, Amiri)", () => {
+  // On a straight curve the layout must match a plain text block's: each
+  // glyph at its pen position plus its GPOS (dx, -dy). Ignoring that offset
+  // drew every tashkeel mark away from its letter.
+  it("applies each glyph's GPOS offset in its pen frame", async () => {
+    const { glyphs, upm } = await amiri("مُحَمَّد");
+    expect(glyphs.some((g) => (g.dy ?? 0) !== 0)).toBe(true);
+    const line = buildArcTable(parseSvgPath("M 0 0 L 1000 0"), false);
+    const r = curveGlyphPlacements({ glyphs, fontSize: 100, unitsPerEm: upm, curveLen: line.total, arcTable: line })!;
+    const px = (100 / upm) * r.fitScale;
+    let pen = 0;
+    glyphs.forEach((g, i) => {
+      expect(r.placements[i].x).toBeCloseTo((pen + (g.dx ?? 0)) * px, 6);
+      expect(r.placements[i].y).toBeCloseTo(-(g.dy ?? 0) * px, 6);
+      pen += g.ax ?? 0;
+    });
+  });
+
+  it("turns the offset with the tangent", async () => {
+    const { glyphs, upm, ascender } = await amiri("مُحَمَّد");
+    // A vertical line, walked downward: the glyphs' "up" is screen +x.
+    const down = buildArcTable(parseSvgPath("M 0 0 L 0 2000"), false);
+    const r = guideGlyphPlacements({
+      glyphs, fontSize: 100, unitsPerEm: upm, ascender, arcTable: down, closed: false, attachment: attach({ align: "start" }),
+    })!;
+    // Every pen position is on the line x = 0, so a glyph's x is its offset
+    // perpendicular to the curve: raising a mark (dy > 0) moves it along +x.
+    const px = (100 / upm) * r.shrink;
+    glyphs.forEach((g, i) => expect(r.placements[i].x).toBeCloseTo((g.dy ?? 0) * px, 6));
   });
 });

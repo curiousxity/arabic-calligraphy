@@ -90,6 +90,7 @@ export function textPathProps(b: Extract<Block, { type: "textPath" }>) {
     // The guide's *path* is resolved by the caller (this module has no
     // `blocks`); the attachment rides along so a mirror lays out the same.
     guideAttachment: b.guide,
+    diacriticOverrides: b.diacriticOverrides,
     glyphAlternates: b.glyphAlternates,
     styleSets: b.styleSets,
   };

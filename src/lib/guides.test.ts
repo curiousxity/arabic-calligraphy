@@ -74,7 +74,10 @@ describe("guides bookkeeping", () => {
     expect(block.textPathD).toBe(guide.guideD);
     expect(block.glyphAlternates).toEqual(t.glyphAlternates);
     expect("letterSpacing" in block).toBe(false);
-    expect(dropped).toContain("diacritic moves");
+    // Curves accept diacritic overrides, and attaching keeps the same text
+    // and font, so the glyph indices they are keyed by still line up.
+    expect(block.diacriticOverrides).toEqual(t.diacriticOverrides);
+    expect(dropped).not.toContain("diacritic moves");
     expect(dropped).toContain("letter and word spacing");
   });
 

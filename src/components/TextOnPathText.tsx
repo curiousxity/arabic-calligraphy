@@ -16,7 +16,10 @@ import {
   type AlternateChoice,
   type LetterAlternates,
 } from "../lib/glyphAlternates";
-import type { GlyphAlternate, GuideAttachment } from "../types";
+import { DiacriticHoverHandles } from "./DiacriticHoverHandles";
+import { findDiacriticGlyphIndices } from "../lib/diacritics";
+import { makeCurveGlyphAdapter, type DiacriticPlacement } from "../lib/diacriticPlacement";
+import type { DiacriticOverride, GlyphAlternate, GuideAttachment } from "../types";
 import { guideCaret, guideGlyphPlacements, guideInkBox, type GuideLayout } from "../lib/guidePlacement";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 import { createBlockFillPainter, type BlockFill } from "../lib/blockFill";
@@ -65,6 +68,16 @@ export type TextOnPathTextProps = {
   alternateLetters?: LetterAlternates[];
   onPickAlternate?: (letter: number, choice: AlternateChoice | null) => void;
   isSelected?: boolean;
+  /**
+   * Per-mark tashkeel overrides. Offsets are in the letter's own tilted frame
+   * at `fontSize`, so "up" is away from the curve at that letter — see
+   * `makeCurveGlyphAdapter`.
+   */
+  diacriticOverrides?: DiacriticOverride[];
+  /** One `pushHistory()` per handle drag, taken on drag start. */
+  onBeginDiacriticDrag?: () => void;
+  onDragDiacriticOverride?: (glyphIndex: number, patch: Partial<DiacriticOverride>) => void;
+  onToggleDiacriticHidden?: (glyphIndex: number) => void;
 
   locked?: boolean;
   draggable?: boolean;
@@ -84,6 +97,7 @@ export type TextOnPathTextProps = {
  */
 const NO_GLYPH_ALTERNATES: GlyphAlternate[] = [];
 const NO_ALTERNATE_LETTERS: LetterAlternates[] = [];
+const NO_DIACRITIC_OVERRIDES: DiacriticOverride[] = [];
 
 export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   id,
@@ -117,6 +131,10 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
   alternateLetters = NO_ALTERNATE_LETTERS,
   onPickAlternate,
   isSelected = false,
+  diacriticOverrides = NO_DIACRITIC_OVERRIDES,
+  onBeginDiacriticDrag,
+  onDragDiacriticOverride,
+  onToggleDiacriticHidden,
   locked,
   draggable = true,
   onClick,
@@ -219,6 +237,48 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
     }
     return out;
   }, [glyphAlternateMode, layout, font, alternateLetters, shapableText, glyphs, baselineOffset]);
+  // Which glyphs are tashkeel, recomputed per render like ShapedText does, so
+  // a stale override (a text edit shifted its glyph index onto a letter)
+  // draws as a no-op instead of moving or hiding that letter.
+  const diacriticGlyphIndices = useMemo(
+    () => findDiacriticGlyphIndices(glyphs, font, shapableText),
+    [glyphs, font, shapableText]
+  );
+  const diacriticByIndex = useMemo(
+    () =>
+      new Map(
+        diacriticOverrides
+          .filter((o) => diacriticGlyphIndices.has(o.glyphIndex))
+          .map((o) => [o.glyphIndex, o])
+      ),
+    [diacriticOverrides, diacriticGlyphIndices]
+  );
+
+  // One hover target per mark, in its own letter's tilted frame at
+  // `fontSize`, so the overlay's handles and drags turn with the letter.
+  const diacriticPlacements = useMemo<DiacriticPlacement[]>(() => {
+    if (!isSelected || !layout || !font || diacriticGlyphIndices.size === 0) return [];
+    const out: DiacriticPlacement[] = [];
+    for (const p of layout.placements) {
+      if (!diacriticGlyphIndices.has(p.glyphIndex)) continue;
+      const bb = font.glyphs.get(glyphs[p.glyphIndex].g)?.getPath(0, 0, fontSize).getBoundingBox();
+      if (!bb || !isFinite(bb.x1) || !isFinite(bb.y1)) continue;
+      out.push({
+        glyphIndex: p.glyphIndex,
+        key: String(p.glyphIndex),
+        box: { x: bb.x1, y: bb.y1, width: bb.x2 - bb.x1, height: bb.y2 - bb.y1 },
+        ...makeCurveGlyphAdapter({
+          x: p.x,
+          y: p.y,
+          angle: p.angle,
+          k: p.size / Math.max(fontSize, 1e-4),
+          baselineOffset,
+        }),
+      });
+    }
+    return out;
+  }, [isSelected, layout, font, glyphs, fontSize, diacriticGlyphIndices, baselineOffset]);
+
   // Attached text only covers part of its guide, so its hit area is its own
   // letters' extent, not the whole guide's box: a circle guide's box would
   // otherwise swallow every click inside the medallion.
@@ -317,6 +377,8 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
           for (const place of layout.placements) {
             const glyphObj = font.glyphs.get(glyphs[place.glyphIndex].g);
             if (!glyphObj) continue;
+            const diacritic = diacriticByIndex.get(place.glyphIndex);
+            if (diacritic?.hidden) continue;
 
             const { x: px, y: py, angle } = place;
             const opPath = glyphObj.getPath(0, 0, place.size);
@@ -329,6 +391,14 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
             c2d.translate(px - hitX, py - hitY);
             c2d.rotate(angle);
             c2d.translate(0, baselineOffset);
+            if (diacritic) {
+              // In the letter's own tilted frame, scaled with the curve's
+              // fit, and pivoted on the pen origin like ShapedText's.
+              const k = place.size / Math.max(fontSize, 1e-4);
+              c2d.translate((diacritic.offsetX ?? 0) * k, (diacritic.offsetY ?? 0) * k);
+              const ds = diacritic.scale ?? 1;
+              c2d.scale(ds, ds);
+            }
             if (isItalic) c2d.transform(1, 0, -0.25, 1, 0, 0);
 
             c2d.fillStyle = painter.style;
@@ -364,6 +434,16 @@ export const TextOnPathText: React.FC<TextOnPathTextProps> = ({
         targets={alternateTargets}
         alternates={glyphAlternates}
         onPick={onPickAlternate}
+      />
+
+      <DiacriticHoverHandles
+        isSelected={isSelected}
+        placements={diacriticPlacements}
+        diacriticOverrides={diacriticOverrides}
+        fontSize={fontSize}
+        onBeginDiacriticDrag={onBeginDiacriticDrag}
+        onDragDiacriticOverride={onDragDiacriticOverride}
+        onToggleDiacriticHidden={onToggleDiacriticHidden}
       />
     </Group>
   );

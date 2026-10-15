@@ -40,9 +40,11 @@ regression, and what it would take to fix.
   Wessam — they build letters from loose pieces, and the detector cannot
   tell a piece from a dot); a dot fused to its stem has no handle in any
   font. Numbers in `docs/archive/detached-mark-coverage.md`.
-- **Per-glyph tools do not apply to text-on-path blocks.** Their glyphs are
-  rotated to a curve tangent, which the straight-bounding-box maths behind
-  those tools assumes away.
+- **Most per-glyph drag tools do not apply to text-on-path blocks** (stroke
+  cuts, dot moves). Their glyphs are rotated to a curve tangent, which the
+  straight-bounding-box maths behind those tools assumes away. Diacritic
+  handles are the exception since 2026-10-15; see
+  [text-on-path.md](.claude/rules/text-on-path.md).
 - **Straight-stroke stretching is plain-text only, and stays that way.** Not
   the tangent reason above: Shape Fill and Curve both renormalise the run to a
   fixed span, so an added advance is divided straight back out. Declined
@@ -98,6 +100,22 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 ---
 
 ## Shipped
+
+### 2026-10-15 — Diacritic handles on curves; marks sit on their letters
+
+- **Curve text (plain and guide-attached) takes the same three diacritic
+  handles as a text block** — move, resize, hide. An offset is in the
+  mark's own letter's tilted frame at `fontSize`, so "up" is away from the
+  curve there and the offset keeps its proportion when the curve is
+  lengthened. Attaching a text block to a guide now keeps its diacritic
+  moves.
+- **Fix: curves now honour GPOS offsets.** Both curve layouts ignored each
+  glyph's `dx`/`dy`, so every tashkeel mark was drawn where its zero advance
+  left the pen — far above or beside its letter in most fonts. The offset is
+  applied rigidly in the pen's tangent frame (`curvePenPlacement`), which
+  matches a straight text block exactly on a straight curve. Saved curves
+  with marks will look different (correct) on load. How and why:
+  [text-on-path.md](.claude/rules/text-on-path.md).
 
 ### 2026-10-15 — Stack editor window
 
@@ -1159,8 +1177,9 @@ move/scale/rotate on Shape Fill all shipped on 2026-09-06; the other five
 items the plan investigated came back declined, with the reasons below.
 
 Text-on-path was dropped from the per-glyph item rather than deferred with
-it: `offsetX` on a curve has no defined meaning until a spec answers
-whether it runs along the tangent or along arc length.
+it: `offsetX` on a curve had no defined meaning. Answered for diacritics on
+2026-10-15 — in the letter's own tangent frame — and shipped; see
+[text-on-path.md](.claude/rules/text-on-path.md).
 
 Declined there, with the reason in the plan: straight-stroke stretching on
 Shape Fill/Curve (both renormalise the span), image trace (Shape Fill's

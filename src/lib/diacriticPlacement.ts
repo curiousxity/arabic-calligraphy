@@ -95,6 +95,46 @@ export function makeShapeFillInstanceAdapter(p: {
 }
 
 /**
+ * One glyph laid along a curve (`TextOnPathText`). Mirrors its draw transform:
+ * translate to the pen position `(x, y)`, rotate by the tangent `angle`, then
+ * the baseline offset — the same maths as `curvePlacementToGroup`.
+ *
+ * Local space is the letter's own tilted frame at the block's `fontSize`, and
+ * `k` (drawn size ÷ `fontSize`) scales it to the size the curve actually draws
+ * at. That makes an override's offset mean "relative to its own letter":
+ * local y is always perpendicular to the curve at that letter, and an offset
+ * keeps its proportion when the curve is lengthened and the text grows with
+ * it. Italic shear is ignored, as in the Shape Fill adapter.
+ */
+export function makeCurveGlyphAdapter(p: {
+  x: number;
+  y: number;
+  angle: number;
+  k: number;
+  baselineOffset: number;
+}): PlacementAdapter {
+  const cos = Math.cos(p.angle);
+  const sin = Math.sin(p.angle);
+  const k = safeDivisor(p.k);
+
+  return {
+    toCanvas: (x, y) => {
+      const lx = x * k;
+      const ly = y * k + p.baselineOffset;
+      return { x: p.x + lx * cos - ly * sin, y: p.y + lx * sin + ly * cos };
+    },
+    toLocal: (x, y) => {
+      const rx = x - p.x;
+      const ry = y - p.y;
+      return {
+        x: (rx * cos + ry * sin) / k,
+        y: (-rx * sin + ry * cos - p.baselineOffset) / k,
+      };
+    },
+  };
+}
+
+/**
  * One hoverable detached mark (a dot, hamza or kaf stroke) on canvas. `box`
  * is where it is drawn now, i.e. already offset by `dx`/`dy`; the overlay
  * adds a drag delta to those and writes the sum back.

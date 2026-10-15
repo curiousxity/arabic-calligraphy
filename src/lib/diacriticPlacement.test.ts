@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  makeCurveGlyphAdapter,
   makeOffsetAdapter,
   makeShapeFillInstanceAdapter,
 } from "./diacriticPlacement";
+import { curvePlacementToGroup } from "./textPath";
 
 describe("makeOffsetAdapter", () => {
   it("translates to canvas space and back", () => {
@@ -69,5 +71,43 @@ describe("makeShapeFillInstanceAdapter", () => {
     expect(Number.isFinite(canvas.y)).toBe(true);
     expect(Number.isFinite(back.x)).toBe(true);
     expect(Number.isFinite(back.y)).toBe(true);
+  });
+});
+
+describe("makeCurveGlyphAdapter", () => {
+  const cases = [
+    { x: 0, y: 0, angle: 0, k: 1, baselineOffset: 0 },
+    { x: 120, y: -40, angle: 0.6, k: 0.75, baselineOffset: 8 },
+    { x: -30, y: 210, angle: -2.4, k: 1.8, baselineOffset: -5 },
+  ];
+
+  for (const c of cases) {
+    it(`round-trips with ${JSON.stringify(c)}`, () => {
+      const a = makeCurveGlyphAdapter(c);
+      for (const p of [{ x: 0, y: 0 }, { x: 12, y: -30 }, { x: -8, y: 45 }]) {
+        const canvas = a.toCanvas(p.x, p.y);
+        const back = a.toLocal(canvas.x, canvas.y);
+        expect(back.x).toBeCloseTo(p.x, 6);
+        expect(back.y).toBeCloseTo(p.y, 6);
+      }
+    });
+
+    it(`matches the renderer's own placement maths with ${JSON.stringify(c)}`, () => {
+      const a = makeCurveGlyphAdapter(c);
+      const p = { x: 10, y: -20 };
+      const expected = curvePlacementToGroup(c, { x: p.x * c.k, y: p.y * c.k }, c.baselineOffset);
+      const got = a.toCanvas(p.x, p.y);
+      expect(got.x).toBeCloseTo(expected.x, 6);
+      expect(got.y).toBeCloseTo(expected.y, 6);
+    });
+  }
+
+  it("moves a mark perpendicular to the curve when its local y changes", () => {
+    // A tangent pointing straight down the page: the letter's "up" is +x.
+    const a = makeCurveGlyphAdapter({ x: 0, y: 0, angle: Math.PI / 2, k: 1, baselineOffset: 0 });
+    const from = a.toCanvas(0, 0);
+    const to = a.toCanvas(0, -10);
+    expect(to.x - from.x).toBeCloseTo(10, 6);
+    expect(to.y - from.y).toBeCloseTo(0, 6);
   });
 });

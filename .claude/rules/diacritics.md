@@ -136,7 +136,9 @@ consumer that reads `offsetY` reads `offsetX` (both renderers, the overlay,
 `stackConvert`). A letter's dots are not diacritics and are not handled
 here — see [detached-marks.md](detached-marks.md).
 
-This feature covers plain text and Shape Fill blocks.
+This feature covers plain text, Shape Fill and Curve blocks (Curve since
+2026-10-15; its adapter and offset frame are in
+[text-on-path.md](text-on-path.md)).
 `DiacriticHoverHandles.tsx` takes a list of `DiacriticPlacement`s
 (`src/lib/diacriticPlacement.ts`) rather than raw hit boxes — each carries
 the mark's box in its renderer's own local space plus a matched
@@ -179,5 +181,5 @@ checkbox at all, and written out longhand there a capability widens in one
 place and silently not the other — both still compile, and the symptom is a
 checkbox that arms nothing.
 
-Text-on-path blocks remain unsupported — their glyphs are rotated to a
-curve tangent, which is separate design work.
+Curve blocks apply the override inside each letter's tangent frame, after
+the rotation and before the italic shear, and arm on selection like text.

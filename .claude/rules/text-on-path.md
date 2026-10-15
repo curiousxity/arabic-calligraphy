@@ -53,15 +53,42 @@ laid out by `guideGlyphPlacements` at its natural size (shrinking only to
 fit) instead of `curveGlyphPlacements`' stretch-to-span. Its hit box is its
 letters' extent, not the curve's. See [guides.md](guides.md).
 
-**Drag-based** per-glyph tools (diacritic overrides, stroke stretching) do
-not apply to `textPath` blocks. Their guards exclude `"textPath"`. A drag needs an answer to "what does an offset
-mean along a curve": along the tangent, or along the arc? That is left for a
-future spec.
+**GPOS offsets go in the pen's tangent frame** (`curvePenPlacement`, used
+by both `curveGlyphPlacements` and `guideGlyphPlacements`): a glyph's
+`(dx, -dy)` is rotated with the tangent at its pen position. Before
+2026-10-15 both layouts ignored `dx`/`dy` entirely, so every tashkeel mark
+was drawn where its zero advance left the pen — far above or beside its
+letter in most fonts. Rigid in the pen frame, **not slid along the arc**:
+HarfBuzz returns Arabic in visual order with each zero-advance mark just
+before its base, so a mark's pen *is* its letter's, and the letter is drawn
+rigidly in that frame. Sliding by `dx` along the arc was tried and put the
+damma of Fatemi Maqala's `مُحَمَّد` past the end of its long ح on the arc
+preset. On a straight curve the result equals `ShapedText`'s `(pen + dx,
+-dy)`, which `guidePlacement.test.ts` checks against real shaping.
 
-**Next Shape is the exception**, and it is safe because it is click-only.
+**Diacritic handles work on curves** (since 2026-10-15), plain and
+guide-attached, armed on selection like a text block — no checkbox, since a
+curve has one copy of each mark. The question that held this back, "is an
+offset along the tangent or along the arc?", is answered: neither, it is in
+the **mark's own letter's tilted frame** (`makeCurveGlyphAdapter` in
+`diacriticPlacement.ts`). Local y is perpendicular to the curve at that
+letter, so "up" stays "away from the curve" wherever the letter sits. The
+override is stored at `fontSize` and scaled by `k = placement.size /
+fontSize` both when drawing and in the adapter, because `fontSize` is inert
+here — a curve lengthened later grows its text, and an offset in raw px
+would drift relative to its letter. Overrides are re-validated each render
+against `findDiacriticGlyphIndices`, as in `ShapedText`. Attaching a text
+block to a guide keeps its overrides (`guides.ts`): same text, same font, so
+the glyph indices they are keyed by still line up.
+
+The remaining drag tools — stroke cuts and dot moves — still exclude
+`"textPath"` in `blockCapabilities.ts`.
+
+**Next Shape also reaches curves**, and it was safe even before the frame
+question was answered because it is click-only.
 It needs to know *which* letter is under the pointer, never how to move one.
 Glyph placement lives in `curveGlyphPlacements` (pure, in `lib/textPath.ts`):
-the draw loop renders from it and the overlay outlines from it, so a rotated
+the draw loop renders from it and both overlays (Next Shape, diacritics) outline from it, so a rotated
 outline cannot drift from its ink. Keep it that way: placement maths inlined
 back into the draw loop would silently desynchronise the two.
 

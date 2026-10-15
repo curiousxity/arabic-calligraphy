@@ -30,7 +30,7 @@ import { attachedTo, guidesIn } from "../lib/guides";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import type { HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
-import { hasOwnFont } from "../lib/blockCapabilities";
+import { hasOwnFont, supportsDiacriticOverrides } from "../lib/blockCapabilities";
 import {
   SelectRow,
   ColorRow,
@@ -1854,8 +1854,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   Clear diacritics
                 </button>
 
-                {(selectedBlock?.type === "text" ||
-                  selectedBlock?.type === "shapeFill") &&
+                {selectedBlock &&
+                  supportsDiacriticOverrides(selectedBlock) &&
                   (selectedBlock.diacriticOverrides?.length ?? 0) > 0 && (
                     <button
                       type="button"

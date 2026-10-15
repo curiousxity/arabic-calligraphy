@@ -232,6 +232,41 @@ export type CurveGlyphPlacement = {
   size: number;
 };
 
+/** A shaped glyph's advance and GPOS offset, font units. */
+export type CurveGlyph = { ax?: number; dx?: number; dy?: number };
+
+/**
+ * One glyph's pen frame on the curve: the tangent frame at its arc-length pen
+ * position `s`, moved by its GPOS offset *inside that frame* — `(dx, -dy)` in
+ * px, exactly where `ShapedText` puts it on a straight baseline.
+ *
+ * Rigid in the pen frame, not slid along the arc, and that is deliberate.
+ * HarfBuzz returns an Arabic run in visual order with each zero-advance mark
+ * just before its base, so a mark's pen position *is* its base letter's, and
+ * the letter itself is drawn rigidly in that same frame. Sliding the mark by
+ * `dx` along the arc instead put it on a different tangent from its letter:
+ * on Fatemi Maqala's `مُحَمَّد` the damma on the long ح travelled 22% of the
+ * curve and landed past the letter's end. Without any offset at all a mark
+ * is drawn where its zero advance leaves the pen, away from its letter.
+ * Shared by both curve layouts so a Curve block and attached text agree.
+ */
+export function curvePenPlacement(
+  arcTable: ArcTable,
+  s: number,
+  g: CurveGlyph,
+  px: number,
+  glyphIndex: number,
+  size: number
+): CurveGlyphPlacement {
+  const { x, y, angle } = pointAtArcLengthFromTable(arcTable, s);
+  const lx = (g.dx ?? 0) * px;
+  const ly = -(g.dy ?? 0) * px;
+  if (lx === 0 && ly === 0) return { glyphIndex, x, y, angle, size };
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return { glyphIndex, x: x + lx * cos - ly * sin, y: y + lx * sin + ly * cos, angle, size };
+}
+
 /**
  * Lays a shaped run along a curve: each glyph at its cumulative advance, all
  * advances scaled so the run spans the curve exactly. The one place this is
@@ -240,7 +275,7 @@ export type CurveGlyphPlacement = {
  * Null when there is nothing to lay out (no glyphs, or zero total advance).
  */
 export function curveGlyphPlacements(args: {
-  glyphs: readonly { ax?: number }[];
+  glyphs: readonly CurveGlyph[];
   fontSize: number;
   unitsPerEm: number;
   curveLen: number;
@@ -258,8 +293,7 @@ export function curveGlyphPlacements(args: {
   const placements: CurveGlyphPlacement[] = [];
   let cursor = 0;
   glyphs.forEach((g, glyphIndex) => {
-    const { x, y, angle } = pointAtArcLengthFromTable(arcTable, cursor);
-    placements.push({ glyphIndex, x, y, angle, size });
+    placements.push(curvePenPlacement(arcTable, cursor, g, scale * fitScale, glyphIndex, size));
     cursor += (g.ax ?? 0) * scale * fitScale;
   });
   return { placements, fitScale };

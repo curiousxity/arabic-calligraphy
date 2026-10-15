@@ -41,8 +41,10 @@ export const section: GuideSection = {
         belongs to the letter, not to the copy.
       </p>
       <p>
-        Marks on a curve cannot be adjusted this way: once a letter is
-        rotated to follow a curve, the handles do not appear.
+        Marks on curved text work the same way. On a curve, "up" means away
+        from the curve at that letter, so a mark you lift keeps leaning with
+        its letter. If you later make the curve longer, the text grows and
+        your adjustment grows with it.
       </p>
 
       <h4>One thing to know before you start</h4>

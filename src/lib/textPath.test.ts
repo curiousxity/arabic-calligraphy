@@ -9,6 +9,7 @@ import {
   wavePathD,
   circlePathD,
   curveGlyphPlacements,
+  curvePenPlacement,
   curvePlacementToGroup,
 } from "./textPath";
 
@@ -204,6 +205,30 @@ describe("curveGlyphPlacements", () => {
     expect(
       curveGlyphPlacements({ glyphs: [{ ax: 0 }], fontSize: 10, unitsPerEm: 1000, curveLen: 300, arcTable: line })
     ).toBeNull();
+  });
+});
+
+describe("curvePenPlacement", () => {
+  it("offsets by (dx, -dy) on a straight curve", () => {
+    const line = buildArcTable(parseSvgPath("M 0 0 L 300 0"), false);
+    const p = curvePenPlacement(line, 100, { dx: -20, dy: 30 }, 1, 0, 10);
+    expect(p.x).toBeCloseTo(80, 6);
+    expect(p.y).toBeCloseTo(-30, 6);
+  });
+
+  it("keeps the offset rigid in the pen's tangent frame on a bend", () => {
+    // A mark and its base share a pen position, and the base is drawn
+    // rigidly in that frame, so the mark must turn with it — not slide along
+    // the arc onto another tangent.
+    const arc = buildArcTable(parseSvgPath(arcPathD(400, 120)), false);
+    const s = arc.total * 0.6;
+    const base = pointAtArcLengthFromTable(arc, s);
+    const p = curvePenPlacement(arc, s, { dx: 200, dy: 50 }, 1, 0, 10);
+    expect(p.angle).toBe(base.angle);
+    const cos = Math.cos(base.angle);
+    const sin = Math.sin(base.angle);
+    expect(p.x).toBeCloseTo(base.x + 200 * cos + 50 * sin, 6);
+    expect(p.y).toBeCloseTo(base.y + 200 * sin - 50 * cos, 6);
   });
 });
 

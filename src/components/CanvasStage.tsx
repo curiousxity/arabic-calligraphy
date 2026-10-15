@@ -1168,6 +1168,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                       glyphAlternateMode={block.glyphAlternateMode ?? false}
                       alternateLetters={block.id === selectedId ? alternateLetters : NO_ALTERNATE_LETTERS}
                       onPickAlternate={(letter, choice) => onPickGlyphAlternate(block.id, letter, choice)}
+                      onBeginDiacriticDrag={onBeginDiacriticDrag}
+                      onDragDiacriticOverride={(glyphIndex, patch) =>
+                        onDragDiacriticOverride(block.id, glyphIndex, patch)
+                      }
+                      onToggleDiacriticHidden={(glyphIndex) => onToggleDiacriticHidden(block.id, glyphIndex)}
                       guidePath={guidePlace ? { d: guidePlace.d, closed: guidePlace.closed } : undefined}
                       onGuideLayout={onGuideLayout ? (info) => onGuideLayout(block.id, info.shrink) : undefined}
                       caret={writing?.textId === block.id}

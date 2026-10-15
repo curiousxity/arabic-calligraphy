@@ -30,14 +30,15 @@ export const hasOwnFont = (
   b.type === "text" || b.type === "shapeFill" || b.type === "textPath";
 
 /**
- * The block types whose renderers mount `DiacriticHoverHandles`. `textPath`
- * blocks inherit `diacriticOverrides` from `BlockCommon` but have no way to
- * edit or apply it, so the mutators must not write to them.
+ * The block types whose renderers mount `DiacriticHoverHandles`: text, Shape
+ * Fill and Curve (where an offset is in the letter's own tilted frame). A
+ * mirror, guide or stack inherits `diacriticOverrides` from `BlockCommon`
+ * without reading it, so the mutators must not write to them.
  */
 export const supportsDiacriticOverrides = (
   b: Block
-): b is Extract<Block, { type: "text" | "shapeFill" }> =>
-  b.type === "text" || b.type === "shapeFill";
+): b is Extract<Block, { type: "text" | "shapeFill" | "textPath" }> =>
+  b.type === "text" || b.type === "shapeFill" || b.type === "textPath";
 
 /**
  * Plain text blocks only: every block type carries `strokeCuts` via

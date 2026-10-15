@@ -1,5 +1,11 @@
 import type { GuideAttachment } from "../types";
-import { pointAtArcLengthFromTable, type ArcTable, type CurveGlyphPlacement } from "./textPath";
+import {
+  curvePenPlacement,
+  pointAtArcLengthFromTable,
+  type ArcTable,
+  type CurveGlyph,
+  type CurveGlyphPlacement,
+} from "./textPath";
 
 /**
  * Glyph placement for text attached to a guide. Pure.
@@ -28,7 +34,7 @@ export const DEFAULT_ATTACHMENT: Omit<GuideAttachment, "id"> = {
 const mod = (v: number, m: number) => ((v % m) + m) % m;
 
 export function guideGlyphPlacements(args: {
-  glyphs: readonly { ax?: number }[];
+  glyphs: readonly CurveGlyph[];
   fontSize: number;
   unitsPerEm: number;
   ascender: number;
@@ -54,8 +60,7 @@ export function guideGlyphPlacements(args: {
   let cursor = start;
   glyphs.forEach((g, glyphIndex) => {
     const s = closed ? mod(cursor, length) : cursor;
-    const { x, y, angle } = pointAtArcLengthFromTable(arcTable, s);
-    placements.push({ glyphIndex, x, y, angle, size });
+    placements.push(curvePenPlacement(arcTable, s, g, scale * shrink, glyphIndex, size));
     cursor += (g.ax ?? 0) * scale * shrink;
   });
 

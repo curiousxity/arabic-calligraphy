@@ -152,4 +152,5 @@ owned by `App` (`writing`) and drawn by `CanvasStage`.
 - Straight, unbent blocks snapping onto a guide.
 - Text continuing from one guide to another.
 - Editing the points of an uploaded SVG guide (upload a new file instead).
-- Per-letter drag tools on attached text. Next Shape does work.
+- Per-letter drag tools on attached text, except diacritic handles. Next
+  Shape does work.
