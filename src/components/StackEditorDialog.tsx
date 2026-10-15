@@ -9,7 +9,7 @@ import type { CurveTrace } from "../lib/stackCurve";
 import { stackProps } from "../lib/blockRenderProps";
 import { stackScale } from "../lib/stackOutline";
 import { complementOf } from "../lib/complementColor";
-import { setEditorStage } from "../lib/testBridge";
+import { setEditorDraft, setEditorStage } from "../lib/testBridge";
 import { useUndoRedo } from "../hooks/useUndoRedo";
 import {
   arrangeDraft, bendDraft, draftChanged, draftOf, fitTransform, inkBoundsPx, patchPieces, resetDraft,
@@ -105,9 +105,13 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
 
   // Editor-local undo: the draft is the snapshot; there is no thumbnail.
   const getSnapshot = useCallback(() => draftRef.current, []);
-  const applySnapshot = useCallback((s: StackDraft) => setDraft(s), []);
   const noThumb = useCallback(() => "", []);
-  const { pushHistory, handleUndo, handleRedo, canUndo, canRedo } = useUndoRedo(getSnapshot, applySnapshot, noThumb);
+  // No coalescing: the canvas hook merges pushes within 300 ms for keystrokes
+  // and slider ticks, but here every push is one deliberate gesture (a press
+  // that frees a curve, then a double-click that rests it), and two of those
+  // in quick succession must stay two steps.
+  const applySnapshot = useCallback((s: StackDraft) => setDraft(s), []);
+  const { pushHistory, handleUndo, handleRedo, canUndo, canRedo } = useUndoRedo(getSnapshot, applySnapshot, noThumb, { coalesceMs: 0 });
 
   // The proof's size, kept current as the window resizes.
   useLayoutEffect(() => {
@@ -139,7 +143,8 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
   // The e2e bridge's view of this stage, while mounted.
   useEffect(() => {
     setEditorStage(stageRef.current);
-    return () => setEditorStage(null);
+    setEditorDraft(draft);
+    return () => { setEditorStage(null); setEditorDraft(null); };
   });
 
   const requestCancel = useCallback(() => {
@@ -291,6 +296,7 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
                   <Group x={view.x} y={view.y} scaleX={view.scale} scaleY={view.scale} rotation={draft.rotation}>
                     <StackView
                       {...stackProps(renderBlock)}
+                      id="stack-editor-block"
                       rotation={0}
                       x={0}
                       y={0}

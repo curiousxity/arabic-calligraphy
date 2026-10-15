@@ -1,5 +1,6 @@
 import type Konva from "konva";
 import type { Block } from "../types";
+import type { StackDraft } from "./stackDraft";
 
 /**
  * The read-only surface the Playwright suite drives the editor through.
@@ -25,12 +26,19 @@ export type HarfTestBridge = {
   getStage: () => Konva.Stage | null;
   /** The stack editor window's own stage while it is open; null otherwise. */
   getEditorStage: () => Konva.Stage | null;
+  /** The stack editor window's staged draft while it is open; null otherwise.
+   *  The block itself does not change until Done, so a test of a gesture in
+   *  the window reads its effect here. */
+  getEditorDraft: () => StackDraft | null;
 };
 
 let editorStage: Konva.Stage | null = null;
 /** Set by `StackEditorDialog` while mounted. Read-only to tests, like the rest. */
 export function setEditorStage(stage: Konva.Stage | null): void { editorStage = stage; }
 export function currentEditorStage(): Konva.Stage | null { return editorStage; }
+let editorDraft: StackDraft | null = null;
+export function setEditorDraft(draft: StackDraft | null): void { editorDraft = draft; }
+export function currentEditorDraft(): StackDraft | null { return editorDraft; }
 
 declare global {
   interface Window {

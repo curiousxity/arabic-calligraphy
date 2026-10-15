@@ -18,7 +18,7 @@ import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useDebouncedHistoryPush } from "./hooks/useDebouncedHistoryPush";
 import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
-import { installTestBridge, currentEditorStage } from "./lib/testBridge";
+import { installTestBridge, currentEditorStage, currentEditorDraft } from "./lib/testBridge";
 import { triggerDownload } from "./lib/download";
 import { STARTER_TEMPLATES, buildBlocksFromTemplate } from "./lib/templates";
 import { FONT_URLS, resolveFontUrl } from "./hooks/useShapedGlyphs";
@@ -590,6 +590,7 @@ const App: React.FC = () => {
         getSelectedIds: () => effectiveSelectedIds,
         getStage: () => stageRef.current,
         getEditorStage: currentEditorStage,
+        getEditorDraft: currentEditorDraft,
       }),
     [blocks, effectiveSelectedIds]
   );
