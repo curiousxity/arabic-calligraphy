@@ -197,6 +197,32 @@ sets the cap's position absolutely each frame; hover is frozen on the cap
 until release. `splitStackPiece` pushes history, so the cut and the pull
 are one undo step and the press must not call `onBegin`.
 
+**A stretch can be healed or slid** (`stretchCut`, `stretchOf`,
+`healStretch`/`healTail`, `beginCutSlide`, `slideCutTo`, `stackConvert.ts`).
+A *stretch* is a plain join (no `profile`, not `fallback`) between two
+pieces of one letter (same `parentId` root) whose faces are the same line —
+which they are, because a split never moves `cmds`: every fragment of a
+letter shares its local frame and only `pivot`/`x`/`y` differ. That is the
+whole trick: `mergeAtFace` drops each side's straight bridge edge and joins
+the two runs, giving the letter's own outline back (the crossing segments
+stay split in two; harmless). **Inner and outer are a distance, not
+`parentId`**: pull a tail twice from its middle and the chain is body →
+middle (rides on the tip) → tip, so `stretchCut` counts joins from the root
+through the letter's own pieces. Heal keeps the *inner* piece's id and
+placement (the tail snaps back), takes the outer's other faces and riders,
+and inherits the outer's parent if the inner rode on it. A freed curve's join
+is not a stretch: its arc is gone. **Slide** heals once at the press
+(`beginCutSlide`, fixed for the drag so the curve segments are not split
+again every frame), finds the straight zone of the healed outline that holds
+the cut (no zone, no slide), and each frame re-splits at the new x with the
+inner face's angle (so the inner piece is the near side). Both pieces keep
+their own transforms (`rebasePiece` preserves the local→world map), so the
+tail's tip stays put and every face keeps its index: no join changes.
+**Delete** over a tail (hover, or its cut edge) is a *capture-phase* window
+listener that stops the event, or the app's Delete would delete the block;
+right-click does the same through Konva's `contextmenu`. The cut edge band
+(`stack-cutedge`) sits above the body polygons and below the curve apexes.
+
 **Where a press cuts** is the press's x in the zone's frame
 (`cutAtPress`, `stackZones.ts`), clamped a little inside the zone. Only
 the outer part of a zone's two ends is a pull target (`pullSpans`: 40% of

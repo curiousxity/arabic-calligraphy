@@ -10,11 +10,12 @@ import {
   zoneExtentX, zoneCentre, DEFAULT_DETECT_OPTS, outlineBounds,
 } from "./strokeCuts";
 import { findKashidaSlots, TATWEEL } from "./tatweel";
-import { splitAtCut, translateCmds, cmdsCentre, transformFace, transformPt, transformCmds } from "./stackGeometry";
+import { splitAtCut, translateCmds, cmdsCentre, transformFace, transformPt, transformCmds, toSegments, fromSegments, type Seg } from "./stackGeometry";
 import { rebasePiece, pieceTransform } from "./stackOutline";
 import { traceCurve, PROFILE_SAMPLES, type CurveTrace } from "./stackCurve";
 import { joinCenterline, solveJoinDrag, faceThickness } from "./stackJoin";
 import { pointInPolygon } from "./svgPath";
+import { stackDetectOpts } from "./stackZones";
 import { findDetachedMarks, buildDetachedMarkPlan, splitContours, type DetachedMarkOverride } from "./detachedMarks";
 import { findDiacriticGlyphIndices } from "./diacritics";
 
@@ -294,6 +295,196 @@ export function splitPieceAtCut(
     { id: `j${p.id}-${capId}`, from: { pieceId: p.id, faceIndex: body.faces.length - 1 }, to: { pieceId: capId, faceIndex: cap.faces.length - 1 }, bow: 0 },
   ];
   return { pieces: pieces.map((x) => (x.id === p.id ? body : x)).concat(cap), joins: newJoins };
+}
+
+/** The piece a chain of tails was split from: follow `parentId` up. */
+function rootOf(byId: Map<string, StackPiece>, p: StackPiece): string {
+  let q = p;
+  for (let guard = 0; q.parentId !== undefined && guard < 1000; guard++) {
+    const up = byId.get(q.parentId);
+    if (!up) break;
+    q = up;
+  }
+  return q.id;
+}
+
+/**
+ * A stretch: a plain cut (a pulled tail's join) between two pieces of one
+ * letter. `inner` is the side toward the letter's body — fewer joins away
+ * from it through the letter's own pieces — and `outer` the side away. Pull
+ * a tail twice from its middle and the chain is body → middle → tip, so
+ * "inner" is a distance, not who rides on whom. Only a plain join qualifies:
+ * a freed curve's carries a `profile` and its arc is gone, so there is
+ * nothing to heal back; a fallback join is between two letters. The two
+ * faces must be one line in the shared local frame (a split never moves
+ * `cmds`), which is what makes healing exact.
+ */
+export function stretchCut(pieces: readonly StackPiece[], joins: readonly StackJoin[], joinId: string) {
+  const join = joins.find((j) => j.id === joinId);
+  if (!join || join.profile || join.fallback) return null;
+  const byId = new Map(pieces.map((p) => [p.id, p]));
+  const a = byId.get(join.from.pieceId), b = byId.get(join.to.pieceId);
+  if (!a || !b || a.role !== "letter" || b.role !== "letter") return null;
+  const root = rootOf(byId, a);
+  if (rootOf(byId, b) !== root) return null;
+  const fa = a.faces[join.from.faceIndex], fb = b.faces[join.to.faceIndex];
+  if (!fa || !fb) return null;
+  const eq = (p: Pt2, q: Pt2) => Math.abs(p[0] - q[0]) < 1e-6 && Math.abs(p[1] - q[1]) < 1e-6;
+  if (!((eq(fa.a, fb.a) && eq(fa.b, fb.b)) || (eq(fa.a, fb.b) && eq(fa.b, fb.a)))) return null;
+  // Joins away from the root through the letter's own pieces.
+  const dist = new Map<string, number>([[root, 0]]);
+  for (let frontier = [root]; frontier.length; ) {
+    const next: string[] = [];
+    for (const j of joins) {
+      for (const [x, y] of [[j.from.pieceId, j.to.pieceId], [j.to.pieceId, j.from.pieceId]]) {
+        if (!frontier.includes(x) || dist.has(y)) continue;
+        const py = byId.get(y);
+        if (!py || rootOf(byId, py) !== root) continue;
+        dist.set(y, dist.get(x)! + 1);
+        next.push(y);
+      }
+    }
+    frontier = next;
+  }
+  const aIn = (dist.get(a.id) ?? Infinity) <= (dist.get(b.id) ?? Infinity);
+  return aIn
+    ? { join, inner: a, outer: b, innerFace: join.from.faceIndex, outerFace: join.to.faceIndex }
+    : { join, inner: b, outer: a, innerFace: join.to.faceIndex, outerFace: join.from.faceIndex };
+}
+
+/** The stretch a tail hangs from: the plain cut on its inner side. Null for
+ *  a piece that is not a pulled tail (a letter's body, a mark, a freed curve's end). */
+export function stretchOf(pieces: readonly StackPiece[], joins: readonly StackJoin[], pieceId: string) {
+  for (const j of joins) {
+    if (j.from.pieceId !== pieceId && j.to.pieceId !== pieceId) continue;
+    const s = stretchCut(pieces, joins, j.id);
+    if (s && s.outer.id === pieceId) return s;
+  }
+  return null;
+}
+
+/**
+ * Two outlines that a cut separated, stitched back into one along `face`:
+ * the straight bridge edge each side was closed with is removed and the two
+ * runs joined end to end. Null if either side has no bridge, or the bridges
+ * run the same way (they cannot be halves of one contour).
+ */
+export function mergeAtFace(a: SvgCmd[], b: SvgCmd[], face: CutFace): SvgCmd[] | null {
+  const eq = (p: Pt2, q: Pt2) => Math.abs(p[0] - q[0]) < 1e-6 && Math.abs(p[1] - q[1]) < 1e-6;
+  const isBridge = (s: Seg) => s.type === "L" &&
+    ((eq(s.p[0], face.a) && eq(s.p[1], face.b)) || (eq(s.p[0], face.b) && eq(s.p[1], face.a)));
+  const find = (cs: Seg[][]) => {
+    for (let c = 0; c < cs.length; c++) { const i = cs[c].findIndex(isBridge); if (i >= 0) return { c, i }; }
+    return null;
+  };
+  const sa = toSegments(a), sb = toSegments(b);
+  const fa = find(sa), fb = find(sb);
+  if (!fa || !fb) return null;
+  // Each run starts where its bridge ended and stops where it began.
+  const run = (segs: Seg[], i: number) => [...segs.slice(i + 1), ...segs.slice(0, i)];
+  const ba = sa[fa.c][fa.i], bb = sb[fb.c][fb.i];
+  if (!eq(ba.p[0], bb.p[1]) || !eq(ba.p[1], bb.p[0])) return null;
+  const merged = [...run(sa[fa.c], fa.i), ...run(sb[fb.c], fb.i)];
+  return fromSegments([merged, ...sa.filter((_, k) => k !== fa.c), ...sb.filter((_, k) => k !== fb.c)]);
+}
+
+/**
+ * Delete a stretch: the outer piece's outline goes back into the inner one,
+ * the cut and its join disappear, and the two are one piece again where the
+ * inner piece sits (the tail snaps back). The survivor keeps the inner id;
+ * the outer piece's other faces (a join it carried on) move to it, whatever
+ * rode on the outer piece rides on it, and if it rode on the outer piece
+ * itself it takes the outer piece's parent.
+ */
+export function healStretch(
+  pieces: readonly StackPiece[], joins: readonly StackJoin[], joinId: string
+): { pieces: StackPiece[]; joins: StackJoin[] } | null {
+  const sc = stretchCut(pieces, joins, joinId);
+  if (!sc) return null;
+  const { inner, outer, join, innerFace, outerFace } = sc;
+  const merged = mergeAtFace(inner.cmds, outer.cmds, inner.faces[innerFace]);
+  if (!merged) return null;
+  const keptIn = inner.faces.filter((_, i) => i !== innerFace);
+  const keptOut = outer.faces.filter((_, i) => i !== outerFace);
+  const healed: StackPiece = {
+    ...rebasePiece(inner, merged), faces: [...keptIn, ...keptOut],
+    parentId: inner.parentId === outer.id ? outer.parentId : inner.parentId,
+  };
+  if (healed.parentId === undefined) delete healed.parentId;
+  const remap = (ref: { pieceId: string; faceIndex: number }) =>
+    ref.pieceId === inner.id ? { pieceId: inner.id, faceIndex: ref.faceIndex - (ref.faceIndex > innerFace ? 1 : 0) }
+    : ref.pieceId === outer.id ? { pieceId: inner.id, faceIndex: keptIn.length + ref.faceIndex - (ref.faceIndex > outerFace ? 1 : 0) }
+    : ref;
+  return {
+    pieces: pieces.filter((p) => p.id !== outer.id).map((p) =>
+      p.id === inner.id ? healed : p.parentId === outer.id ? { ...p, parentId: inner.id } : p),
+    joins: joins.filter((j) => j !== join).map((j) => ({ ...j, from: remap(j.from), to: remap(j.to) })),
+  };
+}
+
+/** Delete the stretch a tail hangs from (`stretchOf`). */
+export function healTail(pieces: readonly StackPiece[], joins: readonly StackJoin[], pieceId: string) {
+  const s = stretchOf(pieces, joins, pieceId);
+  return s ? healStretch(pieces, joins, s.join.id) : null;
+}
+
+/**
+ * Where a stretch's cut can slide, fixed for one drag: the two pieces healed
+ * in their local frame, the cut's angle (the inner face's own, so the inner
+ * piece is the near side, x < cutX) and its x, and the range along the
+ * straight stroke it may move in — the zone of the healed outline that holds
+ * the cut, kept a little inside. Null when no straight zone holds it.
+ */
+export function beginCutSlide(
+  pieces: readonly StackPiece[], joins: readonly StackJoin[], joinId: string, unitsPerEm: number
+): { merged: SvgCmd[]; angle: number; cutX: number; range: [number, number] } | null {
+  const sc = stretchCut(pieces, joins, joinId);
+  if (!sc) return null;
+  const face = sc.inner.faces[sc.innerFace];
+  const merged = mergeAtFace(sc.inner.cmds, sc.outer.cmds, face);
+  if (!merged) return null;
+  const angle = face.tangent;
+  const mid: Pt2 = [(face.a[0] + face.b[0]) / 2, (face.a[1] + face.b[1]) / 2];
+  const inFrame = (p: Pt2, a: number) => [p[0] * Math.cos(a) + p[1] * Math.sin(a), -p[0] * Math.sin(a) + p[1] * Math.cos(a)];
+  const cutX = inFrame(mid, angle)[0];
+  const zones = findCutZonesSwept(flattenContours(merged), { glyphIndex: 0, cluster: 0 }, stackDetectOpts(unitsPerEm || 1000));
+  for (const z of zones) {
+    const same = Math.cos(z.angle - angle);
+    if (Math.abs(same) < Math.cos(0.05)) continue;    // a different stroke direction
+    const [zx, zy] = inFrame(mid, z.angle);
+    if (zx < z.fromX - 1e-6 || zx > z.toX + 1e-6 || Math.abs(zy - z.centreY) > z.thickness) continue;
+    const m = Math.min(z.thickness / 4, (z.toX - z.fromX) / 10);
+    const range: [number, number] = same > 0 ? [z.fromX + m, z.toX - m] : [-(z.toX - m), -(z.fromX + m)];
+    return { merged, angle, cutX, range };
+  }
+  return null;
+}
+
+/**
+ * The two pieces re-cut from their healed outline at `cutX`: material
+ * crosses from one to the other, each keeps its own placement (so the tail's
+ * tip stays where it is) and every face keeps its index, so no join changes.
+ * Null if the cut is not legal there or would pass another face.
+ */
+export function slideCutTo(
+  pieces: readonly StackPiece[], joins: readonly StackJoin[], joinId: string,
+  slide: { merged: SvgCmd[]; angle: number }, cutX: number
+): StackPiece[] | null {
+  const sc = stretchCut(pieces, joins, joinId);
+  if (!sc) return null;
+  const split = splitAtCut(slide.merged, { cutX, angle: slide.angle });
+  if (!split) return null;
+  const carries = (cmds: SvgCmd[], f: CutFace) => {
+    const pts = flattenContours(cmds).flat();
+    const on = (q: Pt2) => pts.some((v) => Math.abs(v[0] - q[0]) < 1e-6 && Math.abs(v[1] - q[1]) < 1e-6);
+    return on(f.a) && on(f.b);
+  };
+  const { inner, outer, innerFace, outerFace } = sc;
+  if (inner.faces.some((f, i) => i !== innerFace && !carries(split.near, f))) return null;
+  if (outer.faces.some((f, i) => i !== outerFace && !carries(split.far, f))) return null;
+  const ni: StackPiece = { ...rebasePiece(inner, split.near), faces: inner.faces.map((f, i) => (i === innerFace ? split.nearFace : f)) };
+  const no: StackPiece = { ...rebasePiece(outer, split.far), faces: outer.faces.map((f, i) => (i === outerFace ? split.farFace : f)) };
+  return pieces.map((p) => (p.id === inner.id ? ni : p.id === outer.id ? no : p));
 }
 
 /** The marks offered as gap fillers, in the rotation the arranger cycles through. */

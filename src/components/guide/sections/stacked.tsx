@@ -4,7 +4,7 @@ export const section: GuideSection = {
   id: "stacked",
   title: "Stacking a word",
   order: 39,
-  keywords: ["stack", "tarkib", "diwani", "name", "composition", "join", "tail", "convert", "teardrop"],
+  keywords: ["stack", "tarkib", "diwani", "name", "composition", "join", "tail", "convert", "teardrop", "stretch", "delete", "remove", "undo stretch", "cut", "slide", "move cut"],
   Body: () => (
     <>
       <p>
@@ -29,6 +29,16 @@ export const section: GuideSection = {
         Rest on a letter and the free ends of its straight strokes outline. Press there and
         pull: the stroke is cut where you pressed and the end comes away in your hand as its
         own piece, to sweep out and round the way the tail of a meem curls under a name.
+      </p>
+      <p>
+        To change where a stretch starts, rest on the edge where the stroke was cut — it
+        lights up — and drag it along the stroke. The tip of the tail stays where it is;
+        only the start of the stretch moves.
+      </p>
+      <p>
+        To remove a stretch, rest on the tail and press <strong>Delete</strong>, or
+        right-click it. The tail goes back and the letter is whole again, exactly as it
+        was. Delete here only removes the stretch, never the composition.
       </p>
       <h4>Shape</h4>
       <p>

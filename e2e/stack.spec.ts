@@ -542,3 +542,106 @@ test("Shift-dragging a freed bowl grows its radius: the tail slides out, the ben
   await page.keyboard.press("Control+z");
   await expect.poll(async () => (await geom()).chord).toBeCloseTo(g0.chord, 6);
 });
+
+/** A whole-px page point on the named node (the first that hits), nearest its centre. */
+async function pointOn(page: Page, name: string, index = 0): Promise<Point | null> {
+  return page.evaluate(([n, i]) => {
+    const stage = window.__HARF__!.getStage()!;
+    const box = stage.container().getBoundingClientRect();
+    const node = stage.find(`.${n}`)[i as number];
+    if (!node) return null;
+    const r = node.getClientRect();
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    let best: { x: number; y: number; d: number } | null = null;
+    for (let gy = 0; gy <= 12; gy++) for (let gx = 0; gx <= 12; gx++) {
+      const px = Math.round(box.left + r.x + (r.width * gx) / 12), py = Math.round(box.top + r.y + (r.height * gy) / 12);
+      if (stage.getIntersection({ x: px - box.left, y: py - box.top }) !== node) continue;
+      const d = Math.hypot(px - box.left - cx, py - box.top - cy);
+      if (!best || d < best.d) best = { x: px, y: py, d };
+    }
+    return best && { x: best.x, y: best.y };
+  }, [name, index] as const);
+}
+
+const cmdsOf = (page: Page, id: string) =>
+  page.evaluate((pid) => JSON.stringify((window.__HARF__!.getBlocks()[0] as unknown as { pieces: { id: string; cmds: unknown }[] })
+    .pieces.find((p) => p.id === pid)?.cmds ?? null), id);
+
+test("a pulled tail's cut edge slides along the stroke; Delete or right-click removes the stretch", async ({ page }) => {
+  await gotoApp(page);
+  await chooseFont(page, "UKIJ Diwani");
+  await setBlockText(page, WORD);
+  await settleFrames(page);
+  await convert(page);
+  const before = await fullPiecesOf(page);
+  const letterIdx = before.map((p, i) => (p.role === "letter" && !p.parentId ? i : -1)).filter((i) => i >= 0);
+
+  // Pull a tail out.
+  const at = await findCutSpan(page, letterIdx);
+  await page.mouse.move(at.x, at.y);
+  await settleFrames(page);
+  await page.mouse.down();
+  await expect.poll(async () => (await fullPiecesOf(page)).length).toBe(before.length + 1);
+  await page.mouse.move(at.x + 1, at.y - 2);
+  await page.mouse.move(at.x + 30, at.y - 40, { steps: 8 });
+  await page.mouse.up();
+  await settleFrames(page);
+  const pulled = await fullPiecesOf(page);
+  const cap = pulled.find((c) => !before.some((p) => p.id === c.id))!;
+  expect(await namedNodeCount(page, "stack-cutedge")).toBe(1);
+
+  // Slide the cut edge toward the body: the tail takes outline from the body.
+  const edge = await pointOn(page, "stack-cutedge");
+  expect(edge).not.toBeNull();
+  await page.mouse.move(edge!.x, edge!.y);
+  await settleFrames(page);
+  expect(await hitTargetAt(page, edge!)).toBe("Line.stack-cutedge");
+  const axis = await page.evaluate(() => {
+    const stage = window.__HARF__!.getStage()!;
+    const n = stage.find(".stack-cutedge")[0] as unknown as { points(): number[]; getAbsoluteTransform(): { point(p: { x: number; y: number }): { x: number; y: number } } };
+    const [ax, ay, bx, by] = n.points();
+    const t = n.getAbsoluteTransform();
+    const a = t.point({ x: ax, y: ay }), b = t.point({ x: bx, y: by });
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    return { x: -(b.y - a.y) / len, y: (b.x - a.x) / len, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+  });
+  const bodyCentre = await pieceCentre(page, pulled.findIndex((p) => p.id === cap.parentId));
+  const box = await page.evaluate(() => window.__HARF__!.getStage()!.container().getBoundingClientRect().toJSON() as { left: number; top: number });
+  const toBody = (bodyCentre.x - box.left - axis.mx) * axis.x + (bodyCentre.y - box.top - axis.my) * axis.y > 0 ? 1 : -1;
+  const capCmds = await cmdsOf(page, cap.id);
+  const bodyCmds = await cmdsOf(page, cap.parentId!);
+  await page.mouse.down();
+  await page.mouse.move(edge!.x + toBody * axis.x * 2, edge!.y + toBody * axis.y * 2);
+  await page.mouse.move(edge!.x + toBody * axis.x * 12, edge!.y + toBody * axis.y * 12, { steps: 6 });
+  await page.mouse.up();
+  await settleFrames(page);
+  expect(await cmdsOf(page, cap.id)).not.toBe(capCmds);
+  expect(await cmdsOf(page, cap.parentId!)).not.toBe(bodyCmds);
+  expect((await fullPiecesOf(page)).length).toBe(pulled.length);
+  // The slide is one undo step.
+  await page.keyboard.press("Control+z");
+  await expect.poll(() => cmdsOf(page, cap.id)).toBe(capCmds);
+
+  // Delete over the tail: the stretch goes, the composition stays.
+  await page.mouse.move(5, 5);
+  const capIdx = (await fullPiecesOf(page)).findIndex((p) => p.id === cap.id);
+  const onCap = await pointOn(page, "stack-piece", capIdx);
+  expect(onCap).not.toBeNull();
+  await page.mouse.move(onCap!.x, onCap!.y);
+  await settleFrames(page);
+  expect(await hitTargetAt(page, onCap!)).toBe("Line.stack-piece");
+  await page.keyboard.press("Delete");
+  await expect.poll(async () => (await fullPiecesOf(page)).length).toBe(before.length);
+  expect((await getBlocks(page)).length).toBe(1);
+  expect((await getBlocks(page))[0].type).toBe("stack");
+
+  // Undo brings the tail back; a right-click removes it again.
+  await page.keyboard.press("Control+z");
+  await expect.poll(async () => (await fullPiecesOf(page)).length).toBe(pulled.length);
+  await page.mouse.move(5, 5);
+  await settleFrames(page);
+  await page.mouse.move(onCap!.x, onCap!.y);
+  await settleFrames(page);
+  await page.mouse.click(onCap!.x, onCap!.y, { button: "right" });
+  await expect.poll(async () => (await fullPiecesOf(page)).length).toBe(before.length);
+});

@@ -10,6 +10,7 @@ import { joinCenterline, joinEdges, joinFloor, joinHandles, solveJoinDrag } from
 import { cutAtPress, invertTransform, pullSpans, spanProbes, stackDetectOpts, zoneRect } from "../lib/stackZones";
 import { complementOf } from "../lib/complementColor";
 import { curveRegions, type CurveRegion, type CurveTrace } from "../lib/stackCurve";
+import { beginCutSlide, slideCutTo, stretchCut, stretchOf } from "../lib/stackConvert";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 
 /** Keyed on a piece's `cmds` identity (a render-pure cache; refs may not be read in render). */
@@ -26,6 +27,8 @@ const JOIN_HIT_PX = 14;
  *  a few px tall, and Chrome rounds mouse positions to whole px. */
 const CUT_SLACK_PX = 3;
 const TILT_TICK_R = 36;
+/** Screen px: the band along a stretch's cut edge that slides the cut. */
+const CUT_EDGE_PX = 10;
 
 /** A curved arrow: there is no native rotate cursor. Hotspot at the centre. */
 const ROTATE_CURSOR =
@@ -65,6 +68,7 @@ type Hover =
   | { kind: "join"; id: string }
   | { kind: "cut"; id: string; pieceId: string }
   | { kind: "curve"; pieceId: string; index: number }
+  | { kind: "cutedge"; joinId: string; outerId: string }
   | null;
 
 export type StackEditOverlayProps = {
@@ -89,6 +93,11 @@ export type StackEditOverlayProps = {
   /** Free the curve the hover traced; returns the new join's id. Pushes
    *  history itself (the free and the bend that follows are one step). */
   onBend?: (pieceId: string, trace: CurveTrace) => string | null;
+  /** Delete the stretch a pulled tail hangs from; false if it is not a tail.
+   *  Pushes history itself. */
+  onHeal?: (pieceId: string) => boolean;
+  /** Replace pieces whole by id (a cut sliding moves outline between two). */
+  onReplacePieces?: (pieces: StackPiece[]) => void;
 };
 
 /**
@@ -102,6 +111,8 @@ export type StackEditOverlayProps = {
  *   a join curve with Shift    → grow or shrink its radius (the free end moves out)
  *   the free end of a straight stroke → press cuts there, the drag pulls the tail
  *   the apex of a curved stroke → press frees the curve, the drag bends it
+ *   the cut edge of a pulled tail → slide where the stretch starts along the stroke
+ *   a pulled tail, Delete / right-click → the stretch goes, the letter is whole
  *
  * Z-order is the whole dispatch: rings lowest, then join curves, then the
  * body polygons, then the curve apexes and the cut spans of the hovered
@@ -112,7 +123,7 @@ export type StackEditOverlayProps = {
  */
 export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   isSelected, pieces, joins, nib, scale, color, moveTogether, onBegin, onSetPieces, onSetBow,
-  unitsPerEm, onSplit, onBend,
+  unitsPerEm, onSplit, onBend, onHeal, onReplacePieces,
 }) => {
   const [hover, setHover] = useState<Hover>(null);
   const groupRef = useRef<Konva.Group>(null);
@@ -127,6 +138,7 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   // the split changes the body's commands, and a node drag dies with it.
   const pull = useRef<{ capId: string; cap: { x: number; y: number }; pointer: { x: number; y: number }; end: () => void } | null>(null);
   const bend = useRef<{ joinId: string; pointer: { x: number; y: number }; end: () => void } | null>(null);
+  const slide = useRef<{ end: () => void } | null>(null);
 
   const accent = useMemo(() => complementOf(color), [color]);
 
@@ -144,7 +156,8 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   // The sweep is fifteen rotations per piece, so it runs for the hovered
   // letter only, and once per `cmds` array: a drag rebuilds `pieces` every
   // frame but never touches a piece's commands.
-  const hoveredPieceId = hover && hover.kind !== "join" ? (hover.kind === "cut" || hover.kind === "curve" ? hover.pieceId : hover.id) : null;
+  const hoveredPieceId = !hover || hover.kind === "join" || hover.kind === "cutedge" ? null
+    : hover.kind === "cut" || hover.kind === "curve" ? hover.pieceId : hover.id;
   const cutSpans = useMemo(() => {
     const p = hoveredPieceId ? byId.get(hoveredPieceId) : undefined;
     if (!p || p.role !== "letter") return [];
@@ -186,7 +199,36 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   // were when the press mounted its listener.
   const joinsRef = useRef(joins);
   const byIdRef = useRef(byId);
-  useEffect(() => { joinsRef.current = joins; byIdRef.current = byId; }, [joins, byId]);
+  const piecesRef = useRef(pieces);
+  useEffect(() => { joinsRef.current = joins; byIdRef.current = byId; piecesRef.current = pieces; }, [joins, byId, pieces]);
+
+  // Every stretch (a pulled tail's plain cut): the inner piece's cut edge in
+  // block px, where a drag slides the cut.
+  const stretches = useMemo(() => joins.flatMap((j) => {
+    const sc = stretchCut(pieces, joins, j.id);
+    if (!sc) return [];
+    const f = transformFace(sc.inner.faces[sc.innerFace], pieceTransform(sc.inner));
+    return [{ joinId: j.id, outerId: sc.outer.id, points: [f.a[0] * scale, f.a[1] * scale, f.b[0] * scale, f.b[1] * scale] }];
+  }), [pieces, joins, scale]);
+
+  // Delete / Backspace over a pulled tail (or its cut edge) removes the
+  // stretch. Capture phase, so the app's own Delete — which would delete the
+  // whole composition — never sees it.
+  const healTarget = hover?.kind === "cutedge" ? hover.outerId
+    : hover?.kind === "piece" && stretchOf(pieces, joins, hover.id) ? hover.id : null;
+  useEffect(() => {
+    if (!healTarget || !onHeal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (onHeal(healTarget)) setHover(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [healTarget, onHeal]);
 
   const joinGeom = useMemo(() => joins.flatMap((j) => {
     const from = byId.get(j.from.pieceId), to = byId.get(j.to.pieceId);
@@ -220,18 +262,58 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
       : hover.kind === "piece" ? "move"
       : hover.kind === "ring" ? ROTATE_CURSOR
       : hover.kind === "join" || hover.kind === "curve" ? "grab"
+      : hover.kind === "cutedge" ? "col-resize"
       : "crosshair";
     return () => { style.cursor = prev; };
   }, [hover]);
 
-  useEffect(() => () => { pull.current?.end(); bend.current?.end(); }, []);
+  useEffect(() => () => { pull.current?.end(); bend.current?.end(); slide.current?.end(); }, []);
 
   if (!isSelected) return null;
 
   // Handles sit at different depths, so read the pointer from the overlay
   // Group itself rather than counting parents.
   const pointerIn = () => groupRef.current?.getRelativePointerPosition() ?? { x: 0, y: 0 };
-  const enter = (h: Hover) => { if (!pull.current && !bend.current) setHover(h); };
+  const enter = (h: Hover) => { if (!pull.current && !bend.current && !slide.current) setHover(h); };
+  const healOnRightClick = (e: Konva.KonvaEventObject<PointerEvent>, pieceId: string) => {
+    if (!onHeal || !stretchOf(pieces, joins, pieceId)) return;
+    e.evt.preventDefault();
+    e.cancelBubble = true;
+    if (onHeal(pieceId)) setHover(null);
+  };
+
+  /**
+   * Press on a stretch's cut edge: slide the cut along its stroke. Outline
+   * crosses between the two pieces, each keeps its placement, so the tail's
+   * tip stays and the start of the stretch follows the pointer. A stage
+   * listener like the pull: the edge band re-renders as the pieces change.
+   * The healed outline and the stroke's range are fixed at the press.
+   */
+  const beginSlide = (joinId: string, stage: Konva.Stage | null) => {
+    if (!stage || !onReplacePieces) return;
+    const snap = beginCutSlide(pieces, joins, joinId, unitsPerEm);
+    if (!snap) return;
+    const sc = stretchCut(pieces, joins, joinId);
+    if (!sc) return;
+    onBegin?.();
+    const at = pointerIn();
+    // The stroke's axis in the block frame: the cut's angle turned by the inner piece.
+    const dir = [Math.cos(snap.angle + sc.inner.rotation), Math.sin(snap.angle + sc.inner.rotation)];
+    const end = () => { slide.current = null; stage.off(".stackslide"); window.removeEventListener("mouseup", end); window.removeEventListener("touchend", end); };
+    slide.current = { end };
+    stage.on("mousemove.stackslide touchmove.stackslide", () => {
+      const now = pointerIn();
+      const along = ((now.x - at.x) * dir[0] + (now.y - at.y) * dir[1]) / scale;
+      const cutX = Math.min(snap.range[1], Math.max(snap.range[0], snap.cutX + along));
+      const next = slideCutTo(piecesRef.current, joinsRef.current, joinId, snap, cutX);
+      if (!next) return;   // not a legal cut there: hold the last one
+      const changed = next.filter((p, i) => p !== piecesRef.current[i]);
+      if (changed.length) onReplacePieces(changed);
+    });
+    stage.on("mouseup.stackslide touchend.stackslide", end);
+    window.addEventListener("mouseup", end);
+    window.addEventListener("touchend", end);
+  };
 
   /**
    * Press on a curve's apex: free it (the handler pushes history) and bend
@@ -395,6 +477,7 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
           draggable
           onMouseEnter={() => enter({ kind: "piece", id })}
           onMouseDown={(e) => { e.cancelBubble = true; }}
+          onContextMenu={(e) => healOnRightClick(e, id)}
           onDragStart={(e) => {
             e.cancelBubble = true;
             const ids = chainOf(pieces, id, !moveTogether || e.evt.altKey);
@@ -418,6 +501,18 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
             dragStart.current = null;
             e.target.position({ x: 0, y: 0 });   // the polygon re-renders from state
           }}
+        />
+      ))}
+
+      {/* The cut edge of each pulled tail: drag to slide the cut, right-click to remove the stretch. */}
+      {stretches.map((s) => (
+        <Line
+          key={`edge-${s.joinId}`} name="stack-cutedge" points={s.points} strokeEnabled={false}
+          hitFunc={hitBand(s.points, false, CUT_EDGE_PX)}
+          onMouseEnter={() => enter({ kind: "cutedge", joinId: s.joinId, outerId: s.outerId })}
+          onMouseDown={(e) => { if (e.evt.button !== 0) return; e.cancelBubble = true; beginSlide(s.joinId, e.target.getStage()); }}
+          onTouchStart={(e) => { e.cancelBubble = true; beginSlide(s.joinId, e.target.getStage()); }}
+          onContextMenu={(e) => healOnRightClick(e, s.outerId)}
         />
       ))}
 
@@ -462,6 +557,15 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
       {hover?.kind === "curve" && (() => {
         const c = curves.find((x) => x.pieceId === hover.pieceId && x.index === hover.index); if (!c) return null;
         return <Line points={c.points} closed stroke={accent} strokeWidth={OUTLINE_PX} strokeScaleEnabled={false} listening={false} />;
+      })()}
+      {hover?.kind === "cutedge" && (() => {
+        const s = stretches.find((x) => x.joinId === hover.joinId); if (!s) return null;
+        return (
+          <>
+            {outlineOf(s.outerId, 0.4)}
+            <Line points={s.points} stroke={accent} strokeWidth={3} strokeScaleEnabled={false} lineCap="round" listening={false} />
+          </>
+        );
       })()}
       {hover?.kind === "cut" && (() => {
         const s = cutSpans.find((x) => x.id === hover.id); if (!s) return null;

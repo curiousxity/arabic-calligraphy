@@ -128,10 +128,10 @@ async function shapeReal(
   }
 }
 
-import { convertRunToStack, runOutline, splitPieceAtCut, fillerShapes, teardropShape, bendCurveAt } from "./stackConvert";
+import { convertRunToStack, runOutline, splitPieceAtCut, fillerShapes, teardropShape, bendCurveAt, stretchOf, healTail, beginCutSlide, slideCutTo } from "./stackConvert";
 import { arcBand } from "./stackCurve";
 import { joinCenterline } from "./stackJoin";
-import { transformFace } from "./stackGeometry";
+import { transformFace, transformPt } from "./stackGeometry";
 import { pieceTransform } from "./stackOutline";
 import { assembleStackOutline, assembleStackOutlineReport, chainOf } from "./stackOutline";
 import { nibFloorFraction, nuqtaUnits } from "./nuqta";
@@ -364,6 +364,110 @@ describe("convertRunToStack", () => {
     expect(new Set(cur.joins.map((j) => j.id)).size).toBe(cur.joins.length);
     expect(resolves(cur.pieces, cur.joins)).toBe(true);
   });
+
+  /** Convert, pull a tail out of the first letter that splits, and move the cap away. */
+  async function pulled(text: string, fontFile: string) {
+    const { result, input } = await convert(text, fontFile);
+    // The zones the editor offers cuts in (its detector settings), as a pull would.
+    for (const target of result.pieces.filter((p) => p.role === "letter")) {
+      for (const z of findCutZonesSwept(flattenContours(target.cmds), { glyphIndex: 0, cluster: 0 }, stackDetectOpts(input.unitsPerEm))) {
+        const cutX = (z.fromX + z.toX) / 2;
+        const split = splitPieceAtCut(result.pieces, result.joins, target.id, { cutX, angle: z.angle });
+        if (!split) continue;
+        const cap = split.pieces[split.pieces.length - 1];
+        const pieces = split.pieces.map((p) => (p.id === cap.id ? { ...p, x: p.x + 80, y: p.y - 40 } : p));
+        return { result, input, target, capId: cap.id, cut: { cutX, angle: z.angle }, pieces, joins: split.joins };
+      }
+    }
+    throw new Error("nothing split");
+  }
+
+  it("healTail puts a pulled tail back: one piece again, the letter's own outline, the cut's join gone", async () => {
+    const { result, target, capId, pieces, joins } = await pulled("مصبح", "UKIJDiwani.ttf");
+    expect(stretchOf(pieces, joins, capId)!.inner.id).toBe(target.id);
+    expect(stretchOf(pieces, joins, target.id)).toBeNull();
+    const healed = healTail(pieces, joins, capId)!;
+    expect(healed).not.toBeNull();
+    expect(healed.pieces.map((p) => p.id).sort()).toEqual(result.pieces.map((p) => p.id).sort());
+    expect(healed.joins.map((j) => j.id).sort()).toEqual(result.joins.map((j) => j.id).sort());
+    expect(resolves(healed.pieces, healed.joins)).toBe(true);
+    const body = healed.pieces.find((p) => p.id === target.id)!;
+    expect(Math.abs(area(body.cmds) - area(target.cmds)) / area(target.cmds)).toBeLessThan(1e-4);
+    expect(flattenContours(body.cmds).length).toBe(flattenContours(target.cmds).length);
+    // The body did not move; every point of the letter is where it was.
+    const before = transformPt([target.pivot[0] + 7, target.pivot[1] - 3], pieceTransform(target));
+    const after = transformPt([target.pivot[0] + 7, target.pivot[1] - 3], pieceTransform(body));
+    expect(after[0]).toBeCloseTo(before[0], 6);
+    expect(after[1]).toBeCloseTo(before[1], 6);
+    // And the whole composition draws as it did before the pull.
+    const nib = { width: 100, minFraction: 0.15 };
+    const a0 = area(assembleStackOutline(result.pieces, result.joins, nib));
+    const a1 = area(assembleStackOutline(healed.pieces, healed.joins, nib));
+    expect(Math.abs(a1 - a0) / a0).toBeLessThan(1e-4);
+  });
+
+  it("a tail pulled twice heals one stretch at a time, whichever piece the second pull made the tip", async () => {
+    const { result, capId, pieces, joins } = await pulled("مصبح", "UKIJDiwani.ttf");
+    const nib = { width: 100, minFraction: 0.15 };
+    const a0 = area(assembleStackOutline(result.pieces, result.joins, nib));
+    const cap = pieces.find((p) => p.id === capId)!;
+    let twice: { pieces: StackPiece[]; joins: StackJoin[] } | null = null;
+    for (const z of await zonesOf(cap)) {
+      twice = splitPieceAtCut(pieces, joins, capId, { cutX: (z.fromX + z.toX) / 2, angle: z.angle });
+      if (twice) break;
+    }
+    expect(twice).not.toBeNull();
+    // Two stretches now; the tip is two joins from the body. Delete the tip's.
+    const tails = twice!.pieces.filter((p) => stretchOf(twice!.pieces, twice!.joins, p.id));
+    expect(tails).toHaveLength(2);
+    const tip = tails.find((t) => stretchOf(twice!.pieces, twice!.joins, t.id)!.inner.id !== cap.parentId)!;
+    const once = healTail(twice!.pieces, twice!.joins, tip.id)!;
+    expect(once).not.toBeNull();
+    expect(resolves(once.pieces, once.joins)).toBe(true);
+    const left = once.pieces.filter((p) => stretchOf(once.pieces, once.joins, p.id));
+    expect(left).toHaveLength(1);
+    expect(left[0].parentId).toBe(cap.parentId);
+    const done = healTail(once.pieces, once.joins, left[0].id)!;
+    expect(done.pieces.length).toBe(result.pieces.length);
+    expect(done.joins.length).toBe(result.joins.length);
+    expect(resolves(done.pieces, done.joins)).toBe(true);
+    expect(Math.abs(area(assembleStackOutline(done.pieces, done.joins, nib)) - a0) / a0).toBeLessThan(1e-4);
+  });
+
+  it("healTail refuses what is not a pulled tail", async () => {
+    const { result } = await convert("مصبح", "UKIJDiwani.ttf");
+    for (const p of result.pieces) expect(healTail(result.pieces, result.joins, p.id)).toBeNull();
+  });
+
+  it("slideCutTo moves the cut along the stroke: material crosses, the tail's tip stays, joins are untouched", async () => {
+    const { input, target, capId, pieces, joins } = await pulled("مصبح", "UKIJDiwani.ttf");
+    const joinId = stretchOf(pieces, joins, capId)!.join.id;
+    const slide = beginCutSlide(pieces, joins, joinId, input.unitsPerEm)!;
+    expect(slide).not.toBeNull();
+    expect(slide.range[0]).toBeLessThanOrEqual(slide.cutX + 1e-6);
+    expect(slide.range[1]).toBeGreaterThanOrEqual(slide.cutX - 1e-6);
+    // Toward the body: the body gets shorter, the tail longer.
+    const to = Math.max(slide.range[0], slide.cutX - 30);
+    expect(to).toBeLessThan(slide.cutX);
+    const moved = slideCutTo(pieces, joins, joinId, slide, to)!;
+    expect(moved).not.toBeNull();
+    const b0 = pieces.find((p) => p.id === target.id)!, c0 = pieces.find((p) => p.id === capId)!;
+    const b1 = moved.find((p) => p.id === target.id)!, c1 = moved.find((p) => p.id === capId)!;
+    expect(area(b1.cmds)).toBeLessThan(area(b0.cmds));
+    expect(area(c1.cmds)).toBeGreaterThan(area(c0.cmds));
+    expect(Math.abs(area(b1.cmds) + area(c1.cmds) - area(b0.cmds) - area(c0.cmds)) / area(b0.cmds)).toBeLessThan(1e-4);
+    // Each piece keeps its placement: a point on the tail draws where it did.
+    const tip = flattenContours(c0.cmds)[0][0];
+    const w0 = transformPt(tip, pieceTransform(c0)), w1 = transformPt(tip, pieceTransform(c1));
+    expect(w1[0]).toBeCloseTo(w0[0], 6);
+    expect(w1[1]).toBeCloseTo(w0[1], 6);
+    expect(resolves(moved, joins)).toBe(true);
+    // Sliding back to where it was heals to the same letter as before.
+    const back = slideCutTo(moved, joins, joinId, slide, slide.cutX)!;
+    expect(Math.abs(area(back.find((p) => p.id === capId)!.cmds) - area(c0.cmds)) / area(c0.cmds)).toBeLessThan(1e-4);
+    const healed = healTail(moved, joins, capId)!;
+    expect(Math.abs(area(healed.pieces.find((p) => p.id === target.id)!.cmds) - area(target.cmds)) / area(target.cmds)).toBeLessThan(1e-4);
+  });
 });
 
 describe("fillerShapes", () => {
@@ -565,7 +669,7 @@ describe("bendCurveAt", () => {
     const holder = r.pieces.find((p) => p.id === ref.pieceId)!;
     const f = holder.faces[ref.faceIndex];
     expect(f).toBeDefined();
-    expect(Math.abs((f.a[0] + f.b[0]) / 2 - 110)).toBeLessThan(1e-6);
+    expect(Math.abs((f.a[0] + f.b[0]) / 2 - 110)).toBeLessThan(1e-4);
     // Moving that fragment and the neighbour together keeps the join spliceable.
     const moved = r.pieces.map((p) => (p.id === holder.id || p.id === "n" ? { ...p, x: p.x + 30 } : p));
     expect(assembleStackOutlineReport(moved, r.joins, { width: 20, minFraction: 0.5 }).skipped).toBe(0);

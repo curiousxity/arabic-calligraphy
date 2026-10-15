@@ -87,7 +87,7 @@ import {
   type SnapTarget,
 } from "../lib/snapping";
 import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
-import type { Block, DiacriticOverride, DetachedMarkOverride, StrokeCut } from "../types";
+import type { Block, DiacriticOverride, DetachedMarkOverride, StrokeCut, StackPiece } from "../types";
 import type { AlternateChoice, LetterAlternates } from "../lib/glyphAlternates";
 
 /** Stable empty list, so unselected blocks' memos do not re-run. */
@@ -179,6 +179,9 @@ export type CanvasStageProps = {
   onSplitStackPiece: (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => { id: string; x: number; y: number } | null;
   /** Free the curve the overlay traced on a stack piece; returns the new join's id. */
   onBendStackCurve: (blockId: number, pieceId: string, trace: CurveTrace) => string | null;
+  /** Delete a pulled tail's stretch; false if the piece is not a tail. */
+  onHealStackTail: (blockId: number, pieceId: string) => boolean;
+  onReplaceStackPieces: (blockId: number, pieces: StackPiece[]) => void;
   stackMoveTogether: boolean;
   /** Next Shape: the selected text block's letters that have alternates. */
   alternateLetters: LetterAlternates[];
@@ -310,6 +313,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSetStackJoinBow,
   onSplitStackPiece,
   onBendStackCurve,
+  onHealStackTail,
+  onReplaceStackPieces,
   stackMoveTogether,
   onSetStrokeCut,
   alternateLetters,
@@ -1237,6 +1242,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                           moveTogether={stackMoveTogether}
                           onSplit={(pieceId, cut) => onSplitStackPiece(block.id, pieceId, cut)}
                           onBend={(pieceId, trace) => onBendStackCurve(block.id, pieceId, trace)}
+                          onHeal={(pieceId) => onHealStackTail(block.id, pieceId)}
+                          onReplacePieces={(ps) => onReplaceStackPieces(block.id, ps)}
                         />
                       ) : null
                     }

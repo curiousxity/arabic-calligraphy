@@ -64,7 +64,7 @@ import {
 } from "./lib/guides";
 import { DEFAULT_ATTACHMENT } from "./lib/guidePlacement";
 import type { GuideAttachment, GuideBlock, GuideParams, GuideShape } from "./types";
-import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
+import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StackPiece, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
   isCloudConfigured,
@@ -169,7 +169,7 @@ import { buildCutPlan, cutAdvanceTotal, outlineBounds, remapCutsForEdits } from 
 import { remapMarksForEdits } from "./lib/detachedMarks";
 import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
 import { shapeText } from "./lib/harfbuzz";
-import { convertRunToStack, splitPieceAtCut, fillerShapes, teardropShape, bendCurveAt, type UnjoinedPair } from "./lib/stackConvert";
+import { convertRunToStack, splitPieceAtCut, fillerShapes, teardropShape, bendCurveAt, healTail, type UnjoinedPair } from "./lib/stackConvert";
 import type { CurveTrace } from "./lib/stackCurve";
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
@@ -725,6 +725,7 @@ const App: React.FC = () => {
       setBlocks((prev) =>
         prev.map((b) => (b.id === blockId && isStackBlock(b) ? { ...b, pieces: next.pieces, joins: next.joins } : b))
       );
+      setExportStatus("Tail pulled. To remove it, hover it and press Delete (or right-click it); drag its cut edge to slide where the stretch starts.");
       // The cap is the piece the split appended; the overlay pulls it in the same gesture.
       const cap = next.pieces[next.pieces.length - 1];
       return { id: cap.id, x: cap.x, y: cap.y };
@@ -749,6 +750,33 @@ const App: React.FC = () => {
     },
     [blocks, pushHistory]
   );
+
+  /** Delete a pulled tail's stretch: the tail goes back into the piece it was
+   *  cut from and the cut disappears. One history step. */
+  const healStackTail = useCallback(
+    (blockId: number, pieceId: string) => {
+      const block = blocks.find((b) => b.id === blockId);
+      if (!block || !isStackBlock(block)) return false;
+      const next = healTail(block.pieces, block.joins, pieceId);
+      if (!next) return false;
+      pushHistory();
+      setBlocks((prev) =>
+        prev.map((b) => (b.id === blockId && isStackBlock(b) ? { ...b, pieces: next.pieces, joins: next.joins } : b))
+      );
+      setExportStatus("Stretch removed.");
+      return true;
+    },
+    [blocks, pushHistory]
+  );
+
+  /** Pieces whose outlines changed (a cut slid along its stroke), replaced
+   *  whole by id. No push: the overlay's press took one through `onBeginStackEdit`. */
+  const replaceStackPieces = useCallback((blockId: number, pieces: StackPiece[]) => {
+    const byId = new Map(pieces.map((p) => [p.id, p]));
+    setBlocks((prev) =>
+      prev.map((b) => (b.id !== blockId || !isStackBlock(b) ? b : { ...b, pieces: b.pieces.map((p) => byId.get(p.id) ?? p) }))
+    );
+  }, []);
 
   /** Editor preference, not block state: dragging a stack letter carries the letters after it. */
   const [stackMoveTogether, setStackMoveTogether] = useState(true);
@@ -3597,6 +3625,8 @@ const App: React.FC = () => {
           onSetStackJoinBow={setStackJoinBow}
           onSplitStackPiece={splitStackPiece}
           onBendStackCurve={bendStackCurve}
+          onHealStackTail={healStackTail}
+          onReplaceStackPieces={replaceStackPieces}
           stackMoveTogether={stackMoveTogether}
           alternateLetters={glyphAlternatesState.letters}
           onPickGlyphAlternate={pickGlyphAlternate}
