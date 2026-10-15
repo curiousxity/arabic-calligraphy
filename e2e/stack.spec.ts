@@ -362,3 +362,80 @@ test("dragging a join curve bends it; double-click straightens", async ({ page }
   const straight = await joinsOf(page);
   expect(straight.every((j) => j.bow === 0 && (j.depth ?? 0) === 0)).toBe(true);
 });
+
+test("pressing a bowl's apex frees the curve and the same drag bends it; double-click restores; the free and drag undo as one step", async ({ page }) => {
+  await gotoApp(page);
+  await chooseFont(page, "Amiri");
+  await setBlockText(page, "نحن");
+  await settleFrames(page);
+  await convert(page);
+  const before = await fullPiecesOf(page);
+  const joinCount = () => page.evaluate(() => (window.__HARF__!.getBlocks()[0] as unknown as { joins: unknown[] }).joins.length);
+  const joinsBefore = await joinCount();
+  expect(await namedNodeCount(page, "stack-curve")).toBe(0);
+
+  // Hover each letter until a curve apex is offered, then press it.
+  let at: Point | null = null;
+  const letterIdx = before.map((p, i) => (p.role === "letter" && !p.parentId ? i : -1)).filter((i) => i >= 0);
+  for (const i of letterIdx) {
+    const c = await pieceCentre(page, i);
+    await page.mouse.move(c.x, c.y);
+    await settleFrames(page);
+    if ((await namedNodeCount(page, "stack-curve")) === 0) continue;
+    at = await page.evaluate(() => {
+      const stage = window.__HARF__!.getStage()!;
+      const node = stage.find(".stack-curve")[0];
+      const r = node.getClientRect();
+      const box = stage.container().getBoundingClientRect();
+      return { x: box.left + r.x + r.width / 2, y: box.top + r.y + r.height / 2 };
+    });
+    break;
+  }
+  expect(at, "a curve apex was offered").not.toBeNull();
+  await page.mouse.move(at!.x, at!.y);
+  await settleFrames(page);
+  expect(await hitTargetAt(page, at!)).toBe("Line.stack-curve");
+  const boxBefore = await blockClientBox(page, 1);
+  await page.mouse.down();
+  await expect.poll(joinCount).toBe(joinsBefore + 1);
+  await page.mouse.move(at!.x + 2, at!.y + 3);
+  await page.mouse.move(at!.x, at!.y + 40, { steps: 8 });
+  await page.mouse.up();
+  await settleFrames(page);
+  // The drag bent the new join away from its rest…
+  const bent = await page.evaluate((n) => {
+    const j = (window.__HARF__!.getBlocks()[0] as unknown as { joins: { bow: number; depth?: number; rest?: { bow: number; depth: number } }[] }).joins[n];
+    return { bow: j.bow, depth: j.depth ?? 0, rest: j.rest ?? { bow: 0, depth: 0 } };
+  }, joinsBefore);
+  expect(Math.abs(bent.bow - bent.rest.bow) + Math.abs(bent.depth - bent.rest.depth), JSON.stringify(bent)).toBeGreaterThan(0.05);
+  // …and the letter's ink moved with it.
+  const boxBent = await blockClientBox(page, 1);
+  expect(Math.abs(boxBent.height - boxBefore.height) + Math.abs(boxBent.width - boxBefore.width), JSON.stringify({ boxBefore, boxBent })).toBeGreaterThan(2);
+
+  // Double-click the freed curve: back to its rest, which reproduces the letter.
+  // Join nodes mount only for joins with a visible chord, so find the freed
+  // curve's by position: the one nearest the press.
+  const joinAt = await page.evaluate((press) => {
+    const stage = window.__HARF__!.getStage()!;
+    const box = stage.container().getBoundingClientRect();
+    const centres = stage.find(".stack-join").map((node) => {
+      const r = node.getClientRect();
+      return { x: box.left + r.x + r.width / 2, y: box.top + r.y + r.height / 2 };
+    });
+    centres.sort((a, b) => Math.hypot(a.x - press.x, a.y - press.y) - Math.hypot(b.x - press.x, b.y - press.y));
+    return centres[0];
+  }, at!);
+  await page.mouse.move(joinAt.x, joinAt.y);
+  await settleFrames(page);
+  await page.mouse.dblclick(joinAt.x, joinAt.y);
+  await settleFrames(page);
+  const boxRest = await blockClientBox(page, 1);
+  expect(Math.abs(boxRest.height - boxBefore.height)).toBeLessThan(3);
+
+  // The double-click was its own step; the free and the drag were one. So
+  // the first undo brings the bend back, and the second restores the letter.
+  await page.keyboard.press("Control+z");
+  await expect.poll(async () => (await fullPiecesOf(page)).length).toBe(before.length + 1);
+  await page.keyboard.press("Control+z");
+  await expect.poll(async () => (await fullPiecesOf(page)).length).toBe(before.length);
+});
