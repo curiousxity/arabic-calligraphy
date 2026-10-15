@@ -133,6 +133,32 @@ describe("arrangeStackInShape", () => {
     for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeLessThan(xs[i - 1]);
   });
 
+  it("hugs the shape with the outer letters of a row of three or more", () => {
+    // One wide row: four 300-wide letters in a 1600×500 px ellipse.
+    const r = arrangeStackInShape({ ...input(), shapePx: ellipse(1600, 500) })!;
+    expect(r.rows).toBe(1);
+    const scale = r.fontSize / UPM;
+    const poly = ellipse(1600, 500).map(([x, y]) => [x / scale, y / scale] as [number, number]);
+    const right = groupBox(r.pieces, "p0"), left = groupBox(r.pieces, "p3");
+    const rs = bandSpan(poly, right.y1, right.y2)!, ls = bandSpan(poly, left.y1, left.y2)!;
+    // Each outer letter's box sits one letter gap (0.08 em) inside the chord at its own band.
+    expect(Math.abs(rs[1] - right.x2 - 80)).toBeLessThan(2);
+    expect(Math.abs(left.x1 - ls[0] - 80)).toBeLessThan(2);
+    // Inner letters sit between them with equal gaps.
+    const b1 = groupBox(r.pieces, "p1"), b2 = groupBox(r.pieces, "p2");
+    const g0 = right.x1 - b1.x2, g1 = b1.x1 - b2.x2, g2 = b2.x1 - left.x2;
+    expect(Math.abs(g0 - g1)).toBeLessThan(1);
+    expect(Math.abs(g1 - g2)).toBeLessThan(1);
+  });
+
+  it("keeps the spread cap for a row of two", () => {
+    const { pieces, joins } = word();
+    const two = pieces.filter((p) => p.id === "p0" || p.id === "p1" || p.id === "d1");
+    const r = arrangeStackInShape({ pieces: two, joins, shapePx: ellipse(3000, 300), fontSize: 100, unitsPerEm: UPM })!;
+    const a = groupBox(r.pieces, "p0"), b = groupBox(r.pieces, "p1");
+    expect(a.x1 - b.x2).toBeLessThanOrEqual(1.0 * UPM + 1);
+  });
+
   it("returns null with no letters or a degenerate shape", () => {
     expect(arrangeStackInShape({ ...input(), pieces: [] })).toBeNull();
     expect(arrangeStackInShape({ ...input(), shapePx: [[0, 0], [1, 1]] })).toBeNull();

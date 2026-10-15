@@ -165,7 +165,7 @@ function pack(groups: Group[], poly: readonly Pt[], upm: number): Row[] | null {
       const g = groups[i];
       const tryMembers = [...members, g], tryDys = [...dys, g.letter.y - members[0].letter.y];
       const tryBox = rowBox(tryMembers, tryDys);
-      const need = tryMembers.reduce((s, m) => s + width(m.box), 0) + gap * (tryMembers.length - 1);
+      const need = rowNeed(tryMembers, gap);
       const tryBand = findBand(cursor, height(tryBox), need);
       if (!tryBand) break;
       members = tryMembers; dys = tryDys; box = tryBox; band = tryBand;
@@ -190,7 +190,7 @@ function spreadRows(rows: Row[], poly: readonly Pt[], upm: number): void {
   let ceiling = Infinity;
   for (let r = rows.length - 1; r >= 0; r--) {
     const row = rows[r];
-    const need = row.groups.reduce((s, g) => s + width(g.box), 0) + gap * (row.groups.length - 1);
+    const need = rowNeed(row.groups, gap);
     let lift = Math.min(share * (r + 1), row.bottom - height(row.box) - top);
     if (ceiling < Infinity) lift = Math.min(lift, ceiling);
     // Back off until the lifted band still fits the row's letters.
@@ -205,8 +205,25 @@ function spreadRows(rows: Row[], poly: readonly Pt[], upm: number): void {
   }
 }
 
-/** Each group's new letter position: the row's letters right to left across
- *  its span, spread to the edges (up to `MAX_SPREAD` apart), one alone centred. */
+/** The span the shape offers over one group's own band when its letter sits at `y`. */
+function ownSpan(poly: readonly Pt[], g: Group, y: number): [number, number] | null {
+  return bandSpan(poly, y + g.box.y1, y + g.box.y2);
+}
+
+/** The width a row of these groups needs: ink, gaps between, and — for a
+ *  row of three or more, which hugs the edges — one gap at each edge. */
+function rowNeed(groups: readonly Group[], gap: number): number {
+  const ink = groups.reduce((s, g) => s + width(g.box), 0);
+  return ink + gap * (groups.length - 1) + (groups.length >= 3 ? 2 * gap : 0);
+}
+
+/**
+ * Each group's new letter position. A row of one or two is centred in the
+ * row's span, its letters spread up to `MAX_SPREAD` apart. A row of three or
+ * more hugs the shape: each outer letter is measured against its *own* band
+ * (not the row's union band, which a tall neighbour narrows) and slid out to
+ * one gap inside the chord there; the inner letters share the rest equally.
+ */
 function placeRow(row: Row, poly: readonly Pt[], upm: number): Map<string, Pt> {
   const out = new Map<string, Pt>();
   const b = row.bottom;
@@ -215,18 +232,25 @@ function placeRow(row: Row, poly: readonly Pt[], upm: number): Map<string, Pt> {
   const total = widths.reduce((s, w) => s + w, 0);
   const n = row.groups.length;
   const minGap = LETTER_GAP * upm;
-  let gap = n > 1 ? (span[1] - span[0] - total) / (n - 1) : 0;
-  gap = Math.max(minGap, Math.min(gap, MAX_SPREAD * upm));
-  const used = total + gap * (n - 1);
-  // Right edge of the row's ink, centred in the span when the spread is capped.
-  let right = (span[0] + span[1]) / 2 + used / 2;
   const y0 = b - row.box.y2; // row space y=0 lands here
-  row.groups.forEach((g, i) => {
-    const x = right - g.box.x2; // letter x such that its box's right edge is at `right`
-    const y = y0 + row.dys[i];
-    out.set(g.letter.id, [x, y]);
-    right -= widths[i] + gap;
-  });
+  const ys = row.dys.map((dy) => y0 + dy);
+  if (n <= 2) {
+    let gap = n > 1 ? (span[1] - span[0] - total) / (n - 1) : 0;
+    gap = Math.max(minGap, Math.min(gap, MAX_SPREAD * upm));
+    const used = total + gap * (n - 1);
+    // Right edge of the row's ink, centred in the span when the spread is capped.
+    let right = (span[0] + span[1]) / 2 + used / 2;
+    row.groups.forEach((g, i) => { out.set(g.letter.id, [right - g.box.x2, ys[i]]); right -= widths[i] + gap; });
+    return out;
+  }
+  const first = row.groups[0], last = row.groups[n - 1];
+  const rightEdge = (ownSpan(poly, first, ys[0]) ?? span)[1] - minGap;
+  const leftEdge = (ownSpan(poly, last, ys[n - 1]) ?? span)[0] + minGap;
+  const innerTotal = widths.slice(1, n - 1).reduce((s, w) => s + w, 0);
+  const free = rightEdge - widths[0] - (leftEdge + widths[n - 1]) - innerTotal;
+  const gap = Math.max(minGap, free / (n - 1));
+  let right = rightEdge;
+  row.groups.forEach((g, i) => { out.set(g.letter.id, [right - g.box.x2, ys[i]]); right -= widths[i] + gap; });
   return out;
 }
 
