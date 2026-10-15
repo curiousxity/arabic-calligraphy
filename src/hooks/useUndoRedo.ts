@@ -29,8 +29,10 @@ const COALESCE_WINDOW_MS = 300;
 export function useUndoRedo<T>(
   getSnapshot: () => T,
   applySnapshot: (snapshot: T) => void,
-  captureThumbnail: () => string
+  captureThumbnail: () => string,
+  options: { coalesceMs?: number } = {}
 ) {
+  const coalesceMs = options.coalesceMs ?? COALESCE_WINDOW_MS;
   const stackRef = useRef<HistoryStack<T>>(emptyHistoryStack<T>());
   const lastPushAtRef = useRef<number>(0);
   const [canUndo, setCanUndo] = useState(false);
@@ -49,13 +51,13 @@ export function useUndoRedo<T>(
     const entry: HistoryEntry<T> = { snapshot: getSnapshot(), thumbnail: captureThumbnail() };
     const now = Date.now();
     const shouldCoalesce =
-      now - lastPushAtRef.current < COALESCE_WINDOW_MS && stackRef.current.past.length > 0;
+      now - lastPushAtRef.current < coalesceMs && stackRef.current.past.length > 0;
     stackRef.current = shouldCoalesce
       ? replaceLastEntry(stackRef.current, entry)
       : pushEntry(stackRef.current, entry);
     lastPushAtRef.current = now;
     syncFlags();
-  }, [getSnapshot, captureThumbnail, syncFlags]);
+  }, [getSnapshot, captureThumbnail, syncFlags, coalesceMs]);
 
   const handleUndo = useCallback(() => {
     const currentEntry: HistoryEntry<T> = { snapshot: getSnapshot(), thumbnail: captureThumbnail() };

@@ -6,9 +6,6 @@ import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
 import { GuideView } from "./GuideView";
 import { StackView } from "./StackView";
-import { StackEditOverlay } from "./StackEditOverlay";
-import type { CurveTrace } from "../lib/stackCurve";
-import { stackScale } from "../lib/stackOutline";
 import { resolveGuidePath, type WritingSession } from "../lib/guides";
 import { isClosedPath } from "../lib/guideShapes";
 import { guideCaret, projectToGuide, type GuideCaret } from "../lib/guidePlacement";
@@ -87,7 +84,7 @@ import {
   type SnapTarget,
 } from "../lib/snapping";
 import { artboardRect, marginRect, type ArtboardConfig } from "../lib/artboard";
-import type { Block, DiacriticOverride, DetachedMarkOverride, StrokeCut, StackPiece } from "../types";
+import type { Block, DiacriticOverride, DetachedMarkOverride, StrokeCut } from "../types";
 import type { AlternateChoice, LetterAlternates } from "../lib/glyphAlternates";
 
 /** Stable empty list, so unselected blocks' memos do not re-run. */
@@ -173,16 +170,8 @@ export type CanvasStageProps = {
   /** One `pushHistory()` per dot/mark handle drag, taken on drag start. */
   onBeginDetachedMarkDrag: () => void;
   onSetDetachedMark: (blockId: number, o: DetachedMarkOverride) => void;
-  onBeginStackEdit: () => void;
-  onSetStackPieces: (blockId: number, patches: { id: string; x?: number; y?: number; rotation?: number }[]) => void;
-  onSetStackJoinBow: (blockId: number, joinId: string, bend: { bow: number; depth: number }) => void;
-  onSplitStackPiece: (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => { id: string; x: number; y: number } | null;
-  /** Free the curve the overlay traced on a stack piece; returns the new join's id. */
-  onBendStackCurve: (blockId: number, pieceId: string, trace: CurveTrace) => string | null;
-  /** Delete a pulled tail's stretch; false if the piece is not a tail. */
-  onHealStackTail: (blockId: number, pieceId: string) => boolean;
-  onReplaceStackPieces: (blockId: number, pieces: StackPiece[]) => void;
-  stackMoveTogether: boolean;
+  /** Open the stack editor window for a composition (double-click). */
+  onEditStack: (id: number) => void;
   /** Next Shape: the selected text block's letters that have alternates. */
   alternateLetters: LetterAlternates[];
   onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
@@ -308,14 +297,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onBeginStrokeCut,
   onBeginDetachedMarkDrag,
   onSetDetachedMark,
-  onBeginStackEdit,
-  onSetStackPieces,
-  onSetStackJoinBow,
-  onSplitStackPiece,
-  onBendStackCurve,
-  onHealStackTail,
-  onReplaceStackPieces,
-  stackMoveTogether,
+  onEditStack,
   onSetStrokeCut,
   alternateLetters,
   onPickGlyphAlternate,
@@ -1226,27 +1208,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     opacity={block.opacity ?? 1}
                     locked={block.locked}
                     isSelected={block.id === selectedId}
-                    editing={
-                      block.id === selectedId && !effectivePanMode && !block.locked ? (
-                        <StackEditOverlay
-                          isSelected
-                          pieces={block.pieces ?? []}
-                          joins={block.joins ?? []}
-                          nib={block.nib}
-                          scale={stackScale(block.fontSize, block.unitsPerEm)}
-                          onBegin={onBeginStackEdit}
-                          onSetPieces={(patches) => onSetStackPieces(block.id, patches)}
-                          onSetBow={(joinId, bend) => onSetStackJoinBow(block.id, joinId, bend)}
-                          unitsPerEm={block.unitsPerEm}
-                          color={block.color}
-                          moveTogether={stackMoveTogether}
-                          onSplit={(pieceId, cut) => onSplitStackPiece(block.id, pieceId, cut)}
-                          onBend={(pieceId, trace) => onBendStackCurve(block.id, pieceId, trace)}
-                          onHeal={(pieceId) => onHealStackTail(block.id, pieceId)}
-                          onReplacePieces={(ps) => onReplaceStackPieces(block.id, ps)}
-                        />
-                      ) : null
-                    }
+                    // Editing lives in the editor window; double-click opens it
+                    // (not while panning or locked — the old overlay's condition).
+                    onDblClick={() => { if (!effectivePanMode && !block.locked) onEditStack(block.id); }}
                   />
                 );
               }

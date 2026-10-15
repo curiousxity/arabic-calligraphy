@@ -1,25 +1,15 @@
 import type { StackBlock } from "../../types";
-import { CheckboxRow, RangeRow, SelectRow } from "./FormControls";
 
 /**
- * The Stack type panel: the baked spelling (read-only), how a drag on the
- * canvas is read, the join thickness floor, and Reset layout. The editing
- * itself has no modes — every gesture is a drag on the ink (see
- * StackEditOverlay) — so this panel only explains them.
+ * The Stack type panel: the baked spelling (read-only) and the way into the
+ * editor window, where every stack control and gesture lives
+ * (StackEditorDialog). Double-clicking the composition on the canvas opens
+ * the same window.
  */
 export const StackPanel: React.FC<{
   block: StackBlock;
-  onUpdate: (patch: Partial<StackBlock>) => void;
-  onReset: () => void;
-  moveTogether: boolean;
-  onMoveTogether: (v: boolean) => void;
-  /** The closed guides on the canvas the letters can be arranged inside. */
-  closedGuides?: { id: number; label: string }[];
-  onArrangeInGuide?: (guideId: number) => void;
-  /** Busy the gaps with the font's tashkeel when filling a guide. */
-  fillGaps: boolean;
-  onFillGaps: (v: boolean) => void;
-}> = ({ block, onUpdate, onReset, moveTogether, onMoveTogether, closedGuides = [], onArrangeInGuide, fillGaps, onFillGaps }) => (
+  onEdit: () => void;
+}> = ({ block, onEdit }) => (
   <div className="sectionPanel">
     <p className="guideEmpty" dir="rtl">{block.source.text}</p>
     <p className="guideEmpty">
@@ -27,67 +17,12 @@ export const StackPanel: React.FC<{
       conversion, or convert a fresh text block.
     </p>
     <p className="guideEmpty">
-      Drag a letter to move it. Drag just outside its edge to tilt it. Drag a curve to bend
-      it, double-click to straighten. Press near the end of a straight stroke and pull to
-      draw out a tail.
+      Move, tilt, bend and arrange the letters in the editor window. Double-click the
+      composition on the canvas, or press the button below.
     </p>
-    <CheckboxRow
-      id={`stack-${block.id}-together`}
-      label="Move letters together"
-      checked={moveTogether}
-      onChange={onMoveTogether}
-    />
-    <RangeRow
-      id={`stack-${block.id}-minFraction`}
-      name="stackMinFraction"
-      label="Join thickness"
-      value={block.nib.minFraction}
-      min={0.05}
-      max={1}
-      step={0.01}
-      // A fraction of each join's own thinner face; per-font defaults reach 1.
-      suffix={block.nib.minFraction.toFixed(2)}
-      onChange={(v) => onUpdate({ nib: { ...block.nib, minFraction: v } })}
-    />
-    {onArrangeInGuide && closedGuides.length > 0 ? (
-      <SelectRow
-        id={`stack-${block.id}-fill-guide`}
-        name="stackFillGuide"
-        label="Fill a guide shape"
-        value=""
-        onChange={(v) => {
-          if (v !== "") onArrangeInGuide(Number(v));
-        }}
-      >
-        <option value="">Choose a guide…</option>
-        {closedGuides.map((g) => (
-          <option key={g.id} value={String(g.id)}>
-            {g.label}
-          </option>
-        ))}
-      </SelectRow>
-    ) : (
-      <p className="guideEmpty">
-        To arrange the letters inside a shape, add a closed guide (a teardrop, an almond, or an
-        uploaded SVG outline), then choose it here.
-      </p>
-    )}
-    <CheckboxRow
-      id={`stack-${block.id}-fill-gaps`}
-      label="Fill gaps with tashkeel"
-      checked={fillGaps}
-      onChange={onFillGaps}
-    />
-    <p className="guideEmpty">
-      Filling a guide lays the letters in rows from the bottom up, in reading order, leans the
-      outer letters into the edge, draws straight upstrokes out toward the boundary where the
-      stroke is straight and even (a tapering stem is left alone), and sizes the composition to
-      the shape. With the box above checked, the gaps are busied with the font's own tashkeel.
-      You can still drag, tilt and bend afterwards; Reset layout removes the ornaments and
-      returns pulled stems.
-    </p>
-    <button type="button" className="sidebarSmallAction" aria-label="Reset layout" onClick={onReset}>
-      Reset layout
+    {/* A locked block cannot be edited (the canvas double-click refuses too). */}
+    <button type="button" className="sidebarSmallAction" aria-label="Edit composition" disabled={block.locked} onClick={onEdit}>
+      Edit composition
     </button>
   </div>
 );

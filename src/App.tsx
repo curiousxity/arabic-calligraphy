@@ -9,6 +9,8 @@ import type Konva from "konva";
 import { Sidebar, type SidebarProps } from "./components/Sidebar";
 import { CanvasStage, type CanvasStageProps } from "./components/CanvasStage";
 import { ConfirmDialog, type ConfirmDialogRequest } from "./components/ConfirmDialog";
+import { StackEditorDialog, type StackEditorGuide } from "./components/StackEditorDialog";
+import type { StackDraft } from "./lib/stackDraft";
 import { StartScreen } from "./components/StartScreen";
 import { shouldShowStartScreen, STARTER_TEXT } from "./lib/startScreen";
 import { fontChoicesWith } from "./lib/fontCatalog";
@@ -16,7 +18,7 @@ import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useDebouncedHistoryPush } from "./hooks/useDebouncedHistoryPush";
 import { useExport } from "./hooks/useExport";
 import { isTypingTarget } from "./lib/dom";
-import { installTestBridge } from "./lib/testBridge";
+import { installTestBridge, currentEditorStage, currentEditorDraft } from "./lib/testBridge";
 import { triggerDownload } from "./lib/download";
 import { STARTER_TEMPLATES, buildBlocksFromTemplate } from "./lib/templates";
 import { FONT_URLS, resolveFontUrl } from "./hooks/useShapedGlyphs";
@@ -47,8 +49,7 @@ import {
   type AlternateTarget,
 } from "./lib/glyphAlternates";
 import { arcPathD } from "./lib/textPath";
-import { GUIDE_DEFAULTS, containerPolygon, guidePathD, svgGuidePathD, uploadedGuideSource } from "./lib/guideShapes";
-import { arrangeStackInShape, type FillerShape } from "./lib/stackArrange";
+import { GUIDE_DEFAULTS, GUIDE_SHAPE_LABELS, containerPolygon, guidePathD, svgGuidePathD, uploadedGuideSource } from "./lib/guideShapes";
 import { parseSvgPath } from "./lib/svgPath";
 import {
   attachTextToGuide,
@@ -64,7 +65,7 @@ import {
 } from "./lib/guides";
 import { DEFAULT_ATTACHMENT } from "./lib/guidePlacement";
 import type { GuideAttachment, GuideBlock, GuideParams, GuideShape } from "./types";
-import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StackPiece, StrokeCut } from "./types";
+import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
   isCloudConfigured,
@@ -169,8 +170,7 @@ import { buildCutPlan, cutAdvanceTotal, outlineBounds, remapCutsForEdits } from 
 import { remapMarksForEdits } from "./lib/detachedMarks";
 import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
 import { shapeText } from "./lib/harfbuzz";
-import { convertRunToStack, splitPieceAtCut, fillerShapes, teardropShape, bendCurveAt, healTail, type UnjoinedPair } from "./lib/stackConvert";
-import type { CurveTrace } from "./lib/stackCurve";
+import { convertRunToStack, fillerShapes, teardropShape, type UnjoinedPair } from "./lib/stackConvert";
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
@@ -314,6 +314,8 @@ const clamp = (value: number, min: number, max: number) =>
 
 const App: React.FC = () => {
   const [confirmRequest, setConfirmRequest] = useState<ConfirmDialogRequest | null>(null);
+  /** The stack block open in the editor window, or null. */
+  const [stackEditorId, setStackEditorId] = useState<number | null>(null);
   const [pendingPlacement, setPendingPlacement] = useState<PendingPlacement | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -587,6 +589,8 @@ const App: React.FC = () => {
         getBlocks: () => blocks,
         getSelectedIds: () => effectiveSelectedIds,
         getStage: () => stageRef.current,
+        getEditorStage: currentEditorStage,
+        getEditorDraft: currentEditorDraft,
       }),
     [blocks, effectiveSelectedIds]
   );
@@ -701,96 +705,10 @@ const App: React.FC = () => {
     []
   );
 
-  const setStackPieces = useCallback(
-    (blockId: number, patches: { id: string; x?: number; y?: number; rotation?: number }[]) => {
-      const byId = new Map(patches.map((p) => [p.id, p]));
-      setBlocks((prev) =>
-        prev.map((b) => {
-          if (b.id !== blockId || !isStackBlock(b)) return b;
-          return { ...b, pieces: b.pieces.map((p) => { const q = byId.get(p.id); return q ? { ...p, ...q, id: p.id } : p; }) };
-        })
-      );
-      // No push: the overlay's drag start took one through `onBeginStackEdit`.
-    },
-    []
-  );
-
-  const splitStackPiece = useCallback(
-    (blockId: number, pieceId: string, cut: { cutX: number; angle: number }) => {
-      const block = blocks.find((b) => b.id === blockId);
-      if (!block || !isStackBlock(block)) return null;
-      const next = splitPieceAtCut(block.pieces, block.joins, pieceId, cut);
-      if (!next) return null;
-      pushHistory();
-      setBlocks((prev) =>
-        prev.map((b) => (b.id === blockId && isStackBlock(b) ? { ...b, pieces: next.pieces, joins: next.joins } : b))
-      );
-      setExportStatus("Tail pulled. To remove it, hover it and press Delete (or right-click it); drag its cut edge to slide where the stretch starts.");
-      // The cap is the piece the split appended; the overlay pulls it in the same gesture.
-      const cap = next.pieces[next.pieces.length - 1];
-      return { id: cap.id, x: cap.x, y: cap.y };
-    },
-    [blocks, pushHistory]
-  );
-
-  /** Free the curved stroke the hover traced and replace it with a join; the
-   *  overlay bends that join in the same gesture. One history step for both. */
-  const bendStackCurve = useCallback(
-    (blockId: number, pieceId: string, trace: CurveTrace) => {
-      const block = blocks.find((b) => b.id === blockId);
-      if (!block || !isStackBlock(block)) return null;
-      const next = bendCurveAt(block.pieces, block.joins, pieceId, trace);
-      if (!next) { setExportStatus("That curve could not be freed cleanly."); return null; }
-      pushHistory();
-      setBlocks((prev) =>
-        prev.map((b) => (b.id === blockId && isStackBlock(b) ? { ...b, pieces: next.pieces, joins: next.joins } : b))
-      );
-      setExportStatus("Curve freed; drag to bend, double-click to restore.");
-      return next.joinId;
-    },
-    [blocks, pushHistory]
-  );
-
-  /** Delete a pulled tail's stretch: the tail goes back into the piece it was
-   *  cut from and the cut disappears. One history step. */
-  const healStackTail = useCallback(
-    (blockId: number, pieceId: string) => {
-      const block = blocks.find((b) => b.id === blockId);
-      if (!block || !isStackBlock(block)) return false;
-      const next = healTail(block.pieces, block.joins, pieceId);
-      if (!next) return false;
-      pushHistory();
-      setBlocks((prev) =>
-        prev.map((b) => (b.id === blockId && isStackBlock(b) ? { ...b, pieces: next.pieces, joins: next.joins } : b))
-      );
-      setExportStatus("Stretch removed.");
-      return true;
-    },
-    [blocks, pushHistory]
-  );
-
-  /** Pieces whose outlines changed (a cut slid along its stroke), replaced
-   *  whole by id. No push: the overlay's press took one through `onBeginStackEdit`. */
-  const replaceStackPieces = useCallback((blockId: number, pieces: StackPiece[]) => {
-    const byId = new Map(pieces.map((p) => [p.id, p]));
-    setBlocks((prev) =>
-      prev.map((b) => (b.id !== blockId || !isStackBlock(b) ? b : { ...b, pieces: b.pieces.map((p) => byId.get(p.id) ?? p) }))
-    );
-  }, []);
-
   /** Editor preference, not block state: dragging a stack letter carries the letters after it. */
   const [stackMoveTogether, setStackMoveTogether] = useState(true);
   /** Editor preference, not block state: "Fill a guide shape" busies the gaps with tashkeel. */
   const [stackFillGaps, setStackFillGaps] = useState(true);
-
-  const setStackJoinBow = useCallback((blockId: number, joinId: string, bend: { bow: number; depth: number }) => {
-    setBlocks((prev) =>
-      prev.map((b) =>
-        b.id !== blockId || !isStackBlock(b) ? b
-          : { ...b, joins: b.joins.map((j) => (j.id === joinId ? { ...j, bow: bend.bow, depth: bend.depth } : j)) }
-      )
-    );
-  }, []);
 
   const setDetachedMark = useCallback(
     (blockId: number, o: DetachedMarkOverride) => {
@@ -1174,9 +1092,10 @@ const App: React.FC = () => {
     const NUDGE_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // The start overlay hides the editor; its shortcuts (delete, nudge,
-      // paste, undo) must not act on the block underneath it.
-      if (showStart) return;
+      // The start overlay and the stack editor window both hide the editor;
+      // their shortcuts (delete, nudge, paste, undo) must not act on the
+      // block underneath.
+      if (showStart || stackEditorId !== null) return;
       const meta = e.ctrlKey || e.metaKey;
       const typing = isTypingTarget(e.target);
 
@@ -1270,6 +1189,7 @@ const App: React.FC = () => {
     writing,
     beginWritingOnGuide,
     showStart,
+    stackEditorId,
   ]);
 
   const createNextId = () => {
@@ -2132,78 +2052,45 @@ const App: React.FC = () => {
     updateSelectedBlock({ guideParams: next, guideD: guidePathD(selectedBlock.guideShape, next) });
   };
 
-  /**
-   * Arrange a stack's letters to fill a closed guide, synchronously from the
-   * *current* state: rows from the bottom up in reading order, outer letters
-   * hugging and leaning into the edge, free stems drawn out, the block sized
-   * to the shape and moved onto the guide, and the gaps busied with the
-   * offered ornaments. Existing fillers are stripped first so a re-run never
-   * accumulates them. One history step (updateBlock).
-   */
-  const arrangeStackNow = (blockId: number, guideId: number, fillers: FillerShape[], fontNote: string) => {
-    const block = blocks.find((b) => b.id === blockId);
-    if (!block || !isStackBlock(block)) { setExportStatus("The composition changed while its font was loading; nothing was arranged."); return; }
-    const guide = blocks.find((b): b is GuideBlock => b.type === "guide" && b.id === guideId);
-    if (!guide) { setExportStatus("That guide is gone; nothing was arranged."); return; }
-    const shapePx = containerPolygon(parseSvgPath(guide.guideD));
-    if (!shapePx) { setExportStatus("That guide is not a closed shape, so there is nothing to fill."); return; }
-    let result: ReturnType<typeof arrangeStackInShape>;
+  const openStackEditor = useCallback((id: number) => {
+    const b = blocks.find((x) => x.id === id);
+    if (!b || !isStackBlock(b) || b.locked) return;
+    setSelectedIds([]);
+    setSelectedId(id);
+    setStackEditorId(id);
+  }, [blocks]);
+
+  /** Done: one history step with the draft's editable fields. */
+  const commitStackEditor = useCallback((patch: StackDraft) => {
+    if (stackEditorId === null) return;
+    updateBlock(stackEditorId, {
+      pieces: patch.pieces, joins: patch.joins, fontSize: patch.fontSize, nib: patch.nib,
+      x: patch.x, y: patch.y, rotation: patch.rotation,
+    });
+    setStackEditorId(null);
+  }, [stackEditorId, updateBlock]);
+
+  /** The font's tashkeel for the editor's "Fill gaps"; teardrops when the font is unavailable. */
+  const loadStackFillers = useCallback(async (b: StackBlock) => {
     try {
-      result = arrangeStackInShape({
-        pieces: block.pieces.filter((p) => !p.filler), joins: block.joins, shapePx,
-        fontSize: block.fontSize, unitsPerEm: block.unitsPerEm, fillers, pullStems: true,
-      });
-    } catch (err) {
-      setExportStatus(`Could not arrange the letters: ${err instanceof Error ? err.message : String(err)}`);
-      return;
+      const shaped = await shapeText(b.source.text, resolveFontUrl(b.source.fontFamily));
+      return { fillers: fillerShapes(shaped.font, b.unitsPerEm, b.nib.width), note: "" };
+    } catch {
+      return { fillers: [teardropShape(b.nib.width)], note: " (font unavailable; teardrops used)" };
     }
-    if (!result) { setExportStatus("Could not fit the letters inside that guide."); return; }
-    updateBlock(block.id, {
-      pieces: result.pieces, joins: result.joins, fontSize: result.fontSize,
-      x: guide.x, y: guide.y, rotation: guide.rotation ?? 0,
-    });
-    const letters = result.pieces.filter((p) => p.role === "letter" && p.parentId === undefined).length;
-    const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
-    setExportStatus(
-      `Arranged ${plural(letters, "letter")} in ${plural(result.rows, "row")} inside the guide` +
-      (result.fillers > 0 ? `, ${plural(result.fillers, "ornament")} added` : "") +
-      (result.stems > 0 ? `, ${plural(result.stems, "stem")} lengthened` : "") + fontNote + "."
-    );
-  };
-  // The font load below awaits; by then this render's closures are stale.
-  // The ref always holds the latest render's handler, so the arrange runs
-  // against current blocks and pushes a current history snapshot.
-  const arrangeStackNowRef = useRef(arrangeStackNow);
-  arrangeStackNowRef.current = arrangeStackNow;
+  }, []);
 
-  /** "Fill a guide shape": load the block's font for its tashkeel (when the
-   *  panel's "Fill gaps with tashkeel" is on), then arrange from current state. */
-  const arrangeStackInGuide = async (guideId: number) => {
-    if (!selectedBlock || !isStackBlock(selectedBlock)) return;
-    const { id, source, unitsPerEm, nib } = selectedBlock;
-    let fillers: FillerShape[] = [];
-    let fontNote = "";
-    if (stackFillGaps) {
-      try {
-        const shaped = await shapeText(source.text, resolveFontUrl(source.fontFamily));
-        fillers = fillerShapes(shaped.font, unitsPerEm, nib.width);
-      } catch {
-        fillers = [teardropShape(nib.width)];
-        fontNote = " (font unavailable; teardrops used)";
-      }
-    }
-    arrangeStackNowRef.current(id, guideId, fillers, fontNote);
-  };
-
-  /** Stack layout back to its home arrangement; fillers go (home is the
-   *  conversion, which had none). updateSelectedBlock pushes the one history step. */
-  const resetStackLayout = () => {
-    if (!selectedBlock || !isStackBlock(selectedBlock)) return;
-    updateSelectedBlock({
-      pieces: selectedBlock.pieces.filter((p) => !p.filler).map((p) => ({ ...p, x: p.homeX, y: p.homeY, rotation: 0 })),
-      joins: selectedBlock.joins.map((j) => ({ ...j, bow: j.rest?.bow ?? 0, depth: j.rest?.depth ?? 0 })),
-    });
-  };
+  const stackEditorBlock = stackEditorId !== null ? blocks.find((b) => b.id === stackEditorId) : undefined;
+  // `containerPolygon` is null for anything not closed, so an open pen guide is left out.
+  const stackEditorGuides = useMemo<StackEditorGuide[]>(
+    () => blocks
+      .filter((b): b is GuideBlock => b.type === "guide")
+      .flatMap((g) => {
+        const polygon = containerPolygon(parseSvgPath(g.guideD));
+        return polygon ? [{ id: g.id, label: g.name ?? `Guide · ${GUIDE_SHAPE_LABELS[g.guideShape]}`, polygon, x: g.x, y: g.y, rotation: g.rotation ?? 0 }] : [];
+      }),
+    [blocks]
+  );
 
   /** Pen-guide point edits; the overlay's onBeginChange already pushed history. */
   const updateGuideD = (id: number, d: string) => {
@@ -3436,19 +3323,14 @@ const App: React.FC = () => {
         background: "var(--bg-page)",
       }}
     >
-      {/* The start screen is a modal overlay: `inert` takes everything under it
+      {/* The start screen and the stack editor window are modal overlays: `inert` takes everything under them
           out of the tab order and the pointer, so Tab cannot reach Add text or
           Quick save behind it. `display: contents` keeps this wrapper out of the
           root's flex layout. */}
-      <div style={{ display: "contents" }} inert={showStart}>
+      <div style={{ display: "contents" }} inert={showStart || stackEditorId !== null}>
       <Sidebar
         onConvertToStack={convertSelectedBlockToStack}
-        onResetStackLayout={resetStackLayout}
-        onArrangeStackInGuide={arrangeStackInGuide}
-        stackMoveTogether={stackMoveTogether}
-        onStackMoveTogether={setStackMoveTogether}
-        stackFillGaps={stackFillGaps}
-        onStackFillGaps={setStackFillGaps}
+        onEditStack={selectedBlock && isStackBlock(selectedBlock) ? () => openStackEditor(selectedBlock.id) : undefined}
         blocks={blocks}
         selectedBlock={selectedBlock}
         selectedIds={selectedIds}
@@ -3620,14 +3502,7 @@ const App: React.FC = () => {
           onBeginStrokeCut={pushHistory}
           onBeginDetachedMarkDrag={pushHistory}
           onSetDetachedMark={setDetachedMark}
-          onBeginStackEdit={pushHistory}
-          onSetStackPieces={setStackPieces}
-          onSetStackJoinBow={setStackJoinBow}
-          onSplitStackPiece={splitStackPiece}
-          onBendStackCurve={bendStackCurve}
-          onHealStackTail={healStackTail}
-          onReplaceStackPieces={replaceStackPieces}
-          stackMoveTogether={stackMoveTogether}
+          onEditStack={openStackEditor}
           alternateLetters={glyphAlternatesState.letters}
           onPickGlyphAlternate={pickGlyphAlternate}
           onSetStrokeCut={setStrokeCut}
@@ -3648,6 +3523,22 @@ const App: React.FC = () => {
       </div>
 
       <ConfirmDialog request={confirmRequest} onCancel={() => setConfirmRequest(null)} />
+      {stackEditorBlock && isStackBlock(stackEditorBlock) && (
+        <StackEditorDialog
+          key={stackEditorBlock.id}
+          block={stackEditorBlock}
+          cssFamily={fontChoices.find((f) => f.value === stackEditorBlock.source.fontFamily)?.cssFamily ?? `'${stackEditorBlock.source.fontFamily}'`}
+          surfaceColor={backgroundColor}
+          closedGuides={stackEditorGuides}
+          moveTogether={stackMoveTogether}
+          onMoveTogether={setStackMoveTogether}
+          fillGaps={stackFillGaps}
+          onFillGaps={setStackFillGaps}
+          loadFillers={loadStackFillers}
+          onDone={commitStackEditor}
+          onCancel={() => setStackEditorId(null)}
+        />
+      )}
       {showStart && <StartScreen fonts={fontChoices} onPick={beginFromStart} onSkip={() => setShowStart(false)} />}
     </div>
   );

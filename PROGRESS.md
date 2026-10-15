@@ -99,6 +99,17 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-15 — Stack editor window
+
+- **All composition editing moved into a window.** Double-click a stacked
+  composition (or Edit composition in its panel): a modal with its own stage
+  shows it as the canvas will, with the gesture guide, Teardrop and Almond
+  templates sized to the composition, join thickness, fill gaps, and Reset.
+  Edits are staged with their own undo; Done commits one history step,
+  Cancel discards. The canvas no longer mounts the overlay. Spec:
+  `docs/superpowers/specs/2026-10-15-stack-editor-window-design.md`; how:
+  [stacked-compositions.md](.claude/rules/stacked-compositions.md).
+
 ### 2026-10-15 — Curved strokes bend
 
 - **Press a bowl, drag to widen or tighten it.** The curve is traced, cut

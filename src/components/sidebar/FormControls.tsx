@@ -197,6 +197,7 @@ export const RangeRow = ({
   onChange,
   suffix,
   fieldKey,
+  disabled,
 }: {
   id: string;
   name: string;
@@ -208,6 +209,7 @@ export const RangeRow = ({
   onChange: (v: number) => void;
   suffix?: string | number;
   fieldKey?: string;
+  disabled?: boolean;
 }) => {
   const defaultVal =
     fieldKey !== undefined ? SLIDER_DEFAULTS[fieldKey] ?? value : value;
@@ -249,6 +251,7 @@ export const RangeRow = ({
         max={max}
         step={step ?? 1}
         value={value}
+        disabled={disabled}
         onChange={(e) =>
           onChange(step ? parseFloat(e.target.value) : parseInt(e.target.value, 10))
         }
@@ -256,7 +259,7 @@ export const RangeRow = ({
           if (fieldKey !== undefined) onChange(defaultVal);
         }}
         className="rangeInput"
-        style={{ cursor: "pointer" }}
+        style={{ cursor: disabled ? "default" : "pointer" }}
       />
     </label>
   );
