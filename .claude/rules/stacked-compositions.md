@@ -180,14 +180,22 @@ overhang a leaning box has below its row bottom, and a tilt is accepted only
 if that extra height fits the headroom to the row above — else halved, down
 to upright. At the bisection's tight fit this means small tilts; it never
 means a letter outside the shape. Inner letters share the remaining width
-equally and stay upright; `pack` reserves the two edge gaps a hugging row
-uses (`rowNeed`). A row of two leans both letters the same way, then draws
-them toward the centre until they are at most one em apart; one alone is
-centred upright. A rider turns with its letter about the letter's pivot.
-Letters in a row keep their original vertical relation (their baseline)
-apart from the nudge. Inner tilt goes to 0 and every join back to its
-tangent-matched default, so the result is an arrangement, not a design: the
-user drags, tilts and bends from there. `homeX`/`homeY` are untouched, so
+equally and stay upright; `pack` reserves the two edge gaps any row of two
+or more uses (`rowNeed`). A row of two leans both letters the same way, then
+draws them toward the centre until they are at most one em apart; one alone
+is centred upright. **`arrangeAt` then checks the layout as placed**: no
+two groups' rotated extents may overlap (hugging, nudging and leaning each
+move a letter after the row was measured, and a first version overlapped
+letters in half of all curved guides), so the bisection shrinks until the
+arrangement is clear. A rider turns with its letter about the letter's
+pivot, and carries the letter's rotation; on the next run `unswing` puts a
+rider that carries its letter's rotation back to the upright frame before
+grouping, or the dot would walk away from its letter on every Fill (a rider
+the user rotated alone keeps its own angle and is left as it is). Letters
+in a row keep their original vertical relation (their baseline) apart from
+the nudge. Inner tilt goes to 0 and every join back to its tangent-matched
+default, so the result is an arrangement, not a design: the user drags,
+tilts and bends from there. `homeX`/`homeY` are untouched, so
 Reset layout still returns to the conversion. The block moves onto the
 guide (x, y, rotation) and takes the fitted `fontSize`, one history step.
 The guide never moves a piece afterwards. Tunables are fractions of an em
@@ -212,8 +220,11 @@ parent and `filler: true`: it drags alone, has no ring or cut spans,
 exports with the outline, and is **stripped** by the arranger, the handler
 and Reset layout, so it never accumulates. The preference is `App.tsx`
 state like "Move letters together", neither saved nor undoable. The
-handler is async (the font load) and commits by captured block id through
-`updateBlock`.
+handler is async: it loads the font first (`arrangeStackInGuide`, which
+reads only the block's source), then arranges and commits through a ref to
+the latest render's `arrangeStackNow`, so the arrange sees current blocks
+and pushes a current history snapshot; a block that changed or vanished
+during the load, or an arrange that throws, ends in a status message.
 
 **Stems** (`pullStemEnds`, after tilt, before fillers; `pullStems: true`
 from the handler): each letter's straight zones are found once with
@@ -224,9 +235,13 @@ short one — under four thicknesses, where `pullSpans` offers one span, and
 an Amiri alif is 3.7 — is cut at its middle, and the cap is kept only if it
 lands on the end's side (`splitPieceAtCut` picks the smaller fragment).
 At the found scale the cap is marched along the stem's axis in `STEM_STEP`
-steps until its `LETTER_GAP`-padded box would leave the shape or touch other
-ink; under `STEM_MIN` the cut is dropped. A letter that already has a cap
-is **slid** along its join axis instead, so re-runs never cut a letter
+steps until its `LETTER_GAP`-padded box would leave the shape or meet other
+ink (`boxMeetsInk`, shared with the filler pass: nine probes *and* any
+contour vertex inside the box, so a dot thinner than the probe spacing still
+stops it); under `STEM_MIN` the cut is dropped. A letter that already has a
+cap is **slid** instead, along the vector between its two faces or — after
+Reset, when the faces coincide — along the body face's normal pointed away
+from the body (`capSlideAxis`; a face is the stroke's cross-section), so re-runs never cut a letter
 twice and a hand-pulled cap is the same thing (a lengthened letter makes its
 row taller, so the block re-sizes and other letters may find room on the
 next run; a third run changes nothing). One pull per letter per run.

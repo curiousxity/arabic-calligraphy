@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { StackPiece, StackJoin } from "../types";
 import type { SvgCmd } from "./svgPath";
 import { pointInPolygon } from "./svgPath";
-import { arrangeStackInShape, bandSpan, letterGroups, type FillerShape } from "./stackArrange";
+import { arrangeStackInShape, bandSpan, capSlideAxis, letterGroups, type FillerShape } from "./stackArrange";
 import { flattenContours, outlineBounds } from "./strokeCuts";
 import { transformCmds, transformPt, translateCmds } from "./stackGeometry";
 
@@ -388,5 +388,84 @@ describe("stem pull", () => {
     const off = arrangeStackInShape({ ...base(), pullStems: false })!;
     expect(off.stems).toBe(0);
     expect(off.pieces.some((p) => p.parentId !== undefined)).toBe(false);
+  });
+});
+
+/** The world bounds of a group's rotated box: the four corners through the letter's transform. */
+function rotatedGroupBox(pieces: StackPiece[], id: string) {
+  const p = pieces.find((x) => x.id === id)!;
+  const g = letterGroups(pieces).find((x) => x.letter.id === id)!;
+  const t = { x: p.x, y: p.y, rotation: p.rotation, pivot: p.pivot };
+  const cs = ([[g.box.x1, g.box.y1], [g.box.x2, g.box.y1], [g.box.x1, g.box.y2], [g.box.x2, g.box.y2]] as const).map((c) => transformPt([c[0], c[1]], t));
+  return { x1: Math.min(...cs.map((c) => c[0])), x2: Math.max(...cs.map((c) => c[0])), y1: Math.min(...cs.map((c) => c[1])), y2: Math.max(...cs.map((c) => c[1])) };
+}
+
+describe("review fixes", () => {
+  it("never overlaps two letters, whatever the guide's proportions", () => {
+    const mixed = () => ({
+      pieces: [letter("m4", 4, 0, 200, 500), letter("m3", 3, 300, 350, 250), letter("m2", 2, 750, 300, 400), letter("m1", 1, 1150, 150, 600), letter("m0", 0, 1400, 300, 300)],
+      joins: [] as StackJoin[],
+    });
+    const shapes: Array<[number, number]> = [[300, 900], [600, 900], [1400, 1400], [1800, 600], [3000, 400], [500, 2000]];
+    for (const [w, h] of shapes) {
+      for (const fixture of [word, mixed, shortTallShort]) {
+        const r = arrangeStackInShape({ ...fixture(), shapePx: ellipse(w, h), fontSize: 100, unitsPerEm: UPM })!;
+        expect(r, `${fixture.name} in ${w}×${h}`).not.toBeNull();
+        const ids = letterGroups(r.pieces).map((g) => g.letter.id);
+        const boxes = ids.map((id) => rotatedGroupBox(r.pieces, id));
+        for (let i = 0; i < boxes.length; i++) for (let j = 0; j < i; j++) {
+          const a = boxes[i], b = boxes[j];
+          const apart = a.x2 <= b.x1 + 1 || a.x1 >= b.x2 - 1 || a.y2 <= b.y1 + 1 || a.y1 >= b.y2 - 1;
+          expect(apart, `${fixture.name} in ${w}×${h}: ${ids[i]} vs ${ids[j]}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("keeps a rider in its letter's frame across repeated runs with tilt", () => {
+    const inFrame = (pieces: StackPiece[]) => {
+      const b = pieces.find((p) => p.id === "p1")!, d = pieces.find((p) => p.id === "d1")!;
+      const vx = d.pivot[0] + d.x - (b.pivot[0] + b.x), vy = d.pivot[1] + d.y - (b.pivot[1] + b.y);
+      const c = Math.cos(-b.rotation), s = Math.sin(-b.rotation);
+      return [vx * c - vy * s, vx * s + vy * c];
+    };
+    let inp = { ...word(), shapePx: PARALLELOGRAM, fontSize: 100, unitsPerEm: UPM };
+    const first = inFrame(inp.pieces);
+    for (let k = 0; k < 3; k++) {
+      const r = arrangeStackInShape(inp)!;
+      const now = inFrame(r.pieces);
+      expect(now[0]).toBeCloseTo(first[0], 3);
+      expect(now[1]).toBeCloseTo(first[1], 3);
+      inp = { ...inp, pieces: r.pieces, joins: r.joins, fontSize: r.fontSize };
+    }
+  });
+
+  it("stops a stem under a dot too thin to meet any probe", () => {
+    const { pieces, joins } = threeStems();
+    const mid = pieces.find((p) => p.id === "a1")!;
+    // A 20×20 dot 300 above the stem's top, 50 to the side of its axis: inside
+    // the cap's padded box but between its corner, edge and centre probes.
+    const dot: StackPiece = { ...letter("tiny", 1, mid.x + 153 + 50 - 10, 20, 20), y: -900, role: "mark", parentId: "a1", pivot: [10, -10] };
+    const r = arrangeStackInShape({ pieces: [...pieces, dot], joins, shapePx: CHIMNEY, fontSize: 1000, unitsPerEm: UPM, pullStems: true })!;
+    const cap = r.pieces.find((p) => p.parentId === "a1" && p.role === "letter");
+    if (!cap) return;   // not pulled at all is also safe
+    const cb = outlineBounds(transformCmds(cap.cmds, { x: cap.x, y: cap.y, rotation: cap.rotation, pivot: cap.pivot }));
+    const d = r.pieces.find((p) => p.id === "tiny")!;
+    const db = outlineBounds(translateCmds(d.cmds, d.x, d.y));
+    expect(cb.y1).toBeGreaterThanOrEqual(db.y2);
+  });
+
+  it("slides a cap along its cut face's normal when the faces coincide", () => {
+    // A vertical face segment is the cross-section of a horizontal stroke.
+    const face = { a: [0, 0] as [number, number], b: [0, 80] as [number, number], tangent: 0 };
+    const away = capSlideAxis(face, face, [-100, 40]);
+    expect(away[0]).toBeCloseTo(1, 6);
+    expect(away[1]).toBeCloseTo(0, 6);
+    const back = capSlideAxis(face, face, [100, 40]);
+    expect(back[0]).toBeCloseTo(-1, 6);
+    // Faces apart: the vector between their centres wins.
+    const far = { a: [300, 0] as [number, number], b: [300, 80] as [number, number], tangent: 0 };
+    const v = capSlideAxis(face, far, [-100, 40]);
+    expect(v[0]).toBeCloseTo(1, 6);
   });
 });

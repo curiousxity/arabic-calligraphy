@@ -1,7 +1,7 @@
 // Arranging a stack block's letters to fill a closed shape. Pure: geometry in
 // font units, the shape in px, the scale between them found here. Never
 // imports ./harfbuzz.
-import type { StackPiece, StackJoin } from "../types";
+import type { StackPiece, StackJoin, CutFace } from "../types";
 import type { SvgCmd } from "./svgPath";
 import { pointInPolygon } from "./svgPath";
 import { outlineBounds, flattenContours, findCutZonesSwept, type Contour } from "./strokeCuts";
@@ -97,13 +97,28 @@ function ridersOf(pieces: readonly StackPiece[], id: string): StackPiece[] {
   return out;
 }
 
+/** A rider the arranger swung with its leaning letter (it carries the
+ *  letter's own rotation) put back where it sits when the letter is upright:
+ *  its pivot swung about the letter's pivot by −rotation. A rider the user
+ *  rotated alone keeps a different angle and is left as it is. Without this
+ *  a re-run would re-swing the already swung offset, and the dot would walk
+ *  away from its letter on every Fill. */
+function unswing(letter: StackPiece, m: StackPiece): StackPiece {
+  if (letter.rotation === 0 || m.rotation !== letter.rotation) return m;
+  const lp: Pt = [letter.pivot[0] + letter.x, letter.pivot[1] + letter.y];
+  const vx = m.pivot[0] + m.x - lp[0], vy = m.pivot[1] + m.y - lp[1];
+  const c = Math.cos(-letter.rotation), sn = Math.sin(-letter.rotation);
+  const nx = lp[0] + vx * c - vy * sn, ny = lp[1] + vx * sn + vy * c;
+  return { ...m, x: nx - m.pivot[0], y: ny - m.pivot[1], rotation: 0 };
+}
+
 /** Letters in reading order, each with its riders and its unrotated bounds. */
 export function letterGroups(pieces: readonly StackPiece[]): Group[] {
   return pieces
     .filter((p) => p.role === "letter" && p.parentId === undefined)
     .sort((a, b) => a.order - b.order)
     .map((letter) => {
-      const members = [letter, ...ridersOf(pieces, letter.id)];
+      const members = [letter, ...ridersOf(pieces, letter.id).map((m) => unswing(letter, m))];
       const b = outlineBounds(members.flatMap((m) => translateCmds(m.cmds, m.x - letter.x, m.y - letter.y)));
       return { letter, members, box: b };
     });
@@ -325,10 +340,11 @@ function leanIntoEdge(
 }
 
 /** The width a row of these groups needs: ink, gaps between, and — for a
- *  row of three or more, which hugs the edges — one gap at each edge. */
+ *  row of two or more, whose outer letters sit one gap inside the edges —
+ *  one gap at each edge. */
 function rowNeed(groups: readonly Group[], gap: number): number {
   const ink = groups.reduce((s, g) => s + width(g.box), 0);
-  return ink + gap * (groups.length - 1) + (groups.length >= 3 ? 2 * gap : 0);
+  return ink + gap * (groups.length - 1) + (groups.length >= 2 ? 2 * gap : 0);
 }
 
 /**
@@ -411,6 +427,18 @@ function arrangeAt(groups: Group[], shapePx: readonly Pt[], scale: number, upm: 
     const p = pos.get(g.letter.id)!;
     if (p.rotation !== 0 && !fitsRotated(poly, g, p.x, p.y, p.rotation, null, 0)) return null;
   }
+  // And no two letters may touch: hugging, nudging and leaning each move a
+  // letter after the row was measured, so the layout is checked as placed
+  // and the scale shrinks until it is clear.
+  const boxes = groups.map((g) => {
+    const p = pos.get(g.letter.id)!;
+    const e = rotatedExtents(g, p.rotation);
+    return { x1: e.x1 + p.x, y1: e.y1 + p.y, x2: e.x2 + p.x, y2: e.y2 + p.y };
+  });
+  for (let i = 0; i < boxes.length; i++) for (let j = 0; j < i; j++) {
+    const a = boxes[i], b = boxes[j];
+    if (!(a.x2 <= b.x1 || a.x1 >= b.x2 || a.y2 <= b.y1 || a.y1 >= b.y2)) return null;
+  }
   return { rows, pos };
 }
 
@@ -431,11 +459,6 @@ function fillGaps(
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
   const cands = fillers.map((f) => ({ name: f.name, cmds: f.cmds, box: outlineBounds(f.cmds) }));
   const inside = (x: number, y: number) => pointInPolygon(x, y, poly as Array<[number, number]>);
-  // A box meets ink if one of its probes is inside a contour, or a contour
-  // vertex is inside the box (a letter's corner poking in between probes).
-  const meetsInk = (wb: Box, probes: readonly Pt[]) =>
-    probes.some(([px, py]) => ink.some((c) => pointInPolygon(px, py, c))) ||
-    ink.some((c) => c.some(([vx, vy]) => vx > wb.x1 && vx < wb.x2 && vy > wb.y1 && vy < wb.y2));
   const placed: Box[] = [];
   const out: StackPiece[] = [];
   let cellIndex = 0;
@@ -450,13 +473,9 @@ function fillGaps(
           const x = cx - pivot[0], y = cy - pivot[1];
           const b = cand.box;
           const wb: Box = { x1: b.x1 * shrink + x - pad, y1: b.y1 * shrink + y - pad, x2: b.x2 * shrink + x + pad, y2: b.y2 * shrink + y + pad };
-          const mx = (wb.x1 + wb.x2) / 2, my = (wb.y1 + wb.y2) / 2;
-          const probes: Pt[] = [
-            [wb.x1, wb.y1], [wb.x2, wb.y1], [wb.x1, wb.y2], [wb.x2, wb.y2],
-            [mx, wb.y1], [mx, wb.y2], [wb.x1, my], [wb.x2, my], [cx, cy],
-          ];
+          const probes = boxProbes(wb);
           if (!probes.every(([px, py]) => inside(px, py))) continue;
-          if (meetsInk(wb, probes)) continue;
+          if (boxMeetsInk(wb, probes, ink)) continue;
           if (placed.some((o) => !(wb.x2 <= o.x1 || wb.x1 >= o.x2 || wb.y2 <= o.y1 || wb.y1 >= o.y2))) continue;
           placed.push(wb);
           out.push({
@@ -470,6 +489,20 @@ function fillGaps(
     }
   }
   return out;
+}
+
+/** A box's corners, edge midpoints and centre. */
+function boxProbes(b: Box): Pt[] {
+  const mx = (b.x1 + b.x2) / 2, my = (b.y1 + b.y2) / 2;
+  return [[b.x1, b.y1], [b.x2, b.y1], [b.x1, b.y2], [b.x2, b.y2], [mx, b.y1], [mx, b.y2], [b.x1, my], [b.x2, my], [mx, my]];
+}
+
+/** A box meets ink if one of its probes is inside a contour, or a contour
+ *  vertex is inside the box — a letter's corner, or a dot thinner than the
+ *  spacing of the probes, poking in between them. */
+function boxMeetsInk(b: Box, probes: readonly Pt[], ink: readonly Contour[]): boolean {
+  return probes.some(([px, py]) => ink.some((c) => pointInPolygon(px, py, c))) ||
+    ink.some((c) => c.some(([vx, vy]) => vx > b.x1 && vx < b.x2 && vy > b.y1 && vy < b.y2));
 }
 
 /** Every piece's ink as flattened world-space contours (font units). */
@@ -521,13 +554,32 @@ function marchDistance(poly: readonly Pt[], cap: StackPiece, dir: Pt, obstacles:
   const step = STEM_STEP * upm, pad = LETTER_GAP * upm, max = STEM_MAX * upm;
   const b = worldBounds(cap);
   const clear = (d: number) => {
-    const x1 = b.x1 - pad + dir[0] * d, x2 = b.x2 + pad + dir[0] * d, y1 = b.y1 - pad + dir[1] * d, y2 = b.y2 + pad + dir[1] * d;
-    const probes: Pt[] = [[x1, y1], [x2, y1], [x1, y2], [x2, y2], [(x1 + x2) / 2, (y1 + y2) / 2]];
-    return probes.every(([px, py]) => pointInPolygon(px, py, poly as Array<[number, number]>) && !obstacles.some((c) => pointInPolygon(px, py, c)));
+    const wb: Box = { x1: b.x1 - pad + dir[0] * d, x2: b.x2 + pad + dir[0] * d, y1: b.y1 - pad + dir[1] * d, y2: b.y2 + pad + dir[1] * d };
+    const probes = boxProbes(wb);
+    return probes.every(([px, py]) => pointInPolygon(px, py, poly as Array<[number, number]>)) && !boxMeetsInk(wb, probes, obstacles);
   };
   let d = 0;
   while (d + step <= max && clear(d + step)) d += step;
   return d;
+}
+
+/**
+ * The axis an existing cap slides along: the vector between the two faces'
+ * centres when they are apart, else — a cap back at its cut, after Reset —
+ * the normal of the body's face (a face is the stroke's cross-section, so
+ * its normal is the stroke's axis), pointed away from the body's pivot.
+ */
+export function capSlideAxis(bodyFace: CutFace, capFace: CutFace, bodyPivot: Pt): Pt {
+  const vx = (capFace.a[0] + capFace.b[0] - bodyFace.a[0] - bodyFace.b[0]) / 2;
+  const vy = (capFace.a[1] + capFace.b[1] - bodyFace.a[1] - bodyFace.b[1]) / 2;
+  const len = Math.hypot(vx, vy);
+  if (len > 1e-6) return [vx / len, vy / len];
+  const ex = bodyFace.b[0] - bodyFace.a[0], ey = bodyFace.b[1] - bodyFace.a[1];
+  const el = Math.hypot(ex, ey) || 1;
+  let nx = -ey / el, ny = ex / el;
+  const mx = (bodyFace.a[0] + bodyFace.b[0]) / 2 - bodyPivot[0], my = (bodyFace.a[1] + bodyFace.b[1]) / 2 - bodyPivot[1];
+  if (nx * mx + ny * my < 0) { nx = -nx; ny = -ny; }
+  return [nx, ny];
 }
 
 /**
@@ -554,9 +606,7 @@ function pullStemEnds(
         const fa = letter.faces[bodyRef.faceIndex], fb = cap.faces[capRef.faceIndex];
         if (!fa || !fb) continue;
         const A = transformFace(fa, pieceTransform(letter)), B = transformFace(fb, pieceTransform(cap));
-        const vx = (B.a[0] + B.b[0] - A.a[0] - A.b[0]) / 2, vy = (B.a[1] + B.b[1] - A.a[1] - A.b[1]) / 2;
-        const len = Math.hypot(vx, vy);
-        const dir: Pt = len > 1e-6 ? [vx / len, vy / len] : rotateVec([0, -1], letter.rotation);
+        const dir = capSlideAxis(A, B, transformPt(letter.pivot, pieceTransform(letter)));
         const d = marchDistance(poly, cap, dir, contoursOf(new Set([id, cap.id])), upm);
         if (d < STEM_MIN * upm) continue;
         ps = ps.map((p) => (p.id === cap.id ? { ...p, x: p.x + dir[0] * d, y: p.y + dir[1] * d } : p));

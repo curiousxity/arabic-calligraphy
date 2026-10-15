@@ -2086,36 +2086,30 @@ const App: React.FC = () => {
   };
 
   /**
-   * Arrange the selected stack's letters to fill a closed guide: rows from
-   * the bottom up in reading order, outer letters hugging and leaning into
-   * the edge, the block sized to the shape and moved onto the guide, and —
-   * when "Fill gaps with tashkeel" is on — the gaps busied with the font's
-   * own marks. Existing fillers are stripped first so a re-run never
-   * accumulates them. One history step (updateBlock, by captured id: the
-   * font load awaits, and the selection may move meanwhile).
+   * Arrange a stack's letters to fill a closed guide, synchronously from the
+   * *current* state: rows from the bottom up in reading order, outer letters
+   * hugging and leaning into the edge, free stems drawn out, the block sized
+   * to the shape and moved onto the guide, and the gaps busied with the
+   * offered ornaments. Existing fillers are stripped first so a re-run never
+   * accumulates them. One history step (updateBlock).
    */
-  const arrangeStackInGuide = async (guideId: number) => {
-    if (!selectedBlock || !isStackBlock(selectedBlock)) return;
-    const block = selectedBlock;
+  const arrangeStackNow = (blockId: number, guideId: number, fillers: FillerShape[], fontNote: string) => {
+    const block = blocks.find((b) => b.id === blockId);
+    if (!block || !isStackBlock(block)) { setExportStatus("The composition changed while its font was loading; nothing was arranged."); return; }
     const guide = blocks.find((b): b is GuideBlock => b.type === "guide" && b.id === guideId);
-    if (!guide) return;
+    if (!guide) { setExportStatus("That guide is gone; nothing was arranged."); return; }
     const shapePx = containerPolygon(parseSvgPath(guide.guideD));
     if (!shapePx) { setExportStatus("That guide is not a closed shape, so there is nothing to fill."); return; }
-    let fillers: FillerShape[] = [];
-    let fontNote = "";
-    if (stackFillGaps) {
-      try {
-        const shaped = await shapeText(block.source.text, resolveFontUrl(block.source.fontFamily));
-        fillers = fillerShapes(shaped.font, block.unitsPerEm, block.nib.width);
-      } catch {
-        fillers = [teardropShape(block.nib.width)];
-        fontNote = " (font unavailable; teardrops used)";
-      }
+    let result: ReturnType<typeof arrangeStackInShape>;
+    try {
+      result = arrangeStackInShape({
+        pieces: block.pieces.filter((p) => !p.filler), joins: block.joins, shapePx,
+        fontSize: block.fontSize, unitsPerEm: block.unitsPerEm, fillers, pullStems: true,
+      });
+    } catch (err) {
+      setExportStatus(`Could not arrange the letters: ${err instanceof Error ? err.message : String(err)}`);
+      return;
     }
-    const result = arrangeStackInShape({
-      pieces: block.pieces.filter((p) => !p.filler), joins: block.joins, shapePx,
-      fontSize: block.fontSize, unitsPerEm: block.unitsPerEm, fillers, pullStems: true,
-    });
     if (!result) { setExportStatus("Could not fit the letters inside that guide."); return; }
     updateBlock(block.id, {
       pieces: result.pieces, joins: result.joins, fontSize: result.fontSize,
@@ -2128,6 +2122,30 @@ const App: React.FC = () => {
       (result.fillers > 0 ? `, ${plural(result.fillers, "ornament")} added` : "") +
       (result.stems > 0 ? `, ${plural(result.stems, "stem")} lengthened` : "") + fontNote + "."
     );
+  };
+  // The font load below awaits; by then this render's closures are stale.
+  // The ref always holds the latest render's handler, so the arrange runs
+  // against current blocks and pushes a current history snapshot.
+  const arrangeStackNowRef = useRef(arrangeStackNow);
+  arrangeStackNowRef.current = arrangeStackNow;
+
+  /** "Fill a guide shape": load the block's font for its tashkeel (when the
+   *  panel's "Fill gaps with tashkeel" is on), then arrange from current state. */
+  const arrangeStackInGuide = async (guideId: number) => {
+    if (!selectedBlock || !isStackBlock(selectedBlock)) return;
+    const { id, source, unitsPerEm, nib } = selectedBlock;
+    let fillers: FillerShape[] = [];
+    let fontNote = "";
+    if (stackFillGaps) {
+      try {
+        const shaped = await shapeText(source.text, resolveFontUrl(source.fontFamily));
+        fillers = fillerShapes(shaped.font, unitsPerEm, nib.width);
+      } catch {
+        fillers = [teardropShape(nib.width)];
+        fontNote = " (font unavailable; teardrops used)";
+      }
+    }
+    arrangeStackNowRef.current(id, guideId, fillers, fontNote);
   };
 
   /** Stack layout back to its home arrangement; fillers go (home is the
