@@ -1,8 +1,65 @@
 import { describe, it, expect } from "vitest";
 import type { SvgCmd } from "./svgPath";
 import type { CutFace } from "../types";
-import { arcBand, traceCurve } from "./stackCurve";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import * as opentype from "opentype.js";
+import { arcBand, curveRegions, traceCurve } from "./stackCurve";
 import { splitAtCut } from "./stackGeometry";
+import { pointInPolygon } from "./svgPath";
+import { normalizeGlyphs } from "./normalizeGlyphs";
+import { convertRunToStack } from "./stackConvert";
+
+// Real shaping, as diacritics.test.ts and stackConvert.test.ts do it: a
+// static ESM import of harfbuzzjs throws under Vitest's loader, so it comes
+// in through createRequire, and its module shape is unwrapped the same way.
+const hbjsModule = createRequire(import.meta.url)("harfbuzzjs");
+type HbModule = {
+  createBlob: (data: ArrayBuffer | Uint8Array) => { destroy?: () => void };
+  createFace: (blob: unknown, index: number) => { destroy?: () => void };
+  createFont: (face: unknown) => { setScale?: (x: number, y: number) => void; destroy?: () => void };
+  createBuffer: () => {
+    addText: (text: string) => void; guessSegmentProperties?: () => void; setDirection?: (d: string) => void;
+    setScript?: (s: string) => void; setLanguage?: (l: string) => void; json?: (font?: unknown) => unknown[]; destroy?: () => void;
+  };
+  shape: (font: unknown, buffer: unknown, features?: string) => void;
+};
+function resolveHbLoader(mod: unknown): Promise<HbModule> {
+  let m: unknown = mod;
+  let rec = m && typeof m === "object" ? (m as Record<string, unknown>) : null;
+  if (rec?.default !== undefined) m = rec.default;
+  rec = m && typeof m === "object" ? (m as Record<string, unknown>) : null;
+  if (rec?.default !== undefined) m = rec.default;
+  if (typeof m === "function") return (m as () => Promise<HbModule> | HbModule)() as Promise<HbModule>;
+  rec = m && typeof m === "object" ? (m as Record<string, unknown>) : null;
+  if (rec && typeof rec.then === "function") return m as Promise<HbModule>;
+  throw new Error("Unable to resolve harfbuzzjs loader in test");
+}
+const hbPromise = resolveHbLoader(hbjsModule);
+
+/** Shape `text` with real HarfBuzz and real font bytes, then bake it. */
+async function convertReal(text: string, fontFile: string) {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const fontData = fs.readFileSync(path.resolve(dir, "../../public/fonts", fontFile));
+  const font = opentype.parse(fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength));
+  const upm = font.unitsPerEm || 1000;
+  const hb = await hbPromise;
+  const blob = hb.createBlob(new Uint8Array(fontData));
+  const face = hb.createFace(blob, 0);
+  const hbFont = hb.createFont(face);
+  const buffer = hb.createBuffer();
+  let raw: unknown[] = [];
+  try {
+    hbFont.setScale?.(upm, upm);
+    buffer.addText(text); buffer.guessSegmentProperties?.(); buffer.setDirection?.("rtl"); buffer.setScript?.("arab"); buffer.setLanguage?.("ar");
+    hb.shape(hbFont, buffer);
+    try { raw = buffer.json?.(hbFont) ?? []; } catch { raw = buffer.json?.() ?? []; }
+  } finally { buffer.destroy?.(); hbFont.destroy?.(); face.destroy?.(); blob.destroy?.(); }
+  const glyphs = normalizeGlyphs(raw as never);
+  return convertRunToStack({ glyphs, font, unitsPerEm: upm, shapableText: text, cutPlan: null, diacriticOverrides: [], fontSize: upm, detachedMarkOverrides: [], fontFamily: fontFile.replace(/\.(ttf|otf)$/, "") });
+}
 
 /** A 20-thick bowl of radius 110 from 0.15π to 0.85π: its apex is at (0, 110). */
 const BOWL = arcBand(100, 120, Math.PI * 0.15, Math.PI * 0.85);
@@ -73,3 +130,35 @@ describe("traceCurve", () => {
     for (const c of t.centre) expect(c[0]).toBeLessThan(62);
   });
 });
+
+describe("curveRegions", () => {
+  it("finds the bowl once, with an apex polygon on the ink, and nothing on a bar", () => {
+    const regions = curveRegions(BOWL);
+    expect(regions).toHaveLength(1);
+    const r = regions[0];
+    expect(r.polygon.length).toBeGreaterThan(6);
+    // The apex region sits around the top of the bowl, on the ink.
+    expect(Math.abs(r.apex[0])).toBeLessThan(40);
+    expect(r.apex[1]).toBeGreaterThan(95); expect(r.apex[1]).toBeLessThan(125);
+    expect(pointInPolygon(r.apex[0], r.apex[1], r.polygon)).toBe(true);
+    expect(curveRegions(BAR)).toHaveLength(0);
+  });
+
+  it("is cheap enough to run on hover: a 300-vertex bowl under 50 ms", () => {
+    const big = arcBand(1000, 1200, Math.PI * 0.1, Math.PI * 0.9, 150);
+    const t0 = performance.now();
+    curveRegions(big);
+    expect(performance.now() - t0).toBeLessThan(50);
+  });
+
+  it("finds a curve in a real ن in Amiri and in UKIJ Diwani", async () => {
+    for (const font of ["Amiri.ttf", "UKIJDiwani.ttf"]) {
+      const { pieces } = await convertReal("ن", font);
+      const noon = pieces.find((p) => p.role === "letter" && p.parentId === undefined)!;
+      const regions = curveRegions(noon.cmds, { faces: noon.faces });
+      expect(regions.length, font).toBeGreaterThanOrEqual(1);
+      for (const r of regions) expect(r.trace.turn).toBeGreaterThanOrEqual(Math.PI / 4);
+    }
+  });
+});
+

@@ -10,12 +10,16 @@ import type { CutFace } from "../types";
 /** Walk step as a fraction of the seed thickness. */
 const STEP_FRACTION = 0.25;
 /** The trace stops where thickness leaves [min, max] × seed, or jumps by
- *  more than THICK_JUMP between steps. */
-const THICK_MIN_RATIO = 0.6;
-const THICK_MAX_RATIO = 1.6;
-const THICK_JUMP = 0.25;
+ *  more than THICK_JUMP between steps. The window is wide because a Diwani
+ *  stroke swells to three times its thin end along one bowl (UKIJ Diwani ن:
+ *  63–223 units); a junction is caught by the per-step jump, not the window. */
+const THICK_MIN_RATIO = 0.35;
+const THICK_MAX_RATIO = 3.0;
+const THICK_JUMP = 0.4;
 /** A step turning less than this is "straight". */
 const TURN_EPS = 0.02;
+/** Sustained turning against the curve's sense that counts as an inflection. */
+const INFLECTION_TURN = 0.12;
 /** A trace must turn at least this much to be a curve. */
 export const MIN_TURN = Math.PI / 4;
 /** …and be at least this many thicknesses long. */
@@ -26,7 +30,9 @@ const MAX_LENGTH_EM = 3;
 export const PROFILE_SAMPLES = 16;
 const EPS = 1e-6;
 
-export type TraceCut = { cutX: number; angle: number };
+/** A cut in `splitAtCut`'s terms, bounded to a window about the stroke's
+ *  centre so the line's far crossings (a U's other arm) are ignored. */
+export type TraceCut = { cutX: number; angle: number; window: { y: number; half: number } };
 export type CurveTrace = {
   /** Centerline samples in stroke order, piece-local font units. */
   centre: Pt[];
@@ -137,6 +143,10 @@ function walk(contours: readonly Contour[], seed: Sample, dir: Pt, thick0: numbe
   const out: Sample[] = [];
   let c = seed.centre, t = dir, prevThick = thick0, travelled = 0, straight = 0, turnSign = 0;
   let straightStart = -1;
+  // Turning against the established sense, accumulated until a step turns
+  // with it again: a flattened curve's polyline jitters by a degree or two
+  // per step, and only a sustained reversal is an inflection.
+  let against = 0;
   while (travelled < opts.maxLength) {
     const ahead = add(c, mul(t, step));
     const m = measure(contours, ahead, t);
@@ -155,7 +165,10 @@ function walk(contours: readonly Contour[], seed: Sample, dir: Pt, thick0: numbe
       straight = 0; straightStart = -1;
       const s = Math.sign(turn);
       if (turnSign === 0) turnSign = s;
-      else if (s !== turnSign) break;   // inflection
+      else if (s !== turnSign) {
+        against += Math.abs(turn);
+        if (against > INFLECTION_TURN) break;
+      } else against = 0;
     }
     out.push({ centre: m.centre, thickness: m.thickness, tangent: nt });
     travelled += step; prevThick = m.thickness; c = m.centre; t = nt;
@@ -168,7 +181,12 @@ function walk(contours: readonly Contour[], seed: Sample, dir: Pt, thick0: numbe
  *  direction, `cutX` the centre's x in the frame rotated by −angle. */
 function cutAt(s: Sample): TraceCut {
   const angle = Math.atan2(s.tangent[1], s.tangent[0]);
-  return { angle, cutX: s.centre[0] * Math.cos(angle) + s.centre[1] * Math.sin(angle) };
+  const c = Math.cos(angle), sn = Math.sin(angle);
+  return {
+    angle,
+    cutX: s.centre[0] * c + s.centre[1] * sn,
+    window: { y: -s.centre[0] * sn + s.centre[1] * c, half: s.thickness },
+  };
 }
 
 /**
@@ -225,4 +243,67 @@ export function traceCurve(cmds: SvgCmd[], press: Pt, partial: Partial<TraceOpts
     pressT: si / (samples.length - 1),
     turn,
   };
+}
+
+export type CurveRegion = {
+  trace: CurveTrace;
+  /** The apex third of the trace widened to the stroke, as a closed polygon. */
+  polygon: Pt[];
+  /** A point inside the apex; a press here seeds the same trace. */
+  apex: Pt;
+};
+
+/** Segment midpoints along every contour, every `stride`-th one: the seeds. */
+function seedPoints(contours: readonly Contour[], stride: number): Pt[] {
+  const out: Pt[] = [];
+  for (const c of contours) for (let i = 0; i + 1 < c.length; i += stride) out.push(mul(add(c[i], c[i + 1]), 0.5));
+  return out;
+}
+
+/**
+ * The curves a hover should offer: traces seeded along the outline (a
+ * quarter of the way across the stroke from each seed edge), kept when they
+ * turn at least `MIN_TURN`, deduplicated so one bowl yields one region (two
+ * traces share a region when either's middle sample lies within a thickness
+ * of a sample of the other; the longer wins).
+ */
+export function curveRegions(cmds: SvgCmd[], partial: Partial<TraceOpts> = {}): CurveRegion[] {
+  const contours = flattenContours(cmds);
+  const verts = contours.reduce((n, c) => n + c.length, 0);
+  const stride = Math.max(1, Math.round(verts / 40));
+  const traces: CurveTrace[] = [];
+  for (const p of seedPoints(contours, stride)) {
+    const e = nearestEdge(contours, p);
+    if (!e) continue;
+    // Step a hair inside along the inward normal, then measure across to
+    // find the stroke's centre; seed a quarter of the way across.
+    const n = perp(e.dir);
+    const inward = insideInk(contours, add(e.point, mul(n, 0.5))) ? n : insideInk(contours, add(e.point, mul(n, -0.5))) ? mul(n, -1) : null;
+    if (!inward) continue;
+    const m = measure(contours, add(e.point, mul(inward, 0.5)), e.dir);
+    if (!m) continue;
+    const seed = add(e.point, mul(sub(m.centre, e.point), 0.5));
+    const t = traceCurve(cmds, seed, partial);
+    if (t) traces.push(t);
+  }
+  traces.sort((a, b) => b.centre.length - a.centre.length);
+  const kept: CurveTrace[] = [];
+  const nearAny = (p: Pt, t: CurveTrace, th: number) => t.centre.some((c) => len(sub(c, p)) < th);
+  const shares = (a: CurveTrace, b: CurveTrace) => {
+    const ma = a.centre[Math.floor(a.centre.length / 2)], mb = b.centre[Math.floor(b.centre.length / 2)];
+    return nearAny(ma, b, a.thickness[0]) || nearAny(mb, a, b.thickness[0]);
+  };
+  for (const t of traces) if (!kept.some((k) => shares(k, t))) kept.push(t);
+  return kept.map((trace) => {
+    const n = trace.centre.length;
+    const i0 = Math.floor(n / 3), i1 = Math.min(Math.ceil((2 * n) / 3), n - 1);
+    const left: Pt[] = [], right: Pt[] = [];
+    for (let i = i0; i <= i1; i++) {
+      const h = perp(trace.tangent[i]);
+      const half = trace.thickness[i] / 2;
+      left.push(add(trace.centre[i], mul(h, half)));
+      right.push(add(trace.centre[i], mul(h, -half)));
+    }
+    return { trace, polygon: [...left, ...right.reverse()], apex: trace.centre[Math.floor(n / 2)] };
+  });
 }

@@ -147,7 +147,7 @@ function splitSegAtX(s: Seg, cutX: number): [Seg, Seg] {
  * cut line other than 0 or 2 times — the cut is not a legal stroke cut.
  */
 export function splitAtCut(
-  cmds: SvgCmd[], cut: { cutX: number; angle: number }
+  cmds: SvgCmd[], cut: { cutX: number; angle: number; window?: { y: number; half: number } }
 ): { near: SvgCmd[]; far: SvgCmd[]; nearFace: CutFace; farFace: CutFace } | null {
   const contours = toSegments(rotateCmds(cmds, -cut.angle));
   const near: Seg[][] = [], far: Seg[][] = [];
@@ -156,6 +156,17 @@ export function splitAtCut(
 
   for (const segs of contours) {
     const crossing = segs.map((s) => isNear(s.p[0][0]) !== isNear(s.p[s.p.length - 1][0]));
+    // A windowed cut is a *segment* of the line, `half` either side of `y`
+    // (the cut's frame): crossings outside it — the other arm of a U — are
+    // not this cut's business, and the two inside it divide the contour.
+    if (cut.window) {
+      for (let i = 0; i < segs.length; i++) {
+        if (!crossing[i]) continue;
+        const [a] = splitSegAtX(segs[i], cut.cutX);
+        const y = a.p[a.p.length - 1][1];
+        if (Math.abs(y - cut.window.y) > cut.window.half) crossing[i] = false;
+      }
+    }
     const n = crossing.filter(Boolean).length;
     if (n === 0) { (isNear(segs[0].p[0][0]) ? near : far).push(segs); continue; }
     if (n !== 2 || face) return null;
