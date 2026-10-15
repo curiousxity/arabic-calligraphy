@@ -80,9 +80,11 @@ export const StackPanel: React.FC<{
     />
     <p className="guideEmpty">
       Filling a guide lays the letters in rows from the bottom up, in reading order, leans the
-      outer letters into the edge, and sizes the composition to the shape. With the box above
-      checked, the gaps are busied with the font's own tashkeel. You can still drag, tilt and
-      bend afterwards; Reset layout removes the ornaments.
+      outer letters into the edge, draws straight upstrokes out toward the boundary where the
+      stroke is straight and even (a tapering stem is left alone), and sizes the composition to
+      the shape. With the box above checked, the gaps are busied with the font's own tashkeel.
+      You can still drag, tilt and bend afterwards; Reset layout removes the ornaments and
+      returns pulled stems.
     </p>
     <button type="button" className="sidebarSmallAction" aria-label="Reset layout" onClick={onReset}>
       Reset layout

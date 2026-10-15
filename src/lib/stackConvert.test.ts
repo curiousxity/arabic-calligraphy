@@ -132,7 +132,8 @@ import { convertRunToStack, runOutline, splitPieceAtCut, fillerShapes, teardropS
 import { assembleStackOutline, assembleStackOutlineReport, chainOf } from "./stackOutline";
 import { nibFloorFraction, nuqtaUnits } from "./nuqta";
 import type { StackJoin, StackPiece } from "../types";
-import { flattenContours, outlineBounds, toSvgCmds } from "./strokeCuts";
+import { flattenContours, findCutZonesSwept, outlineBounds, toSvgCmds } from "./strokeCuts";
+import { stackDetectOpts } from "./stackZones";
 import { findDetachedMarks, splitContours } from "./detachedMarks";
 import type { SvgCmd } from "./svgPath";
 
@@ -386,5 +387,23 @@ describe("fillerShapes", () => {
     const b = outlineBounds(teardropShape(120).cmds);
     expect(b.x2 - b.x1).toBeGreaterThan(100);
     expect(b.y2 - b.y1).toBeGreaterThan(100);
+  });
+});
+
+describe("stem zones on converted pieces (pins the measured font-dependence)", () => {
+  const stemZones = async (fontFile: string) => {
+    const { input, result } = await convert("الملك", fontFile);
+    const upm = input.unitsPerEm;
+    const letters = result.pieces.filter((p) => p.role === "letter" && p.parentId === undefined);
+    return letters.flatMap((p) =>
+      findCutZonesSwept(flattenContours(p.cmds), { glyphIndex: 0, cluster: 0 }, stackDetectOpts(upm))
+        .filter((z) => Math.abs(z.angle) > 1 && z.toX - z.fromX > 0.1 * upm)
+    );
+  };
+  it("finds a usable upstroke in Amiri", async () => {
+    expect((await stemZones("Amiri.ttf")).length).toBeGreaterThan(0);
+  });
+  it("finds none in UKIJ Diwani, whose stems taper", async () => {
+    expect((await stemZones("UKIJDiwani.ttf")).length).toBe(0);
   });
 });

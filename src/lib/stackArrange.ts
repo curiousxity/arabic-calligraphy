@@ -7,7 +7,7 @@ import { pointInPolygon } from "./svgPath";
 import { outlineBounds, flattenContours, findCutZonesSwept, type Contour } from "./strokeCuts";
 import { translateCmds, transformPt, transformCmds, transformFace, scaleCmds, cmdsCentre, splitAtCut } from "./stackGeometry";
 import { pieceTransform } from "./stackOutline";
-import { stackDetectOpts, pullSpans, spanProbes, fromZoneFrame } from "./stackZones";
+import { stackDetectOpts, pullSpans, spanProbes, clampCutX, fromZoneFrame } from "./stackZones";
 import { splitPieceAtCut } from "./stackConvert";
 
 type Pt = [number, number];
@@ -480,23 +480,33 @@ function inkContours(pieces: readonly StackPiece[]): Contour[] {
 /** A straight stroke's free end: where to cut, and which way (piece-local unit) it points. */
 type StemEnd = { cutX: number; angle: number; dir: Pt };
 
-/** The free ends of a letter's straight strokes: each two-span zone's outer
- *  end that will split and has no face of the letter within a thickness. */
+/** The free ends of a letter's straight strokes: each zone's end that will
+ *  split and has no face of the letter within a thickness. A long zone is
+ *  cut at the inner edge of its end's pull span; a short one (under four
+ *  thicknesses, where `pullSpans` offers one span — an Amiri alif is 3.7)
+ *  is cut at its middle, and `pullStemEnds` checks the cap lands on the
+ *  end's side. */
 function freeEnds(letter: StackPiece, upm: number): StemEnd[] {
   const zones = findCutZonesSwept(flattenContours(letter.cmds), { glyphIndex: 0, cluster: 0 }, stackDetectOpts(upm));
   const out: StemEnd[] = [];
   for (const z of zones) {
     const spans = pullSpans(z);
-    if (spans.length !== 2) continue;   // a stub: no end is clearly the free one
-    const ends: { span: [number, number]; end: "from" | "to" }[] = [{ span: spans[0], end: "from" }, { span: spans[1], end: "to" }];
-    for (const { span, end } of ends) {
+    if (spans.length === 0) continue;
+    const two = spans.length === 2;
+    const mid = clampCutX(z, (z.fromX + z.toX) / 2);
+    const ends: { span: [number, number]; end: "from" | "to"; cutX: number }[] = [
+      { span: spans[0], end: "from", cutX: two ? spans[0][1] : mid },
+      { span: spans[two ? 1 : 0], end: "to", cutX: two ? spans[1][0] : mid },
+    ];
+    for (const { span, end, cutX } of ends) {
       if (!spanProbes(z, span).every((cx) => splitAtCut(letter.cmds, { cutX: cx, angle: z.angle }) !== null)) continue;
+      if (splitAtCut(letter.cmds, { cutX, angle: z.angle }) === null) continue;
       const tip = fromZoneFrame([end === "to" ? z.toX : z.fromX, z.centreY], z.angle);
       const blocked = letter.faces.some((f) => Math.hypot((f.a[0] + f.b[0]) / 2 - tip[0], (f.a[1] + f.b[1]) / 2 - tip[1]) < z.thickness);
       if (blocked) continue;
       const o = fromZoneFrame([0, 0], z.angle), u = fromZoneFrame([1, 0], z.angle);
       const sgn = end === "to" ? 1 : -1;
-      out.push({ cutX: end === "to" ? span[0] : span[1], angle: z.angle, dir: [sgn * (u[0] - o[0]), sgn * (u[1] - o[1])] });
+      out.push({ cutX, angle: z.angle, dir: [sgn * (u[0] - o[0]), sgn * (u[1] - o[1])] });
     }
   }
   return out;

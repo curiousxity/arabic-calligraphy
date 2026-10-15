@@ -81,6 +81,17 @@ function stemLetter(id: string, order: number, x: number): StackPiece {
   return { id, cmds, x, y: 0, rotation: 0, pivot: [153, -300], homeX: x, homeY: 0, order, role: "letter", faces: [] };
 }
 
+/** The same letter with a short stem, only 3.6 thicknesses long — under the
+ *  four at which `pullSpans` offers two ends (an Amiri alif is about 3.7). */
+function shortStemLetter(id: string, order: number, x: number): StackPiece {
+  const cmds: SvgCmd[] = [
+    { type: "M", x: 3, y: 0 }, { type: "L", x: 303, y: 0 }, { type: "L", x: 303, y: -103 }, { type: "L", x: 203, y: -103 },
+    { type: "L", x: 193, y: -113 }, { type: "L", x: 193, y: -403 }, { type: "L", x: 113, y: -403 }, { type: "L", x: 113, y: -113 },
+    { type: "L", x: 103, y: -103 }, { type: "L", x: 3, y: -103 }, { type: "Z" },
+  ];
+  return { id, cmds, x, y: 0, rotation: 0, pivot: [153, -200], homeX: x, homeY: 0, order, role: "letter", faces: [] };
+}
+
 /** Three stem letters on one baseline (order 0 rightmost). */
 function threeStems() {
   return { pieces: [stemLetter("a2", 2, 0), stemLetter("a1", 1, 400), stemLetter("a0", 0, 800)], joins: [] as StackJoin[] };
@@ -332,6 +343,17 @@ describe("stem pull", () => {
     expect(pointInPolygon(b.x2 * scale, b.y1 * scale, CHIMNEY)).toBe(true);
     // The outer letters, under the roof, are untouched.
     expect(r.pieces.filter((p) => p.parentId === "a0" || p.parentId === "a2")).toHaveLength(0);
+  });
+
+  it("pulls a short stem too, one whose zone has a single pull span", () => {
+    const pieces = [shortStemLetter("a2", 2, 0), shortStemLetter("a1", 1, 400), shortStemLetter("a0", 0, 800)];
+    const r = arrangeStackInShape({ pieces, joins: [], shapePx: CHIMNEY, fontSize: 1000, unitsPerEm: UPM, pullStems: true })!;
+    expect(r.stems).toBeGreaterThanOrEqual(1);
+    const cap = r.pieces.find((p) => p.parentId === "a1" && p.role === "letter")!;
+    expect(cap).toBeDefined();
+    const scale = r.fontSize / UPM;
+    const b = outlineBounds(transformCmds(cap.cmds, { x: cap.x, y: cap.y, rotation: cap.rotation, pivot: cap.pivot }));
+    expect(b.y1 * scale).toBeLessThan(-350 - 300);
   });
 
   it("is idempotent: a second run slides a cap rather than cutting the letter again", () => {

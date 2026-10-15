@@ -2114,7 +2114,7 @@ const App: React.FC = () => {
     }
     const result = arrangeStackInShape({
       pieces: block.pieces.filter((p) => !p.filler), joins: block.joins, shapePx,
-      fontSize: block.fontSize, unitsPerEm: block.unitsPerEm, fillers,
+      fontSize: block.fontSize, unitsPerEm: block.unitsPerEm, fillers, pullStems: true,
     });
     if (!result) { setExportStatus("Could not fit the letters inside that guide."); return; }
     updateBlock(block.id, {
@@ -2125,7 +2125,8 @@ const App: React.FC = () => {
     const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
     setExportStatus(
       `Arranged ${plural(letters, "letter")} in ${plural(result.rows, "row")} inside the guide` +
-      (result.fillers > 0 ? `, ${plural(result.fillers, "ornament")} added` : "") + fontNote + "."
+      (result.fillers > 0 ? `, ${plural(result.fillers, "ornament")} added` : "") +
+      (result.stems > 0 ? `, ${plural(result.stems, "stem")} lengthened` : "") + fontNote + "."
     );
   };
 
