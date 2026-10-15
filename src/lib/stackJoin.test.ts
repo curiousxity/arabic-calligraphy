@@ -190,6 +190,24 @@ describe("joinFloor", () => {
 });
 
 describe("joinEdges", () => {
+  it("a profile scales the width along the curve; 1 everywhere is today's output; the floor still holds", () => {
+    const flat = joinEdges(A, B, 0, 3, 24, 0);
+    const ones = joinEdges(A, B, 0, 3, 24, 0, new Array(16).fill(1));
+    expect(ones).toEqual(flat);
+    // Peaks at 1.5 mid-way: the mid rung is 1.5× the linear one; the ends are untouched.
+    const peak = Array.from({ length: 16 }, (_, k) => 1 + 0.5 * Math.sin((Math.PI * k) / 15));
+    const bulged = joinEdges(A, B, 0, 3, 24, 0, peak);
+    const w = (e: { edgeA: [number, number][]; edgeB: [number, number][] }, i: number) => dist(e.edgeA[i], e.edgeB[i]);
+    const mid = Math.floor(flat.edgeA.length / 2);
+    expect(w(bulged, mid) / w(flat, mid)).toBeGreaterThan(1.4);
+    expect(w(bulged, mid) / w(flat, mid)).toBeLessThan(1.6);
+    expect(dist(bulged.edgeA[0], A.a)).toBeLessThan(1e-9);
+    expect(dist(bulged.edgeB[bulged.edgeB.length - 1], B.b)).toBeLessThan(1e-9);
+    // A profile below the floor's share is floored, not thinned to nothing.
+    const thin = joinEdges(A, B, 0, 8, 24, 0, new Array(16).fill(0.2));
+    for (let i = 1; i < thin.edgeA.length - 1; i++) expect(w(thin, i)).toBeGreaterThanOrEqual(8 - 1e-6);
+  });
+
   it("lands exactly on the four face points", () => {
     const { edgeA, edgeB } = joinEdges(A, B, 0, 3);
     expect(dist(edgeA[0], A.a)).toBeLessThan(1e-9);

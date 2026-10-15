@@ -169,7 +169,7 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
       const y = u * u * u * cl[0][1] + 3 * u * u * t * cl[1][1] + 3 * u * t * t * cl[2][1] + t * t * t * cl[3][1];
       centre.push(x * scale, y * scale);
     }
-    const { edgeA, edgeB } = joinEdges(A, B, j.bow, joinFloor(A, B, nib.minFraction), 24, depth);
+    const { edgeA, edgeB } = joinEdges(A, B, j.bow, joinFloor(A, B, nib.minFraction), 24, depth, j.profile);
     const band = [...edgeA, ...[...edgeB].reverse()].flatMap((q: Pt) => [q[0] * scale, q[1] * scale]);
     const thick = Math.max(Math.hypot(A.b[0] - A.a[0], A.b[1] - A.a[1]), Math.hypot(B.b[0] - B.a[0], B.b[1] - B.a[1])) * scale;
     return [{ j, A, B, depth, chord, centre, band, thick }];

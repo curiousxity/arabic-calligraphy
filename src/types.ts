@@ -270,6 +270,13 @@ export type StackJoin = {
   bow: number;
   /** Common lengthening of both handles: rounds out a U-shaped join. Absent = 0. */
   depth?: number;
+  /** Width multipliers at even parameters along the curve, 1 = the linear
+   *  interpolation of the two faces. Absent = linear (every join today). A
+   *  curve converted from a letter carries its own sampled width here. */
+  profile?: number[];
+  /** The bend double-click returns to. Absent = { bow: 0, depth: 0 }. A
+   *  curve converted from a letter rests at the bend that reproduces it. */
+  rest?: { bow: number; depth: number };
   /** Made from an inserted tatweel rather than a cut in the letter. */
   fallback?: true;
 };

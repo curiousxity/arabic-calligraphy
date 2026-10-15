@@ -37,7 +37,7 @@ export function assembleStackOutlineReport(
     if (!from || !to || !fa || !fb) { skipped++; continue; }
     const A = transformFace(fa, pieceTransform(from));
     const B = transformFace(fb, pieceTransform(to));
-    const edges = joinEdges(A, B, j.bow, joinFloor(A, B, nib.minFraction), 24, j.depth ?? 0);
+    const edges = joinEdges(A, B, j.bow, joinFloor(A, B, nib.minFraction), 24, j.depth ?? 0, j.profile);
     const spliced = spliceJoin(pool, A, B, edges);
     if (spliced) pool = spliced;
     else skipped++;

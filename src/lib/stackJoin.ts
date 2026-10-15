@@ -146,7 +146,7 @@ function sampleParams(cl: [Pt, Pt, Pt, Pt], samples: number): number[] {
  * what keep a hairpin from pinching to a point.
  */
 export function joinEdges(
-  A: CutFace, B: CutFace, bow: number, minWidth: number, samples = 24, depth = 0
+  A: CutFace, B: CutFace, bow: number, minWidth: number, samples = 24, depth = 0, profile?: readonly number[]
 ): { edgeA: Pt[]; edgeB: Pt[] } {
   const cl = joinCenterline(A, B, bow, depth);
   const vA: Pt = [A.b[0] - A.a[0], A.b[1] - A.a[1]];
@@ -173,6 +173,14 @@ export function joinEdges(
     const t = ts[i];
     const c = centers[i];
     let v: Pt = [vA[0] + (vB[0] - vA[0]) * t, vA[1] + (vB[1] - vA[1]) * t];
+    // The stroke's own width along the curve, when it has one: scale the
+    // nib's cross-section by the profile, never at the two faces (the seam
+    // must land on them exactly); the floor below still applies.
+    if (profile && profile.length > 1 && i > 0 && i < last) {
+      const u = t * (profile.length - 1), k = Math.min(profile.length - 2, Math.floor(u)), f = u - k;
+      const m = profile[k] * (1 - f) + profile[k + 1] * f;
+      v = [v[0] * m, v[1] * m];
+    }
     const [dx, dy] = dirs[i];
     const n: Pt = [-dy, dx];
     const along = v[0] * n[0] + v[1] * n[1];
