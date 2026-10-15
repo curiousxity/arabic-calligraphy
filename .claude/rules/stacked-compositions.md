@@ -193,6 +193,28 @@ guide (x, y, rotation) and takes the fitted `fontSize`, one history step.
 The guide never moves a piece afterwards. Tunables are fractions of an em
 at the top of the module.
 
+**Fillers** (`fillGaps`): when the panel's "Fill gaps with tashkeel" is on,
+`App.tsx` loads the block's font through the cached `shapeText` and passes
+`fillerShapes` (`stackConvert.ts`: the font's fatha, kasra, shadda, damma,
+sukun, tanwin, star and dot, or a nib-width `teardropShape` when fewer than
+two exist — Qahiri and RanaKufi; also the fallback when the font fails to
+load). After letters are final the shape is scanned on a `FILLER_CELL`
+grid (0.2 em), bottom row first, right to left; each cell tries the
+candidates in a rotation starting at the cell index, at natural size then
+`FILLER_SHRINK`, and accepts the first whose `FILLER_GAP`-padded box (0.03
+em) has its corners, edge midpoints and centre inside the shape, meets no
+ink (no probe inside a flattened piece contour *and* no contour vertex
+inside the box — five probes alone let a letter's corner poke in), and
+overlaps no placed filler. The cell and gap were tuned down from 0.33/0.06
+because a padded dot could not enter the gutters of a composition whose
+letters are as wide as the shape. A filler is `role: "mark"` with no
+parent and `filler: true`: it drags alone, has no ring or cut spans,
+exports with the outline, and is **stripped** by the arranger, the handler
+and Reset layout, so it never accumulates. The preference is `App.tsx`
+state like "Move letters together", neither saved nor undoable. The
+handler is async (the font load) and commits by captured block id through
+`updateBlock`.
+
 **"Move letters together"** is `App.tsx` state, not a block field: it is a
 preference about the next drag, not part of the design, so it is neither
 saved nor undoable. Alt still moves a letter alone while it is on.

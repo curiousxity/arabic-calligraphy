@@ -107,6 +107,9 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
   rest. Spec: `docs/superpowers/specs/2026-10-15-stack-arrange-fill-design.md`;
   how it works and its tunables:
   [stacked-compositions.md](.claude/rules/stacked-compositions.md).
+- **Fill gaps with tashkeel.** A checkbox in the Stack panel; the arranger
+  busies the gaps with the font's own marks (teardrop fallback), placed
+  off the ink by contour test. Re-runs replace them; Reset removes them.
 
 ### 2026-10-15 — Stacked compositions fill a shape; guides from an SVG
 
