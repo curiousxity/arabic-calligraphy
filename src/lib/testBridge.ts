@@ -23,7 +23,14 @@ export type HarfTestBridge = {
   getBlocks: () => Block[];
   getSelectedIds: () => number[];
   getStage: () => Konva.Stage | null;
+  /** The stack editor window's own stage while it is open; null otherwise. */
+  getEditorStage: () => Konva.Stage | null;
 };
+
+let editorStage: Konva.Stage | null = null;
+/** Set by `StackEditorDialog` while mounted. Read-only to tests, like the rest. */
+export function setEditorStage(stage: Konva.Stage | null): void { editorStage = stage; }
+export function currentEditorStage(): Konva.Stage | null { return editorStage; }
 
 declare global {
   interface Window {
