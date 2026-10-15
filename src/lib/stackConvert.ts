@@ -4,6 +4,7 @@ import type * as opentype from "opentype.js";
 import type { HarfBuzzGlyph } from "./normalizeGlyphs";
 import type { DiacriticOverride, StackPiece, StackJoin, CutFace } from "../types";
 import type { SvgCmd } from "./svgPath";
+import type { FillerShape } from "./stackArrange";
 import {
   type CutPlan, type CutZone, applyCutsToCommands, toSvgCmds, flattenContours, findCutZonesSwept,
   zoneExtentX, zoneCentre, DEFAULT_DETECT_OPTS, outlineBounds,
@@ -272,4 +273,45 @@ export function splitPieceAtCut(
     { id: `j${p.id}-${capId}`, from: { pieceId: p.id, faceIndex: body.faces.length - 1 }, to: { pieceId: capId, faceIndex: cap.faces.length - 1 }, bow: 0 },
   ];
   return { pieces: pieces.map((x) => (x.id === p.id ? body : x)).concat(cap), joins: newJoins };
+}
+
+/** The marks offered as gap fillers, in the rotation the arranger cycles through. */
+export const FILLER_MARKS: readonly { name: string; cp: number }[] = [
+  { name: "fatha", cp: 0x064e }, { name: "kasra", cp: 0x0650 }, { name: "shadda", cp: 0x0651 },
+  { name: "damma", cp: 0x064f }, { name: "sukun", cp: 0x0652 }, { name: "fathatan", cp: 0x064b },
+  { name: "dammatan", cp: 0x064c }, { name: "kasratan", cp: 0x064d }, { name: "star", cp: 0x066d },
+  { name: "dot", cp: 0x06ec },
+];
+
+/** A pen-drawn teardrop the nib's width across: a circle with a short tail
+ *  rising to the upper right. The filler for fonts without tashkeel. */
+export function teardropShape(nibWidth: number): FillerShape {
+  const r = Math.max(nibWidth, 1) / 2;
+  const k = 0.5523 * r;
+  const cmds: SvgCmd[] = [
+    { type: "M", x: r, y: 0 },
+    { type: "C", x1: r, y1: k, x2: k, y2: r, x: 0, y: r },
+    { type: "C", x1: -k, y1: r, x2: -r, y2: k, x: -r, y: 0 },
+    { type: "C", x1: -r, y1: -k, x2: -k, y2: -r, x: 0, y: -r },
+    { type: "C", x1: k, y1: -r, x2: 1.6 * r, y2: -1.6 * r, x: 1.8 * r, y: -2 * r },
+    { type: "C", x1: 1.6 * r, y1: -1.2 * r, x2: r, y2: -0.6 * r, x: r, y: 0 },
+    { type: "Z" },
+  ];
+  return { name: "teardrop", cmds };
+}
+
+/** The filler outlines a font offers: each of `FILLER_MARKS` the font
+ *  actually draws (a real glyph with commands), plus the teardrop when fewer
+ *  than two survive (Qahiri and RanaKufi carry only hamza-above). */
+export function fillerShapes(font: opentype.Font, upm: number, nibWidth: number): FillerShape[] {
+  const out: FillerShape[] = [];
+  for (const m of FILLER_MARKS) {
+    const g = font.charToGlyph(String.fromCodePoint(m.cp));
+    if (!g || g.index === 0) continue;
+    const cmds = toSvgCmds(g.getPath(0, 0, upm).commands);
+    if (cmds.length < 3) continue;
+    out.push({ name: m.name, cmds });
+  }
+  if (out.length < 2) out.push(teardropShape(nibWidth));
+  return out;
 }

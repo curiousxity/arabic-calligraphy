@@ -128,7 +128,7 @@ async function shapeReal(
   }
 }
 
-import { convertRunToStack, runOutline, splitPieceAtCut } from "./stackConvert";
+import { convertRunToStack, runOutline, splitPieceAtCut, fillerShapes, teardropShape } from "./stackConvert";
 import { assembleStackOutline, assembleStackOutlineReport, chainOf } from "./stackOutline";
 import { nibFloorFraction, nuqtaUnits } from "./nuqta";
 import type { StackJoin, StackPiece } from "../types";
@@ -358,5 +358,33 @@ describe("convertRunToStack", () => {
     expect(new Set(cur.pieces.map((p) => p.id)).size).toBe(cur.pieces.length);
     expect(new Set(cur.joins.map((j) => j.id)).size).toBe(cur.joins.length);
     expect(resolves(cur.pieces, cur.joins)).toBe(true);
+  });
+});
+
+describe("fillerShapes", () => {
+  const load = (file: string) => {
+    const dir = path.dirname(fileURLToPath(import.meta.url));
+    const buf = fs.readFileSync(path.resolve(dir, "../../public/fonts", file));
+    return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  };
+
+  it("takes the font's own tashkeel when it has them", () => {
+    const font = load("Amiri.ttf");
+    const shapes = fillerShapes(font, font.unitsPerEm, 100);
+    const names = shapes.map((s) => s.name);
+    expect(names).toContain("fatha");
+    expect(names).toContain("shadda");
+    expect(names).not.toContain("teardrop");
+    expect(shapes.length).toBeGreaterThanOrEqual(5);
+    for (const s of shapes) expect(s.cmds.length).toBeGreaterThan(2);
+  });
+
+  it("falls back to a nib-width teardrop when the font offers fewer than two marks", () => {
+    const font = load("Qahiri.ttf");
+    const shapes = fillerShapes(font, font.unitsPerEm, 120);
+    expect(shapes.map((s) => s.name)).toContain("teardrop");
+    const b = outlineBounds(teardropShape(120).cmds);
+    expect(b.x2 - b.x1).toBeGreaterThan(100);
+    expect(b.y2 - b.y1).toBeGreaterThan(100);
   });
 });
