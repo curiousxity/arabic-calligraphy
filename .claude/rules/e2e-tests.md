@@ -26,8 +26,11 @@ Two setup details that are easy to undo by accident:
 
 **The bridge.** Konva draws everything into one `<canvas>`, so the DOM says
 almost nothing about the artboard. `src/lib/testBridge.ts` publishes
-`window.__HARF__ = { getBlocks, getSelectedIds, getStage }` in **dev builds
-only** — `import.meta.env.DEV` is substituted with `false` in a production
+`window.__HARF__ = { getBlocks, getSelectedIds, getStage, getEditorStage,
+getEditorDraft }` in **dev builds
+only** (the last two are the stack editor window's stage and staged draft
+while it is open, set by the dialog; see
+[stacked-compositions.md](stacked-compositions.md)) — `import.meta.env.DEV` is substituted with `false` in a production
 build, so the assignment is unreachable and dropped (verified: no `__HARF__`
 anywhere in `dist/`). `App.tsx` wires it in one `useEffect` keyed on
 `[blocks, effectiveSelectedIds]`; re-installing on change is cheaper than
