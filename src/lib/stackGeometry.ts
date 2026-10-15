@@ -75,6 +75,18 @@ export function translateCmds(cmds: SvgCmd[], dx: number, dy: number): SvgCmd[] 
   });
 }
 
+/** Every coordinate multiplied by `k` (about the origin). */
+export function scaleCmds(cmds: SvgCmd[], k: number): SvgCmd[] {
+  return cmds.map((c) => {
+    switch (c.type) {
+      case "M": case "L": return { ...c, x: c.x * k, y: c.y * k };
+      case "Q": return { ...c, x: c.x * k, y: c.y * k, x1: c.x1 * k, y1: c.y1 * k };
+      case "C": return { ...c, x: c.x * k, y: c.y * k, x1: c.x1 * k, y1: c.y1 * k, x2: c.x2 * k, y2: c.y2 * k };
+      default: return c;
+    }
+  });
+}
+
 export function transformCmds(cmds: SvgCmd[], t: PieceTransform): SvgCmd[] {
   // Per point through transformPt, so an edge and a CutFace transformed
   // separately land on bit-identical coordinates (they are matched by equality).

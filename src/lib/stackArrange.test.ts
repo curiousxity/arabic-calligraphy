@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import type { StackPiece, StackJoin } from "../types";
 import type { SvgCmd } from "./svgPath";
 import { pointInPolygon } from "./svgPath";
-import { arrangeStackInShape, bandSpan, letterGroups } from "./stackArrange";
-import { outlineBounds } from "./strokeCuts";
-import { transformPt, translateCmds } from "./stackGeometry";
+import { arrangeStackInShape, bandSpan, letterGroups, type FillerShape } from "./stackArrange";
+import { flattenContours, outlineBounds } from "./strokeCuts";
+import { transformCmds, transformPt, translateCmds } from "./stackGeometry";
 
 // Synthetic pieces are fine here: nothing is shaped, and the solver only
 // reads outlines, positions and the rider tree (see CLAUDE.md's rule, which
@@ -50,6 +50,14 @@ function shortTallShort() {
 
 /** A parallelogram 1400 wide and 1000 tall whose sides lean right going up (about 27°). */
 const PARALLELOGRAM: Array<[number, number]> = [[-700, 500], [700, 500], [1200, -500], [-200, -500]];
+
+const FILLERS: FillerShape[] = [
+  { name: "dot", cmds: rect(60, 60) },
+  { name: "fatha", cmds: rect(200, 50) },
+];
+
+/** Flattened world-space contours of a piece. */
+const worldContours = (p: StackPiece) => flattenContours(transformCmds(p.cmds, { x: p.x, y: p.y, rotation: p.rotation, pivot: p.pivot }));
 
 /** A tall ellipse in px, centred on the origin, clockwise. */
 function ellipse(w: number, h: number, n = 64): Array<[number, number]> {
@@ -230,5 +238,51 @@ describe("arrangeStackInShape", () => {
   it("returns null with no letters or a degenerate shape", () => {
     expect(arrangeStackInShape({ ...input(), pieces: [] })).toBeNull();
     expect(arrangeStackInShape({ ...input(), shapePx: [[0, 0], [1, 1]] })).toBeNull();
+  });
+});
+
+describe("fillers", () => {
+  const shape = ellipse(300, 900);
+  const base = () => ({ ...word(), shapePx: shape, fontSize: 100, unitsPerEm: UPM, fillers: FILLERS });
+
+  it("busies a loose shape with marks that stay inside and off the ink", () => {
+    const r = arrangeStackInShape(base())!;
+    expect(r.fillers).toBeGreaterThan(0);
+    const scale = r.fontSize / UPM;
+    const fillers = r.pieces.filter((p) => p.filler);
+    expect(fillers.length).toBe(r.fillers);
+    const ink = r.pieces.filter((p) => !p.filler).flatMap(worldContours);
+    const boxes = fillers.map((f) => outlineBounds(translateCmds(f.cmds, f.x, f.y)));
+    fillers.forEach((f, i) => {
+      expect(f.role).toBe("mark");
+      expect(f.parentId).toBeUndefined();
+      expect(f.homeX).toBe(f.x); expect(f.homeY).toBe(f.y);
+      const b = boxes[i];
+      const probes: Array<[number, number]> = [[b.x1, b.y1], [b.x2, b.y1], [b.x1, b.y2], [b.x2, b.y2], [(b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2]];
+      for (const [x, y] of probes) {
+        expect(pointInPolygon(x * scale, y * scale, shape), `${f.id} inside`).toBe(true);
+        expect(ink.some((c) => pointInPolygon(x, y, c)), `${f.id} off the ink`).toBe(false);
+      }
+      for (let j = 0; j < i; j++) {
+        const o = boxes[j];
+        const apart = b.x2 <= o.x1 || b.x1 >= o.x2 || b.y2 <= o.y1 || b.y1 >= o.y2;
+        expect(apart, `${f.id} vs ${fillers[j].id}`).toBe(true);
+      }
+    });
+  });
+
+  it("adds none to a shape the letters already fill, and is deterministic", () => {
+    const one = letter("solo", 0, 0, 300, 400);
+    const tight: Array<[number, number]> = [[-160, -210], [160, -210], [160, 210], [-160, 210]];
+    const r = arrangeStackInShape({ pieces: [one], joins: [], shapePx: tight, fontSize: 1000, unitsPerEm: UPM, fillers: FILLERS })!;
+    expect(r.fillers).toBe(0);
+    const a = arrangeStackInShape(base())!, b = arrangeStackInShape(base())!;
+    expect(a).toEqual(b);
+  });
+
+  it("adds no fillers when none are offered", () => {
+    const r = arrangeStackInShape({ ...base(), fillers: undefined })!;
+    expect(r.fillers).toBe(0);
+    expect(r.pieces.some((p) => p.filler)).toBe(false);
   });
 });

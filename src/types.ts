@@ -254,6 +254,9 @@ export type StackPiece = {
   role: "letter" | "mark";
   /** Marks: the letter they ride with. */
   parentId?: string;
+  /** Placed by "Fill a guide shape" to busy the gaps (tashkeel, ornaments);
+   *  stripped on re-run and on Reset layout. */
+  filler?: true;
   faces: CutFace[];
 };
 

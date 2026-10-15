@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  toSegments, fromSegments, transformPt, transformCmds, transformFace, splitAtCut, cmdsCentre,
+  toSegments, fromSegments, transformPt, transformCmds, transformFace, splitAtCut, cmdsCentre, scaleCmds,
 } from "./stackGeometry";
 import { flattenContours } from "./strokeCuts";
 import type { SvgCmd } from "./svgPath";
@@ -126,5 +126,14 @@ describe("splitAtCut", () => {
       { type: "L", x: 80, y: -10 }, { type: "L", x: 0, y: -10 }, { type: "Z" },
     ];
     expect(splitAtCut(u, { cutX: 40, angle: 0 })).toBeNull();
+  });
+});
+
+describe("scaleCmds", () => {
+  it("scales every coordinate about the origin", () => {
+    const cmds: SvgCmd[] = [{ type: "M", x: 10, y: 20 }, { type: "Q", x1: 2, y1: 4, x: 6, y: 8 }, { type: "C", x1: 1, y1: 1, x2: 2, y2: 2, x: 3, y: 3 }, { type: "Z" }];
+    expect(scaleCmds(cmds, 0.5)).toEqual([
+      { type: "M", x: 5, y: 10 }, { type: "Q", x1: 1, y1: 2, x: 3, y: 4 }, { type: "C", x1: 0.5, y1: 0.5, x2: 1, y2: 1, x: 1.5, y: 1.5 }, { type: "Z" },
+    ]);
   });
 });

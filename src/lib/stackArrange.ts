@@ -2,12 +2,18 @@
 // font units, the shape in px, the scale between them found here. Never
 // imports ./harfbuzz.
 import type { StackPiece, StackJoin } from "../types";
+import type { SvgCmd } from "./svgPath";
 import { pointInPolygon } from "./svgPath";
-import { outlineBounds } from "./strokeCuts";
-import { translateCmds, transformPt } from "./stackGeometry";
+import { outlineBounds, flattenContours, type Contour } from "./strokeCuts";
+import { translateCmds, transformPt, transformCmds, scaleCmds, cmdsCentre } from "./stackGeometry";
+import { pieceTransform } from "./stackOutline";
 
 type Pt = [number, number];
 type Box = { x1: number; y1: number; x2: number; y2: number };
+
+/** An ornament the caller offers for the gaps: closed contours in font units
+ *  at the block's unitsPerEm, origin anywhere. */
+export type FillerShape = { cmds: SvgCmd[]; name: string };
 
 export type ArrangeInput = {
   pieces: readonly StackPiece[];
@@ -17,6 +23,8 @@ export type ArrangeInput = {
   shapePx: readonly Pt[];
   fontSize: number;
   unitsPerEm: number;
+  /** Ornaments for the gaps; omitted = no filler pass. */
+  fillers?: readonly FillerShape[];
 };
 
 export type ArrangeResult = {
@@ -25,6 +33,8 @@ export type ArrangeResult = {
   /** The block's new size: the largest at which every letter fits. */
   fontSize: number;
   rows: number;
+  /** Filler pieces added. */
+  fillers: number;
 };
 
 /**
@@ -46,6 +56,10 @@ const CREEP = 0.02;
 const NUDGE_STEPS = 4;
 /** The most an outer letter leans toward the shape's edge. */
 const MAX_TILT = Math.PI / 6;
+/** Filler grid cell, filler padding, and the one shrink step tried after natural size. */
+const FILLER_CELL = 0.2;
+const FILLER_GAP = 0.03;
+const FILLER_SHRINK = 0.6;
 
 /** A letter with its riders: moved as one, its bounds measured as one. */
 type Group = {
@@ -391,6 +405,69 @@ function arrangeAt(groups: Group[], shapePx: readonly Pt[], scale: number, upm: 
 }
 
 /**
+ * Busy the gaps. The shape is scanned on a grid, bottom row first, right to
+ * left; at each cell the candidates are tried in a rotation that starts at
+ * the cell's index (so neighbours differ), each at natural size then shrunk.
+ * A candidate is accepted when its padded box's four corners and centre are
+ * inside the shape, none of them is inside any ink contour, and the box
+ * overlaps no filler already placed. Deterministic for the same input.
+ */
+function fillGaps(
+  poly: readonly Pt[], ink: readonly Contour[], fillers: readonly FillerShape[], upm: number, order: number
+): StackPiece[] {
+  if (fillers.length === 0) return [];
+  const cell = FILLER_CELL * upm, pad = FILLER_GAP * upm;
+  const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const cands = fillers.map((f) => ({ name: f.name, cmds: f.cmds, box: outlineBounds(f.cmds) }));
+  const inside = (x: number, y: number) => pointInPolygon(x, y, poly as Array<[number, number]>);
+  // A box meets ink if one of its probes is inside a contour, or a contour
+  // vertex is inside the box (a letter's corner poking in between probes).
+  const meetsInk = (wb: Box, probes: readonly Pt[]) =>
+    probes.some(([px, py]) => ink.some((c) => pointInPolygon(px, py, c))) ||
+    ink.some((c) => c.some(([vx, vy]) => vx > wb.x1 && vx < wb.x2 && vy > wb.y1 && vy < wb.y2));
+  const placed: Box[] = [];
+  const out: StackPiece[] = [];
+  let cellIndex = 0;
+  for (let cy = maxY - cell / 2; cy > minY; cy -= cell) {
+    for (let cx = maxX - cell / 2; cx > minX; cx -= cell, cellIndex++) {
+      let hit = false;
+      for (let k = 0; k < cands.length && !hit; k++) {
+        const cand = cands[(cellIndex + k) % cands.length];
+        for (const shrink of [1, FILLER_SHRINK]) {
+          const cmds = shrink === 1 ? cand.cmds : scaleCmds(cand.cmds, shrink);
+          const pivot = cmdsCentre(cmds);
+          const x = cx - pivot[0], y = cy - pivot[1];
+          const b = cand.box;
+          const wb: Box = { x1: b.x1 * shrink + x - pad, y1: b.y1 * shrink + y - pad, x2: b.x2 * shrink + x + pad, y2: b.y2 * shrink + y + pad };
+          const mx = (wb.x1 + wb.x2) / 2, my = (wb.y1 + wb.y2) / 2;
+          const probes: Pt[] = [
+            [wb.x1, wb.y1], [wb.x2, wb.y1], [wb.x1, wb.y2], [wb.x2, wb.y2],
+            [mx, wb.y1], [mx, wb.y2], [wb.x1, my], [wb.x2, my], [cx, cy],
+          ];
+          if (!probes.every(([px, py]) => inside(px, py))) continue;
+          if (meetsInk(wb, probes)) continue;
+          if (placed.some((o) => !(wb.x2 <= o.x1 || wb.x1 >= o.x2 || wb.y2 <= o.y1 || wb.y1 >= o.y2))) continue;
+          placed.push(wb);
+          out.push({
+            id: `f${out.length + 1}`, cmds, x, y, rotation: 0, pivot, homeX: x, homeY: y,
+            order, role: "mark", filler: true, faces: [],
+          });
+          hit = true;
+          break;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** Every piece's ink as flattened world-space contours (font units). */
+function inkContours(pieces: readonly StackPiece[]): Contour[] {
+  return pieces.flatMap((p) => flattenContours(transformCmds(p.cmds, pieceTransform(p))));
+}
+
+/**
  * Arrange the stack's letters inside `shapePx`. Rows run bottom to top in
  * reading order, right to left within a row (the way a stacked Diwani name
  * climbs), each letter keeping its riders and losing its tilt, every join
@@ -434,10 +511,17 @@ export function arrangeStackInShape(input: ArrangeInput): ArrangeResult | null {
       moved.set(m.id, { ...m, x: nx - m.pivot[0], y: ny - m.pivot[1], rotation: pl.rotation });
     }
   }
+  // Incoming fillers are dropped here too, so a caller that forgets to strip
+  // them never accumulates a second layer.
+  const arranged = input.pieces.filter((p) => !p.filler).map((p) => moved.get(p.id) ?? p);
+  const polyFU = input.shapePx.map((p): Pt => [p[0] / (base * lo), p[1] / (base * lo)]);
+  const maxOrder = groups.reduce((m, g) => Math.max(m, g.letter.order), 0);
+  const fills = fillGaps(polyFU, inkContours(arranged), input.fillers ?? [], upm, maxOrder);
   return {
-    pieces: input.pieces.map((p) => moved.get(p.id) ?? p),
+    pieces: [...arranged, ...fills],
     joins: input.joins.map((j) => ({ ...j, bow: 0, depth: 0 })),
     fontSize: input.fontSize * lo,
     rows: rows.length,
+    fillers: fills.length,
   };
 }
