@@ -99,6 +99,15 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-15 — Curved strokes bend
+
+- **Press a bowl, drag to widen or tighten it.** The curve is traced, cut
+  free and replaced by a join that reproduces it until dragged, with the
+  stroke's own width; double-click restores. Spec and gate numbers:
+  `docs/superpowers/specs/2026-10-15-bend-curves-design.md`; how the tracer
+  works and where it stops:
+  [stacked-compositions.md](.claude/rules/stacked-compositions.md).
+
 ### 2026-10-15 — Stack arrange follows the silhouette
 
 - **Hug, nudge, tilt.** "Fill a guide shape" now measures the outer letter

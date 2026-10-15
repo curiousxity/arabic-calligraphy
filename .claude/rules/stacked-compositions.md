@@ -105,6 +105,42 @@ to pieces.
 
 **A tail is a split plus a join, and the end cap is a rider.** `splitPieceAtCut` makes the smaller fragment an end cap: `role: "letter"` (it keeps a tilt handle), `parentId` = the body, same `order`. `chainOf` treats any piece with a `parentId` as a rider — it moves with its body, is draggable alone, and never drags anything else. Neither side of the cut is "the tail"; size decides. Cap ids are `<body>t<n>` with a monotonic `n` (relies on pieces never being deleted).
 
+**A curve becomes a join** (`bendCurveAt`, `stackConvert.ts`; tracer in
+`stackCurve.ts`, pure). Hovering a letter outlines the apex third of each
+curved stroke `curveRegions` finds (seeded along the outline, deduped by
+shared samples, cached per `cmds`); pressing there frees the curve and the
+same drag bends it. The tracer (`traceCurve`) takes the nearest edge, casts
+across to the other edge (whichever of the edge's direction or its
+perpendicular gives the thinner cast — near a stroke's end the nearest
+edge is the cap), and walks both ways re-centring every quarter thickness.
+It stops at a thickness outside 0.35–3.0× the seed or a 40% jump between
+steps (a Diwani bowl swells 63→223 units along one stroke; the spec's
+0.6–1.6 window traced nothing in UKIJ Diwani), a *sustained* reversal of
+0.12 rad (one opposite step is flattening jitter), a straight run longer
+than a thickness, a face, or 3 em; a trace is trimmed to π of turn around
+the press (one cubic cannot follow more). The two cuts sit half a thickness
+in from the ends and are **windowed** (`splitAtCut`'s optional `window`:
+crossings farther than a thickness from the stroke's centre in the cut's
+frame are ignored) — the infinite line perpendicular to a U's arm also
+crosses its other arm. `bendCurveAt` takes the hover's `CurveTrace` (a bare
+press re-traces), cuts twice with `splitPieceAtCut`, drops the fragment
+holding the trace's middle and the joins the splits made to it, rides the
+far fragment on the body, swaps the piece id off the arc when the arc was
+the largest fragment, and orients the far face to the body face's side of
+travel. The join's `rest` bend is three Gauss–Newton steps of
+`solveJoinDrag` toward the traced midpoint; its `profile` is the traced
+width over the faces' interpolated thickness, read in the join's direction.
+**A profile sets the drawn width outright** (`joinEdges`: profile × the
+faces' interpolated thickness, square across the travel, keeping the rung's
+sense) — the pen model's interpolated cross-section passes through zero on
+a U, and a rung flipped against its neighbours twists the ribbon into a
+figure-eight (both found by the gate's identity numbers). Double-click on
+any join returns to `rest ?? {0, 0}`. The overlay's curve layer sits above
+the body and below the cut spans; the bend is a `.stackbend` stage listener
+reading joins through refs synced in an effect. Gate (`scripts/
+measureCurves.mjs`): 331/346 curves across 23 fonts free with identity
+under 5%; Amiri 16/16, UKIJ Diwani 11/11; numbers in the spec.
+
 **A letter's own dots, hamza and kaf stroke are riders too.** `convertRunToStack` splits them out of the letter's commands before any cut, at their moved position (`d<index>-<k>` ids, `role: "mark"`, `parentId` the letter), so the join sweep runs on the body only — see [detached-marks.md](detached-marks.md). That is why Amiri's مصبح joins all three pairs now where it joined one.
 
 **The piece transform rotates about a stored `pivot`**, the outline centre
@@ -276,5 +312,6 @@ itself always centres its ink on (x, y).
 **Old builds** render nothing for a `stack` block (CanvasStage's
 fallthrough returns `null`); they do not crash.
 
-Deferred: bending letter bodies (skeleton + nib) and font-side stacking
-alternates — see [deferred-features.md](deferred-features.md).
+Deferred: bending a *whole* letter body (skeleton + nib) and font-side
+stacking alternates — see [deferred-features.md](deferred-features.md).
+Curved strokes bend by becoming joins (above).
