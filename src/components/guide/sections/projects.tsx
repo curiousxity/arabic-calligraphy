@@ -26,7 +26,7 @@ export const section: GuideSection = {
   Body: () => (
     <>
       <p>
-        Saving lives in <strong>Project &amp; Export</strong> near the top of
+        Saving lives in <strong>Save &amp; Export</strong> at the bottom of
         the sidebar. There are three ways to keep a piece, and they are not
         interchangeable.
       </p>

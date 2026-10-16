@@ -49,8 +49,8 @@ test("a quick-save bypasses the start screen", async ({ page }) => {
   await gotoFresh(page);
   await page.getByRole("button", { name: "Skip", exact: true }).click();
   await expect.poll(() => inkPixels(page)).toBeGreaterThan(0);
-  // Quick save lives in the collapsed "Project & Export" panel (aria-label in Sidebar.tsx).
-  await openPanel(page, /^Project & Export/);
+  // Quick save lives in the collapsed "Save & Export" panel (aria-label in Sidebar.tsx).
+  await openPanel(page, /^Save & Export/);
   await page.getByRole("button", { name: "Quick save", exact: true }).click();
   await page.reload();
   await page.locator(STAGE_CANVAS).first().waitFor();

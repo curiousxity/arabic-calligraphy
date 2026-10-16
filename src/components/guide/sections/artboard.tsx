@@ -83,8 +83,8 @@ export const section: GuideSection = {
       <h4>Colour</h4>
       <p>
         The page's colour is set here too, because it belongs to the paper
-        rather than to the view. It is the same control that used to sit under
-        Background &amp; Grid.
+        rather than to the view. The same panel also holds the gridlines,
+        snapping and rulers, under <strong>Grid &amp; snapping</strong>.
       </p>
 
       <h4>What you get out</h4>

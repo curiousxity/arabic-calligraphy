@@ -66,7 +66,7 @@ async function bytesOf(download: Download): Promise<Buffer> {
 }
 
 async function exportAndRead(page: Page, label: string): Promise<Buffer> {
-  await openPanel(page, /Project & Export/);
+  await openPanel(page, /Save & Export/);
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: label, exact: true }).click(),
@@ -149,7 +149,7 @@ test("the surface survives a reload, and an old save loads without one", async (
 
   // There is no autosave — the quick-save button is what writes the payload
   // this test then reloads from.
-  await openPanel(page, /Project & Export/);
+  await openPanel(page, /Save & Export/);
   await page.getByRole("button", { name: "Quick save" }).click();
 
   await page.reload();
@@ -179,7 +179,7 @@ test("a PNG export with a surface differs from one without", async ({ page }) =>
   await gotoApp(page);
   // Transparency defaults on and drops the page rect — and with it the
   // texture, which is exactly the behaviour being pinned here.
-  await openPanel(page, /Project & Export/);
+  await openPanel(page, /Save & Export/);
   await page.getByLabel(/Transparent background/).uncheck();
 
   // Both sides are asked for explicitly. The default is bare as of

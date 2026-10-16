@@ -256,10 +256,15 @@ export const EffectsPanel: React.FC<EffectsPanelProps> = ({
                 name={makeId("strokeWidth", selectedId)}
                 label="Outline width"
                 value={selectedBlock.strokeWidth ?? 0}
+                // Fine steps at the thin end, where outlines are actually
+                // used: the fill covers the stroke's inner half, so the
+                // visible outline is half this value, and the old 1-px steps
+                // up to 20 jumped straight past the useful range.
                 min={0}
-                max={20}
-                onChange={(v) => onUpdateSelectedBlock({ strokeWidth: v })}
-                suffix={selectedBlock.strokeWidth ?? 0}
+                max={8}
+                step={0.1}
+                onChange={(v) => onUpdateSelectedBlock({ strokeWidth: Math.round(v * 10) / 10 })}
+                suffix={Number((selectedBlock.strokeWidth ?? 0).toFixed(1))}
                 fieldKey="strokeWidth"
               />
             </div>

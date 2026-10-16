@@ -25,9 +25,8 @@ pieces (`SelectRow`, `ColorRow`, `RangeRow`, `CheckboxRow`, `PresetKeyboard`,
 `DemoHover`, and the `OpacityRow` / `RotationRow` pair built on `RangeRow`)
 live in `FormControls.tsx`; `utils.ts` has one helper (`makeId`). Each panel
 derives its control-id suffix from `selectedBlock.id` itself rather than
-taking it as a prop. The document-tier panels (Templates, Artboard, Background &
-Grid, Project & Export), Content, Align & Arrange and Shortcuts are still
-inline in `Sidebar.tsx`.
+taking it as a prop. The document-tier panels (Templates, Artboard & Grid), Save & Export,
+Content, Align & Arrange and Shortcuts are still inline in `Sidebar.tsx`.
 
 Its panels are ordered in **three tiers by scope**, each introduced by a
 `SidebarTier` rule (a quiet labelled divider, deliberately lighter than a
@@ -35,11 +34,15 @@ panel title so it groups without competing):
 
 | Tier | Panels |
 |---|---|
-| `document` | Start from a Template · Artboard · Background & Grid · Project & Export |
+| `document` | Start from a Template · Artboard & Grid |
 | `canvas` | Block Controls (Add · Selected · History) · Layers · Align & Arrange |
 | `selected` | **Font** · Content · *type panel* (Verse / Mirror / Shape Fill / Guide / Stacked composition / Curve) · Typography · Effects |
 
-Then Shortcuts, outside any tier. The point of the split is that every
+Then Shortcuts and **Save & Export**, outside any tier. Save & Export
+(formerly Project & Export) moved to the very bottom on 2026-10-16: it is
+where a session ends, so it sits where the sidebar ends. Artboard & Grid is
+the old Artboard and Background & Grid panels merged the same day; the grid,
+snapping and ruler rows sit under a "Grid & snapping" subheading. The point of the split is that every
 panel which appears and disappears with the selection sits in one
 contiguous run, instead of interleaving with the permanent ones.
 
@@ -166,6 +169,16 @@ nearly every edit, and its other groups fold the same way. Four open at once
 was most of why the sidebar ran four screens tall.
 
 CSS is one global stylesheet (`src/index.css`) using CSS custom properties for theming — navy+gold is the unconditional default (`:root`), with an ivory/parchment palette under `@media (prefers-color-scheme: light)` (inverted from the usual light-default/dark-override convention — check this file's structure before assuming which block is "the default").
+
+**Hover descriptions come from one list**, `SIDEBAR_HINTS` in
+`src/lib/sidebarHints.ts`, keyed by visible label (added 2026-10-16).
+`CollapsibleSection`, `RangeRow`, `CheckboxRow`, `SelectRow` and `ColorRow`
+look their label up and show it as a native `title`, so a row gets a
+tooltip with no call-site change; a `hint` prop overrides it. A slider's
+tooltip also keeps its "Double-click to reset" line. Renaming a label
+means moving its entry, and `sidebarHints.test.ts` fails if a key no longer
+appears as a label anywhere in `src/components/`. Buttons outside those
+rows carry their own `title`.
 
 **Keyboard focus is defined once, at the bottom of `index.css`**, as a
 2px `var(--accent)` outline on `:where(button, select, input, textarea,

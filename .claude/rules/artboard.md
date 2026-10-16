@@ -74,8 +74,9 @@ dimensions stop being emergent — dragging a block no longer resizes the PNG.
 now uses the config's dpi (`pxToMm(px, dpi)`) rather than a hardcoded 96,
 which is what makes an A4 document print as A4 rather than as a 656 mm poster.
 
-**Sidebar.** A new **Artboard** panel opens the `document` tier, above
-Background & Grid, and the background-colour row *moved into it* — page
+**Sidebar.** The **Artboard & Grid** panel (the Artboard panel, which
+absorbed Background & Grid on 2026-10-16) sits in the `document` tier, and
+the background-colour row *moved into it* — page
 colour is a property of the page. That panel also owns the margin, the
 units/dpi selects, the orientation toggle, the export-size readout and the
 "Clip to page" checkbox.

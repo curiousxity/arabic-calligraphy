@@ -102,6 +102,11 @@ Skip just closes it. An empty field falls back to the starter word
   disagree with whether there is work to restore.
 - **Nothing from the start screen is persisted.** `showStart` is plain
   `useState`.
+- **A keyboard button beside the field** (added 2026-10-16) shows the same
+  `ArabicKeyboard` the sidebar's floating keyboard uses, inline under the
+  header rather than portalled: the floating one's `z-index: 1000` sits
+  under the overlay's 3000. Keys edit at the field's caret or replace its
+  selection, then put the caret back after the insertion.
 
 ## The strip (`FontPanel.tsx`)
 

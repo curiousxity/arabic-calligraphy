@@ -24,7 +24,7 @@ export const section: GuideSection = {
     <>
       <p>
         Everything to do with getting your work out of the app lives in the
-        <strong> Project &amp; Export</strong> panel, near the top of the sidebar.
+        <strong> Save &amp; Export</strong> panel, at the bottom of the sidebar.
         Exporting always captures the artwork itself — the alignment grid and any
         on-canvas editing handles are hidden automatically, and the picture is
         cropped tightly to your blocks rather than to the whole artboard. Your

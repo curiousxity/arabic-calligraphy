@@ -59,7 +59,7 @@ export const section: GuideSection = {
 
       <h3>Your own guides</h3>
       <p>
-        Turn on <strong>Show rulers</strong> in Background &amp; Grid, then
+        Turn on <strong>Show rulers</strong> in Artboard &amp; Grid, then
         click a ruler to drop a guide of your own. Drag a guide to move it, and
         double-click it to remove it. Guides you placed deliberately take
         priority: when a guide and a nearby block edge are equally close, the
@@ -79,7 +79,7 @@ export const section: GuideSection = {
       <h3>Switching it off</h3>
       <p>
         For placement by eye — where a hair's difference is the point —
-        untick <strong>Snap to block edges</strong> in Background &amp; Grid.
+        untick <strong>Snap to block edges</strong> in Artboard &amp; Grid.
         Your own ruler guides still hold, and the grid still behaves as its own
         tickbox says, but blocks stop reaching for each other's edges. The
         setting lasts for the session and starts on again next time.

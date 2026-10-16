@@ -45,7 +45,7 @@ export const section: GuideSection = {
       </p>
       <p>
         The start screen greets you on each visit until you use{" "}
-        <strong>Quick save</strong>, in the <strong>Project &amp; Export</strong>{" "}
+        <strong>Quick save</strong>, in the <strong>Save &amp; Export</strong>{" "}
         panel. From then on the app opens straight onto your saved work.
       </p>
 
@@ -106,8 +106,8 @@ export const section: GuideSection = {
 
       <h4>Setting the scene</h4>
       <p>
-        <strong>Background &amp; Grid</strong> sets the background colour and
-        turns on gridlines, snapping to those gridlines, and rulers. Clicking a
+        <strong>Artboard &amp; Grid</strong> sets the page size and background
+        colour, and turns on gridlines, snapping to those gridlines, and rulers. Clicking a
         ruler drops a guide line that blocks snap to; a button appears there to
         clear the guides again once you have some.
       </p>

@@ -352,3 +352,11 @@ export const DistributeVerticalIcon: React.FC<IconProps> = (props) => (
     <rect x="8" y="18" width="8" height="4" rx="1" />
   </IconBase>
 );
+
+export const KeyboardIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M10 13h.01M14 13h.01M18 13h.01" />
+    <path d="M8 16h8" />
+  </IconBase>
+);

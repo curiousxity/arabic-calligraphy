@@ -56,7 +56,7 @@ relates instead of the old ±100000 full-canvas line. Origin-snap lines
 have no target rect to union with, so they still span the whole
 `contentBox`. Styling (magenta, dashed, `1 / stageScale`) is unchanged.
 
-The "Snap to block edges" checkbox (Background & Grid panel) is
+The "Snap to block edges" checkbox (Artboard & Grid panel, Grid & snapping rows) is
 `snapToBlockEdges` in `App.tsx`, defaulting **on** and deliberately not
 persisted. Off restores exactly the previous origin-only behaviour.
 

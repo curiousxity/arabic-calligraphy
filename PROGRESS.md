@@ -101,6 +101,20 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-16 — Sidebar tidy-up
+
+- **Save & Export** (formerly Project & Export) moved to the bottom of the
+  sidebar.
+- **Artboard & Grid**: the Artboard and Background & Grid panels are one
+  panel; grid, snapping and rulers sit under "Grid & snapping".
+- **Start screen keyboard**: a keyboard button beside the word field opens
+  the on-screen Arabic keyboard.
+- **Outline width** slider: steps of 0.1 up to 8 (was whole steps up to 20).
+  Saved blocks wider than 8 still draw at their width.
+- **Hover descriptions** on every panel header, slider, checkbox, dropdown
+  and colour row, plus the unlabelled-purpose buttons. See
+  [sidebar.md](.claude/rules/sidebar.md).
+
 ### 2026-10-16 — Tashkeel library
 
 - **The إعراب row became a library.** Under the nine everyday marks sit

@@ -80,7 +80,7 @@ test("undo reverts an edit and redo reapplies it", async ({ page }) => {
 test("Export PNG downloads a non-trivial file", async ({ page }) => {
   await gotoApp(page);
 
-  await openPanel(page, /^Project & Export/);
+  await openPanel(page, /^Save & Export/);
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export PNG" }).click();

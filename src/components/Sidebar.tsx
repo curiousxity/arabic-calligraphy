@@ -522,7 +522,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   >({ kind: "idle" });
   const [showSignInForm, setShowSignInForm] = useState(false);
   const selectionCount = selectedIds.length > 1 ? selectedIds.length : 1;
-  const [showBackgroundSettings, setShowBackgroundSettings] = useState(false);
   // Stream A (artboard). Panel open/close state has no anchor region in this
   // file; one line beside its neighbours is the smallest possible addition.
   const [showArtboard, setShowArtboard] = useState(false);
@@ -766,7 +765,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="sidebarPanel">
           <CollapsibleSection
-            title="Artboard"
+            title="Artboard & Grid"
             isOpen={showArtboard}
             onToggle={() => setShowArtboard((v) => !v)}
           >
@@ -980,18 +979,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               })()}
               {/* ---- /STREAM-F ---- */}
             </div>
-          </CollapsibleSection>
-        </div>
 
-        <div className="sidebarPanel">
-          <CollapsibleSection
-            title="Background & Grid"
-            isOpen={showBackgroundSettings}
-            onToggle={() => setShowBackgroundSettings((v) => !v)}
-          >
-            {/* Background colour used to live here; it moved into the
-                Artboard panel above, where it is the page's own colour. */}
+            {/* Grid & snapping: once its own "Background & Grid" panel,
+                merged here 2026-10-16 (the background colour had already
+                moved up into the page rows above). */}
             <div className="sectionPanel">
+              <div className="sidebarSectionTitle" style={{ marginBottom: 0 }}>
+                Grid & snapping
+              </div>
               <div style={{ display: "grid", gap: 8 }}>
                 <CheckboxRow
                   id="show-grid"
@@ -1035,9 +1030,526 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </CollapsibleSection>
         </div>
 
+        <SidebarTier label="canvas" />
+
+        <BlockControlsPanel
+          selectedBlock={selectedBlock}
+          onAddBlock={onAddBlock}
+          onAddShapeFillBlock={onAddShapeFillBlock}
+          onAddTextPathBlock={onAddTextPathBlock}
+          onAddGuide={onAddGuide}
+          onAddSvgGuide={onAddSvgGuide}
+          onAddMirrorBlock={onAddMirrorBlock}
+          canAddMirrorBlock={canAddMirrorBlock}
+          onDuplicateBlock={onDuplicateBlock}
+          onDeleteBlock={onDeleteBlock}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          historyEntries={historyEntries}
+          onJumpToHistory={onJumpToHistory}
+          onCaptureCurrentThumbnail={onCaptureCurrentThumbnail}
+          onCreateVerse={onCreateVerse}
+          isJustifyingVerse={isJustifyingVerse}
+        />
+
+        <div className="sidebarPanel">
+          <CollapsibleSection title="Layers" isOpen={showLayers} onToggle={() => setShowLayers((v) => !v)}>
+            <div style={{ marginTop: 10 }}>
+              <LayersPanel
+                blocks={blocks}
+                selectedId={selectedBlock?.id}
+                selectedIds={selectedIds}
+                onSelect={(id, additive) => onSelectBlock(id, additive)}
+                onToggleLock={handleToggleLock}
+                onMoveUp={(id) => handleMoveLayer(id, "up")}
+                onMoveDown={(id) => handleMoveLayer(id, "down")}
+                onDelete={(id) => {
+                  const idx = blocks.findIndex((b) => b.id === id);
+                  const remaining = blocks.filter((b) => b.id !== id);
+                  const next = remaining[idx] ?? remaining[idx - 1];
+                  onReorderBlocks?.(remaining);
+                  onSelectBlock(next?.id ?? null);
+                }}
+                onMerge={(a, b) => onMergeBlocks?.(a, b)}
+                onUngroup={(id) => onUngroupBlock?.(id)}
+                onRename={handleRename}
+                onZoomTo={(id) => onZoomToBlock?.(id)}
+                onAddBlock={onAddBlock}
+              />
+            </div>
+          </CollapsibleSection>
+        </div>
+
+        {selectedBlock && (
+          <div className="sidebarPanel">
+            <CollapsibleSection
+              title="Align & Arrange"
+              isOpen={showAlign}
+              onToggle={() => setShowAlign((v) => !v)}
+            >
+              <div className="sectionPanel">
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  {selectionCount > 1
+                    ? `Aligning ${selectionCount} selected layers to each other.`
+                    : "Aligning to the canvas. Shift/Ctrl-click other layers to align them to each other instead."}
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(6, 1fr)",
+                    gap: 6,
+                    justifyItems: "center",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("left")}
+                    className="sidebarCircleButton"
+                    title="Align left"
+                    aria-label="Align left"
+                  >
+                    <AlignLeftIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("centerX")}
+                    className="sidebarCircleButton"
+                    title="Align center (horizontal)"
+                    aria-label="Align center horizontal"
+                  >
+                    <AlignCenterHIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("right")}
+                    className="sidebarCircleButton"
+                    title="Align right"
+                    aria-label="Align right"
+                  >
+                    <AlignRightIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("top")}
+                    className="sidebarCircleButton"
+                    title="Align top"
+                    aria-label="Align top"
+                  >
+                    <AlignTopIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("centerY")}
+                    className="sidebarCircleButton"
+                    title="Align middle (vertical)"
+                    aria-label="Align middle vertical"
+                  >
+                    <AlignMiddleIcon size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAlignSelected?.("bottom")}
+                    className="sidebarCircleButton"
+                    title="Align bottom"
+                    aria-label="Align bottom"
+                  >
+                    <AlignBottomIcon size={14} />
+                  </button>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <button
+                    type="button"
+                    disabled={selectionCount < 3}
+                    onClick={() => onDistributeSelected?.("x")}
+                    className="sidebarPillButton"
+                    title="Distribute horizontally (needs 3+ selected)"
+                    aria-label="Distribute horizontally"
+                  >
+                    <DistributeHorizontalIcon size={13} /> Distribute H
+                  </button>
+                  <button
+                    type="button"
+                    disabled={selectionCount < 3}
+                    onClick={() => onDistributeSelected?.("y")}
+                    className="sidebarPillButton"
+                    title="Distribute vertically (needs 3+ selected)"
+                    aria-label="Distribute vertically"
+                  >
+                    <DistributeVerticalIcon size={13} /> Distribute V
+                  </button>
+                </div>
+
+                {selectionCount > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => onGroupSelected?.()}
+                    className="sidebarSmallAction"
+                    title="Join the selected blocks so they move together"
+                  >
+                    Group {selectionCount} selected layers
+                  </button>
+                )}
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        <SidebarTier label="selected" />
+
+        {/* Font comes first: picking a face is the decision everything else
+            in this tier is styled around. Hidden where the block has no font
+            of its own — a mirror draws its source, a guide is a path, and a
+            stacked composition is a bake nothing re-shapes. */}
+        {selectedBlock && hasOwnFont(selectedBlock) && (
+          <FontPanel
+            id={makeId("font-family", selectedId)}
+            text={selectedText}
+            value={selectedBlock.fontFamily}
+            fonts={fontChoices}
+            missingFontKey={missingFontKey}
+            customFonts={customFonts}
+            onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
+            onAddCustomFont={onAddCustomFont}
+            onRemoveCustomFont={onRemoveCustomFont}
+            isOpen={showFont}
+            onToggle={() => setShowFont((v) => !v)}
+          />
+        )}
+
+        {/* A mirror has no content or typography of its own — both come from
+            its source — so it hides these two panels. */}
+        {selectedBlock && hasOwnFont(selectedBlock) && (
+          <div className="sidebarPanel">
+            <CollapsibleSection
+              title="Content"
+              isOpen={showContent}
+              onToggle={() => setShowContent((v) => !v)}
+            >
+              <div className="sectionPanel">
+                <label htmlFor={makeId("block-text", selectedId)} className="sr-only">
+                  Block text
+                </label>
+                <textarea
+                  ref={textareaRef}
+                  id={makeId("block-text", selectedId)}
+                  name={makeId("blockText", selectedId)}
+                  className="sidebarTextarea"
+                  value={selectedText}
+                  onChange={(e) => updateText(e.target.value)}
+                  onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart ?? 0)}
+                  placeholder="Type Arabic text here..."
+                  dir="rtl"
+                  lang="ar"
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowKeyboard((v) => !v)}
+                  className="sidebarSectionButton"
+                  title="Show an on-screen Arabic keyboard, for typing without an Arabic layout"
+                  aria-expanded={showKeyboard}
+                  aria-pressed={showKeyboard}
+                >
+                  <span>Arabic Keyboard</span>
+                  <span>{showKeyboard ? "Hide" : "Show"}</span>
+                </button>
+
+                {/* Compositions: set this block's text into a pair, a
+                    medallion or a frame. Plain text only — a Shape Fill run is
+                    scaled to its silhouette and a Curve run to its curve, so the
+                    measured run these layouts space themselves by is
+                    meaningless there, the same reason Fit to width is
+                    text-only. */}
+                {selectedBlock?.type === "text" && onApplyComposition && (
+                  <CompositionButton
+                    text={selectedText}
+                    cssFamily={
+                      fontChoices.find((f) => f.value === selectedBlock.fontFamily)?.cssFamily ??
+                      `'${selectedBlock.fontFamily}'`
+                    }
+                    onApply={onApplyComposition}
+                  />
+                )}
+
+                {selectedBlock.type === "text" && onConvertToStack && (
+                  <button
+                    type="button"
+                    className="sidebarSmallAction"
+                    aria-label="Convert to stacked composition"
+                    title="Bake the letters into movable pieces joined by curves. One-way; undo restores the text."
+                    onClick={onConvertToStack}
+                  >
+                    Convert to stacked composition
+                  </button>
+                )}
+
+                {/* Bend this block along a guide on the canvas. It becomes a
+                    Curve block; the picker lists only the guides that exist. */}
+                {selectedBlock?.type === "text" && onAttachToGuide && guidesIn(blocks).length > 0 && (
+                  <SelectRow
+                    id={makeId("attach-to-guide", selectedId)}
+                    name={makeId("attachToGuide", selectedId)}
+                    label="Attach to guide"
+                    value=""
+                    onChange={(v) => {
+                      if (v !== "") onAttachToGuide(Number(v));
+                    }}
+                  >
+                    <option value="">Choose a guide…</option>
+                    {guidesIn(blocks).map((g) => (
+                      <option key={g.id} value={String(g.id)}>
+                        {g.name ?? `Guide · ${GUIDE_SHAPE_LABELS[g.guideShape]}`}
+                      </option>
+                    ))}
+                  </SelectRow>
+                )}
+
+
+                {selectedBlock && (
+                  <TashkeelLibrary
+                    fontKey={selectedBlock.fontFamily}
+                    cssFamily={
+                      fontChoices.find((f) => f.value === selectedBlock.fontFamily)?.cssFamily ??
+                      `'${selectedBlock.fontFamily}'`
+                    }
+                    onPick={handleKeyboardKey}
+                  />
+                )}
+
+                <button
+                  type="button"
+                  onClick={onClearDiacritics}
+                  className="sidebarSmallAction"
+                  title="Delete every vowel and tashkeel mark from this block's text"
+                  style={{ background: "var(--bg-input)" }}
+                >
+                  Clear diacritics
+                </button>
+
+                {selectedBlock &&
+                  supportsDiacriticOverrides(selectedBlock) &&
+                  (selectedBlock.diacriticOverrides?.length ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onUpdateSelectedBlock({ diacriticOverrides: [] })}
+                      className="sidebarSmallAction"
+                      title="Put every mark you moved, resized or hid back to normal"
+                      style={{ background: "var(--bg-input)" }}
+                    >
+                      Reset diacritic overrides
+                    </button>
+                  )}
+
+                <PresetKeyboard
+                  title="Presets"
+                  rows={[PRESETS]}
+                  onPick={handleKeyboardKey}
+                  fontFamily={selectedBlock?.fontFamily ?? "FatemiMaqala"}
+                  collapsible
+                />
+
+                <PresetKeyboard
+                  title="Specials"
+                  rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]}
+                  onPick={handleKeyboardKey}
+                  collapsible
+                />
+
+                <PresetKeyboard
+                  title="Urdu-Farsi Characters"
+                  rows={[PERSIAN, URDU]}
+                  onPick={handleKeyboardKey}
+                  collapsible
+                />
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {/* A verse line is an ordinary text block, so this sits under Content
+            the way a type panel does — it is what that line has that others
+            don't. See .claude/rules/verse.md. */}
+        {selectedBlock?.type === "text" && selectedBlock.verse && onJustifyVerse && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Verse" isOpen={showVerse} onToggle={() => setShowVerse((v) => !v)}>
+              <VersePanel
+                verse={selectedBlock.verse}
+                busy={!!isJustifyingVerse}
+                onJustify={onJustifyVerse}
+              />
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock && selectedBlock.type === "mirror" && (
+          <MirrorPanel
+            selectedBlock={selectedBlock}
+            mirrorSourceLabel={mirrorSourceLabel}
+            onSelectMirrorSource={onSelectMirrorSource}
+            onUpdateSelectedBlock={onUpdateSelectedBlock}
+            isOpen={showText}
+            onToggle={() => setShowText((v) => !v)}
+          />
+        )}
+
+        {selectedBlock && selectedBlock.type === "shapeFill" && (
+          <ShapeFillPanel
+            selectedBlock={selectedBlock}
+            isMobile={isMobile}
+            onUpdateSelectedBlock={onUpdateSelectedBlock}
+            onToggleDiacriticEditMode={onToggleDiacriticEditMode}
+            onFitShapeFillSpacing={onFitShapeFillSpacing}
+            isOpen={showText}
+            onToggle={() => setShowText((v) => !v)}
+          />
+        )}
+
+        {selectedBlock?.type === "guide" && onUpdateGuideParams && onAddTextToGuide && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Guide" isOpen={showGuide} onToggle={() => setShowGuide((v) => !v)}>
+              <GuidePanel
+                guide={selectedBlock}
+                texts={attachedTo(blocks, selectedBlock.id)}
+                onParams={onUpdateGuideParams}
+                onAddText={onAddTextToGuide}
+                onSelect={(id) => onSelectBlock(id)}
+                onToggleEdit={() => onUpdateSelectedBlock({ guideEditMode: !selectedBlock.guideEditMode })}
+                onRotation={(v) => onUpdateSelectedBlock({ rotation: v })}
+              />
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock?.type === "stack" && onEditStack && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Stacked composition" isOpen={showStack} onToggle={() => setShowStack((v) => !v)}>
+              <StackPanel block={selectedBlock} onEdit={onEditStack} />
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock && selectedBlock.type === "textPath" && (
+          <CurvePanel
+            selectedBlock={selectedBlock}
+            onUpdateSelectedBlock={onUpdateSelectedBlock}
+            onDetachFromGuide={onDetachFromGuide}
+            onUpdateGuideAttachment={onUpdateGuideAttachment}
+            guideShrink={guideShrink}
+            isOpen={showText}
+            onToggle={() => setShowText((v) => !v)}
+          />
+        )}
+
+        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && (
+          <TypographyPanel
+            selectedBlock={selectedBlock}
+            onUpdateSelectedBlock={onUpdateSelectedBlock}
+            textStyles={textStyles}
+            selectedTextStyleId={selectedTextStyleId}
+            onSelectTextStyle={onSelectTextStyle}
+            onApplyTextStyle={onApplyTextStyle}
+            newTextStyleName={newTextStyleName}
+            onChangeNewTextStyleName={onChangeNewTextStyleName}
+            onSaveTextStyle={onSaveTextStyle}
+            onDeleteTextStyle={onDeleteTextStyle}
+            palettes={palettes}
+            selectedPaletteId={selectedPaletteId}
+            onSelectPalette={onSelectPalette}
+            onPickPaletteColor={onPickPaletteColor}
+            onSavePaletteFromCanvas={onSavePaletteFromCanvas}
+            onDeletePalette={onDeletePalette}
+            canDeletePalette={canDeletePalette}
+            kashidaSlotOrdinal={kashidaSlotOrdinal}
+            onSelectKashidaSlot={onSelectKashidaSlot}
+            onSetKashidaAtSlot={onSetKashidaAtSlot}
+            fitTargetOverride={fitTargetOverride}
+            fitTargetPageDefault={fitTargetPageDefault}
+            isFittingWidth={isFittingWidth}
+            onChangeFitTargetWidth={onChangeFitTargetWidth}
+            onFitToWidth={onFitToWidth}
+            styleSetsState={styleSetsState}
+            onToggleStyleSet={onToggleStyleSet}
+            glyphAlternatesState={glyphAlternatesState}
+            alternateTarget={alternateTarget}
+            onToggleGlyphAlternateMode={onToggleGlyphAlternateMode}
+            onResetGlyphAlternates={onResetGlyphAlternates}
+            onPickGlyphAlternate={onPickGlyphAlternate}
+            onToggleStrokeCutMode={onToggleStrokeCutMode}
+            onClearStrokeCuts={onClearStrokeCuts}
+            onToggleDetachedMarkMode={onToggleDetachedMarkMode}
+            onClearDetachedMarks={onClearDetachedMarks}
+            isOpen={showText}
+            onToggle={() => setShowText((v) => !v)}
+          />
+        )}
+
+        {selectedBlock && selectedBlock.type !== "guide" && (
+          <EffectsPanel
+            selectedBlock={selectedBlock}
+            isMobile={isMobile}
+            onUpdateSelectedBlock={onUpdateSelectedBlock}
+            blockFill={blockFill}
+            blockColor={blockColor}
+            onSetBlockFill={onSetBlockFill}
+            fillPresets={fillPresets}
+            effectsTab={effectsTab}
+            setEffectsTab={setEffectsTab}
+            isOpen={showEffects}
+            onToggle={() => setShowEffects((v) => !v)}
+          />
+        )}
+
+
         <div className="sidebarPanel">
           <CollapsibleSection
-            title="Project & Export"
+            title="Shortcuts"
+            isOpen={showShortcuts}
+            onToggle={() => setShowShortcuts((v) => !v)}
+          >
+            <div
+              className="sectionPanel"
+              style={{ fontSize: 12, color: "var(--text-secondary)" }}
+            >
+              {[
+                ["Double-click a block", "Jump to its text field"],
+                ["Double-click a layer name", "Rename it"],
+                ["Double-click a layer row", "Zoom to that block"],
+                ["Double-click a slider", "Reset it to default"],
+                ["Arrow keys", "Nudge selected block (Shift = bigger steps)"],
+                ["Delete / Backspace", "Delete selected block"],
+                ["Ctrl+Z / Ctrl+Y", "Undo / redo"],
+                ["Ctrl+C / Ctrl+V", "Copy / paste selected block"],
+                ["Hold Space, or middle-click drag", "Pan the canvas"],
+              ].map(([key, desc]) => (
+                <div
+                  key={key}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    padding: "3px 0",
+                  }}
+                >
+                  <span style={{ color: "var(--text-primary)" }}>{key}</span>
+                  <span style={{ color: "var(--text-muted)", textAlign: "right" }}>
+                    {desc}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CollapsibleSection>
+        </div>
+
+        <div className="sidebarPanel">
+          <CollapsibleSection
+            title="Save & Export"
             isOpen={showFileActions}
             onToggle={() => setShowFileActions((v) => !v)}
           >
@@ -1554,519 +2066,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 )}
               </div>
-            </div>
-          </CollapsibleSection>
-        </div>
-
-        <SidebarTier label="canvas" />
-
-        <BlockControlsPanel
-          selectedBlock={selectedBlock}
-          onAddBlock={onAddBlock}
-          onAddShapeFillBlock={onAddShapeFillBlock}
-          onAddTextPathBlock={onAddTextPathBlock}
-          onAddGuide={onAddGuide}
-          onAddSvgGuide={onAddSvgGuide}
-          onAddMirrorBlock={onAddMirrorBlock}
-          canAddMirrorBlock={canAddMirrorBlock}
-          onDuplicateBlock={onDuplicateBlock}
-          onDeleteBlock={onDeleteBlock}
-          onUndo={onUndo}
-          onRedo={onRedo}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          historyEntries={historyEntries}
-          onJumpToHistory={onJumpToHistory}
-          onCaptureCurrentThumbnail={onCaptureCurrentThumbnail}
-          onCreateVerse={onCreateVerse}
-          isJustifyingVerse={isJustifyingVerse}
-        />
-
-        <div className="sidebarPanel">
-          <CollapsibleSection title="Layers" isOpen={showLayers} onToggle={() => setShowLayers((v) => !v)}>
-            <div style={{ marginTop: 10 }}>
-              <LayersPanel
-                blocks={blocks}
-                selectedId={selectedBlock?.id}
-                selectedIds={selectedIds}
-                onSelect={(id, additive) => onSelectBlock(id, additive)}
-                onToggleLock={handleToggleLock}
-                onMoveUp={(id) => handleMoveLayer(id, "up")}
-                onMoveDown={(id) => handleMoveLayer(id, "down")}
-                onDelete={(id) => {
-                  const idx = blocks.findIndex((b) => b.id === id);
-                  const remaining = blocks.filter((b) => b.id !== id);
-                  const next = remaining[idx] ?? remaining[idx - 1];
-                  onReorderBlocks?.(remaining);
-                  onSelectBlock(next?.id ?? null);
-                }}
-                onMerge={(a, b) => onMergeBlocks?.(a, b)}
-                onUngroup={(id) => onUngroupBlock?.(id)}
-                onRename={handleRename}
-                onZoomTo={(id) => onZoomToBlock?.(id)}
-                onAddBlock={onAddBlock}
-              />
-            </div>
-          </CollapsibleSection>
-        </div>
-
-        {selectedBlock && (
-          <div className="sidebarPanel">
-            <CollapsibleSection
-              title="Align & Arrange"
-              isOpen={showAlign}
-              onToggle={() => setShowAlign((v) => !v)}
-            >
-              <div className="sectionPanel">
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  {selectionCount > 1
-                    ? `Aligning ${selectionCount} selected layers to each other.`
-                    : "Aligning to the canvas. Shift/Ctrl-click other layers to align them to each other instead."}
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(6, 1fr)",
-                    gap: 6,
-                    justifyItems: "center",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("left")}
-                    className="sidebarCircleButton"
-                    title="Align left"
-                    aria-label="Align left"
-                  >
-                    <AlignLeftIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("centerX")}
-                    className="sidebarCircleButton"
-                    title="Align center (horizontal)"
-                    aria-label="Align center horizontal"
-                  >
-                    <AlignCenterHIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("right")}
-                    className="sidebarCircleButton"
-                    title="Align right"
-                    aria-label="Align right"
-                  >
-                    <AlignRightIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("top")}
-                    className="sidebarCircleButton"
-                    title="Align top"
-                    aria-label="Align top"
-                  >
-                    <AlignTopIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("centerY")}
-                    className="sidebarCircleButton"
-                    title="Align middle (vertical)"
-                    aria-label="Align middle vertical"
-                  >
-                    <AlignMiddleIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAlignSelected?.("bottom")}
-                    className="sidebarCircleButton"
-                    title="Align bottom"
-                    aria-label="Align bottom"
-                  >
-                    <AlignBottomIcon size={14} />
-                  </button>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <button
-                    type="button"
-                    disabled={selectionCount < 3}
-                    onClick={() => onDistributeSelected?.("x")}
-                    className="sidebarPillButton"
-                    title="Distribute horizontally (needs 3+ selected)"
-                    aria-label="Distribute horizontally"
-                  >
-                    <DistributeHorizontalIcon size={13} /> Distribute H
-                  </button>
-                  <button
-                    type="button"
-                    disabled={selectionCount < 3}
-                    onClick={() => onDistributeSelected?.("y")}
-                    className="sidebarPillButton"
-                    title="Distribute vertically (needs 3+ selected)"
-                    aria-label="Distribute vertically"
-                  >
-                    <DistributeVerticalIcon size={13} /> Distribute V
-                  </button>
-                </div>
-
-                {selectionCount > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => onGroupSelected?.()}
-                    className="sidebarSmallAction"
-                  >
-                    Group {selectionCount} selected layers
-                  </button>
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
-        <SidebarTier label="selected" />
-
-        {/* Font comes first: picking a face is the decision everything else
-            in this tier is styled around. Hidden where the block has no font
-            of its own — a mirror draws its source, a guide is a path, and a
-            stacked composition is a bake nothing re-shapes. */}
-        {selectedBlock && hasOwnFont(selectedBlock) && (
-          <FontPanel
-            id={makeId("font-family", selectedId)}
-            text={selectedText}
-            value={selectedBlock.fontFamily}
-            fonts={fontChoices}
-            missingFontKey={missingFontKey}
-            customFonts={customFonts}
-            onChange={(v) => onUpdateSelectedBlock({ fontFamily: v })}
-            onAddCustomFont={onAddCustomFont}
-            onRemoveCustomFont={onRemoveCustomFont}
-            isOpen={showFont}
-            onToggle={() => setShowFont((v) => !v)}
-          />
-        )}
-
-        {/* A mirror has no content or typography of its own — both come from
-            its source — so it hides these two panels. */}
-        {selectedBlock && hasOwnFont(selectedBlock) && (
-          <div className="sidebarPanel">
-            <CollapsibleSection
-              title="Content"
-              isOpen={showContent}
-              onToggle={() => setShowContent((v) => !v)}
-            >
-              <div className="sectionPanel">
-                <label htmlFor={makeId("block-text", selectedId)} className="sr-only">
-                  Block text
-                </label>
-                <textarea
-                  ref={textareaRef}
-                  id={makeId("block-text", selectedId)}
-                  name={makeId("blockText", selectedId)}
-                  className="sidebarTextarea"
-                  value={selectedText}
-                  onChange={(e) => updateText(e.target.value)}
-                  onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart ?? 0)}
-                  placeholder="Type Arabic text here..."
-                  dir="rtl"
-                  lang="ar"
-                  spellCheck={false}
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setShowKeyboard((v) => !v)}
-                  className="sidebarSectionButton"
-                  aria-expanded={showKeyboard}
-                  aria-pressed={showKeyboard}
-                >
-                  <span>Arabic Keyboard</span>
-                  <span>{showKeyboard ? "Hide" : "Show"}</span>
-                </button>
-
-                {/* Compositions: set this block's text into a pair, a
-                    medallion or a frame. Plain text only — a Shape Fill run is
-                    scaled to its silhouette and a Curve run to its curve, so the
-                    measured run these layouts space themselves by is
-                    meaningless there, the same reason Fit to width is
-                    text-only. */}
-                {selectedBlock?.type === "text" && onApplyComposition && (
-                  <CompositionButton
-                    text={selectedText}
-                    cssFamily={
-                      fontChoices.find((f) => f.value === selectedBlock.fontFamily)?.cssFamily ??
-                      `'${selectedBlock.fontFamily}'`
-                    }
-                    onApply={onApplyComposition}
-                  />
-                )}
-
-                {selectedBlock.type === "text" && onConvertToStack && (
-                  <button
-                    type="button"
-                    className="sidebarSmallAction"
-                    aria-label="Convert to stacked composition"
-                    title="Bake the letters into movable pieces joined by curves. One-way; undo restores the text."
-                    onClick={onConvertToStack}
-                  >
-                    Convert to stacked composition
-                  </button>
-                )}
-
-                {/* Bend this block along a guide on the canvas. It becomes a
-                    Curve block; the picker lists only the guides that exist. */}
-                {selectedBlock?.type === "text" && onAttachToGuide && guidesIn(blocks).length > 0 && (
-                  <SelectRow
-                    id={makeId("attach-to-guide", selectedId)}
-                    name={makeId("attachToGuide", selectedId)}
-                    label="Attach to guide"
-                    value=""
-                    onChange={(v) => {
-                      if (v !== "") onAttachToGuide(Number(v));
-                    }}
-                  >
-                    <option value="">Choose a guide…</option>
-                    {guidesIn(blocks).map((g) => (
-                      <option key={g.id} value={String(g.id)}>
-                        {g.name ?? `Guide · ${GUIDE_SHAPE_LABELS[g.guideShape]}`}
-                      </option>
-                    ))}
-                  </SelectRow>
-                )}
-
-
-                {selectedBlock && (
-                  <TashkeelLibrary
-                    fontKey={selectedBlock.fontFamily}
-                    cssFamily={
-                      fontChoices.find((f) => f.value === selectedBlock.fontFamily)?.cssFamily ??
-                      `'${selectedBlock.fontFamily}'`
-                    }
-                    onPick={handleKeyboardKey}
-                  />
-                )}
-
-                <button
-                  type="button"
-                  onClick={onClearDiacritics}
-                  className="sidebarSmallAction"
-                  style={{ background: "var(--bg-input)" }}
-                >
-                  Clear diacritics
-                </button>
-
-                {selectedBlock &&
-                  supportsDiacriticOverrides(selectedBlock) &&
-                  (selectedBlock.diacriticOverrides?.length ?? 0) > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => onUpdateSelectedBlock({ diacriticOverrides: [] })}
-                      className="sidebarSmallAction"
-                      style={{ background: "var(--bg-input)" }}
-                    >
-                      Reset diacritic overrides
-                    </button>
-                  )}
-
-                <PresetKeyboard
-                  title="Presets"
-                  rows={[PRESETS]}
-                  onPick={handleKeyboardKey}
-                  fontFamily={selectedBlock?.fontFamily ?? "FatemiMaqala"}
-                  collapsible
-                />
-
-                <PresetKeyboard
-                  title="Specials"
-                  rows={[SPECIALS.slice(0, 6), SPECIALS.slice(6)]}
-                  onPick={handleKeyboardKey}
-                  collapsible
-                />
-
-                <PresetKeyboard
-                  title="Urdu-Farsi Characters"
-                  rows={[PERSIAN, URDU]}
-                  onPick={handleKeyboardKey}
-                  collapsible
-                />
-              </div>
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {/* A verse line is an ordinary text block, so this sits under Content
-            the way a type panel does — it is what that line has that others
-            don't. See .claude/rules/verse.md. */}
-        {selectedBlock?.type === "text" && selectedBlock.verse && onJustifyVerse && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Verse" isOpen={showVerse} onToggle={() => setShowVerse((v) => !v)}>
-              <VersePanel
-                verse={selectedBlock.verse}
-                busy={!!isJustifyingVerse}
-                onJustify={onJustifyVerse}
-              />
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {selectedBlock && selectedBlock.type === "mirror" && (
-          <MirrorPanel
-            selectedBlock={selectedBlock}
-            mirrorSourceLabel={mirrorSourceLabel}
-            onSelectMirrorSource={onSelectMirrorSource}
-            onUpdateSelectedBlock={onUpdateSelectedBlock}
-            isOpen={showText}
-            onToggle={() => setShowText((v) => !v)}
-          />
-        )}
-
-        {selectedBlock && selectedBlock.type === "shapeFill" && (
-          <ShapeFillPanel
-            selectedBlock={selectedBlock}
-            isMobile={isMobile}
-            onUpdateSelectedBlock={onUpdateSelectedBlock}
-            onToggleDiacriticEditMode={onToggleDiacriticEditMode}
-            onFitShapeFillSpacing={onFitShapeFillSpacing}
-            isOpen={showText}
-            onToggle={() => setShowText((v) => !v)}
-          />
-        )}
-
-        {selectedBlock?.type === "guide" && onUpdateGuideParams && onAddTextToGuide && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Guide" isOpen={showGuide} onToggle={() => setShowGuide((v) => !v)}>
-              <GuidePanel
-                guide={selectedBlock}
-                texts={attachedTo(blocks, selectedBlock.id)}
-                onParams={onUpdateGuideParams}
-                onAddText={onAddTextToGuide}
-                onSelect={(id) => onSelectBlock(id)}
-                onToggleEdit={() => onUpdateSelectedBlock({ guideEditMode: !selectedBlock.guideEditMode })}
-                onRotation={(v) => onUpdateSelectedBlock({ rotation: v })}
-              />
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {selectedBlock?.type === "stack" && onEditStack && (
-          <div className="sidebarPanel">
-            <CollapsibleSection title="Stacked composition" isOpen={showStack} onToggle={() => setShowStack((v) => !v)}>
-              <StackPanel block={selectedBlock} onEdit={onEditStack} />
-            </CollapsibleSection>
-          </div>
-        )}
-
-        {selectedBlock && selectedBlock.type === "textPath" && (
-          <CurvePanel
-            selectedBlock={selectedBlock}
-            onUpdateSelectedBlock={onUpdateSelectedBlock}
-            onDetachFromGuide={onDetachFromGuide}
-            onUpdateGuideAttachment={onUpdateGuideAttachment}
-            guideShrink={guideShrink}
-            isOpen={showText}
-            onToggle={() => setShowText((v) => !v)}
-          />
-        )}
-
-        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && (
-          <TypographyPanel
-            selectedBlock={selectedBlock}
-            onUpdateSelectedBlock={onUpdateSelectedBlock}
-            textStyles={textStyles}
-            selectedTextStyleId={selectedTextStyleId}
-            onSelectTextStyle={onSelectTextStyle}
-            onApplyTextStyle={onApplyTextStyle}
-            newTextStyleName={newTextStyleName}
-            onChangeNewTextStyleName={onChangeNewTextStyleName}
-            onSaveTextStyle={onSaveTextStyle}
-            onDeleteTextStyle={onDeleteTextStyle}
-            palettes={palettes}
-            selectedPaletteId={selectedPaletteId}
-            onSelectPalette={onSelectPalette}
-            onPickPaletteColor={onPickPaletteColor}
-            onSavePaletteFromCanvas={onSavePaletteFromCanvas}
-            onDeletePalette={onDeletePalette}
-            canDeletePalette={canDeletePalette}
-            kashidaSlotOrdinal={kashidaSlotOrdinal}
-            onSelectKashidaSlot={onSelectKashidaSlot}
-            onSetKashidaAtSlot={onSetKashidaAtSlot}
-            fitTargetOverride={fitTargetOverride}
-            fitTargetPageDefault={fitTargetPageDefault}
-            isFittingWidth={isFittingWidth}
-            onChangeFitTargetWidth={onChangeFitTargetWidth}
-            onFitToWidth={onFitToWidth}
-            styleSetsState={styleSetsState}
-            onToggleStyleSet={onToggleStyleSet}
-            glyphAlternatesState={glyphAlternatesState}
-            alternateTarget={alternateTarget}
-            onToggleGlyphAlternateMode={onToggleGlyphAlternateMode}
-            onResetGlyphAlternates={onResetGlyphAlternates}
-            onPickGlyphAlternate={onPickGlyphAlternate}
-            onToggleStrokeCutMode={onToggleStrokeCutMode}
-            onClearStrokeCuts={onClearStrokeCuts}
-            onToggleDetachedMarkMode={onToggleDetachedMarkMode}
-            onClearDetachedMarks={onClearDetachedMarks}
-            isOpen={showText}
-            onToggle={() => setShowText((v) => !v)}
-          />
-        )}
-
-        {selectedBlock && selectedBlock.type !== "guide" && (
-          <EffectsPanel
-            selectedBlock={selectedBlock}
-            isMobile={isMobile}
-            onUpdateSelectedBlock={onUpdateSelectedBlock}
-            blockFill={blockFill}
-            blockColor={blockColor}
-            onSetBlockFill={onSetBlockFill}
-            fillPresets={fillPresets}
-            effectsTab={effectsTab}
-            setEffectsTab={setEffectsTab}
-            isOpen={showEffects}
-            onToggle={() => setShowEffects((v) => !v)}
-          />
-        )}
-
-
-        <div className="sidebarPanel">
-          <CollapsibleSection
-            title="Shortcuts"
-            isOpen={showShortcuts}
-            onToggle={() => setShowShortcuts((v) => !v)}
-          >
-            <div
-              className="sectionPanel"
-              style={{ fontSize: 12, color: "var(--text-secondary)" }}
-            >
-              {[
-                ["Double-click a block", "Jump to its text field"],
-                ["Double-click a layer name", "Rename it"],
-                ["Double-click a layer row", "Zoom to that block"],
-                ["Double-click a slider", "Reset it to default"],
-                ["Arrow keys", "Nudge selected block (Shift = bigger steps)"],
-                ["Delete / Backspace", "Delete selected block"],
-                ["Ctrl+Z / Ctrl+Y", "Undo / redo"],
-                ["Ctrl+C / Ctrl+V", "Copy / paste selected block"],
-                ["Hold Space, or middle-click drag", "Pan the canvas"],
-              ].map(([key, desc]) => (
-                <div
-                  key={key}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    padding: "3px 0",
-                  }}
-                >
-                  <span style={{ color: "var(--text-primary)" }}>{key}</span>
-                  <span style={{ color: "var(--text-muted)", textAlign: "right" }}>
-                    {desc}
-                  </span>
-                </div>
-              ))}
             </div>
           </CollapsibleSection>
         </div>

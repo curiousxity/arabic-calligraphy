@@ -115,7 +115,13 @@ export const VersePanel: React.FC<{
         }}
       />
     )}
-    <button type="button" className="sidebarSectionButton" disabled={busy} onClick={() => onJustify()}>
+    <button
+      type="button"
+      className="sidebarSectionButton"
+      disabled={busy}
+      onClick={() => onJustify()}
+      title="Stretch the lines with kashida so they all end up the same width"
+    >
       <span>{busy ? "Justifying…" : "Justify"}</span>
     </button>
   </div>

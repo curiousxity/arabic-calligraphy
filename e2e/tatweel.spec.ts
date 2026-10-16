@@ -104,7 +104,7 @@ test("a saved project round-trips the tatweels", async ({ page }) => {
   const stretched = (await getBlocks(page))[0].text;
   expect(tatweelCount(stretched)).toBe(2);
 
-  await openPanel(page, /^Project & Export/);
+  await openPanel(page, /^Save & Export/);
   await page.getByPlaceholder("Project name…").fill("kashida-roundtrip");
   await page.getByRole("button", { name: "Save As" }).click();
 

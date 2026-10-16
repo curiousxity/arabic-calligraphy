@@ -582,6 +582,10 @@ details:not([open]) > .sidebarPresetKeyboardSummary { margin-bottom: 0; padding-
 .startScreenTitle { margin: 0; font-size: 22px; letter-spacing: 0.02em; }
 .startScreenSubtitle { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
 .startScreenInput { flex: 1 1 320px; font-size: 28px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-input); color: var(--text-primary); }
+.startScreenKeyboardBtn { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--bg-input); color: var(--text-secondary); cursor: pointer; }
+.startScreenKeyboardBtn:hover { border-color: var(--accent); color: var(--accent); }
+.startScreenKeyboardBtn--on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.startScreenKeyboard { align-self: center; width: min(560px, 100%); flex: 0 0 auto; }
 .startScreenSkip { flex: 0 0 auto; padding: 8px 14px; border: 1px solid var(--border-soft); border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; }
 .startScreen .fontPickerBody { flex: 1; }
 .startScreen .fontPickerSample { font-size: 40px; line-height: 1.7; }

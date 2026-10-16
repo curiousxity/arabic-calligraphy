@@ -45,7 +45,7 @@ async function choosePage(page: Page, presetId: string) {
 }
 
 async function exportPng(page: Page): Promise<Download> {
-  await openPanel(page, /Project & Export/);
+  await openPanel(page, /Save & Export/);
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export PNG" }).click();
   return downloadPromise;

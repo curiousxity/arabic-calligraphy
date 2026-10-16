@@ -93,7 +93,12 @@ export const GuideAttachmentPanel: React.FC<{
     {shrink !== undefined && shrink < 0.999 && (
       <span className="nameDesignHint">Shrunk to {Math.round(shrink * 100)}% to fit the guide.</span>
     )}
-    <button type="button" className="sidebarSectionButton" onClick={onDetach}>
+    <button
+      type="button"
+      className="sidebarSectionButton"
+      onClick={onDetach}
+      title="Free this text from the guide. It stays where it is as ordinary curved text."
+    >
       <span>Detach from guide</span>
     </button>
   </div>

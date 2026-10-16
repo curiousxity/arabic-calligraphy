@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PipetteIcon, PlayCircleIcon } from "../Icons";
 import { makeId } from "./utils";
+import { sidebarHint } from "../../lib/sidebarHints";
 
 const supportsEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
 
@@ -31,6 +32,7 @@ export const SelectRow = ({
   value,
   onChange,
   children,
+  hint,
 }: {
   id: string;
   name: string;
@@ -38,8 +40,10 @@ export const SelectRow = ({
   value: string;
   onChange: (v: string) => void;
   children: React.ReactNode;
+  /** Hover description; defaults to the label's entry in `SIDEBAR_HINTS`. */
+  hint?: string;
 }) => (
-  <label className="field" htmlFor={id}>
+  <label className="field" htmlFor={id} title={hint ?? sidebarHint(label)}>
     <span className="fieldTitle">{label}</span>
     <div className="shell">
       <select
@@ -79,12 +83,14 @@ export const ColorRow = ({
   label,
   value,
   onChange,
+  hint,
 }: {
   id: string;
   name: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
+  hint?: string;
 }) => {
   const [hexDraft, setHexDraft] = useState(value);
 
@@ -113,7 +119,7 @@ export const ColorRow = ({
 
   return (
     <div className="field">
-      <span className="fieldTitle">{label}</span>
+      <span className="fieldTitle" title={hint ?? sidebarHint(label)}>{label}</span>
       <div className="colorRowShell">
         <input
           id={id}
@@ -198,6 +204,7 @@ export const RangeRow = ({
   suffix,
   fieldKey,
   disabled,
+  hint,
 }: {
   id: string;
   name: string;
@@ -210,6 +217,7 @@ export const RangeRow = ({
   suffix?: string | number;
   fieldKey?: string;
   disabled?: boolean;
+  hint?: string;
 }) => {
   const defaultVal =
     fieldKey !== undefined ? SLIDER_DEFAULTS[fieldKey] ?? value : value;
@@ -219,7 +227,11 @@ export const RangeRow = ({
     <label
       className="field"
       htmlFor={id}
-      title={fieldKey ? `Double-click to reset to ${defaultVal}` : undefined}
+      title={
+        [hint ?? sidebarHint(label), fieldKey ? `Double-click to reset to ${defaultVal}` : undefined]
+          .filter(Boolean)
+          .join("\n") || undefined
+      }
     >
       <span className="fieldTitle" style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <span style={{ flex: 1, minWidth: 0 }}>
@@ -339,11 +351,13 @@ export const CollapsibleSection = ({
   isOpen,
   onToggle,
   children,
+  hint,
 }: {
   title: React.ReactNode;
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  hint?: string;
 }) => (
   <>
     <button
@@ -351,6 +365,7 @@ export const CollapsibleSection = ({
       onClick={onToggle}
       className="sidebarSectionButton"
       aria-expanded={isOpen}
+      title={hint ?? sidebarHint(title)}
     >
       <span>{title}</span>
       <span>{isOpen ? "−" : "+"}</span>
@@ -483,15 +498,17 @@ export const CheckboxRow = ({
   checked,
   onChange,
   demo,
+  hint,
 }: {
   id: string;
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
   demo?: DemoMedia;
+  hint?: string;
 }) => {
   const row = (
-    <label className="checkboxRow" htmlFor={id}>
+    <label className="checkboxRow" htmlFor={id} title={hint ?? sidebarHint(label)}>
       <input
         id={id}
         type="checkbox"

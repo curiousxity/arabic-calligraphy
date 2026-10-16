@@ -99,7 +99,7 @@ test("a saved block on the retired Layla Diwani still opens on it, and can leave
   await gotoApp(page);
   // Quick-save, then point the saved block at the retired key, as a project
   // saved before the retirement would be.
-  await page.getByRole("button", { name: /^Project & Export/ }).click();
+  await page.getByRole("button", { name: /^Save & Export/ }).click();
   await page.getByRole("button", { name: "Quick save" }).click();
   await page.evaluate(() => {
     const key = "calligraphy-layout-v2";

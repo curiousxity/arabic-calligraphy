@@ -608,6 +608,7 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
                   type="button"
                   onClick={() => onResetGlyphAlternates?.(selectedBlock.id)}
                   className="sidebarSmallAction"
+                  title="Return every letter to the font's usual shape"
                   style={{ background: "var(--bg-input)", marginTop: 8 }}
                 >
                   Reset letter shapes
@@ -643,6 +644,7 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
                   type="button"
                   onClick={() => onClearStrokeCuts?.(selectedBlock.id)}
                   className="sidebarSmallAction"
+                  title="Undo every stroke stretch on this block"
                   style={{ background: "var(--bg-input)", marginTop: 8 }}
                 >
                   Reset stroke stretches
@@ -675,6 +677,7 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
                   type="button"
                   onClick={() => onClearDetachedMarks?.(selectedBlock.id)}
                   className="sidebarSmallAction"
+                  title="Put every moved dot and mark back in its place"
                   style={{ background: "var(--bg-input)", marginTop: 8 }}
                 >
                   Reset dots & marks

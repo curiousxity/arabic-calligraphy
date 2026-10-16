@@ -48,8 +48,8 @@ test("a saved project on an uploaded font reopens on it after a reload", async (
   const key = (await getBlocks(page))[0].fontFamily;
 
   // Saving is manual (there is no autosave), and the quick-save button lives
-  // in the Project & Export panel, which starts collapsed.
-  await openPanel(page, /^Project & Export/);
+  // in the Save & Export panel, which starts collapsed.
+  await openPanel(page, /^Save & Export/);
   await page.getByRole("button", { name: "Quick save" }).click();
 
   const payload = await page.evaluate(() => localStorage.getItem("calligraphy-layout-v2") ?? "");
