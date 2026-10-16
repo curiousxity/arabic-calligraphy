@@ -21,6 +21,9 @@ Names not agreed yet: all 31 pieces `waiting`. Numbered sheet sent
 
 ## Sheet t2 — `thuluth-2.webp` (1623×876)
 
+A second scan of the same page, `thuluth-2b.webp` (sent 2026-10-16), is kept
+as a fallback, like sheet 1's.
+
 Names below include the user's corrections of 2026-10-16. Letters are traced
 without their dots (dots come from the Dots group), which is also what
 removes the measurement dots.
