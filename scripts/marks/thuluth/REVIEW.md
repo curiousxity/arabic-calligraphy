@@ -206,3 +206,12 @@ complete.
   image — "وسط" (medial seen: النسيم-like word, with measurement grid) and
   "سين أولي ووسط ونهائي" (initial, medial and final seen: a stacked run of
   seens over a long final, with stroke-order numbers and measurement dots).
+
+## Sheet t11 — sad and tah: complex strokes and alternate forms (row images)
+
+The user's framing (2026-10-16): "now the complex strokes and alternate forms".
+
+- Row 1, `thuluth-11-row1.png` (2026-10-16): "حرف الصاد والطاء" — ص
+  standalone, صر, a stacked run of two sads over a returned ya tail (صصى-like),
+  صو, and a stacked مصحم-like word; a faint dotted alternate outline at the far
+  left (~75–95 px, the start of the last word). No measurement dots.
