@@ -653,8 +653,8 @@ both; never trace them.
   numbers at the left.
 - `thuluth-24-qalam-4-b.webp` (2026-10-16): **the same verse, "وإنك لعلى خلق
   عظيم", in a second layout**, black on light, no frame, ornament or
-  signature: one line instead of the panel's deep curve, with the long
-  saifi-like kaf stroke of لعلى rising across the top and خلق and عظيم
+  signature: one line instead of the panel's deep curve, with the kaf of
+  وإنك drawn as a long stroke reaching left over لعلى, and خلق and عظيم
   set side by side. Same words, two compositions: pair it with
   `thuluth-24-qalam-4.webp`. No inverting needed.
 - `thuluth-24-fatir-43.webp` (2026-10-16): "ولا يحيق المكر السيء إلا بأهله"
