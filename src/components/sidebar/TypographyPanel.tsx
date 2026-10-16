@@ -23,10 +23,6 @@ import {
   type AlternateTarget,
 } from "../../lib/glyphAlternates";
 import type { GlyphAlternatesState, StyleSetsState } from "../../hooks/useGlyphAlternates";
-import type { TextStyle } from "../../lib/textStyles";
-import type { Palette } from "../../lib/palettes";
-import { PaletteSwatches } from "../PaletteSwatches";
-import { CloseIcon } from "../Icons";
 import { AlternateStrip } from "./AlternateStrip";
 import { useKashidaSupport } from "../../hooks/useKashidaSupport";
 import { makeId } from "./utils";
@@ -36,25 +32,6 @@ export type TypographyPanelProps = {
   /** Mirror and Guide hide Typography. */
   selectedBlock: Exclude<Block, MirrorBlock | GuideBlock>;
   onUpdateSelectedBlock: (patch: Partial<Block>) => void;
-  // Styles & palettes
-  /** Saved text styles, local-only (never part of a project). */
-  textStyles: TextStyle[];
-  selectedTextStyleId: string;
-  onSelectTextStyle?: (id: string) => void;
-  /** Applies the selected style to every selected block, as one undo step. */
-  onApplyTextStyle?: () => void;
-  newTextStyleName: string;
-  onChangeNewTextStyleName?: (name: string) => void;
-  onSaveTextStyle?: () => void;
-  onDeleteTextStyle?: () => void;
-  /** Shipped palettes first, then the user's own. */
-  palettes: Palette[];
-  selectedPaletteId: string;
-  onSelectPalette?: (id: string) => void;
-  onPickPaletteColor?: (color: string) => void;
-  onSavePaletteFromCanvas?: () => void;
-  onDeletePalette?: () => void;
-  canDeletePalette: boolean;
   // Kashida and fit to width
   kashidaSlotOrdinal: number;
   onSelectKashidaSlot?: (ordinal: number) => void;
@@ -92,21 +69,6 @@ export type TypographyPanelProps = {
 export const TypographyPanel: React.FC<TypographyPanelProps> = ({
   selectedBlock,
   onUpdateSelectedBlock,
-  textStyles,
-  selectedTextStyleId,
-  onSelectTextStyle,
-  onApplyTextStyle,
-  newTextStyleName,
-  onChangeNewTextStyleName,
-  onSaveTextStyle,
-  onDeleteTextStyle,
-  palettes,
-  selectedPaletteId,
-  onSelectPalette,
-  onPickPaletteColor,
-  onSavePaletteFromCanvas,
-  onDeletePalette,
-  canDeletePalette,
   kashidaSlotOrdinal,
   onSelectKashidaSlot,
   onSetKashidaAtSlot,
@@ -138,93 +100,6 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
     <div className="sidebarPanel">
       <CollapsibleSection title="Typography" isOpen={isOpen} onToggle={onToggle}>
         <div className="sectionPanel">
-          {/* ---- STREAM-E: styles & palettes — Styles row ---- */}
-          {/* Holds no state: the list, the selection and the name draft all
-              live in App.tsx beside the other local stores. */}
-          <div className="field">
-            <span className="fieldTitle">Style</span>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <select
-                value={selectedTextStyleId}
-                onChange={(e) => onSelectTextStyle?.(e.target.value)}
-                className="select"
-                aria-label="Text style"
-                style={{ minWidth: 0, flex: 1 }}
-              >
-                <option value="">
-                  {textStyles.length === 0 ? "No saved styles" : "Style…"}
-                </option>
-                {textStyles.map((style) => (
-                  <option key={style.id} value={style.id}>
-                    {style.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={onApplyTextStyle}
-                disabled={!selectedTextStyleId}
-                className="sidebarPillButton"
-                style={{ flex: "0 0 auto", padding: "0 10px" }}
-                title="Apply this style to every selected block"
-              >
-                Apply
-              </button>
-              <button
-                type="button"
-                onClick={onDeleteTextStyle}
-                disabled={!selectedTextStyleId}
-                className="layerIconBtn"
-                title="Delete this style"
-                aria-label="Delete this style"
-                style={{ color: "var(--danger)", flex: "0 0 auto" }}
-              >
-                <CloseIcon size={13} />
-              </button>
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <input
-                type="text"
-                value={newTextStyleName}
-                onChange={(e) => onChangeNewTextStyleName?.(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newTextStyleName.trim()) onSaveTextStyle?.();
-                }}
-                placeholder="Style name…"
-                aria-label="New text style name"
-                className="hexInput"
-                style={{ minWidth: 0, fontFamily: "inherit", letterSpacing: 0 }}
-              />
-              <button
-                type="button"
-                onClick={onSaveTextStyle}
-                disabled={!newTextStyleName.trim()}
-                className="sidebarPillButton"
-                style={{ flex: "0 0 auto" }}
-                title="Save this block's font, colour, outline and shadow as a style"
-              >
-                Save style
-              </button>
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-              A style carries font, colour, outline and shadow — never the
-              text or where the block sits. Styles stay in this browser.
-            </div>
-          </div>
-
-          {palettes.length > 0 && (
-            <PaletteSwatches
-              palettes={palettes}
-              selectedId={selectedPaletteId}
-              onSelect={(id) => onSelectPalette?.(id)}
-              value={selectedBlock.color}
-              onPick={(color) => onPickPaletteColor?.(color)}
-              onSaveFromCanvas={onSavePaletteFromCanvas}
-              onDelete={onDeletePalette}
-              canDelete={canDeletePalette}
-            />
-          )}
-          {/* ---- /STREAM-E ---- */}
           {/* Everything this section needs is derived from the block's
               own text, so it holds no state of its own beyond the
               selected slot (which lives in App.tsx). */}

@@ -56,10 +56,8 @@ than a text box
   pair or an N-copy medallion — staying live as the source is edited.
 - **A font picker that shows your own text** in every bundled and uploaded
   style at once, grouped by genre.
-- **Compositions.** Drop a block's text into a mirrored pair or a
-  medallion, spaced to the width it actually draws.
-- **Saveable text styles and colour palettes**, applied to any selection in
-  one step.
+- **Mirrors and medallions.** Reflect a block into a muthanna pair, or turn
+  copies of its text into a medallion spaced to the size it actually draws.
 - **Gradient fills** (including gold/silver/copper/lapis metallic presets)
   and generated paper textures for the page.
 - **An artboard**: preset or custom page sizes, margins, and exports cropped

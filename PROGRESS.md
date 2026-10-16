@@ -101,6 +101,12 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-16 — Styles and Palettes removed
+
+- **Typography's saved Styles list and colour Palettes are gone**, judged
+  redundant with the colour rows' swatches and Duplicate. Neither was ever
+  part of a saved project. See [text-styles.md](.claude/rules/text-styles.md).
+
 ### 2026-10-16 — Kashida in fonts that have none
 
 - **Fix: Kashida join in Jameel Noori, Gulzar, Blaka and Ruqaa.** These

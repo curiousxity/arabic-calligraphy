@@ -1,14 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  TEXT_STYLES_KEY,
-  captureStyle,
-  styleToPatch,
-  loadStyles,
-  saveStyles,
-  upsertStyle,
-  removeStyle,
-  type TextStyle,
-} from "./textStyles";
+import { describe, it, expect } from "vitest";
+import { captureStyle, styleToPatch, type TextStyle } from "./textStyles";
 import type { TextBlock } from "../types";
 
 const block = (over: Partial<TextBlock> = {}): TextBlock => ({
@@ -75,93 +66,6 @@ describe("captureStyle / styleToPatch", () => {
     const patch = styleToPatch(bad) as Record<string, unknown>;
     expect(patch.color).toBe("#fff");
     expect(patch.fontSize).toBeUndefined();
-  });
-});
-
-/**
- * Vitest runs in the node environment here (no jsdom), so `localStorage`
- * genuinely doesn't exist — the same hand-rolled stub `exportPresets.test.ts`
- * uses, for the same reason.
- */
-class MemoryStorage {
-  private data = new Map<string, string>();
-  getItem(key: string) {
-    return this.data.has(key) ? (this.data.get(key) as string) : null;
-  }
-  setItem(key: string, value: string) {
-    this.data.set(key, value);
-  }
-  removeItem(key: string) {
-    this.data.delete(key);
-  }
-  clear() {
-    this.data.clear();
-  }
-}
-
-describe("the style store", () => {
-  beforeEach(() => {
-    (globalThis as { localStorage?: unknown }).localStorage = new MemoryStorage();
-  });
-  afterEach(() => {
-    delete (globalThis as { localStorage?: unknown }).localStorage;
-  });
-
-  const style = (over: Partial<TextStyle> = {}): TextStyle => ({
-    id: "a",
-    name: "Gold",
-    color: "#c9a227",
-    ...over,
-  });
-
-  it("returns [] when nothing is stored", () => {
-    expect(loadStyles()).toEqual([]);
-  });
-
-  it("falls back to [] on corrupt JSON", () => {
-    localStorage.setItem(TEXT_STYLES_KEY, "{not json");
-    expect(loadStyles()).toEqual([]);
-  });
-
-  it("filters out malformed entries but keeps the good ones", () => {
-    localStorage.setItem(
-      TEXT_STYLES_KEY,
-      JSON.stringify([style(), { id: "", name: "" }, { id: "b", name: "empty" }, null])
-    );
-    expect(loadStyles().map((s) => s.id)).toEqual(["a"]);
-  });
-
-  it("round-trips through save/load", () => {
-    saveStyles([style(), style({ id: "b", name: "Ink" })]);
-    expect(loadStyles().map((s) => s.name)).toEqual(["Gold", "Ink"]);
-  });
-
-  it("upserts by id — same id overwrites in place, new id appends", () => {
-    const list = [style(), style({ id: "b", name: "Ink" })];
-    expect(upsertStyle(list, style({ name: "Gold leaf" })).map((s) => s.name)).toEqual([
-      "Gold leaf",
-      "Ink",
-    ]);
-    expect(upsertStyle(list, style({ id: "c", name: "Red" })).map((s) => s.id)).toEqual([
-      "a",
-      "b",
-      "c",
-    ]);
-    expect(list.map((s) => s.name)).toEqual(["Gold", "Ink"]); // pure
-  });
-
-  it("overwrite-by-name is expressible: reusing the existing id replaces the entry", () => {
-    const list = [style()];
-    const existing = list.find((s) => s.name === "Gold");
-    const next = upsertStyle(list, { ...captureStyle(block(), "Gold"), id: existing!.id });
-    expect(next).toHaveLength(1);
-    expect(next[0].fontSize).toBe(64);
-  });
-
-  it("removes by id and leaves the rest in order", () => {
-    const list = [style(), style({ id: "b", name: "Ink" }), style({ id: "c", name: "Red" })];
-    expect(removeStyle(list, "b").map((s) => s.id)).toEqual(["a", "c"]);
-    expect(removeStyle(list, "nope")).toHaveLength(3);
   });
 });
 

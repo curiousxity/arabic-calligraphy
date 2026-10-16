@@ -1,15 +1,12 @@
 /**
- * Saved text styles — a name plus the *styling* fields of a block, so a look
- * built once on one block can be dropped onto another instead of being rebuilt
- * dial by dial.
+ * A block's *look* — its styling fields, never its content — so new text can
+ * be born looking like an existing block: text added to a guide copies the
+ * last text written on it, and a new verse line copies the selected one.
  *
- * Local-only by design, exactly like `lib/exportPresets.ts` (this module is
- * deliberately another instance of that pattern): a style describes how *this
- * browser* likes to letter, not what a project contains, so it stays out of the
- * saved layout payload and out of the Supabase named-project store. Every read
- * and write is wrapped, because localStorage throws in privacy mode and when
- * the quota is exhausted, and losing a style is never worth breaking the editor
- * over.
+ * This was the engine of the Typography panel's saved Styles list (with a
+ * localStorage store) until 2026-10-16, when the list and the palettes beside
+ * it were removed from the UI. The capture/apply pair stayed because those
+ * two callers use it.
  *
  * The field list is the intersection of "styling" and `BlockCommon`, and is
  * where the whole design lives: a style may never carry `text`, `x`/`y`, `id`
@@ -47,8 +44,6 @@ export type TextStyle = {
   letterSpacing?: number;
   wordSpacing?: number;
 };
-
-export const TEXT_STYLES_KEY = "harfcanvas-text-styles-v1";
 
 /**
  * The single list of what a style captures and applies. Both `captureStyle`
@@ -121,58 +116,4 @@ export function styleToPatch(style: TextStyle): Partial<Block> {
     patch[field] = value;
   }
   return patch as Partial<Block>;
-}
-
-const isTextStyle = (value: unknown): value is TextStyle => {
-  if (!value || typeof value !== "object") return false;
-  const s = value as Partial<TextStyle>;
-  if (typeof s.id !== "string" || s.id.length === 0) return false;
-  if (typeof s.name !== "string" || s.name.length === 0) return false;
-  // A style whose fields are all missing or malformed would apply nothing; a
-  // single usable field is enough to keep it, and the bad ones are dropped by
-  // `styleToPatch` anyway.
-  return STYLE_FIELDS.some((field) => {
-    const v = (s as Record<string, unknown>)[field];
-    return v !== undefined && isStyleValue(field, v);
-  });
-};
-
-/** Reads the saved styles, falling back to `[]` on empty or unreadable storage. */
-export function loadStyles(): TextStyle[] {
-  try {
-    if (typeof localStorage === "undefined") return [];
-    const raw = localStorage.getItem(TEXT_STYLES_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isTextStyle);
-  } catch {
-    // Corrupt JSON or privacy mode. Unlike export presets there is nothing
-    // sensible to ship as a default here — a style is by definition the user's.
-    return [];
-  }
-}
-
-/** Best-effort persist; a storage failure is swallowed exactly as the other local stores do. */
-export function saveStyles(styles: TextStyle[]): void {
-  try {
-    if (typeof localStorage === "undefined") return;
-    localStorage.setItem(TEXT_STYLES_KEY, JSON.stringify(styles));
-  } catch {
-    // Privacy mode or quota — the styles simply don't survive this session.
-  }
-}
-
-/** Replaces the entry sharing `style`'s id, or appends it when the id is new. Pure. */
-export function upsertStyle(styles: TextStyle[], style: TextStyle): TextStyle[] {
-  const index = styles.findIndex((s) => s.id === style.id);
-  if (index === -1) return [...styles, style];
-  const next = [...styles];
-  next[index] = style;
-  return next;
-}
-
-/** Drops the entry with `id`, leaving the rest in order. Pure. */
-export function removeStyle(styles: TextStyle[], id: string): TextStyle[] {
-  return styles.filter((s) => s.id !== id);
 }

@@ -44,7 +44,7 @@ dimension in every per-letter tool.
   `baseSpacingForLine` returns the stored base while the block still holds the
   fitted total. Otherwise it adopts the block's current value as the user's.
   It never subtracts the fill back off: the slider's reset, a drag to a value,
-  and an applied style all write *absolute* values, and subtracting from one
+  and (until 2026-10-16) an applied saved style all write *absolute* values, and subtracting from one
   of those gave a negative base.
 - **A copy is not a member.** Paste and Duplicate set `verse: undefined`, as
   they already did for `groupId`. Otherwise the copy would slot into the

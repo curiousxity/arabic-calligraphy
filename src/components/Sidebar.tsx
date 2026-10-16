@@ -71,10 +71,6 @@ import {
   type ArtboardConfig,
   type ArtboardUnit,
 } from "../lib/artboard";
-// ---- STREAM-E: styles & palettes — imports ----
-import type { TextStyle } from "../lib/textStyles";
-import type { Palette } from "../lib/palettes";
-// ---- /STREAM-E ----
 // ---- STREAM-F: ink & surface — imports ----
 import type { BlockFill } from "../lib/blockFill";
 import type { ArtboardSurface, TextureDef } from "../data/textures";
@@ -89,26 +85,6 @@ import type { GlyphAlternatesState, StyleSetsState } from "../hooks/useGlyphAlte
 export type SidebarProps = {
   // Phase 2 parallel-stream prop declarations — each stream adds its own
   // (all optional, arriving via App.tsx's p2* bundles). See PARALLEL-PHASE-2.md.
-  // ---- STREAM-E: styles & palettes — props ----
-  /** Saved text styles, local-only (never part of a project). */
-  textStyles?: TextStyle[];
-  selectedTextStyleId?: string;
-  onSelectTextStyle?: (id: string) => void;
-  /** Applies the selected style to every selected block, as one undo step. */
-  onApplyTextStyle?: () => void;
-  newTextStyleName?: string;
-  onChangeNewTextStyleName?: (name: string) => void;
-  onSaveTextStyle?: () => void;
-  onDeleteTextStyle?: () => void;
-  /** Shipped palettes first, then the user's own. */
-  palettes?: Palette[];
-  selectedPaletteId?: string;
-  onSelectPalette?: (id: string) => void;
-  onPickPaletteColor?: (color: string) => void;
-  onSavePaletteFromCanvas?: () => void;
-  onDeletePalette?: () => void;
-  canDeletePalette?: boolean;
-  // ---- /STREAM-E ----
   // ---- STREAM-F: ink & surface — props ----
   /** The selected block's gradient, if it has one. Undefined = flat `blockColor`. */
   blockFill?: BlockFill;
@@ -334,23 +310,6 @@ const SidebarTier: React.FC<{ label: string }> = ({ label }) => (
 );
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  // ---- STREAM-E: styles & palettes — destructure ----
-  textStyles = [],
-  selectedTextStyleId = "",
-  onSelectTextStyle,
-  onApplyTextStyle,
-  newTextStyleName = "",
-  onChangeNewTextStyleName,
-  onSaveTextStyle,
-  onDeleteTextStyle,
-  palettes = [],
-  selectedPaletteId = "",
-  onSelectPalette,
-  onPickPaletteColor,
-  onSavePaletteFromCanvas,
-  onDeletePalette,
-  canDeletePalette = false,
-  // ---- /STREAM-E ----
   // ---- STREAM-F: ink & surface — destructure ----
   blockFill,
   blockColor,
@@ -1437,21 +1396,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <TypographyPanel
             selectedBlock={selectedBlock}
             onUpdateSelectedBlock={onUpdateSelectedBlock}
-            textStyles={textStyles}
-            selectedTextStyleId={selectedTextStyleId}
-            onSelectTextStyle={onSelectTextStyle}
-            onApplyTextStyle={onApplyTextStyle}
-            newTextStyleName={newTextStyleName}
-            onChangeNewTextStyleName={onChangeNewTextStyleName}
-            onSaveTextStyle={onSaveTextStyle}
-            onDeleteTextStyle={onDeleteTextStyle}
-            palettes={palettes}
-            selectedPaletteId={selectedPaletteId}
-            onSelectPalette={onSelectPalette}
-            onPickPaletteColor={onPickPaletteColor}
-            onSavePaletteFromCanvas={onSavePaletteFromCanvas}
-            onDeletePalette={onDeletePalette}
-            canDeletePalette={canDeletePalette}
             kashidaSlotOrdinal={kashidaSlotOrdinal}
             onSelectKashidaSlot={onSelectKashidaSlot}
             onSetKashidaAtSlot={onSetKashidaAtSlot}
