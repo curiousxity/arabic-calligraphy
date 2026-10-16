@@ -617,3 +617,17 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   - الله, غالب with a long ba, على stacked, الناس with a long seen.
   The frame line is a guide-like straight line: the cleaner will remove
   it, which is what we want.
+
+## Sheet t23 — a dense stacked panel (jali-style)
+
+- `thuluth-23-ahzab-14.webp` (2026-10-16): "ولو دخلت عليهم من أقطارها ثم
+  سئلوا الفتنة لآتوها وما تلبثوا بها إلا يسيرا" (al-Ahzab 33:14), reading
+  confirmed by the text; dark on light. The **densest composition so far**:
+  words stacked two and three tiers deep, tall alif/lam uprights packed in a
+  row, and the gaps filled with tashkeel and ornament signs. A small
+  **signature (imza)** sits at the bottom centre — remove it, never trace
+  it as a piece. A small mark at the far left edge (a verse-end or number)
+  to check.
+  Use: the target for "stacked" quality, the hardest layout the app
+  could aim at. Not a source of single pieces: letters overlap and touch
+  everywhere, so the component assigner would merge most of it.
