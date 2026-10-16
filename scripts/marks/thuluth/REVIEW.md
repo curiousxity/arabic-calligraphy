@@ -335,6 +335,16 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
 - Row 3, `thuluth-14-row3.png` (2026-10-16): three unlabelled pieces numbered
   (1)–(3), each a body with the small S-shaped kaf sign above it. (1) a
   crossed, lam-alif-like body; (2) a slanted body with a short flat base;
-  (3) a tall upright over a round bowl. **Names to confirm with the user**
-  (kaf forms or lam-alif forms?). Clean, no measurement dots or dotted
-  alternates.
+  (3) a tall upright over a round bowl. Clean, no measurement dots or dotted
+  alternates. Named by the notes (`thuluth-14-notes.png`): "١، ٢، ٣: يجوز
+  استعمال الكاف الزنادي الصغير بدل تكملة السيفي في حالات الضيق في الكتابة" —
+  the S shape is a **small zinadi kaf**, used in place of the saifi kaf's
+  upper part when space is tight. So these are three saifi kafs
+  completed the short way.
+- Notes, `thuluth-14-notes.png` (2026-10-16), besides the one above:
+  - "(٥) يكون الفرق في الاحرف المرتفعة لكل من اللام والدال والكاف النهائي
+    نقطتين وأما باقي الاحرف فيكون الفرق بينها نقطة او نصفها" — a height
+    rule: between lam, dal and final kaf the difference is two nuqtas; for
+    the other letters, one nuqta or half. Goes with row 1 piece 5 (كد).
+  - "الكاف السيفي المفرد والوسط" — the saifi kaf, single and medial: a
+    caption, probably for the next row.
