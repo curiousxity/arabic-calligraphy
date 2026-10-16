@@ -113,11 +113,11 @@ export function inkBoundsPx(d: StackDraft, unitsPerEm: number): Box {
  */
 export function arrangeDraft(
   d: StackDraft, unitsPerEm: number, shapePx: Array<[number, number]>, fillers: FillerShape[],
-  placement?: { x: number; y: number; rotation: number }
+  placement?: { x: number; y: number; rotation: number }, fillerAmount = 1
 ): { draft: StackDraft; result: ArrangeResult } | null {
   const result = arrangeStackInShape({
     pieces: d.pieces.filter((p) => !p.filler), joins: d.joins, shapePx,
-    fontSize: d.fontSize, unitsPerEm, fillers, pullStems: true,
+    fontSize: d.fontSize, unitsPerEm, fillers, fillerAmount, pullStems: true,
   });
   if (!result) return null;
   return {

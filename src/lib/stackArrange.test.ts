@@ -318,6 +318,18 @@ describe("fillers", () => {
     expect(a).toEqual(b);
   });
 
+  it("adds fewer, further-apart fillers as the amount falls", () => {
+    const full = arrangeStackInShape(base())!;
+    const half = arrangeStackInShape({ ...base(), fillerAmount: 0.5 })!;
+    const few = arrangeStackInShape({ ...base(), fillerAmount: 0 })!;
+    expect(full.fillers).toBeGreaterThan(half.fillers);
+    expect(half.fillers).toBeGreaterThan(few.fillers);
+    expect(few.fillers).toBeGreaterThan(0);
+    // Same letters whatever the amount: only the filler pass changes.
+    const letters = (r: typeof full) => r.pieces.filter((p) => !p.filler);
+    expect(letters(few)).toEqual(letters(full));
+  });
+
   it("adds no fillers when none are offered", () => {
     const r = arrangeStackInShape({ ...base(), fillers: undefined })!;
     expect(r.fillers).toBe(0);

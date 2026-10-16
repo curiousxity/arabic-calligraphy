@@ -43,6 +43,9 @@ export type StackEditorDialogProps = {
   onMoveTogether: (v: boolean) => void;
   fillGaps: boolean;
   onFillGaps: (v: boolean) => void;
+  /** How busy the gap fill is, 0 (few) to 1 (every gap). */
+  fillAmount: number;
+  onFillAmount: (v: number) => void;
   /** The font's tashkeel for the gaps (App owns font loading). */
   loadFillers: (block: StackBlock) => Promise<{ fillers: FillerShape[]; note: string }>;
   /** Called only when the draft differs from the block; App makes one history step. */
@@ -89,7 +92,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
  * artwork may live in the main stage.
  */
 export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
-  block, cssFamily, surfaceColor, closedGuides, moveTogether, onMoveTogether, fillGaps, onFillGaps, loadFillers, onDone, onCancel,
+  block, cssFamily, surfaceColor, closedGuides, moveTogether, onMoveTogether, fillGaps, onFillGaps, fillAmount, onFillAmount, loadFillers, onDone, onCancel,
 }) => {
   // Captured once: `draftChanged` compares arrays by reference, so the opening
   // draft must hold the block's own arrays, not a copy made on a later render.
@@ -118,6 +121,7 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
   // A slider fires a change per tick; one undo step per drag, not per tick.
   const lastSliderPushAt = useRef(0);
   const sizeTimer = useRef<number | null>(null);
+  const amountTimer = useRef<number | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   // Editor-local undo: the draft is the snapshot; there is no thumbnail.
@@ -239,7 +243,7 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
   }, []);
 
   // ---- arranging ----
-  const arrange = useCallback(async (c: Choice, factor: number, fill: boolean) => {
+  const arrange = useCallback(async (c: Choice, factor: number, fill: boolean, amount: number) => {
     // Free, Reset and unmount also bump the token, so a font load that is
     // still running cannot land its arrange after the user moved on.
     if (c.kind === "free") { ++arrangeToken.current; setOutline(null); return; }
@@ -260,7 +264,7 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
     }
     let r: ReturnType<typeof arrangeDraft>;
     try {
-      r = arrangeDraft(d, block.unitsPerEm, shapePx, fillers, placement);
+      r = arrangeDraft(d, block.unitsPerEm, shapePx, fillers, placement, amount);
     } catch (err) {
       setStatus(`Could not arrange the letters: ${err instanceof Error ? err.message : String(err)}`);
       return;
@@ -280,15 +284,22 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
     requestAnimationFrame(() => fitTo(r!.draft, shapePx));
   }, [block, closedGuides, loadFillers, pushHistory, fitTo]);
 
-  const pick = (c: Choice) => { setChoice(c); void arrange(c, sizeFactor, fillGaps); };
+  const pick = (c: Choice) => { setChoice(c); void arrange(c, sizeFactor, fillGaps, fillAmount); };
   /** The size slider arranges once the ticks settle, so a drag is one arrange and one undo step. */
   const changeSize = (v: number) => {
     setSizeFactor(v);
     if (choice.kind !== "template") return;
     if (sizeTimer.current !== null) window.clearTimeout(sizeTimer.current);
-    sizeTimer.current = window.setTimeout(() => { sizeTimer.current = null; void arrange(choice, v, fillGaps); }, SLIDER_SETTLE_MS);
+    sizeTimer.current = window.setTimeout(() => { sizeTimer.current = null; void arrange(choice, v, fillGaps, fillAmount); }, SLIDER_SETTLE_MS);
   };
-  const changeFillGaps = (v: boolean) => { onFillGaps(v); if (choice.kind !== "free") void arrange(choice, sizeFactor, v); };
+  const changeFillGaps = (v: boolean) => { onFillGaps(v); if (choice.kind !== "free") void arrange(choice, sizeFactor, v, fillAmount); };
+  /** Like the size slider: one arrange once the ticks settle. */
+  const changeFillAmount = (v: number) => {
+    onFillAmount(v);
+    if (choice.kind === "free" || !fillGaps) return;
+    if (amountTimer.current !== null) window.clearTimeout(amountTimer.current);
+    amountTimer.current = window.setTimeout(() => { amountTimer.current = null; void arrange(choice, sizeFactor, fillGaps, v); }, SLIDER_SETTLE_MS);
+  };
   const reset = () => {
     ++arrangeToken.current;
     pushHistory();
@@ -309,7 +320,7 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
     lastSliderPushAt.current = now;
     setDraft((d) => ({ ...d, nib: { ...d.nib, minFraction: v } }));
   };
-  // Baseline on open; cancel a pending size arrange and any in-flight load on close.
+  // Baseline on open; cancel a pending slider arrange and any in-flight load on close.
   useEffect(() => {
     baseInkHeight.current = inkHeight(opening, block.unitsPerEm);
     closeRef.current?.focus();
@@ -317,6 +328,7 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
     return () => {
       ++token.current;
       if (sizeTimer.current !== null) window.clearTimeout(sizeTimer.current);
+      if (amountTimer.current !== null) window.clearTimeout(amountTimer.current);
     };
   }, [opening, block.unitsPerEm]);
 
@@ -441,6 +453,18 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
               onChange={changeSize}
             />
             <CheckboxRow id="stack-editor-fill-gaps" label="Fill gaps with tashkeel" checked={fillGaps} onChange={changeFillGaps} />
+            <RangeRow
+              id="stack-editor-fill-amount"
+              name="stackFillAmount"
+              label="Tashkeel amount"
+              value={fillAmount}
+              min={0}
+              max={1}
+              step={0.05}
+              suffix={`${Math.round(fillAmount * 100)}%`}
+              disabled={!fillGaps}
+              onChange={changeFillAmount}
+            />
 
             <h4>Strokes</h4>
             <RangeRow

@@ -686,6 +686,8 @@ const App: React.FC = () => {
   const [stackMoveTogether, setStackMoveTogether] = useState(true);
   /** Editor preference, not block state: "Fill a guide shape" busies the gaps with tashkeel. */
   const [stackFillGaps, setStackFillGaps] = useState(true);
+  /** Editor preference: how many tashkeel the gap fill adds, 0 (few) to 1 (every gap). */
+  const [stackFillAmount, setStackFillAmount] = useState(0.3);
 
   const setDetachedMark = useCallback(
     (blockId: number, o: DetachedMarkOverride) => {
@@ -3420,6 +3422,8 @@ const App: React.FC = () => {
           onMoveTogether={setStackMoveTogether}
           fillGaps={stackFillGaps}
           onFillGaps={setStackFillGaps}
+          fillAmount={stackFillAmount}
+          onFillAmount={setStackFillAmount}
           loadFillers={loadStackFillers}
           onDone={commitStackEditor}
           onCancel={() => setStackEditorId(null)}

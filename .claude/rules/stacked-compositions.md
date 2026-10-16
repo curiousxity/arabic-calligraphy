@@ -417,7 +417,12 @@ candidates in a rotation starting at the cell index, at natural size then
 em) has its corners, edge midpoints and centre inside the shape, meets no
 ink (no probe inside a flattened piece contour *and* no contour vertex
 inside the box — five probes alone let a letter's corner poke in), and
-overlaps no placed filler. The cell and gap were tuned down from 0.33/0.06
+overlaps no placed filler by less than the **spread** — `(1 − amount) ×
+FILLER_SPREAD` (0.8 em), where `amount` is the window's "Tashkeel amount"
+slider (`fillerAmount`, App preference, default 0.3; 1 is the old
+every-gap carpet, which users found far too busy). The spread applies only
+between fillers, never to ink, so a sparse fill still reaches narrow
+gutters. The cell and gap were tuned down from 0.33/0.06
 because a padded dot could not enter the gutters of a composition whose
 letters are as wide as the shape. A filler is `role: "mark"` with no
 parent and `filler: true`: it drags alone, has no ring or cut spans,
