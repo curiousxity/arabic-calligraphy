@@ -315,7 +315,11 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
      shown in (1)". Dotted alternate tail below.
   3. ك extended (المرسل): "made of the alif and the extended fa and ba; may
      also be used at the end". Dotted alternate tail below.
-  4. ك zinadi (الزنادي). Dotted alternate near its start.
+  4. ك zinadi (الزنادي). Dotted alternate near its start. Note
+     (`thuluth-14-notes-2.png`): "الكاف الزنادي يتكون الرأس من الراء المنحرفة
+     والخط الاول من الباء ذي الرأس المنخفض والخط الثاني من الباء ذي الرأس
+     المرتفع" — the head comes from the slanted ra, the first stroke from
+     the low-headed ba, the second stroke from the raised-head ba.
   5. ك zinadi joined into a following letter (كد-like). Dotted alternate
      vertical at the far left.
   The small ك signs inside 1–3 (the kaf's inner mark) are separate pieces.
