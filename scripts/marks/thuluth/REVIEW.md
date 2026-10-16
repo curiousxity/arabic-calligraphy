@@ -236,3 +236,8 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   measurement dots and stroke-order numbers); "عين ثعبانی" (snake ain, a
   stacked نابتغا-like word with stroke-order numbers and arrows). Measurement
   dots and construction lines on most pieces; no dotted alternates seen.
+- Row 2, `thuluth-12-row2.png` (2026-10-16): "حرف العين" — one clean
+  practice line, right to left: ا, لعمر, با, علی, عسـ…ـلی (an ain over a long
+  seen-like stroke with a returned ya tail), عحمع-like word ending in an open
+  final ain. Clean strokes: no measurement dots, guide lines or dotted
+  alternates.
