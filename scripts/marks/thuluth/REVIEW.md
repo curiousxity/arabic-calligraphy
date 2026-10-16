@@ -30,8 +30,30 @@ A second scan of the same page, `thuluth-1b.webp` (1667×1032, sent 2026-10-16),
 kept too: same resolution and sharpness, slightly different framing — a
 fallback if a piece comes out cleaner in it.
 
-Names not agreed yet: all 31 pieces `waiting`. Numbered sheet sent
-2026-10-16; the user asked to go over the pieces again together.
+Numbered map: `sheet1-numbered.png` (sent 2026-10-16). The user named the
+top row and piece 30 on 2026-10-16; the middle row (14–23) and the bottom
+row (24–31) come next. "Measuring nuqtas" means the piece is drawn with
+its column of measurement dots, which are cleaned off (letters are traced
+dotless).
+
+| # | name | status |
+|---|---|---|
+| 1 | ا alif (measuring nuqtas) | named |
+| 2 | ا alif, smaller | named |
+| 3 | ك | named |
+| 4 | ل lam (measuring nuqtas) — not لن | named (corrected) |
+| 5 | لا | named |
+| 6 | ن nun (measuring nuqtas) — not بن | named (corrected) |
+| 7 | بز | named; **drawn overlapping 8**, needs a split rule |
+| 8 | بت | named; **drawn overlapping 7**, needs a split rule |
+| 9 | لا, large | named |
+| 10 | لا, small | named |
+| 11 | د dal (measuring nuqtas) — not نذ | named (corrected) |
+| 12 | ه ha (measuring nuqtas) — not بهي | named (corrected) |
+| 13 | ى (alif maqsura / ya) | named (corrected) |
+| 14–23 | middle row | waiting for the user |
+| 24–29, 31 | bottom row | waiting for the user |
+| 30 | ن nun, without nuqtas — not ر | named (corrected) |
 
 ## Sheet t2 — `thuluth-2.webp` (1623×876)
 
@@ -805,7 +827,8 @@ traced into the app. Questions to settle with the user during review:
    Answered: no. The signed panels are by **Hashim, the user's
    grandfather**, and so are the lesson sheets (t1–t19), confirmed
    2026-10-16. No credit in the app.
-2. Names for all 31 pieces of sheet t1, and t2 piece 26 (ق or فـ).
+2. Names for sheet t1's middle and bottom rows (top row and 30 done),
+   and t2 piece 26 (ق or فـ).
 3. ~~Script of `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`?~~
    Answered: Naskh. Both stay out of the Thuluth set.
 4. t17 row 5: which pieces the note "١-٢" means, and what the big dotted
