@@ -480,3 +480,16 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   وسطى" (medial ha): ـهـ joined from a short stroke on the right. Clean
   and isolated, but small (about 620 px wide), so it traces coarser.
   Compare with sheet t2 pieces 12–15.
+- Row 2, `thuluth-17-row2.png` (2026-10-16): "حرف الهاء", the named has,
+  right to left:
+  - "الهاء الاولية يشتق من رأس الدال والفاء الوسطية كاملة ويسمى عين الهر" —
+    initial ha built from the dal's head and the whole medial fa; called
+    **"cat's eye" (عين الهر)**. A ده-like piece.
+  - "هاء اولية تشتق من نهاية اواخر النون والكؤوس المشابهة لها وتسمى اذن
+    الفرس" — initial ha built from the end of the nun and similar cups;
+    called **"horse's ear" (اذن الفرس)**.
+  - A joined run, loosely لهلهها, with three labels: "هاء منخفض وسطى" (low
+    medial ha), "هاء وسطية" (medial ha), and "هاء منخفض وتسمى اذن الفرس" (low
+    ha, also called horse's ear).
+  Clean strokes, no measurement dots or dotted alternates; labels and arrows
+  need removing. Matches row 1's shapes at a larger size.
