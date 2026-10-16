@@ -367,3 +367,15 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   numbers and arrows on every piece. The best reference for proportions on
   this sheet, but the hardest to clean; the letters touch the construction
   lines in many places.
+
+## Sheet t15 — ba and the letters built from it (row images)
+
+- Row 1, `thuluth-15-row1.webp` (2026-10-16): "حرف الباء", right to left:
+  - "الباءان العاديان" (the two ordinary bas): a short ب and a long ب. The
+    long one has a **dotted alternate** at its left end: the tail curling
+    down instead of rising.
+  - "الباء والشين" (ba and shin): the ba body used as the shin/seen cup, with
+    a **dotted alternate** head (a teeth-like start) above its right end.
+  - "الباء والكاف" (ba and kaf): the ba body used as the base of a kaf, with
+    the kaf's small inner mark.
+  Clean, dotless; labels need removing. Compare with sheets t7/t8 (beh).
