@@ -523,3 +523,12 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   The construction sheet for ha: nuqta columns, guide lines, stroke numbers
   and arrows on every piece but the first. Readings to confirm. Use it to
   check proportions; trace from the cleaner rows 1–5 where shapes repeat.
+
+## Sheet t18 — final ya (row images)
+
+- Row 1, `thuluth-18-row1.webp` (2026-10-16): "الياءات النهائية وكيفية اتصالها
+  بالأحرف المختلفة" — the **final ya and how it joins each letter**. Right
+  to left, loosely: هي (a long flat ya), مخي, مي, في, عي, طي, صي, سي, and بي/لي
+  — the returned ya tail after each letter. Clean strokes; one small
+  measurement mark and guide line under سي, and letter dots drawn on a few
+  (مخي, عي). Compare with sheet t2 piece 18 and sheet t8 (ya type).
