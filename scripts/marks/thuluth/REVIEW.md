@@ -686,3 +686,12 @@ in the mark library), but only if the user wants that.
   the long ya leaves. **The bottom edge is cropped**: the lowest part of
   the ya's sweep is cut off, so a fuller scan would be needed to trace it.
   No signature, no border.
+
+## Sheet t26 — a closing line
+
+- `thuluth-26-closing.png` (2026-10-16): "وبه نستعين ونستجير إنه ولي الهداية
+  والتوفيق وعليه التكلان" — a closing formula, one level line, fine pen,
+  light tashkeel. A small stacked signature block at the left dated ١٣٨٤
+  (about 1964): remove it. Like t21's third Basmala, the pen and the flat
+  layout read closer to **Naskh** than Thuluth — script to confirm. Small
+  (about 1530 px wide for a long line), so letters are only ~40 px tall.
