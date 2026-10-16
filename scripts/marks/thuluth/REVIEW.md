@@ -841,6 +841,18 @@ traced into the app. Questions to settle with the user during review:
    hadith) as frame pieces at all.
 8. Whether to keep t13 piece 8 (the Muhaqqaq waw) anywhere.
 
+**Stroke-order numbers and arrows must go before tracing** (user,
+2026-10-16). Many lesson sheets (t1, t2, t9, t14 row 5, t15, t16, t17 row 6
+and others) carry small digits and arrows showing the order and direction
+of the pen strokes. The current cleaner (`review.py`'s `clean_sheet`)
+only drops them when they stand apart from the letters (tiny or very thin
+pieces); a digit or arrowhead that **touches a letter** survives and
+would be traced as part of it. So every piece gets a numbers-and-arrows
+pass before its trace: list what is left touching the letter, erase it
+by hand where needed, and check the result with the user. The numbers
+are useful information too: note a piece's stroke order in this ledger
+before erasing it, in case the app ever animates or teaches strokes.
+
 Suggested review order, easiest first, so the method is agreed on clean
 pieces before the hard ones: t16 row 6 (low final mims), t13 rows 1–2 (fa,
 qaf, waw), t14 rows 1–3 (kafs), t15 row 1 (ba), t18 row 1 (final ya), then
