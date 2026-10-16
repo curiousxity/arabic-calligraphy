@@ -739,3 +739,12 @@ in the mark library), but only if the user wants that.
   one image, like t28: crop apart, invert only the panel. Long and dense,
   stacked two tiers, many tall uprights, ending in a long خليلا. Signature at
   the left and date ١٣٧٧ (about 1958) under the middle: remove both.
+
+## Sheet t31 — al-Naml 27:6, one line
+
+- `thuluth-31-naml-6.webp` (2026-10-16): "وإنك لتلقى القرآن من لدن حكيم عليم"
+  (al-Naml 27:6, my reading; no key). White on black, **one mostly level
+  line** with only light stacking (من over لدن, حكيم): much closer to the
+  plain line the app writes than the dense panels, so a good near-term
+  target. A small flower-shaped **verse-end marker** at the far left: not a
+  letter, remove it. No signature or date seen. Invert before cleaning.
