@@ -678,3 +678,11 @@ in the mark library), but only if the user wants that.
   The panel is enclosed by a **repeating patterned border** (one motif
   tiled all the way round). Not a letter, but the clearest candidate yet
   for a tiling frame border, if the user wants frames from these sheets.
+- `thuluth-25-wali-tawfiq.webp` (2026-10-16): "الله ولي التوفيق" as the main
+  line, large: الله with its tall alif and lams, ولي with a very long ya
+  sweeping under the whole middle, التوفيق stacked at the left. The small
+  stacked block above the sweep reads like "نعم المولى ونعم النصير" (to
+  confirm) — the small-companion-text technique again, filling the space
+  the long ya leaves. **The bottom edge is cropped**: the lowest part of
+  the ya's sweep is cut off, so a fuller scan would be needed to trace it.
+  No signature, no border.
