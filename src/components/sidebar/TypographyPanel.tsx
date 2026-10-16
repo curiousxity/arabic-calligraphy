@@ -241,19 +241,9 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
                 </div>
               );
             }
-            if (kashidaOk === false) {
-              return (
-                <div className="field" data-testid="kashida-unsupported">
-                  <span className="fieldTitle">Kashida</span>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                    This font has no kashida (tatweel) stroke, so its joins
-                    can't be stretched and Fit to width can't widen it. Use
-                    Letter or Word spacing instead, or switch to a font that
-                    has one.
-                  </div>
-                </div>
-              );
-            }
+            // No working tatweel: hide the whole section, Fit to width
+            // included, rather than explain it.
+            if (kashidaOk === false) return null;
 
             // The ordinal is clamped rather than reset, so editing the
             // text (which changes how many slots there are) can never

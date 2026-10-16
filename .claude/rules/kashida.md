@@ -101,10 +101,11 @@ the real files. A failed font load answers `true` and is not cached.
 
 Where the answer is used:
 - **Typography** (`useKashidaSupport`): the Kashida section, including Fit
-  to width, is replaced by a note. While the probe is pending (`null`) the
+  to width, is hidden outright, with no explanatory note (the user's call:
+  don't explain what can't be done). While the probe is pending (`null`) the
   controls show.
-- **Fit to width** (`fitSelectedBlockToWidth`): refuses with a status line,
-  for a font switched while the probe ran.
+- **Fit to width** (`fitSelectedBlockToWidth`): returns silently, for a font
+  switched while the probe ran.
 - **Verse justify** (`solveVerse`): passes `maxPerSlot: 0`, so the line is
   justified by spacing alone and any old tatweel is stripped.
 - **Stack conversion**'s close-the-gap retry is skipped.

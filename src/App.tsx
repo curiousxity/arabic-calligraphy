@@ -2610,12 +2610,9 @@ const App: React.FC = () => {
       setIsFittingWidth(true);
       try {
         // A font with no working tatweel would get blank gaps (or boxes)
-        // where the kashida should be. The panel hides Fit for it too; this
+        // where the kashida should be. The panel hides Fit for it; this
         // covers a font switched while the probe was still running.
-        if (!(await fontSupportsKashida(fontUrl))) {
-          setExportStatus("This font has no kashida, so Fit to width can't stretch it.");
-          return;
-        }
+        if (!(await fontSupportsKashida(fontUrl))) return;
         const result = await solveFitToWidth({
           text,
           target,

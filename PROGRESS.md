@@ -107,7 +107,7 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
   fonts have no working tatweel, so a kashida came out as a blank gap that
   split the letters (Jameel Noori, Gulzar), a box (Blaka), or nothing at all
   (Ruqaa). Each font is now probed once by shaping; for these four the
-  Kashida controls and Fit to width give way to a note, and verse Justify
+  Kashida controls and Fit to width are hidden, and verse Justify
   uses spacing only. How: [kashida.md](.claude/rules/kashida.md).
 
 ### 2026-10-16 — Add medallion; Compositions wizard removed
