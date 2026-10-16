@@ -44,8 +44,8 @@ dotless).
 | 4 | ل lam (measuring nuqtas) — not لن | named (corrected) |
 | 5 | لا | named |
 | 6 | ن nun (measuring nuqtas) — not بن | named (corrected) |
-| 7 | بز | named; **drawn overlapping 8**, needs a split rule |
-| 8 | بت | named; **drawn overlapping 7**, needs a split rule |
+| 7 | ر ra — not بز | named (corrected); **drawn overlapping 8**, needs a split rule |
+| 8 | ب the body of ba — not بت | named (corrected); **drawn overlapping 7**, needs a split rule |
 | 9 | لا, large | named |
 | 10 | لا, small | named |
 | 11 | د dal (measuring nuqtas) — not نذ | named (corrected) |
@@ -850,8 +850,10 @@ pieces); a digit or arrowhead that **touches a letter** survives and
 would be traced as part of it. So every piece gets a numbers-and-arrows
 pass before its trace: list what is left touching the letter, erase it
 by hand where needed, and check the result with the user. The numbers
-are useful information too: note a piece's stroke order in this ledger
-before erasing it, in case the app ever animates or teaches strokes.
+are useful information too, and the user wants them kept (2026-10-16):
+**record each piece's stroke order in this ledger before erasing its
+numbers** (which stroke is 1, 2, 3…, and the arrow directions), in case
+the app ever animates or teaches strokes.
 
 Suggested review order, easiest first, so the method is agreed on clean
 pieces before the hard ones: t16 row 6 (low final mims), t13 rows 1–2 (fa,
