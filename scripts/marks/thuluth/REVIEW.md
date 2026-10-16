@@ -356,3 +356,14 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   ح head running into a medial kaf, then ma and a final alif. Possibly the
   example for the caption "الكاف السيفي المفرد والوسط" (to confirm). Clean,
   dotless, small (about 300 px wide), so it traces coarser than the others.
+- Row 5, `thuluth-14-row5.webp` (2026-10-16): the construction sheet for
+  the kafs in words, two halves:
+  - Right, "الكاف الزنادي مع النهائي وفي الوسط والكاف السيفي الاولى" (the
+    zinadi kaf with the final and medial, and the initial saifi kaf): a
+    stacked بكلك-like run and a كا.
+  - Left, "الكاف السيفي المفرد والوسط" (the saifi kaf, single and medial —
+    the caption from the notes): بكر and بكلا.
+  Heavy measurement: nuqta columns, dotted construction diagonals, stroke
+  numbers and arrows on every piece. The best reference for proportions on
+  this sheet, but the hardest to clean; the letters touch the construction
+  lines in many places.
