@@ -101,6 +101,36 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-16 — Mark library
+
+- **Marks panel**: 67 loose pen pieces (strokes & tails, heads & loops,
+  dots, small signs), traced from a reference sheet. Click one, then click
+  the canvas. The **Mark** panel sizes, colours, turns, flips or swaps it.
+  How it works: [marks.md](.claude/rules/marks.md).
+- Same day: 15 more from a second, cleaner sheet (آ, ھ, ه over و, a kaf
+  head, long downstrokes and bases); repeats of the first sheet skipped.
+- `e2e/marks.spec.ts` is written and typechecks but has **not been run**
+  (browser tests skipped this session).
+
+### 2026-10-16 — Tilt and stretch more marks in a composition
+
+- **Tilt a long mark**: drag just outside a fatha, kasra, tanween stroke,
+  kaf's stroke or damma, as with a letter. A stretched mark turns as one.
+- **Stretch more marks**: each tanween stroke (19 fonts), the stroke inside a
+  final kaf (10 fonts), and a damma by its tail (19 fonts). Numbers and the
+  fonts left out: [stacked-compositions.md](.claude/rules/stacked-compositions.md).
+
+### 2026-10-16 — Long fatha and kasra
+
+- **Stretch a fatha or kasra in a stacked composition.** In the editor
+  window, rest on the mark, press either end and pull: it is cut across its
+  middle and the gap is filled at the pen's own width. Shift keeps a pull —
+  this one or a letter's tail — on the stroke's line. Delete or right-click
+  heals it. How and the measured gate:
+  [stacked-compositions.md](.claude/rules/stacked-compositions.md); what
+  comes next: the roadmap in
+  [deferred-features.md](.claude/rules/deferred-features.md).
+
 ### 2026-10-16 — Styles and Palettes removed
 
 - **Typography's saved Styles list and colour Palettes are gone**, judged

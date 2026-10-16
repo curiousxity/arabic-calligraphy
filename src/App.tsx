@@ -64,7 +64,8 @@ import {
   type WritingSession,
 } from "./lib/guides";
 import { DEFAULT_ATTACHMENT } from "./lib/guidePlacement";
-import type { GuideAttachment, GuideBlock, GuideParams, GuideShape } from "./types";
+import type { GuideAttachment, GuideBlock, GuideParams, GuideShape, MarkBlock } from "./types";
+import { markScale, type MarkItem } from "./lib/markLibrary";
 import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
@@ -686,6 +687,8 @@ const App: React.FC = () => {
   const [stackMoveTogether, setStackMoveTogether] = useState(true);
   /** Editor preference, not block state: "Fill a guide shape" busies the gaps with tashkeel. */
   const [stackFillGaps, setStackFillGaps] = useState(true);
+  /** Editor preference: how many tashkeel the gap fill adds, 0 (few) to 1 (every gap). */
+  const [stackFillAmount, setStackFillAmount] = useState(0.3);
 
   const setDetachedMark = useCallback(
     (blockId: number, o: DetachedMarkOverride) => {
@@ -1996,6 +1999,29 @@ const App: React.FC = () => {
     beginPlacement(guide, w, h, 0, 0, "New Guide");
   };
 
+  // Marks: loose pen pieces from the library. Sized and coloured like the
+  // selected block, so a dot added beside a word matches it. See
+  // .claude/rules/marks.md.
+  const addMarkBlock = (item: MarkItem) => {
+    const like = selectedBlock && selectedBlock.type !== "guide" ? selectedBlock : undefined;
+    const fontSize = like?.fontSize ?? DEFAULT_NEW_BLOCK_FONT_SIZE;
+    const mark: MarkBlock = {
+      ...DEFAULT_BLOCK,
+      id: createNextId(),
+      text: "",
+      type: "mark",
+      markId: item.id,
+      markD: item.d,
+      fontSize,
+      color: like?.color ?? DEFAULT_BLOCK.color,
+      x: 0,
+      y: 0,
+    };
+    // The outline is centred on the origin, so the click is the centre.
+    const s = markScale(fontSize);
+    beginPlacement(mark, item.w * s, item.h * s, 0, 0, "New Mark");
+  };
+
   /** A guide from an uploaded outline, at its natural size, placed by a click like the others. */
   const addSvgGuideBlock = (pathData: string) => {
     const src = uploadedGuideSource(pathData);
@@ -3259,6 +3285,7 @@ const App: React.FC = () => {
         onAddTextPathBlock={addTextPathBlock}
         onAddGuide={addGuideBlock}
         onAddSvgGuide={addSvgGuideBlock}
+        onAddMark={addMarkBlock}
         onUpdateGuideParams={updateGuideParams}
         onAddTextToGuide={addTextToGuide}
         onAttachToGuide={attachSelectedToGuide}
@@ -3420,6 +3447,8 @@ const App: React.FC = () => {
           onMoveTogether={setStackMoveTogether}
           fillGaps={stackFillGaps}
           onFillGaps={setStackFillGaps}
+          fillAmount={stackFillAmount}
+          onFillAmount={setStackFillAmount}
           loadFillers={loadStackFillers}
           onDone={commitStackEditor}
           onCancel={() => setStackEditorId(null)}

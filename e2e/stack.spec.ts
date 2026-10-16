@@ -733,3 +733,69 @@ test("a pulled tail's cut edge slides along the stroke; Delete or right-click re
   await done(page);
   expect((await fullPiecesOf(page)).length).toBe(before.length);
 });
+
+test("pulling either end of a fatha stretches it across its middle; Delete makes it whole", async ({ page }) => {
+  await gotoApp(page);
+  await chooseFont(page, "Thuluth");
+  await setBlockText(page, "بَ");
+  await settleFrames(page);
+  await convert(page);
+  await openEditor(page);
+
+  const before = await fullPiecesOf(page);
+  const fathaIdx = before.findIndex((p) => p.role === "mark" && p.id.startsWith("m"));
+  expect(fathaIdx).toBeGreaterThanOrEqual(0);
+  const fatha = before[fathaIdx];
+
+  // Hovering the fatha offers its two ends; a press on one cuts the mark in two.
+  const at = await findCutSpan(page, [fathaIdx]);
+  expect(await namedNodeCount(page, "stack-cut", { editor: true })).toBe(2);
+  // The stroke's axis on screen: from one end span's centre to the other's.
+  const axis = await page.evaluate(() => {
+    const [a, b] = window.__HARF__!.getEditorStage()!.find(".stack-cut").map((n) => n.getClientRect());
+    return { x: b.x + b.width / 2 - a.x - a.width / 2, y: b.y + b.height / 2 - a.y - a.height / 2 };
+  });
+  await page.mouse.move(at.x, at.y);
+  await settleFrames(page);
+  expect(await hitTargetAt(page, at, { editor: true })).toBe("Line.stack-cut");
+  const centre = await pieceCentre(page, fathaIdx);
+  await page.mouse.down();
+  await expect.poll(async () => (await fullPiecesOf(page)).length).toBe(before.length + 1);
+  const split = await fullPiecesOf(page);
+  const cap = split.find((c) => !before.some((p) => p.id === c.id))!;
+  expect(cap.role).toBe("mark");
+  expect(cap.parentId).toBe(fatha.id);
+
+  // The drag pulls the pressed end outward; nothing else moves. With Shift
+  // the pull stays on the stroke's own line, even when the pointer strays
+  // across it: the end moves along the axis the two end spans lie on.
+  const out = { x: at.x - centre.x, y: at.y - centre.y };
+  const len = Math.hypot(out.x, out.y) || 1;
+  await page.keyboard.down("Shift");
+  await page.mouse.move(at.x + out.x / len, at.y + out.y / len);
+  await page.mouse.move(at.x + (out.x / len) * 40 + 25, at.y + (out.y / len) * 40 + 25, { steps: 8 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await settleFrames(page);
+  const after = await fullPiecesOf(page);
+  const capAfter = after.find((p) => p.id === cap.id)!;
+  const moved = { x: capAfter.x - cap.x, y: capAfter.y - cap.y };
+  expect(Math.hypot(moved.x, moved.y)).toBeGreaterThan(10);
+  const sideways = Math.abs(moved.x * axis.y - moved.y * axis.x) / Math.hypot(axis.x, axis.y);
+  expect(sideways / Math.hypot(moved.x, moved.y)).toBeLessThan(0.02);
+  for (const p of after) {
+    if (p.id === cap.id) continue;
+    const q = split.find((s) => s.id === p.id)!;
+    expect(Math.abs(p.x - q.x) + Math.abs(p.y - q.y)).toBeLessThan(1e-3);
+  }
+
+  // Delete over the pulled end: the fatha is one piece again.
+  await page.mouse.move(5, 5);
+  const onCap = await pointOn(page, "stack-piece", after.findIndex((p) => p.id === cap.id));
+  expect(onCap).not.toBeNull();
+  await page.mouse.move(onCap!.x, onCap!.y);
+  await settleFrames(page);
+  await page.keyboard.press("Delete");
+  await expect.poll(async () => (await fullPiecesOf(page)).length).toBe(before.length);
+  await expect(page.getByTestId("stack-editor")).toBeVisible();
+});

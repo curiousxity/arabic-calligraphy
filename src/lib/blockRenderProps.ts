@@ -105,3 +105,10 @@ export const stackProps = (b: Extract<Block, { type: "stack" }>) => ({
   nib: b.nib,
   unitsPerEm: b.unitsPerEm,
 });
+
+export const markProps = (b: Extract<Block, { type: "mark" }>) => ({
+  ...typographicProps(b),
+  // `?? ""`: like stackProps, a hand-edited save is not validated on load.
+  markD: b.markD ?? "",
+  markFlipX: b.markFlipX ?? false,
+});

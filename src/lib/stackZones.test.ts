@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DETECT_OPTS, type CutZone } from "./strokeCuts";
-import { cutAtPress, fromZoneFrame, invertTransform, pullSpans, spanProbes, stackDetectOpts, toZoneFrame, zoneRect } from "./stackZones";
+import { DEFAULT_DETECT_OPTS, type CutZone, type Pt } from "./strokeCuts";
+import type { SvgCmd } from "./svgPath";
+import {
+  cutAtPress, fromZoneFrame, invertTransform, markPullSpans, markStrokeAxis, MARK_MOVE_FRACTION, pullSpans, spanProbes,
+  stackDetectOpts, toZoneFrame, zoneRect,
+} from "./stackZones";
 
 const zone = (over: Partial<CutZone> = {}): CutZone => ({
   glyphIndex: 0, cluster: 0, fromX: 100, toX: 500, thickness: 40, angle: 0, fit: 0, centreY: -200, ...over,
@@ -110,5 +114,37 @@ describe("stackDetectOpts", () => {
     expect(o.step).toBe(20);
     expect(o.minZoneWidth).toBe(50);
     expect(o.maxSlope).toBe(DEFAULT_DETECT_OPTS.maxSlope);
+  });
+});
+
+describe("markStrokeAxis / markPullSpans", () => {
+  // A 300 × 40 bar tilted −30°: a fatha's shape, stripped to its axis.
+  const tilt = -Math.PI / 6;
+  const bar = (len: number, wid: number): SvgCmd[] => {
+    const pts: Pt[] = [[0, -wid / 2], [len, -wid / 2], [len, wid / 2], [0, wid / 2]].map((p) => fromZoneFrame(p as Pt, tilt));
+    return [{ type: "M", x: pts[0][0], y: pts[0][1] }, ...pts.slice(1).map((p) => ({ type: "L" as const, x: p[0], y: p[1] })), { type: "Z" }];
+  };
+
+  it("finds the long axis, the centroid and the width of a tilted stroke", () => {
+    const a = markStrokeAxis(bar(300, 40))!;
+    expect(Math.abs(Math.sin(a.angle - tilt))).toBeLessThan(1e-9);   // same line, either direction
+    expect(a.to - a.from).toBeCloseTo(300, 6);
+    expect(a.width).toBeCloseTo(40, 6);
+    expect(a.centre).toBeCloseTo((a.from + a.to) / 2, 6);
+  });
+
+  it("is null for a mark not clearly longer than wide", () => {
+    expect(markStrokeAxis(bar(100, 40))).toBeNull();
+    expect(markStrokeAxis([])).toBeNull();
+  });
+
+  it("offers the two ends and keeps the middle for moving", () => {
+    const a = markStrokeAxis(bar(300, 40))!;
+    const spans = markPullSpans(a);
+    expect(spans.map((s) => s.side)).toEqual(["near", "far"]);
+    const L = a.to - a.from;
+    expect(spans[1].span[0] - spans[0].span[1]).toBeCloseTo(MARK_MOVE_FRACTION * L, 6);
+    expect(spans[0].span[0]).toBe(a.from);
+    expect(spans[1].span[1]).toBe(a.to);
   });
 });

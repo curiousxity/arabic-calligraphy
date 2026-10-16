@@ -15,9 +15,9 @@ import { rebasePiece, pieceTransform } from "./stackOutline";
 import { traceCurve, PROFILE_SAMPLES, type CurveTrace } from "./stackCurve";
 import { joinCenterline, solveJoinDrag, faceThickness } from "./stackJoin";
 import { pointInPolygon } from "./svgPath";
-import { stackDetectOpts } from "./stackZones";
+import { markStrokeAxis, stackDetectOpts } from "./stackZones";
 import { findDetachedMarks, buildDetachedMarkPlan, splitContours, type DetachedMarkOverride } from "./detachedMarks";
-import { findDiacriticGlyphIndices } from "./diacritics";
+import { ARABIC_DIACRITIC_RE, findDiacriticGlyphIndices } from "./diacritics";
 
 export type ConvertInput = {
   glyphs: HarfBuzzGlyph[];
@@ -44,6 +44,8 @@ type Placed = {
   px: number; py: number;
   cmds: SvgCmd[];
   kind: "letter" | "tatweel" | "mark";
+  /** A mark glyph that draws a damma (see `isDammaGlyph`). */
+  damma: boolean;
   /** A letter's own dots, hamza or kaf stroke, split out of `cmds`, with
    *  the user's offset in font units. */
   detached: { cmds: SvgCmd[]; dx: number; dy: number }[];
@@ -89,12 +91,38 @@ function placeGlyphs(input: ConvertInput): Placed[] {
         px: penX + (g.dx ?? 0) + (cutPlan?.shift[i] ?? 0) + (whole?.[0] ?? 0),
         py: -(g.dy ?? 0) + (whole?.[1] ?? 0),
         cmds, kind, detached,
+        damma: kind === "mark" && isDammaGlyph(obj.unicodes ?? [], clusterText(glyphs, i, shapableText)),
       });
     }
     penX += ax;
   }
   return out;
 }
+
+const DAMMA = 0x064f;
+
+/** The source text of glyph `i`'s cluster: from its `cl` to the next larger one. */
+function clusterText(glyphs: readonly HarfBuzzGlyph[], i: number, text: string): string {
+  const cl = glyphs[i].cl ?? 0;
+  const next = glyphs.reduce((m, g) => ((g.cl ?? 0) > cl && (g.cl ?? 0) < m ? (g.cl ?? 0) : m), text.length);
+  return text.slice(cl, next);
+}
+
+/**
+ * Whether a mark glyph is a damma: its cmap says so, or — for the faces
+ * that draw marks as unencoded or Private Use glyphs (Thuluth) — its
+ * cluster's only mark is a damma. A cluster with two marks and no cmap
+ * answer is left alone rather than guessed at.
+ */
+function isDammaGlyph(unicodes: readonly number[], cluster: string): boolean {
+  if (unicodes.includes(DAMMA)) return true;
+  if (unicodes.some((u) => ARABIC_DIACRITIC_RE.test(String.fromCodePoint(u)))) return false;
+  const marks = [...cluster].filter((ch) => ARABIC_DIACRITIC_RE.test(ch));
+  return marks.length === 1 && marks[0].codePointAt(0) === DAMMA;
+}
+
+/** Kaf letters whose detached mark is the kaf's own stroke (no dots). */
+const KAF_LETTERS = new Set(["\u0643", "\u06A9", "\u06AF"]);
 
 /** The run as one path in run space — what the text block draws. */
 export function runOutline(input: ConvertInput): SvgCmd[] {
@@ -203,18 +231,36 @@ export function convertRunToStack(input: ConvertInput): ConvertResult {
     const parent = ownerOf(m.cl);
     if (!parent) continue;
     const cmds = markAdjusted(m.cmds, o);
+    const x = m.px + (o?.offsetX ?? 0) * scale, y = m.py + (o?.offsetY ?? 0) * scale;
+    const base = { rotation: 0, homeX: 0, homeY: 0, order: parent.order, role: "mark" as const, faces: [] };
+    // Tanween is two (or three) strokes in one glyph, and one cut cannot
+    // split two strokes. When every contour is a fatha-like stroke on its
+    // own, each becomes a piece: the first rides on the letter, the rest on
+    // the first, so a drag still moves the pair and each stretches alone.
+    const strokes = splitContours(cmds);
+    if (strokes.length > 1 && strokes.every((c) => markStrokeAxis(c))) {
+      const first = `m${m.index}`;
+      strokes.forEach((c, k) => markPieces.push({
+        ...base, id: k === 0 ? first : `${first}s${k}`, cmds: c, x, y, pivot: cmdsCentre(c),
+        parentId: k === 0 ? parent.id : first,
+      }));
+      continue;
+    }
     markPieces.push({
-      id: `m${m.index}`, cmds, x: m.px + (o?.offsetX ?? 0) * scale, y: m.py + (o?.offsetY ?? 0) * scale, rotation: 0,
-      pivot: cmdsCentre(cmds), homeX: 0, homeY: 0, order: parent.order, role: "mark", parentId: parent.id, faces: [],
+      ...base, id: `m${m.index}`, cmds, x, y, pivot: cmdsCentre(cmds), parentId: parent.id,
+      ...(m.damma ? { markKind: "damma" as const } : {}),
     });
   }
 
   // A letter's own dots, hamza or kaf stroke: rider pieces on the letter.
   for (const d of drafts) {
+    // A kaf has no dots, so whatever detaches from one is its stroke.
+    const kaf = KAF_LETTERS.has(shapableText[d.placed.cl]);
     d.placed.detached.forEach((m, k) => {
       markPieces.push({
         id: `d${d.placed.index}-${k}`, cmds: m.cmds, x: d.placed.px + m.dx, y: d.placed.py + m.dy, rotation: 0,
         pivot: cmdsCentre(m.cmds), homeX: 0, homeY: 0, order: d.order, role: "mark", parentId: d.id, faces: [],
+        ...(kaf ? { markKind: "kafStroke" as const } : {}),
       });
     });
   }
@@ -233,20 +279,24 @@ export function convertRunToStack(input: ConvertInput): ConvertResult {
   return { pieces, joins, unjoined };
 }
 
-/** Cut a piece's stroke. The fragment with the smaller bounds is the end cap:
- *  it becomes its own letter piece riding on the body (`parentId`, same
- *  order) and is joined to it. The body keeps the original id whichever side
- *  of the cut it is on, so existing joins on the body stay valid; faces and
- *  join references follow whichever fragment now holds them. */
+/** Cut a piece's stroke. The fragment with the smaller bounds is the end cap
+ *  unless `capSide` names it (a mark is cut across its middle, and the half
+ *  pressed is the one that moves): it becomes its own piece of the same role
+ *  riding on the body (`parentId`, same order) and is joined to it. The body
+ *  keeps the original id whichever side of the cut it is on, so existing
+ *  joins on the body stay valid; faces and join references follow whichever
+ *  fragment now holds them. A filler is never cut: a re-run strips fillers
+ *  by flag and would leave the cap and its join behind. */
 export function splitPieceAtCut(
-  pieces: readonly StackPiece[], joins: readonly StackJoin[], pieceId: string, cut: { cutX: number; angle: number }
+  pieces: readonly StackPiece[], joins: readonly StackJoin[], pieceId: string, cut: { cutX: number; angle: number },
+  capSide?: "near" | "far"
 ): { pieces: StackPiece[]; joins: StackJoin[] } | null {
   const p = pieces.find((x) => x.id === pieceId);
-  if (!p || p.role !== "letter") return null;
+  if (!p || p.filler) return null;
   const split = splitAtCut(p.cmds, cut);
   if (!split) return null;
   const boundsArea = (cmds: SvgCmd[]) => { const b = outlineBounds(cmds); return (b.x2 - b.x1) * (b.y2 - b.y1); };
-  const capIsNear = boundsArea(split.near) <= boundsArea(split.far);
+  const capIsNear = capSide ? capSide === "near" : boundsArea(split.near) <= boundsArea(split.far);
   const bodyCmds = capIsNear ? split.far : split.near;
   const capCmds = capIsNear ? split.near : split.far;
   const bodyNewFace = capIsNear ? split.farFace : split.nearFace;
@@ -281,9 +331,13 @@ export function splitPieceAtCut(
   });
 
   const body: StackPiece = { ...rebasePiece(p, bodyCmds), faces: [...bodyIdxs.map((i) => p.faces[i]), bodyNewFace] };
+  // A cap is a plain stroke: the kaf's or damma's own rule was for the
+  // whole mark, and a damma's tail is no longer a damma.
+  const { markKind: _kind, ...plain } = p;
+  void _kind;
   const cap: StackPiece = {
-    ...rebasePiece({ ...p, id: capId }, capCmds),
-    role: "letter", parentId: p.id, order: p.order,
+    ...rebasePiece({ ...plain, id: capId }, capCmds),
+    role: p.role, parentId: p.id, order: p.order,
     faces: [...capIdxs.map((i) => p.faces[i]), capNewFace],
   };
   const remap = (ref: { pieceId: string; faceIndex: number }) =>
@@ -297,12 +351,14 @@ export function splitPieceAtCut(
   return { pieces: pieces.map((x) => (x.id === p.id ? body : x)).concat(cap), joins: newJoins };
 }
 
-/** The piece a chain of tails was split from: follow `parentId` up. */
+/** The piece a chain of tails was split from: follow `parentId` up while
+ *  the role holds. A mark rides on its letter, so a stretched fatha's root
+ *  is the fatha, not the letter under it. */
 function rootOf(byId: Map<string, StackPiece>, p: StackPiece): string {
   let q = p;
   for (let guard = 0; q.parentId !== undefined && guard < 1000; guard++) {
     const up = byId.get(q.parentId);
-    if (!up) break;
+    if (!up || up.role !== q.role) break;
     q = up;
   }
   return q.id;
@@ -310,7 +366,7 @@ function rootOf(byId: Map<string, StackPiece>, p: StackPiece): string {
 
 /**
  * A stretch: a plain cut (a pulled tail's join) between two pieces of one
- * letter. `inner` is the side toward the letter's body — fewer joins away
+ * letter, or of one mark (a stretched fatha). `inner` is the side toward the letter's body — fewer joins away
  * from it through the letter's own pieces — and `outer` the side away. Pull
  * a tail twice from its middle and the chain is body → middle → tip, so
  * "inner" is a distance, not who rides on whom. Only a plain join qualifies:
@@ -324,7 +380,7 @@ export function stretchCut(pieces: readonly StackPiece[], joins: readonly StackJ
   if (!join || join.profile || join.fallback) return null;
   const byId = new Map(pieces.map((p) => [p.id, p]));
   const a = byId.get(join.from.pieceId), b = byId.get(join.to.pieceId);
-  if (!a || !b || a.role !== "letter" || b.role !== "letter") return null;
+  if (!a || !b || a.role !== b.role) return null;
   const root = rootOf(byId, a);
   if (rootOf(byId, b) !== root) return null;
   const fa = a.faces[join.from.faceIndex], fb = b.faces[join.to.faceIndex];
@@ -353,7 +409,7 @@ export function stretchCut(pieces: readonly StackPiece[], joins: readonly StackJ
 }
 
 /** The stretch a tail hangs from: the plain cut on its inner side. Null for
- *  a piece that is not a pulled tail (a letter's body, a mark, a freed curve's end). */
+ *  a piece that is not a pulled tail (a letter's body, a whole mark, a freed curve's end). */
 export function stretchOf(pieces: readonly StackPiece[], joins: readonly StackJoin[], pieceId: string) {
   for (const j of joins) {
     if (j.from.pieceId !== pieceId && j.to.pieceId !== pieceId) continue;

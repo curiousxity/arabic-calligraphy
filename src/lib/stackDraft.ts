@@ -62,9 +62,9 @@ export function setJoinBend(d: StackDraft, joinId: string, bend: { bow: number; 
 
 /** Cut a piece; the cap is the piece the split appended (the overlay pulls it in the same gesture). */
 export function splitDraft(
-  d: StackDraft, pieceId: string, cut: { cutX: number; angle: number }
+  d: StackDraft, pieceId: string, cut: { cutX: number; angle: number }, capSide?: "near" | "far"
 ): { draft: StackDraft; cap: { id: string; x: number; y: number } } | null {
-  const next = splitPieceAtCut(d.pieces, d.joins, pieceId, cut);
+  const next = splitPieceAtCut(d.pieces, d.joins, pieceId, cut, capSide);
   if (!next) return null;
   const cap = next.pieces[next.pieces.length - 1];
   return { draft: { ...d, pieces: next.pieces, joins: next.joins }, cap: { id: cap.id, x: cap.x, y: cap.y } };
@@ -113,11 +113,11 @@ export function inkBoundsPx(d: StackDraft, unitsPerEm: number): Box {
  */
 export function arrangeDraft(
   d: StackDraft, unitsPerEm: number, shapePx: Array<[number, number]>, fillers: FillerShape[],
-  placement?: { x: number; y: number; rotation: number }
+  placement?: { x: number; y: number; rotation: number }, fillerAmount = 1
 ): { draft: StackDraft; result: ArrangeResult } | null {
   const result = arrangeStackInShape({
     pieces: d.pieces.filter((p) => !p.filler), joins: d.joins, shapePx,
-    fontSize: d.fontSize, unitsPerEm, fillers, pullStems: true,
+    fontSize: d.fontSize, unitsPerEm, fillers, fillerAmount, pullStems: true,
   });
   if (!result) return null;
   return {

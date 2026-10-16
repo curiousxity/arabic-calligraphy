@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { shapedTextProps, textPathProps } from "./blockRenderProps";
+import { markProps, shapedTextProps, textPathProps } from "./blockRenderProps";
 import type { Block } from "../types";
 import { resolveGuidePath } from "./guides";
 
@@ -35,5 +35,17 @@ describe("guide-attached Curve props", () => {
     const t = { id: 2, type: "textPath", guide: { id: 1 } };
     expect(resolveGuidePath([guide as never], t as never)).toMatchObject({ d: guide.guideD, closed: true, x: 5, y: 6, rotation: 30 });
     expect(resolveGuidePath([], t as never)).toBeNull();
+  });
+});
+
+describe("markProps", () => {
+  it("carries the outline, flip and styling, defaulting a dropped outline to empty", () => {
+    const b = {
+      id: 3, type: "mark", markId: "dots-40", markD: "M0 0L1 0L1 1Z", markFlipX: true,
+      text: "", x: 0, y: 0, fontSize: 40, color: "#123456", fontFamily: "Amiri",
+      stroke: "#000", shadowColor: "#000", rotation: 15,
+    } as unknown as Extract<Block, { type: "mark" }>;
+    expect(markProps(b)).toMatchObject({ markD: "M0 0L1 0L1 1Z", markFlipX: true, color: "#123456", rotation: 15 });
+    expect(markProps({ ...b, markD: undefined as never, markFlipX: undefined })).toMatchObject({ markD: "", markFlipX: false });
   });
 });

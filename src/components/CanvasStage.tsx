@@ -6,6 +6,7 @@ import { ShapeFillText } from "./ShapeFillText";
 import { TextOnPathText } from "./TextOnPathText";
 import { GuideView } from "./GuideView";
 import { StackView } from "./StackView";
+import { MarkView } from "./MarkView";
 import { resolveGuidePath, type WritingSession } from "../lib/guides";
 import { isClosedPath } from "../lib/guideShapes";
 import { guideCaret, projectToGuide, type GuideCaret } from "../lib/guidePlacement";
@@ -93,6 +94,7 @@ import { EXPORT_HIDDEN } from "../lib/exportChrome";
 import {
   shapeFillProps,
   shapedTextProps,
+  markProps,
   stackProps,
   textPathProps,
 } from "../lib/blockRenderProps";
@@ -1216,6 +1218,21 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     // Editing lives in the editor window; double-click opens it
                     // (not while panning or locked — the old overlay's condition).
                     onDblClick={() => { if (!effectivePanMode && !block.locked) onEditStack(block.id); }}
+                  />
+                );
+              }
+
+              if (block.type === "mark") {
+                return (
+                  <MarkView
+                    key={block.id}
+                    {...commonProps}
+                    {...markProps(block)}
+                    x={block.x}
+                    y={block.y}
+                    opacity={block.opacity ?? 1}
+                    locked={block.locked}
+                    isSelected={block.id === selectedId}
                   />
                 );
               }

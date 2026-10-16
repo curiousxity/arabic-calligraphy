@@ -37,7 +37,13 @@ export const FontGallery: React.FC<FontGalleryProps> = ({
   return (
     <div className="fontPickerBody" data-testid={testId}>
       {groupByGenre(fonts).map((group) => (
-        <section key={group.genre} aria-label={group.genre}>
+        // `--cards` lets the start screen size each genre from its card count
+        // rather than from its content (see index.css, .startScreen).
+        <section
+          key={group.genre}
+          aria-label={group.genre}
+          style={{ "--cards": group.fonts.length } as React.CSSProperties}
+        >
           <h3 className="fontPickerGenre">{group.genre}</h3>
           <div className="fontPickerGrid">
             {group.fonts.map((font) => {

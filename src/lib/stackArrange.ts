@@ -27,6 +27,8 @@ export type ArrangeInput = {
   unitsPerEm: number;
   /** Ornaments for the gaps; omitted = no filler pass. */
   fillers?: readonly FillerShape[];
+  /** How busy the filler pass is, 0 (sparsest) to 1 (every gap). Default 1. */
+  fillerAmount?: number;
   /** Draw straight free stem ends out toward the boundary. Default false. */
   pullStems?: boolean;
 };
@@ -66,6 +68,10 @@ const MAX_TILT = Math.PI / 6;
 const FILLER_CELL = 0.2;
 const FILLER_GAP = 0.03;
 const FILLER_SHRINK = 0.6;
+/** The extra space kept between two fillers at the sparsest amount; it falls
+ *  to zero as the amount rises to 1. Only filler-to-filler: a filler still
+ *  slips into a narrow gutter beside the ink at any amount. */
+const FILLER_SPREAD = 0.8;
 /** Stem pull: march step, the least pull worth a cut, and the most. All ems. */
 const STEM_STEP = 0.02;
 const STEM_MIN = 0.1;
@@ -448,13 +454,15 @@ function arrangeAt(groups: Group[], shapePx: readonly Pt[], scale: number, upm: 
  * the cell's index (so neighbours differ), each at natural size then shrunk.
  * A candidate is accepted when its padded box's four corners and centre are
  * inside the shape, none of them is inside any ink contour, and the box
- * overlaps no filler already placed. Deterministic for the same input.
+ * stays `amount`'s spread clear of every filler already placed.
+ * Deterministic for the same input.
  */
 function fillGaps(
-  poly: readonly Pt[], ink: readonly Contour[], fillers: readonly FillerShape[], upm: number, order: number
+  poly: readonly Pt[], ink: readonly Contour[], fillers: readonly FillerShape[], upm: number, order: number, amount: number
 ): StackPiece[] {
   if (fillers.length === 0) return [];
   const cell = FILLER_CELL * upm, pad = FILLER_GAP * upm;
+  const spread = (1 - Math.min(1, Math.max(0, amount))) * FILLER_SPREAD * upm;
   const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
   const cands = fillers.map((f) => ({ name: f.name, cmds: f.cmds, box: outlineBounds(f.cmds) }));
@@ -476,7 +484,7 @@ function fillGaps(
           const probes = boxProbes(wb);
           if (!probes.every(([px, py]) => inside(px, py))) continue;
           if (boxMeetsInk(wb, probes, ink)) continue;
-          if (placed.some((o) => !(wb.x2 <= o.x1 || wb.x1 >= o.x2 || wb.y2 <= o.y1 || wb.y1 >= o.y2))) continue;
+          if (placed.some((o) => !(wb.x2 + spread <= o.x1 || wb.x1 - spread >= o.x2 || wb.y2 + spread <= o.y1 || wb.y1 - spread >= o.y2))) continue;
           placed.push(wb);
           out.push({
             id: `f${out.length + 1}`, cmds, x, y, rotation: 0, pivot, homeX: x, homeY: y,
@@ -693,7 +701,7 @@ export function arrangeStackInShape(input: ArrangeInput): ArrangeResult | null {
     const r = pullStemEnds(arrangedPieces, arrangedJoins, groups.map((g) => g.letter.id), polyFU, upm);
     arrangedPieces = r.pieces; arrangedJoins = r.joins; stems = r.stems;
   }
-  const fills = fillGaps(polyFU, inkContours(arrangedPieces), input.fillers ?? [], upm, maxOrder);
+  const fills = fillGaps(polyFU, inkContours(arrangedPieces), input.fillers ?? [], upm, maxOrder, input.fillerAmount ?? 1);
   return {
     pieces: [...arrangedPieces, ...fills],
     joins: arrangedJoins,

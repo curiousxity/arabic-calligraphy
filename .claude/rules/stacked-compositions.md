@@ -125,7 +125,68 @@ the stroke's frame) is visually left, which is the **later** letter in
 reading order. `convertRunToStack` relies on this when handing fragments
 to pieces.
 
-**A tail is a split plus a join, and the end cap is a rider.** `splitPieceAtCut` makes the smaller fragment an end cap: `role: "letter"` (it keeps a tilt handle), `parentId` = the body, same `order`. `chainOf` treats any piece with a `parentId` as a rider — it moves with its body, is draggable alone, and never drags anything else. Neither side of the cut is "the tail"; size decides. Cap ids are `<body>t<n>` with a monotonic `n` (relies on pieces never being deleted).
+**A tail is a split plus a join, and the end cap is a rider.** `splitPieceAtCut` makes the smaller fragment an end cap (or the side `capSide` names): the cut piece's own role (a letter's cap keeps a tilt handle), `parentId` = the body, same `order`. `chainOf` treats any piece with a `parentId` as a rider — it moves with its body, is draggable alone, and never drags anything else. Neither side of the cut is "the tail"; size decides. Cap ids are `<body>t<n>` with a monotonic `n` (relies on pieces never being deleted).
+
+**A fatha or kasra stretches the same way, cut at its middle**
+(`markStrokeAxis`, `markPullSpans`, `stackZones.ts`; since 2026-10-16). The
+stroke detector wants parallel edges and a fatha is a tapered wedge: in
+Thuluth and Amiri it finds no zone on one at all. So a mark's stroke is its
+**long axis from the outline's second moments**, the cut is always across
+the ink's centroid (its widest part, so the band is the nib's full width),
+and outside the middle `MARK_MOVE_FRACTION` of its length (which still
+moves the mark) each end is a press target whose `capSide` is that end — the
+half pressed moves, whatever its size.
+`MARK_MIN_ASPECT` (3.7) is measured, not chosen: fatha/kasra 4.0 (Yekan) to
+13 (Thuluth), damma at most 3.4 (AlFatemi), the rest ≤ 2.6; tanween passes
+some fonts' aspect but two strokes cannot be split by one cut, and the
+overlay offers only an axis `splitAtCut` accepts (pinned per font in
+`stackConvert.test.ts`). The cap is `role: "mark"` riding on the mark, so the
+letter carries both; `rootOf` stops where the role changes, which is what
+makes a mark's stretch a stretch (`stretchCut` wants the same role on both
+sides) and lets Delete heal it. **No slide edge on a mark**: there is no
+straight zone to slide along, so the overlay omits it. A filler is never cut
+(a re-run strips fillers by flag and would orphan the cap and its join).
+**Other marks (2026-10-16): one rule per kind, `markCutPlan`** (`stackZones.ts`,
+pure, `splitAtCut` injected so a plan always splits; the overlay and the tests
+call the same function). Measured on all 23 bundled faces with real shaping:
+- **Tanween** is split at *conversion*, not at the press: when every contour
+  of a mark passes `markStrokeAxis` (fathatan and kasratan in 19 faces), each
+  contour is its own piece — `m<i>` rides on the letter, `m<i>s<k>` on `m<i>`,
+  so dragging the first moves the pair and each stretches like a fatha. One
+  cut across two parallel strokes cannot split them (two contours crossed),
+  which is why it is done up front. Qahiri, Rana Kufi and Raqq draw tanween
+  as one contour and keep it whole. Dammatan is not split (its contours are
+  not strokes).
+- **The kaf's stroke** (`markKind: "kafStroke"`): the detached mark inside a
+  final or isolated ك/ک/گ (a kaf has no dots, so whatever detaches from it is
+  the stroke). Its wedge runs 1.3 to 2.7 long over wide, so it gets its own
+  gate, `KAF_STROKE_MIN_ASPECT` (1.3), never applied to anything unflagged —
+  a dot is 1.0 to 1.1. Ten faces detach it and all ten cut; Blaka's and
+  Janna's are round (1.1) and refuse. An initial or medial kaf's top stroke is
+  part of the letter body and is not this.
+- **Damma** (`markKind: "damma"`, from the glyph's cmap, or for a PUA face
+  from its cluster's only mark): `markTail` walks the long axis from the wide
+  end (the loop, which may hold a counter) to the first sample past the
+  counter under `TAIL_NECK_FRACTION` (0.7) of the widest, and cuts there;
+  only the tail end pulls (`capSide` = the tail's side). Guards: the tail
+  must be a quarter of the length and 12–60% of the ink
+  (`TAIL_MIN_SHARE`/`TAIL_MAX_SHARE`) — without the share check Blaka, Rabat
+  and Rana Kufi shaved a corner off. 19 faces cut; Blaka, Qahiri, Rabat,
+  Rana Kufi and Raqq do not.
+- **A cap never carries `markKind`** (`splitPieceAtCut` drops it): the kind's
+  rule is for the whole mark, and a damma's tail is no longer a damma.
+
+**Tilting a mark** (2026-10-16): every letter and every mark `markCutPlan`
+accepts, except a filler and a mark riding on a mark (a cap, a tanween's
+second stroke), gets a tilt ring. Mark rings render *below* letter rings, so
+where a small mark's band overlaps a letter's, the letter wins — the open
+question the roadmap raised. Turning a mark turns its riders with it about
+the mark's pivot (`orbitRiders`, `stackOutline.ts`, pure, tested to keep a
+stretched fatha's two cut faces coincident); a letter's riders still do not
+turn with it, as before.
+
+**Shift holds any pull** — tail or mark — to the stroke's axis (zone angle
+plus piece rotation), so it lengthens without bending.
 
 **A curve becomes a join** (`bendCurveAt`, `stackConvert.ts`; tracer in
 `stackCurve.ts`, pure). Hovering a letter outlines the apex third of each
@@ -356,7 +417,12 @@ candidates in a rotation starting at the cell index, at natural size then
 em) has its corners, edge midpoints and centre inside the shape, meets no
 ink (no probe inside a flattened piece contour *and* no contour vertex
 inside the box — five probes alone let a letter's corner poke in), and
-overlaps no placed filler. The cell and gap were tuned down from 0.33/0.06
+overlaps no placed filler by less than the **spread** — `(1 − amount) ×
+FILLER_SPREAD` (0.8 em), where `amount` is the window's "Tashkeel amount"
+slider (`fillerAmount`, App preference, default 0.3; 1 is the old
+every-gap carpet, which users found far too busy). The spread applies only
+between fillers, never to ink, so a sparse fill still reaches narrow
+gutters. The cell and gap were tuned down from 0.33/0.06
 because a padded dot could not enter the gutters of a composition whose
 letters are as wide as the shape. A filler is `role: "mark"` with no
 parent and `filler: true`: it drags alone, has no ring or cut spans,
