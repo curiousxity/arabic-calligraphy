@@ -658,3 +658,23 @@ both; never trace them.
 Both: invert before cleaning. The corner florals are not letters; they
 could be a later source for frame corner pieces (sheet `c`'s Frames group
 in the mark library), but only if the user wants that.
+
+## Sheet t25 — two panels with a small companion text (black on light)
+
+- `thuluth-25-naml-30.webp` (2026-10-16): "إنه من سليمان وإنه بسم الله
+  الرحمن الرحيم" (al-Naml 27:30). The Basmala is the main line, with the
+  long extended seen; the words before it, "إنه من سليمان وإنه", are
+  written **small and stacked into one compact block** sitting in the space
+  above the extended seen. The same small-text technique as sheet t22's
+  يعلمون, used for a whole phrase. Vertical floral borders at both ends:
+  not letters.
+- `thuluth-25-hadith.webp` (2026-10-16): a hadith panel in three tiers —
+  small top line "قال رسول الله صلى الله عليه وسلم", the main line "من حسن
+  إسلام المرء تركه ما لا يعنيه", and a small bottom line "صدق رسول الله"
+  (with its own long extended lam). Floral sprays beside the small lines,
+  a signature at the far left, small date digits (١٣ ٧٦?) under the main
+  line: remove all of them. The main line has tall lam-alifs and a long
+  stacked تركه ما.
+  The panel is enclosed by a **repeating patterned border** (one motif
+  tiled all the way round). Not a letter, but the clearest candidate yet
+  for a tiling frame border, if the user wants frames from these sheets.
