@@ -466,3 +466,9 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   - At the far left, an unlabelled mim with a long straight tail (the
     extended-ra mim, as in row 2's last piece).
   Clean, no measurement dots; labels need removing.
+- Row 6, `thuluth-16-row6.png` (2026-10-16): "الميمات النهائية المنخفضة" —
+  the **low final mims**, four of them, each a small head on a tail that
+  drops straight down. Right to left: two joined from a long rising
+  diagonal (the second with a tiny **dotted alternate** hook at the tail's
+  foot), then two joined from a short upright stub. Very clean, isolated
+  pieces; an easy first trace.
