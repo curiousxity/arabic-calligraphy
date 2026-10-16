@@ -182,3 +182,11 @@ complete.
   مفتوح). No measurement dots. Note: the open ha may not be used before a
   raised letter such as kaf or lam (لا يجوز استعمال الحاء المفتوح إذا وقعت قبل
   أحد الحروف المرتفعة مثل الكاف واللام).
+
+## Sheet t10 — the seen (row images)
+
+- Row 1, `thuluth-10-row1.png` (2026-10-16): "حرف السين" — س standalone
+  (labelled الفردي twice: the plain and the extended), لسه, سط with a medial
+  seen (labelled وسط), and "السين مع الميم" (seen with meem): سمد، سملا. A
+  faint dotted alternate outline above the سملا (the alif/lam, ~330–350 px
+  from the left). No measurement dots.
