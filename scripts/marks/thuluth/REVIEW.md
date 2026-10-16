@@ -416,3 +416,14 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   الله and محمد are whole-word pieces: candidates for word-level marks
   rather than letter pieces. Compare the lams with sheet t6, the mims with
   t2 pieces 8–11.
+- Row 2, `thuluth-16-row2.webp` (2026-10-16), right to left:
+  - "ميم وسط" (medial mim): one stacked بمـ-like piece with a construction
+    box.
+  - "الميمات النهائية" (final mims): بم/لم with a round bowl, a بم-like pair
+    ending in a long sweeping tail, and a tall stacked final mim whose tail
+    drops straight down (a vertical tail beside a nuqta column).
+  - "ميم الراء المرسلة" (the mim of the extended ra): لم-like, the mim's tail
+    taking the extended ra's sweep. **Dotted alternate** at its top right
+    (a different start for the head).
+  Measurement dots, construction boxes, stroke numbers and arrows on all
+  but the last piece, which is clean.
