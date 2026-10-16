@@ -220,3 +220,8 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   stacked مصحى-like word, سط, a ط over ع stack, a long طـ run, and مصى.
   Dotted alternate outlines: a vertical at the far left by the first word,
   and dotted pieces beside سط and the stacked ع. No measurement dots seen.
+- Row 3, `thuluth-11-row3.png` (2026-10-16, 771×271): two joined runs on
+  guide lines. Right: "صاد اولی و وسط و نهائی" — initial, medial and final sad
+  (صصص-like). Left: "طاد اولی و وسط و نهائی" — initial, medial and final tah
+  (ططط-like), the three tall tah uprights ending in arrowheads. Thin guide
+  lines run through both; no measurement dots or dotted alternates seen.
