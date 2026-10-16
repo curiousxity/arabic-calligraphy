@@ -400,3 +400,19 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   - small ء "همزة الكاف" (the kaf's hamza): "not to be used in place of the
     alif's hamza in the three scripts".
   So the two hamzas are distinct marks and must not be swapped.
+
+## Sheet t16 — lam, the two special words, and mim (row images)
+
+- Row 1, `thuluth-16-row1.webp` (2026-10-16), right to left:
+  - "اللام الاولى والوسط والنهائي" (lam at the start, middle and end): a
+    بلل-like run of tall lams.
+  - "لفظة الجلالة قاعدتها خاصة" — the word **الله has its own rule**.
+  - "كلمة محمد قاعدتها خاصة" — the word **محمد has its own rule** (stacked,
+    with a dotted construction diagonal).
+  - "الميمات الأولية" (initial mims): two مـ heads, the second with a dotted
+    alternate tail.
+  - "الميمات الوسطية" (medial mims): three بمـ-like pairs.
+  Measurement dots, guide lines, stroke numbers and arrows on all of them.
+  الله and محمد are whole-word pieces: candidates for word-level marks
+  rather than letter pieces. Compare the lams with sheet t6, the mims with
+  t2 pieces 8–11.
