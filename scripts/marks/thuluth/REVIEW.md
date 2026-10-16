@@ -580,3 +580,9 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   ain, اهدنا, الصراط with sad and tah side by side (compare sheet t11), and
   المستقيم with a long seen-ta-qaf run. Letter signs under letters (س, ع,
   ط, ص, م) again show sheet t19's signs in place.
+- `thuluth-20-fatiha-5.webp` (2026-10-16): "صراط الذين أنعمت عليهم غير"
+  (verse 7, first part; the next line should start with المغضوب). New
+  here: الذين, أنعمت with a very long ain-mim-ta sweep (the longest
+  extension in the set, with a long fatha stroke over it), عليهم stacked,
+  and غير with its returned ya. صراط repeats the previous line's الصراط:
+  a second copy to cross-check.
