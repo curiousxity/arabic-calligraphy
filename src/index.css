@@ -574,10 +574,14 @@ details:not([open]) > .sidebarPresetKeyboardSummary { margin-bottom: 0; padding-
    two to four faces, and the dialog's grid gives each genre its own row. Here
    the genres flow side by side and wrap, each sized to its own cards. */
 .startScreen .fontPickerBody { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 12px 28px; }
-.startScreen .fontPickerBody > section { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+/* Each genre's width is stated from its card count, not left to the content:
+   Safari (iPad) sized a section holding a wrapping row as if every card sat
+   on one line, so wrapped cards spilled over the next genre. The cards are a
+   fixed-column grid, so a section clamped by max-width wraps with a real height. */
+.startScreen .fontPickerBody > section { flex: 0 1 calc(var(--cards, 1) * 190px + (var(--cards, 1) - 1) * 10px); min-width: 0; max-width: 100%; }
 .startScreen .fontPickerGenre { margin-top: 2px; }
-.startScreen .fontPickerGrid { display: flex; flex-wrap: wrap; }
-.startScreen .fontPickerGrid > * { flex: 0 0 190px; min-width: 0; }
+.startScreen .fontPickerGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 190px)); }
+.startScreen .fontPickerGrid > * { min-width: 0; }
 
 /* Mark library (sidebar/MarkPicker.tsx). Previews are inline SVG in currentColor. */
 .sidebarMarkGroup > summary { cursor: pointer; font-size: 12px; color: var(--text-secondary); padding: 2px 0; }
