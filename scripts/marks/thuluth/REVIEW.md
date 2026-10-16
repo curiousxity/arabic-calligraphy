@@ -30,7 +30,9 @@ A second scan of the same page, `thuluth-1b.webp` (1667×1032, sent 2026-10-16),
 kept too: same resolution and sharpness, slightly different framing — a
 fallback if a piece comes out cleaner in it.
 
-Numbered map: `sheet1-numbered.png` (sent 2026-10-16). The user named the
+Numbered map: `sheet1-numbered.png` (sent 2026-10-16). Pieces 9/14 and
+10/15 are the same two lam-alif forms drawn twice: cross-reference them
+and trace whichever copy comes out cleaner. The user named the
 top row and piece 30 on 2026-10-16; the middle row (14–23) and the bottom
 row (24–31) come next. "Measuring nuqtas" means the piece is drawn with
 its column of measurement dots, which are cleaned off (letters are traced
@@ -46,12 +48,16 @@ dotless).
 | 6 | ن nun (measuring nuqtas) — not بن | named (corrected) |
 | 7 | ر ra — not بز | named (corrected); **drawn overlapping 8**, needs a split rule |
 | 8 | ب the body of ba — not بت | named (corrected); **drawn overlapping 7**, needs a split rule |
-| 9 | لا, large | named |
-| 10 | لا, small | named |
+| 9 | لا, large — same form as 14 | named |
+| 10 | لا, small — same form as 15 | named |
 | 11 | د dal (measuring nuqtas) — not نذ | named (corrected) |
 | 12 | ه ha (measuring nuqtas) — not بهي | named (corrected) |
 | 13 | ى (alif maqsura / ya) | named (corrected) |
-| 14–23 | middle row | waiting for the user |
+| 14 | لا, large — same form as 9 | named |
+| 15 | لا, small — same form as 10 (not ه) | named (corrected) |
+| 16 | صـ | named |
+| 17 | ط / ظ ta/za (measuring nuqtas) — not ظـ alone | named (corrected) |
+| 18–23 | rest of the middle row | waiting for the user |
 | 24–29, 31 | bottom row | waiting for the user |
 | 30 | ن nun, without nuqtas — not ر | named (corrected) |
 
