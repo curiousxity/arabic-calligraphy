@@ -15,9 +15,9 @@ import { rebasePiece, pieceTransform } from "./stackOutline";
 import { traceCurve, PROFILE_SAMPLES, type CurveTrace } from "./stackCurve";
 import { joinCenterline, solveJoinDrag, faceThickness } from "./stackJoin";
 import { pointInPolygon } from "./svgPath";
-import { stackDetectOpts } from "./stackZones";
+import { markStrokeAxis, stackDetectOpts } from "./stackZones";
 import { findDetachedMarks, buildDetachedMarkPlan, splitContours, type DetachedMarkOverride } from "./detachedMarks";
-import { findDiacriticGlyphIndices } from "./diacritics";
+import { ARABIC_DIACRITIC_RE, findDiacriticGlyphIndices } from "./diacritics";
 
 export type ConvertInput = {
   glyphs: HarfBuzzGlyph[];
@@ -44,6 +44,8 @@ type Placed = {
   px: number; py: number;
   cmds: SvgCmd[];
   kind: "letter" | "tatweel" | "mark";
+  /** A mark glyph that draws a damma (see `isDammaGlyph`). */
+  damma: boolean;
   /** A letter's own dots, hamza or kaf stroke, split out of `cmds`, with
    *  the user's offset in font units. */
   detached: { cmds: SvgCmd[]; dx: number; dy: number }[];
@@ -89,12 +91,38 @@ function placeGlyphs(input: ConvertInput): Placed[] {
         px: penX + (g.dx ?? 0) + (cutPlan?.shift[i] ?? 0) + (whole?.[0] ?? 0),
         py: -(g.dy ?? 0) + (whole?.[1] ?? 0),
         cmds, kind, detached,
+        damma: kind === "mark" && isDammaGlyph(obj.unicodes ?? [], clusterText(glyphs, i, shapableText)),
       });
     }
     penX += ax;
   }
   return out;
 }
+
+const DAMMA = 0x064f;
+
+/** The source text of glyph `i`'s cluster: from its `cl` to the next larger one. */
+function clusterText(glyphs: readonly HarfBuzzGlyph[], i: number, text: string): string {
+  const cl = glyphs[i].cl ?? 0;
+  const next = glyphs.reduce((m, g) => ((g.cl ?? 0) > cl && (g.cl ?? 0) < m ? (g.cl ?? 0) : m), text.length);
+  return text.slice(cl, next);
+}
+
+/**
+ * Whether a mark glyph is a damma: its cmap says so, or — for the faces
+ * that draw marks as unencoded or Private Use glyphs (Thuluth) — its
+ * cluster's only mark is a damma. A cluster with two marks and no cmap
+ * answer is left alone rather than guessed at.
+ */
+function isDammaGlyph(unicodes: readonly number[], cluster: string): boolean {
+  if (unicodes.includes(DAMMA)) return true;
+  if (unicodes.some((u) => ARABIC_DIACRITIC_RE.test(String.fromCodePoint(u)))) return false;
+  const marks = [...cluster].filter((ch) => ARABIC_DIACRITIC_RE.test(ch));
+  return marks.length === 1 && marks[0].codePointAt(0) === DAMMA;
+}
+
+/** Kaf letters whose detached mark is the kaf's own stroke (no dots). */
+const KAF_LETTERS = new Set(["\u0643", "\u06A9", "\u06AF"]);
 
 /** The run as one path in run space — what the text block draws. */
 export function runOutline(input: ConvertInput): SvgCmd[] {
@@ -203,18 +231,36 @@ export function convertRunToStack(input: ConvertInput): ConvertResult {
     const parent = ownerOf(m.cl);
     if (!parent) continue;
     const cmds = markAdjusted(m.cmds, o);
+    const x = m.px + (o?.offsetX ?? 0) * scale, y = m.py + (o?.offsetY ?? 0) * scale;
+    const base = { rotation: 0, homeX: 0, homeY: 0, order: parent.order, role: "mark" as const, faces: [] };
+    // Tanween is two (or three) strokes in one glyph, and one cut cannot
+    // split two strokes. When every contour is a fatha-like stroke on its
+    // own, each becomes a piece: the first rides on the letter, the rest on
+    // the first, so a drag still moves the pair and each stretches alone.
+    const strokes = splitContours(cmds);
+    if (strokes.length > 1 && strokes.every((c) => markStrokeAxis(c))) {
+      const first = `m${m.index}`;
+      strokes.forEach((c, k) => markPieces.push({
+        ...base, id: k === 0 ? first : `${first}s${k}`, cmds: c, x, y, pivot: cmdsCentre(c),
+        parentId: k === 0 ? parent.id : first,
+      }));
+      continue;
+    }
     markPieces.push({
-      id: `m${m.index}`, cmds, x: m.px + (o?.offsetX ?? 0) * scale, y: m.py + (o?.offsetY ?? 0) * scale, rotation: 0,
-      pivot: cmdsCentre(cmds), homeX: 0, homeY: 0, order: parent.order, role: "mark", parentId: parent.id, faces: [],
+      ...base, id: `m${m.index}`, cmds, x, y, pivot: cmdsCentre(cmds), parentId: parent.id,
+      ...(m.damma ? { markKind: "damma" as const } : {}),
     });
   }
 
   // A letter's own dots, hamza or kaf stroke: rider pieces on the letter.
   for (const d of drafts) {
+    // A kaf has no dots, so whatever detaches from one is its stroke.
+    const kaf = KAF_LETTERS.has(shapableText[d.placed.cl]);
     d.placed.detached.forEach((m, k) => {
       markPieces.push({
         id: `d${d.placed.index}-${k}`, cmds: m.cmds, x: d.placed.px + m.dx, y: d.placed.py + m.dy, rotation: 0,
         pivot: cmdsCentre(m.cmds), homeX: 0, homeY: 0, order: d.order, role: "mark", parentId: d.id, faces: [],
+        ...(kaf ? { markKind: "kafStroke" as const } : {}),
       });
     });
   }
@@ -285,8 +331,12 @@ export function splitPieceAtCut(
   });
 
   const body: StackPiece = { ...rebasePiece(p, bodyCmds), faces: [...bodyIdxs.map((i) => p.faces[i]), bodyNewFace] };
+  // A cap is a plain stroke: the kaf's or damma's own rule was for the
+  // whole mark, and a damma's tail is no longer a damma.
+  const { markKind: _kind, ...plain } = p;
+  void _kind;
   const cap: StackPiece = {
-    ...rebasePiece({ ...p, id: capId }, capCmds),
+    ...rebasePiece({ ...plain, id: capId }, capCmds),
     role: p.role, parentId: p.id, order: p.order,
     faces: [...capIdxs.map((i) => p.faces[i]), capNewFace],
   };

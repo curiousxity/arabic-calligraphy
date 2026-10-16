@@ -66,12 +66,12 @@ const TEMPLATE_ICON: Record<StackTemplate, string> = {
 
 const GESTURES: Array<[string, string]> = [
   ["Move", "drag a letter; the letters after it come along."],
-  ["Tilt", "drag just outside a letter's edge; hold Shift for even steps."],
+  ["Tilt", "drag just outside a letter's or a long mark's edge; hold Shift for even steps."],
   ["Bend", "drag a curve between letters; double-click it to straighten."],
   ["Grow a curve", "hold Shift and drag a curve away from its fixed end; drag back to tighten."],
   ["Free a bowl", "press the outlined top of a round stroke and drag."],
   ["Pull a tail", "press the free end of a straight stroke and pull it out; hold Shift to keep it in line."],
-  ["Stretch a mark", "press either end of a fatha or kasra and pull; hold Shift to keep it straight."],
+  ["Stretch a mark", "press either end of a fatha, kasra, tanween stroke or kaf's stroke, or a damma's tail, and pull; hold Shift to keep it straight."],
   ["Slide a cut", "drag the edge where a tail was cut along its stroke."],
   ["Remove a stretch", "rest on a pulled tail and press Delete, or right-click it."],
   ["One letter alone", "hold Alt, or untick Move letters together."],

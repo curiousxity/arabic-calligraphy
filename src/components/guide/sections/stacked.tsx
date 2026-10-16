@@ -4,7 +4,7 @@ export const section: GuideSection = {
   id: "stacked",
   title: "Stacking a word",
   order: 39,
-  keywords: ["stack", "tarkib", "diwani", "name", "composition", "join", "tail", "convert", "teardrop", "editor", "template", "stretch", "delete", "remove", "undo stretch", "cut", "slide", "move cut", "fatha", "kasra", "tashkeel", "harakat", "long fatha", "mark"],
+  keywords: ["stack", "tarkib", "diwani", "name", "composition", "join", "tail", "convert", "teardrop", "editor", "template", "stretch", "delete", "remove", "undo stretch", "cut", "slide", "move cut", "fatha", "kasra", "tashkeel", "harakat", "long fatha", "mark", "damma", "tanween", "kaf", "tilt mark"],
   Body: () => (
     <>
       <p>
@@ -38,7 +38,7 @@ export const section: GuideSection = {
         Hold <kbd>Shift</kbd> while you pull and the tail stays on the stroke's own line,
         so it gets longer without bending.
       </p>
-      <h4>Long fatha and kasra</h4>
+      <h4>Long fatha, kasra and other marks</h4>
       <p>
         In Thuluth a fatha or kasra is often drawn long, to fill a gap in the composition.
         Rest on one in the editor window and both of its ends outline. Press either end and
@@ -46,8 +46,18 @@ export const section: GuideSection = {
         the gap filled in at the pen's own width. Hold <kbd>Shift</kbd> to keep it straight;
         pull without Shift and it can sweep into a curve. The middle of the mark still moves
         it as before. Delete or right-click the pulled end to make the mark whole again.
-        Damma, sukun, shadda and tanween are not single straight strokes, so they don't
-        stretch.
+      </p>
+      <p>
+        The same works on more marks. Each stroke of a tanween (ًٍ) stretches on its own,
+        and dragging the first stroke moves both. The small stroke inside a final or
+        standalone kaf (ك) stretches in most Naskh and Thuluth fonts. A damma stretches by
+        its tail: rest on it and only the tail outlines; pull it and the loop stays put.
+        Sukun and shadda are not strokes, so they don't stretch.
+      </p>
+      <p>
+        To set a long mark's angle, drag just outside its edge, the same way you tilt a
+        letter. A mark you have stretched turns as one piece. Hold <kbd>Shift</kbd> for
+        even steps.
       </p>
       <p>
         To change where a stretch starts, rest on the edge where the stroke was cut — it

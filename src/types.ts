@@ -254,6 +254,10 @@ export type StackPiece = {
   role: "letter" | "mark";
   /** Marks: the letter they ride with. */
   parentId?: string;
+  /** A mark that stretches its own way (stackZones.ts): a kaf's stroke,
+   *  whose wedge is too short for the fatha gate, and a damma, pulled by its
+   *  tail. Set at conversion; a cut's cap never carries it. */
+  markKind?: "kafStroke" | "damma";
   /** Placed by "Fill a guide shape" to busy the gaps (tashkeel, ornaments);
    *  stripped on re-run and on Reset layout. */
   filler?: true;

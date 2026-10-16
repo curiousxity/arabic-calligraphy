@@ -2,13 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Line } from "react-konva";
 import type Konva from "konva";
 import type { StackPiece, StackJoin, StackBlock } from "../types";
-import { chainOf, pieceTransform, radiusEnds, radiusFactor, radiusOffset } from "../lib/stackOutline";
+import { chainOf, orbitRiders, pieceTransform, radiusEnds, radiusFactor, radiusOffset } from "../lib/stackOutline";
 import { splitAtCut, transformCmds, transformFace, transformPt } from "../lib/stackGeometry";
 import { flattenContours, findCutZonesSwept, type CutZone, type Pt } from "../lib/strokeCuts";
 import type { SvgCmd } from "../lib/svgPath";
 import { joinCenterline, joinEdges, joinFloor, joinHandles, solveJoinDrag } from "../lib/stackJoin";
 import {
-  cutAtPress, invertTransform, markPullSpans, markStrokeAxis, pullSpans, spanProbes, stackDetectOpts, zoneRect, type MarkAxis,
+  cutAtPress, invertTransform, markCutPlan, pullSpans, spanProbes, stackDetectOpts, zoneRect, type MarkCutPlan,
 } from "../lib/stackZones";
 import { complementOf } from "../lib/complementColor";
 import { curveRegions, type CurveRegion, type CurveTrace } from "../lib/stackCurve";
@@ -18,7 +18,17 @@ import { EXPORT_HIDDEN } from "../lib/exportChrome";
 /** Keyed on a piece's `cmds` identity (a render-pure cache; refs may not be read in render). */
 const sweepCache = new WeakMap<SvgCmd[], CutZone[]>();
 /** A mark's long axis per `cmds` array (null: not a stroke). */
-const markAxisCache = new WeakMap<SvgCmd[], MarkAxis | null>();
+const markPlanCache = new WeakMap<SvgCmd[], MarkCutPlan | null>();
+const splitsAt = (cmds: SvgCmd[], cut: { cutX: number; angle: number }) => splitAtCut(cmds, cut) !== null;
+/** How a mark piece is cut and pulled, cached per `cmds` array. */
+function markPlan(p: StackPiece): MarkCutPlan | null {
+  let plan = markPlanCache.get(p.cmds);
+  if (plan === undefined) {
+    plan = markCutPlan(p.cmds, p.markKind, splitsAt);
+    markPlanCache.set(p.cmds, plan);
+  }
+  return plan;
+}
 /** Curve regions per `cmds` array, like the zone sweep. */
 const curveCache = new WeakMap<SvgCmd[], CurveRegion[]>();
 /** Screen px: the band just outside a letter's edge that tilts it. */
@@ -144,7 +154,12 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
   const groupRef = useRef<Konva.Group>(null);
   const dragStart = useRef<{ ids: string[]; at: Map<string, { x: number; y: number }>; pointer: { x: number; y: number } } | null>(null);
   const pressAt = useRef<{ x: number; y: number } | null>(null);
-  const rotateStart = useRef<{ id: string; centre: { x: number; y: number }; rotation: number; pressAngle: number } | null>(null);
+  const rotateStart = useRef<{
+    id: string; centre: { x: number; y: number }; rotation: number; pressAngle: number;
+    /** A mark's riders (its stretch caps, a tanween's second stroke) turn
+     *  with it about the same centre; a letter's do not, as before. */
+    riders: { id: string; x: number; y: number; rotation: number; pivot: Pt }[];
+  } | null>(null);
   const bowStart = useRef<{ id: string; bow: number; depth: number; tA: number; tB: number; chord: number; pointer: { x: number; y: number } } | null>(null);
   // Shift-drag on a join: the fixed end, the curve's midpoint and the free
   // end in font units, and where each carried piece started.
@@ -167,6 +182,16 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
       return { id: p.id, outer, all };
     }), [pieces, scale]);
   const byId = useMemo(() => new Map(pieces.map((p) => [p.id, p])), [pieces]);
+  /** Which pieces get a tilt ring: every letter, and every mark that is a
+   *  stroke `markCutPlan` can cut — not a dot, not a filler, and not a rider
+   *  on another mark (a cap or a tanween's second stroke turns with it). */
+  const hasRing = (id: string): "letter" | "mark" | false => {
+    const p = byId.get(id);
+    if (!p) return false;
+    if (p.role === "letter") return "letter";
+    if (p.filler || (p.parentId !== undefined && byId.get(p.parentId)?.role === "mark")) return false;
+    return markPlan(p) ? "mark" : false;
+  };
   const contourById = useMemo(() => new Map(contoursPx.map((c) => [c.id, c])), [contoursPx]);
 
   // The sweep is fifteen rotations per piece, so it runs for the hovered
@@ -178,20 +203,14 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
     const p = hoveredPieceId ? byId.get(hoveredPieceId) : undefined;
     if (!p || p.filler) return [];
     if (p.role === "mark") {
-      // A mark is one tapered stroke the zone detector does not see: cut it
-      // across its widest part, and let either end pull its half away.
-      let axis = markAxisCache.get(p.cmds);
-      if (axis === undefined) {
-        const a = markStrokeAxis(p.cmds);
-        axis = a && splitAtCut(p.cmds, { cutX: a.centre, angle: a.angle }) ? a : null;
-        markAxisCache.set(p.cmds, axis);
-      }
-      if (!axis) return [];
-      const a = axis, t = pieceTransform(p);
-      const zone = { fromX: a.from, toX: a.to, centreY: a.centreY, thickness: a.width, angle: a.angle } as CutZone;
-      return markPullSpans(a).map(({ span: [from, to], side }, si) => ({
-        id: `${p.id}:m:${si}`, pieceId: p.id, zone, fixed: { cut: { cutX: a.centre, angle: a.angle }, side },
-        points: zoneRect(zone, from, to).flatMap((q) => { const w = transformPt(q, t); return [w[0] * scale, w[1] * scale]; }),
+      // A mark is cut its own way (a fatha across its middle, a damma at the
+      // neck of its tail): `markCutPlan`, once per `cmds` array.
+      const plan = markPlan(p);
+      if (!plan) return [];
+      const t = pieceTransform(p);
+      return plan.ends.map(({ span: [from, to], side }, si) => ({
+        id: `${p.id}:m:${si}`, pieceId: p.id, zone: plan.zone, fixed: { cut: plan.cut, side },
+        points: zoneRect(plan.zone, from, to).flatMap((q) => { const w = transformPt(q, t); return [w[0] * scale, w[1] * scale]; }),
       }));
     }
     const upm = unitsPerEm || 1000;   // as stackScale: a save without it is 1000
@@ -417,8 +436,12 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
 
   return (
     <Group ref={groupRef} name={EXPORT_HIDDEN} onMouseLeave={() => { if (!pull.current) setHover(null); }}>
-      {/* Tilt rings: the band just outside each letter. Lowest, so ink wins. */}
-      {contoursPx.map(({ id, outer }) => byId.get(id)?.role === "letter" && (
+      {/* Tilt rings: the band just outside each letter, and each stroke mark
+          (a fatha, a tanween, a kaf's stroke, a damma). Lowest, so ink wins;
+          marks' below letters', so a small mark's ring never takes a press
+          from the letter beside it. */}
+      {[...contoursPx].sort((a, b) => Number(hasRing(a.id) === "letter") - Number(hasRing(b.id) === "letter"))
+        .map(({ id, outer }) => hasRing(id) && (
         <Line
           key={`ring-${id}`} name="stack-ring" points={outer} closed fillEnabled={false} strokeEnabled={false}
           hitFunc={hitBand(outer, true, RING_PX * 2)}
@@ -431,15 +454,26 @@ export const StackEditOverlay: React.FC<StackEditOverlayProps> = ({
             const p = byId.get(id)!;
             const centre = { x: (p.pivot[0] + p.x) * scale, y: (p.pivot[1] + p.y) * scale };
             const press = pressAt.current ?? pointerIn();
-            rotateStart.current = { id, centre, rotation: p.rotation, pressAngle: Math.atan2(press.y - centre.y, press.x - centre.x) };
+            const riders = p.role === "mark"
+              ? chainOf(pieces, id, true).filter((r) => r !== id).flatMap((r) => {
+                  const q = byId.get(r);
+                  return q ? [{ id: r, x: q.x, y: q.y, rotation: q.rotation, pivot: q.pivot }] : [];
+                })
+              : [];
+            rotateStart.current = { id, centre, rotation: p.rotation, pressAngle: Math.atan2(press.y - centre.y, press.x - centre.x), riders };
             onBegin?.();
           }}
           onDragMove={(e) => {
             e.cancelBubble = true;
             const s = rotateStart.current; if (!s) return;
             const now = pointerIn();
-            const angle = s.rotation + Math.atan2(now.y - s.centre.y, now.x - s.centre.x) - s.pressAngle;
-            onSetPieces?.([{ id: s.id, rotation: e.evt.shiftKey ? Math.round(angle / (Math.PI / 12)) * (Math.PI / 12) : angle }]);
+            const raw = s.rotation + Math.atan2(now.y - s.centre.y, now.x - s.centre.x) - s.pressAngle;
+            const angle = e.evt.shiftKey ? Math.round(raw / (Math.PI / 12)) * (Math.PI / 12) : raw;
+            // Riders orbit the centre by the same turn, so a stretched mark stays whole.
+            onSetPieces?.([
+              { id: s.id, rotation: angle },
+              ...orbitRiders(s.riders, [s.centre.x / scale, s.centre.y / scale], angle - s.rotation),
+            ]);
           }}
           onDragEnd={(e) => { e.cancelBubble = true; rotateStart.current = null; pressAt.current = null; e.target.position({ x: 0, y: 0 }); }}
         />

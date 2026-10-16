@@ -146,6 +146,45 @@ makes a mark's stretch a stretch (`stretchCut` wants the same role on both
 sides) and lets Delete heal it. **No slide edge on a mark**: there is no
 straight zone to slide along, so the overlay omits it. A filler is never cut
 (a re-run strips fillers by flag and would orphan the cap and its join).
+**Other marks (2026-10-16): one rule per kind, `markCutPlan`** (`stackZones.ts`,
+pure, `splitAtCut` injected so a plan always splits; the overlay and the tests
+call the same function). Measured on all 23 bundled faces with real shaping:
+- **Tanween** is split at *conversion*, not at the press: when every contour
+  of a mark passes `markStrokeAxis` (fathatan and kasratan in 19 faces), each
+  contour is its own piece — `m<i>` rides on the letter, `m<i>s<k>` on `m<i>`,
+  so dragging the first moves the pair and each stretches like a fatha. One
+  cut across two parallel strokes cannot split them (two contours crossed),
+  which is why it is done up front. Qahiri, Rana Kufi and Raqq draw tanween
+  as one contour and keep it whole. Dammatan is not split (its contours are
+  not strokes).
+- **The kaf's stroke** (`markKind: "kafStroke"`): the detached mark inside a
+  final or isolated ك/ک/گ (a kaf has no dots, so whatever detaches from it is
+  the stroke). Its wedge runs 1.3 to 2.7 long over wide, so it gets its own
+  gate, `KAF_STROKE_MIN_ASPECT` (1.3), never applied to anything unflagged —
+  a dot is 1.0 to 1.1. Ten faces detach it and all ten cut; Blaka's and
+  Janna's are round (1.1) and refuse. An initial or medial kaf's top stroke is
+  part of the letter body and is not this.
+- **Damma** (`markKind: "damma"`, from the glyph's cmap, or for a PUA face
+  from its cluster's only mark): `markTail` walks the long axis from the wide
+  end (the loop, which may hold a counter) to the first sample past the
+  counter under `TAIL_NECK_FRACTION` (0.7) of the widest, and cuts there;
+  only the tail end pulls (`capSide` = the tail's side). Guards: the tail
+  must be a quarter of the length and 12–60% of the ink
+  (`TAIL_MIN_SHARE`/`TAIL_MAX_SHARE`) — without the share check Blaka, Rabat
+  and Rana Kufi shaved a corner off. 19 faces cut; Blaka, Qahiri, Rabat,
+  Rana Kufi and Raqq do not.
+- **A cap never carries `markKind`** (`splitPieceAtCut` drops it): the kind's
+  rule is for the whole mark, and a damma's tail is no longer a damma.
+
+**Tilting a mark** (2026-10-16): every letter and every mark `markCutPlan`
+accepts, except a filler and a mark riding on a mark (a cap, a tanween's
+second stroke), gets a tilt ring. Mark rings render *below* letter rings, so
+where a small mark's band overlaps a letter's, the letter wins — the open
+question the roadmap raised. Turning a mark turns its riders with it about
+the mark's pivot (`orbitRiders`, `stackOutline.ts`, pure, tested to keep a
+stretched fatha's two cut faces coincident); a letter's riders still do not
+turn with it, as before.
+
 **Shift holds any pull** — tail or mark — to the stroke's axis (zone angle
 plus piece rotation), so it lengthens without bending.
 

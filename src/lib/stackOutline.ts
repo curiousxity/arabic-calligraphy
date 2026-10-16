@@ -141,3 +141,20 @@ export function rebasePiece(p: StackPiece, cmds: SvgCmd[]): StackPiece {
 /** px per font unit. A hand-edited save without `unitsPerEm` draws at 1000. */
 export const stackScale = (fontSize: number, unitsPerEm: number | undefined) =>
   fontSize / Math.max(unitsPerEm || 1000, 1);
+
+/**
+ * Riders turned with a piece: each rider's pivot, at block position
+ * `pivot + (x, y)`, orbits `centre` by `turn` radians, and its own rotation
+ * grows by the same turn, so a stretched mark (body, caps, a tanween's second
+ * stroke) tilts as one rigid thing. Block font units throughout.
+ */
+export function orbitRiders(
+  riders: readonly { id: string; x: number; y: number; rotation: number; pivot: Pt }[],
+  centre: Pt, turn: number
+): { id: string; x: number; y: number; rotation: number }[] {
+  const c = Math.cos(turn), s = Math.sin(turn);
+  return riders.map((r) => {
+    const px = r.pivot[0] + r.x - centre[0], py = r.pivot[1] + r.y - centre[1];
+    return { id: r.id, x: centre[0] + px * c - py * s - r.pivot[0], y: centre[1] + px * s + py * c - r.pivot[1], rotation: r.rotation + turn };
+  });
+}

@@ -75,14 +75,13 @@ of size:
 1. **Stretch fatha and kasra in a composition** — *shipped 2026-10-16*
    (see stacked-compositions.md). Press either end and pull; Shift keeps it
    straight.
-2. **Tilt a mark in a composition.** Marks can move and stretch but have no
-   tilt ring; a calligrapher sets a long fatha's angle to the space it fills.
-   Small: the ring is gated to letters in `StackEditOverlay`; the open
-   question is whether a small mark's ring steals presses from its
-   neighbours.
-3. **Stretch the other marks** — the kaf's stroke (a detached mark, aspect
-   ~2), tanween (two strokes: cut each, pull together?), the tail of a
-   damma. Each fails a different gate today; measure before widening one.
+2. **Tilt a mark in a composition** — *shipped 2026-10-16*. Stroke marks get
+   a tilt ring, drawn below the letters' so it never takes their presses;
+   a stretched mark turns whole (`orbitRiders`).
+3. **Stretch the other marks** — *shipped 2026-10-16*: tanween as one piece
+   per stroke, the kaf's stroke by its own aspect gate, the damma by its
+   tail. Measured per font; see stacked-compositions.md for the numbers and
+   the fonts left out.
 4. **Bend any part of any letter** ("Approach C", above): skeleton plus nib,
    so every stroke can stretch or bend, not only straight runs, curves and
    joins. Research; Diwani's overlapping strokes are the hard case.

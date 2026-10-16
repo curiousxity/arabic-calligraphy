@@ -101,6 +101,14 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-16 — Tilt and stretch more marks in a composition
+
+- **Tilt a long mark**: drag just outside a fatha, kasra, tanween stroke,
+  kaf's stroke or damma, as with a letter. A stretched mark turns as one.
+- **Stretch more marks**: each tanween stroke (19 fonts), the stroke inside a
+  final kaf (10 fonts), and a damma by its tail (19 fonts). Numbers and the
+  fonts left out: [stacked-compositions.md](.claude/rules/stacked-compositions.md).
+
 ### 2026-10-16 — Long fatha and kasra
 
 - **Stretch a fatha or kasra in a stacked composition.** In the editor
