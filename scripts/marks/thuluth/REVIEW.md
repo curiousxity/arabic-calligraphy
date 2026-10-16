@@ -171,3 +171,9 @@ complete.
   several head angles) and "جيمات وسطية" (medial jeems), plus a large stacked
   جـ over ح with its full measurement grid. Heavy measurement dots on every
   piece — a candidate for cross-referencing with a cleaner scan if one comes.
+- Row 2, `thuluth-9-row2.png` (2026-10-16): "حرف الحاء" — four words with
+  a long ha: حم، حسا، حمل، حم. Almost no measurement dots. Notes (proportion
+  rules): every ha followed by a madd (extension) is six nuqtas long; here
+  the ha is followed not by a madd but by a low letter, and is still six
+  nuqtas; a rule special to the word الرحمن in the Muhaqqaq pen makes the ha
+  six nuqtas, and the noon likewise.
