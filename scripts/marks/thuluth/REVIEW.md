@@ -498,3 +498,9 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   middle, and a final ha/ta marbuta at the left end with a looped,
   knotted tail. Probably a final-ha example; **reading and name to confirm**.
   Clean, no measurement dots; small (about 760 px wide).
+- Row 4, `thuluth-17-row4.png` (2026-10-16): numbered "(2)", "يجمع الهاءات
+  الوسطية والهاء الاخير" — **brings together the medial has and the final
+  ha**: a tall lam with an arrowhead, then لههه-like medial has, ending in
+  the looped, knotted final ha seen in (1). So (1) is very likely the same
+  lesson (final ha after mim and ha). Clean, no measurement dots; small
+  (about 500 px wide).
