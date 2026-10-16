@@ -454,3 +454,15 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
     joined run, loosely محمعمسمصملم — a mim after ح, ع, س, ص and ل in turn.
   Clean strokes, no measurement dots; labels need removing. Readings to
   confirm.
+- Row 5, `thuluth-16-row5.png` (2026-10-16): mim-ra forms (ميم الراء — a mim
+  whose tail is a ra), right to left:
+  - "ميم الراء" after a lam (لم): the mim-ra joined to a tall lam.
+  - "ميم الراء" standalone, with a **dotted alternate**: a tall lam-like
+    upright with an arrowhead rising from the head (the same mim-ra joined
+    under a lam instead).
+  - "ميم الراء رحمانية" (the rahmani mim-ra) and "ميم الراء": a سمر-like run,
+    the first a mim-ra after a seen-like stroke, the second a separate
+    mim-ra.
+  - At the far left, an unlabelled mim with a long straight tail (the
+    extended-ra mim, as in row 2's last piece).
+  Clean, no measurement dots; labels need removing.
