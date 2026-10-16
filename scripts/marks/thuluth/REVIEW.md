@@ -532,3 +532,20 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   — the returned ya tail after each letter. Clean strokes; one small
   measurement mark and guide line under سي, and letter dots drawn on a few
   (مخي, عي). Compare with sheet t2 piece 18 and sheet t8 (ya type).
+
+## Sheet t19 — practice words, and Thuluth's tashkeel and ornament signs
+
+- Row 1, `thuluth-19-row1.webp` (2026-10-16), two parts:
+  - Top, "كلمات فردية للتمرين" (single words for practice): one line of
+    words on guide lines, loosely علي، لهم، عهم، سعف، فص، صطع، لا — with a
+    small vertical side note by the فـ (reads like "يكتب قبل الاحرف
+    المنخفضة", to confirm) and a small hamza-like sign over the final لا.
+  - Below, "تشكيلات وتزيين خط الثلث" — **Thuluth's tashkeel and ornament
+    signs**: two rows of small marks — small letter signs (ح، ع، ط، ص، س, a
+    small ه, a small lam-alif, ء, a small mim, ي, ا), the small الله sign,
+    madda-like strokes, waw-shaped signs, and long fatha/kasra strokes.
+    Many carry tiny decorative hairline flicks (drawn with a fine pen).
+  The second part belongs with the **mark/tashkeel library**, not letters:
+  these are the small signs a Thuluth panel is filled with. Their flicks are
+  hairlines, so they need the gentlest cleaning (the guide-line remover
+  could eat them). Clean, no measurement dots.
