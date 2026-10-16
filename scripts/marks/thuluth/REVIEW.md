@@ -720,3 +720,13 @@ in the mark library), but only if the user wants that.
   a forest of tall alif/lam uprights across the top; a small stacked "صدق
   الله العظيم" block at the top left, the "هاشم" signature and the date
   ١٣٧٧ (about 1958) along the bottom: remove all three.
+
+## Sheet t29 — al-Fath panel
+
+- `thuluth-29-fath-10.webp` (2026-10-16): "إن الذين يبايعونك إنما يبايعون
+  الله" (al-Fath 48:10, my reading; no key sent). White on black, large
+  and bold — fewer words than t27/t28, so the letters are bigger (alifs
+  about 500 px tall) and the stacking is easier to follow: يبايعونك and
+  يبايعون each stacked in two tiers, a row of tall alifs and lams, الله at
+  the left end. Signature at the bottom left and the date ١٣٨٠ (about
+  1960) under it: remove both. Invert before cleaning.
