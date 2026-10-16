@@ -567,3 +567,11 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   tashkeel. Repeats الله, الرحمن and الرحيم from the Basmala, so the two can
   be cross-checked. New here: the stacked الحمد, رب with its long
   extended ba, and العالمين.
+- `thuluth-20-fatiha-3.webp` (2026-10-16): "مالك يوم الدين إياك نعبد وإياك"
+  (verse 4 and the start of verse 5; the line breaks mid-verse, so the
+  next line should start with نستعين). New here: مالك with the small kaf
+  sign inside its kaf, يوم, the stacked الدين, إياك twice (two kafs to
+  compare), and نعبد with its long ain-ba sweep. The small signs under
+  letters (ع under the ain, م, ح) show the sheet t19 letter signs in use.
+  A slightly lighter strip along the bottom-left edge is scan background:
+  crop it.
