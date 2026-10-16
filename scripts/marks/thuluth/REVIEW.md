@@ -108,7 +108,7 @@ removes the measurement dots.
 | 23 | صـ start | waiting |
 | 24 | ص standalone (tail split from the ط) | waiting |
 | 25 | ط | cleanup (stub at the bottom) |
-| 26 | ق / فـ ? | cleanup (dots); name to confirm |
+| 26 | ف fa without dots (the user, 2026-10-16) | cleanup (dots) |
 | 27 | ق without dots | waiting |
 | 28 | و | waiting |
 
@@ -844,8 +844,9 @@ traced into the app. Questions to settle with the user during review:
    Answered: no. The signed panels are by **Hashim, the user's
    grandfather**, and so are the lesson sheets (t1–t19), confirmed
    2026-10-16. No credit in the app.
-2. ~~Names for sheet t1~~ — all 31 named 2026-10-16 (pieces the user
-   did not correct keep the guessed name). Still open: t2 piece 26 (ق or فـ).
+2. ~~Names for sheet t1 and t2 piece 26~~ — all named 2026-10-16 (t1
+   pieces the user did not correct keep the guessed name; t2 26 is ف
+   fa without dots).
 3. ~~Script of `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`?~~
    Answered: Naskh. Both stay out of the Thuluth set.
 4. t17 row 5: which pieces the note "١-٢" means, and what the big dotted
