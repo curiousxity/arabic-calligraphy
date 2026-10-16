@@ -177,3 +177,8 @@ complete.
   the ha is followed not by a madd but by a low letter, and is still six
   nuqtas; a rule special to the word الرحمن in the Muhaqqaq pen makes the ha
   six nuqtas, and the noon likewise.
+- Row 3, `thuluth-9-row3.webp` (2026-10-16): ha joined after and before
+  other letters — لحم، لحم (two), حم، حكم، حمر، حر (the open ha, حاء
+  مفتوح). No measurement dots. Note: the open ha may not be used before a
+  raised letter such as kaf or lam (لا يجوز استعمال الحاء المفتوح إذا وقعت قبل
+  أحد الحروف المرتفعة مثل الكاف واللام).
