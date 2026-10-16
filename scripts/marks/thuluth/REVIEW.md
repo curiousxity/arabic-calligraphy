@@ -89,3 +89,19 @@ worked example, and the notes underneath give each alif's height in nuqtas
 by line type: (1) single-line 5–6, (2) medium composed 6–7, (3) light
 composed 7–8 (8–9 in Muhaqqaq), (4) heavy composed 9–12. Almost no
 measurement dots — mostly clean strokes and Arabic notes.
+
+## Sheet t5 — `thuluth-5.webp` (dal and ra)
+
+Received 2026-10-16, saved only. Row 1 "احرف فردية مع احرف نهائية"
+(isolated with final letters): ا، د، ي/ن، ن، ر، ز، ر، و، ق and others, with
+some measurement dots. Row 2 "حرف الدال": four dal forms; note — in a
+non-composed line (Quran verses, hadith) the dal's end may be extended
+(مرسل), not otherwise. Side note: when dal, ra or waw sit inside a noon in a
+composition, the noon is six nuqtas long (taken from Muhaqqaq). Row 3
+"حرف الراء", named forms: الرهانية، الملتوية، المرسلة، "في النون يصغر
+الراء" (the ra made small inside a noon), "مع اللام يصغر الراء" (made small
+after a lam). Notes underneath (proportions): ra has three shapes by
+position; the rihaniya and mursala ra are normally six nuqtas long, cut to
+four when the rihaniya sits inside a noon or joins a lam, and likewise the
+mursala inside a noon; the composed multawiya ra is a fixed four nuqtas,
+standalone or joined. Few measurement dots outside row 1.
