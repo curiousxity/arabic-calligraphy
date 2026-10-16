@@ -379,3 +379,11 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   - "الباء والكاف" (ba and kaf): the ba body used as the base of a kaf, with
     the kaf's small inner mark.
   Clean, dotless; labels need removing. Compare with sheets t7/t8 (beh).
+- Row 2, `thuluth-15-row2.webp` (2026-10-16): "حرف الباء ذات النقطة والنصف
+  وهي متصلة بالحرف النهائي" — the **ba one and a half nuqtas wide**, joined
+  to a final letter. Right to left, loosely: غو (or a و after a dot), با,
+  بذ/بن, بك, بل, بق, به, and a stacked ...بلا run at the far left. The ba's
+  short body is the same in every pair, so these are the initial-ba joins
+  to each final letter. Measurement dots (nuqta columns), guide lines and
+  stroke numbers on most pairs; letter dots drawn on some. Readings to
+  confirm.
