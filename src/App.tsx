@@ -151,7 +151,13 @@ import {
   hasOrphanedMirrors,
   isMirrorSourceCandidate,
 } from "./lib/mirror";
-import { applyKashida, findKashidaSlots, readKashida, type KashidaSlot } from "./lib/tatweel";
+import {
+  applyKashida,
+  findKashidaSlots,
+  MAX_KASHIDA_PER_SLOT,
+  readKashida,
+  type KashidaSlot,
+} from "./lib/tatweel";
 import { runStyleForBlock, solveFitToWidth, type FitToWidthResult } from "./lib/fitToWidth";
 import { measureShapedRun, measureShapedWidth } from "./lib/measureShapedText";
 import { applySpacing, spacingForBlock } from "./lib/spacing";
@@ -169,7 +175,7 @@ import type { TextBlock, VerseLayout, VerseSettings } from "./types";
 import { buildCutPlan, cutAdvanceTotal, outlineBounds, remapCutsForEdits } from "./lib/strokeCuts";
 import { remapMarksForEdits } from "./lib/detachedMarks";
 import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
-import { shapeText } from "./lib/harfbuzz";
+import { fontSupportsKashida, shapeText } from "./lib/harfbuzz";
 import { convertRunToStack, fillerShapes, teardropShape, type UnjoinedPair } from "./lib/stackConvert";
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
@@ -2603,6 +2609,13 @@ const App: React.FC = () => {
 
       setIsFittingWidth(true);
       try {
+        // A font with no working tatweel would get blank gaps (or boxes)
+        // where the kashida should be. The panel hides Fit for it too; this
+        // covers a font switched while the probe was still running.
+        if (!(await fontSupportsKashida(fontUrl))) {
+          setExportStatus("This font has no kashida, so Fit to width can't stretch it.");
+          return;
+        }
         const result = await solveFitToWidth({
           text,
           target,
@@ -2679,12 +2692,19 @@ const App: React.FC = () => {
     settings: VerseSettings,
     anchor: { x: number; y: number }
   ) => {
-    const inputs = lines.map((line) => ({
-      line,
-      measure: measureForLine(line),
-      baseFontSize: baseFontSizeForLine(line),
-      base: baseSpacingForLine(line),
-    }));
+    const inputs = await Promise.all(
+      lines.map(async (line) => ({
+        line,
+        measure: measureForLine(line),
+        baseFontSize: baseFontSizeForLine(line),
+        base: baseSpacingForLine(line),
+        // A font with no working tatweel justifies by spacing alone: zero
+        // kashida per slot also strips any tatweel an earlier justify left.
+        maxPerSlot: (await fontSupportsKashida(resolveFontUrl(line.fontFamily)))
+          ? MAX_KASHIDA_PER_SLOT
+          : 0,
+      }))
+    );
     const target =
       settings.width ??
       Math.max(
@@ -2702,6 +2722,7 @@ const App: React.FC = () => {
           userSpacing: i.base,
           target,
           measure: i.measure,
+          maxPerSlot: i.maxPerSlot,
         })
       );
     }
@@ -2973,7 +2994,14 @@ const App: React.FC = () => {
       const before = result.unjoined.length;
       // Mark overrides are keyed by cluster like cuts, but the retry re-shapes
       // from scratch, so it is refused the same way tashkeel overrides are.
-      if (before > 0 && shaped.shapableText === source.text && overrides.length === 0 && marks.length === 0) {
+      if (
+        before > 0 &&
+        shaped.shapableText === source.text &&
+        overrides.length === 0 &&
+        marks.length === 0 &&
+        // A font with no working tatweel can't close a gap with one.
+        (await fontSupportsKashida(fontUrl))
+      ) {
         const all = withTatweels(result.unjoined);
         if (all.edits.length) {
           const trial = await shapeAndConvert(all.text, all.cuts);

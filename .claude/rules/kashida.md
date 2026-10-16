@@ -1,6 +1,7 @@
 ---
 paths:
   - "src/lib/tatweel*.ts"
+  - "src/hooks/useKashidaSupport.ts"
   - "src/lib/arabicJoining*.ts"
   - "e2e/tatweel.spec.ts"
 ---
@@ -80,3 +81,32 @@ all get it with no separate gate.
 Known and correct: some fonts substitute differently across a tatweel (الله
 decomposes when interrupted). That is the font doing its job; offering only
 legal joins is the guardrail, and the guide says so.
+
+## Fonts with no working kashida (2026-10-16)
+
+**Jameel Noori (`Urdu`), Gulzar, Blaka and Ruqaa cannot stretch a join.**
+The first three have no tatweel in their cmap, so HarfBuzz shapes U+0640 as
+`.notdef`: a blank advance in Jameel Noori and Gulzar (a gap that splits the
+two letters) and a box in Blaka. Ruqaa maps tatweel to an empty zero-width
+glyph, so nothing widens. Reported by the user as "Kashida join does not
+work for Jameel Noori".
+
+**Support is probed by shaping, never by metrics.** `fontSupportsKashida`
+(`harfbuzz.ts`, cached per URL, cleared with `clearShapeCache`) shapes
+`KASHIDA_PROBE` (بب and بـب) and asks the pure `kashidaWidens`: no glyph 0
+in the stretched run, and it is wider. A cmap or glyph-metrics check gets
+Raqq and Al Fatemi wrong: their own tatweel is zero-width, and their GSUB
+replaces it with a real stroke. `tatweel.test.ts` pins both sides against
+the real files. A failed font load answers `true` and is not cached.
+
+Where the answer is used:
+- **Typography** (`useKashidaSupport`): the Kashida section, including Fit
+  to width, is replaced by a note. While the probe is pending (`null`) the
+  controls show.
+- **Fit to width** (`fitSelectedBlockToWidth`): refuses with a status line,
+  for a font switched while the probe ran.
+- **Verse justify** (`solveVerse`): passes `maxPerSlot: 0`, so the line is
+  justified by spacing alone and any old tatweel is stripped.
+- **Stack conversion**'s close-the-gap retry is skipped.
+
+A tatweel the user types from the Specials row is still inserted as typed.

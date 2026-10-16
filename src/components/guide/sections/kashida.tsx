@@ -92,6 +92,15 @@ export const section: GuideSection = {
         what it was built to do, not a fault; pick a different join if you would
         rather keep the combined form.
       </p>
+      <p>
+        <strong>Four fonts have no kashida at all:</strong> Jameel Noori,
+        Gulzar, Blaka and Ruqaa. Their designers left out the elongation
+        stroke, so there is nothing to stretch with. For these fonts the
+        Kashida controls are replaced by a short note, Fit to width is
+        unavailable, and a verse is justified with letter and word spacing
+        only. Use Letter or Word spacing to widen them, or switch to a font
+        that has a kashida.
+      </p>
     </>
   ),
 };

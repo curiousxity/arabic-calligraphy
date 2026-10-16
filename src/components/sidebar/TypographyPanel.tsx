@@ -28,6 +28,7 @@ import type { Palette } from "../../lib/palettes";
 import { PaletteSwatches } from "../PaletteSwatches";
 import { CloseIcon } from "../Icons";
 import { AlternateStrip } from "./AlternateStrip";
+import { useKashidaSupport } from "../../hooks/useKashidaSupport";
 import { makeId } from "./utils";
 import { CheckboxRow, CollapsibleSection, ColorRow, OpacityRow, RangeRow, RotationRow, SelectRow } from "./FormControls";
 
@@ -129,6 +130,9 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
   onToggle,
 }) => {
   // The suffix of every control id here.
+  // Some fonts have no working tatweel (Jameel Noori, Gulzar, Blaka, Ruqaa);
+  // see `fontSupportsKashida`. `null` until the one-off probe answers.
+  const kashidaOk = useKashidaSupport(selectedBlock.fontFamily);
   const selectedId = selectedBlock.id;
   return (
     <div className="sidebarPanel">
@@ -233,6 +237,19 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
                   <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                     No stretchable joins in this text — a kashida needs two
                     letters that join to each other.
+                  </div>
+                </div>
+              );
+            }
+            if (kashidaOk === false) {
+              return (
+                <div className="field" data-testid="kashida-unsupported">
+                  <span className="fieldTitle">Kashida</span>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    This font has no kashida (tatweel) stroke, so its joins
+                    can't be stretched and Fit to width can't widen it. Use
+                    Letter or Word spacing instead, or switch to a font that
+                    has one.
                   </div>
                 </div>
               );

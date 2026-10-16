@@ -12,7 +12,14 @@ import type { HarfBuzzGlyph } from "./harfbuzz";
 // during a static `import` and throws on. `require` sidesteps it.
 const hbjsModule = createRequire(import.meta.url)("harfbuzzjs");
 import { normalizeGlyphs } from "./normalizeGlyphs";
-import { findKashidaSlots, applyKashida, readKashida, TATWEEL } from "./tatweel";
+import {
+  findKashidaSlots,
+  applyKashida,
+  readKashida,
+  TATWEEL,
+  KASHIDA_PROBE,
+  kashidaWidens,
+} from "./tatweel";
 
 function resolveHbLoader(mod: unknown): Promise<HbModule> {
   let m: unknown = mod;
@@ -238,6 +245,32 @@ describe("real HarfBuzz shaping", () => {
       for (let i = 1; i < widths.length; i++) {
         expect(widths[i]).toBeGreaterThan(widths[i - 1]);
       }
+    });
+  }
+});
+
+// Which fonts can stretch a join at all. Measured 2026-10-16 across every
+// bundled font: these four cannot (no tatweel → `.notdef`, or an empty
+// zero-width one), and the Kashida controls hide for them. Raqq and Al Fatemi
+// are the trap the probe exists for: a zero-width tatweel in the cmap that
+// their own GSUB replaces with a real stroke, so a metrics check would
+// wrongly reject them.
+describe("kashidaWidens (real fonts)", () => {
+  const probe = async (fontFile: string) =>
+    kashidaWidens(
+      (await shapeReal(KASHIDA_PROBE.plain, fontFile)).glyphs,
+      (await shapeReal(KASHIDA_PROBE.stretched, fontFile)).glyphs
+    );
+
+  for (const fontFile of ["Urdu.ttf", "Gulzar.ttf", "Blaka.ttf", "Ruqaa.ttf"]) {
+    it(`rejects ${fontFile}, whose tatweel cannot lengthen a join`, async () => {
+      expect(await probe(fontFile)).toBe(false);
+    });
+  }
+
+  for (const fontFile of ["Amiri.ttf", "NotoSans.ttf", "Thuluth.ttf", "Raqq.ttf", "AlFatemi.otf"]) {
+    it(`accepts ${fontFile}`, async () => {
+      expect(await probe(fontFile)).toBe(true);
     });
   }
 });

@@ -120,3 +120,27 @@ export function applyKashida(text: string, slot: KashidaSlot, count: number): st
 export function readKashida(text: string, slots: KashidaSlot[]): Map<number, number> {
   return new Map(slots.map((slot) => [slot.index, scanRun(text, slot.index).positions.length]));
 }
+
+/**
+ * The pair a font is probed with to see whether its kashida works: two behs
+ * (dual-joining in every Arabic font), plain and with one tatweel between.
+ */
+export const KASHIDA_PROBE = { plain: "بب", stretched: "بـب" } as const;
+
+/**
+ * Whether a font's tatweel really lengthens a join, judged from the shaped
+ * probe: the stretched run must be wider and must contain no `.notdef`
+ * (glyph 0). Neither the cmap nor the tatweel glyph's own metrics can answer
+ * this — Jameel Noori, Gulzar and Blaka have no tatweel, so HarfBuzz falls
+ * back to `.notdef` (a blank gap that splits the letters, or a box); Ruqaa
+ * maps it to an empty zero-width glyph, so nothing widens; and Raqq and Al
+ * Fatemi carry a zero-width tatweel that their GSUB replaces with a real
+ * stroke. Only shaping tells them apart. See .claude/rules/kashida.md.
+ */
+export function kashidaWidens(
+  plain: readonly { g: number; ax?: number }[],
+  stretched: readonly { g: number; ax?: number }[]
+): boolean {
+  const width = (run: readonly { ax?: number }[]) => run.reduce((s, g) => s + (g.ax ?? 0), 0);
+  return !stretched.some((g) => g.g === 0) && width(stretched) > width(plain);
+}

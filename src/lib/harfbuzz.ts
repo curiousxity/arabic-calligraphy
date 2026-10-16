@@ -6,6 +6,7 @@ import {
   type HarfBuzzGlyph,
 } from "./normalizeGlyphs";
 import { ARABIC_DIACRITIC_RE } from "./diacritics";
+import { KASHIDA_PROBE, kashidaWidens } from "./tatweel";
 import type { GlyphAlternate } from "../types";
 import {
   activeStyleSets,
@@ -513,14 +514,42 @@ export async function findStyleSets(text: string, fontUrl: string): Promise<Styl
   }
 }
 
+/** `fontSupportsKashida` answers, one probe per font URL. */
+const kashidaSupportCache = new Map<string, Promise<boolean>>();
+
+/**
+ * Whether the font at `fontUrl` can stretch a join with tatweel at all.
+ * Shapes `KASHIDA_PROBE` once per font and caches the answer; a font that
+ * fails to load answers `true`, so a network blip never hides the controls.
+ */
+export function fontSupportsKashida(fontUrl: string): Promise<boolean> {
+  let answer = kashidaSupportCache.get(fontUrl);
+  if (!answer) {
+    answer = Promise.all([
+      shapeText(KASHIDA_PROBE.plain, fontUrl),
+      shapeText(KASHIDA_PROBE.stretched, fontUrl),
+    ])
+      .then(([plain, stretched]) => kashidaWidens(plain.glyphs, stretched.glyphs))
+      .catch(() => {
+        // Not cached: the next ask probes again once the font loads.
+        kashidaSupportCache.delete(fontUrl);
+        return true;
+      });
+    kashidaSupportCache.set(fontUrl, answer);
+  }
+  return answer;
+}
+
 export function clearShapeCache(fontUrl?: string): void {
   if (fontUrl) {
+    kashidaSupportCache.delete(fontUrl);
     shapeCache.delete(fontUrl);
     alternatesCache.delete(fontUrl);
     styleSetsCache.delete(fontUrl);
     fontDataCache.delete(fontUrl);
     parsedFontCache.delete(fontUrl);
   } else {
+    kashidaSupportCache.clear();
     shapeCache.clear();
     alternatesCache.clear();
     styleSetsCache.clear();
