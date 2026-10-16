@@ -293,3 +293,14 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   (`thuluth-13-notes.png`): "حرف الفاء وكيفية استعماله بين الاحرف" —
   the fa and how it is used between letters, so these heads are fa. Clean, dotless;
   a faint dotted segment on the baseline under the ط to check.
+- Row 4, `thuluth-13-row4.png` (2026-10-16): fa at the start, middle and end,
+  in two kinds, each with a rule:
+  - Right, "فاء اولى و وسط و نهائى": a وففـ-like run plus a فـ head stacked on
+    a ح (فح), with the note "يكتب قبل الاحرف المرتفعة" — this fa is written
+    **before tall letters**. Measurement dots and construction lines on the
+    heads.
+  - Left, "حرف فاء ممدود و متصل و وسط مع واو نهائى" (extended, joined and
+    medial fa with a final waw): a و then a فبو-like run, with the note
+    "يكتب قبل الاحرف المنخفضة" — this fa is written **before low letters**.
+    Guide lines and a measurement dot.
+  The tall/low rule is a placement rule worth keeping with the pieces.
