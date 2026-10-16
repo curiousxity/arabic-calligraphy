@@ -606,9 +606,9 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
 - `thuluth-21-basmala-b.png` (2026-10-16): a third Basmala — the long
   extended seen like t20's, but a **finer pen**, light strokes, sparse
   tashkeel (fatha/kasra strokes and small signs only, no v flicks), and
-  الرحمن الرحيم kept on one level instead of stacked. It reads closer to
-  Naskh than Thuluth: **script to confirm** before it goes in a Thuluth
-  set. Clean, no guide lines.
+  الرحمن الرحيم kept on one level instead of stacked. **Naskh, confirmed by
+  the user (2026-10-16)**: keep it out of the Thuluth set; Naskh reference
+  only. Clean, no guide lines.
 
 ## Sheet t22 — a framed verse panel
 
@@ -698,7 +698,8 @@ in the mark library), but only if the user wants that.
   والتوفيق وعليه التكلان" — a closing formula, one level line, fine pen,
   light tashkeel. A small stacked signature block at the left dated ١٣٨٤
   (about 1964): remove it. Like t21's third Basmala, the pen and the flat
-  layout read closer to **Naskh** than Thuluth — script to confirm. Small
+  layout are **Naskh, confirmed by the user (2026-10-16)**: keep it out of
+  the Thuluth set; Naskh reference only. Small
   (about 1530 px wide for a long line), so letters are only ~40 px tall.
 
 ## Sheet t27 — a dense panel with its reading key
@@ -793,8 +794,8 @@ traced into the app. Questions to settle with the user during review:
 1. ~~Source: are the lesson sheets from Hashim al-Baghdadi's book?~~
    Answered: no.
 2. Names for all 31 pieces of sheet t1, and t2 piece 26 (ق or فـ).
-3. Script: are `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`
-   Thuluth or Naskh?
+3. ~~Script of `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`?~~
+   Answered: Naskh. Both stay out of the Thuluth set.
 4. t17 row 5: which pieces the note "١-٢" means, and what the big dotted
    overlay stands for; the words in t17 row 3.
 5. t14 row 4 (حكما): is it the example for "الكاف السيفي المفرد والوسط"?
