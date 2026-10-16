@@ -54,12 +54,23 @@ dotless).
 | 12 | ه ha (measuring nuqtas) — not بهي | named (corrected) |
 | 13 | ى (alif maqsura / ya) | named (corrected) |
 | 14 | لا, large — same form as 9 | named |
-| 15 | لا, small — same form as 10 (not ه) | named (corrected) |
+| 15 | لا, small — same form as 10, not ه. Tell it by the **alif's hat stroke** (the head at the top of the alif), which a ه never has | named (corrected) |
 | 16 | صـ | named |
 | 17 | ط / ظ ta/za (measuring nuqtas) — not ظـ alone | named (corrected) |
-| 18–23 | rest of the middle row | waiting for the user |
-| 24–29, 31 | bottom row | waiting for the user |
+| 18 | ض | named (guess not corrected) |
+| 19 | ط | named (guess not corrected) |
+| 20 | ب / ت / ث body — **two forms drawn superimposed** on each other, not بن | named (corrected); needs separating into two pieces |
+| 21 | ج / ح / خ — the **alternate body**, not بي | named (corrected) |
+| 22 | ق | named (guess not corrected) |
+| 23 | ه | named (guess not corrected) |
+| 24 | ك — with a **small handwritten note** beside it to remove | named |
+| 25 | ل | named (guess not corrected) |
+| 26 | د | named (guess not corrected) |
+| 27 | د dal (measuring nuqtas) — not ذ | named (corrected) |
+| 28 | ن nun body (measuring nuqtas) — not ان | named (corrected) |
+| 29 | ر ra body (measuring nuqtas) — not بز | named (corrected) |
 | 30 | ن nun, without nuqtas — not ر | named (corrected) |
+| 31 | ى / ي ya — **three forms** in one drawing, not بني | named (corrected); needs separating into three pieces |
 
 ## Sheet t2 — `thuluth-2.webp` (1623×876)
 
@@ -833,8 +844,8 @@ traced into the app. Questions to settle with the user during review:
    Answered: no. The signed panels are by **Hashim, the user's
    grandfather**, and so are the lesson sheets (t1–t19), confirmed
    2026-10-16. No credit in the app.
-2. Names for sheet t1's middle and bottom rows (top row and 30 done),
-   and t2 piece 26 (ق or فـ).
+2. ~~Names for sheet t1~~ — all 31 named 2026-10-16 (pieces the user
+   did not correct keep the guessed name). Still open: t2 piece 26 (ق or فـ).
 3. ~~Script of `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`?~~
    Answered: Naskh. Both stay out of the Thuluth set.
 4. t17 row 5: which pieces the note "١-٢" means, and what the big dotted
