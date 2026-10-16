@@ -304,3 +304,19 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
     "يكتب قبل الاحرف المنخفضة" — this fa is written **before low letters**.
     Guide lines and a measurement dot.
   The tall/low rule is a placement rule worth keeping with the pieces.
+
+## Sheet t14 — kaf and its kinds (row images)
+
+- Row 1, `thuluth-14-row1.webp` (2026-10-16): "الكاف وانواعه", five numbered
+  kafs, right to left, each with a dotted alternate tail or stroke:
+  1. ك single (المفرد): "made of the alif and the base of fa and ba".
+     Dotted alternate: a curled tail at the right edge.
+  2. ك final (الكاف النهائي): "the upright of the medial lam with the base
+     shown in (1)". Dotted alternate tail below.
+  3. ك extended (المرسل): "made of the alif and the extended fa and ba; may
+     also be used at the end". Dotted alternate tail below.
+  4. ك zinadi (الزنادي). Dotted alternate near its start.
+  5. ك zinadi joined into a following letter (كد-like). Dotted alternate
+     vertical at the far left.
+  The small ك signs inside 1–3 (the kaf's inner mark) are separate pieces.
+  Clean strokes otherwise; labels and numbers need removing.
