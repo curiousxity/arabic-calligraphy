@@ -253,3 +253,8 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   calligrapher must understand the rules of composition: putting each letter
   in its place"). A reference for stacked compositions rather than a source
   of single pieces. Clean: no measurement dots or dotted alternates.
+- Row 5, `thuluth-12-row5.png` (2026-10-16): a second arrangement of
+  "وجعلنا" — the ain moved to the upper left beside the alif, the ن bowl
+  directly under it, the lam's long bowl sweeping beneath the whole word.
+  Pair it with row 4: same word, two placements of the same letters. Clean:
+  no measurement dots, notes or dotted alternates.
