@@ -320,3 +320,15 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
      vertical at the far left.
   The small ك signs inside 1–3 (the kaf's inner mark) are separate pieces.
   Clean strokes otherwise; labels and numbers need removing.
+- Row 2, `thuluth-14-row2.webp` (2026-10-16): the saifi (sword) kaf, pieces
+  6–9, right to left:
+  6. saifi, initial joined (السيفي الاول المتصل): "made from the start of
+     lam-alif, the head from the start of the extended seen". Dotted
+     alternate: a long tail looping down below.
+  7. saifi, single and joined (السيفي المفرد والمتصل): "from the first half
+     of lam-alif; some calligraphers derive it from the dal". Dotted
+     alternate: a looped tail below.
+  8. "model of the medial saifi kaf and its derivatives" (a كرا-like run).
+     Dotted alternate: a tall upright above.
+  9. "model of the saifi kaf, medial and final, joined" (a مكا-like run).
+  Clean strokes; labels and numbers need removing.
