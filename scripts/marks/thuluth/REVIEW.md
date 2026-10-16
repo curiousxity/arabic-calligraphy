@@ -276,6 +276,9 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   right to left:
   6. و gathered (مجموع), derived from gathered ra and dal.
   7. و with a **dotted alternate outline** of a longer, curled tail.
+     Note (`thuluth-13-notes.png`): "الواو المرسل ذات ٤ نقاط يكون داخل كأس
+     النون أو السين" — the dotted one is the extended waw, four nuqtas
+     long, used inside the cup of a nun or seen.
   8. و of seven nuqtas — labelled as Muhaqqaq, "not to be used in Thuluth".
      Keep it out of the Thuluth set.
   9. و with its head open on the left (الرأس المفتوح من اليسار).
@@ -286,5 +289,7 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
 - Row 3, `thuluth-13-row3.png` (2026-10-16): piece 12, one long joined run
   showing the shared fa/qaf/waw head in the start and middle of a word —
   a ف head stacked over a ح at the right, then medial heads after ع, ل, ط and
-  ص, ending in لا. Read loosely as فحـعـفلفطفصلا; to confirm. Clean, dotless;
+  ص, ending in لا. Read loosely as فحـعـفلفطفصلا; to confirm. Note
+  (`thuluth-13-notes.png`): "حرف الفاء وكيفية استعماله بين الاحرف" —
+  the fa and how it is used between letters, so these heads are fa. Clean, dotless;
   a faint dotted segment on the baseline under the ط to check.
