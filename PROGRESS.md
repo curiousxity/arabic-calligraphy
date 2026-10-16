@@ -103,10 +103,12 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ### 2026-10-16 — Mark library
 
-- **Marks panel**: 52 loose pen pieces (strokes & tails, heads & loops,
+- **Marks panel**: 67 loose pen pieces (strokes & tails, heads & loops,
   dots, small signs), traced from a reference sheet. Click one, then click
   the canvas. The **Mark** panel sizes, colours, turns, flips or swaps it.
   How it works: [marks.md](.claude/rules/marks.md).
+- Same day: 15 more from a second, cleaner sheet (آ, ھ, ه over و, a kaf
+  head, long downstrokes and bases); repeats of the first sheet skipped.
 - `e2e/marks.spec.ts` is written and typechecks but has **not been run**
   (browser tests skipped this session).
 

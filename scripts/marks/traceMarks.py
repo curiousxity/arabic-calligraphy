@@ -1,118 +1,149 @@
 """
-Traces the mark library (src/lib/markLibraryData.ts) from a raster sheet of
-calligraphic pen pieces. Re-run after changing the sheet or the names:
+Traces the mark library (src/lib/markLibraryData.ts) from raster sheets of
+calligraphic pen pieces (SHEETS, below). Re-run after changing the sheet or the names:
 
     pip install potracer opencv-python-headless pillow
-    python3 -I scripts/marks/traceMarks.py scripts/marks/source.jpg > src/lib/markLibraryData.ts
+    python3 -I scripts/marks/traceMarks.py > src/lib/markLibraryData.ts
 
 Marks are found as clusters of dark pixels (dilated so a mark's separate
 dots stay together), keyed row+column ("40" = row 4, first mark), enlarged
 8x, cleaned of the sheet's grid lines, and traced with potrace. Output is
-in units of 1/10 source pixel, centred on the mark's own ink box.
+in library units (see SHEETS for the per-sheet scale), centred on the mark's own ink box.
 See .claude/rules/marks.md.
 """
-import sys, json, numpy as np, cv2, potrace
+import os, sys, numpy as np, cv2, potrace
 from PIL import Image
-im = np.array(Image.open(sys.argv[1]).convert('L'))
-mask = (im < 140).astype(np.uint8)
-dil = cv2.dilate(mask, np.ones((9,9),np.uint8))
-n, lab, stats, cent = cv2.connectedComponentsWithStats(dil, 8)
-clusters=[]
-for i in range(1,n):
-    if (mask[lab==i]).sum()<30: continue
-    x,y,w,h,_=stats[i]; clusters.append([i,(x,y,w,h)])
-clusters.sort(key=lambda c:c[1][1]+c[1][3]/2)
-rows=[]
-for c in clusters:
-    cy=c[1][1]+c[1][3]/2
-    if rows and abs(cy-rows[-1][0])<35: rows[-1][1].append(c)
-    else: rows.append([cy,[c]])
-named={}
-for r,(cy,cs) in enumerate(rows):
-    cs.sort(key=lambda c:c[1][0])
-    for k,c in enumerate(cs): named[f"{r}{k}"]=[c[0]]
-named['54']+=named.pop('55')
-named['58']=named['58']; named['59']=named.pop('59')
-named['60']=named.pop('60')  # row-6 lone item
-S=8          # upscale factor
-UNIT=10      # output units per source pixel
-out={}
-for key,labs in named.items():
-    sel=np.isin(lab,labs)
-    ys,xs=np.where(sel)
-    x0,x1,y0,y1=xs.min()-3,xs.max()+4,ys.min()-3,ys.max()+4
-    g=im[y0:y1,x0:x1].astype(np.float32)
-    g[~sel[y0:y1,x0:x1]]=255
-    big=cv2.resize(g,None,fx=S,fy=S,interpolation=cv2.INTER_CUBIC)
-    big=cv2.GaussianBlur(big,(0,0),S*0.35)
-    bw=(big<170).astype(np.uint8)
-    ker=cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(S+1,S+1))
-    bw=cv2.morphologyEx(bw,cv2.MORPH_CLOSE,ker)>0
-    bw=~bw
-    bm=potrace.Bitmap(bw)
-    pl=bm.trace(turdsize=S*S*4, alphamax=1.1, opticurve=True, opttolerance=0.4)
-    f=UNIT/S
-    # Measure the traced outline itself (curves sampled), so the stored size
-    # and centring match what the app draws, not the pixel mask.
-    pts=[]
-    for curve in pl:
-        a=curve.start_point; pts.append((a.x,a.y))
-        for sg in curve.segments:
-            if sg.is_corner:
-                pts += [(sg.c.x,sg.c.y),(sg.end_point.x,sg.end_point.y)]
-            else:
-                p1,p2,p3=sg.c1,sg.c2,sg.end_point
-                for i in range(1,17):
-                    t=i/16; u=1-t
-                    pts.append((u**3*a.x+3*u*u*t*p1.x+3*u*t*t*p2.x+t**3*p3.x,
-                                u**3*a.y+3*u*u*t*p1.y+3*u*t*t*p2.y+t**3*p3.y))
-            a=sg.end_point
-    px_=[q[0] for q in pts]; py_=[q[1] for q in pts]
-    mx=(min(px_)+max(px_))/2; my=(min(py_)+max(py_))/2
-    w=(max(px_)-min(px_))*f; h=(max(py_)-min(py_))*f
-    def p(pt): return f"{(pt.x-mx)*f:.0f} {(pt.y-my)*f:.0f}"
-    d=[]
-    for curve in pl:
-        d.append("M"+p(curve.start_point))
-        for sg in curve.segments:
-            if sg.is_corner: d.append("L"+p(sg.c)+"L"+p(sg.end_point))
-            else: d.append("C"+p(sg.c1)+" "+p(sg.c2)+" "+p(sg.end_point))
-        d.append("Z")
-    out[key]={"d":"".join(d),"w":int(w),"h":int(h)}
+
+def trace_sheet(path, unit, dilate, row_gap, merges):
+    """Every mark on one sheet, keyed row+column: {key: {d, w, h}}.
+    `unit` is library units per source pixel, chosen per sheet so marks from
+    different sheets come out at one scale (an alif about 500 units tall)."""
+    UNIT=unit
+    im = np.array(Image.open(path).convert('L'))
+    mask = (im < 140).astype(np.uint8)
+    dil = cv2.dilate(mask, np.ones((dilate,dilate),np.uint8))
+    n, lab, stats, cent = cv2.connectedComponentsWithStats(dil, 8)
+    clusters=[]
+    for i in range(1,n):
+        if (mask[lab==i]).sum()<30: continue
+        x,y,w,h,_=stats[i]; clusters.append([i,(x,y,w,h)])
+    clusters.sort(key=lambda c:c[1][1]+c[1][3]/2)
+    rows=[]
+    for c in clusters:
+        cy=c[1][1]+c[1][3]/2
+        if rows and abs(cy-rows[-1][0])<row_gap: rows[-1][1].append(c)
+        else: rows.append([cy,[c]])
+    named={}
+    for r,(cy,cs) in enumerate(rows):
+        cs.sort(key=lambda c:c[1][0])
+        for k,c in enumerate(cs): named[f"{r}{k}"]=[c[0]]
+    for into,frm in merges: named[into]+=named.pop(frm)
+    S=8          # upscale factor
+    out={}
+    for key,labs in named.items():
+        sel=np.isin(lab,labs)
+        ys,xs=np.where(sel)
+        x0,x1,y0,y1=xs.min()-3,xs.max()+4,ys.min()-3,ys.max()+4
+        g=im[y0:y1,x0:x1].astype(np.float32)
+        g[~sel[y0:y1,x0:x1]]=255
+        big=cv2.resize(g,None,fx=S,fy=S,interpolation=cv2.INTER_CUBIC)
+        big=cv2.GaussianBlur(big,(0,0),S*0.35)
+        bw=(big<170).astype(np.uint8)
+        ker=cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(S+1,S+1))
+        bw=cv2.morphologyEx(bw,cv2.MORPH_CLOSE,ker)>0
+        bw=~bw
+        bm=potrace.Bitmap(bw)
+        pl=bm.trace(turdsize=S*S*4, alphamax=1.1, opticurve=True, opttolerance=0.4)
+        f=UNIT/S
+        # Measure the traced outline itself (curves sampled), so the stored size
+        # and centring match what the app draws, not the pixel mask.
+        pts=[]
+        for curve in pl:
+            a=curve.start_point; pts.append((a.x,a.y))
+            for sg in curve.segments:
+                if sg.is_corner:
+                    pts += [(sg.c.x,sg.c.y),(sg.end_point.x,sg.end_point.y)]
+                else:
+                    p1,p2,p3=sg.c1,sg.c2,sg.end_point
+                    for i in range(1,17):
+                        t=i/16; u=1-t
+                        pts.append((u**3*a.x+3*u*u*t*p1.x+3*u*t*t*p2.x+t**3*p3.x,
+                                    u**3*a.y+3*u*u*t*p1.y+3*u*t*t*p2.y+t**3*p3.y))
+                a=sg.end_point
+        px_=[q[0] for q in pts]; py_=[q[1] for q in pts]
+        mx=(min(px_)+max(px_))/2; my=(min(py_)+max(py_))/2
+        w=(max(px_)-min(px_))*f; h=(max(py_)-min(py_))*f
+        def p(pt): return f"{(pt.x-mx)*f:.0f} {(pt.y-my)*f:.0f}"
+        d=[]
+        for curve in pl:
+            d.append("M"+p(curve.start_point))
+            for sg in curve.segments:
+                if sg.is_corner: d.append("L"+p(sg.c)+"L"+p(sg.end_point))
+                else: d.append("C"+p(sg.c1)+" "+p(sg.c2)+" "+p(sg.end_point))
+            d.append("Z")
+        out[key]={"d":"".join(d),"w":int(w),"h":int(h)}
+
+    return out
+
+# One entry per source sheet. `unit` brings each sheet to one scale (an alif
+# about 500 units tall); `skip` lists marks a sheet repeats from an earlier
+# one; `prefix` keeps ids from different sheets apart (sheet "a" has none,
+# so ids saved before sheet "b" was added still resolve).
+SHEETS = {
+  "a": {"file": "source.jpg", "unit": 10, "dilate": 9, "row_gap": 35, "prefix": "",
+        "merges": [("54","55")], "skip": []},
+  "b": {"file": "source-2.webp", "unit": 5, "dilate": 15, "row_gap": 70, "prefix": "b",
+        "merges": [], "skip": ["01","02","03","05","06","13","14","15","16","24","25","26","27"]},
+}
 
 GROUPS = [
   ("strokes", "Strokes & tails", [
-    ("00","Hooked rising stroke"),("01","Forked head with drop"),("02","Small hooked alif"),
-    ("03","Alif with ha loop"),("04","Forked head"),("05","Small hook"),("06","Curled alif"),
-    ("07","Wavy alif"),("08","Thick alif"),("10","Short alif"),("11","Long bowl stroke"),
-    ("12","Waw tail"),("13","Hairline curled alif"),("14","Forked head on a long tail"),
-    ("16","Kaf stroke"),("17","Curved kaf stroke"),("23","Double stroke"),
-    ("24","Thin rising stroke"),("25","Thick slanted stroke"),("26","Long straight stroke"),
-    ("27","Curved tail stroke")]),
+    ("a","00","Hooked rising stroke"),("a","01","Forked head with drop"),("a","02","Small hooked alif"),
+    ("a","03","Alif with ha loop"),("a","04","Forked head"),("a","05","Small hook"),("a","06","Curled alif"),
+    ("a","07","Wavy alif"),("a","08","Thick alif"),("a","10","Short alif"),("a","11","Long bowl stroke"),
+    ("a","12","Waw tail"),("a","13","Hairline curled alif"),("a","14","Forked head on a long tail"),
+    ("a","16","Kaf stroke"),("a","17","Curved kaf stroke"),("a","23","Double stroke"),
+    ("a","24","Thin rising stroke"),("a","25","Thick slanted stroke"),("a","26","Long straight stroke"),
+    ("a","27","Curved tail stroke"),
+    ("b","04","Hooked downstroke"),("b","30","Long curved downstroke"),("b","31","Twisted stroke"),
+    ("b","10","Long seen stroke"),("b","12","Alif on a bowl"),("b","11","Alif with madda"),
+    ("b","32","Hooked bowl"),("b","33","Long flat base"),("b","34","Short flat base"),
+  ]),
   ("heads", "Heads & loops", [
-    ("20","Seen teeth, upright"),("21","Seen teeth, slanted"),("22","Seen teeth, leaning"),
-    ("30","Ain head"),("31","Hamza curl"),("32","Open ain head"),("15","Small ha"),
-    ("33","Mim and waw loops on a tail"),("34","Waw loop, long tail"),("35","Waw loop, short tail"),
-    ("36","Double loop"),("37","Waw loop with hook")]),
+    ("a","20","Seen teeth, upright"),("a","21","Seen teeth, slanted"),("a","22","Seen teeth, leaning"),
+    ("a","30","Ain head"),("a","31","Hamza curl"),("a","32","Open ain head"),("a","15","Small ha"),
+    ("a","33","Mim and waw loops on a tail"),("a","34","Waw loop, long tail"),("a","35","Waw loop, short tail"),
+    ("a","36","Double loop"),("a","37","Waw loop with hook"),
+    ("b","00","Two-eyed ha"),("b","20","Ha over waw"),("b","22","Alif and waw loop"),
+    ("b","07","Waw loops on a long tail"),("b","21","Kaf head"),
+  ]),
   ("dots", "Dots (nuqta)", [
-    ("40","Round dot"),("41","Two round dots, stacked"),("42","Two round dots, side by side"),
-    ("43","Three round dots"),("44","Nuqta"),("45","Two nuqtas, stacked"),
-    ("46","Two nuqtas, side by side"),("47","Three nuqtas, point down"),("48","Three nuqtas, point up")]),
+    ("a","40","Round dot"),("a","41","Two round dots, stacked"),("a","42","Two round dots, side by side"),
+    ("a","43","Three round dots"),("a","44","Nuqta"),("a","45","Two nuqtas, stacked"),
+    ("a","46","Two nuqtas, side by side"),("a","47","Three nuqtas, point down"),("a","48","Three nuqtas, point up")]),
   ("signs", "Small signs", [
-    ("50","Small kaf"),("51","Mim ha"),("52","Seen ra"),("53","Ain"),("54","Mim with ha"),
-    ("56","Mim with forked head"),("57","Mim"),("58","Sad ra"),("59","Sad ha"),("60","Ta")]),
+    ("a","50","Small kaf"),("a","51","Mim ha"),("a","52","Seen ra"),("a","53","Ain"),("a","54","Mim with ha"),
+    ("a","56","Mim with forked head"),("a","57","Mim"),("a","58","Sad ra"),("a","59","Sad ha"),("a","60","Ta"),
+    ("b","23","Small hah"),
+  ]),
 ]
-used={k for _,_,items in GROUPS for k,_ in items}
-assert used==set(out), (sorted(set(out)-used), sorted(used-set(out)))
+HERE=os.path.dirname(os.path.abspath(__file__))
+outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"])
+      for name,cfg in SHEETS.items()}
+for name in SHEETS:
+    used={k for _,_,items in GROUPS for sh,k,_ in items if sh==name}
+    skip=set(SHEETS[name]["skip"])
+    assert used|skip==set(outs[name]) and not used&skip, (name, sorted(set(outs[name])-used-skip), sorted((used|skip)-set(outs[name])))
 print("// Generated by scripts/marks/traceMarks.py — do not edit by hand.")
-print("// Paths are centred on the origin, 10 units per source pixel.")
+print("// Paths are centred on the origin; an alif is about 500 units tall.")
 print('import type { MarkGroup } from "./markLibrary";')
 print("")
 print("export const MARK_GROUPS: MarkGroup[] = [")
 for gid,title,items in GROUPS:
     print(f'  {{ id: "{gid}", title: "{title}", items: [')
-    for k,name in items:
-        v=out[k]
-        print(f'    {{ id: "{gid}-{k}", name: "{name}", w: {v["w"]}, h: {v["h"]}, d: "{v["d"]}" }},')
+    for sh,k,name in items:
+        v=outs[sh][k]
+        mid=f"{gid}-{SHEETS[sh]['prefix']}{k}"
+        print(f'    {{ id: "{mid}", name: "{name}", w: {v["w"]}, h: {v["h"]}, d: "{v["d"]}" }},')
     print("  ] },")
 print("];")

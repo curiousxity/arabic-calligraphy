@@ -16,8 +16,16 @@ library ([tashkeel-library.md](tashkeel-library.md)) nothing is typed: a
 mark is not a character in any font, so it is its own block type.
 
 **Where the outlines come from.** `src/lib/markLibraryData.ts` is generated
-by `scripts/marks/traceMarks.py` from the raster sheet
-`scripts/marks/source.jpg` (a user-supplied 514×484 image on a grey grid).
+by `scripts/marks/traceMarks.py` from the raster sheets listed in its
+`SHEETS` table: sheet `a`, `scripts/marks/source.jpg` (a user-supplied
+514×484 image on a grey grid, 52 marks), and sheet `b`,
+`scripts/marks/source-2.webp` (1005×740, clean white, drawn about twice as
+large; 15 marks, its other 14 skipped as repeats of sheet `a`). Each sheet
+has its own `unit` so both come out at one scale (an alif about 500 units),
+and its own `prefix` for ids (`a` has none, so ids saved before `b` existed
+still resolve; `b`'s are `strokes-b04` and so on). Adding a sheet is a
+`SHEETS` entry plus its names in `GROUPS`; the script asserts every traced
+mark on a sheet is either named or skipped.
 The script finds marks as clusters of dark pixels (dilated 9px, so a mark's
 separate dots stay together), keys them row+column (`"40"` = row 4, first),
 enlarges 8×, closes small gaps left by the grid lines, and traces with
@@ -27,11 +35,10 @@ asserts every traced mark is named. **Don't hand-edit the data file**;
 change the script and re-run it (the command is in its docstring).
 
 The traced quality is bounded by the source: marks are 12–80 source px, so
-edges are smooth but not pen-sharp. A cleaner sheet (higher resolution, no
-grid) dropped in as `source.jpg` re-traces with no code change, provided
-the row/column layout and the name table still match.
+edges are smooth but not pen-sharp. Sheet `b` shows what a clean, larger source gives;
+prefer one like it for new marks.
 
-**Units and size.** Paths are in units of 1/10 source pixel, centred on the
+**Units and size.** Paths are in library units (sheet `a`: 10 per source pixel), centred on the
 outline's own measured box (curves sampled, not the pixel mask, so the
 stored `w`/`h` match what is drawn; a unit test holds this). Only M/L/C/Z
 commands: `parseSvgPath` flattens arcs. Size is `fontSize`:
