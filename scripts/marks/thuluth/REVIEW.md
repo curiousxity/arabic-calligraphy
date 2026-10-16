@@ -272,3 +272,14 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   5. ق extended, derived from extended nun.
   Clean strokes, dotless (one small mark above piece 5 to check); labels,
   arrows and numbers need removing. No dotted alternates.
+- Row 2, `thuluth-13-row2.webp` (2026-10-16): waw forms, numbered 6–11,
+  right to left:
+  6. و gathered (مجموع), derived from gathered ra and dal.
+  7. و with a **dotted alternate outline** of a longer, curled tail.
+  8. و of seven nuqtas — labelled as Muhaqqaq, "not to be used in Thuluth".
+     Keep it out of the Thuluth set.
+  9. و with its head open on the left (الرأس المفتوح من اليسار).
+  10. و with its head open on the right (الرأس المفتوح من اليمين).
+  11. a joined مو-like pair: "the letter before the waw may join the waw's
+      head from the left".
+  Clean, dotless strokes; labels, arrows and numbers need removing.
