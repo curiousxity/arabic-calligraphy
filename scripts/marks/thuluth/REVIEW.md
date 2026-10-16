@@ -51,7 +51,7 @@ dotless).
 | 9 | لا, large — same form as 14 | named |
 | 10 | لا, small — same form as 15 | named |
 | 11 | د dal (measuring nuqtas) — not نذ | named (corrected) |
-| 12 | ه ha (measuring nuqtas) — not بهي | named (corrected) |
+| 12 | ه ha — the **construction drawing** of 23: stroke numbers, measuring nuqtas and a **half nuqta**. Not a piece to trace; use it for proportions and to record the stroke order | named (corrected) |
 | 13 | ى (alif maqsura / ya) | named (corrected) |
 | 14 | لا, large — same form as 9 | named |
 | 15 | لا, small — same form as 10, not ه. Tell it by the **alif's hat stroke** (the head at the top of the alif), which a ه never has | named (corrected) |
@@ -62,7 +62,7 @@ dotless).
 | 20 | ب / ت / ث body — **two forms drawn superimposed** on each other, not بن | named (corrected); needs separating into two pieces |
 | 21 | ج / ح / خ — the **alternate body**, not بي | named (corrected) |
 | 22 | ق | named (guess not corrected) |
-| 23 | ه | named (guess not corrected) |
+| 23 | ه ha — **the actual shape** (the user, 2026-10-16): trace this one; 12 is its construction | named |
 | 24 | ك — with a **small handwritten note** beside it to remove | named |
 | 25 | ل | named (guess not corrected) |
 | 26 | د | named (guess not corrected) |
