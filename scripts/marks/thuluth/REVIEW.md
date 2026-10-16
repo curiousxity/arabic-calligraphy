@@ -444,3 +444,13 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
     needed. **Dotted alternate**: a long joined shape behind it. A smaller
     مـ head at the far left.
   Clean strokes, no measurement dots; labels and arrows need removing.
+- Row 4, `thuluth-16-row4.webp` (2026-10-16), right to left:
+  - A سم-like piece and a separate mim head, with the rule "هذا الميم يستعمل
+    مع الباء والسين والصاد والطاء والفاء والقاف المرتفعين قبل المد ويستعمل مع
+    الياء النهائية في حالات قليلة" — this mim follows ba, seen, sad, tah, and
+    the raised fa and qaf, before a long stroke; with a final ya only
+    rarely. **Dotted alternate**: a curled tail under the separate head.
+  - "الميمات الوسطية بين الاحرف" (medial mims between letters): one long
+    joined run, loosely محمعمسمصملم — a mim after ح, ع, س, ص and ل in turn.
+  Clean strokes, no measurement dots; labels need removing. Readings to
+  confirm.
