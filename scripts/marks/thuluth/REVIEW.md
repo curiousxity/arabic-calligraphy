@@ -761,3 +761,18 @@ in the mark library), but only if the user wants that.
   the left, while the ya of ولي stays short and drops under the line. One
   level line, light tashkeel, no signature or border; the whole sweep is
   in frame this time.
+
+## Sheet t32 — book-title compositions (black on light)
+
+- `thuluth-32-title-kaab.webp` (2026-10-16): a book title in three lines —
+  small "ديوان" on top, the main Thuluth line "كعب بن مالك الأنصاري" stacked
+  in two tiers (بن ما lifted over the run, a tall row of alif/lam uprights,
+  the kaf at the right drawn large), and small "دراسة وتحقيق" underneath.
+  The top and bottom lines are in a plainer hand (not Thuluth): reference
+  only. Full ornament signs around the main line.
+- `thuluth-32-title-tughrai.png` (2026-10-16): the single word "الطغرائي",
+  large and compact: tall alif, lam and tah uprights, the ghain head
+  stacked mid-height, the final ya sweeping back under the lam. The "هاشم"
+  signature sits inside the lower bowl: remove it.
+Both show a calligrapher composing **a short phrase or one word to fill a
+block**, rather than a line: a different target from the verse panels.
