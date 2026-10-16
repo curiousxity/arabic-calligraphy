@@ -640,12 +640,9 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
 
 ## Sheet t24 — two signed panels with corner ornaments (white on black)
 
-Both signed "هاشم" and dated ١٣٧٥ (AH, about 1955). **Hashim is the
-user's grandfather** (told 2026-10-16); the work is not from al-Baghdadi's
-book, so never attribute it to him. The signature is the artist's: the
-source scans are kept exactly as sent, signature and date included. It
-is only left out of *traced pieces*, and never traced as a piece itself.
-How the app should credit him is the user's call (open question).
+Both were signed "هاشم" and dated. **Hashim is the user's grandfather**
+(told 2026-10-16); the work is not from al-Baghdadi's book, so never
+attribute it to him. The user asked for no credit in the app.
 
 - `thuluth-24-qalam-4.webp` (2026-10-16): "وإنك لعلى خلق عظيم" (al-Qalam
   68:4), a landscape panel: tall alifs and the ظ upright in a row, لعلى and
@@ -790,16 +787,23 @@ block**, rather than a line: a different target from the verse panels.
 
 ## Collection complete (2026-10-16) — open questions and review order
 
-Wherever a note above says "remove the signature", it means: leave it
-out of the traced pieces. The source scans themselves are never edited.
+**Signatures and dates are erased from the saved scans** (2026-10-16, at
+the user's request). Twelve files were cleaned: t23, both t24 panels,
+the t25 hadith, t26, t27, t28, t29, t30 and the three signed t32 titles.
+Only marks lying wholly inside a hand-picked box were erased, so no
+letter was touched; each patch is filled with its own surrounding
+colour. The originals stay in git history (before commit "Erase
+signatures and dates"). Notes above that say "remove the signature" or
+"remove the date" are now done. The "صدق الله العظيم" blocks are text,
+not signatures, and were kept.
 
 The user finished sending scans: 87 files, sheets t1–t32. Nothing has been
 traced into the app. Questions to settle with the user during review:
 
 1. ~~Source: are the lesson sheets from Hashim al-Baghdadi's book?~~
    Answered: no. The signed panels are by **Hashim, the user's
-   grandfather**. Still open: are the lesson sheets his too, and how
-   would the user like him credited in the app?
+   grandfather**; no credit in the app. Still open: are the lesson
+   sheets his too?
 2. Names for all 31 pieces of sheet t1, and t2 piece 26 (ق or فـ).
 3. ~~Script of `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`?~~
    Answered: Naskh. Both stay out of the Thuluth set.
