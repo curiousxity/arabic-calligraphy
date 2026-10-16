@@ -215,3 +215,8 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   standalone, صر, a stacked run of two sads over a returned ya tail (صصى-like),
   صو, and a stacked مصحم-like word; a faint dotted alternate outline at the far
   left (~75–95 px, the start of the last word). No measurement dots.
+- Row 2, `thuluth-11-row2.webp` (2026-10-16, 1551×602): two rows of complex
+  tah and sad strokes and stacked forms — a مطـ-like opening run, طط, a
+  stacked مصحى-like word, سط, a ط over ع stack, a long طـ run, and مصى.
+  Dotted alternate outlines: a vertical at the far left by the first word,
+  and dotted pieces beside سط and the stacked ع. No measurement dots seen.
