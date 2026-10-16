@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { GUIDE_SHAPE_LABELS } from "../../lib/guideShapes";
+import { findMark } from "../../lib/markLibrary";
 import type { Block } from "../../types";
 import { makeId } from "./utils";
 import {
@@ -23,6 +24,8 @@ const blockTypeIcon = (b: Block) =>
     <ShapesIcon size={13} />
   ) : b.type === "guide" ? (
     "◯"
+  ) : b.type === "mark" ? (
+    "✒"
   ) : (
     "T"
   );
@@ -31,6 +34,7 @@ const blockTypeIcon = (b: Block) =>
 const defaultLabel = (b: Block) =>
   b.type === "guide" ? `Guide · ${GUIDE_SHAPE_LABELS[b.guideShape]}`
   : b.type === "stack" ? `Stack · ${b.source.text}`
+  : b.type === "mark" ? `Mark · ${findMark(b.markId)?.name ?? "custom"}`
   : `Block ${b.id}`;
 
 export type LayersPanelProps = {

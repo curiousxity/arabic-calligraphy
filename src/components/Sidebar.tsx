@@ -22,6 +22,9 @@ import { MirrorPanel } from "./sidebar/MirrorPanel";
 import { CurvePanel } from "./sidebar/CurvePanel";
 import { ShapeFillPanel } from "./sidebar/ShapeFillPanel";
 import { BlockControlsPanel } from "./sidebar/BlockControlsPanel";
+import { MarkPanel } from "./sidebar/MarkPanel";
+import { MarkPicker } from "./sidebar/MarkPicker";
+import type { MarkItem } from "../lib/markLibrary";
 import { TypographyPanel } from "./sidebar/TypographyPanel";
 import { EffectsPanel } from "./sidebar/EffectsPanel";
 import { GUIDE_SHAPE_LABELS } from "../lib/guideShapes";
@@ -196,6 +199,8 @@ export type SidebarProps = {
   /** Guides — see .claude/rules/guides.md. */
   onAddGuide?: (shape: GuideShape) => void;
   onAddSvgGuide?: (pathData: string) => void;
+  /** Marks — see .claude/rules/marks.md. */
+  onAddMark?: (item: MarkItem) => void;
   onUpdateGuideParams?: (params: GuideParams) => void;
   onAddTextToGuide?: () => void;
   onAttachToGuide?: (guideId: number) => void;
@@ -391,6 +396,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddTextPathBlock,
   onAddGuide,
   onAddSvgGuide,
+  onAddMark,
   onUpdateGuideParams,
   onAddTextToGuide,
   onAttachToGuide,
@@ -464,6 +470,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showVerse, setShowVerse] = useState(true);
   const [showGuide, setShowGuide] = useState(true);
   const [showStack, setShowStack] = useState(true);
+  const [showMark, setShowMark] = useState(true);
+  // Closed by default: four groups of preview buttons are most of a screen.
+  const [showMarks, setShowMarks] = useState(false);
 
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(!isMobile);
@@ -1016,6 +1025,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isJustifyingVerse={isJustifyingVerse}
         />
 
+        {onAddMark && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Marks" isOpen={showMarks} onToggle={() => setShowMarks((v) => !v)}>
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div className="sidebarTashkeelNote">
+                  Pen pieces to place anywhere. Click one, then click the canvas.
+                </div>
+                <MarkPicker onPick={onAddMark} />
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+
         <div className="sidebarPanel">
           <CollapsibleSection title="Layers" isOpen={showLayers} onToggle={() => setShowLayers((v) => !v)}>
             <div style={{ marginTop: 10 }}>
@@ -1380,6 +1402,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
+        {selectedBlock?.type === "mark" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Mark" isOpen={showMark} onToggle={() => setShowMark((v) => !v)}>
+              <MarkPanel block={selectedBlock} onUpdate={onUpdateSelectedBlock} />
+            </CollapsibleSection>
+          </div>
+        )}
+
         {selectedBlock && selectedBlock.type === "textPath" && (
           <CurvePanel
             selectedBlock={selectedBlock}
@@ -1392,7 +1422,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         )}
 
-        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && (
+        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && selectedBlock.type !== "mark" && (
           <TypographyPanel
             selectedBlock={selectedBlock}
             onUpdateSelectedBlock={onUpdateSelectedBlock}

@@ -4,7 +4,8 @@ export type BlockType =
   | "textPath"
   | "mirror"
   | "guide"
-  | "stack";
+  | "stack"
+  | "mark";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 
@@ -229,6 +230,22 @@ export type GuideBlock = BlockCommon & {
   guideSvgD?: string;
 };
 
+/**
+ * A loose pen piece from the mark library (a stroke, head, dot group or small
+ * sign), drawn as a filled outline. Sized by `fontSize`; see
+ * .claude/rules/marks.md.
+ */
+export type MarkBlock = BlockCommon & {
+  type: "mark";
+  /** Library entry it came from (`MARK_GROUPS` item id), for the picker. */
+  markId: string;
+  /** The outline itself, in library units centred on the origin. Stored so a
+   *  save draws the same even if the library entry later changes or goes. */
+  markD: string;
+  /** Mirror left-right. */
+  markFlipX?: boolean;
+};
+
 /** The two outline points on a cut line and the stroke's outward direction
  *  there (radians, pointing away from the piece), piece-local font units. */
 export type CutFace = { a: Pt; b: Pt; tangent: number };
@@ -348,4 +365,5 @@ export type Block =
   | TextPathBlock
   | MirrorBlock
   | GuideBlock
-  | StackBlock;
+  | StackBlock
+  | MarkBlock;

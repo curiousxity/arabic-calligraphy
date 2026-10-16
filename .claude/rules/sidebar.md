@@ -35,8 +35,8 @@ panel title so it groups without competing):
 | Tier | Panels |
 |---|---|
 | `document` | Start from a Template · Artboard & Grid |
-| `canvas` | Block Controls (Add · Selected · History) · Layers · Align & Arrange |
-| `selected` | **Font** · Content · *type panel* (Verse / Mirror / Shape Fill / Guide / Stacked composition / Curve) · Typography · Effects |
+| `canvas` | Block Controls (Add · Selected · History) · Marks · Layers · Align & Arrange |
+| `selected` | **Font** · Content · *type panel* (Verse / Mirror / Shape Fill / Guide / Stacked composition / Mark / Curve) · Typography · Effects |
 
 Then Shortcuts and **Save & Export**, outside any tier. Save & Export
 (formerly Project & Export) moved to the very bottom on 2026-10-16: it is
@@ -49,8 +49,9 @@ contiguous run, instead of interleaving with the permanent ones.
 Not every panel shows for every type. **Font and Content** hide for a
 mirror, a guide and a stacked composition: a mirror draws its source, a
 guide is a path, and a stack is a bake that nothing re-shapes.
-**Typography** hides for a mirror and a guide (a stacked composition keeps
-it). **Effects** hides only for a guide, which is never
+**Typography** hides for a mirror, a guide and a mark (a stacked
+composition keeps it); the Mark type panel carries its own size, colour and
+Rotation rows (see [marks.md](marks.md)). **Effects** hides only for a guide, which is never
 exported. The **Guide** type panel (size rows, Rotation, Add text to guide, the
 texts on it) renders for a guide block; an attached Curve block's `Curve`
 panel swaps its curve-editing rows for the On guide controls

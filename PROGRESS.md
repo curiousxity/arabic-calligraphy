@@ -101,6 +101,15 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-16 — Mark library
+
+- **Marks panel**: 52 loose pen pieces (strokes & tails, heads & loops,
+  dots, small signs), traced from a reference sheet. Click one, then click
+  the canvas. The **Mark** panel sizes, colours, turns, flips or swaps it.
+  How it works: [marks.md](.claude/rules/marks.md).
+- `e2e/marks.spec.ts` is written and typechecks but has **not been run**
+  (browser tests skipped this session).
+
 ### 2026-10-16 — Tilt and stretch more marks in a composition
 
 - **Tilt a long mark**: drag just outside a fatha, kasra, tanween stroke,
