@@ -695,3 +695,17 @@ in the mark library), but only if the user wants that.
   (about 1964): remove it. Like t21's third Basmala, the pen and the flat
   layout read closer to **Naskh** than Thuluth — script to confirm. Small
   (about 1530 px wide for a long line), so letters are only ~40 px tall.
+
+## Sheet t27 — a dense panel with its reading key
+
+- `thuluth-27-qalam-51.webp` (2026-10-16): "وإن يكاد الذين كفروا ليزلقونك
+  بأبصارهم لما سمعوا الذكر ويقولون إنه لمجنون" (al-Qalam 68:51), white on
+  black, a long dense panel stacked two and three tiers deep like t23. A
+  small stacked "صدق الله العظيم" at the top left, the "هاشم" signature at
+  the bottom left and the date ١٣٧٦ (about 1957) under the middle: remove
+  all three. Invert before cleaning.
+- `thuluth-27-qalam-51-key.webp` (2026-10-16): **the same verse written
+  plainly on one line** (a Naskh-like key), so every word of the panel can
+  be read off it. This is the first panel to come with its own key: use the
+  pair to name the stacked pieces of the panel exactly, and as the model
+  for checking readings of t23 and the other dense panels.
