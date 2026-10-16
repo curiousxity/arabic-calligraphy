@@ -640,10 +640,12 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
 
 ## Sheet t24 — two signed panels with corner ornaments (white on black)
 
-Both signed "هاشم" and dated ١٣٧٥ (AH, about 1955). The user confirmed
-(2026-10-16) that the lesson sheets (t1–t19) do **not** come from Hashim
-al-Baghdadi's book; don't attribute them to it. Remove the signature and
-date from both panels; never trace them.
+Both signed "هاشم" and dated ١٣٧٥ (AH, about 1955). **Hashim is the
+user's grandfather** (told 2026-10-16); the work is not from al-Baghdadi's
+book, so never attribute it to him. The signature is the artist's: the
+source scans are kept exactly as sent, signature and date included. It
+is only left out of *traced pieces*, and never traced as a piece itself.
+How the app should credit him is the user's call (open question).
 
 - `thuluth-24-qalam-4.webp` (2026-10-16): "وإنك لعلى خلق عظيم" (al-Qalam
   68:4), a landscape panel: tall alifs and the ظ upright in a row, لعلى and
@@ -788,11 +790,16 @@ block**, rather than a line: a different target from the verse panels.
 
 ## Collection complete (2026-10-16) — open questions and review order
 
+Wherever a note above says "remove the signature", it means: leave it
+out of the traced pieces. The source scans themselves are never edited.
+
 The user finished sending scans: 87 files, sheets t1–t32. Nothing has been
 traced into the app. Questions to settle with the user during review:
 
 1. ~~Source: are the lesson sheets from Hashim al-Baghdadi's book?~~
-   Answered: no.
+   Answered: no. The signed panels are by **Hashim, the user's
+   grandfather**. Still open: are the lesson sheets his too, and how
+   would the user like him credited in the app?
 2. Names for all 31 pieces of sheet t1, and t2 piece 26 (ق or فـ).
 3. ~~Script of `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`?~~
    Answered: Naskh. Both stay out of the Thuluth set.
