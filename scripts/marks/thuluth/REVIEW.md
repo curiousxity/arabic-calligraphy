@@ -785,3 +785,29 @@ block**, rather than a line: a different target from the verse panels.
   ta marbuta stacked, ض at the left), with "للطباعة والنشر والتوزيع" small
   underneath in a plainer hand (reference only). Small signature under the
   main line: remove it. The closest thing yet to a **logo/wordmark**.
+
+## Collection complete (2026-10-16) — open questions and review order
+
+The user finished sending scans: 87 files, sheets t1–t32. Nothing has been
+traced into the app. Questions to settle with the user during review:
+
+1. Source: are the lesson sheets from Hashim al-Baghdadi's "قواعد الخط
+   العربي"? (t24)
+2. Names for all 31 pieces of sheet t1, and t2 piece 26 (ق or فـ).
+3. Script: are `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`
+   Thuluth or Naskh?
+4. t17 row 5: which pieces the note "١-٢" means, and what the big dotted
+   overlay stands for; the words in t17 row 3.
+5. t14 row 4 (حكما): is it the example for "الكاف السيفي المفرد والوسط"?
+6. Readings marked "to confirm": t13 row 3, t15 rows 2–3, t17 row 6, t19's
+   practice words and side note, t23 (al-Ahzab 33:14), t25 (the small
+   block), t29 (al-Fath 48:10), t31 (al-Naml 27:6).
+7. Whether to use the corner florals (t24) and the tiled border (t25
+   hadith) as frame pieces at all.
+8. Whether to keep t13 piece 8 (the Muhaqqaq waw) anywhere.
+
+Suggested review order, easiest first, so the method is agreed on clean
+pieces before the hard ones: t16 row 6 (low final mims), t13 rows 1–2 (fa,
+qaf, waw), t14 rows 1–3 (kafs), t15 row 1 (ba), t18 row 1 (final ya), then
+the lettered sheets with measurement dots, then t19's small signs, and the
+panels last (as targets, not sources).
