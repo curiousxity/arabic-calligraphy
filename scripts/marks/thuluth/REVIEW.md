@@ -637,3 +637,24 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   Use: the target for "stacked" quality, the hardest layout the app
   could aim at. Not a source of single pieces: letters overlap and touch
   everywhere, so the component assigner would merge most of it.
+
+## Sheet t24 — two signed panels with corner ornaments (white on black)
+
+Both signed "هاشم" and dated ١٣٧٥ (AH, about 1955). That points to Hashim
+al-Baghdadi, whose "قواعد الخط العربي" teaches Thuluth with exactly this
+kind of nuqta-measured sheet; **to confirm with the user** whether the
+earlier sheets come from that book. Remove the signature and date from
+both; never trace them.
+
+- `thuluth-24-qalam-4.webp` (2026-10-16): "وإنك لعلى خلق عظيم" (al-Qalam
+  68:4), a landscape panel: tall alifs and the ظ upright in a row, لعلى and
+  خلق stacked in a deep curve underneath, the long kasra stroke under it.
+  Small floral ornaments in all four corners. Verse marker "١٣" style
+  numbers at the left.
+- `thuluth-24-fatir-43.webp` (2026-10-16): "ولا يحيق المكر السيء إلا بأهله"
+  (Fatir 35:43), a **square** panel: a row of tall lam-alifs across the top
+  half, السيء stacked above, بأهله and يحيق wrapped around the bottom.
+  Corner floral ornaments, denser than the first.
+Both: invert before cleaning. The corner florals are not letters; they
+could be a later source for frame corner pieces (sheet `c`'s Frames group
+in the mark library), but only if the user wants that.
