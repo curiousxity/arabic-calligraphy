@@ -190,3 +190,10 @@ complete.
   seen (labelled وسط), and "السين مع الميم" (seen with meem): سمد، سملا. A
   faint dotted alternate outline above the سملا (the alif/lam, ~330–350 px
   from the left). No measurement dots.
+- Row 2, `thuluth-10-row2.png` (2026-10-16): seen joined to ra and to meem
+  — سمر، بسم-type runs, سر، سرس، سمرس. Notes: "السين والصاد متساويان
+  بالاتصال مع الراء" (seen and sad behave the same when joined to ra); "إذا
+  استعمل باء البسملة يكون المد بعده سيناً مرسلة" (when the ba of the basmala
+  is used, the extension after it is an extended seen). A dotted alternate
+  outline at the right, inside the first سمر (~1270–1310 px), and a small
+  separate س under the line. No measurement dots.
