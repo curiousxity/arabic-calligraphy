@@ -600,7 +600,6 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   extended seen, the words close together and stacked, the final ميم of
   الرحيم curled back at the left. Dark ink on light paper (no inverting).
   Full tashkeel and ornament signs in place, with more of the small
-  v-shaped flicks than t20. The letters seem to carry a thin offset edge
-  (a shadow-like double outline along the lower-left of strokes) — check
-  at full size before tracing; if it is a drawn shadow, trace the main
-  body only. Compare with t20's Basmala: same text, two layouts.
+  v-shaped flicks than t20. Checked at full size: solid strokes, no
+  shadow or double edge. Compare with t20's Basmala: same text, two
+  layouts.
