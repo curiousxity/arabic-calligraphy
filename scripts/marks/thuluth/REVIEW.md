@@ -575,3 +575,8 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   letters (ع under the ain, م, ح) show the sheet t19 letter signs in use.
   A slightly lighter strip along the bottom-left edge is scan background:
   crop it.
+- `thuluth-20-fatiha-4.webp` (2026-10-16): "نستعين اهدنا الصراط المستقيم"
+  (end of verse 5 and verse 6). New here: نستعين with its teeth and stacked
+  ain, اهدنا, الصراط with sad and tah side by side (compare sheet t11), and
+  المستقيم with a long seen-ta-qaf run. Letter signs under letters (س, ع,
+  ط, ص, م) again show sheet t19's signs in place.
