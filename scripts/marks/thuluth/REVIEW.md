@@ -730,3 +730,12 @@ in the mark library), but only if the user wants that.
   يبايعون each stacked in two tiers, a row of tall alifs and lams, الله at
   the left end. Signature at the bottom left and the date ١٣٨٠ (about
   1960) under it: remove both. Invert before cleaning.
+
+## Sheet t30 — al-Isra panel with its key (one image)
+
+- `thuluth-30-isra-73.webp` (2026-10-16): "وإن كادوا ليفتنونك عن الذي أوحينا
+  إليك لتفتري علينا غيره وإذا لاتخذوك خليلا" (al-Isra 17:73), read off the
+  key. Panel (white on black, top, about y < 560) and plain key (below) in
+  one image, like t28: crop apart, invert only the panel. Long and dense,
+  stacked two tiers, many tall uprights, ending in a long خليلا. Signature at
+  the left and date ١٣٧٧ (about 1958) under the middle: remove both.
