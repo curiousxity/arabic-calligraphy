@@ -246,3 +246,10 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   word at the right, a medial ain in عسر, and a long ending in بعد. Clean
   strokes: no measurement dots, guide lines or dotted alternates. Dotless
   as drawn.
+- Row 4, `thuluth-12-row4.png` (2026-10-16): a stacked composition (tarkib)
+  of "وجعلنا" — tall alif and lam uprights, the ain and jeem stacked
+  mid-height, the و at the right, the ن bowl underneath. Beside it the note
+  "يجب على الخطاط ان يفهم اصول التركيب في وضع الحروف بموضعها" ("the
+  calligrapher must understand the rules of composition: putting each letter
+  in its place"). A reference for stacked compositions rather than a source
+  of single pieces. Clean: no measurement dots or dotted alternates.
