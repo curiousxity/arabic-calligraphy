@@ -352,3 +352,7 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
     the other letters, one nuqta or half. Goes with row 1 piece 5 (كد).
   - "الكاف السيفي المفرد والوسط" — the saifi kaf, single and medial: a
     caption, probably for the next row.
+- Row 4, `thuluth-14-row4.png` (2026-10-16): one small word, read as حكما — a
+  ح head running into a medial kaf, then ma and a final alif. Possibly the
+  example for the caption "الكاف السيفي المفرد والوسط" (to confirm). Clean,
+  dotless, small (about 300 px wide), so it traces coarser than the others.
