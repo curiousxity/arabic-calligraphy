@@ -241,3 +241,8 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   seen-like stroke with a returned ya tail), عحمع-like word ending in an open
   final ain. Clean strokes: no measurement dots, guide lines or dotted
   alternates.
+- Row 3, `thuluth-12-row3.png` (2026-10-16): one clean practice line, likely
+  the words يسر / عسر / بعد (as in "بعد عسر يسرا"): a stacked ain-seen-ra
+  word at the right, a medial ain in عسر, and a long ending in بعد. Clean
+  strokes: no measurement dots, guide lines or dotted alternates. Dotless
+  as drawn.
