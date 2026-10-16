@@ -74,3 +74,18 @@ letters for practice, not descending); row 2 "احرف فردية ملفوفة" 
 isolated heh), "حرف الحاء مرسل وملفوف" (ha, extended and wrapped),
 "حرف الحاء النهائي" (final ha). Very few measurement dots on this sheet.
 Second scan: `thuluth-3b.webp` (sent 2026-10-16).
+
+## Sheet t4 — `thuluth-4.webp` (the alif)
+
+Received 2026-10-16, saved only. "حرف الألف": the plain standalone alif in
+three lengths (الألف المفرد العادي, numbered 1–3); the arched alif taken
+from Diwani (الألف المفرد المقوس المأخوذ من الديواني) and its full Diwani
+form; the alif in لفظة الجلالة (الله); two alifs usable for the lam (الر);
+the final alif joined to the first lam (الحر); the "tah alif" (ألف الطاء،
+خاصة) and its Diwani-like variant (ط); four alif heights (1–4) for the four
+kinds of line; and ع joined to a final alif (اعلما), with the rule that a
+separate ع's head must stay clear. The bottom line يا غالباً غير مغلوب is a
+worked example, and the notes underneath give each alif's height in nuqtas
+by line type: (1) single-line 5–6, (2) medium composed 6–7, (3) light
+composed 7–8 (8–9 in Muhaqqaq), (4) heavy composed 9–12. Almost no
+measurement dots — mostly clean strokes and Arabic notes.
