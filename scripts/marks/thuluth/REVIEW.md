@@ -472,3 +472,11 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   diagonal (the second with a tiny **dotted alternate** hook at the tail's
   foot), then two joined from a short upright stub. Very clean, isolated
   pieces; an easy first trace.
+
+## Sheet t17 — ha (ه) (row images)
+
+- Row 1, `thuluth-17-row1.png` (2026-10-16): "هاءات اولية" (initial has):
+  a هـ with a long rising diagonal entry and a هـ with a pointed top; "هاء
+  وسطى" (medial ha): ـهـ joined from a short stroke on the right. Clean
+  and isolated, but small (about 620 px wide), so it traces coarser.
+  Compare with sheet t2 pieces 12–15.
