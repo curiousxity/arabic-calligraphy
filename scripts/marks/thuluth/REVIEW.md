@@ -197,3 +197,8 @@ complete.
   is used, the extension after it is an extended seen). A dotted alternate
   outline at the right, inside the first سمر (~1270–1310 px), and a small
   separate س under the line. No measurement dots.
+- Row 3, `thuluth-10-row3.png` (2026-10-16): the extended seen — سرا with
+  a long flat seen, and a stacked composition of a long seen over ح with ط
+  (سحط-like). Note: "السين يكون في المد مقارباً إلى مد الباء المرسلة" (the
+  seen's extension is close to that of the extended ba). A clipped stroke at
+  the top edge belongs to the row above. No measurement dots.
