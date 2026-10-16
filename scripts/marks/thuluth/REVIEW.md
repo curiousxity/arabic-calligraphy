@@ -387,3 +387,16 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   to each final letter. Measurement dots (nuqta columns), guide lines and
   stroke numbers on most pairs; letter dots drawn on some. Readings to
   confirm.
+- Row 3, `thuluth-15-row3.webp` (2026-10-16): "حرف الباء ذات الثلاث نقاط وهو
+  متصل بالحرف الاخير" — the **ba three nuqtas wide**, joined to the last
+  letter. Right to left, loosely: a stacked بن, بن, نز/بر-like pair, a
+  stacked بخ/نخ (with construction triangle), السن, and a long ...سس run
+  under a nine-nuqta measurement row. Measurement dots, guide lines and
+  letter dots on most. Readings to confirm.
+  Also on this row, **two hamza shapes with a rule each** (small signs, for
+  the marks/tashkeel side, not ba pieces):
+  - ع-shaped "همزة الألف" (the alif's hamza): "not to be used in Thuluth,
+    Naskh or Ijaza in place of the kaf's hamza".
+  - small ء "همزة الكاف" (the kaf's hamza): "not to be used in place of the
+    alif's hamza in the three scripts".
+  So the two hamzas are distinct marks and must not be swapped.
