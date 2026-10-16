@@ -592,3 +592,15 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   copies to cross-check. New here: المغضوب with its sad and waw, ولا (a
   lam-alif after a waw), and الضالين ending in a returned nun. A lighter
   strip along the bottom-right edge is scan background: crop it.
+
+## Sheet t21 — a second Basmala (black on light)
+
+- `thuluth-21-basmala.webp` (2026-10-16, 1172×423): "بسم الله الرحمن الرحيم"
+  in a **different, compact composition** from sheet t20's: no long
+  extended seen, the words close together and stacked, the final ميم of
+  الرحيم curled back at the left. Dark ink on light paper (no inverting).
+  Full tashkeel and ornament signs in place, with more of the small
+  v-shaped flicks than t20. The letters seem to carry a thin offset edge
+  (a shadow-like double outline along the lower-left of strokes) — check
+  at full size before tracing; if it is a drawn shadow, trace the main
+  body only. Compare with t20's Basmala: same text, two layouts.
