@@ -640,11 +640,10 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
 
 ## Sheet t24 — two signed panels with corner ornaments (white on black)
 
-Both signed "هاشم" and dated ١٣٧٥ (AH, about 1955). That points to Hashim
-al-Baghdadi, whose "قواعد الخط العربي" teaches Thuluth with exactly this
-kind of nuqta-measured sheet; **to confirm with the user** whether the
-earlier sheets come from that book. Remove the signature and date from
-both; never trace them.
+Both signed "هاشم" and dated ١٣٧٥ (AH, about 1955). The user confirmed
+(2026-10-16) that the lesson sheets (t1–t19) do **not** come from Hashim
+al-Baghdadi's book; don't attribute them to it. Remove the signature and
+date from both panels; never trace them.
 
 - `thuluth-24-qalam-4.webp` (2026-10-16): "وإنك لعلى خلق عظيم" (al-Qalam
   68:4), a landscape panel: tall alifs and the ظ upright in a row, لعلى and
@@ -791,8 +790,8 @@ block**, rather than a line: a different target from the verse panels.
 The user finished sending scans: 87 files, sheets t1–t32. Nothing has been
 traced into the app. Questions to settle with the user during review:
 
-1. Source: are the lesson sheets from Hashim al-Baghdadi's "قواعد الخط
-   العربي"? (t24)
+1. ~~Source: are the lesson sheets from Hashim al-Baghdadi's book?~~
+   Answered: no.
 2. Names for all 31 pieces of sheet t1, and t2 piece 26 (ق or فـ).
 3. Script: are `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`
    Thuluth or Naskh?
