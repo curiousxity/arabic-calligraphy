@@ -110,8 +110,9 @@ place in the sidebar.
 ## Other panels and conventions
 
 `Content` owns everything that puts characters into the block: the RTL
-textarea, the Arabic Keyboard toggle, and the `PresetKeyboard` rows
-(إعراب, Presets, Specials, Urdu-Farsi) that were once a separate "Arabic
+textarea, the Arabic Keyboard toggle, the tashkeel library (`TashkeelLibrary`,
+see [tashkeel-library.md](tashkeel-library.md)), and the `PresetKeyboard` rows
+(Presets, Specials, Urdu-Farsi) that were once a separate "Arabic
 Helpers" panel. That name is gone — character insertion lives in exactly
 one place now.
 
@@ -159,8 +160,9 @@ these buttons by accessible name.
 
 `PresetKeyboard` takes a `collapsible` flag and renders as a native
 `<details>` when set — no owning state, and keyboard-operable for free.
-Presets, Specials and Urdu-Farsi use it and start closed; the إعراب harakat
-row stays open, being the one wanted on nearly every edit. Four open at once
+Presets, Specials and Urdu-Farsi use it and start closed; the tashkeel
+library's first group (the إعراب harakat) stays open, being the one wanted on
+nearly every edit, and its other groups fold the same way. Four open at once
 was most of why the sidebar ran four screens tall.
 
 CSS is one global stylesheet (`src/index.css`) using CSS custom properties for theming — navy+gold is the unconditional default (`:root`), with an ivory/parchment palette under `@media (prefers-color-scheme: light)` (inverted from the usual light-default/dark-override convention — check this file's structure before assuming which block is "the default").

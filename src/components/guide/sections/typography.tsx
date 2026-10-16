@@ -5,6 +5,11 @@ export const section: GuideSection = {
   title: "Type and text",
   order: 30,
   keywords: [
+    "tashkeel",
+    "harakat",
+    "shadda",
+    "quranic marks",
+    "waqf",
     "font",
     "typeface",
     "font strip",
@@ -67,7 +72,13 @@ export const section: GuideSection = {
       </p>
       <ul>
         <li>
-          <strong>إِعْرَاب</strong> — the vowel marks and other tashkeel.
+          <strong>إِعْرَاب</strong> — the vowel marks. Below them sit more
+          groups you can open: shadda combinations, hamza and madda, Quranic
+          marks, stop signs and honorific signs. Only the marks your chosen
+          font can draw are shown, and each button is drawn in that font, so
+          you see the font&rsquo;s own shape for the mark (Thuluth&rsquo;s
+          decorated shadda pairs, for example). A few fonts add an{" "}
+          <strong>Only in this font</strong> group with marks of their own.
         </li>
         <li>
           <strong>Presets</strong> — honorific symbols such as ﷺ. These are

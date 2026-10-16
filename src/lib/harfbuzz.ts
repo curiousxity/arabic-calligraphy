@@ -171,6 +171,11 @@ async function loadParsedFont(fontUrl: string): Promise<opentype.Font> {
   return parsedFontCache.get(fontUrl)!;
 }
 
+/** The parsed font at `fontUrl`, shared with shaping's cache — for UI that asks what a font covers. */
+export function loadFont(fontUrl: string): Promise<opentype.Font> {
+  return loadParsedFont(fontUrl);
+}
+
 // Arabic combining marks: harakat, tanween, sukun, shadda, Quranic annotation
 // signs, etc. Lives in `diacritics.ts` (a dependency-free module - no
 // harfbuzzjs import) so it, and anything built on it, stays importable

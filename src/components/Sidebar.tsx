@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  DIACRITICS,
   SPECIALS,
   PERSIAN,
   URDU,
@@ -13,6 +12,7 @@ import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
 import { CompositionButton } from "./CompositionDialog";
 import { FontPanel } from "./sidebar/FontPanel";
+import { TashkeelLibrary } from "./sidebar/TashkeelLibrary";
 import type { FontChoice } from "../lib/fontCatalog";
 import type { CompositionSelection } from "../lib/composition";
 import type { GuideAttachment, GuideParams, GuideShape, VerseLayout, VerseSettings } from "../types";
@@ -1838,12 +1838,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
 
 
-                <PresetKeyboard
-                  title="إِعْرَاب"
-                  rows={[DIACRITICS.slice(0, 6), DIACRITICS.slice(6)]}
-                  onPick={handleKeyboardKey}
-                  large
-                />
+                {selectedBlock && (
+                  <TashkeelLibrary
+                    fontKey={selectedBlock.fontFamily}
+                    cssFamily={
+                      fontChoices.find((f) => f.value === selectedBlock.fontFamily)?.cssFamily ??
+                      `'${selectedBlock.fontFamily}'`
+                    }
+                    onPick={handleKeyboardKey}
+                  />
+                )}
 
                 <button
                   type="button"

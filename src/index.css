@@ -256,6 +256,8 @@ html, body, #root { height: 100%; margin: 0; }
 .sidebarPresetKeyboardKey:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--key-shadow-active); }
 .sidebarPresetKeyboardKeyWide { font-size: 14px; }
 .sidebarPresetKeyboardKeyLarge { font-size: 34px; }
+.sidebarTashkeelKey { font-size: 24px; }
+.sidebarTashkeelNote { font-size: 11px; line-height: 1.5; color: var(--text-muted); text-align: center; }
 .sidebarPresetKeyboardKeyAction { flex: 1.4 1 0; font-size: 15px; color: var(--text-secondary); }
 .sidebarPresetKeyboardKeyActive { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset, 0 2px 0 var(--key-shadow); }
 .sidebarPresetKeyboardKeySpace { flex: 1 1 auto; font-size: 12px; letter-spacing: 0.04em; color: var(--text-muted); }

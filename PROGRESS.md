@@ -101,6 +101,17 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-16 — Tashkeel library
+
+- **The إعراب row became a library.** Under the nine everyday marks sit
+  folding groups: shadda combinations, hamza & madda, Quranic marks, stop
+  signs (waqf) and honorific signs. Only marks the block's font can draw are
+  listed; a group with none disappears. Buttons preview in the block's font,
+  so Thuluth shows its own decorated shadda pairs.
+- **Font extras:** Jameel Noori gets an "Only in this font" group with its
+  two honorific marks (رضی, رح). Why the other fonts' Private Use Area
+  glyphs are not offered: [tashkeel-library.md](.claude/rules/tashkeel-library.md).
+
 ### 2026-10-15 — Diacritic handles on curves; marks sit on their letters
 
 - **Curve text (plain and guide-attached) takes the same three diacritic
