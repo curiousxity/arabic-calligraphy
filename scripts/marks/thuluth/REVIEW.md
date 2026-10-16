@@ -157,3 +157,7 @@ complete.
 - Row 1, `thuluth-8-row1.png` (2026-10-16): "باء أولية من نوع الياء" (initial
   beh of the ya type: يـ/بـ joined to ح، م، ه and others) and "باء أولية من
   نوع الياء المصغرة" (the same with the small ya), with measurement dots.
+- Row 2, `thuluth-8-row2.png` (2026-10-16): "الباءات الأولية والوسطية
+  والنهائية" (initial, medial and final behs): بلـ/بب-type runs, a long run
+  of joined behs with measurement dots and a dotted circle, and a run like
+  بلسة/تليمة with stroke-order numbers.
