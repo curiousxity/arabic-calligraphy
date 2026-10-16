@@ -17,6 +17,9 @@ their own right: join the dots into a closed outline, fill it, and review it
 separately from the solid letter it sits by. They are lighter than the ink
 (grey 150 to ~225 on a 250 paper), so the solid-ink threshold misses them.
 
+**Sheets may arrive line by line** (one image per row), saved as
+`thuluth-<n>-row<k>`; a sheet's section lists which rows are in.
+
 Statuses: `waiting` (shown, no answer yet), `cleanup` (leftover measurement
 dots or guide lines touching the letter, to remove by hand before review),
 `approved`, `redo` (with the user's note).
@@ -148,3 +151,9 @@ dotted alternate beside the second piece from the right). Row 3 saved as
 `thuluth-7-row3.png` ("الباء مع الميم": صط-like beh joins, بم, a seen-like
 run with a final ya, and a dotted alternate head at the far left). Sheet 7 is
 complete.
+
+## Sheet t8 — initial beh of the ya type (row images)
+
+- Row 1, `thuluth-8-row1.png` (2026-10-16): "باء أولية من نوع الياء" (initial
+  beh of the ya type: يـ/بـ joined to ح، م، ه and others) and "باء أولية من
+  نوع الياء المصغرة" (the same with the small ya), with measurement dots.
