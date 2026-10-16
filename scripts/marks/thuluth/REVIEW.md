@@ -6,6 +6,11 @@ the app's mark library.** Source sheets live in `scripts/marks/` and are kept
 even before any of their pieces are used. The tool is `review.py` (this
 folder); it draws the source crop beside the traced outline for review.
 
+**Repeat scans are deliberate.** The user sends several copies of the same
+page so pieces can be cross-referenced: when one scan has a smudge, a
+measurement dot touching the letter or a soft edge, the same piece can be
+taken from another (`<sheet>b`, `<sheet>c`, …). Keep every copy.
+
 Statuses: `waiting` (shown, no answer yet), `cleanup` (leftover measurement
 dots or guide lines touching the letter, to remove by hand before review),
 `approved`, `redo` (with the user's note).
@@ -68,3 +73,4 @@ letters for practice, not descending); row 2 "احرف فردية ملفوفة" 
 "احرف فردية للتمرين"; row 3 "الهاء المتصلة والفردية" (connected and
 isolated heh), "حرف الحاء مرسل وملفوف" (ha, extended and wrapped),
 "حرف الحاء النهائي" (final ha). Very few measurement dots on this sheet.
+Second scan: `thuluth-3b.webp` (sent 2026-10-16).
