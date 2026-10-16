@@ -1,6 +1,7 @@
 ---
 paths:
   - "src/lib/markLibrary*.ts"
+  - "src/lib/frameWindow*.ts"
   - "src/components/MarkView.tsx"
   - "src/components/sidebar/MarkPanel.tsx"
   - "src/components/sidebar/MarkPicker.tsx"
@@ -57,11 +58,38 @@ a save draws the same even if the library entry is renamed, re-traced or
 removed. `markFlipX` mirrors left–right; rotation is `BlockCommon.rotation`.
 
 **Rendering** (`MarkView.tsx`) copies StackView: a transparent `Rect` for
-hit and bounds (a sceneFunc-only Shape measures 0×0, which would break
-snapping, align and export bounds), outline before fill, gradients through
+bounds only (a sceneFunc-only Shape measures 0×0, which would break
+snapping, align and export bounds) — it is `listening={false}`. **The hit is
+the ink**: the Shape's `hitFunc` fills the outline plus a 5px stroke
+(`HIT_MARGIN_PX`, so a lone dot stays easy to grab). Until 2026-10-16 the
+bounding Rect was the hit, and a frame's open middle swallowed every click
+meant for the text inside it. Outline before fill, gradients through
 `createBlockFillPainter`, commands pre-scaled to px (react-konva-to-svg loses
 a path drawn under `ctx.scale`). Mirrors draw it through `markProps` like
 every other type.
+
+**Frames** (2026-10-16). A frame is a mark from the `frames` group
+(`FRAMES_GROUP_ID`, `isFrameMark`). Picked in the Marks panel *with a block
+selected* (not a mark, not a guide), `frameSelectedBlock` in `App.tsx` wraps
+that block instead of starting a placement:
+- `frameWindow(d)` (`frameWindow.ts`, pure) finds the frame's open window:
+  the largest axis-aligned rectangle of grid cells (120 along the long side)
+  inside the outline's convex hull and at least one cell clear of ink
+  (even-odd, so a counter reads as empty). No per-frame setting, so a new
+  frame sheet needs nothing but its trace; a frame with no window (a solid
+  shape) falls back to ordinary placement.
+- `fitFrameToRect` maps the window onto the block's on-canvas box
+  (`getClientRect` relative to the stage) padded by `FRAME_PADDING` (12%)
+  each side. It stretches **each way independently** — the user's call:
+  "resizing is fine as long as we can see through the center" — via
+  `markScaleX`/`markScaleY` on top of `fontSize`'s uniform scale, the
+  uniform part chosen so the two stretches multiply to 1.
+- The frame is inserted **just below** the framed block (drawn behind it),
+  takes its colour, and shares its `groupId` (a new one if it had none), so
+  they move together. One `pushHistory()`.
+- The fit is a one-off: editing the text does not refit. A frame's Mark panel
+  shows *Stretch width* / *Stretch height* (0.3–3) for adjusting by hand;
+  other marks don't get those rows, though `markScaleX/Y` works on any mark.
 
 **Sidebar.** The *Marks* panel (canvas tier, after Block Controls, closed by
 default) adds one: click a mark, then click the canvas (`beginPlacement`).

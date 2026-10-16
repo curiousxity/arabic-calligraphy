@@ -26,10 +26,13 @@ export type MarkViewProps = ReturnType<typeof markProps> & {
  * Same drawing as StackView — outline before fill, gradients through the
  * block fill painter, commands pre-scaled to px for the SVG export.
  */
+/** How far outside its ink a mark still takes a click, in px. */
+const HIT_MARGIN_PX = 5;
+
 export const MarkView: React.FC<MarkViewProps> = (p) => {
   const cmds = useMemo(
-    () => markPxCmds(p.markD, p.fontSize, p.markFlipX),
-    [p.markD, p.fontSize, p.markFlipX]
+    () => markPxCmds(p.markD, p.fontSize, p.markFlipX, p.markScaleX, p.markScaleY),
+    [p.markD, p.fontSize, p.markFlipX, p.markScaleX, p.markScaleY]
   );
   const px = useMemo(() => markPxBounds(cmds), [cmds]);
 
@@ -47,10 +50,21 @@ export const MarkView: React.FC<MarkViewProps> = (p) => {
       onDragMove={p.onDragMove}
       onDragEnd={p.onDragEnd}
     >
-      {/* Hit area and bounds: a sceneFunc-only Shape measures as 0×0. */}
-      <Rect x={px.x} y={px.y} width={px.width} height={px.height} fill="transparent" />
+      {/* Bounds only: a sceneFunc-only Shape measures as 0×0. Not a hit
+          area — a frame's open middle must let a click reach the text
+          inside it, so only the ink (plus a margin, for a small dot) hits. */}
+      <Rect x={px.x} y={px.y} width={px.width} height={px.height} fill="transparent" listening={false} />
       <Shape
-        listening={false}
+        hitFunc={(ctx, shape) => {
+          if (cmds.length === 0) return;
+          replayPath(ctx as unknown as CanvasRenderingContext2D, cmds);
+          ctx.fillStyle = shape.colorKey;
+          ctx.fill();
+          ctx.lineWidth = HIT_MARGIN_PX * 2;
+          ctx.lineJoin = "round";
+          ctx.strokeStyle = shape.colorKey;
+          ctx.stroke();
+        }}
         shadowColor={p.shadowBlur > 0 ? p.shadowColor : undefined}
         shadowBlur={p.shadowBlur}
         shadowOffsetX={p.shadowOffsetX}

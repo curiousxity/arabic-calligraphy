@@ -1031,6 +1031,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                 <div className="sidebarTashkeelNote">
                   Pen pieces to place anywhere. Click one, then click the canvas.
+                  A frame picked with a text selected goes around that text.
                 </div>
                 <MarkPicker onPick={onAddMark} />
               </div>

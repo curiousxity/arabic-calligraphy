@@ -111,4 +111,6 @@ export const markProps = (b: Extract<Block, { type: "mark" }>) => ({
   // `?? ""`: like stackProps, a hand-edited save is not validated on load.
   markD: b.markD ?? "",
   markFlipX: b.markFlipX ?? false,
+  markScaleX: b.markScaleX ?? 1,
+  markScaleY: b.markScaleY ?? 1,
 });

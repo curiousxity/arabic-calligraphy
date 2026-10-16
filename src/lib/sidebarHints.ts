@@ -89,6 +89,10 @@ export const SIDEBAR_HINTS: Record<string, string> = {
   Gap: "The distance between the text and the guide.",
   Flip: "Put the text on the other side of the guide.",
 
+  // ---- Mark (frames) ----
+  "Stretch width": "Make the frame wider or narrower without changing its height.",
+  "Stretch height": "Make the frame taller or shorter without changing its width.",
+
   // ---- Mirror ----
   Mode: "Mirror across a line, or repeat copies around a centre.",
   Copies: "How many copies go around the circle.",

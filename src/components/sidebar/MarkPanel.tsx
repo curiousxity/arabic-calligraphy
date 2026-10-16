@@ -1,6 +1,7 @@
 import type { Block, MarkBlock } from "../../types";
 import { CheckboxRow, ColorRow, OpacityRow, RangeRow, RotationRow } from "./FormControls";
 import { MarkPicker } from "./MarkPicker";
+import { isFrameMark } from "../../lib/markLibrary";
 import { makeId } from "./utils";
 
 /**
@@ -36,6 +37,34 @@ export const MarkPanel: React.FC<{
       />
       <OpacityRow selectedId={id} value={block.opacity} onChange={(v) => onUpdate({ opacity: v })} />
       <RotationRow selectedId={id} value={block.rotation} onChange={(v) => onUpdate({ rotation: v })} />
+      {/* A frame stretches each way to fit what it holds; any mark could,
+          but only a frame is fitted, so only a frame shows the rows. */}
+      {isFrameMark(block.markId) && (
+        <>
+          <RangeRow
+            id={makeId("mark-stretch-x", id)}
+            name={makeId("markStretchX", id)}
+            label="Stretch width"
+            value={block.markScaleX ?? 1}
+            min={0.3}
+            max={3}
+            step={0.01}
+            onChange={(v) => onUpdate({ markScaleX: v })}
+            suffix={`${Math.round((block.markScaleX ?? 1) * 100)}%`}
+          />
+          <RangeRow
+            id={makeId("mark-stretch-y", id)}
+            name={makeId("markStretchY", id)}
+            label="Stretch height"
+            value={block.markScaleY ?? 1}
+            min={0.3}
+            max={3}
+            step={0.01}
+            onChange={(v) => onUpdate({ markScaleY: v })}
+            suffix={`${Math.round((block.markScaleY ?? 1) * 100)}%`}
+          />
+        </>
+      )}
       <CheckboxRow
         id={makeId("mark-flip", id)}
         label="Flip left–right"

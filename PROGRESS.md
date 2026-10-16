@@ -101,6 +101,16 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-16 — Frames go around text
+
+- **Pick a frame with a text block selected** and it wraps the text: its
+  open middle is found automatically, the frame stretches to fit the text
+  with a little room, sits behind it and is grouped with it. Stretch width
+  and height sliders adjust it afterwards. Any new frame added to the
+  library works the same way. How: [marks.md](.claude/rules/marks.md).
+- **Marks take clicks only on their ink**, so a frame's open middle no
+  longer blocks clicks on the text inside it.
+
 ### 2026-10-16 — Mark library
 
 - **Marks panel**: 67 loose pen pieces (strokes & tails, heads & loops,
@@ -112,8 +122,7 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 - Same day: 12 more from a third, crowded sheet — a long double stroke, a
   long tapered stroke, a long yaa tail, a kaf body, three ha forms, a bold
   sad, a stacked hamza, and three drop-shaped **frames** in a new *Frames*
-  group. For now a frame is just a big mark; a real frame feature (text
-  inside it) is not built yet.
+  group. (Frames now go around text — see the entry above.)
 - `e2e/marks.spec.ts` is written and typechecks but has **not been run**
   (browser tests skipped this session).
 

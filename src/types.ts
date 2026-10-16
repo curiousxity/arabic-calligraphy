@@ -244,6 +244,10 @@ export type MarkBlock = BlockCommon & {
   markD: string;
   /** Mirror left-right. */
   markFlipX?: boolean;
+  /** Stretch on top of `fontSize`'s uniform scale; absent means 1. A frame
+   *  fitted around text stretches each way to its window (frameWindow.ts). */
+  markScaleX?: number;
+  markScaleY?: number;
 };
 
 /** The two outline points on a cut line and the stroke's outward direction

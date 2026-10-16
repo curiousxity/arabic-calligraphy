@@ -65,7 +65,8 @@ import {
 } from "./lib/guides";
 import { DEFAULT_ATTACHMENT } from "./lib/guidePlacement";
 import type { GuideAttachment, GuideBlock, GuideParams, GuideShape, MarkBlock } from "./types";
-import { markScale, type MarkItem } from "./lib/markLibrary";
+import { isFrameMark, markScale, MARK_UNITS_PER_EM, type MarkItem } from "./lib/markLibrary";
+import { fitFrameToRect, frameWindow } from "./lib/frameWindow";
 import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
@@ -1999,10 +2000,53 @@ const App: React.FC = () => {
     beginPlacement(guide, w, h, 0, 0, "New Guide");
   };
 
+  /**
+   * A frame picked with a block selected goes round that block: stretched so
+   * the frame's open window (frameWindow.ts) wraps the block's box with a
+   * little room, drawn behind it, and grouped with it so they move together.
+   * The window is clear of ink and the frame takes clicks only on its ink,
+   * so the text stays visible and selectable through the middle. Returns
+   * false (and the caller places the frame as an ordinary mark) when there is
+   * nothing to wrap. One undo step.
+   */
+  const frameSelectedBlock = (item: MarkItem): boolean => {
+    const target = selectedBlock;
+    if (!target || target.type === "mark" || target.type === "guide") return false;
+    const win = frameWindow(item.d);
+    const node = stageRef.current?.findOne(`#block-${target.id}`);
+    if (!win || !node) return false;
+    const rect = node.getClientRect({ relativeTo: stageRef.current! });
+    if (!(rect.width > 0 && rect.height > 0)) return false;
+    const fit = fitFrameToRect(win, rect, MARK_UNITS_PER_EM);
+    const groupId = target.groupId ?? nextGroupIdRef.current++;
+    const frame: MarkBlock = {
+      ...DEFAULT_BLOCK,
+      id: createNextId(),
+      text: "",
+      type: "mark",
+      markId: item.id,
+      markD: item.d,
+      color: target.color ?? DEFAULT_BLOCK.color,
+      groupId,
+      ...fit,
+    };
+    pushHistory();
+    setBlocks((prev) => {
+      const at = prev.findIndex((b) => b.id === target.id);
+      if (at < 0) return prev;
+      const next = prev.map((b) => (b.id === target.id ? { ...b, groupId } : b));
+      // Just below the framed block, so the frame never paints over it.
+      next.splice(at, 0, frame);
+      return next;
+    });
+    return true;
+  };
+
   // Marks: loose pen pieces from the library. Sized and coloured like the
   // selected block, so a dot added beside a word matches it. See
   // .claude/rules/marks.md.
   const addMarkBlock = (item: MarkItem) => {
+    if (isFrameMark(item.id) && frameSelectedBlock(item)) return;
     const like = selectedBlock && selectedBlock.type !== "guide" ? selectedBlock : undefined;
     const fontSize = like?.fontSize ?? DEFAULT_NEW_BLOCK_FONT_SIZE;
     const mark: MarkBlock = {

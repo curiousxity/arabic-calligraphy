@@ -46,9 +46,10 @@ export function findMark(id: string): MarkItem | undefined {
  * `ctx.scale`: react-konva-to-svg loses a path whose transform scope closes
  * (see StackView).
  */
-export function markPxCmds(d: string, fontSize: number, flipX = false): SvgCmd[] {
-  const s = markScale(fontSize);
-  const sx = flipX ? -s : s;
+export function markPxCmds(d: string, fontSize: number, flipX = false, stretchX = 1, stretchY = 1): SvgCmd[] {
+  const u = markScale(fontSize);
+  const s = u * stretchY;
+  const sx = (flipX ? -u : u) * stretchX;
   return parseSvgPath(d).map((c): SvgCmd => {
     switch (c.type) {
       case "M":
@@ -70,3 +71,9 @@ export function markPxBounds(cmds: SvgCmd[]) {
   const b = outlineBounds(cmds);
   return { x: b.x1, y: b.y1, width: b.x2 - b.x1, height: b.y2 - b.y1 };
 }
+
+/** The library group whose marks are frames: picked with a block selected,
+ *  one wraps that block (see `fitFrameToRect`) instead of being placed. */
+export const FRAMES_GROUP_ID = "frames";
+export const isFrameMark = (id: string) =>
+  MARK_GROUPS.some((g) => g.id === FRAMES_GROUP_ID && g.items.some((it) => it.id === id));
