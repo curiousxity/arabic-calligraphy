@@ -603,3 +603,17 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   v-shaped flicks than t20. Checked at full size: solid strokes, no
   shadow or double edge. Compare with t20's Basmala: same text, two
   layouts.
+
+## Sheet t22 — a framed verse panel
+
+- `thuluth-22-yusuf-21.webp` (2026-10-16): "والله غالب على أمره ولكن أكثر
+  الناس لا يعلمون" (Yusuf 12:21), one line inside a thin rectangular
+  frame, dark on light, full tashkeel and ornament signs. Worth noting:
+  - **The last word, يعلمون, is written small** and tucked in at the left
+    end, beside لا: the traditional way to fit an overflowing word into a
+    fixed panel. A layout technique the app does not have yet.
+  - ولكن أكثر: two long saifi kafs leaning right (compare sheet t14 row 2),
+    the second crossing over the ن of ولكن.
+  - الله, غالب with a long ba, على stacked, الناس with a long seen.
+  The frame line is a guide-like straight line: the cleaner will remove
+  it, which is what we want.
