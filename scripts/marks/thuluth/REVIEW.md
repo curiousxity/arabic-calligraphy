@@ -11,6 +11,12 @@ page so pieces can be cross-referenced: when one scan has a smudge, a
 measurement dot touching the letter or a soft edge, the same piece can be
 taken from another (`<sheet>b`, `<sheet>c`, …). Keep every copy.
 
+**Dotted outlines are alternate forms.** Some sheets draw an alternative shape
+as a faint dotted outline beside or over a solid letter. They are pieces in
+their own right: join the dots into a closed outline, fill it, and review it
+separately from the solid letter it sits by. They are lighter than the ink
+(grey 150 to ~225 on a 250 paper), so the solid-ink threshold misses them.
+
 Statuses: `waiting` (shown, no answer yet), `cleanup` (leftover measurement
 dots or guide lines touching the letter, to remove by hand before review),
 `approved`, `redo` (with the user's note).
@@ -105,3 +111,24 @@ position; the rihaniya and mursala ra are normally six nuqtas long, cut to
 four when the rihaniya sits inside a noon or joins a lam, and likewise the
 mursala inside a noon; the composed multawiya ra is a fixed four nuqtas,
 standalone or joined. Few measurement dots outside row 1.
+
+## Sheet t6 — `thuluth-6.webp` (lam and lam-alif)
+
+Received 2026-10-16, saved only. Solid letters with long Arabic notes.
+Row 1: ل ("اللام واللام الألف" — the lam is the alif plus the bowl of ن، ق،
+ص، س or ي); لا made of the alif and the end of the final mursala heh, with
+the crooked alif giving the second alif; لا starting with the crooked alif;
+a lam-alif cut short when the composition needs it. Row 2: braided lam-alif
+(ذات الظفيرة, one to three knots, common with the Baghdadis); لا for forced
+cases at line ends; فلا. Row 3: lam-alif forms used only at the end (حلا,
+سلا); the standalone mursala lam at the end of non-composed lines (هول، حل);
+an old rule's lam form, for Muhaqqaq and non-composed Thuluth (صلى).
+
+Dotted alternate forms on this sheet (to fill and review separately):
+- beside the ل, top right (~1430–1545, 140–200): a seen with a loop flowing
+  into the lam's bowl;
+- beside the first لا, top (~1085–1220, 60–235): the alif continued long to
+  the upper right, and a ب-like tooth before the لا;
+- middle row, left of the second لا (~1040–1110, 330–410): a slanted
+  alternate alif head;
+- small traces near صلى (~150–195, 690–725) and above the big لا (~400, 320).
