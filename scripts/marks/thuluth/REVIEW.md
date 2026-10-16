@@ -12,6 +12,10 @@ dots or guide lines touching the letter, to remove by hand before review),
 
 ## Sheet t1 — `thuluth-1.webp` (1638×1024)
 
+A second scan of the same page, `thuluth-1b.webp` (1667×1032, sent 2026-10-16), is
+kept too: same resolution and sharpness, slightly different framing — a
+fallback if a piece comes out cleaner in it.
+
 Names not agreed yet: all 31 pieces `waiting`. Numbered sheet sent
 2026-10-16; the user asked to go over the pieces again together.
 
