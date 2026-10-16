@@ -516,3 +516,10 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   numbered (1) and (2); possibly the first two on this row. Either way,
   mark those as rare, not the default final ha.
   Clean strokes, no measurement dots.
+- Row 6, `thuluth-17-row6.webp` (2026-10-16): "الهاءات الاولية والوسطية
+  والنهائية" — the has at the start, middle and end, in words, right to
+  left, loosely: هه (clean, no measurement), نجه/بجه (stacked), مهنه-like,
+  a stacked لها/لهـ with a tall lam, فيه/فهه, and جحه-like at the left.
+  The construction sheet for ha: nuqta columns, guide lines, stroke numbers
+  and arrows on every piece but the first. Readings to confirm. Use it to
+  check proportions; trace from the cleaner rows 1–5 where shapes repeat.
