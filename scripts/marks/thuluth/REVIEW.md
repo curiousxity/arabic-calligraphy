@@ -202,3 +202,7 @@ complete.
   (سحط-like). Note: "السين يكون في المد مقارباً إلى مد الباء المرسلة" (the
   seen's extension is close to that of the extended ba). A clipped stroke at
   the top edge belongs to the row above. No measurement dots.
+- Row 4, `thuluth-10-row4.png` (2026-10-16): two pieces stacked in one
+  image — "وسط" (medial seen: النسيم-like word, with measurement grid) and
+  "سين أولي ووسط ونهائي" (initial, medial and final seen: a stacked run of
+  seens over a long final, with stroke-order numbers and measurement dots).
