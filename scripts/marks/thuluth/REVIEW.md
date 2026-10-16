@@ -621,8 +621,8 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
 ## Sheet t23 — a dense stacked panel (jali-style)
 
 - `thuluth-23-ahzab-14.webp` (2026-10-16): "ولو دخلت عليهم من أقطارها ثم
-  سئلوا الفتنة لآتوها وما تلبثوا بها إلا يسيرا" (al-Ahzab 33:14), reading
-  confirmed by the text; dark on light. The **densest composition so far**:
+  سئلوا الفتنة لآتوها وما تلبثوا بها إلا يسيرا" (al-Ahzab 33:14, my reading;
+  to confirm); dark on light. The **densest composition so far**:
   words stacked two and three tiers deep, tall alif/lam uprights packed in a
   row, and the gaps filled with tashkeel and ornament signs. A small
   **signature (imza)** sits at the bottom centre — remove it, never trace
