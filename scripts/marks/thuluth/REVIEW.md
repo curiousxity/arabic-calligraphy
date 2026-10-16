@@ -586,3 +586,9 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   extension in the set, with a long fatha stroke over it), عليهم stacked,
   and غير with its returned ya. صراط repeats the previous line's الصراط:
   a second copy to cross-check.
+- `thuluth-20-fatiha-6.webp` (2026-10-16): "غير المغضوب عليهم ولا الضالين"
+  (end of verse 7). **The surah is complete** across the six files. غير
+  repeats the end of the previous line, and عليهم repeats too: second
+  copies to cross-check. New here: المغضوب with its sad and waw, ولا (a
+  lam-alif after a waw), and الضالين ending in a returned nun. A lighter
+  strip along the bottom-right edge is scan background: crop it.
