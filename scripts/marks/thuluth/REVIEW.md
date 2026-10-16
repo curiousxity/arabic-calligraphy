@@ -550,7 +550,7 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   hairlines, so they need the gentlest cleaning (the guide-line remover
   could eat them). Clean, no measurement dots.
 
-## Sheet t20 — a finished piece: the Basmala
+## Sheet t20 — finished pieces: al-Fatiha, line by line (white on black)
 
 - `thuluth-20-basmala.webp` (2026-10-16): "بسم الله الرحمن الرحيم", fully
   voweled and ornamented, **white ink on black** (the only inverted scan so
@@ -562,3 +562,8 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   ص-like signs over the alifs — so it is the reference for **where** those
   signs sit, not just what they look like. A target for a composed result,
   rather than a source of single pieces.
+- `thuluth-20-fatiha-2.webp` (2026-10-16): "الحمد لله رب العالمين الرحمن
+  الرحيم" (verses 2–3), same hand, same white-on-black treatment and full
+  tashkeel. Repeats الله, الرحمن and الرحيم from the Basmala, so the two can
+  be cross-checked. New here: the stacked الحمد, رب with its long
+  extended ba, and العالمين.
