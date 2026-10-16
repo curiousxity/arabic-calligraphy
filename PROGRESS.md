@@ -101,6 +101,15 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-16 — Add medallion; Compositions wizard removed
+
+- **Add medallion** button in Block Controls (beside Add mirror, the
+  muthanna): sets the selected text into a radial medallion, measured so the
+  copies don't crowd. The Add buttons are now two rows of three.
+- **Content → Compositions removed.** The measured muthanna it offered has
+  no button now; Add mirror keeps its fixed offset. See
+  [compositions.md](.claude/rules/compositions.md).
+
 ### 2026-10-16 — Sidebar tidy-up
 
 - **Save & Export** (formerly Project & Export) moved to the bottom of the

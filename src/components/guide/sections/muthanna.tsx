@@ -21,6 +21,13 @@ export const section: GuideSection = {
     "circle",
     "repeat",
     "copies",
+    "composition",
+    "compositions",
+    "name",
+    "names",
+    "اسم",
+    "gift",
+    "wedding",
   ],
   Body: () => (
     <>
@@ -32,11 +39,13 @@ export const section: GuideSection = {
       </p>
       <p>
         For a mirror, select a block, then press <strong>Add mirror</strong>{" "}
-        under <strong>Block Controls &rarr; Add</strong>. For a medallion, open{" "}
-        <strong>Compositions</strong> in the <strong>Content</strong> panel and
-        choose <strong>Medallion</strong>. Either way a new block appears that
-        draws the selected block's writing again, reflected or repeated around
-        a circle.
+        under <strong>Block Controls &rarr; Add</strong>. For a medallion,
+        select a text block and press <strong>Add medallion</strong> beside
+        it: copies of the text are turned around it, spaced so they don't
+        crowd each other. Either way a new block appears that draws the
+        selected block's writing again, reflected or repeated around a circle.
+        Change how many copies a medallion has, or its radius, in its own
+        Mirror panel. One <strong>Ctrl+Z</strong> undoes either.
       </p>
 
       <h4>The copy stays alive</h4>

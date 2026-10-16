@@ -2450,7 +2450,8 @@ const App: React.FC = () => {
       ? selectedBlock
       : null;
 
-  // Always a horizontal mirror: the radial medallion is made from Compositions.
+  // Always a horizontal mirror: the radial medallion is Block Controls' Add
+  // medallion, which goes through `applyComposition`.
   const addMirrorBlock = () => {
     if (!mirrorSourceCandidate) return;
     pushHistory();

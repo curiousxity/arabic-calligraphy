@@ -259,22 +259,14 @@ export async function openFontGallery(page: Page) {
 }
 
 /**
- * Runs the Compositions wizard on the selected block: opens it from the
- * Content panel, picks `layout`, fills the radial count if given, and
- * creates. Returns the block it added, once the bridge reports it.
+ * Sets the selected text block into a medallion with Block Controls' Add
+ * medallion button. Returns the block it added, once the bridge reports it.
+ * (The Compositions wizard that also offered a measured muthanna was removed
+ * 2026-10-16; Add mirror is the muthanna now.)
  */
-export async function composeSelected(
-  page: Page,
-  layout: "muthanna" | "medallion",
-  opts: { radialCount?: number } = {}
-) {
+export async function addMedallionToSelected(page: Page) {
   const before = (await getBlocks(page)).length;
-  await page.getByTestId("composition-open").click();
-  await page.locator(`[data-layout-id="${layout}"]`).click();
-  if (opts.radialCount !== undefined) {
-    await page.locator("#composition-radial-count").fill(String(opts.radialCount));
-  }
-  await page.getByRole("button", { name: "Create composition" }).click();
+  await page.getByRole("button", { name: "Add medallion" }).click();
   await expect.poll(async () => (await getBlocks(page)).length).toBe(before + 1);
   const blocks = await getBlocks(page);
   return blocks[blocks.length - 1];

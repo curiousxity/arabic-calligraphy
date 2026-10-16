@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
-  gotoApp, getBlocks, blockClientBox, composeSelected, inkPixels,
+  gotoApp, getBlocks, blockClientBox, addMedallionToSelected, inkPixels,
   dragFromHere, openPanel, openTypography, parkOnDot, settleFrames, setBlockText,
   STRETCH_HANDLE_DOT, strokeProbes, type Box,
 } from "./harf";
@@ -69,10 +69,10 @@ async function addMirror(page: Page, selector: string): Promise<number> {
 
 /**
  * Makes a radial mirror of the (already selected) starter block the one way
- * the app offers: the Compositions dialog's medallion layout. Returns its id.
+ * the app offers: Block Controls' Add medallion button. Returns its id.
  */
 async function addMedallion(page: Page): Promise<number> {
-  const radial = (await composeSelected(page, "medallion")) as { id: number; type: string; mode?: string };
+  const radial = (await addMedallionToSelected(page)) as { id: number; type: string; mode?: string };
   expect(radial.type).toBe("mirror");
   expect(radial.mode).toBe("radial");
   return radial.id;

@@ -10,7 +10,6 @@ import type { NamedProjectMeta } from "../App";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import type { StarterTemplate } from "../lib/templates";
 import { TemplateWizardDialog } from "./TemplateWizardDialog";
-import { CompositionButton } from "./CompositionDialog";
 import { FontPanel } from "./sidebar/FontPanel";
 import { TashkeelLibrary } from "./sidebar/TashkeelLibrary";
 import type { FontChoice } from "../lib/fontCatalog";
@@ -136,7 +135,7 @@ export type SidebarProps = {
   /** Set when the selected block names a font this browser cannot resolve. */
   missingFontKey?: string | null;
   // ---- /STREAM-G ----
-  /** Compositions: add the chosen layout's companion blocks around the selected text. */
+  /** Builds a measured composition around the selected text block; Block Controls' Add medallion calls it. */
   onApplyComposition?: (selection: CompositionSelection) => void;
   onCreateVerse?: (lines: string[], layout: VerseLayout) => void;
   onJustifyVerse?: (overrides?: Partial<VerseSettings>) => void;
@@ -1041,6 +1040,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onAddSvgGuide={onAddSvgGuide}
           onAddMirrorBlock={onAddMirrorBlock}
           canAddMirrorBlock={canAddMirrorBlock}
+          onAddMedallion={
+            onApplyComposition ? () => onApplyComposition({ layout: "medallion" }) : undefined
+          }
+          canAddMedallion={selectedBlock?.type === "text" && selectedBlock.text.trim() !== ""}
           onDuplicateBlock={onDuplicateBlock}
           onDeleteBlock={onDeleteBlock}
           onUndo={onUndo}
@@ -1260,23 +1263,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span>Arabic Keyboard</span>
                   <span>{showKeyboard ? "Hide" : "Show"}</span>
                 </button>
-
-                {/* Compositions: set this block's text into a pair, a
-                    medallion or a frame. Plain text only — a Shape Fill run is
-                    scaled to its silhouette and a Curve run to its curve, so the
-                    measured run these layouts space themselves by is
-                    meaningless there, the same reason Fit to width is
-                    text-only. */}
-                {selectedBlock?.type === "text" && onApplyComposition && (
-                  <CompositionButton
-                    text={selectedText}
-                    cssFamily={
-                      fontChoices.find((f) => f.value === selectedBlock.fontFamily)?.cssFamily ??
-                      `'${selectedBlock.fontFamily}'`
-                    }
-                    onApply={onApplyComposition}
-                  />
-                )}
 
                 {selectedBlock.type === "text" && onConvertToStack && (
                   <button

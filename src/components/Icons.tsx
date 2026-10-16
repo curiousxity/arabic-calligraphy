@@ -360,3 +360,18 @@ export const KeyboardIcon: React.FC<IconProps> = (props) => (
     <path d="M8 16h8" />
   </IconBase>
 );
+
+/** A ring of copies around a centre: the radial medallion. */
+export const MedallionIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <circle cx="12" cy="12" r="2" />
+    <circle cx="12" cy="4.5" r="1.5" />
+    <circle cx="12" cy="19.5" r="1.5" />
+    <circle cx="4.5" cy="12" r="1.5" />
+    <circle cx="19.5" cy="12" r="1.5" />
+    <circle cx="6.7" cy="6.7" r="1.5" />
+    <circle cx="17.3" cy="6.7" r="1.5" />
+    <circle cx="6.7" cy="17.3" r="1.5" />
+    <circle cx="17.3" cy="17.3" r="1.5" />
+  </IconBase>
+);

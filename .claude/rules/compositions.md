@@ -1,15 +1,24 @@
 ---
 paths:
   - "src/lib/composition*.ts"
-  - "src/components/CompositionDialog.tsx"
   - "e2e/composition.spec.ts"
 ---
 
-# Compositions (`src/lib/composition.ts`, `CompositionDialog.tsx`)
+# Compositions (`src/lib/composition.ts`)
 
-Content → **Compositions** opens a one-step wizard that sets the selected
-text block into a muthanna pair or a medallion, previewed with the
-block's own text in the font it already has.
+Block Controls → **Add medallion** sets the selected text block into a
+radial medallion of mirrors, spaced by the run it actually draws.
+
+**The wizard is gone (2026-10-16).** Content → Compositions opened a dialog
+offering a measured muthanna pair or a medallion. It was removed because
+Block Controls already had Add mirror (the muthanna); the medallion moved to
+its own Add button, which calls `applyComposition({ layout: "medallion" })`
+with the default copy count (the Mirror panel's Copies row changes it
+after). `CompositionDialog.tsx` and its CSS went with it. **The `muthanna`
+layout in `composition.ts` now has no UI**: Add mirror still uses
+`buildMirrorBlock`'s fixed 180px nudge, not the measured offset. The layout
+and its tests were kept, since wiring it into Add mirror for text blocks is
+the obvious next step if that nudge ever bothers anyone.
 
 **History.** This was "Name designs" until 2026-10-13: a two-step wizard
 whose first step was a gallery of the text in every font, plus a `single`
@@ -40,9 +49,6 @@ mirror" (a fixed 180px nudge the user then drags) and "compose this text".
   keeps the copies' inner ends clear of the centre, where the source block is
   still drawn. Getting this backwards produces rings that overlap at high
   counts and look fine at low ones.
-- **Previews are CSS, not canvas**, in the block's own font's CSS family
-  (`Sidebar.tsx` resolves it from the same `fontChoices` list the font picker
-  uses, so an uploaded font previews in itself too).
 - **One `pushHistory()` covers the added blocks**, so a whole composition is a
   single undo. The block is captured **by id** — measuring is async and the
   selection can change while it runs, the same hazard
@@ -67,12 +73,12 @@ mirror" (a fixed 180px nudge the user then drags) and "compose this text".
   layer must not import a domain type back out of a component, and the `Omit`
   makes a new request field a type error at the wizard rather than a silent
   omission.
-- Plain text only, gated in `Sidebar.tsx`: a Shape Fill run is auto-scaled to
+- Plain text only (Add medallion is disabled otherwise, via
+  `canAddMedallion` in `Sidebar.tsx`): a Shape Fill run is auto-scaled to
   its silhouette and a Curve run to its curve, so a measured run width has
   nothing to act on there — the same reason Fit to width is text-only.
-- The dialog chrome classes are still named `nameDesign*` in `index.css`:
-  the font picker, verse and guide dialogs share them, and renaming them was
-  churn this change did not need.
+- The shared dialog chrome classes are still named `nameDesign*` in
+  `index.css`: the font picker, verse and guide dialogs use them.
 
 Deliberately **not** built: Latin→Arabic transliteration and a name
 dictionary (typing the Arabic is the app's own input model, and a phonetic

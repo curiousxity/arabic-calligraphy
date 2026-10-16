@@ -71,8 +71,8 @@ export const section: GuideSection = {
       <p>
         Not text of its own — a live reflection or radial repetition of
         another block, for a muthanna pair or a medallion. Add a mirror with
-        exactly one other block selected, or make a medallion from{" "}
-        <strong>Compositions</strong>; either stays in sync as you keep editing
+        exactly one other block selected, or make a medallion from a text block
+        with <strong>Add medallion</strong>; either stays in sync as you keep editing
         the source. See <strong>Mirrored and radial compositions</strong> in
         this guide.
       </p>

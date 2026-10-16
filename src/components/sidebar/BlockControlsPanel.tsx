@@ -13,6 +13,7 @@ import {
   UndoIcon,
   RedoIcon,
   MirrorIcon,
+  MedallionIcon,
 } from "../Icons";
 
 /** How long the pointer must rest on an Add button before its demo opens. */
@@ -38,6 +39,10 @@ export type BlockControlsPanelProps = {
   onAddMirrorBlock?: () => void;
   /** Exactly one block is selected and it is not itself a mirror. */
   canAddMirrorBlock?: boolean;
+  /** Sets the selected text into a radial medallion of mirrors, spaced by its measured run. */
+  onAddMedallion?: () => void;
+  /** A plain text block with some text is selected. */
+  canAddMedallion?: boolean;
   onDuplicateBlock: () => void;
   onDeleteBlock: () => void;
   onUndo: () => void;
@@ -64,6 +69,8 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
   onAddSvgGuide,
   onAddMirrorBlock,
   canAddMirrorBlock,
+  onAddMedallion,
+  canAddMedallion,
   onDuplicateBlock,
   onDeleteBlock,
   onUndo,
@@ -113,9 +120,8 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
           chips. The old row let flex-wrap choose the shape, and at the
           sidebar's width it broke 8 / 1 / 3 — leaving one button
           stranded alone on a line of its own, which reads as a bug rather
-          than a layout. A fixed grid of five — text, shape fill, curved text,
-          guide, mirror — cannot orphan anything; a medallion is made from
-          Compositions, not here.
+          than a layout. A fixed 3 × 2 grid — text, shape fill, curved text;
+          guide, mirror (muthanna), medallion — cannot orphan anything.
           Splitting Add from the destructive pair also moves Delete out of
           the leading position, where it sat immediately beside Duplicate. */}
       <div className="blockControlGroup">
@@ -192,6 +198,29 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
                 <MirrorIcon size={15} />
               </button>
             </DemoHover>
+          )}
+
+          {/* The tooltip sits on a wrapper: a disabled button fires no mouse
+              events in Chrome, so its own title would never show the hint. */}
+          {onAddMedallion && (
+            <span
+              className="blockControlDemo"
+              title={
+                canAddMedallion
+                  ? "Turn copies of the selected text in a ring around it (medallion)"
+                  : "Select a text block with some text to make a medallion"
+              }
+            >
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                disabled={!canAddMedallion}
+                aria-label="Add medallion"
+                onClick={onAddMedallion}
+              >
+                <MedallionIcon size={15} />
+              </button>
+            </span>
           )}
         </div>
       </div>

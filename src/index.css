@@ -455,7 +455,6 @@ html, body, #root { height: 100%; margin: 0; }
 .nameDesignGrid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 .nameDesignEmpty { padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; background: var(--overlay-hover); color: var(--text-muted); }
 
-.nameDesignGrid--layouts { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 
 /* Font picker (FontPickerDialog): the same dialog chrome, a scrolling body
    of genre sections, each a heading over a grid of cards. The cards are the
@@ -486,26 +485,9 @@ html, body, #root { height: 100%; margin: 0; }
 .fontStripSample { display: block; font-size: 24px; line-height: 1.5; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 
-.nameLayoutCard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 10px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--overlay-hover); cursor: pointer; text-align: center; }
-.nameLayoutCard--active { border-color: var(--accent); outline: 1px solid var(--accent); }
-.nameLayoutName { display: flex; align-items: baseline; justify-content: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-primary); }
-.nameLayoutNameAr { font-size: 12px; font-weight: 400; color: var(--text-muted); }
-.nameLayoutDescription { font-size: 11px; line-height: 1.5; color: var(--text-muted); }
-
-/* Schematic previews. Overflow is hidden rather than scaled to fit: a long
-   name is clipped by the card instead of shrinking the whole arrangement to
-   illegibility. */
-.namePreview { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 96px; overflow: hidden; }
-.namePreview--row { gap: 6px; }
-.namePreviewText { font-size: 20px; line-height: 1.4; color: var(--text-primary); white-space: nowrap; }
-.namePreviewMirror { display: inline-flex; transform: scaleX(-1); }
-.namePreviewSpoke { position: absolute; display: inline-flex; font-size: 9px; }
-.namePreviewSpoke .namePreviewText { font-size: 11px; }
-
 .nameDesignOptionRow { display: flex; align-items: center; gap: 8px; padding-top: 2px; }
 .nameDesignOptionRow > * { min-width: 0; }
 .nameDesignOptionRow label { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
-.nameDesignNumber { width: 68px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); color: var(--text-primary); font-size: 12px; }
 .nameDesignHint { flex: 1; min-width: 0; font-size: 11px; line-height: 1.5; color: var(--text-muted); }
 
 .nameDesignActions { display: flex; align-items: center; gap: 8px; }
@@ -545,12 +527,11 @@ html, body, #root { height: 100%; margin: 0; }
   justify-content: start;
 }
 .blockControlGrid--inline { grid-template-columns: repeat(3, 34px); }
-/* The Add row: five buttons across the full width, no column gap. At the
-   sidebar's 220px minimum the row is 171px, and five 34px buttons only fit
-   if the columns take all of it; with the shared 8px gap the columns drop
-   to ~28px and the buttons squash into ovals. Wider, the 1fr columns space
-   them out. */
-.blockControlGrid--add { grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 0; }
+/* The Add grid: six buttons as two rows of three. At the sidebar's 220px
+   minimum the row is 171px, which fits only five 34px buttons with no gap at
+   all; three columns of ~52px leave room for the shared 8px gap. Wider, the
+   1fr columns space them out. */
+.blockControlGrid--add { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 /* Selected and History sit side by side: two short groups stacked would
    cost a third of a screen in a sidebar that is already four screens tall. */
 .blockControlSplit { display: flex; gap: 20px; flex-wrap: wrap; }
