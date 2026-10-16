@@ -142,5 +142,7 @@ each. The full page was seen 2026-10-16 but arrived mid-turn and could not be
 saved; its rows 2–3 are "الباء مع الياء" (beh with ya), seen-like teeth usable
 for ب ت ث ن ("يجوز استعمال هذه في الباء والتاء والثاء والنون"), and
 "الباء مع الميم" (beh with meem), with dotted alternate outlines beside the
-لا-like shape in row 2 and at the start of the bottom-left word. Waiting for
-the full page.
+لا-like shape in row 2 and at the start of the bottom-left word. Row 2 saved
+as `thuluth-7-row2.png` (beh with ya; the seen-like teeth for ب ت ث ن; the
+dotted alternate beside the second piece from the right). Row 3 (beh with
+meem) still to come.
