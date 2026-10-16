@@ -641,8 +641,9 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
 ## Sheet t24 — two signed panels with corner ornaments (white on black)
 
 Both were signed "هاشم" and dated. **Hashim is the user's grandfather**
-(told 2026-10-16); the work is not from al-Baghdadi's book, so never
-attribute it to him. The user asked for no credit in the app.
+(told 2026-10-16), and the lesson sheets t1–t19 are his work too. None of
+it is from al-Baghdadi's book, so never attribute it to him. The user
+asked for no credit in the app.
 
 - `thuluth-24-qalam-4.webp` (2026-10-16): "وإنك لعلى خلق عظيم" (al-Qalam
   68:4), a landscape panel: tall alifs and the ظ upright in a row, لعلى and
@@ -802,8 +803,8 @@ traced into the app. Questions to settle with the user during review:
 
 1. ~~Source: are the lesson sheets from Hashim al-Baghdadi's book?~~
    Answered: no. The signed panels are by **Hashim, the user's
-   grandfather**; no credit in the app. Still open: are the lesson
-   sheets his too?
+   grandfather**, and so are the lesson sheets (t1–t19), confirmed
+   2026-10-16. No credit in the app.
 2. Names for all 31 pieces of sheet t1, and t2 piece 26 (ق or فـ).
 3. ~~Script of `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`?~~
    Answered: Naskh. Both stay out of the Thuluth set.
