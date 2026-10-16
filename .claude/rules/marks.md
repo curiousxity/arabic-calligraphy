@@ -20,8 +20,14 @@ by `scripts/marks/traceMarks.py` from the raster sheets listed in its
 `SHEETS` table: sheet `a`, `scripts/marks/source.jpg` (a user-supplied
 514×484 image on a grey grid, 52 marks), and sheet `b`,
 `scripts/marks/source-2.webp` (1005×740, clean white, drawn about twice as
-large; 15 marks, its other 14 skipped as repeats of sheet `a`). Each sheet
-has its own `unit` so both come out at one scale (an alif about 500 units),
+large; 15 marks, its other 14 skipped as repeats of sheet `a`), and sheet
+`c`, `scripts/marks/source-3.png` (847×760, crowded, about sheet `a`'s
+scale). Sheet `c` mostly repeats `a` and `b` and its rows don't sort cleanly,
+so it is not named row by row: its `seeds` table picks the 12 new marks by
+one source-pixel point each (the nearest cluster is traced), and every other
+cluster on it is ignored. Its three drop shapes are the *Frames* group, for
+now placeable like any mark (a real frame feature is still to build). Each sheet
+has its own `unit` so all come out at one scale (an alif about 500 units),
 and its own `prefix` for ids (`a` has none, so ids saved before `b` existed
 still resolve; `b`'s are `strokes-b04` and so on). Adding a sheet is a
 `SHEETS` entry plus its names in `GROUPS`; the script asserts every traced

@@ -4,8 +4,8 @@ import { findMark, MARK_GROUPS, MARK_UNITS_PER_EM, markPxBounds, markPxCmds } fr
 const all = MARK_GROUPS.flatMap((g) => g.items);
 
 describe("mark library", () => {
-  it("has the four groups, every id unique", () => {
-    expect(MARK_GROUPS.map((g) => g.id)).toEqual(["strokes", "heads", "dots", "signs"]);
+  it("has the five groups, every id unique", () => {
+    expect(MARK_GROUPS.map((g) => g.id)).toEqual(["strokes", "heads", "dots", "signs", "frames"]);
     expect(new Set(all.map((m) => m.id)).size).toBe(all.length);
     expect(all.length).toBeGreaterThan(40);
   });

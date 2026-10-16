@@ -109,6 +109,11 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
   How it works: [marks.md](.claude/rules/marks.md).
 - Same day: 15 more from a second, cleaner sheet (آ, ھ, ه over و, a kaf
   head, long downstrokes and bases); repeats of the first sheet skipped.
+- Same day: 12 more from a third, crowded sheet — a long double stroke, a
+  long tapered stroke, a long yaa tail, a kaf body, three ha forms, a bold
+  sad, a stacked hamza, and three drop-shaped **frames** in a new *Frames*
+  group. For now a frame is just a big mark; a real frame feature (text
+  inside it) is not built yet.
 - `e2e/marks.spec.ts` is written and typechecks but has **not been run**
   (browser tests skipped this session).
 

@@ -14,12 +14,18 @@ See .claude/rules/marks.md.
 import os, sys, numpy as np, cv2, potrace
 from PIL import Image
 
-def trace_sheet(path, unit, dilate, row_gap, merges):
+def trace_sheet(path, unit, dilate, row_gap, merges, seeds=None):
     """Every mark on one sheet, keyed row+column: {key: {d, w, h}}.
+    With `seeds` ({key: (x, y)} in source px) only the cluster nearest each
+    seed point is traced, keyed as given: for a crowded sheet whose rows don't
+    sort cleanly and which mostly repeats marks already in the library.
     `unit` is library units per source pixel, chosen per sheet so marks from
     different sheets come out at one scale (an alif about 500 units tall)."""
     UNIT=unit
-    im = np.array(Image.open(path).convert('L'))
+    img = Image.open(path)
+    if img.mode in ("RGBA","LA"):   # transparent background reads as white
+        bg = Image.new("RGB", img.size, "white"); bg.paste(img, mask=img.getchannel("A")); img = bg
+    im = np.array(img.convert('L'))
     mask = (im < 140).astype(np.uint8)
     dil = cv2.dilate(mask, np.ones((dilate,dilate),np.uint8))
     n, lab, stats, cent = cv2.connectedComponentsWithStats(dil, 8)
@@ -34,6 +40,11 @@ def trace_sheet(path, unit, dilate, row_gap, merges):
         if rows and abs(cy-rows[-1][0])<row_gap: rows[-1][1].append(c)
         else: rows.append([cy,[c]])
     named={}
+    if seeds:
+        ys,xs=np.nonzero(lab)
+        for key,(sx,sy) in seeds.items():
+            i=np.argmin((xs-sx)**2+(ys-sy)**2); named[key]=[lab[ys[i],xs[i]]]
+        rows=[]
     for r,(cy,cs) in enumerate(rows):
         cs.sort(key=lambda c:c[1][0])
         for k,c in enumerate(cs): named[f"{r}{k}"]=[c[0]]
@@ -94,6 +105,15 @@ SHEETS = {
         "merges": [("54","55")], "skip": []},
   "b": {"file": "source-2.webp", "unit": 5, "dilate": 15, "row_gap": 70, "prefix": "b",
         "merges": [], "skip": ["01","02","03","05","06","13","14","15","16","24","25","26","27"]},
+  # A crowded sheet that mostly repeats a and b, so its new marks are picked
+  # by a seed point each (source px) rather than named row by row. Its three
+  # drop shapes on the left are the "frames" group.
+  "c": {"file": "source-3.png", "unit": 10, "dilate": 5, "row_gap": 20, "prefix": "c",
+        "merges": [], "skip": [], "seeds": {
+          "00": (80,160), "01": (80,380), "02": (80,630),
+          "10": (372,238), "11": (430,305), "12": (480,670),
+          "20": (420,465), "21": (650,575), "22": (375,465), "23": (585,375),
+          "30": (330,680), "31": (812,645)}},
 }
 
 GROUPS = [
@@ -108,6 +128,7 @@ GROUPS = [
     ("b","04","Hooked downstroke"),("b","30","Long curved downstroke"),("b","31","Twisted stroke"),
     ("b","10","Long seen stroke"),("b","12","Alif on a bowl"),("b","11","Alif with madda"),
     ("b","32","Hooked bowl"),("b","33","Long flat base"),("b","34","Short flat base"),
+    ("c","10","Long double stroke"),("c","11","Long tapered stroke"),("c","12","Long yaa tail"),
   ]),
   ("heads", "Heads & loops", [
     ("a","20","Seen teeth, upright"),("a","21","Seen teeth, slanted"),("a","22","Seen teeth, leaning"),
@@ -116,6 +137,7 @@ GROUPS = [
     ("a","36","Double loop"),("a","37","Waw loop with hook"),
     ("b","00","Two-eyed ha"),("b","20","Ha over waw"),("b","22","Alif and waw loop"),
     ("b","07","Waw loops on a long tail"),("b","21","Kaf head"),
+    ("c","20","Kaf body"),("c","21","Ha on a long tail"),("c","22","Bold two-eyed ha"),("c","23","Medial ha"),
   ]),
   ("dots", "Dots (nuqta)", [
     ("a","40","Round dot"),("a","41","Two round dots, stacked"),("a","42","Two round dots, side by side"),
@@ -124,11 +146,13 @@ GROUPS = [
   ("signs", "Small signs", [
     ("a","50","Small kaf"),("a","51","Mim ha"),("a","52","Seen ra"),("a","53","Ain"),("a","54","Mim with ha"),
     ("a","56","Mim with forked head"),("a","57","Mim"),("a","58","Sad ra"),("a","59","Sad ha"),("a","60","Ta"),
-    ("b","23","Small hah"),
+    ("b","23","Small hah"),("c","30","Bold sad"),("c","31","Stacked hamza"),
   ]),
+  ("frames", "Frames", [
+    ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
 HERE=os.path.dirname(os.path.abspath(__file__))
-outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"])
+outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))
       for name,cfg in SHEETS.items()}
 for name in SHEETS:
     used={k for _,_,items in GROUPS for sh,k,_ in items if sh==name}
