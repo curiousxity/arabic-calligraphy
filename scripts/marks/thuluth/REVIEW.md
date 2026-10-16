@@ -504,3 +504,15 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   the looped, knotted final ha seen in (1). So (1) is very likely the same
   lesson (final ha after mim and ha). Clean, no measurement dots; small
   (about 500 px wide).
+- Row 5, `thuluth-17-row5.webp` (2026-10-16): final has (ـه) after a
+  dal-like stroke, right to left: two with a round inner loop, two with a
+  crossed (knotted) inner stroke, and a حه-like pair at the left under a
+  large **dotted alternate** (tall crossing uprights, a kaf/lam-like
+  overlay — what it stands for to confirm).
+  Note under the row: "١-٢ استعمالها قليل إلا في أواخر كلمة سنة وما شابهها
+  وخاصة في خط الإجازة" — "1–2 are rarely used, except at the end of the
+  word سنة and similar words, especially in Ijaza script". **Which pieces
+  "1–2" means is to confirm**: most likely the knotted final ha of rows 3–4,
+  numbered (1) and (2); possibly the first two on this row. Either way,
+  mark those as rare, not the default final ha.
+  Clean strokes, no measurement dots.
