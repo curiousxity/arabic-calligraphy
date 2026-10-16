@@ -709,3 +709,14 @@ in the mark library), but only if the user wants that.
   be read off it. This is the first panel to come with its own key: use the
   pair to name the stacked pieces of the panel exactly, and as the model
   for checking readings of t23 and the other dense panels.
+
+## Sheet t28 — a second panel with its key (one image)
+
+- `thuluth-28-furqan-74.webp` (2026-10-16): "ربنا هب لنا من أزواجنا
+  وذرياتنا قرة أعين واجعلنا للمتقين إماما" (al-Furqan 25:74). **Panel and
+  key in one image**: the white-on-black panel on top (about y < 670), the
+  plain one-line key on light paper below. Crop them apart before
+  cleaning; invert only the panel. The panel is stacked two tiers deep with
+  a forest of tall alif/lam uprights across the top; a small stacked "صدق
+  الله العظيم" block at the top left, the "هاشم" signature and the date
+  ١٣٧٧ (about 1958) along the bottom: remove all three.
