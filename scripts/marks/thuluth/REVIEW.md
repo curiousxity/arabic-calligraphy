@@ -776,3 +776,12 @@ in the mark library), but only if the user wants that.
   signature sits inside the lower bowl: remove it.
 Both show a calligrapher composing **a short phrase or one word to fill a
 block**, rather than a line: a different target from the verse panels.
+- `thuluth-32-title-furusiya.png` (2026-10-16): the single word "الفروسية",
+  one level line: tall alif and lam, the fa head, a long seen run with a
+  long fatha stroke above it, ending in a ta marbuta. Small signature under
+  the end: remove it.
+- `thuluth-32-title-nahda.png` (2026-10-16): a publisher's name, "مكتبة
+  النهضة" in Thuluth (the kaf's long stroke reaching left over the word, the
+  ta marbuta stacked, ض at the left), with "للطباعة والنشر والتوزيع" small
+  underneath in a plainer hand (reference only). Small signature under the
+  main line: remove it. The closest thing yet to a **logo/wordmark**.
