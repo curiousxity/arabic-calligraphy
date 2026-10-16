@@ -101,6 +101,17 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-16 — Long fatha and kasra
+
+- **Stretch a fatha or kasra in a stacked composition.** In the editor
+  window, rest on the mark, press either end and pull: it is cut across its
+  middle and the gap is filled at the pen's own width. Shift keeps a pull —
+  this one or a letter's tail — on the stroke's line. Delete or right-click
+  heals it. How and the measured gate:
+  [stacked-compositions.md](.claude/rules/stacked-compositions.md); what
+  comes next: the roadmap in
+  [deferred-features.md](.claude/rules/deferred-features.md).
+
 ### 2026-10-16 — Styles and Palettes removed
 
 - **Typography's saved Styles list and colour Palettes are gone**, judged

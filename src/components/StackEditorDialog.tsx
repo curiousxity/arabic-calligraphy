@@ -70,7 +70,8 @@ const GESTURES: Array<[string, string]> = [
   ["Bend", "drag a curve between letters; double-click it to straighten."],
   ["Grow a curve", "hold Shift and drag a curve away from its fixed end; drag back to tighten."],
   ["Free a bowl", "press the outlined top of a round stroke and drag."],
-  ["Pull a tail", "press the free end of a straight stroke and pull it out."],
+  ["Pull a tail", "press the free end of a straight stroke and pull it out; hold Shift to keep it in line."],
+  ["Stretch a mark", "press either end of a fatha or kasra and pull; hold Shift to keep it straight."],
   ["Slide a cut", "drag the edge where a tail was cut along its stroke."],
   ["Remove a stretch", "rest on a pulled tail and press Delete, or right-click it."],
   ["One letter alone", "hold Alt, or untick Move letters together."],
@@ -201,13 +202,16 @@ export const StackEditorDialog: React.FC<StackEditorDialogProps> = ({
   const onSetBow = useCallback((joinId: string, bend: { bow: number; depth: number }) => {
     setDraft((d) => setJoinBend(d, joinId, bend));
   }, []);
-  const onSplit = useCallback((pieceId: string, cut: { cutX: number; angle: number }) => {
-    const r = splitDraft(draftRef.current, pieceId, cut);
+  const onSplit = useCallback((pieceId: string, cut: { cutX: number; angle: number }, capSide?: "near" | "far") => {
+    const r = splitDraft(draftRef.current, pieceId, cut, capSide);
     if (!r) return null;
     pushHistory();                 // the cut and the pull that follows are one step
     draftRef.current = r.draft;    // the overlay reads the cap from the return value; keep the ref current for the next frame
     setDraft(r.draft);
-    setStatus("Tail pulled. Delete or right-click it to remove the stretch; drag its cut edge to slide where it starts.");
+    const isMark = r.draft.pieces.find((p) => p.id === pieceId)?.role === "mark";
+    setStatus(isMark
+      ? "Mark stretched. Delete or right-click its end to make it whole again."
+      : "Tail pulled. Delete or right-click it to remove the stretch; drag its cut edge to slide where it starts.");
     return r.cap;
   }, [pushHistory]);
   const onBend = useCallback((pieceId: string, trace: CurveTrace) => {

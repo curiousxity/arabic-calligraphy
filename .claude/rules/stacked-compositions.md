@@ -125,7 +125,29 @@ the stroke's frame) is visually left, which is the **later** letter in
 reading order. `convertRunToStack` relies on this when handing fragments
 to pieces.
 
-**A tail is a split plus a join, and the end cap is a rider.** `splitPieceAtCut` makes the smaller fragment an end cap: `role: "letter"` (it keeps a tilt handle), `parentId` = the body, same `order`. `chainOf` treats any piece with a `parentId` as a rider — it moves with its body, is draggable alone, and never drags anything else. Neither side of the cut is "the tail"; size decides. Cap ids are `<body>t<n>` with a monotonic `n` (relies on pieces never being deleted).
+**A tail is a split plus a join, and the end cap is a rider.** `splitPieceAtCut` makes the smaller fragment an end cap (or the side `capSide` names): the cut piece's own role (a letter's cap keeps a tilt handle), `parentId` = the body, same `order`. `chainOf` treats any piece with a `parentId` as a rider — it moves with its body, is draggable alone, and never drags anything else. Neither side of the cut is "the tail"; size decides. Cap ids are `<body>t<n>` with a monotonic `n` (relies on pieces never being deleted).
+
+**A fatha or kasra stretches the same way, cut at its middle**
+(`markStrokeAxis`, `markPullSpans`, `stackZones.ts`; since 2026-10-16). The
+stroke detector wants parallel edges and a fatha is a tapered wedge: in
+Thuluth and Amiri it finds no zone on one at all. So a mark's stroke is its
+**long axis from the outline's second moments**, the cut is always across
+the ink's centroid (its widest part, so the band is the nib's full width),
+and outside the middle `MARK_MOVE_FRACTION` of its length (which still
+moves the mark) each end is a press target whose `capSide` is that end — the
+half pressed moves, whatever its size.
+`MARK_MIN_ASPECT` (3.7) is measured, not chosen: fatha/kasra 4.0 (Yekan) to
+13 (Thuluth), damma at most 3.4 (AlFatemi), the rest ≤ 2.6; tanween passes
+some fonts' aspect but two strokes cannot be split by one cut, and the
+overlay offers only an axis `splitAtCut` accepts (pinned per font in
+`stackConvert.test.ts`). The cap is `role: "mark"` riding on the mark, so the
+letter carries both; `rootOf` stops where the role changes, which is what
+makes a mark's stretch a stretch (`stretchCut` wants the same role on both
+sides) and lets Delete heal it. **No slide edge on a mark**: there is no
+straight zone to slide along, so the overlay omits it. A filler is never cut
+(a re-run strips fillers by flag and would orphan the cap and its join).
+**Shift holds any pull** — tail or mark — to the stroke's axis (zone angle
+plus piece rotation), so it lengthens without bending.
 
 **A curve becomes a join** (`bendCurveAt`, `stackConvert.ts`; tracer in
 `stackCurve.ts`, pure). Hovering a letter outlines the apex third of each

@@ -131,13 +131,13 @@ async function shapeReal(
 import { convertRunToStack, runOutline, splitPieceAtCut, fillerShapes, teardropShape, bendCurveAt, stretchOf, healTail, beginCutSlide, slideCutTo } from "./stackConvert";
 import { arcBand } from "./stackCurve";
 import { joinCenterline } from "./stackJoin";
-import { transformFace, transformPt } from "./stackGeometry";
+import { cmdsCentre, splitAtCut, transformFace, transformPt } from "./stackGeometry";
 import { pieceTransform } from "./stackOutline";
 import { assembleStackOutline, assembleStackOutlineReport, chainOf } from "./stackOutline";
 import { nibFloorFraction, nuqtaUnits } from "./nuqta";
 import type { StackJoin, StackPiece } from "../types";
 import { flattenContours, findCutZonesSwept, outlineBounds, toSvgCmds, DEFAULT_DETECT_OPTS } from "./strokeCuts";
-import { stackDetectOpts } from "./stackZones";
+import { markStrokeAxis, stackDetectOpts, toZoneFrame } from "./stackZones";
 import { findDetachedMarks, splitContours } from "./detachedMarks";
 import type { SvgCmd } from "./svgPath";
 
@@ -678,5 +678,79 @@ describe("bendCurveAt", () => {
   it("returns null off a curve", () => {
     const bar: StackPiece = { id: "s", cmds: [{ type: "M", x: 0, y: -10 }, { type: "L", x: 300, y: -10 }, { type: "L", x: 300, y: 10 }, { type: "L", x: 0, y: 10 }, { type: "Z" }], x: 0, y: 0, rotation: 0, pivot: [150, 0], homeX: 0, homeY: 0, order: 0, role: "letter", faces: [] };
     expect(bendCurveAt([bar], [], "s", [150, 0])).toBeNull();
+  });
+});
+
+describe("stretching a tashkeel mark", () => {
+  const isMark = (p: StackPiece) => p.role === "mark" && p.id.startsWith("m");
+  const nibOf = (input: { unitsPerEm: number }, family: string) =>
+    ({ width: nuqtaUnits(family, input.unitsPerEm), minFraction: nibFloorFraction(family) });
+
+  // Which marks read as one stroke to stretch, measured per font. Fatha and
+  // kasra do in every face; the others are not long strokes (damma, sukun,
+  // shadda) or are two strokes a single cut cannot separate (tanween).
+  const STROKE_FONTS = ["Thuluth.ttf", "Amiri.ttf", "TahaNaskhRegular.ttf", "UKIJDiwani.ttf", "NotoSans.ttf", "Yekan.ttf", "AlFatemi.otf"];
+  for (const fontFile of STROKE_FONTS) {
+    it(`${fontFile}: fatha and kasra are stretchable strokes; damma, sukun, shadda and tanween are not`, async () => {
+      const stretchable = async (ch: string) => {
+        const { result } = await convert(`ب${ch}`, fontFile);
+        const m = result.pieces.find(isMark)!;
+        expect(m).toBeDefined();
+        const a = markStrokeAxis(m.cmds);
+        return !!a && splitAtCut(m.cmds, { cutX: a.centre, angle: a.angle }) !== null;
+      };
+      expect(await stretchable("َ")).toBe(true);    // fatha
+      expect(await stretchable("ِ")).toBe(true);    // kasra
+      for (const ch of ["ُ", "ْ", "ّ", "ً", "ٍ"]) expect(await stretchable(ch)).toBe(false);
+    });
+  }
+
+  it("Thuluth: pulling a fatha's end lengthens it by a nib-wide band, and healing gives the mark back", async () => {
+    const { input, result } = await convert("بَ", "Thuluth.ttf");
+    const nib = nibOf(input, "Thuluth");
+    const fatha = result.pieces.find(isMark)!;
+    const a = markStrokeAxis(fatha.cmds)!;
+    const split = splitPieceAtCut(result.pieces, result.joins, fatha.id, { cutX: a.centre, angle: a.angle }, "far")!;
+    expect(split).not.toBeNull();
+    const cap = split.pieces[split.pieces.length - 1];
+    expect(cap.role).toBe("mark");
+    expect(cap.parentId).toBe(fatha.id);
+    // The pressed half moved off: the cap is the far side of the centre.
+    const capMid = toZoneFrame(cmdsCentre(cap.cmds), a.angle)[0];
+    expect(capMid).toBeGreaterThan(a.centre);
+
+    // Pull the cap along the stroke by 400 units.
+    const d = 400;
+    const pulled = split.pieces.map((p) => (p.id === cap.id ? { ...p, x: p.x + d * Math.cos(a.angle), y: p.y + d * Math.sin(a.angle) } : p));
+    const before = assembleStackOutlineReport(result.pieces, result.joins, nib);
+    const after = assembleStackOutlineReport(pulled, split.joins, nib);
+    expect(after.skipped).toBe(0);
+    const face = cap.faces[cap.faces.length - 1];
+    const thick = Math.hypot(face.b[0] - face.a[0], face.b[1] - face.a[1]);
+    const grew = area(after.cmds) - area(before.cmds);
+    expect(Math.abs(grew - d * thick) / (d * thick)).toBeLessThan(0.05);
+
+    // Dragging the letter carries the fatha and its pulled end; the end is a tail.
+    const letter = pulled.find((p) => p.role === "letter")!;
+    expect(chainOf(pulled, letter.id, true)).toEqual(expect.arrayContaining([fatha.id, cap.id]));
+    expect(stretchOf(pulled, split.joins, cap.id)?.inner.id).toBe(fatha.id);
+
+    const healed = healTail(pulled, split.joins, cap.id)!;
+    expect(healed).not.toBeNull();
+    expect(healed.pieces).toHaveLength(result.pieces.length);
+    expect(healed.joins).toHaveLength(result.joins.length);
+    const back = assembleStackOutlineReport(healed.pieces, healed.joins, nib);
+    expect(Math.abs(area(back.cmds) - area(before.cmds)) / area(before.cmds)).toBeLessThan(1e-4);
+  });
+
+  it("cuts the named side whatever its size, and never a filler", async () => {
+    const { result } = await convert("بِ", "Amiri.ttf");
+    const kasra = result.pieces.find(isMark)!;
+    const a = markStrokeAxis(kasra.cmds)!;
+    const near = splitPieceAtCut(result.pieces, result.joins, kasra.id, { cutX: a.centre, angle: a.angle }, "near")!;
+    const cap = near.pieces[near.pieces.length - 1];
+    expect(toZoneFrame(cmdsCentre(cap.cmds), a.angle)[0]).toBeLessThan(a.centre);
+    const asFiller = result.pieces.map((p) => (p.id === kasra.id ? { ...p, filler: true as const } : p));
+    expect(splitPieceAtCut(asFiller, result.joins, kasra.id, { cutX: a.centre, angle: a.angle }, "near")).toBeNull();
   });
 });

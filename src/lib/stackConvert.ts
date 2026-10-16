@@ -233,20 +233,24 @@ export function convertRunToStack(input: ConvertInput): ConvertResult {
   return { pieces, joins, unjoined };
 }
 
-/** Cut a piece's stroke. The fragment with the smaller bounds is the end cap:
- *  it becomes its own letter piece riding on the body (`parentId`, same
- *  order) and is joined to it. The body keeps the original id whichever side
- *  of the cut it is on, so existing joins on the body stay valid; faces and
- *  join references follow whichever fragment now holds them. */
+/** Cut a piece's stroke. The fragment with the smaller bounds is the end cap
+ *  unless `capSide` names it (a mark is cut across its middle, and the half
+ *  pressed is the one that moves): it becomes its own piece of the same role
+ *  riding on the body (`parentId`, same order) and is joined to it. The body
+ *  keeps the original id whichever side of the cut it is on, so existing
+ *  joins on the body stay valid; faces and join references follow whichever
+ *  fragment now holds them. A filler is never cut: a re-run strips fillers
+ *  by flag and would leave the cap and its join behind. */
 export function splitPieceAtCut(
-  pieces: readonly StackPiece[], joins: readonly StackJoin[], pieceId: string, cut: { cutX: number; angle: number }
+  pieces: readonly StackPiece[], joins: readonly StackJoin[], pieceId: string, cut: { cutX: number; angle: number },
+  capSide?: "near" | "far"
 ): { pieces: StackPiece[]; joins: StackJoin[] } | null {
   const p = pieces.find((x) => x.id === pieceId);
-  if (!p || p.role !== "letter") return null;
+  if (!p || p.filler) return null;
   const split = splitAtCut(p.cmds, cut);
   if (!split) return null;
   const boundsArea = (cmds: SvgCmd[]) => { const b = outlineBounds(cmds); return (b.x2 - b.x1) * (b.y2 - b.y1); };
-  const capIsNear = boundsArea(split.near) <= boundsArea(split.far);
+  const capIsNear = capSide ? capSide === "near" : boundsArea(split.near) <= boundsArea(split.far);
   const bodyCmds = capIsNear ? split.far : split.near;
   const capCmds = capIsNear ? split.near : split.far;
   const bodyNewFace = capIsNear ? split.farFace : split.nearFace;
@@ -283,7 +287,7 @@ export function splitPieceAtCut(
   const body: StackPiece = { ...rebasePiece(p, bodyCmds), faces: [...bodyIdxs.map((i) => p.faces[i]), bodyNewFace] };
   const cap: StackPiece = {
     ...rebasePiece({ ...p, id: capId }, capCmds),
-    role: "letter", parentId: p.id, order: p.order,
+    role: p.role, parentId: p.id, order: p.order,
     faces: [...capIdxs.map((i) => p.faces[i]), capNewFace],
   };
   const remap = (ref: { pieceId: string; faceIndex: number }) =>
@@ -297,12 +301,14 @@ export function splitPieceAtCut(
   return { pieces: pieces.map((x) => (x.id === p.id ? body : x)).concat(cap), joins: newJoins };
 }
 
-/** The piece a chain of tails was split from: follow `parentId` up. */
+/** The piece a chain of tails was split from: follow `parentId` up while
+ *  the role holds. A mark rides on its letter, so a stretched fatha's root
+ *  is the fatha, not the letter under it. */
 function rootOf(byId: Map<string, StackPiece>, p: StackPiece): string {
   let q = p;
   for (let guard = 0; q.parentId !== undefined && guard < 1000; guard++) {
     const up = byId.get(q.parentId);
-    if (!up) break;
+    if (!up || up.role !== q.role) break;
     q = up;
   }
   return q.id;
@@ -310,7 +316,7 @@ function rootOf(byId: Map<string, StackPiece>, p: StackPiece): string {
 
 /**
  * A stretch: a plain cut (a pulled tail's join) between two pieces of one
- * letter. `inner` is the side toward the letter's body — fewer joins away
+ * letter, or of one mark (a stretched fatha). `inner` is the side toward the letter's body — fewer joins away
  * from it through the letter's own pieces — and `outer` the side away. Pull
  * a tail twice from its middle and the chain is body → middle → tip, so
  * "inner" is a distance, not who rides on whom. Only a plain join qualifies:
@@ -324,7 +330,7 @@ export function stretchCut(pieces: readonly StackPiece[], joins: readonly StackJ
   if (!join || join.profile || join.fallback) return null;
   const byId = new Map(pieces.map((p) => [p.id, p]));
   const a = byId.get(join.from.pieceId), b = byId.get(join.to.pieceId);
-  if (!a || !b || a.role !== "letter" || b.role !== "letter") return null;
+  if (!a || !b || a.role !== b.role) return null;
   const root = rootOf(byId, a);
   if (rootOf(byId, b) !== root) return null;
   const fa = a.faces[join.from.faceIndex], fb = b.faces[join.to.faceIndex];
@@ -353,7 +359,7 @@ export function stretchCut(pieces: readonly StackPiece[], joins: readonly StackJ
 }
 
 /** The stretch a tail hangs from: the plain cut on its inner side. Null for
- *  a piece that is not a pulled tail (a letter's body, a mark, a freed curve's end). */
+ *  a piece that is not a pulled tail (a letter's body, a whole mark, a freed curve's end). */
 export function stretchOf(pieces: readonly StackPiece[], joins: readonly StackJoin[], pieceId: string) {
   for (const j of joins) {
     if (j.from.pieceId !== pieceId && j.to.pieceId !== pieceId) continue;
