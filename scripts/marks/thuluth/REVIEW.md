@@ -283,3 +283,8 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   11. a joined مو-like pair: "the letter before the waw may join the waw's
       head from the left".
   Clean, dotless strokes; labels, arrows and numbers need removing.
+- Row 3, `thuluth-13-row3.png` (2026-10-16): piece 12, one long joined run
+  showing the shared fa/qaf/waw head in the start and middle of a word —
+  a ف head stacked over a ح at the right, then medial heads after ع, ل, ط and
+  ص, ending in لا. Read loosely as فحـعـفلفطفصلا; to confirm. Clean, dotless;
+  a faint dotted segment on the baseline under the ط to check.
