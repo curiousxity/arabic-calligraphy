@@ -258,3 +258,17 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   directly under it, the lam's long bowl sweeping beneath the whole word.
   Pair it with row 4: same word, two placements of the same letters. Clean:
   no measurement dots, notes or dotted alternates.
+
+## Sheet t13 — fa, qaf and waw (row images)
+
+- Row 1, `thuluth-13-row1.webp` (2026-10-16): "حرف الفاء والقاف والواو",
+  with the rule "يكتب رؤوس هذه الاحرف الثلاثة بشكل واحد" — the heads of
+  these three letters are written the same way. **One shared head**, so it
+  should be traced once and reused. Five numbered pieces, right to left:
+  1. ف gathered (مجموع), derived from ba.
+  2. ق gathered, its bowl derived from the cup of seen, sad and nun.
+  3. و extended (مرسل), derived from extended ra.
+  4. ف extended, derived from ba and from the base of the zinadi kaf.
+  5. ق extended, derived from extended nun.
+  Clean strokes, dotless (one small mark above piece 5 to check); labels,
+  arrows and numbers need removing. No dotted alternates.
