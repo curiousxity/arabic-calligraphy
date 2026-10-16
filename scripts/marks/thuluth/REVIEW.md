@@ -161,3 +161,6 @@ complete.
   والنهائية" (initial, medial and final behs): بلـ/بب-type runs, a long run
   of joined behs with measurement dots and a dotted circle, and a run like
   بلسة/تليمة with stroke-order numbers.
+- Row 3, `thuluth-8-row3.png` (2026-10-16): one word, a run of joined behs
+  ending in ة (416×152; drawn a little smaller — strokes ~18 px against ~24
+  on the other rows, so its trace takes its own scale).
