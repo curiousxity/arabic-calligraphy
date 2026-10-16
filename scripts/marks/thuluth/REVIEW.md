@@ -51,3 +51,13 @@ removes the measurement dots.
 | 26 | ق / فـ ? | cleanup (dots); name to confirm |
 | 27 | ق without dots | waiting |
 | 28 | و | waiting |
+
+## Sheet t3 — `thuluth-3.webp`
+
+Received 2026-10-16, saved only (no pieces cut or traced yet). Three rows,
+headings on the sheet: row 1 "احرف فردية للتمرين وهي غير مسقطة" (isolated
+letters for practice, not descending); row 2 "احرف فردية ملفوفة" (wrapped),
+"احرف فردية مرسلة" (extended), "حرفان مرتفعان" (two raised letters),
+"احرف فردية للتمرين"; row 3 "الهاء المتصلة والفردية" (connected and
+isolated heh), "حرف الحاء مرسل وملفوف" (ha, extended and wrapped),
+"حرف الحاء النهائي" (final ha). Very few measurement dots on this sheet.
