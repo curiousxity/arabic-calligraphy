@@ -427,3 +427,20 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
     (a different start for the head).
   Measurement dots, construction boxes, stroke numbers and arrows on all
   but the last piece, which is clean.
+- Row 3, `thuluth-16-row3.webp` (2026-10-16): "حرف الميم" — the standalone
+  mims, each with a usage rule, right to left:
+  - Two single mims: "هذا الميم الفردي يستعمل في خط الثلث ما عدا المحقق" —
+    the **Thuluth single mim** (not Muhaqqaq). Under them: "ويجوز جعله ميمًا
+    وراءً اذا زيد نصف نقطة عن قاعدة الميم" — adding half a nuqta to the base
+    makes it a mim-ra. The second looks like that longer version.
+  - "هذا الميم يستعمل في اول الحاء والخاء والجيم والراء والياء ومع النون
+    الرحمانية النهائية" — this mim is used before ha, kha, jeem, ra and ya,
+    and with the final "rahmani" nun. **Dotted alternate**: a following
+    ح-like shape.
+  - A mim with its tail dropping straight down: "يجوز استعماله في حالات
+    اضطرارية وفي النهاية" — allowed when needed, and at the end.
+  - At the left: "هذا الميم الفردي يستعمل في المحقق وفي الثلث في حالات
+    الضرورة" — the **Muhaqqaq single mim**, used in Thuluth only when
+    needed. **Dotted alternate**: a long joined shape behind it. A smaller
+    مـ head at the far left.
+  Clean strokes, no measurement dots; labels and arrows need removing.
