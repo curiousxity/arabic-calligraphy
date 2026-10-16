@@ -225,3 +225,14 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   (صصص-like). Left: "طا اولی و وسط و نهائی" — initial, medial and final tah
   (ططط-like), the three tall tah uprights ending in arrowheads. Thin guide
   lines run through both; no measurement dots or dotted alternates seen.
+
+## Sheet t12 — ain (row images)
+
+- Row 1, `thuluth-12-row1.png` (2026-10-16): the named ain forms, right to
+  left. "عين فنجانی" (cup ain, standalone with dot-grid construction lines);
+  "عين صادی" (sad-like ain, بغ-like with construction lines); "عين فنجانی" and
+  "ثعبانی صادی" over one joined بلغب-like run; "عين اولی و وسط و نهائی"
+  (initial, medial and final ain: an عغع-like run with a deep final bowl,
+  measurement dots and stroke-order numbers); "عين ثعبانی" (snake ain, a
+  stacked نابتغا-like word with stroke-order numbers and arrows). Measurement
+  dots and construction lines on most pieces; no dotted alternates seen.
