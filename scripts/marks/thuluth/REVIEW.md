@@ -754,3 +754,10 @@ in the mark library), but only if the user wants that.
   plain line the app writes than the dense panels, so a good near-term
   target. A small flower-shaped **verse-end marker** at the far left: not a
   letter, remove it. No signature or date seen. Invert before cleaning.
+- `thuluth-25-wali-tawfiq-b.webp` (2026-10-16): **"الله ولي التوفيق" in a
+  second layout** (it belongs with `thuluth-25-wali-tawfiq.webp`; logged
+  here because it arrived later). No small companion block. The long sweep
+  has moved: here it is the final **qaf of التوفيق** that runs out flat to
+  the left, while the ya of ولي stays short and drops under the line. One
+  level line, light tashkeel, no signature or border; the whole sweep is
+  in frame this time.
