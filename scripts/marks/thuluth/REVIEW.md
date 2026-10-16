@@ -132,3 +132,15 @@ Dotted alternate forms on this sheet (to fill and review separately):
 - middle row, left of the second لا (~1040–1110, 330–410): a slanted
   alternate alif head;
 - small traces near صلى (~150–195, 690–725) and above the big لا (~400, 320).
+
+## Sheet t7 — the beh (`thuluth-7-row1.webp` so far)
+
+Only the top row is saved so far (1617×314, same scale as the full sheets):
+initial beh with two dots and with three dots ("الباء الأولى ذات النقطتين /
+ذات ثلاث نقاط"), joined to ص، ط، غ، ق، م، ر، و، ي — with measurement dots on
+each. The full page was seen 2026-10-16 but arrived mid-turn and could not be
+saved; its rows 2–3 are "الباء مع الياء" (beh with ya), seen-like teeth usable
+for ب ت ث ن ("يجوز استعمال هذه في الباء والتاء والثاء والنون"), and
+"الباء مع الميم" (beh with meem), with dotted alternate outlines beside the
+لا-like shape in row 2 and at the start of the bottom-left word. Waiting for
+the full page.
