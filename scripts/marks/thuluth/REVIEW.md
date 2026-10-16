@@ -593,7 +593,7 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   lam-alif after a waw), and الضالين ending in a returned nun. A lighter
   strip along the bottom-right edge is scan background: crop it.
 
-## Sheet t21 — a second Basmala (black on light)
+## Sheet t21 — more Basmalas (black on light)
 
 - `thuluth-21-basmala.webp` (2026-10-16, 1172×423): "بسم الله الرحمن الرحيم"
   in a **different, compact composition** from sheet t20's: no long
@@ -603,6 +603,12 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   v-shaped flicks than t20. Checked at full size: solid strokes, no
   shadow or double edge. Compare with t20's Basmala: same text, two
   layouts.
+- `thuluth-21-basmala-b.png` (2026-10-16): a third Basmala — the long
+  extended seen like t20's, but a **finer pen**, light strokes, sparse
+  tashkeel (fatha/kasra strokes and small signs only, no v flicks), and
+  الرحمن الرحيم kept on one level instead of stacked. It reads closer to
+  Naskh than Thuluth: **script to confirm** before it goes in a Thuluth
+  set. Clean, no guide lines.
 
 ## Sheet t22 — a framed verse panel
 
