@@ -549,3 +549,16 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   these are the small signs a Thuluth panel is filled with. Their flicks are
   hairlines, so they need the gentlest cleaning (the guide-line remover
   could eat them). Clean, no measurement dots.
+
+## Sheet t20 — a finished piece: the Basmala
+
+- `thuluth-20-basmala.webp` (2026-10-16): "بسم الله الرحمن الرحيم", fully
+  voweled and ornamented, **white ink on black** (the only inverted scan so
+  far: invert it before cleaning, since the pipeline expects dark ink on
+  light paper). The long extended seen of بسم, the الله with its shadda-alif
+  and small ه sign, the stacked الرحمن and الرحيم. Every tashkeel and
+  ornament sign from sheet t19 appears here **in place** — shadda with
+  fatha, sukun, kasra strokes, the small م and ح signs under letters, the
+  ص-like signs over the alifs — so it is the reference for **where** those
+  signs sit, not just what they look like. A target for a composed result,
+  rather than a source of single pieces.
