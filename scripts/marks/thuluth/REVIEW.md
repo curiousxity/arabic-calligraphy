@@ -164,3 +164,10 @@ complete.
 - Row 3, `thuluth-8-row3.png` (2026-10-16): one word, a run of joined behs
   ending in ة (416×152; drawn a little smaller — strokes ~18 px against ~24
   on the other rows, so its trace takes its own scale).
+
+## Sheet t9 — the jeem family (row images)
+
+- Row 1, `thuluth-9-row1.png` (2026-10-16): "جيمات أولية" (initial jeems,
+  several head angles) and "جيمات وسطية" (medial jeems), plus a large stacked
+  جـ over ح with its full measurement grid. Heavy measurement dots on every
+  piece — a candidate for cross-referencing with a cleaner scan if one comes.
