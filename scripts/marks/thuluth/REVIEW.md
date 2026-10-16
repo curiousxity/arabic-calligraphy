@@ -332,3 +332,9 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
      Dotted alternate: a tall upright above.
   9. "model of the saifi kaf, medial and final, joined" (a مكا-like run).
   Clean strokes; labels and numbers need removing.
+- Row 3, `thuluth-14-row3.png` (2026-10-16): three unlabelled pieces numbered
+  (1)–(3), each a body with the small S-shaped kaf sign above it. (1) a
+  crossed, lam-alif-like body; (2) a slanted body with a short flat base;
+  (3) a tall upright over a round bowl. **Names to confirm with the user**
+  (kaf forms or lam-alif forms?). Clean, no measurement dots or dotted
+  alternates.
