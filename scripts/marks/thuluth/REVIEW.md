@@ -493,3 +493,8 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
     ha, also called horse's ear).
   Clean strokes, no measurement dots or dotted alternates; labels and arrows
   need removing. Matches row 1's shapes at a larger size.
+- Row 3, `thuluth-17-row3.png` (2026-10-16): numbered "(1)", unlabelled.
+  Two joined runs, loosely محه and مهحة: a mim-ha opening, a ha bowl in the
+  middle, and a final ha/ta marbuta at the left end with a looped,
+  knotted tail. Probably a final-ha example; **reading and name to confirm**.
+  Clean, no measurement dots; small (about 760 px wide).
