@@ -827,6 +827,20 @@ as 6 and 13. Row 4's pieces are numbered 1–3 within the row.
   this sheet, but the hardest to clean; the letters touch the construction
   lines in many places.
 
+
+Mapped and traced 2026-10-17 as `t14r1`–`t14r5` (parts mode). Pens 18 to
+18.4 px (row 4: 14). Rows 1–3 keep the sheet's numbers. The small ك sign
+inside kafs 1–3 is dropped from those traces (it is a separate piece);
+row 3 keeps its small zinadi kaf, which is part of the form.
+
+| piece | status |
+|---|---|
+| r1 1–5 (single, final, extended, zinadi, zinadi joined) | traced, clean |
+| r2 6–9 (saifi kafs) | traced, clean (dotted alternates cleaned away) |
+| r3 1–3 (saifi finished with a small zinadi) | traced, clean |
+| r4 1 (حكما) | traced, clean |
+| r5 1–5 (construction sheet) | traced; **needs cleanup**: measuring nuqtas, construction diagonals, arrows; stroke numbers to read in review |
+
 ## Sheet t15 — ba and the letters built from it (row images)
 
 - Row 1, `thuluth-15-row1.webp` (2026-10-16): "حرف الباء", right to left:

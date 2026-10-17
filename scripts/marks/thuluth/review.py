@@ -287,6 +287,32 @@ SHEETS = {
     2: ("فح fa head stacked on ha", (714,41,912,346)),
     3: ("و فبو extended joined fa with final waw: before low letters", (83,90,673,321)),
   }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3)}},
+  # Sheet 14, kaf and its kinds (mapped 2026-10-17, parts mode). Rows 1-3
+  # keep the sheet's own numbers.
+  "t14r1": {"file": "../thuluth-14-row1.webp", "dot": 18, "unit": 48 / 18, "units": {
+    1: ("ك single kaf (المفرد)", (1703,65,1867,304)), 2: ("ك final kaf (النهائي)", (1322,58,1527,301)),
+    3: ("ك extended kaf (المرسل)", (832,54,1178,295)), 4: ("ك zinadi kaf (الزنادي)", (399,118,752,281)),
+    5: ("كد zinadi kaf joined into a following letter", (20,115,379,274)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4, 5)}},
+  "t14r2": {"file": "../thuluth-14-row2.webp", "dot": 18, "unit": 48 / 18.4, "units": {
+    6: ("ك saifi kaf, initial joined", (1727,46,1978,317)), 7: ("ك saifi kaf, single and joined", (1145,49,1409,321)),
+    8: ("كرا model of the medial saifi kaf", (533,31,832,380)), 9: ("مكا saifi kaf, medial and final, joined", (28,34,311,323)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (6, 7, 8, 9)}},
+  "t14r3": {"file": "../thuluth-14-row3.png", "dot": 17, "unit": 48 / 17.2, "units": {
+    1: ("saifi kaf finished with a small zinadi kaf, (1)", (776,26,937,269)),
+    2: ("saifi kaf finished with a small zinadi kaf, (2)", (381,40,626,263)),
+    3: ("saifi kaf finished with a small zinadi kaf, (3)", (64,18,207,264)),
+  }, "splits": {}},
+  "t14r4": {"file": "../thuluth-14-row4.png", "dot": 14, "unit": 48 / 14, "units": {
+    1: ("حكما (to confirm)", (4,10,282,171)),
+  }, "splits": {}, "erase": {1: ["main"]}},
+  "t14r5": {"file": "../thuluth-14-row5.webp", "dot": 18, "unit": 48 / 18, "units": {
+    1: ("zinadi kaf construction, part 1 (to name)", (1468,153,1949,389)),
+    2: ("بكلك zinadi kaf with final and medial (to name)", (820,102,1541,399)),
+    3: ("كا initial saifi kaf (to name)", (702,138,869,370)),
+    4: ("بكر saifi kaf, single and medial (to name)", (374,109,679,395)),
+    5: ("بكلا saifi kaf, single and medial (to name)", (65,118,389,375)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4, 5)}},
   "t10r4": {"file": "../thuluth-10-row4.png", "dot": 14, "unit": 48 / 14.4, "units": {
     1: ("medial seen in an النسيم-like word (measuring grid)", (178,26,438,218)),
     2: ("initial, medial and final seen, stacked run (stroke numbers, measuring nuqtas)", (10,280,528,500)),
