@@ -190,22 +190,22 @@ clean.
 
 | # | provisional name | units tall | status |
 |---|---|---|---|
-| 1 | ا alif, standalone, length 1 | 511 | traced 2026-10-17, clean |
-| 2 | ا alif, standalone, length 2 | 527 | traced 2026-10-17, clean |
-| 3 | ا alif, standalone, length 3 | 569 | traced 2026-10-17, clean |
-| 14 | ا alif height 1 (single line, 5–6 nuqtas) | 550 | traced 2026-10-17, clean |
-| 15 | ا alif height 2 (medium composed, 6–7) | 586 | traced 2026-10-17, clean |
-| 26 | ا alif height 3 (light composed, 7–8) | 619 | traced 2026-10-17, clean |
-| 11 | ا alif height 4 (heavy composed, 9–12) | 718 | traced 2026-10-17, clean |
-| 4 | ا arched alif, from Diwani | 534 | traced 2026-10-17, clean |
-| 5 | ا arched alif, full Diwani form | 529 | traced 2026-10-17, clean |
-| 13 | ط tah alif (ألف الطاء) | 442 | traced 2026-10-17, clean |
-| 27 | ط tah alif, Diwani-like variant | 370 | traced 2026-10-17, clean |
-| 7 | ال the two alifs usable for the lam (الر) | 830 | traced 2026-10-17, clean |
-| 8 | الحر final alif joined to the first lam | 700 | traced 2026-10-17, clean |
-| 10 | الله: either of two alifs may be used here; the dotted curve is the second (arched) alif, erased from this trace | 606 | traced 2026-10-17, clean |
-| 16 | اعلما ain joined to a final alif | 636 | traced 2026-10-17, clean |
-| 18 | يا غالباً غير مغلوب, the worked example line (traced dotless) | 888 | traced 2026-10-17, clean |
+| 1 | ا alif, standalone, length 1 | 511 | traced 2026-10-17, clean; **approved, in the library** |
+| 2 | ا alif, standalone, length 2 | 527 | traced 2026-10-17, clean; **approved, in the library** |
+| 3 | ا alif, standalone, length 3 | 569 | traced 2026-10-17, clean; **approved, in the library** |
+| 14 | ا alif height 1 (single line, 5–6 nuqtas) | 550 | traced 2026-10-17, clean; **approved, in the library** |
+| 15 | ا alif height 2 (medium composed, 6–7) | 586 | traced 2026-10-17, clean; **approved, in the library** |
+| 26 | ا alif height 3 (light composed, 7–8) | 619 | traced 2026-10-17, clean; **approved, in the library** |
+| 11 | ا alif height 4 (heavy composed, 9–12) | 718 | traced 2026-10-17, clean; **approved, in the library** |
+| 4 | ا arched alif, from Diwani | 534 | traced 2026-10-17, clean; **approved, in the library** |
+| 5 | ا arched alif, full Diwani form | 529 | traced 2026-10-17, clean; **approved, in the library** |
+| 13 | ط tah alif (ألف الطاء) | 442 | traced 2026-10-17, clean; **approved, in the library** |
+| 27 | ط tah alif, Diwani-like variant | 370 | traced 2026-10-17, clean; **approved, in the library** |
+| 7 | ال the two alifs usable for the lam (الر) | 830 | traced 2026-10-17, clean; **approved, in the library** |
+| 8 | الحر final alif joined to the first lam | 700 | traced 2026-10-17, clean; **approved, in the library** |
+| 10 | الله: either of two alifs may be used here; the dotted curve is the second (arched) alif, erased from this trace | 606 | traced 2026-10-17, clean; **approved, in the library** |
+| 16 | اعلما ain joined to a final alif | 636 | traced 2026-10-17, clean; **approved, in the library** |
+| 18 | يا غالباً غير مغلوب, the worked example line (traced dotless) | 888 | traced 2026-10-17, clean; **approved, in the library** |
 
 ### Sheet 4's notes, transcribed (2026-10-17)
 
@@ -1099,6 +1099,7 @@ else on a sheet is added.
 | t2 23 | Starting sad (صـ) | `thuluth-t2-23` | 2026-10-17 |
 | t2 28 | Waw (و) | `thuluth-t2-28` | 2026-10-17 |
 | t3 (21 pieces) | see `traceMarks.py` | `thuluth-t3-<n>` | 2026-10-17 (all of sheet 3 but 15 and 16) |
+| t4 (16 pieces) | see `traceMarks.py` | `thuluth-t4-<n>` | 2026-10-17 (all of sheet 4) |
 | outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1

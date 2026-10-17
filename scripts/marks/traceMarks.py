@@ -162,7 +162,15 @@ GROUPS = [
     ("t3","14","Ra and meem, raised (ر م)"),("t3","17","Waw with connected and standalone ha (و هـ ه)"),
     ("t3","18","Ya, second form (ى)"),("t3","19","Ha, extended (ح)"),("t3","20","Ha, wrapped (ح)"),
     ("t3","25","Ha, wrapped, second form (ح)"),("t3","21","Ain (ع)"),("t3","22","Final ha (ـح)"),
-    ("t3","23","Final ha, second form (ـح)"),("t3","24","Ending dal (ـد)")]),
+    ("t3","23","Final ha, second form (ـح)"),("t3","24","Ending dal (ـد)"),
+    ("t4","1","Alif, standalone (ا)"),("t4","2","Alif, standalone, second form (ا)"),("t4","3","Free alif (ا)"),
+    ("t4","14","Alif, height 1: single line (ا)"),("t4","15","Alif, height 2: medium composed line (ا)"),
+    ("t4","26","Alif, height 3: light composed line (ا)"),("t4","11","Alif, height 4: heavy composed line (ا)"),
+    ("t4","4","Arched alif, from Diwani (ا)"),("t4","5","Arched alif, full Diwani form (ا)"),
+    ("t4","13","Ta's alif (ط)"),("t4","27","Ta's alif, close to Diwani (ط)"),
+    ("t4","7","Two alifs for the lam (الر)"),("t4","8","Last alif joined to the first lam (الحر)"),
+    ("t4","10","Allah (الله)"),("t4","16","Ain joined to a final alif (اعلما)"),
+    ("t4","18","Ya ghaliban ghayra maghlub (يا غالباً غير مغلوب)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
@@ -174,6 +182,7 @@ GROUPS = [
 TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t2": ("thuluth/traces/t2/t2-traced.json", "thuluth-t2-"),
           "t3": ("thuluth/traces/t3/t3-traced.json", "thuluth-t3-"),
+          "t4": ("thuluth/traces/t4/t4-traced.json", "thuluth-t4-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))
