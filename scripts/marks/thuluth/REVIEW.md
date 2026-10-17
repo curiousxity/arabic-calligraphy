@@ -889,10 +889,17 @@ measurement marks). Traced with `traceOutline.py`; the review image and the
 traced path sit beside each source.
 
 - `outline-01.png` (2026-10-17, 652×1284): **ـم the joined ending meem**
-  (named by the user, 2026-10-17). Traced exactly (1706 path commands; may be
-  simplified before it enters the library). Scale: not yet known. The user is
-  sending more meem outlines; take the scale from one of them that has a
-  known size (or sits beside an alif), then add this one to the library.
+  (named by the user, 2026-10-17). In the library at **420 units tall**
+  (`traceOutline.py` unit 0.354 per source px; the outline is shrunk to about
+  600 px before tracing, which halves the path to 862 commands and still keeps
+  the notch under the flag). How the size was chosen: the reference
+  alphabet's meem measured against its alif, lam, ta and ha, scaled to those
+  letters' sizes in the library, gives 420, 390, 433 and 437. Matching pen
+  width to the grandfather's pieces gave 364, but the widest point on the
+  meem is where two strokes overlap, so that reading runs small. Re-check
+  against the coming meem outlines.
+  `thuluth-lineup.png` (drawn by `lineup.py`) shows every Thuluth piece in the
+  library side by side at library scale.
 
 ## Reference alphabet (`reference/alphabet.png`)
 
@@ -904,8 +911,8 @@ at a time. It is useful for proportions between letters.
 First measurement (dark ink only, source px): the alif is 104 tall and the
 isolated meem 88 tall, so a meem is about 0.85 of an alif. At the library's
 alif of about 500 units, that puts a meem near 420 units tall. This is the
-**isolated** meem, so it is only an estimate for the joined ending meem of
-`outline-01`; confirm against the coming meem outlines before using it.
+**isolated** meem. The same figure comes out of the alphabet's lam, ta and
+ha, so it was used for `outline-01` (see above).
 
 ## In the app's mark library
 
@@ -919,6 +926,7 @@ else on a sheet is added.
 | t1 23 | Ha (ه) | `thuluth-t1-23` | 2026-10-17 |
 | t1 25 | Lam (ل) | `thuluth-t1-25` | 2026-10-17 |
 | t1 19 | Ta (ط) | `thuluth-t1-19` | 2026-10-17 |
+| outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | 2026-10-17 (shape; size set from the reference) |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1
 pieces 19 and 25) is **part of the letter**, not a direction arrow. Keep it.

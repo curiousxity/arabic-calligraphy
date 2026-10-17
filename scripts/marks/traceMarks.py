@@ -149,7 +149,8 @@ GROUPS = [
     ("b","23","Small hah"),("c","30","Bold sad"),("c","31","Stacked hamza"),
   ]),
   ("thuluth", "Thuluth", [
-    ("t1","23","Ha (ه)"),("t1","25","Lam (ل)"),("t1","19","Ta (ط)")]),
+    ("t1","23","Ha (ه)"),("t1","25","Lam (ل)"),("t1","19","Ta (ط)"),
+    ("o","01","Joined ending meem (ـم)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
@@ -157,12 +158,20 @@ GROUPS = [
 # lesson sheets and traces each piece for review (thuluth/REVIEW.md). Only a
 # piece the user has approved is listed in GROUPS; its outline is read from the
 # review's saved trace, already in library units and centred.
-TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-")}
+# A user-supplied clean outline ("o") is one piece per file, keyed by its number.
+TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
+          "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))
       for name,cfg in SHEETS.items()}
 for name,(rel,_) in TRACED.items():
-    with open(os.path.join(HERE,rel),encoding="utf-8") as fh: outs[name]=json.load(fh)
+    if "{}" in rel:
+        keys={k for _,_,items in GROUPS for sh,k,_ in items if sh==name}
+        outs[name]={}
+        for k in keys:
+            with open(os.path.join(HERE,rel.format(k)),encoding="utf-8") as fh: outs[name][k]=json.load(fh)
+    else:
+        with open(os.path.join(HERE,rel),encoding="utf-8") as fh: outs[name]=json.load(fh)
     SHEETS[name]={"prefix":None}
 for name in SHEETS:
     if name in TRACED: continue   # a review trace holds unapproved pieces too

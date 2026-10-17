@@ -38,7 +38,9 @@ scanned lesson sheets, cleaned and traced for review under
 `scripts/marks/thuluth/` (ledger: `thuluth/REVIEW.md`). `traceMarks.py`
 does not trace them; its `TRACED` table reads the review's saved trace, and
 only pieces the user has approved are named in `GROUPS` (ids
-`thuluth-t1-23` and so on). Nothing goes into that group without approval.
+`thuluth-t1-23` and so on). A clean outline the user supplies is one JSON
+per piece (`thuluth/outlines/outline-NN.json`, ids `thuluth-outline-NN`),
+traced by `thuluth/traceOutline.py` at a units-per-pixel the ledger records. Nothing goes into that group without approval.
 The script finds marks as clusters of dark pixels (dilated 9px, so a mark's
 separate dots stay together), keys them row+column (`"40"` = row 4, first),
 enlarges 8×, closes small gaps left by the grid lines, and traces with
