@@ -32,8 +32,9 @@ SHEETS = {
     28: ("و waw tail (body without the head), measuring nuqtas", (866,818,990,930)), 29: ("ر ra body, a different form from 7 (measuring nuqtas)", (694,828,830,936)), 30: ("ن nun, the clean shape (6 is its construction)", (516,818,654,930)),
     31: ("ى/ي ya, three forms", (38,762,482,938)),
   }, "splits": {},
-  # Per piece, source-px boxes (x0, y0, x1, y1) erased from that piece only:
-  # leftovers the cleaner can't tell from ink. 3: the end of a guide line
+  # Per piece, what to erase from that piece only (leftovers the cleaner
+  # can't tell from ink): a source-px box (x0, y0, x1, y1), or a point (x, y)
+  # that removes the whole separate bit it lands on. 3: the end of a guide line
   # touching the right side of the kaf's barb (the user, 2026-10-17).
   "erase": {3: [(1444, 205, 1450, 221)]}},
   "t2": {"file": "../thuluth-2.webp", "dot": 15, "units": {
@@ -49,7 +50,11 @@ SHEETS = {
     21: ("ع", (1167,598,1314,820)), 22: ("ع wrapped", (1010,620,1145,830)), 23: ("صـ start", (869,693,968,766)),
     24: ("ص standalone", (690,640,840,820)), 25: ("ط", (543,587,690,800)), 26: ("ف fa without dots", (350,675,508,792)),
     27: ("ق without dots", (180,695,325,808)), 28: ("و", (48,694,148,798)),
-  }, "splits": {
+  },
+  # 3: the two blobs above the kaf's start are not part of the letter (the
+  # user, 2026-10-17); a point picks out that separate bit.
+  "erase": {3: [(918, 130)]},
+  "splits": {
     # ص's tail runs into ط's base: the loop and the low tail are the ص.
     (542, 586): (24, 25, lambda xs, ys: (xs >= 700) | ((ys >= 768) & (xs >= 595))),
   }},
@@ -77,9 +82,16 @@ def clean_sheet(path, dot):
 
 def assign(clean, units, splits, erase=None):
     sel = _assign(clean, units, splits)
-    for k, boxes in (erase or {}).items():
-        if k in sel:
-            for x0, y0, x1, y1 in boxes: sel[k][y0:y1, x0:x1] = False
+    for k, items in (erase or {}).items():
+        if k not in sel: continue
+        for it in items:
+            if len(it) == 2:   # a point: drop the separate bit of this piece that holds it
+                n, lab = cv2.connectedComponents(sel[k].astype(np.uint8), connectivity=8)
+                i = lab[it[1], it[0]]
+                assert i > 0, (k, it, "point is not on the piece")
+                sel[k][lab == i] = False
+            else:              # a box: clear every pixel of this piece inside it
+                x0, y0, x1, y1 = it; sel[k][y0:y1, x0:x1] = False
     return sel
 
 def _assign(clean, units, splits):

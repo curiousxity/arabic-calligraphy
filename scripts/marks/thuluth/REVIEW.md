@@ -87,9 +87,9 @@ across the stroke), so the same scale: 3.0 units per source px.
 
 | # | name | status |
 |---|---|---|
-| 1 | ح standalone | traced 2026-10-17; nearly clean: a thin bit of guide line on top of the head |
+| 1 | ح standalone | traced 2026-10-17; **for the user to touch up by hand later** (needs more cleanup than the thin bit of guide line on top of the head) |
 | 2 | ح ج خ shared stroke | traced 2026-10-17, clean; **awaiting approval** |
-| 3 | ك zinadi, standalone | traced 2026-10-17; **needs a look**: two blobs above the start (measuring nuqta or part of the letter?) and a tick on the upper stroke |
+| 3 | ك zinadi, standalone | traced 2026-10-17; the two blobs above the start are **not part of the letter** (the user) and are erased (`erase` in `review.py`). Stroke numbers on the sheet: 1 at the upper stroke with an arrow along it, 2 along the middle stroke. **Open question**: a small tick inside the upper stroke near where the second arrow points (probably arrow residue) |
 | 4 | ب long, standalone and final | traced 2026-10-17; cleanup (baseline bits) |
 | 5 | ح almond | traced 2026-10-17; cleanup (dots, line) |
 | 6 | ح almond, small | traced 2026-10-17; needs cleanup: a drip under the base (a stroke number touching it) |
@@ -110,7 +110,7 @@ across the stroke), so the same scale: 3.0 units per source px.
 | 21 | ع (dots on top are measurement) | traced 2026-10-17; cleanup (dots, side line) |
 | 22 | ع wrapped | traced 2026-10-17; cleanup (construction lines in the head) |
 | 23 | صـ start | traced 2026-10-17, clean; **awaiting approval** (the small tick hanging at the left is in the scan: the tooth?) |
-| 24 | ص standalone (tail split from the ط) | traced 2026-10-17, clean; **awaiting approval** |
+| 24 | ص standalone (tail split from the ط) | traced 2026-10-17; **incomplete**: the tail is cut off where it ran into the ط on the original. Borrow a tail from a later tracing of the same form |
 | 25 | ط | traced 2026-10-17; cleanup (stub at the bottom) |
 | 26 | ف fa without dots (the user, 2026-10-16) | traced 2026-10-17; cleanup (dots) |
 | 27 | ق without dots | traced 2026-10-17; needs cleanup: a mark left inside the head at the join |
@@ -940,6 +940,13 @@ code. Each traced piece is saved, cleaned and enlarged 4x, as
 white to erase and black to add, and saves. From then on the piece is traced
 from that file, not the scan, and the file is never overwritten. To start a
 piece over, delete its file and re-run `tracePieces.py`.
+
+## Waiting on something
+
+- **For the user to touch up by hand later**: t1 3 (kaf: barb and tail tip
+  to match the alif's barb and the other tails), t2 1 (standalone ha).
+- **Incomplete, borrow from a later tracing**: t2 24 (standalone sad, tail
+  cut off where it ran into the ط).
 
 ## In the app's mark library
 
