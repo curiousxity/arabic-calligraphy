@@ -894,6 +894,19 @@ traced path sit beside each source.
   sending more meem outlines; take the scale from one of them that has a
   known size (or sits beside an alif), then add this one to the library.
 
+## Reference alphabet (`reference/alphabet.png`)
+
+The full Thuluth alphabet, isolated forms, supplied by the user on
+2026-10-17 **for reference only**. It carries a watermark, so nothing is
+traced from it; the user will supply suitable outlines for new letters one
+at a time. It is useful for proportions between letters.
+
+First measurement (dark ink only, source px): the alif is 104 tall and the
+isolated meem 88 tall, so a meem is about 0.85 of an alif. At the library's
+alif of about 500 units, that puts a meem near 420 units tall. This is the
+**isolated** meem, so it is only an estimate for the joined ending meem of
+`outline-01`; confirm against the coming meem outlines before using it.
+
 ## In the app's mark library
 
 Approved pieces go into the *Thuluth* group of the mark library.
