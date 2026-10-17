@@ -82,38 +82,39 @@ as a fallback, like sheet 1's.
 
 Names below include the user's corrections of 2026-10-16. Letters are traced
 without their dots (dots come from the Dots group), which is also what
-removes the measurement dots.
+removes the measurement dots. Same pen as sheet 1 (both measure 16 px
+across the stroke), so the same scale: 3.0 units per source px.
 
 | # | name | status |
 |---|---|---|
-| 1 | ح standalone | waiting |
-| 2 | ح ج خ shared stroke | waiting |
-| 3 | ك zinadi, standalone | waiting |
-| 4 | ب long, standalone and final | cleanup (baseline bits) |
-| 5 | ح almond | cleanup (dots, line) |
-| 6 | ح almond, small | waiting |
-| 7 | ح almond, large | cleanup (dots on the right) |
-| 8 | مـ start, small | waiting |
-| 9 | م joined | cleanup (dots) |
-| 10 | مـ start, joined | waiting |
-| 11 | م standalone | cleanup (small square at the top) |
-| 12 | ه | waiting |
-| 13 | ه | waiting |
-| 14 | هـ tall, start | cleanup (guide lines, dot) |
-| 15 | ـهـ long, middle | cleanup (dot, line) |
-| 16 | لا | waiting |
-| 17 | لا | waiting |
-| 18 | ى | waiting |
-| 19 | ح wrapped | waiting |
-| 20 | عـ head, start/join | cleanup (dot, line) |
-| 21 | ع (dots on top are measurement) | cleanup (dots, side line) |
-| 22 | ع wrapped | cleanup (construction lines in the head) |
-| 23 | صـ start | waiting |
-| 24 | ص standalone (tail split from the ط) | waiting |
-| 25 | ط | cleanup (stub at the bottom) |
-| 26 | ف fa without dots (the user, 2026-10-16) | cleanup (dots) |
-| 27 | ق without dots | waiting |
-| 28 | و | waiting |
+| 1 | ح standalone | traced 2026-10-17; nearly clean: a thin bit of guide line on top of the head |
+| 2 | ح ج خ shared stroke | traced 2026-10-17, clean; **awaiting approval** |
+| 3 | ك zinadi, standalone | traced 2026-10-17; **needs a look**: two blobs above the start (measuring nuqta or part of the letter?) and a tick on the upper stroke |
+| 4 | ب long, standalone and final | traced 2026-10-17; cleanup (baseline bits) |
+| 5 | ح almond | traced 2026-10-17; cleanup (dots, line) |
+| 6 | ح almond, small | traced 2026-10-17; needs cleanup: a drip under the base (a stroke number touching it) |
+| 7 | ح almond, large | traced 2026-10-17; cleanup (dots on the right) |
+| 8 | مـ start, small | traced 2026-10-17; needs cleanup: a drip under the base (a stroke number touching it) |
+| 9 | م joined | traced 2026-10-17; cleanup (dots) |
+| 10 | مـ start, joined | traced 2026-10-17, clean; **awaiting approval** |
+| 11 | م standalone | traced 2026-10-17; cleanup (small square at the top) |
+| 12 | ه | traced 2026-10-17, clean; **awaiting approval** |
+| 13 | ه | traced 2026-10-17, clean; **awaiting approval** |
+| 14 | هـ tall, start | traced 2026-10-17; cleanup (guide lines, dot) |
+| 15 | ـهـ long, middle | traced 2026-10-17; cleanup (dot, line) |
+| 16 | لا | traced 2026-10-17, clean; **awaiting approval** |
+| 17 | لا | traced 2026-10-17, clean; **awaiting approval** |
+| 18 | ى | traced 2026-10-17, clean (dots removed); **awaiting approval** |
+| 19 | ح wrapped | traced 2026-10-17, clean (stroke numbers removed); **awaiting approval** |
+| 20 | عـ head, start/join | traced 2026-10-17; cleanup (dot, line) |
+| 21 | ع (dots on top are measurement) | traced 2026-10-17; cleanup (dots, side line) |
+| 22 | ع wrapped | traced 2026-10-17; cleanup (construction lines in the head) |
+| 23 | صـ start | traced 2026-10-17, clean; **awaiting approval** (the small tick hanging at the left is in the scan: the tooth?) |
+| 24 | ص standalone (tail split from the ط) | traced 2026-10-17, clean; **awaiting approval** |
+| 25 | ط | traced 2026-10-17; cleanup (stub at the bottom) |
+| 26 | ف fa without dots (the user, 2026-10-16) | traced 2026-10-17; cleanup (dots) |
+| 27 | ق without dots | traced 2026-10-17; needs cleanup: a mark left inside the head at the join |
+| 28 | و | traced 2026-10-17, clean; **awaiting approval** |
 
 ## Sheet t3 — `thuluth-3.webp`
 

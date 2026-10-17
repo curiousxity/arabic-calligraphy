@@ -46,3 +46,4 @@ src/data/strokeSpines/*-sheet.png
 /.claude/worktrees/
 .superpowers/
 .playwright-mcp/
+__pycache__/

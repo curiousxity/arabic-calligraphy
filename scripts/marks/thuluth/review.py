@@ -91,7 +91,8 @@ def _assign(clean, units, splits):
         key = (int(st[i][0]), int(st[i][1]))
         if key in splits:
             a, b, rule = splits[key]; r = rule(xs, ys)
-            sel[a][ys[r], xs[r]] = True; sel[b][ys[~r], xs[~r]] = True
+            if a in sel: sel[a][ys[r], xs[r]] = True       # either piece may not be chosen
+            if b in sel: sel[b][ys[~r], xs[~r]] = True
             continue
         best, bestc = None, 0
         for k, (_, (x0, y0, x1, y1)) in units.items():
