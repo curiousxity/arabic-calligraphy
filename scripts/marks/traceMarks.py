@@ -177,7 +177,10 @@ GROUPS = [
     ("t5","13","Dal, form 1 (د)"),("t5","14","Dal, form 2 (د)"),("t5","15","Dal, form 3 (د)"),("t5","16","Dal, form 4 (د)"),
     ("t5","17","Dal, extended end: lines not composed (د)"),("t5","18","Dal inside a nun (ن د)"),
     ("t5","23","Ra, rihaniya (ر)"),("t5","19","Ra, multawiya (ر)"),("t5","20","Ra, mursala (ر)"),
-    ("t5","21","Ra made small inside a nun (ن ر)"),("t5","22","Ra made small after a lam (ل ر)")]),
+    ("t5","21","Ra made small inside a nun (ن ر)"),("t5","22","Ra made small after a lam (ل ر)"),
+    ("t6","2","Lam-alif (لا)"),("t6","3","Lam-alif, crooked start with zulf (لا)"),
+    ("t6","7","Lam-alif, cut short for panels (لا)"),("t6","8","Lam-alif, cut short, small (لا)"),
+    ("t6","14","Braided lam-alif (لا)"),("t6","13","Joined lam-alif, for tight panels (ـلا)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
@@ -191,6 +194,7 @@ TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t3": ("thuluth/traces/t3/t3-traced.json", "thuluth-t3-"),
           "t4": ("thuluth/traces/t4/t4-traced.json", "thuluth-t4-"),
           "t5": ("thuluth/traces/t5/t5-traced.json", "thuluth-t5-"),
+          "t6": ("thuluth/traces/t6/t6-traced.json", "thuluth-t6-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))

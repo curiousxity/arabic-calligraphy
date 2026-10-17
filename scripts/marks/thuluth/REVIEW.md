@@ -389,7 +389,11 @@ alternates are thin and are cleaned away; they are listed above.
   zulf is lengthened, as in the figure.
 - **Piece 13 (فلا)**: "هذا الشكل في الحالات الاضطرارية سواء كان في وسط
   السطر او في نهايته ويقتصر على الالواح المقيدة الحجم": for forced cases,
-  mid-line or at the end, and only in panels of limited size.
+  mid-line or at the end, and only in panels of limited size. The arrow
+  points at the لا. The user's reading (2026-10-17): this is a lam-alif at
+  the end of the connected partial bodies of joined letters (the fa's head
+  and the teeth run straight into it), a cramped joined form kept for tight
+  panels, not a free-standing لا.
 - **Pieces 15/16**: "هذا الشكل يكتب في الحالات الاضطرارية وفي نهاية
   الاسطر": written in forced cases and at line ends (the arrow points to 15).
 - **Piece 14**: "اللام الالف ذات الظفيرة يكون بعقدة او عقدتين او ثلاث وهذا
@@ -410,12 +414,12 @@ alternates are thin and are cleaned away; they are listed above.
 | # | provisional name | units tall | status |
 |---|---|---|---|
 | 1 | ل lam | 712 | traced 2026-10-17, clean |
-| 2 | لا lam-alif (alif + end of the mursala ha + crooked alif) | 701 | traced 2026-10-17, clean |
-| 3 | لا lam-alif beginning with the crooked alif | 600 | traced 2026-10-17, clean |
-| 7 | لا lam-alif cut short in a panel, zulf lengthened | 532 | traced 2026-10-17, clean |
-| 8 | لا the same, small example | 309 | traced 2026-10-17, clean |
-| 13 | فلا forced cases | 693 | traced 2026-10-17, clean |
-| 14 | لا braided (ذات الظفيرة) | 704 | traced 2026-10-17, clean |
+| 2 | لا lam-alif (alif + end of the mursala ha + crooked alif) | 701 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
+| 3 | لا lam-alif beginning with the crooked alif | 600 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
+| 7 | لا lam-alif cut short in a panel, zulf lengthened | 532 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
+| 8 | لا the same, small example | 309 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
+| 13 | ـلا joined lam-alif ending a run (fa and teeth before it) | 693 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
+| 14 | لا braided (ذات الظفيرة) | 704 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 | 15 | لا forced cases and line ends | 703 | traced 2026-10-17, clean |
 | 16 | لا second form | 715 | traced 2026-10-17, clean |
 | 17 | سلا end-only lam-alif | 733 | traced 2026-10-17, clean |
@@ -1463,6 +1467,12 @@ else on a sheet is added.
 | t3 (21 pieces) | see `traceMarks.py` | `thuluth-t3-<n>` | 2026-10-17 (all of sheet 3 but 15 and 16) |
 | t4 (16 pieces) | see `traceMarks.py` | `thuluth-t4-<n>` | 2026-10-17 (all of sheet 4) |
 | t5 (20 pieces) | see `traceMarks.py` | `thuluth-t5-<n>` | 2026-10-17 (all of sheet 5 but 2, 4, 12) |
+| t6 2 | Lam-alif (لا) | `thuluth-t6-2` | 2026-10-17 |
+| t6 3 | Lam-alif, crooked start with zulf (لا) | `thuluth-t6-3` | 2026-10-17 |
+| t6 7 | Lam-alif, cut short for panels (لا) | `thuluth-t6-7` | 2026-10-17 |
+| t6 8 | Lam-alif, cut short, small (لا) | `thuluth-t6-8` | 2026-10-17 |
+| t6 14 | Braided lam-alif (لا) | `thuluth-t6-14` | 2026-10-17 |
+| t6 13 | Joined lam-alif, for tight panels (ـلا) | `thuluth-t6-13` | 2026-10-17; kept whole with the fa and teeth that lead into it |
 | outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1
