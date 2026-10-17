@@ -676,6 +676,29 @@ and tah). The dotted alternates are thin and are cleaned away.
   Pair it with row 4: same word, two placements of the same letters. Clean:
   no measurement dots, notes or dotted alternates.
 
+
+Mapped and traced 2026-10-17 as `t12r1`–`t12r5` (parts mode). Rows 4 and 5
+(وجعلنا) are written larger (pen 24 and 22.8 px); the per-row unit brings
+them to the shared scale. Notes: the named ains (عين فنجاني cup, عين صادي
+sad-like, ثعباني صادي snake-sad, عين ثعباني snake, عين اولى ووسط ونهائي);
+row 2 heading حرف العين; row 4 "يجب على الخطاط ان يفهم اصول التركيب في وضع
+الحروف بموضعها" (the calligrapher must understand the rules of
+composition, putting each letter in its place).
+
+| piece | provisional name | status |
+|---|---|---|
+| r1 1 | cup ain (عين فنجاني) | traced; **needs cleanup**: construction lines inside the bowl, a dot above |
+| r1 2 | sad-like ain (عين صادي) | traced; **needs cleanup**: construction lines, a dot above |
+| r1 3 | cup ain and snake-sad ain in one run | traced, clean (a small guide tick at the left) |
+| r1 4 | initial, medial and final ain | traced; **needs cleanup**: construction lines and nuqtas in the bowl |
+| r1 5 | snake ain (عين ثعباني) | traced, clean (stroke numbers erased; read in review) |
+| r2 1 | بالعمر | traced, clean |
+| r2 2 | على عسلى | traced, clean |
+| r2 3 | عحمع | traced, clean |
+| r3 1 | يسر عسر بعد | traced, clean |
+| r4 1 | وجعلنا, first arrangement | traced, clean |
+| r5 1 | وجعلنا, second arrangement | traced, clean |
+
 ## Sheet t13 — fa, qaf and waw (row images)
 
 - Row 1, `thuluth-13-row1.webp` (2026-10-16): "حرف الفاء والقاف والواو",

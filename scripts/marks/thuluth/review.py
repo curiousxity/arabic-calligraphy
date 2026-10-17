@@ -240,6 +240,29 @@ SHEETS = {
   "t11r3": {"file": "../thuluth-11-row3.png", "dot": 16, "units": {
     1: ("initial, medial and final sad, then initial, medial and final tah (two runs, touching)", (6,21,770,268)),
   }, "splits": {}, "erase": {1: ["main"]}},
+  # Sheet 12, the ain, five rows (mapped 2026-10-17, parts mode). Rows 4 and
+  # 5 are the composition وجعلنا written large (pen 24 and 22.8 px).
+  "t12r1": {"file": "../thuluth-12-row1.png", "dot": 16, "unit": 48 / 15.98, "units": {
+    1: ("ع cup ain (عين فنجاني), construction lines", (1329,77,1431,192)),
+    2: ("ع sad-like ain (عين صادي), construction lines", (1179,73,1294,202)),
+    3: ("بلغب cup ain and snake-sad ain in one run", (593,13,985,219)),
+    4: ("عغع initial, medial and final ain (measuring nuqtas, stroke numbers)", (363,54,677,284)),
+    5: ("نابتغا snake ain (عين ثعباني), stroke numbers", (42,16,218,208)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4, 5)}},
+  "t12r2": {"file": "../thuluth-12-row2.png", "dot": 14, "unit": 48 / 14, "units": {
+    1: ("بالعمر ain words, start of the practice line", (978,61,1389,302)),
+    2: ("على عسلى ain over a long seen with a returned ya", (387,51,1000,352)),
+    3: ("عحمع ending in an open final ain", (-5,87,449,346)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3)}},
+  "t12r3": {"file": "../thuluth-12-row3.png", "dot": 14, "unit": 48 / 14.4, "units": {
+    1: ("يسر عسر بعد, one practice line", (19,19,928,248)),
+  }, "splits": {}, "erase": {1: ["main"]}},
+  "t12r4": {"file": "../thuluth-12-row4.png", "dot": 24, "unit": 48 / 24, "units": {
+    1: ("وجعلنا composition, first arrangement", (389,60,819,449)),
+  }, "splits": {}, "erase": {1: ["main"]}},
+  "t12r5": {"file": "../thuluth-12-row5.png", "dot": 23, "unit": 48 / 22.8, "units": {
+    1: ("وجعلنا composition, second arrangement", (23,7,487,411)),
+  }, "splits": {}, "erase": {1: ["main"]}},
   "t10r4": {"file": "../thuluth-10-row4.png", "dot": 14, "unit": 48 / 14.4, "units": {
     1: ("medial seen in an النسيم-like word (measuring grid)", (178,26,438,218)),
     2: ("initial, medial and final seen, stacked run (stroke numbers, measuring nuqtas)", (10,280,528,500)),
