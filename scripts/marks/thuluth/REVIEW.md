@@ -88,33 +88,33 @@ across the stroke), so the same scale: 3.0 units per source px.
 | # | name | status |
 |---|---|---|
 | 1 | ح standalone | traced 2026-10-17; **for the user to touch up by hand later** (needs more cleanup than the thin bit of guide line on top of the head) |
-| 2 | ح ج خ shared stroke | traced 2026-10-17, clean; **awaiting approval** |
-| 3 | ك zinadi, standalone | traced 2026-10-17; the two blobs above the start are **not part of the letter** (the user) and are erased (`erase` in `review.py`). Stroke numbers on the sheet: 1 at the upper stroke with an arrow along it, 2 along the middle stroke. **Open question**: a small tick inside the upper stroke near where the second arrow points (probably arrow residue) |
+| 2 | ح ج خ shared stroke | traced 2026-10-17, clean; **approved, in the library** |
+| 3 | ك zinadi, standalone | traced 2026-10-17; the two blobs above the start are **not part of the letter** (the user) and are erased (`erase` in `review.py`). Stroke numbers on the sheet: 1 at the upper stroke with an arrow along it, 2 along the middle stroke. The small tick on the lower stroke near where the second arrow points is a **stray mark** (the user) and is erased too. **Awaiting approval** of the cleaned trace |
 | 4 | ب long, standalone and final | traced 2026-10-17; cleanup (baseline bits) |
 | 5 | ح almond | traced 2026-10-17; cleanup (dots, line) |
 | 6 | ح almond, small | traced 2026-10-17; needs cleanup: a drip under the base (a stroke number touching it) |
 | 7 | ح almond, large | traced 2026-10-17; cleanup (dots on the right) |
 | 8 | مـ start, small | traced 2026-10-17; needs cleanup: a drip under the base (a stroke number touching it) |
 | 9 | م joined | traced 2026-10-17; cleanup (dots) |
-| 10 | مـ start, joined | traced 2026-10-17, clean; **awaiting approval** |
+| 10 | مـ start, joined | traced 2026-10-17, clean; **approved, in the library** |
 | 11 | م standalone | traced 2026-10-17; cleanup (small square at the top) |
-| 12 | ه | traced 2026-10-17, clean; **awaiting approval** |
-| 13 | ه | traced 2026-10-17, clean; **awaiting approval** |
+| 12 | ه | traced 2026-10-17, clean; **approved, in the library** |
+| 13 | ه | traced 2026-10-17, clean; **approved, in the library** |
 | 14 | هـ tall, start | traced 2026-10-17; cleanup (guide lines, dot) |
 | 15 | ـهـ long, middle | traced 2026-10-17; cleanup (dot, line) |
-| 16 | لا | traced 2026-10-17, clean; **awaiting approval** |
-| 17 | لا | traced 2026-10-17, clean; **awaiting approval** |
-| 18 | ى | traced 2026-10-17, clean (dots removed); **awaiting approval** |
-| 19 | ح wrapped | traced 2026-10-17, clean (stroke numbers removed); **awaiting approval** |
+| 16 | لا | traced 2026-10-17, clean; **approved, in the library** |
+| 17 | لا | traced 2026-10-17, clean; **approved, in the library** |
+| 18 | ى | traced 2026-10-17, clean (dots removed); **approved, in the library** |
+| 19 | ح wrapped | traced 2026-10-17, clean (stroke numbers removed); **approved, in the library** |
 | 20 | عـ head, start/join | traced 2026-10-17; cleanup (dot, line) |
 | 21 | ع (dots on top are measurement) | traced 2026-10-17; cleanup (dots, side line) |
 | 22 | ع wrapped | traced 2026-10-17; cleanup (construction lines in the head) |
-| 23 | صـ start | traced 2026-10-17, clean; **awaiting approval** (the small tick hanging at the left is in the scan: the tooth?) |
+| 23 | صـ start | traced 2026-10-17, clean; **approved, in the library** (the tick hanging at the left stays: the user approved it as drawn) |
 | 24 | ص standalone (tail split from the ط) | traced 2026-10-17; **incomplete**: the tail is cut off where it ran into the ط on the original. Borrow a tail from a later tracing of the same form |
 | 25 | ط | traced 2026-10-17; cleanup (stub at the bottom) |
 | 26 | ف fa without dots (the user, 2026-10-16) | traced 2026-10-17; cleanup (dots) |
 | 27 | ق without dots | traced 2026-10-17; needs cleanup: a mark left inside the head at the join |
-| 28 | و | traced 2026-10-17, clean; **awaiting approval** |
+| 28 | و | traced 2026-10-17, clean; **approved, in the library** |
 
 ## Sheet t3 — `thuluth-3.webp`
 
@@ -964,6 +964,16 @@ else on a sheet is added.
 | t1 15 | Small lam-alif (لا) | `thuluth-t1-15` | 2026-10-17 |
 | t1 26 | Dal (د) | `thuluth-t1-26` | 2026-10-17 |
 | t1 30 | Nun (ن) | `thuluth-t1-30` | 2026-10-17 |
+| t2 2 | Ha body, shared by ha, jim and kha (ح) | `thuluth-t2-2` | 2026-10-17 |
+| t2 10 | Joined starting meem (مـ) | `thuluth-t2-10` | 2026-10-17 |
+| t2 12 | Ha, round (ه) | `thuluth-t2-12` | 2026-10-17 |
+| t2 13 | Ha, round, second form (ه) | `thuluth-t2-13` | 2026-10-17 |
+| t2 16 | Small lam-alif, second form (لا) | `thuluth-t2-16` | 2026-10-17 |
+| t2 17 | Lam-alif, open (لا) | `thuluth-t2-17` | 2026-10-17 |
+| t2 18 | Ya (ى) | `thuluth-t2-18` | 2026-10-17 |
+| t2 19 | Wrapped ha (ح) | `thuluth-t2-19` | 2026-10-17 |
+| t2 23 | Starting sad (صـ) | `thuluth-t2-23` | 2026-10-17 |
+| t2 28 | Waw (و) | `thuluth-t2-28` | 2026-10-17 |
 | outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1

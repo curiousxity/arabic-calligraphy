@@ -25,6 +25,13 @@ src = os.path.join(rv.HERE, cfg["file"])
 im, clean = rv.clean_sheet(src, cfg["dot"])
 units = {k: v for k, v in cfg["units"].items() if k in nums}
 sel = rv.assign(clean, units, cfg["splits"], cfg.get("erase"))
+# Whiten what `erase` removed in the grey copy too: the tracer reads the scan's
+# grey edge one pixel outside each piece, which would bring an erased bit back.
+raw = rv.assign(clean, units, cfg["splits"])
+im = im.copy()
+for k in units:
+    gone = cv2.dilate((raw[k] & ~sel[k]).astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    im[gone & ~sel[k]] = 255
 color = Image.open(src).convert("RGB")
 font = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 22)
 os.makedirs(out_dir, exist_ok=True)

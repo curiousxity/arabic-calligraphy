@@ -150,7 +150,11 @@ GROUPS = [
   ]),
   ("thuluth", "Thuluth", [
     ("t1","23","Ha (ه)"),("t1","25","Lam (ل)"),("t1","19","Ta (ط)"),
-    ("t1","2","Small alif (ا)"),("t1","15","Small lam-alif (لا)"),("t1","26","Dal (د)"),("t1","30","Nun (ن)")]),
+    ("t1","2","Small alif (ا)"),("t1","15","Small lam-alif (لا)"),("t1","26","Dal (د)"),("t1","30","Nun (ن)"),
+    ("t2","2","Ha body, shared by ha, jim and kha (ح)"),("t2","10","Joined starting meem (مـ)"),
+    ("t2","12","Ha, round (ه)"),("t2","13","Ha, round, second form (ه)"),
+    ("t2","16","Small lam-alif, second form (لا)"),("t2","17","Lam-alif, open (لا)"),
+    ("t2","18","Ya (ى)"),("t2","19","Wrapped ha (ح)"),("t2","23","Starting sad (صـ)"),("t2","28","Waw (و)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
@@ -160,6 +164,7 @@ GROUPS = [
 # review's saved trace, already in library units and centred.
 # A user-supplied clean outline ("o") is one piece per file, keyed by its number.
 TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
+          "t2": ("thuluth/traces/t2/t2-traced.json", "thuluth-t2-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))

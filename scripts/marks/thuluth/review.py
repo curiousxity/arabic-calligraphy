@@ -52,8 +52,9 @@ SHEETS = {
     27: ("ق without dots", (180,695,325,808)), 28: ("و", (48,694,148,798)),
   },
   # 3: the two blobs above the kaf's start are not part of the letter (the
-  # user, 2026-10-17); a point picks out that separate bit.
-  "erase": {3: [(918, 130)]},
+  # user, 2026-10-17); a point picks out that separate bit. The box is a
+  # stray tick rising from the top edge of the lower stroke (the user).
+  "erase": {3: [(918, 130), (963, 178, 971, 185)]},
   "splits": {
     # ص's tail runs into ط's base: the loop and the low tail are the ص.
     (542, 586): (24, 25, lambda xs, ys: (xs >= 700) | ((ys >= 768) & (xs >= 595))),
