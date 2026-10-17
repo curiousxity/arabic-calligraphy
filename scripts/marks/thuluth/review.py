@@ -21,15 +21,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SHEETS = {
   "t1": {"file": "../thuluth-1.webp", "dot": 16, "units": {
     1: ("ا alif (measuring nuqtas)", (1540,190,1580,362)), 2: ("ا alif, smaller", (1490,190,1535,362)), 3: ("ك", (1330,165,1462,380)),
-    4: ("ل lam (measuring nuqtas)", (1172,130,1330,382)), 5: ("لا", (1025,155,1160,384)), 6: ("ن nun (measuring nuqtas)", (903,258,1072,384)),
+    4: ("ل lam (measuring nuqtas)", (1172,130,1330,382)), 5: ("لا", (1025,155,1160,384)), 6: ("ن nun, construction of 30 (measuring nuqtas)", (903,258,1072,384)),
     7: ("ر ra (overlaps 8)", (738,255,892,386)), 8: ("ب body of ba (overlaps 7)", (640,280,795,384)), 9: ("لا, large (same form as 14)", (476,170,672,384)),
-    10: ("لا, small (same form as 15)", (452,265,512,368)), 11: ("د dal (measuring nuqtas)", (320,222,418,366)), 12: ("ه ha, construction drawing of 23 (stroke numbers, measuring nuqtas, half nuqta)", (150,245,302,377)),
+    10: ("لا, small (same form as 15)", (452,265,512,368)), 11: ("د dal, construction (measuring nuqtas; 26 is the clean shape)", (320,222,418,366)), 12: ("ه ha, construction drawing of 23 (stroke numbers, measuring nuqtas, half nuqta)", (150,245,302,377)),
     13: ("ى", (46,232,150,378)), 14: ("لا, large (same form as 9)", (1412,468,1588,640)), 15: ("لا, small (same form as 10; told by the alif's hat stroke)", (1366,553,1420,645)),
-    16: ("صـ", (1176,578,1326,656)), 17: ("ط / ظ ta/za (measuring nuqtas)", (1034,482,1176,654)), 18: ("ض", (897,560,1014,658)),
-    19: ("ط", (742,475,858,652)), 20: ("ب/ت/ث body, two forms superimposed", (497,530,720,650)), 21: ("ج/ح/خ alternate body", (322,495,470,672)),
+    16: ("صـ", (1176,578,1326,656)), 17: ("ط / ظ ta/za, construction of 19 (measuring nuqtas)", (1034,482,1176,654)), 18: ("ض", (897,560,1014,658)),
+    19: ("ط ta, the clean shape (17 is its construction)", (742,475,858,652)), 20: ("ب/ت/ث body, two forms superimposed", (497,530,720,650)), 21: ("ج/ح/خ alternate body", (322,495,470,672)),
     22: ("ق", (163,513,284,642)), 23: ("ه ha, the clean shape (trace this one; 12 is its construction)", (20,527,126,620)), 24: ("ك (small written note to remove)", (1440,755,1566,938)),
-    25: ("ل", (1294,750,1420,944)), 26: ("د", (1146,808,1244,932)), 27: ("د dal (measuring nuqtas)", (980,806,1110,932)),
-    28: ("ن nun body (measuring nuqtas)", (866,818,990,930)), 29: ("ر ra body (measuring nuqtas)", (694,828,830,936)), 30: ("ن nun, no nuqtas", (516,818,654,930)),
+    25: ("ل", (1294,750,1420,944)), 26: ("د dal, the clean shape (11 and 27 are its construction)", (1146,808,1244,932)), 27: ("د dal, construction (measuring nuqtas; 26 is the clean shape)", (980,806,1110,932)),
+    28: ("و waw tail (body without the head), measuring nuqtas", (866,818,990,930)), 29: ("ر ra body, a different form from 7 (measuring nuqtas)", (694,828,830,936)), 30: ("ن nun, the clean shape (6 is its construction)", (516,818,654,930)),
     31: ("ى/ي ya, three forms", (38,762,482,938)),
   }, "splits": {}},
   "t2": {"file": "../thuluth-2.webp", "dot": 15, "units": {

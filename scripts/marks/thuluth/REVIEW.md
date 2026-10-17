@@ -32,7 +32,10 @@ fallback if a piece comes out cleaner in it.
 
 Numbered map: `sheet1-numbered.png` (sent 2026-10-16). Pieces 9/14 and
 10/15 are the same two lam-alif forms drawn twice: cross-reference them
-and trace whichever copy comes out cleaner. The user named the
+and trace whichever copy comes out cleaner. Construction/clean pairs
+(confirmed 2026-10-17): 6→30 (nun), 11 and 27→26 (dal), 12→23 (ha),
+17→19 (ta). 7 and 29 are two different ra forms. Trace the clean one; the
+construction drawing supplies proportions and stroke order. The user named the
 top row and piece 30 on 2026-10-16; the middle row (14–23) and the bottom
 row (24–31) come next. "Measuring nuqtas" means the piece is drawn with
 its column of measurement dots, which are cleaned off (letters are traced
@@ -45,31 +48,31 @@ dotless).
 | 3 | ك | named |
 | 4 | ل lam (measuring nuqtas) — not لن | named (corrected) |
 | 5 | لا | named |
-| 6 | ن nun (measuring nuqtas) — not بن | named (corrected) |
+| 6 | ن nun — construction of 30 (measuring nuqtas) | named (corrected) |
 | 7 | ر ra — not بز | named (corrected); **drawn overlapping 8**, needs a split rule |
 | 8 | ب the body of ba — not بت | named (corrected); **drawn overlapping 7**, needs a split rule |
 | 9 | لا, large — same form as 14 | named |
 | 10 | لا, small — same form as 15 | named |
-| 11 | د dal (measuring nuqtas) — not نذ | named (corrected) |
+| 11 | د dal — construction of 26 (measuring nuqtas) | named (corrected) |
 | 12 | ه ha — the **construction drawing** of 23: stroke numbers, measuring nuqtas and a **half nuqta**. Not a piece to trace; use it for proportions and to record the stroke order | named (corrected) |
 | 13 | ى (alif maqsura / ya) | named (corrected) |
 | 14 | لا, large — same form as 9 | named |
 | 15 | لا, small — same form as 10, not ه. Tell it by the **alif's hat stroke** (the head at the top of the alif), which a ه never has | named (corrected) |
 | 16 | صـ | named |
-| 17 | ط / ظ ta/za (measuring nuqtas) — not ظـ alone | named (corrected) |
+| 17 | ط / ظ ta/za — construction of 19 (measuring nuqtas) | named (corrected) |
 | 18 | ض | named (guess not corrected) |
-| 19 | ط | named (guess not corrected) |
+| 19 | ط ta — **the clean shape** (17 is its construction) | named; **trace** |
 | 20 | ب / ت / ث body — **two forms drawn superimposed** on each other, not بن | named (corrected); needs separating into two pieces |
 | 21 | ج / ح / خ — the **alternate body**, not بي | named (corrected) |
 | 22 | ق | named (guess not corrected) |
-| 23 | ه ha — **the actual shape** (the user, 2026-10-16): trace this one; 12 is its construction | named |
+| 23 | ه ha — **the actual shape** (the user, 2026-10-16): trace this one; 12 is its construction | named; **trace** |
 | 24 | ك — with a **small handwritten note** beside it to remove | named |
-| 25 | ل | named (guess not corrected) |
-| 26 | د | named (guess not corrected) |
-| 27 | د dal (measuring nuqtas) — not ذ | named (corrected) |
-| 28 | ن nun body (measuring nuqtas) — not ان | named (corrected) |
-| 29 | ر ra body (measuring nuqtas) — not بز | named (corrected) |
-| 30 | ن nun, without nuqtas — not ر | named (corrected) |
+| 25 | ل lam — clean | named; **trace** |
+| 26 | د dal — the clean shape (11 and 27 are its construction) | named |
+| 27 | د dal — construction of 26 (measuring nuqtas) | named (corrected) |
+| 28 | و **waw tail** (the body without the head), measuring nuqtas — not a nun (corrected 2026-10-17) | named (corrected) |
+| 29 | ر ra body (measuring nuqtas) — **a different form from 7**, not its construction | named (corrected) |
+| 30 | ن nun — the clean shape (6 is its construction) | named |
 | 31 | ى / ي ya — **three forms** in one drawing, not بني | named (corrected); needs separating into three pieces |
 
 ## Sheet t2 — `thuluth-2.webp` (1623×876)
