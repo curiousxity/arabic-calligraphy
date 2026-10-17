@@ -169,6 +169,24 @@ SHEETS = {
     3: ("بم beh with meem (الباء مع الميم)", (729,55,972,241)),
     4: ("a seen-like run with a final ya and an upright (to name; dotted alternate head)", (11,0,688,226)),
   }, "splits": {}},
+  # Sheet 8, initial beh of the ya type, three rows (mapped 2026-10-17;
+  # sheet8-rowN-numbered.png). Pen 16 px. "main" drops the measuring nuqtas.
+  "t8r1": {"file": "../thuluth-8-row1.png", "dot": 16, "units": {
+    1: ("يـ initial beh of the ya type, alone (measuring marks)", (1450,92,1564,195)),
+    2: ("بح beh of the ya type with ha (measuring marks)", (1290,44,1466,292)),
+    3: ("بح beh of the ya type with ha, second", (1128,37,1286,288)),
+    4: ("بمى beh of the ya type in a run ending in a long ya (to name)", (745,49,1113,229)),
+    6: ("بر بن small-ya beh with ra and with nun, joined (map 5 and 6; to name)", (431,78,744,240)),
+    7: ("بنه small-ya beh run (to name)", (267,114,440,222)), 8: ("بيم small-ya beh run with meem (to name)", (27,71,269,224)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4, 6, 7, 8)}},
+  "t8r2": {"file": "../thuluth-8-row2.png", "dot": 16, "units": {
+    1: ("بلب initial, medial and final behs (to name)", (1219,114,1496,228)),
+    2: ("a long run of joined behs, dotted circle (to name)", (613,111,1031,232)),
+    3: ("بلسة تليمة beh runs with stroke numbers (to name)", (24,89,523,256)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3)}},
+  "t8r3": {"file": "../thuluth-8-row3.png", "dot": 16, "units": {
+    1: ("one word: a run of joined behs ending in ة (to name)", (5,9,407,140)),
+  }, "splits": {}, "erase": {1: ["main"]}},
 }
 
 def clean_sheet(path, dot):

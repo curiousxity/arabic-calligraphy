@@ -485,6 +485,30 @@ their start. Row 3: الباء مع الميم (beh with meem, piece 3).
   ending in ة (416×152; drawn a little smaller — strokes ~18 px against ~24
   on the other rows, so its trace takes its own scale).
 
+
+Mapped and traced 2026-10-17 as `t8r1`–`t8r3` (`sheet8-rowN-numbered.png`).
+Pen 16 px on all three rows (row 3 included): the shared scale. Notes:
+row 1 headings باء اولية من نوع الياء (initial beh of the ya type: pieces
+1–4) and باء اولية من نوع الياء المصغرة (of the small-ya type: 6–8); row 2
+heading الباءات الاولية والوسطية والنهائية (initial, medial and final
+behs). Map pieces 5 and 6 of row 1 are one joined shape, traced as 6.
+Baseline and guide-line bits touching the teeth are the common leftover on
+this sheet; they are left for hand touch-up.
+
+| piece | provisional name | status |
+|---|---|---|
+| r1 1 | يـ initial beh of the ya type | traced; **needs cleanup**: a tick on the stroke |
+| r1 2 | بح beh with ha | traced, clean |
+| r1 3 | بح beh with ha, second | traced, clean |
+| r1 4 | بمى run ending in a long ya (to name) | traced, clean |
+| r1 6 | small-ya beh with ra and nun, joined (to name) | traced, clean |
+| r1 7 | small-ya beh run (to name) | traced; **needs cleanup**: measuring nuqtas and guide line joined to it |
+| r1 8 | small-ya beh run with meem (to name) | traced; **needs cleanup**: guide-line bits |
+| r2 1 | initial, medial and final behs (to name) | traced; **needs cleanup**: baseline bits under the teeth |
+| r2 2 | long run of joined behs (to name) | traced; **needs cleanup**: baseline bits under the teeth |
+| r2 3 | بلسة تليمة runs, stroke numbers (to name) | traced; **needs cleanup**: baseline bits; stroke numbers 1–7 read in review |
+| r3 1 | one word, behs ending in ة (to name) | traced; **needs cleanup**: baseline under it |
+
 ## Sheet t9 — the jeem family (row images)
 
 - Row 1, `thuluth-9-row1.png` (2026-10-16): "جيمات أولية" (initial jeems,
