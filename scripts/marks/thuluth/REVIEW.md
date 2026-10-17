@@ -277,6 +277,65 @@ four when the rihaniya sits inside a noon or joins a lam, and likewise the
 mursala inside a noon; the composed multawiya ra is a fixed four nuqtas,
 standalone or joined. Few measurement dots outside row 1.
 
+
+Mapped and traced 2026-10-17 (`sheet5-numbered.png`). Same scale. Cluster
+24 is a word in the notes, skipped.
+
+### Sheet 5's notes, transcribed (2026-10-17)
+
+- **Row 1 heading**: احرف فردية مع احرف نهائية, standalone letters with
+  final letters.
+- **Row 2 heading**: حرف الدال. Note over the row, arrow to **piece 17**:
+  "اذا استعمل حرف الدال في الاسطر غير المركبة (الآيات القرآنية والاحاديث)
+  جاز ان يكون آخره مرسلاً. ولا يجوز ارسال آخره اذا استعمل في اشكال أخرى":
+  in lines that are not composed (Quran verses and hadith) the dal's end
+  may be extended (mursal); it may not be extended in other layouts.
+- **Left note, piece 18**: "اذا وقع حرف الدال او الراء او الواو في باطن حرف
+  النون في اثناء التركيب، يجب ان يكون طول حرف النون ست نقاط، لان النون
+  مأخوذ من خط المحقق": when dal, ra or waw sits inside a nun in a
+  composition, the nun must be six nuqtas long, because that nun is taken
+  from Muhaqqaq.
+- **Row 3 heading**: حرف الراء. Labels: **23** الرهانية (rihaniya), **19**
+  الملتوية (multawiya), **20** المرسلة (mursala), **21** في النون يصغر
+  الراء (inside a nun the ra is made small), **22** مع اللام يصغر الراء
+  (with a lam the ra is made small).
+- **Bottom note**: "لحرف الراء ثلاثة اشكال تختلف باختلاف موقعها. وطول
+  الرهانية والمرسلة عادة ست نقاط، إلا ان الراء الرهانية اذا وقعت في وسط
+  النون او اتصلت باللام فان طولها يقصر الى اربع نقاط، وكذلك الراء المرسلة
+  اذا وقعت داخل حرف النون يقصر طولها ايضاً الى اربع نقاط. اما المركبة
+  الملتوية فيكون طولها ثابتاً (وهو اربع نقاط)، سواء كانت مفردة او متصلة":
+  the ra has three shapes that change with position. The rihaniya and
+  mursala are normally **six nuqtas** long; the rihaniya inside a nun or
+  joined to a lam shortens to **four**, and so does the mursala inside a
+  nun. The composed multawiya is a fixed **four nuqtas**, standalone or
+  joined.
+
+| # | provisional name | status |
+|---|---|---|
+| 1 | ا alif | traced 2026-10-17; clean |
+| 2 | ا alif | traced 2026-10-17; **needs cleanup**: guide-line bits at the foot |
+| 3 | د dal | traced 2026-10-17; clean |
+| 4 | ى/ن final | traced 2026-10-17; **needs cleanup**: measuring nuqtas joined to the right side, guide marks |
+| 5 | ں nun body, dotless | traced 2026-10-17; clean |
+| 6 | ن nun | traced 2026-10-17; clean |
+| 7 | ز/ر za or ra body (dotless) | traced 2026-10-17; clean |
+| 8 | ر ra, joined form with a flag head | traced 2026-10-17; clean |
+| 9 | ر joined to a preceding letter (to name); stroke numbers 1 (arrow up-left at the right) and 2 (arrow up at the middle) | traced 2026-10-17; clean (numbers, guide triangle erased) |
+| 10 | و waw | traced 2026-10-17; clean |
+| 11 | و waw, second form | traced 2026-10-17; clean |
+| 12 | ق qaf | traced 2026-10-17; **needs cleanup**: measuring nuqtas, guide box and line |
+| 13 | د dal, form 1 | traced 2026-10-17; clean |
+| 14 | د dal, form 2 | traced 2026-10-17; clean |
+| 15 | د dal, form 3 | traced 2026-10-17; clean |
+| 16 | د dal, form 4 | traced 2026-10-17; clean |
+| 17 | د dal with an extended end (مرسل) | traced 2026-10-17; clean |
+| 18 | ن + د dal inside a nun | traced 2026-10-17; clean |
+| 23 | ر ra, rihaniya (الرهانية) | traced 2026-10-17; clean |
+| 19 | ر ra, multawiya (الملتوية) | traced 2026-10-17; clean |
+| 20 | ر ra, mursala (المرسلة) | traced 2026-10-17; clean |
+| 21 | ن + ر ra made small inside a nun | traced 2026-10-17; clean (label word erased) |
+| 22 | ل + ر ra made small after a lam | traced 2026-10-17; clean (label word erased) |
+
 ## Sheet t6 — `thuluth-6.webp` (lam and lam-alif)
 
 Received 2026-10-16, saved only. Solid letters with long Arabic notes.

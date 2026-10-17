@@ -103,6 +103,27 @@ SHEETS = {
   "erase": {7: [(487,114), (465,150)], 8: [(131,184)], 10: [(856,121), (850,156)],
             16: [(357,406), (345,366), (369,361), (482,472), (493,439)],
             18: [(940,836), (1471,847), (1502,587)]}},
+  # Sheet 5, dal and ra (mapped 2026-10-17; sheet5-numbered.png). Row 1 is
+  # standalone letters with final forms; row 2 the dal; row 3 the ra, each
+  # labelled on the sheet. Cluster 24 is a word in the notes, skipped.
+  "t5": {"file": "../thuluth-5.webp", "dot": 16, "units": {
+    1: ("ا alif (measuring marks)", (1602,27,1648,214)), 2: ("ا alif (guide lines)", (1525,35,1587,217)),
+    3: ("د dal", (1406,85,1522,229)), 4: ("ى/ن final (guide lines)", (1243,69,1396,232)),
+    5: ("ں nun body, dotless", (1115,106,1232,237)), 6: ("ن nun", (965,109,1096,232)),
+    7: ("ز za", (878,98,953,244)), 8: ("ر ra, joined form with a flag head (arrow)", (714,101,881,243)),
+    9: ("ر with a start, stroke numbers and a guide (to name)", (494,126,779,239)),
+    10: ("و waw", (350,109,473,238)), 11: ("و waw, second form", (217,105,355,229)),
+    12: ("ق qaf (measuring nuqtas)", (58,80,215,246)),
+    13: ("د dal, form 1", (1472,450,1601,608)), 14: ("د dal, form 2", (1287,427,1451,605)),
+    15: ("د dal, form 3", (1056,415,1217,587)), 16: ("د dal, form 4", (833,430,983,598)),
+    17: ("د dal, extended end (مرسل): only in lines not composed", (646,418,820,603)),
+    18: ("ن + د dal inside a nun: the nun is six nuqtas long", (434,396,613,589)),
+    23: ("ر ra, rihaniya (الرهانية)", (1426,807,1592,914)), 19: ("ر ra, multawiya (الملتوية)", (1251,767,1379,902)),
+    20: ("ر ra, mursala (المرسلة)", (1034,754,1197,908)), 21: ("ن + ر ra made small inside a nun", (825,689,1004,891)),
+    22: ("ل + ر ra made small after a lam", (577,641,754,897)),
+  }, "splits": {},
+  # a word of the label beside each of 21 and 22
+  "erase": {21: [(833,741)], 22: [(589,771)]}},
 }
 
 def clean_sheet(path, dot):
