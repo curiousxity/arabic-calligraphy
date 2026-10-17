@@ -312,29 +312,29 @@ Mapped and traced 2026-10-17 (`sheet5-numbered.png`). Same scale. Cluster
 
 | # | provisional name | status |
 |---|---|---|
-| 1 | ا alif | traced 2026-10-17; clean |
+| 1 | ا alif | traced 2026-10-17; clean; **approved, in the library** |
 | 2 | ا alif | traced 2026-10-17; **needs cleanup**: guide-line bits at the foot |
-| 3 | د dal | traced 2026-10-17; clean |
+| 3 | د dal | traced 2026-10-17; clean; **approved, in the library** |
 | 4 | ى/ن final | traced 2026-10-17; **needs cleanup**: measuring nuqtas joined to the right side, guide marks |
-| 5 | ں nun body, dotless | traced 2026-10-17; clean |
-| 6 | ن nun | traced 2026-10-17; clean |
-| 7 | ز/ر za or ra body (dotless) | traced 2026-10-17; clean |
-| 8 | ر ra, joined form with a flag head | traced 2026-10-17; clean |
-| 9 | ر joined to a preceding letter (to name); stroke numbers 1 (arrow up-left at the right) and 2 (arrow up at the middle) | traced 2026-10-17; clean (numbers, guide triangle erased) |
-| 10 | و waw | traced 2026-10-17; clean |
-| 11 | و waw, second form | traced 2026-10-17; clean |
+| 5 | ں nun body, dotless | traced 2026-10-17; clean; **approved, in the library** |
+| 6 | ن nun | traced 2026-10-17; clean; **approved, in the library** |
+| 7 | ز/ر za or ra body (dotless) | traced 2026-10-17; clean; **approved, in the library** |
+| 8 | ر ra, joined form with a flag head | traced 2026-10-17; clean; **approved, in the library** |
+| 9 | ر joined to a preceding letter (to name); stroke numbers 1 (arrow up-left at the right) and 2 (arrow up at the middle) | traced 2026-10-17; clean (numbers, guide triangle erased); **approved, in the library** |
+| 10 | و waw | traced 2026-10-17; clean; **approved, in the library** |
+| 11 | و waw, second form | traced 2026-10-17; clean; **approved, in the library** |
 | 12 | ق qaf | traced 2026-10-17; **needs cleanup**: measuring nuqtas, guide box and line |
-| 13 | د dal, form 1 | traced 2026-10-17; clean |
-| 14 | د dal, form 2 | traced 2026-10-17; clean |
-| 15 | د dal, form 3 | traced 2026-10-17; clean |
-| 16 | د dal, form 4 | traced 2026-10-17; clean |
-| 17 | د dal with an extended end (مرسل) | traced 2026-10-17; clean |
-| 18 | ن + د dal inside a nun | traced 2026-10-17; clean |
-| 23 | ر ra, rihaniya (الرهانية) | traced 2026-10-17; clean |
-| 19 | ر ra, multawiya (الملتوية) | traced 2026-10-17; clean |
-| 20 | ر ra, mursala (المرسلة) | traced 2026-10-17; clean |
-| 21 | ن + ر ra made small inside a nun | traced 2026-10-17; clean (label word erased) |
-| 22 | ل + ر ra made small after a lam | traced 2026-10-17; clean (label word erased) |
+| 13 | د dal, form 1 | traced 2026-10-17; clean; **approved, in the library** |
+| 14 | د dal, form 2 | traced 2026-10-17; clean; **approved, in the library** |
+| 15 | د dal, form 3 | traced 2026-10-17; clean; **approved, in the library** |
+| 16 | د dal, form 4 | traced 2026-10-17; clean; **approved, in the library** |
+| 17 | د dal with an extended end (مرسل) | traced 2026-10-17; clean; **approved, in the library** |
+| 18 | ن + د dal inside a nun | traced 2026-10-17; clean; **approved, in the library** |
+| 23 | ر ra, rihaniya (الرهانية) | traced 2026-10-17; clean; **approved, in the library** |
+| 19 | ر ra, multawiya (الملتوية) | traced 2026-10-17; clean; **approved, in the library** |
+| 20 | ر ra, mursala (المرسلة) | traced 2026-10-17; clean; **approved, in the library** |
+| 21 | ن + ر ra made small inside a nun | traced 2026-10-17; clean (label word erased); **approved, in the library** |
+| 22 | ل + ر ra made small after a lam | traced 2026-10-17; clean (label word erased); **approved, in the library** |
 
 ## Sheet t6 — `thuluth-6.webp` (lam and lam-alif)
 
@@ -1121,6 +1121,10 @@ piece over, delete its file and re-run `tracePieces.py`.
 
 ## Waiting on something
 
+From sheet 6 on (the user, 2026-10-17): go through the remaining sheets
+one by one (map, read the notes, trace, log), **then** review them
+together. Nothing from sheet 6 on enters the library before that review.
+
 The user wants to go through all the tracings first, then do **one
 cleanup sweep at the end** (2026-10-17): the hand touch-ups, borrowed
 tails, the English names in the library, and the sheet-3 names.
@@ -1159,6 +1163,7 @@ else on a sheet is added.
 | t2 28 | Waw (و) | `thuluth-t2-28` | 2026-10-17 |
 | t3 (21 pieces) | see `traceMarks.py` | `thuluth-t3-<n>` | 2026-10-17 (all of sheet 3 but 15 and 16) |
 | t4 (16 pieces) | see `traceMarks.py` | `thuluth-t4-<n>` | 2026-10-17 (all of sheet 4) |
+| t5 (20 pieces) | see `traceMarks.py` | `thuluth-t5-<n>` | 2026-10-17 (all of sheet 5 but 2, 4, 12) |
 | outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1

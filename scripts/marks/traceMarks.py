@@ -170,7 +170,14 @@ GROUPS = [
     ("t4","13","Ta's alif (ط)"),("t4","27","Ta's alif, close to Diwani (ط)"),
     ("t4","7","Two alifs for the lam (الر)"),("t4","8","Last alif joined to the first lam (الحر)"),
     ("t4","10","Allah (الله)"),("t4","16","Ain joined to a final alif (اعلما)"),
-    ("t4","18","Ya ghaliban ghayra maghlub (يا غالباً غير مغلوب)")]),
+    ("t4","18","Ya ghaliban ghayra maghlub (يا غالباً غير مغلوب)"),
+    ("t5","1","Alif, third form (ا)"),("t5","3","Dal, second form (د)"),("t5","5","Nun body, dotless (ں)"),
+    ("t5","6","Nun, with its head (ن)"),("t5","7","Ra body, short (ر)"),("t5","8","Ra, joined, flag head (ـر)"),
+    ("t5","9","Ra joined to a letter before it (ـر)"),("t5","10","Waw, third form (و)"),("t5","11","Waw, fourth form (و)"),
+    ("t5","13","Dal, form 1 (د)"),("t5","14","Dal, form 2 (د)"),("t5","15","Dal, form 3 (د)"),("t5","16","Dal, form 4 (د)"),
+    ("t5","17","Dal, extended end: lines not composed (د)"),("t5","18","Dal inside a nun (ن د)"),
+    ("t5","23","Ra, rihaniya (ر)"),("t5","19","Ra, multawiya (ر)"),("t5","20","Ra, mursala (ر)"),
+    ("t5","21","Ra made small inside a nun (ن ر)"),("t5","22","Ra made small after a lam (ل ر)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
@@ -183,6 +190,7 @@ TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t2": ("thuluth/traces/t2/t2-traced.json", "thuluth-t2-"),
           "t3": ("thuluth/traces/t3/t3-traced.json", "thuluth-t3-"),
           "t4": ("thuluth/traces/t4/t4-traced.json", "thuluth-t4-"),
+          "t5": ("thuluth/traces/t5/t5-traced.json", "thuluth-t5-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))
