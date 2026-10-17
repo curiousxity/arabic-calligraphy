@@ -59,6 +59,29 @@ SHEETS = {
     # ص's tail runs into ط's base: the loop and the low tail are the ص.
     (542, 586): (24, 25, lambda xs, ys: (xs >= 700) | ((ys >= 768) & (xs >= 595))),
   }},
+  # Sheet 3 (mapped 2026-10-17): same pen as sheets 1 and 2 (about 16 px), so
+  # the same scale. Names are provisional readings, for the user to confirm
+  # in the end-of-tracing sweep. Numbers follow the cluster map
+  # (sheet3-numbered.png); 1 is part of a written heading and 4 is the kaf's
+  # small sign, traced with 3. 20 is two separate ha forms: 20 the right one,
+  # 25 the left one.
+  "t3": {"file": "../thuluth-3.webp", "dot": 16, "units": {
+    2: ("ا alif", (1630,68,1678,252)), 3: ("ك kaf, upright, with its small kaf sign", (1495,70,1631,276)),
+    5: ("ل lam", (1345,68,1484,290)), 6: ("لا two lam-alif forms, overlapping", (1104,46,1333,287)),
+    7: ("ط ta", (935,75,1089,276)), 8: ("س seen, extended (stroke numbers 1-4)", (429,86,932,290)),
+    9: ("و + ك waw and long kaf, joined (stroke numbers 1-3)", (47,101,432,297)),
+    10: ("ر و د ra, waw, dal, joined (wrapped forms)", (1389,406,1671,558)),
+    11: ("ر ra, extended", (1202,421,1350,570)), 12: ("و/م (to confirm), extended", (1128,419,1281,570)),
+    13: ("م (to confirm), extended", (1021,434,1212,569)), 14: ("ر م ra and meem, raised, joined", (807,430,1048,570)),
+    15: ("ص + ش sad with seen/shin teeth and measuring nuqtas", (405,411,819,575)),
+    16: ("و ه ة waw, ha, ta marbuta, with measuring marks", (91,398,402,569)),
+    17: ("و هـ ه waw, connected and standalone ha", (1307,661,1673,841)),
+    18: ("ى ya", (1153,683,1304,842)), 19: ("ح ha, extended", (1001,702,1168,886)),
+    20: ("ح ha (right of the pair)", (857,704,996,901)), 25: ("ح ha (left of the pair)", (705,704,857,901)),
+    21: ("ع ain", (538,680,705,907)), 22: ("ـح final ha (stroke numbers, dotted guide)", (378,673,536,899)),
+    23: ("ـح final ha (stroke numbers, dotted guide)", (226,664,378,896)),
+    24: ("final form, to name (stroke numbers 1-4)", (74,693,219,860)),
+  }, "splits": {}},
 }
 
 def clean_sheet(path, dot):

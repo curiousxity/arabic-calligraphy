@@ -127,6 +127,41 @@ isolated heh), "حرف الحاء مرسل وملفوف" (ha, extended and wrapp
 "حرف الحاء النهائي" (final ha). Very few measurement dots on this sheet.
 Second scan: `thuluth-3b.webp` (sent 2026-10-16).
 
+
+Mapped and traced 2026-10-17. Same pen as sheets 1 and 2 (15 to 16 px
+across the stroke), so the same scale: the alif comes out 487 units tall.
+Numbers follow `sheet3-numbered.png`: cluster 1 is part of a heading and
+is skipped; cluster 4 is the kaf's small sign, traced with 3; cluster 20
+held two separate ha forms, traced as 20 (right) and 25 (left). Several
+pieces are joined letter groups, kept whole for now. Names are provisional
+readings for the user to confirm in the end-of-tracing sweep.
+
+| # | provisional name | status |
+|---|---|---|
+| 2 | ا alif | traced 2026-10-17; clean |
+| 3 | ك kaf, upright, with its small kaf sign (cluster 4 on the map) | traced 2026-10-17; clean |
+| 5 | ل lam | traced 2026-10-17; clean |
+| 6 | لا two lam-alif forms, overlapping (one joined shape) | traced 2026-10-17; clean; may need splitting into two pieces |
+| 7 | ط ta | traced 2026-10-17; clean |
+| 8 | س seen, extended, with a start on the right. Stroke numbers: 1 at the upper right hook (arrow up), 2 along the upper stroke (arrow left), 3 at the start of the bowl (arrow down), 4 along the bottom of the bowl (arrow left) | traced 2026-10-17; clean (numbers erased) |
+| 9 | و + ك waw and long kaf, joined. Stroke numbers: 1 inside the waw head (arrow left), 2 over the head (arrow right), 3 along the waw tail (arrow left) | traced 2026-10-17; clean (numbers erased) |
+| 10 | ر و د ra, waw, dal, joined (wrapped forms) | traced 2026-10-17; clean |
+| 11 | ر ra, extended | traced 2026-10-17; clean |
+| 12 | و waw, extended | traced 2026-10-17; clean |
+| 13 | م meem, extended | traced 2026-10-17; clean |
+| 14 | ر م ra and meem, raised, joined | traced 2026-10-17; clean |
+| 15 | ص + ش/س sad with teeth, measuring nuqtas | traced 2026-10-17; **needs cleanup**: guide lines and measuring nuqtas at the teeth |
+| 16 | و ه ة waw, ha, ta marbuta | traced 2026-10-17; **needs cleanup**: measuring marks and guide lines on the ha |
+| 17 | و هـ ه waw, connected and standalone ha | traced 2026-10-17; clean |
+| 18 | ى ya | traced 2026-10-17; clean |
+| 19 | ح ha, extended | traced 2026-10-17; clean |
+| 20 | ح ha (right of the pair in cluster 20) | traced 2026-10-17; clean |
+| 25 | ح ha (left of the pair in cluster 20) | traced 2026-10-17; clean |
+| 21 | ع ain | traced 2026-10-17; clean |
+| 22 | ـح final ha. Stroke numbers: 1 at the top right, beside a dotted guide, 2 on the head (arrow down-left) | traced 2026-10-17; clean (numbers and dotted guide erased) |
+| 23 | ـح final ha. Stroke numbers: 1 at a dotted curve at the top right, 2 on the head (arrow left) | traced 2026-10-17; clean (numbers and dotted guide erased) |
+| 24 | final form, to name. Stroke numbers: 1 beside the upright (arrow up), 2 at its top (arrow down), 3 along the base (arrow left), 4 at the left end (arrow up) | traced 2026-10-17; clean (numbers erased) |
+
 ## Sheet t4 — `thuluth-4.webp` (the alif)
 
 Received 2026-10-16, saved only. "حرف الألف": the plain standalone alif in
@@ -942,6 +977,11 @@ from that file, not the scan, and the file is never overwritten. To start a
 piece over, delete its file and re-run `tracePieces.py`.
 
 ## Waiting on something
+
+The user wants to go through all the tracings first, then do **one
+cleanup sweep at the end** (2026-10-17): the hand touch-ups, borrowed
+tails, the English names in the library, and the sheet-3 names.
+
 
 - **For the user to touch up by hand later**: t1 3 (kaf: barb and tail tip
   to match the alif's barb and the other tails), t2 1 (standalone ha).
