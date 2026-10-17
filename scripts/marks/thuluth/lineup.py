@@ -20,7 +20,7 @@ def polys(d):
         else: out.append(cur); cur = []
     return out
 GAP, BASE = 60, 700   # every piece's bottom on one line (the meem's tail hangs below the others in real writing)
-W = sum(int(w) for _, _, w, _, _ in items) + GAP * (len(items) + 1) + 160; H = BASE + 120
+W = sum(max(int(w), 240) for _, _, w, _, _ in items) + GAP * (len(items) + 1) + 160; H = BASE + 120
 page = Image.new("L", (W, H), 255); x = GAP
 font = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 22)
 dr = ImageDraw.Draw(page)
@@ -32,6 +32,6 @@ for mid, name, w, h, d in items:
         m = Image.fromarray(__import__("numpy").logical_xor(__import__("numpy").array(m), __import__("numpy").array(layer)))
     page.paste(0, mask=m)
     dr.text((x, BASE + 20), f"{name.split(' (')[0]}  {h} tall", fill=0, font=font)
-    x += w + GAP
+    x += max(w, 240) + GAP
 dr.line([(0, BASE - 500), (W, BASE - 500)], fill=170); dr.text((4, BASE - 530), "alif height (500)", fill=120, font=font)
 page.save(sys.argv[1])

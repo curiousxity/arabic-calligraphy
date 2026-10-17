@@ -31,7 +31,11 @@ SHEETS = {
     25: ("ل", (1294,750,1420,944)), 26: ("د dal, the clean shape (11 and 27 are its construction)", (1146,808,1244,932)), 27: ("د dal, construction (measuring nuqtas; 26 is the clean shape)", (980,806,1110,932)),
     28: ("و waw tail (body without the head), measuring nuqtas", (866,818,990,930)), 29: ("ر ra body, a different form from 7 (measuring nuqtas)", (694,828,830,936)), 30: ("ن nun, the clean shape (6 is its construction)", (516,818,654,930)),
     31: ("ى/ي ya, three forms", (38,762,482,938)),
-  }, "splits": {}},
+  }, "splits": {},
+  # Per piece, source-px boxes (x0, y0, x1, y1) erased from that piece only:
+  # leftovers the cleaner can't tell from ink. 3: the end of a guide line
+  # touching the right side of the kaf's barb (the user, 2026-10-17).
+  "erase": {3: [(1444, 205, 1450, 221)]}},
   "t2": {"file": "../thuluth-2.webp", "dot": 15, "units": {
     1: ("ح standalone", (1305,95,1458,258)), 2: ("ح ج خ shared stroke", (1168,100,1300,258)),
     3: ("ك zinadi, standalone", (855,95,1122,245)), 4: ("ب long, standalone and final", (533,175,842,252)),
@@ -71,7 +75,14 @@ def clean_sheet(path, dot):
         elif max(w, h) < 2.2 * dot and a < 2.2 * dot * dot: clean[comp] = 0      # every loose dot
     return im, clean
 
-def assign(clean, units, splits):
+def assign(clean, units, splits, erase=None):
+    sel = _assign(clean, units, splits)
+    for k, boxes in (erase or {}).items():
+        if k in sel:
+            for x0, y0, x1, y1 in boxes: sel[k][y0:y1, x0:x1] = False
+    return sel
+
+def _assign(clean, units, splits):
     n, lab, st, _ = cv2.connectedComponentsWithStats(clean, 8)
     sel = {k: np.zeros_like(clean, bool) for k in units}
     for i in range(1, n):
@@ -89,15 +100,25 @@ def assign(clean, units, splits):
         if best is not None and bestc > 0.5 * len(xs): sel[best] |= comp
     return sel
 
-def trace(sel, unit=3.0, S=8):
+def trace(sel, unit=3.0, S=8, blur=0.35, alphamax=1.1, opttolerance=0.4, gray=None):
     """Potrace one piece; returns {d, w, h} in library units centred on the ink,
-    plus the sampled contours (for the review drawing)."""
+    plus the sampled contours (for the review drawing). `blur` is the smoothing
+    before tracing, in source px; more of it irons out the scan's ragged edge.
+    With `gray` (the scan, 0-255) the piece's own grey edge shading is traced
+    instead of its black-and-white mask, which places each edge to a fraction
+    of a pixel: inside one pixel of the piece the scan is used, white elsewhere."""
     ys, xs = np.nonzero(sel)
     x0, x1, y0, y1 = xs.min() - 3, xs.max() + 4, ys.min() - 3, ys.max() + 4
-    g = np.where(sel[y0:y1, x0:x1], 0, 255).astype(np.float32)
-    big = cv2.GaussianBlur(cv2.resize(g, None, fx=S, fy=S, interpolation=cv2.INTER_CUBIC), (0, 0), S * 0.35)
+    if gray is None:
+        g = np.where(sel[y0:y1, x0:x1], 0, 255).astype(np.float32)
+    else:
+        near = cv2.dilate(sel[y0:y1, x0:x1].astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+        g = np.where(near, gray[y0:y1, x0:x1], 255).astype(np.float32)
+        # the scan's ink is dark grey, not black: stretch so its threshold sits at 128
+        g = np.clip((g - 0) * (128 / 140), 0, 255)
+    big = cv2.GaussianBlur(cv2.resize(g, None, fx=S, fy=S, interpolation=cv2.INTER_CUBIC), (0, 0), S * blur)
     bw = cv2.morphologyEx((big < 128).astype(np.uint8), cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (S + 1, S + 1))) > 0
-    pl = potrace.Bitmap(~bw).trace(turdsize=S * S * 4, alphamax=1.1, opticurve=True, opttolerance=0.4)
+    pl = potrace.Bitmap(~bw).trace(turdsize=S * S * 4, alphamax=alphamax, opticurve=True, opttolerance=opttolerance)
     contours = []
     for curve in pl:
         a = curve.start_point; pts = [(a.x, a.y)]
@@ -123,20 +144,22 @@ def trace(sel, unit=3.0, S=8):
     w = (max(q[0] for q in allp) - min(q[0] for q in allp)) * f; h = (max(q[1] for q in allp) - min(q[1] for q in allp)) * f
     return {"d": "".join(d), "w": round(w), "h": round(h)}, contours, (x0, y0, S)
 
-def draw_traced(contours, size, S):
-    """The traced outline, filled even-odd, at source scale."""
-    acc = np.zeros((size[1] * 2, size[0] * 2), np.uint8)
+def draw_traced(contours, size, S, scale=1):
+    """The traced outline, filled even-odd, at `scale` times source size.
+    Drawn 4x larger and shrunk, so its edges are smooth like the app's."""
+    k = 4 * scale
+    acc = np.zeros((size[1] * k, size[0] * k), np.uint8)
     for c in contours:
         m = np.zeros_like(acc)
-        cv2.fillPoly(m, [np.array([(x * 2 / S, y * 2 / S) for x, y in c], np.int32)], 1)
+        cv2.fillPoly(m, [np.array([(x * k / S * 16, y * k / S * 16) for x, y in c], np.int32)], 1, lineType=cv2.LINE_8, shift=4)
         acc ^= m
-    return Image.fromarray(np.where(acc > 0, 0, 255).astype(np.uint8)).resize(size, Image.LANCZOS)
+    return Image.fromarray(np.where(acc > 0, 0, 255).astype(np.uint8)).resize((size[0] * scale, size[1] * scale), Image.LANCZOS)
 
 def main(sheet, out_dir):
     cfg = SHEETS[sheet]
     src = os.path.join(HERE, cfg["file"])
     im, clean = clean_sheet(src, cfg["dot"])
-    sel = assign(clean, cfg["units"], cfg["splits"])
+    sel = assign(clean, cfg["units"], cfg["splits"], cfg.get("erase"))
     color = Image.open(src).convert("RGB")
     font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 18)
     traced, tiles = {}, []

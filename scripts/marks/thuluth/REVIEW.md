@@ -44,8 +44,8 @@ dotless).
 | # | name | status |
 |---|---|---|
 | 1 | ا alif (measuring nuqtas) | named |
-| 2 | ا alif, smaller | traced 2026-10-17, clean; **awaiting approval** |
-| 3 | ك | traced 2026-10-17, clean; **awaiting approval** |
+| 2 | ا alif, smaller | traced 2026-10-17, clean; **approved, in the library** |
+| 3 | ك | traced 2026-10-17; **not approved yet** (the user): the barb has extra pixels and should match the alif's barb; the tail tip has the same problem (a stroke number touches it) and should match the other letters' tails. A guide-line end on the barb is erased in `review.py` (`erase`); the rest is for a hand touch-up |
 | 4 | ل lam (measuring nuqtas) — not لن | named (corrected) |
 | 5 | لا | traced 2026-10-17; **needs cleanup**: measuring nuqtas, stroke numbers, arrows |
 | 6 | ن nun — construction of 30 (measuring nuqtas) | named (corrected) |
@@ -57,7 +57,7 @@ dotless).
 | 12 | ه ha — the **construction drawing** of 23: stroke numbers, measuring nuqtas and a **half nuqta**. Not a piece to trace; use it for proportions and to record the stroke order | named (corrected) |
 | 13 | ى (alif maqsura / ya) | traced 2026-10-17; **needs cleanup**: a construction line through the bowl |
 | 14 | لا, large — same form as 9 | traced 2026-10-17; **needs cleanup**: tick marks along the alif and bits of guide line at the join |
-| 15 | لا, small — same form as 10, not ه. Tell it by the **alif's hat stroke** (the head at the top of the alif), which a ه never has | traced 2026-10-17, clean; **awaiting approval** |
+| 15 | لا, small — same form as 10, not ه. Tell it by the **alif's hat stroke** (the head at the top of the alif), which a ه never has | traced 2026-10-17, clean; **approved, in the library** |
 | 16 | صـ | traced 2026-10-17; **needs cleanup**: a guide line inside the counter, bits along the tail |
 | 17 | ط / ظ ta/za — construction of 19 (measuring nuqtas) | named (corrected) |
 | 18 | ض | traced 2026-10-17; **needs cleanup**: a guide line inside the counter, the dot |
@@ -68,11 +68,11 @@ dotless).
 | 23 | ه ha — **the actual shape** (the user, 2026-10-16): trace this one; 12 is its construction | traced; **approved, in the library** |
 | 24 | ك — with a **small handwritten note** beside it to remove | traced 2026-10-17; **needs cleanup**: the written note (left over above the small kaf) |
 | 25 | ل lam — clean | traced; **approved, in the library** |
-| 26 | د dal — the clean shape (11 and 27 are its construction). Stroke numbers on the sheet, read before erasing: 1 at the head (top), 2 beside the upper stroke with an arrow down along it, 3 under the base with an arrow along it | traced 2026-10-17, clean (numbers erased); **awaiting approval** |
+| 26 | د dal — the clean shape (11 and 27 are its construction). Stroke numbers on the sheet, read before erasing: 1 at the head (top), 2 beside the upper stroke with an arrow down along it, 3 under the base with an arrow along it | traced 2026-10-17, clean (numbers erased); **approved, in the library** |
 | 27 | د dal — construction of 26 (measuring nuqtas) | named (corrected) |
 | 28 | و **waw tail** (the body without the head), measuring nuqtas — not a nun (corrected 2026-10-17) | named (corrected) |
 | 29 | ر ra body (measuring nuqtas) — **a different form from 7**, not its construction | named (corrected) |
-| 30 | ن nun — the clean shape (6 is its construction) | traced 2026-10-17, clean; **awaiting approval** |
+| 30 | ن nun — the clean shape (6 is its construction) | traced 2026-10-17, clean; **approved, in the library** |
 | 31 | ى / ي ya — **three forms** in one drawing, not بني | named (corrected); needs separating into three pieces |
 
 ## Sheet t2 — `thuluth-2.webp` (1623×876)
@@ -921,6 +921,25 @@ ha, so it was used for `outline-01`, and turned out too small (see above):
 a joined form carries a hat the standalone form lacks, so match like with
 like.
 
+## Smoother tracing (2026-10-17)
+
+The user found the traced letters pixelated. Two causes, both fixed: the
+review pictures were drawn without edge smoothing (now drawn 4x and shrunk),
+and the tracer saw only a black-and-white copy of each piece, so its curves
+followed the scan's pixel steps. `tracePieces.py` now traces the scan's own
+grey edge shading (`gray=` in `review.trace`), lightly smoothed (blur 0.5 px,
+alphamax 1.2, opttolerance 0.8). Paths are about half as long as before.
+Every sheet-1 trace, approved ones included, was redone this way.
+
+## Hand touch-ups (`touchup/`)
+
+The user's suggestion (2026-10-17): erase leftovers by hand instead of in
+code. Each traced piece is saved, cleaned and enlarged 4x, as
+`touchup/<sheet>-<n>.png`. The user opens it in any paint program, paints
+white to erase and black to add, and saves. From then on the piece is traced
+from that file, not the scan, and the file is never overwritten. To start a
+piece over, delete its file and re-run `tracePieces.py`.
+
 ## In the app's mark library
 
 Approved pieces go into the *Thuluth* group of the mark library.
@@ -933,6 +952,10 @@ else on a sheet is added.
 | t1 23 | Ha (ه) | `thuluth-t1-23` | 2026-10-17 |
 | t1 25 | Lam (ل) | `thuluth-t1-25` | 2026-10-17 |
 | t1 19 | Ta (ط) | `thuluth-t1-19` | 2026-10-17 |
+| t1 2 | Small alif (ا) | `thuluth-t1-2` | 2026-10-17 |
+| t1 15 | Small lam-alif (لا) | `thuluth-t1-15` | 2026-10-17 |
+| t1 26 | Dal (د) | `thuluth-t1-26` | 2026-10-17 |
+| t1 30 | Nun (ن) | `thuluth-t1-30` | 2026-10-17 |
 | outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1
