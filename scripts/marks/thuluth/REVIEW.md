@@ -527,6 +527,37 @@ this sheet; they are left for hand touch-up.
   raised letter such as kaf or lam (لا يجوز استعمال الحاء المفتوح إذا وقعت قبل
   أحد الحروف المرتفعة مثل الكاف واللام).
 
+
+Mapped and traced 2026-10-17 as `t9r1`–`t9r3` (`sheet9-rowN-numbered.png`).
+Row 1 pen 16 px; rows 2 and 3 are scanned larger (17.2 and 17.6 px) and
+carry their own unit. Notes, transcribed: row 1 headings جيمات اولية
+(initial jeems, 2–4) and جيمات وسطية (medial jeems, 5–6). Row 2 heading
+حرف الحاء; over **5 (حم)** "كل حرف حاء تظهر بعده مد يكون طولها ست نقاط"
+(every ha followed by an extension is six nuqtas long); over **2 (حسا)**
+"والحاء هنا ليس بعدها مد بل حرف منخفض فيكون طولها ست نقاط" (here no
+extension follows, but a low letter, and the ha is still six nuqtas); over
+**6 (حمل)** "هذه القاعدة خاصة بكلمة الرحمن بقلم المحقق فيكون طول الحاء ست
+نقاط وكذلك طول النون" (this rule is special to the word الرحمن in the
+Muhaqqaq pen: the ha is six nuqtas, and so is the nun). Row 3, under the
+row: "لا يجوز استعمال الحاء المفتوح اذا وقعت قبل احد الحروف المرتفعة مثل
+الكاف واللام" (the open ha may not be used before a raised letter such as
+kaf or lam).
+
+| piece | provisional name | status |
+|---|---|---|
+| r1 2 | جـ initial jeem, head angle 1 | traced, clean |
+| r1 3, 4 | جـ initial jeem, head angles 2 and 3 | traced; **needs cleanup**: measuring nuqtas inside, guide lines |
+| r1 5, 6 | ـجـ medial jeem, two forms | traced; **needs cleanup**: guide lines, nuqtas |
+| r1 7 | جـ over ح stacked, measuring grid | traced; **needs cleanup**: grid lines and nuqtas |
+| r2 5 | حم ha before an extension | traced, clean |
+| r2 2 | حسا ha before a low letter | traced, clean |
+| r2 6 | حمل the الرحمن rule | traced, clean |
+| r2 7 | حم second | traced, clean |
+| r3 1 | لحم لحم two words | traced, clean |
+| r3 2 | حم | traced, clean |
+| r3 3 | حكم | traced, clean |
+| r3 4 | حمر حر the open ha, two words | traced, clean |
+
 ## Sheet t10 — the seen (row images)
 
 - Row 1, `thuluth-10-row1.png` (2026-10-16): "حرف السين" — س standalone

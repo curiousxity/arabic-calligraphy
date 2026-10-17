@@ -187,6 +187,25 @@ SHEETS = {
   "t8r3": {"file": "../thuluth-8-row3.png", "dot": 16, "units": {
     1: ("one word: a run of joined behs ending in ة (to name)", (5,9,407,140)),
   }, "splits": {}, "erase": {1: ["main"]}},
+  # Sheet 9, the jeem family, three rows (mapped 2026-10-17). Rows 2 and 3
+  # are scanned larger (pen 17.2 and 17.6 px), so each has its own unit.
+  "t9r1": {"file": "../thuluth-9-row1.png", "dot": 16, "units": {
+    2: ("جـ initial jeem, head angle 1 (measuring nuqtas)", (928,160,1076,254)),
+    3: ("جـ initial jeem, head angle 2", (751,143,902,257)), 4: ("جـ initial jeem, head angle 3", (588,144,734,247)),
+    5: ("ـجـ medial jeem, form 1", (406,134,581,255)), 6: ("ـجـ medial jeem, form 2", (228,132,385,257)),
+    7: ("جـ over ح stacked, with its measuring grid", (18,33,215,353)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (2, 3, 4, 5, 6, 7)}},
+  "t9r2": {"file": "../thuluth-9-row2.png", "dot": 17, "unit": 48 / 17.2, "units": {
+    5: ("حم ha followed by an extension: six nuqtas", (1043,135,1506,311)),
+    2: ("حسا ha followed by a low letter: still six nuqtas", (688,18,1147,248)),
+    6: ("حمل the rule for الرحمن in Muhaqqaq: ha and nun six nuqtas", (308,12,698,328)),
+    7: ("حم ha with meem, second", (4,124,308,315)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (5, 2, 6, 7)}},
+  "t9r3": {"file": "../thuluth-9-row3.webp", "dot": 18, "unit": 48 / 17.6, "units": {
+    1: ("لحم لحم ha joined after and before, two words", (1067,66,1563,425)),
+    2: ("حم ha with meem", (736,209,1039,397)), 3: ("حكم ha before kaf and meem", (504,75,849,388)),
+    4: ("حمر حر the open ha (حاء مفتوح), two words", (29,187,570,373)),
+  }, "splits": {}},
 }
 
 def clean_sheet(path, dot):
