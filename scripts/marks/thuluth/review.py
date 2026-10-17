@@ -33,8 +33,9 @@ SHEETS = {
     31: ("ى/ي ya, three forms", (38,762,482,938)),
   }, "splits": {},
   # Per piece, what to erase from that piece only (leftovers the cleaner
-  # can't tell from ink): a source-px box (x0, y0, x1, y1), or a point (x, y)
-  # that removes the whole separate bit it lands on. 3: the end of a guide line
+  # can't tell from ink): a source-px box (x0, y0, x1, y1), a point (x, y)
+  # that removes the whole separate bit it lands on, or "main", which keeps
+  # only the piece's largest separate shape. 3: the end of a guide line
   # touching the right side of the kaf's barb (the user, 2026-10-17).
   "erase": {3: [(1444, 205, 1450, 221)]}},
   "t2": {"file": "../thuluth-2.webp", "dot": 15, "units": {
@@ -124,6 +125,26 @@ SHEETS = {
   }, "splits": {},
   # a word of the label beside each of 21 and 22
   "erase": {21: [(833,741)], 22: [(589,771)]}},
+  # Sheet 6, lam and lam-alif (mapped 2026-10-17; sheet6-numbered.png). Pen
+  # 14 px, so 48/14 units per px. Clusters 4-6, 9-12 and 22-25 are notes.
+  "t6": {"file": "../thuluth-6.webp", "dot": 14, "unit": 48 / 14, "units": {
+    1: ("ل lam: the alif plus the bowl of nun, qaf, sad, seen or ya", (1344,54,1487,283)),
+    2: ("لا lam-alif: alif, the end of the final mursala ha, and the crooked alif", (1012,52,1151,277)),
+    3: ("لا lam-alif starting with the crooked alif (with the zulf)", (633,52,850,248)),
+    7: ("لا lam-alif cut short for a panel composition, zulf lengthened", (295,89,480,265)),
+    8: ("لا the cut-short lam-alif, small example", (125,156,240,268)),
+    13: ("فلا forced cases, mid-line or at the end; panels of limited size", (236,290,558,514)),
+    14: ("لا braided lam-alif (ذات الظفيرة), Baghdadi", (1375,319,1514,549)),
+    15: ("لا lam-alif for forced cases and line ends", (1084,314,1197,540)),
+    16: ("لا lam-alif, second form", (744,314,868,544)),
+    17: ("سلا lam-alif used only at the end", (1349,560,1578,795)),
+    18: ("حلا lam-alif used only at the end", (1061,551,1251,791)),
+    19: ("هول standalone mursala lam at the end of lines not composed", (608,568,969,799)),
+    20: ("حل standalone mursala lam, second example", (526,546,755,773)),
+    21: ("صلى the old rule's lam, for Muhaqqaq and Thuluth not composed", (98,538,520,791)),
+  }, "splits": {},
+  # note words beside these pieces: keep only each one's main shape
+  "erase": {1: ["main"], 3: ["main"], 7: ["main"], 13: ["main"]}},
 }
 
 def clean_sheet(path, dot):
@@ -151,7 +172,10 @@ def assign(clean, units, splits, erase=None):
     for k, items in (erase or {}).items():
         if k not in sel: continue
         for it in items:
-            if len(it) == 2:   # a point: drop the separate bit of this piece that holds it
+            if it == "main":   # keep only the piece's largest separate shape
+                n, lab, st, _ = cv2.connectedComponentsWithStats(sel[k].astype(np.uint8), 8)
+                if n > 2: sel[k] = lab == 1 + int(np.argmax(st[1:, 4]))
+            elif len(it) == 2:   # a point: drop the separate bit of this piece that holds it
                 n, lab = cv2.connectedComponents(sel[k].astype(np.uint8), connectivity=8)
                 i = lab[it[1], it[0]]
                 assert i > 0, (k, it, "point is not on the piece")

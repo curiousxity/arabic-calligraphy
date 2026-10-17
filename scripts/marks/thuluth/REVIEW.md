@@ -357,6 +357,73 @@ Dotted alternate forms on this sheet (to fill and review separately):
   alternate alif head;
 - small traces near صلى (~150–195, 690–725) and above the big لا (~400, 320).
 
+
+Mapped and traced 2026-10-17 (`sheet6-numbered.png`, made by the new
+`mapSheet.py`). The pen measures **14 px** on this scan, so the sheet uses
+48/14 = 3.43 units per px. **Scale to check in review**: at that scale the
+lam is 712 units tall against 577 for sheet 1's lam, about a fifth taller.
+Either the letters really are drawn larger for the pen here, or the scan's
+blur makes the pen read thin. Note words beside 1, 3, 7 and 13 are dropped
+with the new `"main"` erase (keep only the largest shape). The dotted
+alternates are thin and are cleaned away; they are listed above.
+
+### Sheet 6's notes, transcribed (2026-10-17)
+
+- **Piece 1**, heading اللام واللام الالف: "يتكون من الالف وحوض النون او
+  حوض القاف او الصاد او السين او الياء": the lam is the alif plus the bowl
+  of nun, or of qaf, sad, seen or ya. (The dotted seen beside it shows one.)
+- **Piece 2**, اللام الالف: "يتكون من حرف الالف ومن نهاية حرف الهاء النهائية
+  المرسلة والالف المعوج ومنه يخرج الالف الثانية": made of the alif, the end
+  of the final mursala ha, and the crooked alif, from which the second alif
+  comes.
+- **Piece 3**, اللام الالف: "يتكون في بدايته من الالف المعوج في نهايته في
+  اندفاع القلم الى اليسار بنقطتين وانخفاضه بنقطة، يرجع القلم بقوس منحن.
+  ويرتفع عن الرأس الاول بنقطة واحدة ويكون الزلف المضاف للزينة وهذا شكله":
+  it begins with the crooked alif; at its end the pen pushes left **two
+  nuqtas** and drops **one**, then returns in a bending arc. It rises **one
+  nuqta** above the first head, and the **zulf** (the thin hairline) is
+  added for decoration; this is its shape.
+- **Pieces 7 and 8**: "في هذه الحالة عندما يكون التركيب في اللوحة يقطع
+  امتداد اكمال اللام الالف ويكون الزلف مطولاً كما في الشكل": when a panel's
+  composition calls for it, the lam-alif's extension is cut short and the
+  zulf is lengthened, as in the figure.
+- **Piece 13 (فلا)**: "هذا الشكل في الحالات الاضطرارية سواء كان في وسط
+  السطر او في نهايته ويقتصر على الالواح المقيدة الحجم": for forced cases,
+  mid-line or at the end, and only in panels of limited size.
+- **Pieces 15/16**: "هذا الشكل يكتب في الحالات الاضطرارية وفي نهاية
+  الاسطر": written in forced cases and at line ends (the arrow points to 15).
+- **Piece 14**: "اللام الالف ذات الظفيرة يكون بعقدة او عقدتين او ثلاث وهذا
+  يرجع الى طول اللام الالف ويكثر استعماله عند البغداديين": the braided
+  lam-alif has one, two or three knots depending on its length; common with
+  the Baghdadis.
+- **Pieces 17, 18**: "يجوز استعمال اللام الالف في هذه الاشكال وتكون دائماً
+  في النهاية": these lam-alif shapes may be used, always at the end.
+- **Pieces 19, 20**: "يجوز استعمال اللام المرسل الفردي في نهاية الاسطر غير
+  المركبة إلا ان ارساله يختلف عن ارسال كأس النون وتوابعه وهذا شكله الصحيح
+  الموزون": the standalone mursala lam may end a line that is not composed,
+  but its extension differs from that of the nun's cup and its kin; this is
+  its correct, balanced shape.
+- **Piece 21 (صلى)**: "هناك قاعدة قديمة بهذا الشكل للام واستعمالها في خط
+  المحقق والثلث غير المركب": an old rule gives the lam this shape, used in
+  Muhaqqaq and in Thuluth that is not composed.
+
+| # | provisional name | units tall | status |
+|---|---|---|---|
+| 1 | ل lam | 712 | traced 2026-10-17, clean |
+| 2 | لا lam-alif (alif + end of the mursala ha + crooked alif) | 701 | traced 2026-10-17, clean |
+| 3 | لا lam-alif beginning with the crooked alif | 600 | traced 2026-10-17, clean |
+| 7 | لا lam-alif cut short in a panel, zulf lengthened | 532 | traced 2026-10-17, clean |
+| 8 | لا the same, small example | 309 | traced 2026-10-17, clean |
+| 13 | فلا forced cases | 693 | traced 2026-10-17, clean |
+| 14 | لا braided (ذات الظفيرة) | 704 | traced 2026-10-17, clean |
+| 15 | لا forced cases and line ends | 703 | traced 2026-10-17, clean |
+| 16 | لا second form | 715 | traced 2026-10-17, clean |
+| 17 | سلا end-only lam-alif | 733 | traced 2026-10-17, clean |
+| 18 | حلا end-only lam-alif | 750 | traced 2026-10-17, clean |
+| 19 | هول standalone mursala lam | 722 | traced 2026-10-17, clean |
+| 20 | حل standalone mursala lam | 707 | traced 2026-10-17, clean |
+| 21 | صلى the old rule's lam | 796 | traced 2026-10-17, clean |
+
 ## Sheet t7 — the beh (three row images)
 
 Only the top row is saved so far (1617×314, same scale as the full sheets):

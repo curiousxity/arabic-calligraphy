@@ -21,6 +21,9 @@ import numpy as np, cv2
 from PIL import Image, ImageDraw, ImageFont
 SMOOTH = dict(blur=0.5, alphamax=1.2, opttolerance=0.8)
 cfg = rv.SHEETS[sheet]
+# library units per source px: 48 units per pen width (sheets 1-5: a 16 px pen
+# at 3.0), so every sheet comes out at one scale whatever its scan size
+UNIT = cfg.get("unit", 3.0)
 src = os.path.join(rv.HERE, cfg["file"])
 im, clean = rv.clean_sheet(src, cfg["dot"])
 units = {k: v for k, v in cfg["units"].items() if k in nums}
@@ -52,7 +55,7 @@ for k in nums:
         # traced from the user's hand touch-up (same crop, TOUCH times larger)
         g = np.array(Image.open(tpath).convert("L"))
         tsel = g < 140
-        data, contours, (x0, y0, S) = rv.trace(tsel, unit=3.0 / TOUCH, S=2, gray=g,
+        data, contours, (x0, y0, S) = rv.trace(tsel, unit=UNIT / TOUCH, S=2, gray=g,
                                                blur=SMOOTH["blur"] * TOUCH, alphamax=SMOOTH["alphamax"], opttolerance=SMOOTH["opttolerance"])
         # map the contours back to the scan's px for the review drawing
         S2 = S * TOUCH
@@ -62,7 +65,7 @@ for k in nums:
         near = cv2.dilate(sel[k].astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
         crop = np.where(near, im, 255)[by0:by1, bx0:bx1]
         Image.fromarray(crop).resize((crop.shape[1] * TOUCH, crop.shape[0] * TOUCH), Image.BICUBIC).save(tpath)
-        data, contours, (x0, y0, S) = rv.trace(sel[k], gray=im, **SMOOTH)
+        data, contours, (x0, y0, S) = rv.trace(sel[k], unit=UNIT, gray=im, **SMOOTH)
         S2 = S
         # contours are relative to the tracer's own crop; shift them to this one
         shifted = [[(x + (x0 - bx0) * S, y + (y0 - by0) * S) for x, y in c] for c in contours]
