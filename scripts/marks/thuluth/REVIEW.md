@@ -203,9 +203,63 @@ clean.
 | 27 | ط tah alif, Diwani-like variant | 370 | traced 2026-10-17, clean |
 | 7 | ال the two alifs usable for the lam (الر) | 830 | traced 2026-10-17, clean |
 | 8 | الحر final alif joined to the first lam | 700 | traced 2026-10-17, clean |
-| 10 | الله the alif in lafz al-jalala (dotted guide erased) | 606 | traced 2026-10-17, clean |
+| 10 | الله: either of two alifs may be used here; the dotted curve is the second (arched) alif, erased from this trace | 606 | traced 2026-10-17, clean |
 | 16 | اعلما ain joined to a final alif | 636 | traced 2026-10-17, clean |
 | 18 | يا غالباً غير مغلوب, the worked example line (traced dotless) | 888 | traced 2026-10-17, clean |
+
+### Sheet 4's notes, transcribed (2026-10-17)
+
+The user: "Read the annotations as well. They have important information."
+Every note on the sheet, with the piece it belongs to (my reading; check
+in the sweep):
+
+- **Heading**: حرف الالف (the letter alif).
+- **Pieces 1–3**, label الالف المفرد العادي: the ordinary standalone
+  alif, in three versions numbered ١ ٢ ٣. Small arrows at the feet of 2
+  and 3 point to how each one ends.
+- **Bottom right, about 1–3**: "١، ٢، ٣ الالف المفرد العادي وآخره نهاية
+  الالف الجلي ديواني": the third one ends like the Jali Diwani alif.
+  "ويكتب عند عدم ظهور النهاية في الاحرف (ويسمى بالالف الحر عند الخطاطين
+  العباسيين)": it is written when the ending does not show among the
+  letters, and Abbasid calligraphers call it **the free alif** (الالف الحر).
+  "يجوز كتابة الالف بدون رسم الرأس وهذه القاعدة بغدادية (ويسمى بالالف
+  السنادي)": the alif may be written **without its head**; this is a
+  Baghdadi rule, and that alif is called **al-alif al-sinadi**.
+- **Piece 4**: الالف المفرد المقوس المأخوذ من الديواني, the arched
+  standalone alif, taken from Diwani.
+- **Piece 5**: الالف المأخوذ من الديواني بشكله الكامل, the alif taken
+  from Diwani in its full form.
+- **Piece 10 (الله)**: "يجوز استعمال احد الالفين بحالة الضرورة في كتابة
+  لفظة الجلالة": either of the two alifs may be used, when needed, in
+  writing the word Allah. **The dotted curve is the second alif, not a
+  guide line**: it shows the arched alternative for the last upright.
+  The trace erased it; the arched form is the one in piece 4/5.
+- **Piece 7 (الر)**: "يجوز استعمال هذين الالفين للام": these two alifs
+  may be used for the lam.
+- **Piece 8**: "يجوز اتصال الالف الاخير باللام الاولى للكلمة": the last
+  alif may be joined to the first lam of the word.
+- **Piece 16 (اعلما)**: "لا يجوز اتصال حرف العين الشعبانية بحرف الالف اذا
+  كان منفصلاً لأنه يجب ان يكون رأسها واضحاً. ويجوز اتصاله بالالف النهائية
+  فقط": the **sha'baniya ain** must not be joined to an alif that stands
+  apart, because the ain's head must stay clear; it may be joined **only
+  to a final alif**.
+- **Piece 13**: الف الطاء (خاصة), the ta's own alif (special).
+  **Piece 27**: الف الطاء (خاصة) مقاربة الى الديواني, the same, close to
+  Diwani.
+- **Pieces 14, 15, 26, 11** (labelled ١ ٢ ٣ ٤) and the numbered notes at
+  the bottom: the alif's height by kind of line:
+  1. in lines not composed (single line) to the end: 5 to 6 nuqtas;
+  2. in medium composed lines: 6 to 7 nuqtas (divided among the letters
+     that take part in the composition);
+  3. in light composed lines: 7 to 8 nuqtas, and 8 to 9 nuqtas in
+     Muhaqqaq;
+  4. in heavy composed lines: 9 to 12 nuqtas.
+  "(انظر ص ٥)": see page 5.
+
+What this means for the library: the four heights are one alif drawn for
+four kinds of line, so they belong together as a set, and a composition
+should pick its alif by line type. The free alif (3) and the sinadi alif
+(no head) are named forms worth keeping by those names.
 
 ## Sheet t5 — `thuluth-5.webp` (dal and ra)
 
