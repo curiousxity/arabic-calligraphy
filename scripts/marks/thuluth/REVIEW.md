@@ -402,31 +402,35 @@ alternates are thin and are cleaned away; they are listed above.
   the Baghdadis.
 - **Pieces 17, 18**: "يجوز استعمال اللام الالف في هذه الاشكال وتكون دائماً
   في النهاية": these lam-alif shapes may be used, always at the end.
+  Two arrows, one under each of 17 and 18. The user calls 17 a forced case
+  (2026-10-17). 18 reads as a ha's head joined to a lam-alif whose lam
+  loops down into a round bowl that the slanting alif crosses: حلا.
 - **Pieces 19, 20**: "يجوز استعمال اللام المرسل الفردي في نهاية الاسطر غير
   المركبة إلا ان ارساله يختلف عن ارسال كأس النون وتوابعه وهذا شكله الصحيح
   الموزون": the standalone mursala lam may end a line that is not composed,
   but its extension differs from that of the nun's cup and its kin; this is
-  its correct, balanced shape.
+  its correct, balanced shape. Both arrows point at 19's lam: one at its
+  turn, one at the tip of its long tail, which runs under 20.
 - **Piece 21 (صلى)**: "هناك قاعدة قديمة بهذا الشكل للام واستعمالها في خط
   المحقق والثلث غير المركب": an old rule gives the lam this shape, used in
   Muhaqqaq and in Thuluth that is not composed.
 
 | # | provisional name | units tall | status |
 |---|---|---|---|
-| 1 | ل lam | 712 | traced 2026-10-17, clean |
+| 1 | ل lam | 712 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 | 2 | لا lam-alif (alif + end of the mursala ha + crooked alif) | 701 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 | 3 | لا lam-alif beginning with the crooked alif | 600 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 | 7 | لا lam-alif cut short in a panel, zulf lengthened | 532 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 | 8 | لا the same, small example | 309 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 | 13 | ـلا joined lam-alif ending a run (fa and teeth before it) | 693 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 | 14 | لا braided (ذات الظفيرة) | 704 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
-| 15 | لا forced cases and line ends | 703 | traced 2026-10-17, clean |
-| 16 | لا second form | 715 | traced 2026-10-17, clean |
-| 17 | سلا end-only lam-alif | 733 | traced 2026-10-17, clean |
-| 18 | حلا end-only lam-alif | 750 | traced 2026-10-17, clean |
+| 15 | لا forced cases and line ends | 703 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
+| 16 | لا second form | 715 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
+| 17 | سلا end-only lam-alif | 733 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
+| 18 | حلا end-only lam-alif | 750 | traced 2026-10-17, clean; **waiting**: user unsure what it is (2026-10-17), see the note above |
 | 19 | هول standalone mursala lam | 722 | traced 2026-10-17, clean |
-| 20 | حل standalone mursala lam | 707 | traced 2026-10-17, clean |
-| 21 | صلى the old rule's lam | 796 | traced 2026-10-17, clean |
+| 20 | حل standalone mursala lam | 707 | traced 2026-10-17; **not added**: user says it looks cut off (2026-10-17). The trace matches the scan; its lam's tail is short, likely so 19's long tail can pass under it |
+| 21 | صلى the old rule's lam | 796 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 
 ## Sheet t7 — the beh (three row images)
 
@@ -1473,6 +1477,11 @@ else on a sheet is added.
 | t6 8 | Lam-alif, cut short, small (لا) | `thuluth-t6-8` | 2026-10-17 |
 | t6 14 | Braided lam-alif (لا) | `thuluth-t6-14` | 2026-10-17 |
 | t6 13 | Joined lam-alif, for tight panels (ـلا) | `thuluth-t6-13` | 2026-10-17; kept whole with the fa and teeth that lead into it |
+| t6 1 | Lam, alif with a bowl (ل) | `thuluth-t6-1` | 2026-10-17 |
+| t6 15 | Lam-alif, forced cases and line ends (لا) | `thuluth-t6-15` | 2026-10-17 |
+| t6 16 | Lam-alif, forced cases, second form (لا) | `thuluth-t6-16` | 2026-10-17 |
+| t6 17 | Joined lam-alif after a seen, forced case (سلا) | `thuluth-t6-17` | 2026-10-17 |
+| t6 21 | Lam, old rule: Muhaqqaq and uncomposed Thuluth (صلى) | `thuluth-t6-21` | 2026-10-17 |
 | outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1

@@ -180,7 +180,10 @@ GROUPS = [
     ("t5","21","Ra made small inside a nun (ن ر)"),("t5","22","Ra made small after a lam (ل ر)"),
     ("t6","2","Lam-alif (لا)"),("t6","3","Lam-alif, crooked start with zulf (لا)"),
     ("t6","7","Lam-alif, cut short for panels (لا)"),("t6","8","Lam-alif, cut short, small (لا)"),
-    ("t6","14","Braided lam-alif (لا)"),("t6","13","Joined lam-alif, for tight panels (ـلا)")]),
+    ("t6","14","Braided lam-alif (لا)"),("t6","13","Joined lam-alif, for tight panels (ـلا)"),
+    ("t6","1","Lam, alif with a bowl (ل)"),("t6","15","Lam-alif, forced cases and line ends (لا)"),
+    ("t6","16","Lam-alif, forced cases, second form (لا)"),("t6","17","Joined lam-alif after a seen, forced case (سلا)"),
+    ("t6","21","Lam, old rule: Muhaqqaq and uncomposed Thuluth (صلى)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
