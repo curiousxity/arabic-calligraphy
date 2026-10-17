@@ -263,6 +263,30 @@ SHEETS = {
   "t12r5": {"file": "../thuluth-12-row5.png", "dot": 23, "unit": 48 / 22.8, "units": {
     1: ("وجعلنا composition, second arrangement", (23,7,487,411)),
   }, "splits": {}, "erase": {1: ["main"]}},
+  # Sheet 13, fa, qaf and waw (mapped 2026-10-17, parts mode). Pieces keep
+  # the sheet's own numbers 1-12 (the ledger lists them).
+  "t13r1": {"file": "../thuluth-13-row1.webp", "dot": 18, "unit": 48 / 18.4, "units": {
+    1: ("ف gathered fa, from ba", (1726,164,1915,286)), 2: ("ق gathered qaf", (1461,154,1629,293)),
+    3: ("و extended waw, from extended ra", (1174,141,1346,298)), 4: ("ف extended fa", (681,143,1097,275)),
+    5: ("ق extended qaf, from extended nun", (164,133,644,282)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4, 5)}},
+  "t13r2": {"file": "../thuluth-13-row2.webp", "dot": 20, "unit": 48 / 20, "units": {
+    6: ("و gathered waw, from gathered ra and dal", (1783,159,1962,323)),
+    13: ("و gathered waw, second (beside the ٦)", (1601,157,1739,294)),
+    7: ("و waw (dotted alternate: the extended 4-nuqta waw, inside a nun or seen cup)", (1311,143,1461,290)),
+    8: ("و waw of 7 nuqtas: Muhaqqaq, not for Thuluth", (948,150,1145,322)),
+    9: ("و waw, head open on the left", (821,149,907,267)),
+    10: ("و waw, head open on the right", (482,157,644,301)),
+    11: ("مو the letter before joins the waw's head from the left", (117,145,386,307)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (6, 13, 7, 8, 9, 10, 11)}},
+  "t13r3": {"file": "../thuluth-13-row3.png", "dot": 20, "unit": 48 / 20, "units": {
+    12: ("the fa head between letters, one long run", (0,0,99999,99999)),
+  }, "splits": {}, "erase": {12: ["main"]}},
+  "t13r4": {"file": "../thuluth-13-row4.png", "dot": 22, "unit": 48 / 21.6, "units": {
+    1: ("وففـ fa start, middle, end: before tall letters (measuring marks)", (813,113,1204,286)),
+    2: ("فح fa head stacked on ha", (714,41,912,346)),
+    3: ("و فبو extended joined fa with final waw: before low letters", (83,90,673,321)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3)}},
   "t10r4": {"file": "../thuluth-10-row4.png", "dot": 14, "unit": 48 / 14.4, "units": {
     1: ("medial seen in an النسيم-like word (measuring grid)", (178,26,438,218)),
     2: ("initial, medial and final seen, stacked run (stroke numbers, measuring nuqtas)", (10,280,528,500)),

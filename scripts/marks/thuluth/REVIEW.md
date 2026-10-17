@@ -745,6 +745,25 @@ composition, putting each letter in its place).
     Guide lines and a measurement dot.
   The tall/low rule is a placement rule worth keeping with the pieces.
 
+
+Mapped and traced 2026-10-17 as `t13r1`–`t13r4` (parts mode). Pens 18.4,
+20, 20 and 21.6 px; each row has its own unit. Pieces keep the sheet's own
+numbers (1–12, above); row 2 holds two gathered waws beside the ٦, traced
+as 6 and 13. Row 4's pieces are numbered 1–3 within the row.
+
+| piece | status |
+|---|---|
+| r1 1–5 (fa, qaf, waw, fa, qaf) | traced, clean (5's small mark dropped) |
+| r2 6, 13 (gathered waw) | traced, clean |
+| r2 7 (waw; its dotted alternate cleaned away) | traced, clean |
+| r2 8 (Muhaqqaq waw: **keep out of Thuluth**) | traced, clean |
+| r2 9, 10 (head open left, right) | traced, clean |
+| r2 11 (مو) | traced, clean |
+| r3 12 (fa head between letters, long run) | traced, clean |
+| r4 1 (وففـ before tall letters) | traced; **needs cleanup**: measuring marks, guide lines, an arrow |
+| r4 2 (فح) | traced, clean |
+| r4 3 (و فبو before low letters) | traced; **needs cleanup**: guide lines |
+
 ## Sheet t14 — kaf and its kinds (row images)
 
 - Row 1, `thuluth-14-row1.webp` (2026-10-16): "الكاف وانواعه", five numbered
