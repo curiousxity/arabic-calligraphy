@@ -82,6 +82,27 @@ SHEETS = {
     23: ("ـح final ha (stroke numbers, dotted guide)", (226,664,378,896)),
     24: ("ـد ending dal (the user, 2026-10-17; stroke numbers 1-4)", (74,693,219,860)),
   }, "splits": {}},
+  # Sheet 4, the alif (mapped 2026-10-17; sheet4-numbered.png). Numbers follow
+  # the cluster map; written notes (6, 9, 12, 20-25) are skipped. The map
+  # merged الله with the height-3 alif (now 10 and 26) and the worked line
+  # with the second tah-alif (now 18 and 27). Names are provisional.
+  "t4": {"file": "../thuluth-4.webp", "dot": 16, "units": {
+    1: ("ا alif, standalone, length 1", (1566,99,1612,292)), 2: ("ا alif, standalone, length 2", (1480,97,1529,295)),
+    3: ("ا alif, standalone, length 3", (1379,102,1434,314)), 4: ("ا arched alif, from Diwani", (1235,108,1336,308)),
+    5: ("ا arched alif, full Diwani form", (1075,110,1190,309)), 7: ("ال the two alifs usable for the lam (الر)", (440,38,679,337)),
+    8: ("الحر final alif joined to the first lam", (72,72,355,328)), 10: ("الله the alif in lafz al-jalala (dotted guide)", (767,112,990,335)),
+    11: ("ا alif height 4 (heavy composed line)", (765,287,830,548)), 26: ("ا alif height 3 (light composed line)", (880,336,965,548)),
+    15: ("ا alif height 2 (medium composed line)", (1009,337,1063,554)), 14: ("ا alif height 1 (single line)", (1111,351,1162,557)),
+    13: ("ط tah alif (ألف الطاء)", (1459,387,1620,557)), 27: ("ط tah alif, Diwani-like variant", (1268,413,1410,562)),
+    16: ("اعلما ain joined to a final alif (notes written inside)", (161,335,649,570)),
+    18: ("يا غالباً غير مغلوب, the worked example line", (286,560,1500,872)),
+  }, "splits": {},
+  # Bits of the written notes left beside the letters, and on 18 the paired
+  # dots under both ya letters and a small mark above the line (letters are
+  # traced dotless). Each point removes the separate bit it lands on.
+  "erase": {7: [(487,114), (465,150)], 8: [(131,184)], 10: [(856,121), (850,156)],
+            16: [(357,406), (345,366), (369,361), (482,472), (493,439)],
+            18: [(940,836), (1471,847), (1502,587)]}},
 }
 
 def clean_sheet(path, dot):

@@ -177,6 +177,36 @@ by line type: (1) single-line 5–6, (2) medium composed 6–7, (3) light
 composed 7–8 (8–9 in Muhaqqaq), (4) heavy composed 9–12. Almost no
 measurement dots — mostly clean strokes and Arabic notes.
 
+
+Mapped and traced 2026-10-17 (`sheet4-numbered.png`). Same scale as
+sheets 1–3. Map clusters 6, 9, 12 and 20–25 are written notes and are
+skipped; the map merged الله with the height-3 alif (now 10 and 26) and the
+worked line with the second tah-alif (now 18 and 27). Bits of the notes
+next to pieces 7, 8, 10 and 16, and the ya dots and a small mark on 18, are
+erased by point (`erase` in `review.py`). The small digits under the alifs
+label lengths and heights, not stroke order. The alif heights grow from 550
+to 718 units, as the notes' nuqta counts say they should. All 16 pieces are
+clean.
+
+| # | provisional name | units tall | status |
+|---|---|---|---|
+| 1 | ا alif, standalone, length 1 | 511 | traced 2026-10-17, clean |
+| 2 | ا alif, standalone, length 2 | 527 | traced 2026-10-17, clean |
+| 3 | ا alif, standalone, length 3 | 569 | traced 2026-10-17, clean |
+| 14 | ا alif height 1 (single line, 5–6 nuqtas) | 550 | traced 2026-10-17, clean |
+| 15 | ا alif height 2 (medium composed, 6–7) | 586 | traced 2026-10-17, clean |
+| 26 | ا alif height 3 (light composed, 7–8) | 619 | traced 2026-10-17, clean |
+| 11 | ا alif height 4 (heavy composed, 9–12) | 718 | traced 2026-10-17, clean |
+| 4 | ا arched alif, from Diwani | 534 | traced 2026-10-17, clean |
+| 5 | ا arched alif, full Diwani form | 529 | traced 2026-10-17, clean |
+| 13 | ط tah alif (ألف الطاء) | 442 | traced 2026-10-17, clean |
+| 27 | ط tah alif, Diwani-like variant | 370 | traced 2026-10-17, clean |
+| 7 | ال the two alifs usable for the lam (الر) | 830 | traced 2026-10-17, clean |
+| 8 | الحر final alif joined to the first lam | 700 | traced 2026-10-17, clean |
+| 10 | الله the alif in lafz al-jalala (dotted guide erased) | 606 | traced 2026-10-17, clean |
+| 16 | اعلما ain joined to a final alif | 636 | traced 2026-10-17, clean |
+| 18 | يا غالباً غير مغلوب, the worked example line (traced dotless) | 888 | traced 2026-10-17, clean |
+
 ## Sheet t5 — `thuluth-5.webp` (dal and ra)
 
 Received 2026-10-16, saved only. Row 1 "احرف فردية مع احرف نهائية"
