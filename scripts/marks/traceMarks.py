@@ -149,8 +149,7 @@ GROUPS = [
     ("b","23","Small hah"),("c","30","Bold sad"),("c","31","Stacked hamza"),
   ]),
   ("thuluth", "Thuluth", [
-    ("t1","23","Ha (ه)"),("t1","25","Lam (ل)"),("t1","19","Ta (ط)"),
-    ("o","01","Joined ending meem (ـم)")]),
+    ("t1","23","Ha (ه)"),("t1","25","Lam (ل)"),("t1","19","Ta (ط)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]

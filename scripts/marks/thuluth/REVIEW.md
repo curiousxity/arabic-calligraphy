@@ -44,35 +44,35 @@ dotless).
 | # | name | status |
 |---|---|---|
 | 1 | ا alif (measuring nuqtas) | named |
-| 2 | ا alif, smaller | named |
-| 3 | ك | named |
+| 2 | ا alif, smaller | traced 2026-10-17, clean; **awaiting approval** |
+| 3 | ك | traced 2026-10-17, clean; **awaiting approval** |
 | 4 | ل lam (measuring nuqtas) — not لن | named (corrected) |
-| 5 | لا | named |
+| 5 | لا | traced 2026-10-17; **needs cleanup**: measuring nuqtas, stroke numbers, arrows |
 | 6 | ن nun — construction of 30 (measuring nuqtas) | named (corrected) |
 | 7 | ر ra — not بز | named (corrected); **drawn overlapping 8**, needs a split rule |
 | 8 | ب the body of ba — not بت | named (corrected); **drawn overlapping 7**, needs a split rule |
-| 9 | لا, large — same form as 14 | named |
-| 10 | لا, small — same form as 15 | named |
+| 9 | لا, large — same form as 14 | traced 2026-10-17; **needs cleanup**: measuring nuqtas, guide line along the top, stroke numbers |
+| 10 | لا, small — same form as 15 | traced 2026-10-17; **needs cleanup**: guide-line bits around the edge |
 | 11 | د dal — construction of 26 (measuring nuqtas) | named (corrected) |
 | 12 | ه ha — the **construction drawing** of 23: stroke numbers, measuring nuqtas and a **half nuqta**. Not a piece to trace; use it for proportions and to record the stroke order | named (corrected) |
-| 13 | ى (alif maqsura / ya) | named (corrected) |
-| 14 | لا, large — same form as 9 | named |
-| 15 | لا, small — same form as 10, not ه. Tell it by the **alif's hat stroke** (the head at the top of the alif), which a ه never has | named (corrected) |
-| 16 | صـ | named |
+| 13 | ى (alif maqsura / ya) | traced 2026-10-17; **needs cleanup**: a construction line through the bowl |
+| 14 | لا, large — same form as 9 | traced 2026-10-17; **needs cleanup**: tick marks along the alif and bits of guide line at the join |
+| 15 | لا, small — same form as 10, not ه. Tell it by the **alif's hat stroke** (the head at the top of the alif), which a ه never has | traced 2026-10-17, clean; **awaiting approval** |
+| 16 | صـ | traced 2026-10-17; **needs cleanup**: a guide line inside the counter, bits along the tail |
 | 17 | ط / ظ ta/za — construction of 19 (measuring nuqtas) | named (corrected) |
-| 18 | ض | named (guess not corrected) |
+| 18 | ض | traced 2026-10-17; **needs cleanup**: a guide line inside the counter, the dot |
 | 19 | ط ta — **the clean shape** (17 is its construction) | traced; **approved, in the library** |
 | 20 | ب / ت / ث body — **two forms drawn superimposed** on each other, not بن | named (corrected); needs separating into two pieces |
-| 21 | ج / ح / خ — the **alternate body**, not بي | named (corrected) |
-| 22 | ق | named (guess not corrected) |
+| 21 | ج / ح / خ — the **alternate body**, not بي | traced 2026-10-17; **needs cleanup**: construction lines and measuring nuqtas inside the bowl |
+| 22 | ق | traced 2026-10-17; **needs cleanup**: the dots, guide-box bits at the top, the base line |
 | 23 | ه ha — **the actual shape** (the user, 2026-10-16): trace this one; 12 is its construction | traced; **approved, in the library** |
-| 24 | ك — with a **small handwritten note** beside it to remove | named |
+| 24 | ك — with a **small handwritten note** beside it to remove | traced 2026-10-17; **needs cleanup**: the written note (left over above the small kaf) |
 | 25 | ل lam — clean | traced; **approved, in the library** |
-| 26 | د dal — the clean shape (11 and 27 are its construction) | named |
+| 26 | د dal — the clean shape (11 and 27 are its construction). Stroke numbers on the sheet, read before erasing: 1 at the head (top), 2 beside the upper stroke with an arrow down along it, 3 under the base with an arrow along it | traced 2026-10-17, clean (numbers erased); **awaiting approval** |
 | 27 | د dal — construction of 26 (measuring nuqtas) | named (corrected) |
 | 28 | و **waw tail** (the body without the head), measuring nuqtas — not a nun (corrected 2026-10-17) | named (corrected) |
 | 29 | ر ra body (measuring nuqtas) — **a different form from 7**, not its construction | named (corrected) |
-| 30 | ن nun — the clean shape (6 is its construction) | named |
+| 30 | ن nun — the clean shape (6 is its construction) | traced 2026-10-17, clean; **awaiting approval** |
 | 31 | ى / ي ya — **three forms** in one drawing, not بني | named (corrected); needs separating into three pieces |
 
 ## Sheet t2 — `thuluth-2.webp` (1623×876)
@@ -889,7 +889,12 @@ measurement marks). Traced with `traceOutline.py`; the review image and the
 traced path sit beside each source.
 
 - `outline-01.png` (2026-10-17, 652×1284): **ـم the joined ending meem**
-  (named by the user, 2026-10-17). In the library at **420 units tall**
+  (named by the user, 2026-10-17). **Taken back out of the library**
+  (the user, 2026-10-17): at 420 units it is too small, because the size
+  ignored the **hat**, the joining stroke that rises into the meem from the
+  letter before it. The standalone meem in the reference alphabet has no hat,
+  so comparing heights with it undercounts. Left out for now; the trace and
+  its notes are kept. Was in the library at **420 units tall**
   (`traceOutline.py` unit 0.354 per source px; the outline is shrunk to about
   600 px before tracing, which halves the path to 862 commands and still keeps
   the notch under the flag). How the size was chosen: the reference
@@ -912,7 +917,9 @@ First measurement (dark ink only, source px): the alif is 104 tall and the
 isolated meem 88 tall, so a meem is about 0.85 of an alif. At the library's
 alif of about 500 units, that puts a meem near 420 units tall. This is the
 **isolated** meem. The same figure comes out of the alphabet's lam, ta and
-ha, so it was used for `outline-01` (see above).
+ha, so it was used for `outline-01`, and turned out too small (see above):
+a joined form carries a hat the standalone form lacks, so match like with
+like.
 
 ## In the app's mark library
 
@@ -926,7 +933,7 @@ else on a sheet is added.
 | t1 23 | Ha (ه) | `thuluth-t1-23` | 2026-10-17 |
 | t1 25 | Lam (ل) | `thuluth-t1-25` | 2026-10-17 |
 | t1 19 | Ta (ط) | `thuluth-t1-19` | 2026-10-17 |
-| outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | 2026-10-17 (shape; size set from the reference) |
+| outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1
 pieces 19 and 25) is **part of the letter**, not a direction arrow. Keep it.
