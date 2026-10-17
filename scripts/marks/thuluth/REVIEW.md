@@ -881,3 +881,17 @@ pieces before the hard ones: t16 row 6 (low final mims), t13 rows 1–2 (fa,
 qaf, waw), t14 rows 1–3 (kafs), t15 row 1 (ba), t18 row 1 (final ya), then
 the lettered sheets with measurement dots, then t19's small signs, and the
 panels last (as targets, not sources).
+
+## Clean outlines (`outlines/`)
+
+Vector-clean pieces the user supplies directly (coloured ink on white, no
+measurement marks). Traced with `traceOutline.py`; the review image and the
+traced path sit beside each source.
+
+- `outline-01.png` (2026-10-17, 652×1284): a head with a flag-like top and a
+  long tail dropping down and left (a كـ/عـ-like start; **name to confirm**).
+  Traced exactly (1706 path commands; may be simplified before it enters the
+  library). Scale against an alif **to confirm**.
+
+Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1
+pieces 19 and 25) is **part of the letter**, not a direction arrow. Keep it.
