@@ -964,6 +964,17 @@ until named in review. Pens 22, 17.2 and 20.8 px.
   foot), then two joined from a short upright stub. Very clean, isolated
   pieces; an easy first trace.
 
+
+Traced 2026-10-17 with `autoSheet.py` (rows 1–6, `traces/t16/t16rN-review.png`,
+maps in `sheetmaps/`). Pieces are "part N" until named in review.
+- **Row 1**: part 1 (لله, the special word) and part 3 (محمد) clean; parts
+  4–9 (meem construction pieces with stroke numbers and arrows) mostly
+  clean shapes, but 7, 8 and 9 **need cleanup** (arrows, ticks).
+- **Row 2**: parts 1–7, meem joins with stroke numbers: clean shapes;
+  stroke numbers to read in review.
+- **Rows 3–6**: final and medial meems, the long محمد-style run, and small
+  meem forms: all clean except row 6 part 5 (a word with small marks, rough).
+
 ## Sheet t17 — ha (ه) (row images)
 
 - Row 1, `thuluth-17-row1.png` (2026-10-16): "هاءات اولية" (initial has):
@@ -1015,6 +1026,12 @@ until named in review. Pens 22, 17.2 and 20.8 px.
   and arrows on every piece but the first. Readings to confirm. Use it to
   check proportions; trace from the cleaner rows 1–5 where shapes repeat.
 
+
+Traced 2026-10-17 with `autoSheet.py` (rows 1–6). Ha and heh forms (هـ
+start, middle, end, the ة, long joined runs): nearly all clean. **Needs
+cleanup**: row 6 part 2 (guide lines), part 3 (a row of measuring nuqtas
+with a line, **skip**), parts 4 and 5 (measuring marks).
+
 ## Sheet t18 — final ya (row images)
 
 - Row 1, `thuluth-18-row1.webp` (2026-10-16): "الياءات النهائية وكيفية اتصالها
@@ -1023,6 +1040,11 @@ until named in review. Pens 22, 17.2 and 20.8 px.
   — the returned ya tail after each letter. Clean strokes; one small
   measurement mark and guide line under سي, and letter dots drawn on a few
   (مخي, عي). Compare with sheet t2 piece 18 and sheet t8 (ya type).
+
+
+Traced 2026-10-17 with `autoSheet.py`. Row 1, parts 1–8: ya joined after
+ب, س, ص, ط, ع, ف, م and هـ. All clean but part 2 (a guide stroke under the
+bowl, **needs cleanup**).
 
 ## Sheet t19 — practice words, and Thuluth's tashkeel and ornament signs
 
@@ -1040,6 +1062,13 @@ until named in review. Pens 22, 17.2 and 20.8 px.
   these are the small signs a Thuluth panel is filled with. Their flicks are
   hairlines, so they need the gentlest cleaning (the guide-line remover
   could eat them). Clean, no measurement dots.
+
+
+Traced 2026-10-17 with `autoSheet.py`. Row 1: part 1 (علي هم, guide line
+under it), part 2 (a long practice run with a guide line and a note above
+it), parts 3 and 4 (small signs: an ornamental knot, a double stroke), part
+5 (سلة-like with small marks). Parts 1, 2, 5 **need cleanup**; 3 and 4 are
+small signs for the marks side, clean.
 
 ## Sheet t20 — finished pieces: al-Fatiha, line by line (white on black)
 
