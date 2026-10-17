@@ -463,14 +463,16 @@ their start. Row 3: الباء مع الميم (beh with meem, piece 3).
 
 | piece | provisional name | status |
 |---|---|---|
-| r1 2 | بص بط initial beh with sad and with ta, touching | traced; nearly clean (a guide-line tick at the left) |
-| r1 4 | بغ beh with ghain | traced; **needs cleanup**: guide lines across it |
-| r1 5 | بق beh with qaf | traced; **needs cleanup**: nuqta stubs at the head |
-| r1 9 | بم beh with meem | traced; **needs cleanup**: a nuqta stub on the tip |
-| r1 10 | بر beh with ra | traced, clean |
-| r1 13 | بو beh with waw | traced, clean |
-| r1 15 | بى beh with ya | traced, clean |
-| r1 19 | three-dot beh, long joined run (to name) | traced; **needs cleanup**: guide-line bits |
+| r1 2 | بص beh joined to sad | split from 3 and cleaned 2026-10-17 (nuqta stubs off the sad); the sad's tail ends flat where it ran into the ta's stroke: **borrow a tail** in the sweep; awaiting the user's look |
+| r1 3 | بط beh joined to ta | split from 2, 2026-10-17; awaiting the user's look |
+| r1 4 | بغ beh with ghain | cleaned 2026-10-17 (guide lines, ticks; the ghain's own dot kept); awaiting the user's look |
+| r1 5 | ـق joined qaf body (the user, 2026-10-17) | cleaned 2026-10-17 (line and nuqta at the right, tick over the head, tail spur); awaiting the user's look |
+| r1 9 | ـر joined ra (the user, 2026-10-17) | cleaned 2026-10-17 (line over the tooth, tick on the join, tail spur); awaiting the user's look |
+| r1 10 | joined meem, sloping tail (provisional) | the user: fine. **In the library** 2026-10-17 |
+| r1 13 | ـو joined waw, like 5 with a waw for the qaf's body (the user) | cleaned 2026-10-17 (spur at the head); awaiting the user's look |
+| r1 15 | joined waw, straight tail (provisional) | the user: fine. **In the library** 2026-10-17 |
+| r1 19 | ـى joined ya, the right one with its bowl (three-dot beh) | split from 20 and cleaned 2026-10-17; the bowl's tip ends where it met 20's stroke; awaiting the user's look |
+| r1 20 | ـى joined ya, the left one, long | split from 19 and cleaned 2026-10-17 (guide lines along the tooth); awaiting the user's look |
 | r2 1 | بى beh with ya | traced, clean |
 | r2 2–5 | initial teeth for ب ت ث ن, four forms | traced, clean (2's dotted alternate cleaned away) |
 | r2 6 | beh body, long (to name) | traced, clean |
@@ -1417,6 +1419,14 @@ grey edge shading (`gray=` in `review.trace`), lightly smoothed (blur 0.5 px,
 alphamax 1.2, opttolerance 0.8). Paths are about half as long as before.
 Every sheet-1 trace, approved ones included, was redone this way.
 
+## Thin-line erase (2026-10-17)
+
+`erase` takes a fourth kind, `("thin", x0, y0, x1, y1, r)`: inside the box,
+whatever a disc r px across cannot fit in (a guide line, a spur) is cleared,
+and the pen strokes it runs along or crosses stay. Too large an r breaks a
+stroke at its thin neck (t7 r1 20 needed 3, not 5); follow it with "main" to
+drop what was cut loose.
+
 ## Hand touch-ups (`touchup/`)
 
 The user's suggestion (2026-10-17): erase leftovers by hand instead of in
@@ -1482,6 +1492,8 @@ else on a sheet is added.
 | t6 16 | Lam-alif, forced cases, second form (لا) | `thuluth-t6-16` | 2026-10-17 |
 | t6 17 | Joined lam-alif after a seen, forced case (سلا) | `thuluth-t6-17` | 2026-10-17 |
 | t6 21 | Lam, old rule: Muhaqqaq and uncomposed Thuluth (صلى) | `thuluth-t6-21` | 2026-10-17 |
+| t7 r1 10 | Joined meem, sloping tail (بم) | `thuluth-t7r1-10` | 2026-10-17 |
+| t7 r1 15 | Joined waw, straight tail (بو) | `thuluth-t7r1-15` | 2026-10-17 |
 | outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1

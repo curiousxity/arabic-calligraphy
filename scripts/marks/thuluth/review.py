@@ -151,12 +151,41 @@ SHEETS = {
   # beside each pair ("main" drops them); its piece numbers are shapes after
   # cleaning, right to left.
   "t7r1": {"file": "../thuluth-7-row1.webp", "dot": 16, "units": {
-    2: ("بص بط initial beh (two dots) with sad and with ta, touching", (1209,34,1560,275)),
-    4: ("بغ initial beh with ghain", (1093,97,1240,305)), 5: ("بق initial beh with qaf", (892,105,1090,258)),
-    9: ("بم initial beh with meem", (739,109,886,243)), 10: ("بر initial beh with ra", (522,99,727,273)),
-    13: ("بو initial beh with waw", (451,106,581,251)), 15: ("بى initial beh with ya", (297,99,453,264)),
-    19: ("initial beh with three dots, long joined run (to name)", (15,59,339,258)),
-  }, "splits": {}, "erase": {k: ["main"] for k in (2, 4, 5, 9, 10, 13, 15, 19)}},
+    2: ("بص initial beh (two dots) joined to sad", (1209,34,1560,275)),
+    3: ("بط initial beh (two dots) joined to ta", (1209,34,1400,275)),
+    4: ("بغ initial beh with ghain", (1093,97,1240,305)), 5: ("ـق joined qaf body", (892,105,1090,258)),
+    9: ("ـر joined ra", (739,109,886,243)), 10: ("بر initial beh with ra", (522,99,727,273)),
+    13: ("ـو joined waw (like 5, with a waw for the qaf's body)", (451,106,581,251)), 15: ("بى initial beh with ya", (297,99,453,264)),
+    19: ("ـى joined ya, the right one, with its bowl", (180,59,339,258)),
+    20: ("ـى joined ya, the left one, long", (15,59,280,200)),
+  },
+  # The user's review (2026-10-17). 2 was two joins touching: the sad's tail
+  # runs up into the ta's base stroke, so below that stroke it is the sad's
+  # (2), above it the ta's (3). 19 was two joined ya forms touching the same
+  # way: the right one (19) owns the bowl below the long stroke, the left
+  # one (20) the long stroke.
+  "splits": {
+    (1213, 38): (2, 3, lambda xs, ys: (xs >= 1400) | (ys >= 202)),
+    (19, 63): (19, 20, lambda xs, ys: (xs >= 275) | ((ys >= 186) & (xs >= 150))),
+  },
+  # Boxes and thin-line passes first, then "main" drops what they cut loose.
+  "erase": {
+    # nuqta stubs on the sad's tooth
+    2: [(1404, 183, 1422, 230), (1415, 186, 1422, 208), "main"],
+    3: [(1306, 199, 1318, 206), "main"],
+    # beh with ghain: the guide lines down the left side and across and down
+    # the right; the stray ticks beside the head
+    4: [(1094, 172, 1100, 275), (1150, 183, 1256, 195), (1196, 179, 1256, 186), (1199, 186, 1213, 242),
+        ("thin", 1110, 180, 1150, 200, 4), (1100, 120, 1111, 129), (1178, 118, 1192, 132), "main"],
+    # qaf body: the line and nuqta to its right, the tick above the head, the
+    # spur at the tail's tip
+    5: [(1050, 145, 1090, 185), (1000, 137, 1032, 144), (1017, 142, 1030, 149), (1050, 128, 1058, 150), (893, 184, 900, 192), "main"],
+    # joined ra: the line over the tooth, the guide tick on the join, the tail's spur
+    9: [(853, 109, 864, 118), (840, 109, 846, 118), (861, 147, 868, 160), (767, 159, 778, 168), "main"],
+    10: ["main"], 13: [(549, 112, 555, 118), "main"], 15: ["main"],
+    19: [("thin", 182, 176, 208, 210, 4), "main"],
+    20: [("thin", 20, 110, 85, 150, 3), (196, 177, 206, 196), "main"],
+  }},
   "t7r2": {"file": "../thuluth-7-row2.png", "dot": 16, "units": {
     1: ("بى beh with ya (الباء مع الياء)", (1411,58,1579,238)),
     2: ("initial teeth for ب ت ث ن, form 1 (dotted alternate beside it)", (1214,120,1366,245)),
@@ -359,6 +388,13 @@ def assign(clean, units, splits, erase=None):
             if it == "main":   # keep only the piece's largest separate shape
                 n, lab, st, _ = cv2.connectedComponentsWithStats(sel[k].astype(np.uint8), 8)
                 if n > 2: sel[k] = lab == 1 + int(np.argmax(st[1:, 4]))
+            elif it[0] == "thin":   # ("thin", x0, y0, x1, y1, r): inside the box, clear
+                # whatever a disc r px across can't fit in (guide lines, spurs),
+                # keeping the pen strokes they run along or cross
+                _, x0, y0, x1, y1, r = it
+                box = sel[k][y0:y1, x0:x1].astype(np.uint8)
+                kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (r, r))
+                sel[k][y0:y1, x0:x1] = cv2.morphologyEx(box, cv2.MORPH_OPEN, kern) > 0
             elif len(it) == 2:   # a point: drop the separate bit of this piece that holds it
                 n, lab = cv2.connectedComponents(sel[k].astype(np.uint8), connectivity=8)
                 i = lab[it[1], it[0]]

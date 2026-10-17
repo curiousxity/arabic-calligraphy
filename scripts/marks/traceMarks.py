@@ -183,7 +183,8 @@ GROUPS = [
     ("t6","14","Braided lam-alif (لا)"),("t6","13","Joined lam-alif, for tight panels (ـلا)"),
     ("t6","1","Lam, alif with a bowl (ل)"),("t6","15","Lam-alif, forced cases and line ends (لا)"),
     ("t6","16","Lam-alif, forced cases, second form (لا)"),("t6","17","Joined lam-alif after a seen, forced case (سلا)"),
-    ("t6","21","Lam, old rule: Muhaqqaq and uncomposed Thuluth (صلى)")]),
+    ("t6","21","Lam, old rule: Muhaqqaq and uncomposed Thuluth (صلى)"),
+    ("t7r1","10","Joined meem, sloping tail (بم)"),("t7r1","15","Joined waw, straight tail (بو)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
@@ -198,6 +199,7 @@ TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t4": ("thuluth/traces/t4/t4-traced.json", "thuluth-t4-"),
           "t5": ("thuluth/traces/t5/t5-traced.json", "thuluth-t5-"),
           "t6": ("thuluth/traces/t6/t6-traced.json", "thuluth-t6-"),
+          "t7r1": ("thuluth/traces/t7/t7r1-traced.json", "thuluth-t7r1-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))
