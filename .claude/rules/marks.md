@@ -33,6 +33,12 @@ and its own `prefix` for ids (`a` has none, so ids saved before `b` existed
 still resolve; `b`'s are `strokes-b04` and so on). Adding a sheet is a
 `SHEETS` entry plus its names in `GROUPS`; the script asserts every traced
 mark on a sheet is either named or skipped.
+The *Thuluth* group is different: its pieces come from the grandfather's
+scanned lesson sheets, cleaned and traced for review under
+`scripts/marks/thuluth/` (ledger: `thuluth/REVIEW.md`). `traceMarks.py`
+does not trace them; its `TRACED` table reads the review's saved trace, and
+only pieces the user has approved are named in `GROUPS` (ids
+`thuluth-t1-23` and so on). Nothing goes into that group without approval.
 The script finds marks as clusters of dark pixels (dilated 9px, so a mark's
 separate dots stay together), keys them row+column (`"40"` = row 4, first),
 enlarges 8×, closes small gaps left by the grid lines, and traces with

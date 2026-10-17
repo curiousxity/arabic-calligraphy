@@ -5,7 +5,7 @@ const all = MARK_GROUPS.flatMap((g) => g.items);
 
 describe("mark library", () => {
   it("has the five groups, every id unique", () => {
-    expect(MARK_GROUPS.map((g) => g.id)).toEqual(["strokes", "heads", "dots", "signs", "frames"]);
+    expect(MARK_GROUPS.map((g) => g.id)).toEqual(["strokes", "heads", "dots", "signs", "thuluth", "frames"]);
     expect(new Set(all.map((m) => m.id)).size).toBe(all.length);
     expect(all.length).toBeGreaterThan(40);
   });

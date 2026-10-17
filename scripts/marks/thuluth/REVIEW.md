@@ -61,13 +61,13 @@ dotless).
 | 16 | صـ | named |
 | 17 | ط / ظ ta/za — construction of 19 (measuring nuqtas) | named (corrected) |
 | 18 | ض | named (guess not corrected) |
-| 19 | ط ta — **the clean shape** (17 is its construction) | named; **trace** |
+| 19 | ط ta — **the clean shape** (17 is its construction) | traced; **approved, in the library** |
 | 20 | ب / ت / ث body — **two forms drawn superimposed** on each other, not بن | named (corrected); needs separating into two pieces |
 | 21 | ج / ح / خ — the **alternate body**, not بي | named (corrected) |
 | 22 | ق | named (guess not corrected) |
-| 23 | ه ha — **the actual shape** (the user, 2026-10-16): trace this one; 12 is its construction | named; **trace** |
+| 23 | ه ha — **the actual shape** (the user, 2026-10-16): trace this one; 12 is its construction | traced; **approved, in the library** |
 | 24 | ك — with a **small handwritten note** beside it to remove | named |
-| 25 | ل lam — clean | named; **trace** |
+| 25 | ل lam — clean | traced; **approved, in the library** |
 | 26 | د dal — the clean shape (11 and 27 are its construction) | named |
 | 27 | د dal — construction of 26 (measuring nuqtas) | named (corrected) |
 | 28 | و **waw tail** (the body without the head), measuring nuqtas — not a nun (corrected 2026-10-17) | named (corrected) |
@@ -888,10 +888,24 @@ Vector-clean pieces the user supplies directly (coloured ink on white, no
 measurement marks). Traced with `traceOutline.py`; the review image and the
 traced path sit beside each source.
 
-- `outline-01.png` (2026-10-17, 652×1284): a head with a flag-like top and a
-  long tail dropping down and left (a كـ/عـ-like start; **name to confirm**).
-  Traced exactly (1706 path commands; may be simplified before it enters the
-  library). Scale against an alif **to confirm**.
+- `outline-01.png` (2026-10-17, 652×1284): **ـم the joined ending meem**
+  (named by the user, 2026-10-17). Traced exactly (1706 path commands; may be
+  simplified before it enters the library). Scale: not yet known. The user is
+  sending more meem outlines; take the scale from one of them that has a
+  known size (or sits beside an alif), then add this one to the library.
+
+## In the app's mark library
+
+Approved pieces go into the *Thuluth* group of the mark library.
+`scripts/marks/traceMarks.py` reads them from the saved review trace (its
+`TRACED` table) and lists each approved one by name in `GROUPS`; nothing
+else on a sheet is added.
+
+| piece | name in the app | id | approved |
+|---|---|---|---|
+| t1 23 | Ha (ه) | `thuluth-t1-23` | 2026-10-17 |
+| t1 25 | Lam (ل) | `thuluth-t1-25` | 2026-10-17 |
+| t1 19 | Ta (ط) | `thuluth-t1-19` | 2026-10-17 |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1
 pieces 19 and 25) is **part of the letter**, not a direction arrow. Keep it.

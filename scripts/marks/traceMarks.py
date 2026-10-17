@@ -11,7 +11,7 @@ dots stay together), keyed row+column ("40" = row 4, first mark), enlarged
 in library units (see SHEETS for the per-sheet scale), centred on the mark's own ink box.
 See .claude/rules/marks.md.
 """
-import os, sys, numpy as np, cv2, potrace
+import os, sys, json, numpy as np, cv2, potrace
 from PIL import Image
 
 def trace_sheet(path, unit, dilate, row_gap, merges, seeds=None):
@@ -148,13 +148,24 @@ GROUPS = [
     ("a","56","Mim with forked head"),("a","57","Mim"),("a","58","Sad ra"),("a","59","Sad ha"),("a","60","Ta"),
     ("b","23","Small hah"),("c","30","Bold sad"),("c","31","Stacked hamza"),
   ]),
+  ("thuluth", "Thuluth", [
+    ("t1","23","Ha (ه)"),("t1","25","Lam (ل)"),("t1","19","Ta (ط)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
+# Thuluth pieces are not traced here: scripts/marks/thuluth/ cleans the scanned
+# lesson sheets and traces each piece for review (thuluth/REVIEW.md). Only a
+# piece the user has approved is listed in GROUPS; its outline is read from the
+# review's saved trace, already in library units and centred.
+TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))
       for name,cfg in SHEETS.items()}
+for name,(rel,_) in TRACED.items():
+    with open(os.path.join(HERE,rel),encoding="utf-8") as fh: outs[name]=json.load(fh)
+    SHEETS[name]={"prefix":None}
 for name in SHEETS:
+    if name in TRACED: continue   # a review trace holds unapproved pieces too
     used={k for _,_,items in GROUPS for sh,k,_ in items if sh==name}
     skip=set(SHEETS[name]["skip"])
     assert used|skip==set(outs[name]) and not used&skip, (name, sorted(set(outs[name])-used-skip), sorted((used|skip)-set(outs[name])))
@@ -167,7 +178,7 @@ for gid,title,items in GROUPS:
     print(f'  {{ id: "{gid}", title: "{title}", items: [')
     for sh,k,name in items:
         v=outs[sh][k]
-        mid=f"{gid}-{SHEETS[sh]['prefix']}{k}"
+        mid=f"{TRACED[sh][1]}{k}" if sh in TRACED else f"{gid}-{SHEETS[sh]['prefix']}{k}"
         print(f'    {{ id: "{mid}", name: "{name}", w: {v["w"]}, h: {v["h"]}, d: "{v["d"]}" }},')
     print("  ] },")
 print("];")
