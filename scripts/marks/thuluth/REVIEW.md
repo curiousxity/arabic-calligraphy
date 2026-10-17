@@ -582,6 +582,26 @@ kaf or lam).
   "سين أولي ووسط ونهائي" (initial, medial and final seen: a stacked run of
   seens over a long final, with stroke-order numbers and measurement dots).
 
+
+Mapped and traced 2026-10-17 as `t10r1`–`t10r4`, using `mapSheet.py`'s new
+`parts` mode (numbers are separate shapes, because whole words sit close).
+Pens: rows 1, 2 at 14 px, row 3 at 16, row 4 at 14.4; each row has its own
+unit. The notes are transcribed above (labels الفردي, وسط, السين مع الميم;
+the seen/sad-with-ra rule; the basmala's ba; the seen's extension).
+
+| piece | provisional name | status |
+|---|---|---|
+| r1 4 | س standalone seen (الفردي) | traced, clean (label word dropped) |
+| r1 1 | س لسه سط, joined in the scan | traced, clean (label words dropped) |
+| r1 2 | سمد سملا seen with meem | traced, clean |
+| r2 1, 3 | سمر, two forms | traced, clean |
+| r2 2 | seen joined to ra, long run | traced, clean |
+| r2 4 | سمرس | traced, clean |
+| r3 1 | سرا with a long flat seen | traced, clean |
+| r3 2 | long seen over ح with ط, stacked | traced, clean |
+| r4 1 | medial seen (النسيم-like) | traced; **needs cleanup**: guide lines |
+| r4 2 | initial, medial and final seen, stacked | traced; **needs cleanup**: measuring nuqtas and lines; stroke numbers 1–4 to read |
+
 ## Sheet t11 — sad and tah: complex strokes and alternate forms (row images)
 
 The user's framing (2026-10-16): "now the complex strokes and alternate forms".

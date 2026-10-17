@@ -49,7 +49,8 @@ for k in nums:
     if not sel[k].any():
         print(k, "EMPTY"); continue
     ys, xs = np.nonzero(sel[k])
-    bx0, by0, bx1, by1 = xs.min() - 6, ys.min() - 6, xs.max() + 7, ys.max() + 7
+    bx0, by0 = max(0, xs.min() - 6), max(0, ys.min() - 6)
+    bx1, by1 = min(im.shape[1], xs.max() + 7), min(im.shape[0], ys.max() + 7)
     tpath = os.path.join(touch_dir, f"{sheet}-{k}.png")
     if os.path.exists(tpath):
         # traced from the user's hand touch-up (same crop, TOUCH times larger)

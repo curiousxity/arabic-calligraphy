@@ -206,6 +206,27 @@ SHEETS = {
     2: ("حم ha with meem", (736,209,1039,397)), 3: ("حكم ha before kaf and meem", (504,75,849,388)),
     4: ("حمر حر the open ha (حاء مفتوح), two words", (29,187,570,373)),
   }, "splits": {}},
+  # Sheet 10, the seen, four rows (mapped 2026-10-17 with mapSheet.py's
+  # `parts` mode: numbers are separate shapes, right to left).
+  "t10r1": {"file": "../thuluth-10-row1.png", "dot": 14, "unit": 48 / 14, "units": {
+    4: ("س standalone seen (الفردي)", (1322,186,1521,310)),
+    1: ("س لسه سط standalone extended seen, لسه, medial seen in سط (joined in the scan)", (459,55,1494,298)),
+    2: ("سمد سملا seen with meem (السين مع الميم)", (13,58,471,302)),
+  }, "splits": {}, "erase": {4: ["main"], 1: ["main"]}},
+  "t10r2": {"file": "../thuluth-10-row2.png", "dot": 14, "unit": 48 / 14, "units": {
+    1: ("سمر seen with meem and ra", (1191,130,1493,299)),
+    2: ("سرسرس run: seen joined to ra (the extension after the basmala's ba is an extended seen)", (507,106,1270,265)),
+    3: ("سمر seen with meem and ra, second", (369,93,611,224)),
+    4: ("سمرس seen, meem, ra, seen", (12,86,463,247)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4)}},
+  "t10r3": {"file": "../thuluth-10-row3.png", "dot": 16, "units": {
+    1: ("سرا with a long flat seen", (560,80,1035,313)),
+    2: ("long seen over ح with ط, stacked (the seen's extension is close to the extended ba's)", (0,46,532,407)),
+  }, "splits": {}, "erase": {2: ["main"]}},
+  "t10r4": {"file": "../thuluth-10-row4.png", "dot": 14, "unit": 48 / 14.4, "units": {
+    1: ("medial seen in an النسيم-like word (measuring grid)", (178,26,438,218)),
+    2: ("initial, medial and final seen, stacked run (stroke numbers, measuring nuqtas)", (10,280,528,500)),
+  }, "splits": {}, "erase": {1: ["main"]}},
 }
 
 def clean_sheet(path, dot):
@@ -271,6 +292,10 @@ def trace(sel, unit=3.0, S=8, blur=0.35, alphamax=1.1, opttolerance=0.4, gray=No
     With `gray` (the scan, 0-255) the piece's own grey edge shading is traced
     instead of its black-and-white mask, which places each edge to a fraction
     of a pixel: inside one pixel of the piece the scan is used, white elsewhere."""
+    # a piece touching the image edge is padded with white, so the crop below
+    # always has its 3 px margin
+    sel = np.pad(sel, 8)
+    if gray is not None: gray = np.pad(gray, 8, constant_values=255)
     ys, xs = np.nonzero(sel)
     x0, x1, y0, y1 = xs.min() - 3, xs.max() + 4, ys.min() - 3, ys.max() + 4
     if gray is None:
@@ -306,7 +331,7 @@ def trace(sel, unit=3.0, S=8, blur=0.35, alphamax=1.1, opttolerance=0.4, gray=No
             d.append(("L" + P(sg.c) + "L" + P(sg.end_point)) if sg.is_corner else ("C" + P(sg.c1) + " " + P(sg.c2) + " " + P(sg.end_point)))
         d.append("Z")
     w = (max(q[0] for q in allp) - min(q[0] for q in allp)) * f; h = (max(q[1] for q in allp) - min(q[1] for q in allp)) * f
-    return {"d": "".join(d), "w": round(w), "h": round(h)}, contours, (x0, y0, S)
+    return {"d": "".join(d), "w": round(w), "h": round(h)}, contours, (x0 - 8, y0 - 8, S)
 
 def draw_traced(contours, size, S, scale=1):
     """The traced outline, filled even-odd, at `scale` times source size.

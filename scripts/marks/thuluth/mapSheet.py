@@ -1,5 +1,9 @@
 """Map a new Thuluth sheet: measure its pen, number its clusters, draft its units.
-usage: python -I -X utf8 scripts/marks/thuluth/mapSheet.py IMAGE OUT_PNG
+usage: python -I -X utf8 scripts/marks/thuluth/mapSheet.py IMAGE OUT_PNG [parts]
+
+With `parts`, each separate shape (after cleaning, no merging of nearby
+shapes) is numbered instead of each cluster: for rows whose words sit so
+close that clusters swallow several of them.
 
 Prints the pen width (median stroke thickness of the big shapes), the
 library units per source px that puts it at the shared scale (48 units per
@@ -13,6 +17,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 spec = importlib.util.spec_from_file_location("review", os.path.join(HERE, "review.py"))
 rv = importlib.util.module_from_spec(spec); spec.loader.exec_module(rv)
 path, out = sys.argv[1], sys.argv[2]
+parts = len(sys.argv) > 3 and sys.argv[3] == "parts"
 img = Image.open(path)
 if img.mode in ("RGBA", "LA"):
     bg = Image.new("RGB", img.size, "white"); bg.paste(img, mask=img.getchannel("A")); img = bg
@@ -29,14 +34,14 @@ print(f"pen {pen:.1f} px  unit {unit:.3f}  size {gray.shape[1]}x{gray.shape[0]}"
 tmp = os.path.join(os.path.dirname(out), "_map_src.png"); img.convert("RGB").save(tmp)
 im, clean = rv.clean_sheet(tmp, max(8, int(round(pen))))
 os.remove(tmp)
-dil = max(5, int(round(pen)))
+dil = 1 if parts else max(5, int(round(pen)))
 d = cv2.dilate(clean, np.ones((dil, dil), np.uint8))
 n, lab, st, _ = cv2.connectedComponentsWithStats(d, 8)
 boxes = []
 for i in range(1, n):
     x, y, w, h, a = st[i]
     ink = int(clean[lab == i].sum())
-    if ink < 1.5 * pen * pen: continue
+    if ink < (4 if parts else 1.5) * pen * pen: continue
     boxes.append((int(x), int(y), int(x + w), int(y + h), ink))
 boxes.sort(key=lambda b: (b[1] + b[3]) / 2)
 rows = []
