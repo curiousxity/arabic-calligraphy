@@ -154,7 +154,15 @@ GROUPS = [
     ("t2","2","Ha body, shared by ha, jim and kha (ح)"),("t2","10","Joined starting meem (مـ)"),
     ("t2","12","Ha, round (ه)"),("t2","13","Ha, round, second form (ه)"),
     ("t2","16","Small lam-alif, second form (لا)"),("t2","17","Lam-alif, open (لا)"),
-    ("t2","18","Ya (ى)"),("t2","19","Wrapped ha (ح)"),("t2","23","Starting sad (صـ)"),("t2","28","Waw (و)")]),
+    ("t2","18","Ya (ى)"),("t2","19","Wrapped ha (ح)"),("t2","23","Starting sad (صـ)"),("t2","28","Waw (و)"),
+    ("t3","2","Alif (ا)"),("t3","3","Kaf, upright (ك)"),("t3","5","Lam, second form (ل)"),
+    ("t3","6","Two lam-alifs, overlapping (لا لا)"),("t3","7","Ta, second form (ط)"),
+    ("t3","8","Extended seen (س)"),("t3","9","Waw and long kaf (و ك)"),("t3","10","Ra, waw, dal (ر و د)"),
+    ("t3","11","Ra, extended (ر)"),("t3","12","Waw, extended (و)"),("t3","13","Meem, extended (م)"),
+    ("t3","14","Ra and meem, raised (ر م)"),("t3","17","Waw with connected and standalone ha (و هـ ه)"),
+    ("t3","18","Ya, second form (ى)"),("t3","19","Ha, extended (ح)"),("t3","20","Ha, wrapped (ح)"),
+    ("t3","25","Ha, wrapped, second form (ح)"),("t3","21","Ain (ع)"),("t3","22","Final ha (ـح)"),
+    ("t3","23","Final ha, second form (ـح)"),("t3","24","Ending dal (ـد)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
@@ -165,6 +173,7 @@ GROUPS = [
 # A user-supplied clean outline ("o") is one piece per file, keyed by its number.
 TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t2": ("thuluth/traces/t2/t2-traced.json", "thuluth-t2-"),
+          "t3": ("thuluth/traces/t3/t3-traced.json", "thuluth-t3-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))

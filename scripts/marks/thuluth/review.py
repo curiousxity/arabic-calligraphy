@@ -80,7 +80,7 @@ SHEETS = {
     20: ("ح ha (right of the pair)", (857,704,996,901)), 25: ("ح ha (left of the pair)", (705,704,857,901)),
     21: ("ع ain", (538,680,705,907)), 22: ("ـح final ha (stroke numbers, dotted guide)", (378,673,536,899)),
     23: ("ـح final ha (stroke numbers, dotted guide)", (226,664,378,896)),
-    24: ("final form, to name (stroke numbers 1-4)", (74,693,219,860)),
+    24: ("ـد ending dal (the user, 2026-10-17; stroke numbers 1-4)", (74,693,219,860)),
   }, "splits": {}},
 }
 
