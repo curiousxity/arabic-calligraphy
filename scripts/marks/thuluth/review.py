@@ -145,6 +145,30 @@ SHEETS = {
   }, "splits": {},
   # note words beside these pieces: keep only each one's main shape
   "erase": {1: ["main"], 3: ["main"], 7: ["main"], 13: ["main"]}},
+  # Sheet 7, the beh, three row images (mapped 2026-10-17;
+  # sheet7-rowN-numbered.png). Pen 16 px on all three: the shared scale.
+  # Row 1: the initial beh joined to ص ط غ ق م ر و ي, with measuring nuqtas
+  # beside each pair ("main" drops them); its piece numbers are shapes after
+  # cleaning, right to left.
+  "t7r1": {"file": "../thuluth-7-row1.webp", "dot": 16, "units": {
+    2: ("بص بط initial beh (two dots) with sad and with ta, touching", (1209,34,1560,275)),
+    4: ("بغ initial beh with ghain", (1093,97,1240,305)), 5: ("بق initial beh with qaf", (892,105,1090,258)),
+    9: ("بم initial beh with meem", (739,109,886,243)), 10: ("بر initial beh with ra", (522,99,727,273)),
+    13: ("بو initial beh with waw", (451,106,581,251)), 15: ("بى initial beh with ya", (297,99,453,264)),
+    19: ("initial beh with three dots, long joined run (to name)", (15,59,339,258)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (2, 4, 5, 9, 10, 13, 15, 19)}},
+  "t7r2": {"file": "../thuluth-7-row2.png", "dot": 16, "units": {
+    1: ("بى beh with ya (الباء مع الياء)", (1411,58,1579,238)),
+    2: ("initial teeth for ب ت ث ن, form 1 (dotted alternate beside it)", (1214,120,1366,245)),
+    3: ("initial teeth for ب ت ث ن, form 2", (1023,131,1190,235)), 4: ("initial teeth for ب ت ث ن, form 3", (844,134,1019,240)),
+    5: ("initial teeth for ب ت ث ن, form 4", (673,132,842,236)), 6: ("ب beh body, long (to name)", (389,112,640,237)),
+    7: ("بو beh with waw (to name)", (178,99,385,259)), 8: ("بو beh with waw, second (to name)", (30,60,222,246)),
+  }, "splits": {}},
+  "t7r3": {"file": "../thuluth-7-row3.png", "dot": 16, "units": {
+    1: ("بص beh joined like sad (to name)", (1210,98,1515,269)), 2: ("بط beh with ta", (999,0,1232,224)),
+    3: ("بم beh with meem (الباء مع الميم)", (729,55,972,241)),
+    4: ("a seen-like run with a final ya and an upright (to name; dotted alternate head)", (11,0,688,226)),
+  }, "splits": {}},
 }
 
 def clean_sheet(path, dot):

@@ -440,6 +440,38 @@ dotted alternate beside the second piece from the right). Row 3 saved as
 run with a final ya, and a dotted alternate head at the far left). Sheet 7 is
 complete.
 
+
+Mapped and traced 2026-10-17 as three sheets, `t7r1`–`t7r3`
+(`sheet7-rowN-numbered.png`). Pen 16 px on all three: the shared scale.
+Row 1's pieces are numbered by shape after cleaning (right to left), and
+`"main"` drops the measuring nuqtas beside each pair.
+
+Notes, transcribed: row 1 headings الباء الاولى ذات النقطتين (the initial
+beh with two dots: pieces 2–15) and الباء الاولى ذات ثلاث نقاط (with three
+dots: piece 19). Row 2: الباء مع الياء (beh with ya, piece 1), and over
+pieces 2–5 "يجوز استعمال هذه في الباء والتاء والثاء والنون وهي متشابهات في
+بدايتها": these may be used for ba, ta, tha and nun, which are alike at
+their start. Row 3: الباء مع الميم (beh with meem, piece 3).
+
+| piece | provisional name | status |
+|---|---|---|
+| r1 2 | بص بط initial beh with sad and with ta, touching | traced; nearly clean (a guide-line tick at the left) |
+| r1 4 | بغ beh with ghain | traced; **needs cleanup**: guide lines across it |
+| r1 5 | بق beh with qaf | traced; **needs cleanup**: nuqta stubs at the head |
+| r1 9 | بم beh with meem | traced; **needs cleanup**: a nuqta stub on the tip |
+| r1 10 | بر beh with ra | traced, clean |
+| r1 13 | بو beh with waw | traced, clean |
+| r1 15 | بى beh with ya | traced, clean |
+| r1 19 | three-dot beh, long joined run (to name) | traced; **needs cleanup**: guide-line bits |
+| r2 1 | بى beh with ya | traced, clean |
+| r2 2–5 | initial teeth for ب ت ث ن, four forms | traced, clean (2's dotted alternate cleaned away) |
+| r2 6 | beh body, long (to name) | traced, clean |
+| r2 7, 8 | beh with waw, two forms (to name) | traced, clean |
+| r3 1 | sad-like beh join (to name) | traced, clean |
+| r3 2 | بط beh with ta | traced, clean |
+| r3 3 | بم beh with meem | traced, clean |
+| r3 4 | seen-like run with final ya and upright (to name) | traced, clean (dotted alternate head cleaned away) |
+
 ## Sheet t8 — initial beh of the ya type (row images)
 
 - Row 1, `thuluth-8-row1.png` (2026-10-16): "باء أولية من نوع الياء" (initial
