@@ -621,6 +621,28 @@ The user's framing (2026-10-16): "now the complex strokes and alternate forms".
   (ططط-like), the three tall tah uprights ending in arrowheads. Thin guide
   lines run through both; no measurement dots or dotted alternates seen.
 
+
+Mapped and traced 2026-10-17 as `t11r1`–`t11r3` (parts mode). Pens 16,
+15.6 and 16 px. Notes: row 1 heading حرف الصاد والطاء; row 3 labels صاد
+اولى ووسط ونهائي and طاء اولى ووسط ونهائي (initial, medial and final sad
+and tah). The dotted alternates are thin and are cleaned away.
+
+| piece | provisional name | status |
+|---|---|---|
+| r1 1 | ص standalone sad | traced, clean |
+| r1 2 | صر and a stacked صصى run | traced, clean |
+| r1 3 | صو | traced, clean |
+| r1 4 | stacked مصحم-like word (to name) | traced, clean |
+| r2 1 | stacked مصحى-like word with ح (to name) | traced, clean |
+| r2 2, 6 | ط tah, two forms | traced, clean |
+| r2 3 | طط | traced, clean |
+| r2 4 | مطـ run stacked with ط (to name) | traced, clean |
+| r2 5 | مصى stacked, with a zigzag tail (as drawn) | traced, clean |
+| r2 7 | long طـ run (to name) | traced, clean |
+| r2 8 | ط over ع, stacked | traced, clean |
+| r2 9 | سط | traced, clean |
+| r3 1 | initial, medial, final sad and tah, touching | traced; **needs cleanup**: guide lines |
+
 ## Sheet t12 — ain (row images)
 
 - Row 1, `thuluth-12-row1.png` (2026-10-16): the named ain forms, right to

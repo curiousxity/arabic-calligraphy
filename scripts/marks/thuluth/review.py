@@ -223,6 +223,23 @@ SHEETS = {
     1: ("سرا with a long flat seen", (560,80,1035,313)),
     2: ("long seen over ح with ط, stacked (the seen's extension is close to the extended ba's)", (0,46,532,407)),
   }, "splits": {}, "erase": {2: ["main"]}},
+  # Sheet 11, sad and tah, complex strokes and alternate forms (mapped
+  # 2026-10-17, parts mode). Row 2 is two rows in one image.
+  "t11r1": {"file": "../thuluth-11-row1.png", "dot": 16, "unit": 48 / 15.98, "units": {
+    1: ("ص standalone sad", (1363,146,1591,286)),
+    2: ("صر and a stacked صصى run with a returned ya tail", (817,114,1359,280)),
+    3: ("صو sad with waw", (505,129,772,265)), 4: ("a stacked مصحم-like word (to name)", (65,77,516,262)),
+  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4)}},
+  "t11r2": {"file": "../thuluth-11-row2.webp", "dot": 16, "unit": 48 / 15.6, "units": {
+    1: ("a stacked مصحى-like word with ح (to name)", (999,71,1535,336)), 2: ("ط tah", (794,82,955,273)),
+    3: ("طط two tahs", (539,73,791,282)), 4: ("a مطـ opening run stacked with ط (to name)", (45,41,527,374)),
+    5: ("مصى stacked (to name)", (1311,330,1539,603)), 6: ("ط tah, second", (1051,340,1264,581)),
+    7: ("a long طـ run (to name)", (756,316,1170,562)), 8: ("ط over ع, stacked", (559,297,725,588)),
+    9: ("سط seen with tah", (27,326,467,525)),
+  }, "splits": {}, "erase": {k: ["main"] for k in range(1, 10)}},
+  "t11r3": {"file": "../thuluth-11-row3.png", "dot": 16, "units": {
+    1: ("initial, medial and final sad, then initial, medial and final tah (two runs, touching)", (6,21,770,268)),
+  }, "splits": {}, "erase": {1: ["main"]}},
   "t10r4": {"file": "../thuluth-10-row4.png", "dot": 14, "unit": 48 / 14.4, "units": {
     1: ("medial seen in an النسيم-like word (measuring grid)", (178,26,438,218)),
     2: ("initial, medial and final seen, stacked run (stroke numbers, measuring nuqtas)", (10,280,528,500)),
