@@ -874,6 +874,24 @@ row 3 keeps its small zinadi kaf, which is part of the form.
     alif's hamza in the three scripts".
   So the two hamzas are distinct marks and must not be swapped.
 
+
+Mapped and traced 2026-10-17 with the new `autoSheet.py` (map in parts
+mode, draft sheet in `drafts/`, trace, one review picture per row:
+`traces/t15/t15rN-review.png`; maps in `sheetmaps/`). Pieces are "part N"
+until named in review. Pens 22, 17.2 and 20.8 px.
+
+- **Row 1**: parts 1–4 are the two ordinary bas (1 short, 2 long), ba and
+  shin (3), ba and kaf (4): all clean except 4, where an arrow touches the
+  kaf (**needs cleanup**). The dotted alternates are cleaned away.
+- **Row 2** (ba one and a half nuqtas wide): part 1 is only a column of
+  measuring nuqtas (**skip**); parts 2 (و) and 11 (a fragment) are clean;
+  parts 3, 4, 5, 7, 8, 9, 10 are the joins and all **need cleanup**
+  (guide lines, nuqtas, stroke numbers).
+- **Row 3** (ba three nuqtas wide): part 4 (ن) and part 10 (the ع-shaped
+  alif's hamza) are clean; part 6 is mostly measuring nuqtas (**skip**);
+  the rest **need cleanup** (nuqta rows, guide lines, construction lines).
+  The small kaf's hamza (ء) was too small for parts mode and is not traced.
+
 ## Sheet t16 — lam, the two special words, and mim (row images)
 
 - Row 1, `thuluth-16-row1.webp` (2026-10-16), right to left:

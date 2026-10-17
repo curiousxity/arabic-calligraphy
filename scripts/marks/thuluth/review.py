@@ -319,6 +319,18 @@ SHEETS = {
   }, "splits": {}, "erase": {1: ["main"]}},
 }
 
+
+# Draft sheets written by mapSheet.py (drafts/<key>.json): every piece is
+# "part N" and keeps only its main shape. A SHEETS entry of the same key wins.
+import json as _json, glob as _glob
+for _f in sorted(_glob.glob(os.path.join(HERE, "drafts", "*.json"))):
+    _k = os.path.splitext(os.path.basename(_f))[0]
+    if _k in SHEETS: continue
+    with open(_f, encoding="utf-8") as _fh: _d = _json.load(_fh)
+    SHEETS[_k] = {"file": _d["file"], "dot": _d["dot"], "unit": _d["unit"], "splits": {},
+                  "units": {int(n): (v[0], tuple(v[1])) for n, v in _d["units"].items()},
+                  "erase": {int(n): ["main"] for n in _d["units"]}}
+
 def clean_sheet(path, dot):
     im = np.array(Image.open(path).convert("L"))
     mask = (im < 140).astype(np.uint8)

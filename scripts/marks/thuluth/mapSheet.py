@@ -1,5 +1,9 @@
 """Map a new Thuluth sheet: measure its pen, number its clusters, draft its units.
-usage: python -I -X utf8 scripts/marks/thuluth/mapSheet.py IMAGE OUT_PNG [parts]
+usage: python -I -X utf8 scripts/marks/thuluth/mapSheet.py IMAGE OUT_PNG [parts] [KEY]
+
+With KEY, the numbered pieces are also written as a draft sheet,
+drafts/KEY.json, which review.py loads as SHEETS[KEY] (each piece "part N",
+keeping only its main shape) unless SHEETS already defines KEY.
 
 With `parts`, each separate shape (after cleaning, no merging of nearby
 shapes) is numbered instead of each cluster: for rows whose words sit so
@@ -18,6 +22,7 @@ spec = importlib.util.spec_from_file_location("review", os.path.join(HERE, "revi
 rv = importlib.util.module_from_spec(spec); spec.loader.exec_module(rv)
 path, out = sys.argv[1], sys.argv[2]
 parts = len(sys.argv) > 3 and sys.argv[3] == "parts"
+key = sys.argv[4] if len(sys.argv) > 4 else None
 img = Image.open(path)
 if img.mode in ("RGBA", "LA"):
     bg = Image.new("RGB", img.size, "white"); bg.paste(img, mask=img.getchannel("A")); img = bg
@@ -57,3 +62,14 @@ for k, (x0, y0, x1, y1, ink) in enumerate(order, 1):
     dr.text((x0 + 2, y0 + 1), str(k), fill=(0, 0, 230), font=font)
     print(f'    {k}: ("?", ({x0-4},{y0-4},{x1+4},{y1+4})),  # ink {ink}')
 color.save(out)
+if key:
+    import json
+    rel = os.path.relpath(os.path.abspath(path), os.path.dirname(HERE)).replace(os.sep, "/")
+    draft = {"file": "../" + os.path.basename(path) if rel.startswith("thuluth-") else rel,
+             "dot": int(round(pen)), "unit": unit,
+             "units": {str(k): [f"part {k}", [x0 - 4, y0 - 4, x1 + 4, y1 + 4]]
+                       for k, (x0, y0, x1, y1, ink) in enumerate(order, 1)}}
+    os.makedirs(os.path.join(HERE, "drafts"), exist_ok=True)
+    with open(os.path.join(HERE, "drafts", key + ".json"), "w", encoding="utf-8") as fh:
+        json.dump(draft, fh, indent=1)
+    print("draft", key, len(order), "pieces")
