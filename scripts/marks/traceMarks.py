@@ -11,7 +11,7 @@ dots stay together), keyed row+column ("40" = row 4, first mark), enlarged
 in library units (see SHEETS for the per-sheet scale), centred on the mark's own ink box.
 See .claude/rules/marks.md.
 """
-import os, sys, json, numpy as np, cv2, potrace
+import os, sys, re, json, hashlib, importlib.util, numpy as np, cv2, potrace
 from PIL import Image
 
 def trace_sheet(path, unit, dilate, row_gap, merges, seeds=None):
@@ -255,7 +255,17 @@ TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-"),
           # frames from the panels' ornament (thuluth/traceBorder.py, tileBorder.py)
           "fr": ("thuluth/traces/frames/{}.json", "frames-")}
+# The scanned pieces the user kept in the final run-through (2026-10-18):
+# thuluth/kept-2026-10-18.json, from the review page's suggestions, which the
+# user accepted. Each row sheet they come from reads its review trace.
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"thuluth/kept-2026-10-18.json"),encoding="utf-8") as _fh: KEPT=json.load(_fh)
+for _gid,_rows in KEPT.items():
+    for _sh,_k,_n in _rows:
+        if _sh not in TRACED:
+            _n_=re.match(r"t(\d+)",_sh).group(1)
+            TRACED[_sh]=(f"thuluth/traces/t{_n_}/{_sh}-traced.json",f"thuluth-{_sh}-")
 for _g in GROUPS:
+    if _g[0] in KEPT: _g[2].extend(tuple(r) for r in KEPT[_g[0]])
     if _g[0]=="thuluth": _g[2].extend(vector_items())
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))
@@ -269,6 +279,24 @@ for name,(rel,_) in TRACED.items():
     else:
         with open(os.path.join(HERE,rel),encoding="utf-8") as fh: outs[name]=json.load(fh)
     SHEETS[name]={"prefix":None}
+# Scanned pieces get their edges smoothed (thuluth/smoothEdges.py: the scan's
+# pixel ripple, corners held); the vector set and the frames are clean
+# already. Cached by outline, so a re-run only smooths what changed.
+SCANNED=[n for n in TRACED if re.fullmatch(r"t\d+(r\d+)?",n) and n not in ("t34r1","t35r1","t36r1")]
+_cpath=os.path.join(HERE,"thuluth/traces/smoothed-cache.json")
+_cache=json.load(open(_cpath,encoding="utf-8")) if os.path.exists(_cpath) else {}
+_used={(sh,k) for _,_,items in GROUPS for sh,k,_ in items}
+_spec=importlib.util.spec_from_file_location("smoothEdges",os.path.join(HERE,"thuluth/smoothEdges.py"))
+_sm=importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_sm)
+_fresh={}
+for name in SCANNED:
+    for k,v in list(outs[name].items()):
+        if (name,k) not in _used: continue
+        h=hashlib.sha1(v["d"].encode()).hexdigest()
+        if h not in _cache: _cache[h]=_sm.smooth_piece(v["d"])
+        _fresh[h]=_cache[h]
+        outs[name][k]={**v,**_cache[h]}
+with open(_cpath,"w",encoding="utf-8",newline="\n") as fh: json.dump(_fresh,fh,separators=(",",":"))
 for name in SHEETS:
     if name in TRACED: continue   # a review trace holds unapproved pieces too
     used={k for _,_,items in GROUPS for sh,k,_ in items if sh==name}

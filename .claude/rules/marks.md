@@ -41,6 +41,14 @@ only pieces the user has approved are named in `GROUPS` (ids
 `thuluth-t1-23` and so on). A clean outline the user supplies is one JSON
 per piece (`thuluth/outlines/outline-NN.json`, ids `thuluth-outline-NN`),
 traced by `thuluth/traceOutline.py` at a units-per-pixel the ledger records. Nothing goes into that group without approval.
+Every scanned Thuluth piece is **edge-smoothed at generation**
+(`thuluth/smoothEdges.py`, called from `traceMarks.py`): the scans leave a
+pixel ripple a fraction of a pen wide on every edge, and blurring before
+tracing would round the nib's corners, so each contour is smoothed along its
+length with corners held, then re-traced. Results are cached by outline in
+`thuluth/traces/smoothed-cache.json`; the vector set and frames skip it.
+The pieces kept in the final run-through are listed in
+`thuluth/kept-2026-10-18.json`, not inline in `GROUPS`.
 The script finds marks as clusters of dark pixels (dilated 9px, so a mark's
 separate dots stay together), keys them row+column (`"40"` = row 4, first),
 enlarges 8×, closes small gaps left by the grid lines, and traces with

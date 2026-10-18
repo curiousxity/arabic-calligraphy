@@ -1,0 +1,741 @@
+{
+"thuluth": [
+[
+"t7r1",
+"2",
+"Initial beh (two dots) joined to sad (بص)"
+],
+[
+"t7r1",
+"3",
+"Initial beh (two dots) joined to ta (بط)"
+],
+[
+"t7r1",
+"4",
+"Initial beh with ghain (بغ)"
+],
+[
+"t7r2",
+"1",
+"Beh with ya (الباء مع الياء) (بى)"
+],
+[
+"t7r2",
+"7",
+"Beh with waw (بو)"
+],
+[
+"t7r2",
+"8",
+"Beh with waw, second (بو)"
+],
+[
+"t7r3",
+"1",
+"Beh joined like sad (بص)"
+],
+[
+"t7r3",
+"2",
+"Beh with ta (بط)"
+],
+[
+"t7r3",
+"3",
+"Beh with meem (الباء مع الميم) (بم)"
+],
+[
+"t7r3",
+"4",
+"A seen-like run with a final ya and an upright (dotted alternate head)"
+],
+[
+"t8r1",
+"8",
+"Small-ya beh run with meem (بيم)"
+],
+[
+"t8r2",
+"1",
+"Initial, medial and final behs (بلب)"
+],
+[
+"t8r2",
+"2",
+"A long run of joined behs, dotted circle"
+],
+[
+"t8r2",
+"3",
+"Beh run with stroke numbers (بلسة)"
+],
+[
+"t8r2",
+"4",
+"Beh run with stroke numbers (تليمة)"
+],
+[
+"t8r3",
+"1",
+"One word: a run of joined behs ending in ة"
+],
+[
+"t10r1",
+"1",
+"Standalone extended seen, لسه, medial seen in سط (joined in the scan) (س لسه سط)"
+],
+[
+"t10r3",
+"2",
+"Long seen over ح with ط, stacked (the seen's extension is close to the extended ba's)"
+],
+[
+"t10r4",
+"1",
+"Medial seen in an النسيم-like word (measuring grid)"
+],
+[
+"t10r4",
+"2",
+"Medial and final seen, the lower word (measuring nuqtas) (سـ)"
+],
+[
+"t10r3",
+"1",
+"With a long flat seen (سرا)"
+],
+[
+"t10r4",
+"3",
+"Initial seen with its long sweep, the upper shape (stroke numbers 1-4) (سـ)"
+],
+[
+"t11r1",
+"2",
+"And a stacked صصى run with a returned ya tail (صر)"
+],
+[
+"t11r1",
+"3",
+"Sad with waw (صو)"
+],
+[
+"t11r1",
+"4",
+"A stacked مصحم-like word"
+],
+[
+"t11r2",
+"1",
+"A stacked مصحى-like word with ح"
+],
+[
+"t11r2",
+"3",
+"Two tahs (طط)"
+],
+[
+"t11r2",
+"4",
+"A مطـ opening run stacked with ط"
+],
+[
+"t11r2",
+"5",
+"Stacked (مصى)"
+],
+[
+"t11r2",
+"7",
+"A long طـ run"
+],
+[
+"t11r2",
+"8",
+"Over ع, stacked (ط)"
+],
+[
+"t11r2",
+"9",
+"Seen with tah (سط)"
+],
+[
+"t11r3",
+"1",
+"Initial, medial and final sad, then initial, medial and final tah (two runs, touching)"
+],
+[
+"t12r1",
+"1",
+"Cup ain (عين فنجاني), construction lines (ع)"
+],
+[
+"t12r1",
+"2",
+"Sad-like ain (عين صادي), construction lines (ع)"
+],
+[
+"t12r1",
+"3",
+"Cup ain and snake-sad ain in one run (بلغب)"
+],
+[
+"t12r1",
+"4",
+"Initial, medial and final ain (measuring nuqtas, stroke numbers) (عغع)"
+],
+[
+"t12r1",
+"5",
+"Snake ain (عين ثعباني), stroke numbers (نابتغا)"
+],
+[
+"t12r2",
+"1",
+"Ain words, start of the practice line (بالعمر)"
+],
+[
+"t12r2",
+"2",
+"Ain over a long seen with a returned ya (على عسلى)"
+],
+[
+"t12r2",
+"3",
+"Ending in an open final ain (عحمع)"
+],
+[
+"t12r3",
+"1",
+"يسر عسر بعد, one practice line"
+],
+[
+"t12r4",
+"1",
+"Composition, first arrangement (وجعلنا)"
+],
+[
+"t12r5",
+"1",
+"Composition, second arrangement (وجعلنا)"
+],
+[
+"t13r1",
+"1",
+"Gathered fa, from ba (ف)"
+],
+[
+"t13r1",
+"2",
+"Gathered qaf (ق)"
+],
+[
+"t13r1",
+"3",
+"Extended waw, from extended ra (و)"
+],
+[
+"t13r1",
+"4",
+"Extended fa (ف)"
+],
+[
+"t13r1",
+"5",
+"Extended qaf, from extended nun (ق)"
+],
+[
+"t13r2",
+"6",
+"Gathered waw, from gathered ra and dal (و)"
+],
+[
+"t13r2",
+"13",
+"Gathered waw, second (beside the ٦) (و)"
+],
+[
+"t13r2",
+"7",
+"Waw (dotted alternate: the extended 4-nuqta waw, inside a nun or seen cup) (و)"
+],
+[
+"t13r2",
+"9",
+"Waw, head open on the left (و)"
+],
+[
+"t13r2",
+"10",
+"Waw, head open on the right (و)"
+],
+[
+"t13r2",
+"11",
+"The letter before joins the waw's head from the left (مو)"
+],
+[
+"t13r3",
+"12",
+"The fa head between letters, one long run"
+],
+[
+"t13r4",
+"2",
+"Fa head stacked on ha (فح)"
+],
+[
+"t13r4",
+"3",
+"Extended joined fa with final waw: before low letters (و فبو)"
+],
+[
+"t14r1",
+"5",
+"Zinadi kaf joined into a following letter (كد)"
+],
+[
+"t14r2",
+"6",
+"Saifi kaf, initial joined (ك)"
+],
+[
+"t14r2",
+"7",
+"Saifi kaf, single and joined (ك)"
+],
+[
+"t14r2",
+"8",
+"Model of the medial saifi kaf (كرا)"
+],
+[
+"t14r2",
+"9",
+"Saifi kaf, medial and final, joined (مكا)"
+],
+[
+"t14r3",
+"1",
+"Saifi kaf finished with a small zinadi kaf, (1)"
+],
+[
+"t14r3",
+"2",
+"Saifi kaf finished with a small zinadi kaf, (2)"
+],
+[
+"t14r3",
+"3",
+"Saifi kaf finished with a small zinadi kaf, (3)"
+],
+[
+"t14r4",
+"1",
+"حكما"
+],
+[
+"t14r5",
+"1",
+"Zinadi kaf construction, part 1"
+],
+[
+"t14r5",
+"2",
+"Zinadi kaf with final and medial (بكلك)"
+],
+[
+"t14r5",
+"3",
+"Initial saifi kaf (كا)"
+],
+[
+"t14r5",
+"4",
+"Saifi kaf, single and medial (بكر)"
+],
+[
+"t14r5",
+"5",
+"Saifi kaf, single and medial (بكلا)"
+],
+[
+"t15r1",
+"3",
+"Ba as the shin/seen cup"
+],
+[
+"t15r1",
+"4",
+"Ba as the base of a kaf"
+],
+[
+"t15r2",
+"3",
+"Ba 1½ nuqtas wide, joined to a final letter, part 3"
+],
+[
+"t15r2",
+"4",
+"Ba 1½ nuqtas wide, joined to a final letter, part 4"
+],
+[
+"t15r2",
+"5",
+"Ba 1½ nuqtas wide, joined to a final letter, part 5"
+],
+[
+"t15r2",
+"7",
+"Ba 1½ nuqtas wide, joined to a final letter, part 7"
+],
+[
+"t15r2",
+"8",
+"Ba 1½ nuqtas wide, joined to a final letter, part 8"
+],
+[
+"t15r2",
+"9",
+"Ba 1½ nuqtas wide, joined to a final letter, part 9"
+],
+[
+"t15r2",
+"10",
+"Ba 1½ nuqtas wide, joined to a final letter, part 10"
+],
+[
+"t15r3",
+"1",
+"Ba three nuqtas wide, joined to the last letter, part 1"
+],
+[
+"t15r3",
+"2",
+"Ba three nuqtas wide, joined to the last letter, part 2"
+],
+[
+"t15r3",
+"3",
+"Ba three nuqtas wide, joined to the last letter, part 3"
+],
+[
+"t15r3",
+"5",
+"Ba three nuqtas wide, joined to the last letter, part 5"
+],
+[
+"t15r3",
+"7",
+"Ba three nuqtas wide, joined to the last letter, part 7"
+],
+[
+"t15r3",
+"8",
+"Ba three nuqtas wide, joined to the last letter, part 8"
+],
+[
+"t15r3",
+"9",
+"Ba three nuqtas wide, joined to the last letter, part 9"
+],
+[
+"t16r1",
+"1",
+"Lam at start, middle and end (بلل)"
+],
+[
+"t16r1",
+"3",
+"محمد, its own rule"
+],
+[
+"t16r1",
+"4",
+"Meem construction (row 1), part 4"
+],
+[
+"t16r1",
+"5",
+"Meem construction (row 1), part 5"
+],
+[
+"t16r1",
+"6",
+"Meem construction (row 1), part 6"
+],
+[
+"t16r1",
+"7",
+"Meem construction (row 1), part 7"
+],
+[
+"t16r1",
+"8",
+"Meem construction (row 1), part 8"
+],
+[
+"t16r1",
+"9",
+"Meem construction (row 1), part 9"
+],
+[
+"t16r2",
+"1",
+"Medial and final meems, mim of the extended ra, part 1"
+],
+[
+"t16r2",
+"2",
+"Medial and final meems, mim of the extended ra, part 2"
+],
+[
+"t16r2",
+"3",
+"Medial and final meems, mim of the extended ra, part 3"
+],
+[
+"t16r2",
+"4",
+"Medial and final meems, mim of the extended ra, part 4"
+],
+[
+"t16r2",
+"5",
+"Medial and final meems, mim of the extended ra, part 5"
+],
+[
+"t16r2",
+"6",
+"Medial and final meems, mim of the extended ra, part 6"
+],
+[
+"t16r2",
+"7",
+"Medial and final meems, mim of the extended ra, part 7"
+],
+[
+"t16r3",
+"1",
+"Standalone meems with their usage rules, part 1"
+],
+[
+"t16r3",
+"2",
+"Standalone meems with their usage rules, part 2"
+],
+[
+"t16r3",
+"3",
+"Standalone meems with their usage rules, part 3"
+],
+[
+"t16r3",
+"4",
+"Standalone meems with their usage rules, part 4"
+],
+[
+"t16r3",
+"5",
+"Standalone meems with their usage rules, part 5"
+],
+[
+"t16r3",
+"6",
+"Standalone meems with their usage rules, part 6"
+],
+[
+"t16r4",
+"1",
+"Meem after ba/seen/sad…; medial meems between letters, part 1"
+],
+[
+"t16r4",
+"2",
+"Meem after ba/seen/sad…; medial meems between letters, part 2"
+],
+[
+"t16r4",
+"3",
+"Meem after ba/seen/sad…; medial meems between letters, part 3"
+],
+[
+"t16r5",
+"1",
+"Mim-ra forms, part 1"
+],
+[
+"t16r5",
+"2",
+"Mim-ra forms, part 2"
+],
+[
+"t16r5",
+"3",
+"Mim-ra forms, part 3"
+],
+[
+"t16r5",
+"4",
+"Mim-ra forms, part 4"
+],
+[
+"t16r5",
+"5",
+"Mim-ra forms, part 5"
+],
+[
+"t16r1",
+"10",
+"The word Allah (لفظ الجلالة), split from part 1 (الله)"
+],
+[
+"t17r2",
+"1",
+"Named has: cat's eye, horse's ear, low medial, part 1"
+],
+[
+"t17r2",
+"2",
+"Named has: cat's eye, horse's ear, low medial, part 2"
+],
+[
+"t17r2",
+"3",
+"Named has: cat's eye, horse's ear, low medial, part 3"
+],
+[
+"t17r3",
+"1",
+"Final ha, knotted (1), part 1"
+],
+[
+"t17r3",
+"2",
+"Final ha, knotted (1), part 2"
+],
+[
+"t17r4",
+"1",
+"Medial has and the knotted final ha (2), part 1"
+],
+[
+"t17r5",
+"1",
+"Final has after a dal-like stroke (row note: 1–2 rare), part 1"
+],
+[
+"t17r5",
+"2",
+"Final has after a dal-like stroke (row note: 1–2 rare), part 2"
+],
+[
+"t17r5",
+"3",
+"Final has after a dal-like stroke (row note: 1–2 rare), part 3"
+],
+[
+"t17r5",
+"4",
+"Final has after a dal-like stroke (row note: 1–2 rare), part 4"
+],
+[
+"t17r5",
+"5",
+"Final has after a dal-like stroke (row note: 1–2 rare), part 5"
+],
+[
+"t17r6",
+"1",
+"Has at start, middle and end, in words, part 1"
+],
+[
+"t17r6",
+"2",
+"Has at start, middle and end, in words, part 2"
+],
+[
+"t17r6",
+"5",
+"Has at start, middle and end, in words, part 5"
+],
+[
+"t17r6",
+"6",
+"Has at start, middle and end, in words, part 6"
+],
+[
+"t17r6",
+"7",
+"Has at start, middle and end, in words, part 7"
+],
+[
+"t18r1",
+"1",
+"Ya after ب (ـي)"
+],
+[
+"t18r1",
+"2",
+"Ya after س (ـي)"
+],
+[
+"t18r1",
+"3",
+"Ya after ص (ـي)"
+],
+[
+"t18r1",
+"4",
+"Ya after ط (ـي)"
+],
+[
+"t18r1",
+"5",
+"Ya after ع (ـي)"
+],
+[
+"t18r1",
+"6",
+"Ya after ف (ـي)"
+],
+[
+"t18r1",
+"7",
+"Ya after م (ـي)"
+],
+[
+"t18r1",
+"8",
+"Ya after هـ (ـي)"
+],
+[
+"t19r1",
+"1",
+"Practice words (علي هم)"
+],
+[
+"t19r1",
+"2",
+"Practice run (single words)"
+],
+[
+"t19r1",
+"5",
+"سلة-like word with small marks"
+]
+],
+"signs": [
+[
+"t19r1",
+"3",
+"Small sign: an ornamental knot"
+],
+[
+"t19r1",
+"4",
+"Small sign: a double stroke"
+]
+]
+}

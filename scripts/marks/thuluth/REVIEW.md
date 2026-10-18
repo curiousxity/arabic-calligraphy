@@ -1759,3 +1759,14 @@ for the tarkib work.
   https://claude.ai/artifact/Rf42rdVENpkY3q4Zcbvadc . The user's choices
   are saved in its `choices` collection (doc id = the piece's ref with `_`
   for the space). Keep = add to the library; retire = drop; skip = leave out.
+
+**The user's answer (2026-10-18): "I agree with your choices but the edges
+still need some cleaning up."** So:
+- **Kept (147)** are in the library: `thuluth/kept-2026-10-18.json` lists
+  them (145 in the Thuluth group, the two t19 small signs in Small signs),
+  read by `traceMarks.py`.
+- **Retired (39) and skipped (1)** stay out: the review page's list.
+- **Edges**: every scanned piece in the library (old and new) is smoothed by
+  `smoothEdges.py` at generation: the scan's pixel ripple ironed out along
+  each contour (Gaussian, 9 units; a pen is 48), corners held, re-traced.
+  Cached in `traces/smoothed-cache.json` by outline.
