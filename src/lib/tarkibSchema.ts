@@ -32,7 +32,10 @@ export type PieceGeometry = {
   noFreeEnd?: boolean;
 };
 export type PieceSchema = {
+  /** Schema id: the library id, or `<library id>@middle` for a stand-in. */
   id: string;
+  /** The mark library item whose outline this is. */
+  itemId: string;
   /** Reading order, with each letter's mark anchors (piece units). */
   letters: { skeleton: string; form: LetterForm; above: Pt; below: Pt }[];
   entry?: JoinEnd;
@@ -57,6 +60,12 @@ export type TarkibLibrary = {
 };
 
 const PEN = 48;
+/** `StackBlock.source.fontFamily` of a block composed from the piece library:
+ *  its letters come from no font. */
+export const TARKIB_FONT = "thuluth-pieces";
+/** The bundled font whose tashkeel fills a tarkib's gaps until the library
+ *  has its own Thuluth vowel signs. */
+export const TARKIB_SIGNS_FONT = "Thuluth";
 /** Letters whose flat or tail stroke may lengthen anywhere along it. */
 const FLATS = new Set(["ba", "seen", "sad", "ta", "fa", "kaf"]);
 const TAILS = new Set(["ya", "nun", "ra", "waw", "qaf"]);
@@ -140,7 +149,7 @@ function schemaOf(item: MarkItem, g: PieceGeometry | undefined): PieceSchema {
     stretch.push({ cutX: z.cutX, angle: z.angle, ...(z.window ? { window: z.window } : {}), side: "far", min: 0, max: tail && !flat ? 3 * PEN : 4 * PEN });
   }
   return {
-    id: item.id, letters, ...(entry ? { entry } : {}), ...(exit ? { exit } : {}), stretch,
+    id: item.id, itemId: item.id, letters, ...(entry ? { entry } : {}), ...(exit ? { exit } : {}), stretch,
     ownDots: (g?.dots ?? 0) > 0, ...(g?.noFreeEnd ? { noFreeEnd: true as const } : {}), reviewed: g?.reviewed ?? false,
   };
 }
@@ -175,9 +184,10 @@ export function loadTarkibLibrary(): Promise<TarkibLibrary> {
       if (form !== "starting" || single.has(`${skeleton}|middle`)) continue;
       const stand = list.flatMap((s): PieceSchema[] => {
         const foot = data.PIECE_GEOMETRY[s.id]?.foot;
-        return foot ? [{ ...s, letters: [{ ...s.letters[0], form: "middle" }], entry: { point: foot, angle: Math.PI }, standIn: true }] : [];
+        return foot ? [{ ...s, id: `${s.id}@middle`, letters: [{ ...s.letters[0], form: "middle" }], entry: { point: foot, angle: Math.PI }, standIn: true }] : [];
       });
       if (stand.length) single.set(`${skeleton}|middle`, stand);
+      for (const s of stand) schema.set(s.id, s);
     }
     const rank = (s: PieceSchema) => (s.reviewed ? 0 : 2) + (s.id.startsWith("thuluth-v") ? 0 : 1);
     for (const m of [single, multi]) for (const list of m.values()) list.sort((a, b) => rank(a) - rank(b));

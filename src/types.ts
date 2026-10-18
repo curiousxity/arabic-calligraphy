@@ -311,6 +311,17 @@ export type StackJoin = {
 
 /** A text block baked into movable letter pieces joined by synthesised
  *  curves. One-way; the spelling cannot be edited. */
+/** How a tarkib was composed from the Thuluth piece library, so it can be
+ *  composed again later (tarkib.md). */
+export type TarkibRecord = {
+  /** The phrase as composed, vowels included if any. */
+  phrase: string;
+  target: { kind: "template"; template: string; sizeFactor: number } | { kind: "guide"; guideId: number } | { kind: "box" } | { kind: "line" };
+  seed: number;
+  /** Schema ids of the pieces used, reading order. */
+  pieceIds: string[];
+};
+
 export type StackBlock = BlockCommon & {
   type: "stack";
   source: { text: string; fontFamily: string };
@@ -318,6 +329,8 @@ export type StackBlock = BlockCommon & {
   nib: { width: number; minFraction: number };
   pieces: StackPiece[];
   joins: StackJoin[];
+  /** Present on a block composed from the Thuluth piece library (tarkib.md). */
+  tarkib?: TarkibRecord;
 };
 
 export type GuideAttachment = {

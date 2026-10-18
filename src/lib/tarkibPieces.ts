@@ -36,7 +36,7 @@ export function buildPiece(
   opts: { splice?: { entry?: boolean; exit?: boolean } } = {}
 ): BuiltPiece {
   const s = lib.schema.get(schemaId);
-  const item = lib.items.get(schemaId);
+  const item = s && lib.items.get(s.itemId);
   if (!s || !item) throw new Error(`no piece ${schemaId}`);
   let cmds = parseSvgPath(item.d);
   const faces: CutFace[] = [];

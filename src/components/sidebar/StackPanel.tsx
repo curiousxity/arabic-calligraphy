@@ -13,8 +13,8 @@ export const StackPanel: React.FC<{
   <div className="sectionPanel">
     <p className="guideEmpty" dir="rtl">{block.source.text}</p>
     <p className="guideEmpty">
-      Baked from {block.source.fontFamily}. The spelling cannot be edited here — undo the
-      conversion, or convert a fresh text block.
+      {block.tarkib ? "Composed from the Thuluth pen pieces." : `Baked from ${block.source.fontFamily}.`} The
+      spelling cannot be edited here — undo the conversion, or convert a fresh text block.
     </p>
     <p className="guideEmpty">
       Move, tilt, bend and arrange the letters in the editor window. Double-click the

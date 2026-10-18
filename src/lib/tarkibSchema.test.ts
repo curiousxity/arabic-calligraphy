@@ -4,7 +4,8 @@ import { analyzePhrase } from "./tarkibText";
 import { formsFromName, loadTarkibLibrary } from "./tarkibSchema";
 import { splitAtCut } from "./stackGeometry";
 import { parseSvgPath } from "./svgPath";
-import { outlineBounds } from "./strokeCuts";
+import { flattenContours, outlineBounds } from "./strokeCuts";
+import { pointInPolygon } from "./svgPath";
 import type { SvgCmd } from "./svgPath";
 
 const lib = await loadTarkibLibrary();
@@ -30,7 +31,7 @@ describe("tarkib piece schema", () => {
     const usable = new Set([...lib.single.values(), ...lib.multi.values()].flat());
     for (const s of usable) for (const [face, keep] of [[s.entry?.face, "far"], [s.exit?.face, "near"]] as const) {
       if (!face) continue;
-      const r = splitAtCut(parseSvgPath(lib.items.get(s.id)!.d), face);
+      const r = splitAtCut(parseSvgPath(lib.items.get(s.itemId)!.d), face);
       expect(r, s.id).not.toBeNull();
       const kept = keep === "far" ? r!.far : r!.near, cut = keep === "far" ? r!.near : r!.far;
       expect(area(kept), s.id).toBeGreaterThan(area(cut));
@@ -54,15 +55,21 @@ describe("tarkib piece schema", () => {
     const mids = lib.single.get("jeem|middle")!;
     expect(mids.length).toBeGreaterThan(0);
     for (const s of mids.filter((m) => m.standIn)) {
+      expect(lib.schema.get(s.id)).toBe(s);
+      expect(s.id).toBe(`${s.itemId}@middle`);
       expect(s.letters[0].form).toBe("middle");
       expect(s.entry!.angle).toBeCloseTo(Math.PI);
       expect(s.exit).toBeDefined();
     }
   });
 
-  it("has a one-pen nuqta", () => {
+  it("has a pen-stamp nuqta: a rhombus with pen-wide sides, solid across", () => {
+    const contours = flattenContours(parseSvgPath(lib.nuqtaD)) as [number, number][][];
     const b = outlineBounds(parseSvgPath(lib.nuqtaD));
-    expect(b.x2 - b.x1).toBeGreaterThan(40);
-    expect(b.x2 - b.x1).toBeLessThan(56);
+    expect(b.x2 - b.x1).toBeGreaterThan(60);
+    expect(b.x2 - b.x1).toBeLessThan(76);
+    let solid = 0;
+    for (let x = -30; x <= 30; x += 2) if (contours.some((c) => pointInPolygon(x, 0, c))) solid++;
+    expect(solid).toBeGreaterThanOrEqual(29);
   });
 });

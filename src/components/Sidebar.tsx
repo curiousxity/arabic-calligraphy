@@ -108,6 +108,8 @@ export type SidebarProps = {
   onAddCustomFont?: (file: File, label?: string) => Promise<CustomFont | { error: string }>;
   /** Bake the selected text block into a stacked composition. */
   onConvertToStack?: () => void;
+  /** Compose the selected text from the Thuluth piece library (tarkib.md). */
+  onComposeInThuluth?: () => void;
   onEditStack?: () => void;
   /** Arrange the selected stack's letters inside a closed guide. */
   onRemoveCustomFont?: (key: string) => void;
@@ -329,6 +331,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   fontChoices = [],
   onAddCustomFont,
   onConvertToStack,
+  onComposeInThuluth,
   onEditStack,
   onRemoveCustomFont,
   missingFontKey = null,
@@ -1255,6 +1258,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={onConvertToStack}
                   >
                     Convert to stacked composition
+                  </button>
+                )}
+                {selectedBlock.type === "text" && onComposeInThuluth && (
+                  <button
+                    type="button"
+                    className="sidebarSmallAction"
+                    aria-label="Compose in Thuluth"
+                    title="Write this text with real Thuluth pen pieces, joined letter to letter. One-way; undo restores the text."
+                    onClick={onComposeInThuluth}
+                  >
+                    Compose in Thuluth
                   </button>
                 )}
 

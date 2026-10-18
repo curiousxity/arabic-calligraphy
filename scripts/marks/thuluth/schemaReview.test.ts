@@ -23,7 +23,7 @@ it.skipIf(!OUT)("writes the join review page", async () => {
     seen.add(k);
     const glyph = { standalone: l.char, starting: l.char + "ـ", middle: "ـ" + l.char + "ـ", finishing: "ـ" + l.char }[l.form];
     const pieces = [...(lib.single.get(k) ?? []), ...(lib.multi.get(k) ?? [])].map((s) => {
-      const it = lib.items.get(s.id)!;
+      const it = lib.items.get(s.itemId)!;
       return { uid: `${k}:${s.id}`, id: s.id, key: k, name: it.name, d: it.d, w: it.w, h: it.h, entry: s.entry, exit: s.exit,
         stretch: s.stretch, letters: s.letters, standIn: !!s.standIn };
     });

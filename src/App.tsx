@@ -159,7 +159,9 @@ import {
 import type { TextBlock, VerseLayout, VerseSettings } from "./types";
 import { buildCutPlan, cutAdvanceTotal, outlineBounds, remapCutsForEdits } from "./lib/strokeCuts";
 import { remapMarksForEdits } from "./lib/detachedMarks";
-import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
+import { FALLBACK_NIB_FLOOR, nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
+import { loadTarkibLibrary, TARKIB_FONT, TARKIB_SIGNS_FONT } from "./lib/tarkibSchema";
+import { chainPhraseOnLine } from "./lib/tarkibChain";
 import { fontSupportsKashida, shapeText } from "./lib/harfbuzz";
 import { convertRunToStack, fillerShapes, teardropShape, type UnjoinedPair } from "./lib/stackConvert";
 import { assembleStackOutline } from "./lib/stackOutline";
@@ -2135,7 +2137,9 @@ const App: React.FC = () => {
   /** The font's tashkeel for the editor's "Fill gaps"; teardrops when the font is unavailable. */
   const loadStackFillers = useCallback(async (b: StackBlock) => {
     try {
-      const shaped = await shapeText(b.source.text, resolveFontUrl(b.source.fontFamily));
+      // A tarkib's letters come from no font; its fillers come from the bundled Thuluth.
+      const family = b.source.fontFamily === TARKIB_FONT ? TARKIB_SIGNS_FONT : b.source.fontFamily;
+      const shaped = await shapeText(b.source.text, resolveFontUrl(family));
       return { fillers: fillerShapes(shaped.font, b.unitsPerEm, b.nib.width), note: "" };
     } catch {
       return { fillers: [teardropShape(b.nib.width)], note: " (font unavailable; teardrops used)" };
@@ -2992,6 +2996,39 @@ const App: React.FC = () => {
    * (they are keyed by glyph index, which an insertion shifts). A tatweel is
    * kept only at a slot it actually made joinable; the status says how many.
    */
+  // Tarkib: the selected text composed from the Thuluth piece library, for
+  // now on one line (the joins are what the user checks first). A stack
+  // block in library units, so the stack editor's tools apply. See
+  // .claude/rules/tarkib.md.
+  const composeSelectedInThuluth = async () => {
+    const source = selectedBlock;
+    if (!source || source.type !== "text") return;
+    if (source.text.trim() === "") { setExportStatus("Type some text into this block first."); return; }
+    try {
+      const lib = await loadTarkibLibrary();
+      const r = chainPhraseOnLine(lib, source.text);
+      if ("error" in r) { setExportStatus(`Can't compose: no Thuluth pieces for ${r.letters.join(" ")}`); return; }
+      const stack: StackBlock = {
+        id: source.id, type: "stack", name: source.name, text: source.text, x: source.x, y: source.y,
+        fontSize: source.fontSize, color: source.color, fontFamily: source.fontFamily, opacity: source.opacity,
+        stroke: source.stroke, strokeWidth: source.strokeWidth, shadowColor: source.shadowColor,
+        shadowBlur: source.shadowBlur, shadowOffsetX: source.shadowOffsetX, shadowOffsetY: source.shadowOffsetY,
+        shadowOpacity: source.shadowOpacity, locked: source.locked, rotation: source.rotation,
+        groupId: source.groupId, fill: source.fill,
+        source: { text: source.text, fontFamily: TARKIB_FONT },
+        unitsPerEm: MARK_UNITS_PER_EM,
+        nib: { width: 48, minFraction: FALLBACK_NIB_FLOOR },
+        pieces: r.pieces, joins: r.joins,
+        tarkib: { phrase: source.text, target: { kind: "line" }, seed: 0, pieceIds: r.pieceIds },
+      };
+      replaceBlockWithHistory(source.id, stack);
+      setExportStatus("Composed in Thuluth from the piece library.");
+    } catch (err) {
+      console.error("tarkib composition failed", err);
+      setExportStatus("Could not compose this block in Thuluth.");
+    }
+  };
+
   const convertSelectedBlockToStack = async () => {
     const source = selectedBlock;
     if (!source || source.type !== "text") return;
@@ -3302,6 +3339,7 @@ const App: React.FC = () => {
       <div style={{ display: "contents" }} inert={showStart || stackEditorId !== null}>
       <Sidebar
         onConvertToStack={convertSelectedBlockToStack}
+        onComposeInThuluth={composeSelectedInThuluth}
         onEditStack={selectedBlock && isStackBlock(selectedBlock) ? () => openStackEditor(selectedBlock.id) : undefined}
         blocks={blocks}
         selectedBlock={selectedBlock}

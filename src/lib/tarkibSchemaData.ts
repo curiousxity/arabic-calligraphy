@@ -2,7 +2,7 @@
 // Join cuts, stretch zones and dot counts of the Thuluth pieces (library units).
 import type { PieceGeometry } from "./tarkibSchema";
 
-export const NUQTA_D = "M4.3 25.9C1.5 24.0 -1.9 20.5 -2.7 19.0C-3.5 17.4 -4.3 17.0 -6.6 16.3C-8.5 15.5 -10.8 14.3 -12.4 13.2C-13.5 12.4 -16.3 10.1 -18.6 8.9C-24.4 4.3 -25.2 2.3 -22.8 -2.3C-20.5 -7.0 -17.8 -12.8 -17.0 -14.7C-16.6 -15.9 -15.9 -17.4 -15.5 -18.2C-15.1 -19.0 -13.9 -20.5 -13.2 -22.1C-10.8 -27.1 -7.7 -28.3 -3.5 -25.2C-1.9 -24.4 0.4 -22.8 1.5 -22.1C13.9 -13.9 17.8 -10.8 19.4 -8.5C19.7 -7.0 20.9 -6.2 20.9 -6.2C21.3 -6.2 22.5 -5.8 23.2 -5.0C25.2 -3.5 24.4 0.4 18.6 11.2C11.6 25.5 8.5 28.6 4.3 25.9Z";
+export const NUQTA_D = "M6 -34L34 -3L-6 34L-34 3Z";
 
 export const PIECE_GEOMETRY: Record<string, PieceGeometry> = {
   "thuluth-t1-15": {"left":{"point":[-44.5,-36.0],"angle":2.4371,"face":{"cutX":8.59,"angle":2.4371,"window":{"y":56.25,"half":19.1}}},"dots":0,"foot":[50.0,62.0]},
