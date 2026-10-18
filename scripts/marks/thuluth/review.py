@@ -207,7 +207,13 @@ SHEETS = {
     4: ("بمى beh of the ya type in a run ending in a long ya (to name)", (745,49,1113,229)),
     6: ("بر بن small-ya beh with ra and with nun, joined (map 5 and 6; to name)", (431,78,744,240)),
     7: ("بنه small-ya beh run (to name)", (267,114,440,222)), 8: ("بيم small-ya beh run with meem (to name)", (27,71,269,224)),
-  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4, 6, 7, 8)}},
+  }, "splits": {},
+  # The user's review (2026-10-17): 1's spur; 7's top line, nuqtas and the
+  # thin guide lines inside its ha; 8's guide lines at the tail's tip, at the
+  # ha's join and under the bowl.
+  "erase": {1: [(1497, 137, 1505, 143), "main"], 2: ["main"], 3: ["main"], 4: ["main"], 6: ["main"],
+            7: [(280, 128, 345, 134), (294, 131, 326, 150), ("thin", 297, 150, 318, 198, 4), "main"],
+            8: [(50, 136, 64, 141), (128, 132, 150, 139), ("thin", 50, 199, 125, 212, 4), (55, 203, 80, 210), "main"]}},
   "t8r2": {"file": "../thuluth-8-row2.png", "dot": 16, "units": {
     1: ("بلب initial, medial and final behs (to name)", (1219,114,1496,228)),
     2: ("a long run of joined behs, dotted circle (to name)", (613,111,1031,232)),
@@ -391,10 +397,12 @@ def assign(clean, units, splits, erase=None):
             elif it[0] == "thin":   # ("thin", x0, y0, x1, y1, r): inside the box, clear
                 # whatever a disc r px across can't fit in (guide lines, spurs),
                 # keeping the pen strokes they run along or cross
+                # (the disc is tried on the whole piece, so a stroke only
+                # grazing the box is judged by its full width)
                 _, x0, y0, x1, y1, r = it
-                box = sel[k][y0:y1, x0:x1].astype(np.uint8)
                 kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (r, r))
-                sel[k][y0:y1, x0:x1] = cv2.morphologyEx(box, cv2.MORPH_OPEN, kern) > 0
+                opened = cv2.morphologyEx(sel[k].astype(np.uint8), cv2.MORPH_OPEN, kern) > 0
+                sel[k][y0:y1, x0:x1] = opened[y0:y1, x0:x1]
             elif len(it) == 2:   # a point: drop the separate bit of this piece that holds it
                 n, lab = cv2.connectedComponents(sel[k].astype(np.uint8), connectivity=8)
                 i = lab[it[1], it[0]]

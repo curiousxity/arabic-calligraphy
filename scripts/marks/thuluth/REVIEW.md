@@ -427,9 +427,9 @@ alternates are thin and are cleaned away; they are listed above.
 | 15 | لا forced cases and line ends | 703 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 | 16 | لا second form | 715 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 | 17 | سلا end-only lam-alif | 733 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
-| 18 | حلا end-only lam-alif | 750 | traced 2026-10-17, clean; **waiting**: user unsure what it is (2026-10-17), see the note above |
-| 19 | هول standalone mursala lam | 722 | traced 2026-10-17, clean |
-| 20 | حل standalone mursala lam | 707 | traced 2026-10-17; **not added**: user says it looks cut off (2026-10-17). The trace matches the scan; its lam's tail is short, likely so 19's long tail can pass under it |
+| 18 | حلا lam-alif joined to the body of a ha: an edge case, not a separate letter (the user) | 750 | **in the library** 2026-10-17 as an edge-case part |
+| 19 | هول incomplete body of a lam ending a line: an edge case (the user) | 722 | **in the library** 2026-10-17 as an edge-case part |
+| 20 | حل incomplete body of a lam ending a line, mostly cut off: an edge case (the user) | 707 | **in the library** 2026-10-17 as an edge-case part ("use them as parts, but they won't be in use too often") |
 | 21 | صلى the old rule's lam | 796 | traced 2026-10-17, clean; **in the library** 2026-10-17 |
 
 ## Sheet t7 — the beh (three row images)
@@ -463,7 +463,7 @@ their start. Row 3: الباء مع الميم (beh with meem, piece 3).
 
 | piece | provisional name | status |
 |---|---|---|
-| r1 2 | بص beh joined to sad | split from 3 and cleaned 2026-10-17 (nuqta stubs off the sad); the sad's tail ends flat where it ran into the ta's stroke: **borrow a tail** in the sweep; awaiting the user's look |
+| r1 2 | بص beh joined to sad (sheet 7: the user will review it at the end) | split from 3 and cleaned 2026-10-17 (nuqta stubs off the sad); the sad's tail ends flat where it ran into the ta's stroke: **borrow a tail** in the sweep; awaiting the user's look |
 | r1 3 | بط beh joined to ta | split from 2, 2026-10-17; awaiting the user's look |
 | r1 4 | بغ beh with ghain | cleaned 2026-10-17 (guide lines, ticks; the ghain's own dot kept); awaiting the user's look |
 | r1 5 | ـق joined qaf body (the user, 2026-10-17) | cleaned 2026-10-17 (line and nuqta at the right, tick over the head, tail spur); awaiting the user's look |
@@ -507,13 +507,13 @@ this sheet; they are left for hand touch-up.
 
 | piece | provisional name | status |
 |---|---|---|
-| r1 1 | يـ initial beh of the ya type | traced; **needs cleanup**: a tick on the stroke |
-| r1 2 | بح beh with ha | traced, clean |
-| r1 3 | بح beh with ha, second | traced, clean |
-| r1 4 | بمى run ending in a long ya (to name) | traced, clean |
-| r1 6 | small-ya beh with ra and nun, joined (to name) | traced, clean |
-| r1 7 | small-ya beh run (to name) | traced; **needs cleanup**: measuring nuqtas and guide line joined to it |
-| r1 8 | small-ya beh run with meem (to name) | traced; **needs cleanup**: guide-line bits |
+| r1 1 | يـ initial beh of the ya type; the user reads it as a connecting stroke. Only note: the row heading | spur cleared 2026-10-17; awaiting the user's look (`review-r1-cleaned.png`) |
+| r1 2 | ـح joined ending ha body (the user) | **in the library** 2026-10-17 |
+| r1 3 | ـح joined ending ha body, second (the user) | **in the library** 2026-10-17 |
+| r1 4 | ـمى joined ending meem running into a joined ending ya body (the user) | **in the library** 2026-10-17 |
+| r1 6 | ـن joined ending nun body (the user) | **in the library** 2026-10-17 |
+| r1 7 | ـه joined ending ha (the user) | cleaned 2026-10-17 (top line, nuqtas, guide lines inside the ha; the hairline left side kept); awaiting the user's look |
+| r1 8 | small-ya beh run with meem (to name) | cleaned 2026-10-17 (lines at the tail's tip, at the join and under the bowl); awaiting the user's look. Stroke order on the sheet: 1 the head of the right tooth, 2 down its curve, 3 the turn at the base, 4 over the tall loop's peak, 5 the long tail sweeping left (the ٥ in the top-right corner is a height of five nuqtas, not a stroke) |
 | r2 1 | initial, medial and final behs (to name) | traced; **needs cleanup**: baseline bits under the teeth |
 | r2 2 | long run of joined behs (to name) | traced; **needs cleanup**: baseline bits under the teeth |
 | r2 3 | بلسة تليمة runs, stroke numbers (to name) | traced; **needs cleanup**: baseline bits; stroke numbers 1–7 read in review |
@@ -1494,6 +1494,13 @@ else on a sheet is added.
 | t6 21 | Lam, old rule: Muhaqqaq and uncomposed Thuluth (صلى) | `thuluth-t6-21` | 2026-10-17 |
 | t7 r1 10 | Joined meem, sloping tail (بم) | `thuluth-t7r1-10` | 2026-10-17 |
 | t7 r1 15 | Joined waw, straight tail (بو) | `thuluth-t7r1-15` | 2026-10-17 |
+| t6 18 | Lam-alif with a ha body, edge case (حلا) | `thuluth-t6-18` | 2026-10-17; an edge-case part |
+| t6 19 | Lam ending, incomplete body, edge case (هول) | `thuluth-t6-19` | 2026-10-17; an edge-case part |
+| t6 20 | Lam ending, mostly cut off, edge case (حل) | `thuluth-t6-20` | 2026-10-17; an edge-case part |
+| t8 r1 2 | Joined ending ha body (ـح) | `thuluth-t8r1-2` | 2026-10-17 |
+| t8 r1 3 | Joined ending ha body, second form (ـح) | `thuluth-t8r1-3` | 2026-10-17 |
+| t8 r1 4 | Joined ending meem into a joined ending ya (ـمى) | `thuluth-t8r1-4` | 2026-10-17 |
+| t8 r1 6 | Joined ending nun body (ـن) | `thuluth-t8r1-6` | 2026-10-17 |
 | outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1
