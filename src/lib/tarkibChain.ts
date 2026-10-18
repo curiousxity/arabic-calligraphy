@@ -176,6 +176,23 @@ export function pickTrims(as: readonly FaceCut[], bs: readonly FaceCut[], offset
   return { a: best!.a, b: best!.b };
 }
 
+/**
+ * The entry face with its two points labelled to match the exit face's
+ * across the bridge. A join pairs a with a and b with b; two cuts made on
+ * different pieces may run in opposite senses, and then the bridge's two
+ * edges cross (a twisted sliver). `at` is the entry piece's offset; both
+ * pieces are unrotated, so a face's world points are its own plus the offset.
+ */
+function alignFace(prev: StackPiece, exitIndex: number, entry: StackPiece["faces"][number], at: Pt): StackPiece["faces"][number] {
+  const ex = prev.faces[exitIndex];
+  const ea: Pt = [ex.a[0] + prev.x, ex.a[1] + prev.y], eb: Pt = [ex.b[0] + prev.x, ex.b[1] + prev.y];
+  const na: Pt = [entry.a[0] + at[0], entry.a[1] + at[1]], nb: Pt = [entry.b[0] + at[0], entry.b[1] + at[1]];
+  const m1: Pt = [(ea[0] + eb[0]) / 2, (ea[1] + eb[1]) / 2], m2: Pt = [(na[0] + nb[0]) / 2, (na[1] + nb[1]) / 2];
+  const t: Pt = [m2[0] - m1[0], m2[1] - m1[1]];
+  const side = (p: Pt, m: Pt) => Math.sign(t[0] * (p[1] - m[1]) - t[1] * (p[0] - m[0]));
+  return side(ea, m1) === side(na, m2) ? entry : { ...entry, a: entry.b, b: entry.a };
+}
+
 const shift = (p: StackPiece, d: Pt): StackPiece => ({ ...p, x: p.x + d[0], y: p.y + d[1], homeX: p.homeX + d[0], homeY: p.homeY + d[1] });
 
 export function chainRun(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, idPrefix: string, orderStart: number): ChainedRun {
@@ -199,11 +216,7 @@ export function chainRun(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, 
       const it = lib.items.get(n.itemId)!;
       off = [ex.point[0] + w[0] * JOIN_GAP - en.point[0], ex.point[1] + w[1] * JOIN_GAP - en.point[1] - it.h - PEN / 4];
     }
-    // pickTrims (deeper trims for room) made two clean joints worse on the
-    // first target (2026-10-18): the default trims stand until the bridge's
-    // own width is right
-    void off;
-    return { a: ex.face!, b: en.face! };
+    return pickTrims(ex.options ?? [ex.face!], en.options ?? [en.face!], off);
   });
   choice.schemaIds.forEach((sid, k) => {
     const s = schemas[k];
@@ -226,7 +239,10 @@ export function chainRun(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, 
       } else {
         at = [prevExit.world[0] - w[0] * OVERLAP - b.entry.point[0], prevExit.world[1] - w[1] * OVERLAP - b.entry.point[1]];
         // where the letters meet; both ends trimmed back, the pen stroke spans the gap
-        if (spliced[k - 1]) joins.push({ id: `j${prevExit.pieceId}-${id}`, from: { pieceId: prevExit.pieceId, faceIndex: prevExit.faceIndex! }, to: { pieceId: id, faceIndex: b.entry.faceIndex! }, bow: 0 });
+        if (spliced[k - 1]) {
+          b.piece.faces[b.entry.faceIndex!] = alignFace(pieces.find((p) => p.id === prevExit!.pieceId)!, prevExit.faceIndex!, b.piece.faces[b.entry.faceIndex!], at);
+          joins.push({ id: `j${prevExit.pieceId}-${id}`, from: { pieceId: prevExit.pieceId, faceIndex: prevExit.faceIndex! }, to: { pieceId: id, faceIndex: b.entry.faceIndex! }, bow: 0 });
+        }
       }
       meets.push({ exit: prevExit.world, entry: [at[0] + b.entry.point[0], at[1] + b.entry.point[1]] });
     }

@@ -7,6 +7,7 @@ import { transformCmds } from "./stackGeometry";
 import { flattenContours } from "./strokeCuts";
 import { pointInPolygon } from "./svgPath";
 import { scoreLayout } from "./tarkibScore";
+import type { StackPiece } from "../types";
 
 const lib = await loadTarkibLibrary();
 const NIB = { width: 48, minFraction: 0.5 };
@@ -76,6 +77,25 @@ describe("typical forms", () => {
     const nun = lib.items.get(lib.schema.get(ids[ids.length - 1])!.itemId)!;
     const ws = lib.single.get("nun|finishing")!.filter((s) => s.itemId.startsWith("thuluth-v")).map((s) => lib.items.get(s.itemId)!.w);
     expect(nun.w).toBeGreaterThan(Math.min(...ws));
+  });
+});
+
+describe("joins (the user: smooth joints are essential)", () => {
+  it("bridges every trimmed meeting without a twist: the two edges never cross", () => {
+    for (const text of ["أيمن", "الحب", "حياتي", "محمد"]) for (const run of analyzePhrase(text).words.flatMap((w) => w.runs)) {
+      if (run.letters.length < 2) continue;
+      const c = chainRun(lib, run, defaultChoice(lib, run)!, "p", 0);
+      const byId = new Map(c.pieces.map((p) => [p.id, p]));
+      for (const j of c.joins) {
+        const A = byId.get(j.from.pieceId)!, B = byId.get(j.to.pieceId)!;
+        const fa = A.faces[j.from.faceIndex], fb = B.faces[j.to.faceIndex];
+        const w = (p: [number, number], q: StackPiece): [number, number] => [p[0] + q.x, p[1] + q.y];
+        const [p1, p2, q1, q2] = [w(fa.a, A), w(fb.a, B), w(fa.b, A), w(fb.b, B)];
+        const side = (o: [number, number], p: [number, number], q: [number, number]) => Math.sign((p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]));
+        const cross = side(p1, p2, q1) !== side(p1, p2, q2) && side(q1, q2, p1) !== side(q1, q2, p2);
+        expect(cross, `${text} ${j.id}`).toBe(false);
+      }
+    }
   });
 });
 

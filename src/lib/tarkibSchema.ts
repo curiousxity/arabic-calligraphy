@@ -118,6 +118,8 @@ const boxArea = (cmds: SvgCmd[]) => { const b = outlineBounds(cmds); return (b.x
  *  never two inks overlapping at an angle (the user: "the joints need to be
  *  smooth. that is essential"). */
 export const JOIN_TRIM = PEN / 2;
+/** Radians: a designer's flat end within this of square across the stroke is joined at. */
+const FLAT_SQUARE = 0.45;
 /** The trims offered per end, units: the composer takes the shallowest pair
  *  that leaves the bridge room to taper and turn (tarkibChain.ts). */
 export const JOIN_DEPTHS = [PEN / 4, PEN / 2, (3 * PEN) / 4, PEN, 1.5 * PEN];
@@ -152,8 +154,26 @@ function joinEnd(cmds: SvgCmd[], end: JoinEnd | undefined, keep: "near" | "far")
   // First choice: square across the stroke as measured (tarkibEnds.ts), at
   // every depth the composer may pick from.
   const inward: Pt = [deeper * c, deeper * s];
-  const cuts = squareCuts(cmds, end.point, inward, JOIN_DEPTHS, keep === "near");
+  // Where the designer cut the end flat, the walk starts from that edge's
+  // middle: the meeting point may sit at one corner of it, and a cut from a
+  // corner runs diagonally and leaves the rest of the end standing.
+  const g = end.face, gc = Math.cos(g?.angle ?? 0), gs = Math.sin(g?.angle ?? 0);
+  const start: Pt = g?.window ? [g.cutX * gc - g.window.y * gs, g.cutX * gs + g.window.y * gc] : end.point;
+  const cuts = squareCuts(cmds, start, inward, JOIN_DEPTHS, keep === "near");
   const ok = cuts.map((f, i) => (f && accepts(f) ? { f, depth: JOIN_DEPTHS[i] } : null)).filter((o): o is { f: FaceCut; depth: number } => !!o);
+  // The designer's own flat end, where there is one and it lies square
+  // across the stroke as measured: the join is made right there (a trim
+  // inside it left the end's corner standing as a step).
+  let flat: FaceCut | null = null;
+  if (g?.window && ok.length) {
+    const w = g.window;
+    for (const half of WINDOW_GROWTH.map((k) => w.half * k[0] + k[1])) {
+      const f: FaceCut = { ...g, window: { y: w.y, half }, thickness: ok[0].f.thickness };
+      if (accepts(f)) { flat = f; break; }
+    }
+    if (flat && angleGap(flat.angle, ok[0].f.angle) > FLAT_SQUARE) flat = null;
+  }
+  if (flat) return { ...end, face: flat, options: [flat, ...ok.map((o) => o.f)] };
   if (ok.length) return { ...end, face: (ok.find((o) => o.depth >= JOIN_TRIM) ?? ok[ok.length - 1]).f, options: ok.map((o) => o.f) };
   const atMeeting: FaceCut = {
     cutX: end.point[0] * c + end.point[1] * s, angle: end.angle,

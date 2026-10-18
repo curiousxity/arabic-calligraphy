@@ -81,6 +81,19 @@ describe("tarkib piece schema", () => {
     expect(alif.ownDots).toBe(false);
   });
 
+  it("never trims away a counter: every join cut keeps all the piece's contours", () => {
+    const count = (c: SvgCmd[]) => c.filter((k) => k.type === "M").length;
+    for (const s of lib.schema.values()) {
+      const cmds = parseSvgPath(lib.items.get(s.itemId)!.d);
+      for (const [end, keep] of [["entry", "far"], ["exit", "near"]] as const) {
+        const f = s[end]?.face;
+        if (!f) continue;
+        const r = splitAtCut(cmds, f)!;
+        expect(count(keep === "far" ? r.far : r.near), `${s.id} ${end}`).toBe(count(cmds));
+      }
+    }
+  });
+
   it("keeps most generated join faces: a cut window wide enough for a tapering stroke", () => {
     // sized to the flat edge alone, 445 of 714 windows missed the stroke's
     // second crossing and the piece could only join by touch (no climbs)
