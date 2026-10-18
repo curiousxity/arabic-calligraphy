@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { MARK_GROUPS } from "./markLibrary";
+import { loadMarkGroups } from "./markLibrary";
 import { frameWindow } from "./frameWindow";
 import { outlineBounds } from "./strokeCuts";
 import { parseSvgPath } from "./svgPath";
 import { ringCounts, tileRing } from "./tileRing";
+
+const MARK_GROUPS = await loadMarkGroups();
 
 const tiles = MARK_GROUPS.flatMap((g) => g.items).filter((m) => m.tile);
 

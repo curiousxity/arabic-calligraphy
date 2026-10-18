@@ -69,6 +69,17 @@ commands: `parseSvgPath` flattens arcs. Size is `fontSize`:
 mark at a block's font size sits at its letters' scale. A new mark takes the
 selected block's size and colour.
 
+**Loaded on demand** (2026-10-18). `markLibraryData.ts` is ~1.9 MB and
+most sessions never use it, so nothing imports it statically:
+`loadMarkGroups()` fetches it as its own chunk, `useMarkGroups(enabled)`
+wraps that for components. The picker mounting (the Marks panel opened, or
+a mark selected) is what loads it; the Layers list loads it once a mark
+block exists, for names; until then `findMark` returns undefined.
+`isFrameMark` goes by id (`frames-…`) so it never needs the data. Tests
+`await loadMarkGroups()` at the top. Don't add a static import of the data
+file or of `MARK_GROUPS` anywhere; it pulls the whole library back into the
+main bundle.
+
 **The block** (`MarkBlock` in `types.ts`) stores `markId` *and* `markD`, so
 a save draws the same even if the library entry is renamed, re-traced or
 removed. `markFlipX` mirrors left–right; rotation is `BlockCommon.rotation`.

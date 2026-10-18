@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { MARK_GROUPS } from "./markLibrary";
+import { loadMarkGroups } from "./markLibrary";
 import { FRAME_PADDING, fitFrameToRect, frameWindow } from "./frameWindow";
 import { flattenContours } from "./strokeCuts";
 import { parseSvgPath, pointInPolygon } from "./svgPath";
+
+const MARK_GROUPS = await loadMarkGroups();
 
 // Every frame in the library must have an open window that holds no ink, so
 // framed text is never covered by its own frame.

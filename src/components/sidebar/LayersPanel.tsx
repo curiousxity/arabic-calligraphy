@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { GUIDE_SHAPE_LABELS } from "../../lib/guideShapes";
 import { findMark } from "../../lib/markLibrary";
+import { useMarkGroups } from "../../hooks/useMarkGroups";
 import type { Block } from "../../types";
 import { makeId } from "./utils";
 import {
@@ -68,6 +69,8 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   onZoomTo,
   onAddBlock,
 }) => {
+  // Marks are listed by their library name, so load the library once there is one.
+  useMarkGroups(blocks.some((b) => b.type === "mark"));
   const [mergeTarget, setMergeTarget] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");

@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { findMark, MARK_GROUPS, MARK_UNITS_PER_EM, markPxBounds, markPxCmds } from "./markLibrary";
+import { findMark, isFrameMark, loadMarkGroups, MARK_UNITS_PER_EM, markPxBounds, markPxCmds } from "./markLibrary";
+
+const MARK_GROUPS = await loadMarkGroups();
 
 const all = MARK_GROUPS.flatMap((g) => g.items);
 
 describe("mark library", () => {
+  it("tells a frame by its id alone, so it works before the library loads", () => {
+    for (const g of MARK_GROUPS) for (const m of g.items) expect(isFrameMark(m.id), m.id).toBe(g.id === "frames");
+  });
+
   it("has the five groups, every id unique", () => {
     expect(MARK_GROUPS.map((g) => g.id)).toEqual(["strokes", "heads", "dots", "signs", "thuluth", "frames"]);
     expect(new Set(all.map((m) => m.id)).size).toBe(all.length);

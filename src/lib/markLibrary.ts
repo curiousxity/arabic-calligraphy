@@ -3,9 +3,11 @@
  * that are placed on the canvas as `mark` blocks, not typed into text.
  *
  * Pure (no harfbuzz, no React). The outlines themselves live in the generated
- * `markLibraryData.ts`. See .claude/rules/marks.md.
+ * `markLibraryData.ts`, which is loaded on demand (`loadMarkGroups`): it is
+ * megabytes of outlines, and most sessions never open the Marks panel. A
+ * placed mark carries its own outline (`markD`), so drawing never needs it.
+ * See .claude/rules/marks.md.
  */
-import { MARK_GROUPS } from "./markLibraryData";
 import { outlineBounds } from "./strokeCuts";
 import { parseSvgPath, type SvgCmd } from "./svgPath";
 import type { TileSpec } from "./tileRing";
@@ -26,7 +28,17 @@ export type MarkItem = {
 
 export type MarkGroup = { id: string; title: string; items: MarkItem[] };
 
-export { MARK_GROUPS };
+let loaded: MarkGroup[] | null = null;
+let pending: Promise<MarkGroup[]> | null = null;
+
+/** The library, fetched once (a separate chunk) and kept. */
+export function loadMarkGroups(): Promise<MarkGroup[]> {
+  pending ??= import("./markLibraryData").then((m) => (loaded = m.MARK_GROUPS));
+  return pending;
+}
+
+/** The library if it has loaded, else null. */
+export const loadedMarkGroups = (): MarkGroup[] | null => loaded;
 
 /**
  * Library units per em. The sheet the library was traced from has letters
@@ -37,8 +49,9 @@ export const MARK_UNITS_PER_EM = 400;
 
 export const markScale = (fontSize: number) => fontSize / MARK_UNITS_PER_EM;
 
+/** A library entry by id; undefined until the library has loaded. */
 export function findMark(id: string): MarkItem | undefined {
-  for (const g of MARK_GROUPS) {
+  for (const g of loaded ?? []) {
     const it = g.items.find((m) => m.id === id);
     if (it) return it;
   }
@@ -79,5 +92,6 @@ export function markPxBounds(cmds: SvgCmd[]) {
 /** The library group whose marks are frames: picked with a block selected,
  *  one wraps that block (see `fitFrameToRect`) instead of being placed. */
 export const FRAMES_GROUP_ID = "frames";
-export const isFrameMark = (id: string) =>
-  MARK_GROUPS.some((g) => g.id === FRAMES_GROUP_ID && g.items.some((it) => it.id === id));
+/** By id alone (every frame's id is `frames-…`), so it answers before the
+ *  library has loaded, e.g. for a frame in a project just opened. */
+export const isFrameMark = (id: string) => id.startsWith(`${FRAMES_GROUP_ID}-`);

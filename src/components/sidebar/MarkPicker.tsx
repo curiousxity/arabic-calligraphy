@@ -1,4 +1,5 @@
-import { MARK_GROUPS, type MarkItem } from "../../lib/markLibrary";
+import type { MarkItem } from "../../lib/markLibrary";
+import { useMarkGroups } from "../../hooks/useMarkGroups";
 
 /**
  * The mark library as a grid of preview buttons, one fold per group. Used by
@@ -13,9 +14,12 @@ export function MarkPicker({
   /** Highlights the selected mark's own shape. */
   currentId?: string;
 }) {
+  // Mounting the picker (opening the Marks panel, or selecting a mark) is what loads the library.
+  const groups = useMarkGroups();
+  if (!groups) return <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Loading marks…</div>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {MARK_GROUPS.map((g) => (
+      {groups.map((g) => (
         <details key={g.id} className="sidebarMarkGroup" open={g.items.some((it) => it.id === currentId)}>
           <summary>{g.title}</summary>
           <div className="sidebarMarkGrid">
