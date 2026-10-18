@@ -191,6 +191,7 @@ GROUPS = [
     ("t6","19","Lam ending, incomplete body, edge case (هول)"),("t6","20","Lam ending, mostly cut off, edge case (حل)"),
     ("t8r1","2","Joined ending ha body (ـح)"),("t8r1","3","Joined ending ha body, second form (ـح)"),
     ("t8r1","4","Joined ending meem into a joined ending ya (ـمى)"),("t8r1","6","Joined ending nun body (ـن)"),
+    ("t8r1","1","Ba, starting, first alternate, head (بـ)"),("t8r1","7","Ha, terminal (ـه)"),
     ("t9r1","2","Starting jeem, head angle 1 (جـ)"),
     ("t9r2","5","Ha before an extension: six nuqtas (حم)"),("t9r2","2","Ha before a low letter: six nuqtas (حسا)"),
     ("t9r2","6","Ha, the rule for al-Rahman (حمل)"),("t9r2","7","Ha with meem, second (حم)"),

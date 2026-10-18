@@ -533,13 +533,13 @@ this sheet; they are left for hand touch-up.
 
 | piece | provisional name | status |
 |---|---|---|
-| r1 1 | يـ initial beh of the ya type; the user reads it as a connecting stroke. Only note: the row heading | spur cleared 2026-10-17; awaiting the user's look (`review-1-cleaned.png`) |
+| r1 1 | بـ ba, starting, first alternate, head (the user: @(*1 of a ba) | **in the library** 2026-10-18 |
 | r1 2 | ـح joined ending ha body (the user) | **in the library** 2026-10-17 |
 | r1 3 | ـح joined ending ha body, second (the user) | **in the library** 2026-10-17 |
 | r1 4 | ـمى joined ending meem running into a joined ending ya body (the user) | **in the library** 2026-10-17 |
 | r1 6 | ـن joined ending nun body (the user) | **in the library** 2026-10-17 |
-| r1 7 | ـه joined ending ha (the user) | cleaned 2026-10-17 (top line, nuqtas, guide lines inside the ha, the measuring circle on the hairline's top, a guide-line join on the left side; the hairline left side kept); awaiting the user's look |
-| r1 8 | small-ya beh run with meem (to name) | cleaned 2026-10-17 (lines at the tail's tip, at the join and under the bowl); awaiting the user's look. Stroke order on the sheet: 1 the head of the right tooth, 2 down its curve, 3 the turn at the base, 4 over the tall loop's peak, 5 the long tail sweeping left (the ٥ in the top-right corner is a height of five nuqtas, not a stroke) |
+| r1 7 | ـه ha, terminal (the user: correct) | **in the library** 2026-10-18 |
+| r1 8 | ـحـم middle ha with a terminal meem (the user, 2026-10-18); the meem's tail is cut off: **borrow a tail** from sheet 33 | cleaned 2026-10-17 (lines at the tail's tip, at the join and under the bowl); awaiting the user's look. Stroke order on the sheet: 1 the head of the right tooth, 2 down its curve, 3 the turn at the base, 4 over the tall loop's peak, 5 the long tail sweeping left (the ٥ in the top-right corner is a height of five nuqtas, not a stroke) |
 | r2 1 | بلب initial, medial and final behs (to name) | cleaned 2026-10-17 (the thin upright and the bottom line the user called stray, the lam's spur, ticks over the bowls); awaiting the user's look (`review-2-cleaned.png`) |
 | r2 2 | long run of joined behs (to name) | cleaned 2026-10-17 (spurs and straight lines); awaiting the user's look |
 | r2 3 | بلسة beh run (to name) | split from 4 and cleaned 2026-10-17 (stray lines, the baseline fused under the seen, spurs); awaiting the user's look. Stroke order on the sheet: 1 down the first tooth's head, 2 up into the second tooth, 3 down from the lam's top, 4 the lam's base turning left, 5 into the seen's teeth, 6 along the seen's bowl, 7 over the ta marbuta's top, 8 down its left side and back up |
@@ -1102,6 +1102,15 @@ under it), part 2 (a long practice run with a guide line and a note above
 it), parts 3 and 4 (small signs: an ornamental knot, a double stroke), part
 5 (سلة-like with small marks). Parts 1, 2, 5 **need cleanup**; 3 and 4 are
 small signs for the marks side, clean.
+
+## Sheet t33 — every terminal meem (`thuluth-33-meem-terminal-src.png`)
+
+Sent by the user 2026-10-18 ("Lets make this easier. the attached is all
+the $ forms of meem in black"): twenty terminal meems in black, each with
+the letter before it in grey for context. A clean drawing, not a scan. The
+grey is removed in `thuluth-33-meem-terminal.png` (black kept with its own
+edge), then mapped and traced as `t33r1` (pen 12.8 px, so 3.75 units per
+px). A source for borrowing meem tails too (t8 7).
 
 ## Sheet t20 — finished pieces: al-Fatiha, line by line (white on black)
 
