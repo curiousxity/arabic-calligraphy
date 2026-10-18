@@ -15,6 +15,23 @@ from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+
+def nearer_to(px, py, r=3):
+    """A split rule for two shapes joined only by guide lines: with those thin
+    lines opened away (a disc r px across), each pixel goes to whichever
+    remaining shape is nearer; True for the shape holding (px, py)."""
+    def rule(xs, ys):
+        x0, y0 = xs.min(), ys.min()
+        m = np.zeros((ys.max() - y0 + 1, xs.max() - x0 + 1), np.uint8); m[ys - y0, xs - x0] = 1
+        core = cv2.morphologyEx(m, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (r, r)))
+        _, lab = cv2.connectedComponents(core, connectivity=8)
+        mine = lab == lab[py - y0, px - x0]
+        assert mine.any() and lab[py - y0, px - x0] > 0, ("point is not on a shape", px, py)
+        dm = cv2.distanceTransform((~mine).astype(np.uint8), cv2.DIST_L2, 3)
+        do = cv2.distanceTransform(((core > 0) & ~mine == 0).astype(np.uint8), cv2.DIST_L2, 3)
+        return (dm <= do)[ys - y0, xs - x0]
+    return rule
+
 # One entry per sheet. `units`: piece number -> (name, box in source px),
 # right to left, top to bottom. `splits`: a component touching two pieces,
 # found by its bounding box's top-left, split by a pixel rule.
@@ -212,16 +229,35 @@ SHEETS = {
   # thin guide lines inside its ha; 8's guide lines at the tail's tip, at the
   # ha's join and under the bowl.
   "erase": {1: [(1497, 137, 1505, 143), "main"], 2: ["main"], 3: ["main"], 4: ["main"], 6: ["main"],
-            7: [(280, 128, 345, 134), (294, 131, 326, 150), ("thin", 297, 150, 318, 198, 4), "main"],
+            7: [(280, 128, 345, 134), (294, 131, 326, 150), ("thin", 297, 150, 318, 198, 4), (290, 133, 296, 145), (283, 133, 286, 145), ("poly", [(292, 175), (301, 175), (301, 186), (298, 187)]), "main"],
             8: [(50, 136, 64, 141), (128, 132, 150, 139), ("thin", 50, 199, 125, 212, 4), (55, 203, 80, 210), "main"]}},
   "t8r2": {"file": "../thuluth-8-row2.png", "dot": 16, "units": {
     1: ("بلب initial, medial and final behs (to name)", (1219,114,1496,228)),
     2: ("a long run of joined behs, dotted circle (to name)", (613,111,1031,232)),
-    3: ("بلسة تليمة beh runs with stroke numbers (to name)", (24,89,523,256)),
-  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3)}},
+    3: ("بلسة beh run with stroke numbers (to name)", (262,89,523,256)),
+    4: ("تليمة beh run with stroke numbers (to name)", (24,89,290,256)),
+  },
+  # 3 was two words joined only by the baseline: بلسة on the right (3),
+  # تليمة on the left (4)
+  "splits": {(39, 104): (3, 4, nearer_to(449, 192))},
+  # The user's review (2026-10-17): stray lines and spurs. A thin pass over
+  # the whole piece takes the hairline guide lines first.
+  "erase": {
+    # the lam's spur, the ticks over each bowl
+    1: [("thin", 0, 0, 1600, 300, 3), (1428, 165, 1432, 174), (1411, 182, 1416, 187), (1437, 183, 1442, 188), "main"],
+    2: [("thin", 0, 0, 1600, 300, 3), (678, 212, 683, 216), "main"],
+    # the baseline fused under the seen's bowl, a knob under the first tooth
+    3: [("thin", 0, 0, 1600, 300, 3), (346, 207, 382, 212), (408, 202, 416, 207), "main"],
+    # the tail tip's spur, a bump on the meem, a tick under the lam's bowl
+    4: [("thin", 0, 0, 1600, 300, 3), (43, 179, 48, 184), (200, 182, 205, 186), (264, 181, 268, 185), "main"],
+  }},
   "t8r3": {"file": "../thuluth-8-row3.png", "dot": 16, "units": {
     1: ("one word: a run of joined behs ending in ة (to name)", (5,9,407,140)),
-  }, "splits": {}, "erase": {1: ["main"]}},
+  }, "splits": {},
+  # The user's review (2026-10-17): the guide-line stub at the ta marbuta's
+  # crossing, the baseline fused under the strokes, small ticks and knobs
+  "erase": {1: [("thin", 0, 0, 420, 160, 3), (50, 44, 56, 49), (78, 119, 125, 123), (150, 119, 170, 123),
+                (226, 120, 234, 124), (338, 38, 342, 42), (389, 87, 393, 93), (366, 111, 374, 115), "main"]}},
   # Sheet 9, the jeem family, three rows (mapped 2026-10-17). Rows 2 and 3
   # are scanned larger (pen 17.2 and 17.6 px), so each has its own unit.
   "t9r1": {"file": "../thuluth-9-row1.png", "dot": 16, "units": {
@@ -394,6 +430,11 @@ def assign(clean, units, splits, erase=None):
             if it == "main":   # keep only the piece's largest separate shape
                 n, lab, st, _ = cv2.connectedComponentsWithStats(sel[k].astype(np.uint8), 8)
                 if n > 2: sel[k] = lab == 1 + int(np.argmax(st[1:, 4]))
+            elif it[0] == "poly":   # ("poly", [(x, y), ...]): clear inside a polygon,
+                # for an edge that runs on a slant where a box would notch it
+                m = np.zeros(sel[k].shape, np.uint8)
+                cv2.fillPoly(m, [np.array(it[1], np.int32)], 1)
+                sel[k][m > 0] = False
             elif it[0] == "thin":   # ("thin", x0, y0, x1, y1, r): inside the box, clear
                 # whatever a disc r px across can't fit in (guide lines, spurs),
                 # keeping the pen strokes they run along or cross

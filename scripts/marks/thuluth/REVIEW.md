@@ -507,17 +507,18 @@ this sheet; they are left for hand touch-up.
 
 | piece | provisional name | status |
 |---|---|---|
-| r1 1 | يـ initial beh of the ya type; the user reads it as a connecting stroke. Only note: the row heading | spur cleared 2026-10-17; awaiting the user's look (`review-r1-cleaned.png`) |
+| r1 1 | يـ initial beh of the ya type; the user reads it as a connecting stroke. Only note: the row heading | spur cleared 2026-10-17; awaiting the user's look (`review-1-cleaned.png`) |
 | r1 2 | ـح joined ending ha body (the user) | **in the library** 2026-10-17 |
 | r1 3 | ـح joined ending ha body, second (the user) | **in the library** 2026-10-17 |
 | r1 4 | ـمى joined ending meem running into a joined ending ya body (the user) | **in the library** 2026-10-17 |
 | r1 6 | ـن joined ending nun body (the user) | **in the library** 2026-10-17 |
-| r1 7 | ـه joined ending ha (the user) | cleaned 2026-10-17 (top line, nuqtas, guide lines inside the ha; the hairline left side kept); awaiting the user's look |
+| r1 7 | ـه joined ending ha (the user) | cleaned 2026-10-17 (top line, nuqtas, guide lines inside the ha, the measuring circle on the hairline's top, a guide-line join on the left side; the hairline left side kept); awaiting the user's look |
 | r1 8 | small-ya beh run with meem (to name) | cleaned 2026-10-17 (lines at the tail's tip, at the join and under the bowl); awaiting the user's look. Stroke order on the sheet: 1 the head of the right tooth, 2 down its curve, 3 the turn at the base, 4 over the tall loop's peak, 5 the long tail sweeping left (the ٥ in the top-right corner is a height of five nuqtas, not a stroke) |
-| r2 1 | initial, medial and final behs (to name) | traced; **needs cleanup**: baseline bits under the teeth |
-| r2 2 | long run of joined behs (to name) | traced; **needs cleanup**: baseline bits under the teeth |
-| r2 3 | بلسة تليمة runs, stroke numbers (to name) | traced; **needs cleanup**: baseline bits; stroke numbers 1–7 read in review |
-| r3 1 | one word, behs ending in ة (to name) | traced; **needs cleanup**: baseline under it |
+| r2 1 | بلب initial, medial and final behs (to name) | cleaned 2026-10-17 (the thin upright and the bottom line the user called stray, the lam's spur, ticks over the bowls); awaiting the user's look (`review-2-cleaned.png`) |
+| r2 2 | long run of joined behs (to name) | cleaned 2026-10-17 (spurs and straight lines); awaiting the user's look |
+| r2 3 | بلسة beh run (to name) | split from 4 and cleaned 2026-10-17 (stray lines, the baseline fused under the seen, spurs); awaiting the user's look. Stroke order on the sheet: 1 down the first tooth's head, 2 up into the second tooth, 3 down from the lam's top, 4 the lam's base turning left, 5 into the seen's teeth, 6 along the seen's bowl, 7 over the ta marbuta's top, 8 down its left side and back up |
+| r2 4 | تليمة beh run (to name) | split from 3, 2026-10-17: the two words were joined only by the baseline. Cleaned (tail-tip spur, bumps); awaiting the user's look. Stroke order on the sheet: 1 under the meem's loop, 2 over the meem's top, heading left |
+| r3 1 | one word, behs ending in ة (to name) | cleaned 2026-10-17 (the guide-line stub at the ta marbuta, the baseline fused under the strokes, spurs; the measuring nuqtas beside the ta marbuta dropped); awaiting the user's look |
 
 ## Sheet t9 — the jeem family (row images)
 
@@ -1426,6 +1427,19 @@ whatever a disc r px across cannot fit in (a guide line, a spur) is cleared,
 and the pen strokes it runs along or crosses stay. Too large an r breaks a
 stroke at its thin neck (t7 r1 20 needed 3, not 5); follow it with "main" to
 drop what was cut loose.
+
+## Review pages are labelled by row (2026-10-17)
+
+A sheet split into row images numbers each row's pieces from 1, so one page
+showing two rows had two piece 1s. `reviewSheet.py` builds a review page
+with every piece labelled "row 2 · 1", "row 3 · 1" and so on; use it for
+every page shown to the user.
+
+`erase` also takes `("poly", [(x, y), ...])`, clearing inside a polygon, for
+a guide line meeting a stroke on a slant, where a box would notch the edge.
+A split rule `nearer_to(x, y)` separates two shapes joined only by thin
+guide lines: it opens the lines away, then gives each pixel to the nearer
+shape (sheet 8 row 2's بلسة and تليمة).
 
 ## Hand touch-ups (`touchup/`)
 
