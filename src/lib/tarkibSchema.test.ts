@@ -71,6 +71,19 @@ describe("tarkib piece schema", () => {
     for (const s of mids.filter((m) => m.ownDots)) expect(["ج", "خ"]).toContain(s.letters[0].char);
   });
 
+  it("draws every source at one scale: the bought alifs stand within a quarter of the scans' alif", () => {
+    // the bought alif cells were once cut ~1.5x too large (their upright
+    // stems measured as the full pen): thuluth/nibScale.py corrects them
+    const median = (xs: number[]) => xs.sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+    const alifs = lib.single.get("alif|standalone")!.filter((s) => !s.standIn);
+    const h = (re: RegExp) => median(alifs.filter((s) => re.test(s.itemId)).map((s) => lib.items.get(s.itemId)!.h));
+    const scans = h(/^thuluth-(?![vw]\d)/);
+    for (const re of [/^thuluth-v\d/, /^thuluth-w\d/]) {
+      expect(h(re) / scans, String(re)).toBeGreaterThan(0.8);
+      expect(h(re) / scans, String(re)).toBeLessThan(1.25);
+    }
+  });
+
   it("has a pen-stamp nuqta: a rhombus with pen-wide sides, solid across", () => {
     const contours = flattenContours(parseSvgPath(lib.nuqtaD)) as [number, number][][];
     const b = outlineBounds(parseSvgPath(lib.nuqtaD));

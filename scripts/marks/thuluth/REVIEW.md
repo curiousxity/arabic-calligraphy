@@ -1871,3 +1871,20 @@ What this ledger promised, or the work needs, and does not yet have:
 10. **Join review** of the 142 first-phrase pieces (page above) is waiting
    on the user, and so are the scanned pieces' join ends, which have no grey
    neighbours to read from.
+
+## One scale across the sources (2026-10-18)
+
+The user, on the first rendered line: "there is a real scale issue. A
+little variation is fine but that is too much." Cause: `vectorSheet.py`
+scales each cell by its strokes' thickness, and a broad nib draws an
+upright stroke thinner than a flat one, so the cells of uprights alone (the
+alifs, some lams) were cut ~1.5x too large: their stems 44-48 units where
+every kaf, lam and ta stem, scanned or bought, is 26-30. `nibScale.py`
+measures each sheet's alif and lam cells against its own kaf and ta stems
+and records the correction (`traces/nib-scale.json`); alif cells come out
+x0.58-0.78, the t34, t36, t38, t39 and t40 lam cells x0.63-0.90. The
+bought alifs now stand ~500 units against the scans' 534. Also the
+composer's default variant: the narrower half picked a sheet's smallest
+nun (read as a zay); it now takes the form nearest a lower-quartile width
+and the median height. Second-set middle cell 0 ("ث?") also reads as all
+uprights with alif-thick stems; it is left as cut, still to be identified.

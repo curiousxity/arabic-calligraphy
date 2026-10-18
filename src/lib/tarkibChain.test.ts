@@ -69,6 +69,16 @@ describe("defaultChoice", () => {
   });
 });
 
+describe("typical forms", () => {
+  it("does not pick a sheet's smallest form: a final nun reads as a nun, not a zay", () => {
+    const run = analyzePhrase("أيمن").words[0].runs[1];        // ي م ن
+    const ids = defaultChoice(lib, run)!.schemaIds;
+    const nun = lib.items.get(lib.schema.get(ids[ids.length - 1])!.itemId)!;
+    const ws = lib.single.get("nun|finishing")!.filter((s) => s.itemId.startsWith("thuluth-v")).map((s) => lib.items.get(s.itemId)!.w);
+    expect(nun.w).toBeGreaterThan(Math.min(...ws));
+  });
+});
+
 describe("sources", () => {
   it("prefers the first vector set, and takes a second-set piece only where the first has no real form", () => {
     const run = analyzePhrase("الحب").words[0].runs[1];     // ل ح ب: the ح is middle

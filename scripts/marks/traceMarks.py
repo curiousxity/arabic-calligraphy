@@ -339,6 +339,18 @@ for name in SCANNED+list(VECTOR):
         _fresh[h]=_cache[h]
         outs[name][k]={**v,**_cache[h]}
 with open(_cpath,"w",encoding="utf-8",newline="\n") as fh: json.dump(_fresh,fh,separators=(",",":"))
+# A bought sheet's alif and lam cells were cut too large (their stems read
+# as the full pen): thuluth/nibScale.py measures each against its sheet's
+# kaf and ta stems and records the correction, applied here about the
+# piece's centre (pieces are centred on their box).
+with open(os.path.join(HERE,"thuluth/traces/nib-scale.json"),encoding="utf-8") as fh: _nib=json.load(fh)
+def _scaled(v,f):
+    d=re.sub(r"-?\d+(?:\.\d+)?",lambda m: str(round(float(m.group())*f)),v["d"])
+    return {**v,"d":d,"w":round(int(v["w"])*f),"h":round(int(v["h"])*f)}
+for _name,_cells in _nib.items():
+    for _k,_v in list(outs[_name].items()):
+        _f=_cells.get("{},{}".format(*_v["cell"])) if "cell" in _v else None
+        if _f and (_name,_k) in _used: outs[_name][_k]=_scaled(_v,_f)
 for name in SHEETS:
     if name in TRACED: continue   # a review trace holds unapproved pieces too
     used={k for _,_,items in GROUPS for sh,k,_ in items if sh==name}

@@ -64,18 +64,22 @@ export function missingLetters(lib: TarkibLibrary, run: PhraseRun): string[] {
 const SOURCES = [/^thuluth-v\d/, /^thuluth-w\d/, /./];
 
 /** A plain, typical form from the best source's real forms in `list`: the
- *  narrower half (the less flourished: a straight alif, not a curved display
- *  one), then the median height among those (not the longest alif, not a
- *  cramped one). A stand-in is used only when no source has a real form. */
+ *  one nearest (by ratio) a lower-quartile width (the less flourished: a
+ *  straight alif, not a curved display one) and the median height (not the
+ *  longest alif, not a cramped one). Taking the narrower half outright picked
+ *  the smallest nun of a sheet, which read as a zay. A stand-in is used only
+ *  when no source has a real form. */
 function typical(lib: TarkibLibrary, list: PieceSchema[]): PieceSchema | undefined {
   const real = list.filter((s) => !s.standIn);
   const tier = SOURCES.map((re) => real.filter((s) => re.test(s.itemId))).find((t) => t.length);
   const pool = tier ?? list;
-  const h = (s: PieceSchema) => lib.items.get(s.itemId)?.h ?? 0;
-  const w = (s: PieceSchema) => lib.items.get(s.itemId)?.w ?? 0;
-  const ws = pool.map(w).sort((a, b) => a - b), medW = ws[Math.floor((ws.length - 1) / 2)];
-  const plain = pool.filter((s) => w(s) <= medW);
-  return plain.sort((a, b) => h(a) - h(b))[Math.floor((plain.length - 1) / 2)];
+  if (!pool.length) return undefined;
+  const h = (s: PieceSchema) => lib.items.get(s.itemId)?.h || 1;
+  const w = (s: PieceSchema) => lib.items.get(s.itemId)?.w || 1;
+  const at = (xs: number[], q: number) => xs.sort((a, b) => a - b)[Math.floor((xs.length - 1) * q)];
+  const tw = at(pool.map(w), 0.25), th = at(pool.map(h), 0.5);
+  const off = (s: PieceSchema) => Math.abs(Math.log(w(s) / tw)) + Math.abs(Math.log(h(s) / th));
+  return pool.reduce((best, s) => (off(s) < off(best) ? s : best));
 }
 
 /** Multi-letter pieces where one spells the run (the calligrapher's own
