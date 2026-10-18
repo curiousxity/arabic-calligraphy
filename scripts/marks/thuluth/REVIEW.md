@@ -1461,6 +1461,51 @@ A split rule `nearer_to(x, y)` separates two shapes joined only by thin
 guide lines: it opens the lines away, then gives each pixel to the nearer
 shape (sheet 8 row 2's بلسة and تليمة).
 
+## Cleanup sweep, sheets 7-19 (2026-10-17)
+
+The user: "go through the rest and revise the cleaned up ones again so I
+don't have to repeat myself." Every piece not yet in the library was cleaned
+again and traced; review pages are rebuilt (numbers unchanged; new pieces
+take the next free number). What the earlier rounds taught, now applied
+everywhere:
+
+- **Guide lines and pencil marks fused to a letter** go automatically
+  (`"auto"` erase): a thin bit is dropped when its darker quarter is clearly
+  lighter than the piece's own ink, and never when dropping it would cut a
+  large part of the letter loose. Hairline tips and the zulf stay. On the
+  very dark scans of sheets 16-19 the threshold has a floor, so light tail
+  tips stay too.
+- **Lines ruled in ink** (sheets 15 and 19), as dark as the letters, go by
+  length instead (`"lines"`).
+- **Measuring nuqtas sitting on a stroke, arrows, ticks and spurs** are
+  removed piece by piece, by box or polygon, checked close up.
+- **A kaf's small sign is kept** (`"add"` puts back a shape "keep the
+  largest" dropped): sheet 14 row 1's three kafs and row 5's first.
+- **Two words touching only through a guide line or a tip** are split into
+  separate pieces; two separate words that were always one piece stay one.
+- **Not letters**: a column of measuring nuqtas alone (t15 row 2 · 1, row
+  3 · 6, t17 row 6 · 3) and a handwritten note word (t16 row 6 · 5) are left
+  off the pages (`SKIP` in `review.py`).
+
+New pieces from splits: **t10 12** (the upper initial seen with its long
+sweep, split from 10, the lower word); **t16 35** (the word الله, split from
+1, which keeps the three lams; its alif is put back).
+
+Judgment calls for the user to confirm rather than re-review:
+- t13 14 (the fa construction drawing, row 4 · 1): the measuring nuqtas and
+  lines are gone, but small inner marks remain in the two fa heads. A hand
+  touch-up candidate.
+- t13 16 (row 4 · 3) is two words, فبو and a waw, kept as one piece like
+  the earlier approved two-word pieces.
+- t15 10 (row 2 · 7): a small dot inside the curl was left; it may be the
+  letter's own dot.
+- t16 8 (row 1 · 9): the dark square on top of the medial meem was kept as
+  the pen's start, not a nuqta.
+- t17 18 (row 6 · 4) is a construction drawing with guide lines through the
+  strokes: a hand touch-up candidate.
+- t17 20 (row 6 · 6): the dark shape inside the waw's head is kept as the
+  pen's turn.
+
 ## Hand touch-ups (`touchup/`)
 
 The user's suggestion (2026-10-17): erase leftovers by hand instead of in

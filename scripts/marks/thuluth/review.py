@@ -461,6 +461,16 @@ DRAFT_ERASE = {
             8: [("lines", 4), (746, 160, 783, 188), (786, 185, 802, 212), (660, 243, 684, 262), ("thin", 695, 276, 825, 290, 6), "main"],
             9: [("lines", 4), (403, 174, 458, 180), (416, 179, 436, 201), (415, 201, 436, 226), ("thin", 418, 196, 452, 203, 5),
                 ("thin", 480, 280, 525, 290, 5), "main"]},
+  # t16r1 1 was the three lams (اللام الاولى والوسطى والنهائية) joined to the
+  # word الله (لفظ الجلالة) where the lams' bowl tip touches الله's ha: split
+  # below (DRAFT_SPLITS); 1 keeps the lams, 10 is الله with its alif put back
+  # measuring nuqtas fused between the uprights and in the joins; small ticks
+  "t19r1": {1: [("lines", 4), "main"], 2: [("lines", 4), "main"]},   # ruled lines in ink
+  "t17r6": {5: [(797, 118, 823, 141), (823, 116, 846, 139), (744, 225, 753, 236), "main"],
+            6: [(531, 180, 551, 210), "main"],
+            7: [(203, 183, 216, 196), "main"]},
+  "t16r1": {8: [(347, 198, 365, 219), "main"], 9: [(85, 195, 91, 202), (114, 246, 125, 251), "main"],
+            1: [("lines", 5), "main"], 10: [("lines", 5), (1610, 201, 1630, 223), (1651, 205, 1672, 228), (1651, 158, 1668, 182), "main", ("add", 1725, 150)]},
   "t15r3": {**{n: [("lines", 5), "main"] for n in (5, 7, 8, 9)},
             # the row of measuring nuqtas on its line, and the nuqtas on the bowl
             1: [("lines", 5), (1795, 193, 1960, 232), ("thin", 1771, 225, 1975, 240, 5), (1935, 259, 1992, 283), "main"],
@@ -468,9 +478,15 @@ DRAFT_ERASE = {
             3: [("lines", 5), (1468, 149, 1497, 157), ("thin", 1355, 275, 1400, 298, 4), (1440, 258, 1447, 266), "main"]},
 }
 
+# Extra pieces and splits for draft rows: units added as {n: (name, box)},
+# splits as in SHEETS.
+DRAFT_UNITS = {"t16r1": {10: ("الله the word Allah (لفظ الجلالة), split from part 1", (1521, 75, 1745, 300))}}
+DRAFT_SPLITS = {"t16r1": {(1525, 79): (1, 10, lambda xs, ys: (xs >= 1745) | ((ys >= 262) & (xs >= 1645)))}}
+
 # Pieces that are not letters (a column of measuring nuqtas alone): kept in
 # the traces, left off the review pages.
-SKIP = {"t15r2 1", "t15r3 6"}
+SKIP = {"t15r2 1", "t15r3 6", "t17r6 3",
+        "t16r6 5"}   # a handwritten note word, not a letter
 
 # Draft sheets written by mapSheet.py (drafts/<key>.json): every piece is
 # "part N" and keeps only its main shape. A SHEETS entry of the same key wins.
@@ -479,9 +495,9 @@ for _f in sorted(_glob.glob(os.path.join(HERE, "drafts", "*.json"))):
     _k = os.path.splitext(os.path.basename(_f))[0]
     if _k in SHEETS: continue
     with open(_f, encoding="utf-8") as _fh: _d = _json.load(_fh)
-    SHEETS[_k] = {"file": _d["file"], "dot": _d["dot"], "unit": _d["unit"], "splits": {},
-                  "units": {int(n): (v[0], tuple(v[1])) for n, v in _d["units"].items()},
-                  "erase": {int(n): DRAFT_ERASE.get(_k, {}).get(int(n), ["main"]) for n in _d["units"]}}
+    SHEETS[_k] = {"file": _d["file"], "dot": _d["dot"], "unit": _d["unit"], "splits": DRAFT_SPLITS.get(_k, {}),
+                  "units": {**{int(n): (v[0], tuple(v[1])) for n, v in _d["units"].items()}, **DRAFT_UNITS.get(_k, {})},
+                  "erase": {int(n): DRAFT_ERASE.get(_k, {}).get(int(n), ["main"]) for n in list(_d["units"]) + list(DRAFT_UNITS.get(_k, {}))}}
 
 LAST_GRAY = None   # the scan clean_sheet last read, for the "auto" erase
 
@@ -500,7 +516,7 @@ for _k, _cfg in SHEETS.items():
         _items = _er.get(_n, [])
         if any(isinstance(i, tuple) and i[0] == "auto" for i in _items): continue
         if "main" not in _items: _items = _items + [("small", round(3 * _pen * _pen))]
-        _er[_n] = [("auto", _r)] + _items
+        _er[_n] = [("auto", _r) if int(_m.group(1)) < 16 else ("auto", _r, 75)] + _items
 
 def clean_sheet(path, dot):
     global LAST_GRAY
@@ -558,7 +574,10 @@ def assign(clean, units, splits, erase=None):
                 # than the piece's own ink (pencil and printed rules are grey, a
                 # pen hairline is as dark as the stroke), so the zulf and other
                 # hairlines stay.
-                r = it[1]
+                # ("auto", r, floor): on a very dark scan the gap above the ink is
+                # floored, or a light hairline tip goes too (sheet 16: ink 12,
+                # tail tips 63-72, lines 90 and up)
+                r = it[1]; floor = it[2] if len(it) > 2 else 0
                 kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (r, r))
                 core = cv2.morphologyEx(sel[k].astype(np.uint8), cv2.MORPH_OPEN, kern) > 0
                 if not core.any(): continue
@@ -577,7 +596,7 @@ def assign(clean, units, splits, erase=None):
                     # the darker quarter decides: a thin tip still holds some
                     # ink-dark pixels, a pencil line none (t8 row 1 piece 8:
                     # its tail tip 46, lines 73-114, against ink 32)
-                    if np.percentile(gray[part], 25) <= ink + 35: continue
+                    if np.percentile(gray[part], 25) <= max(ink + 35, floor): continue
                     piece[part] = False
                     if n_big(piece) > kept: piece[part] = True
                 sel[k][bx] = piece
