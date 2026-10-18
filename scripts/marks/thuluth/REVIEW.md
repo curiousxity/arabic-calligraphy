@@ -556,18 +556,14 @@ kaf or lam).
 
 | piece | provisional name | status |
 |---|---|---|
-| r1 2 | جـ initial jeem, head angle 1 | traced, clean |
-| r1 3, 4 | جـ initial jeem, head angles 2 and 3 | traced; **needs cleanup**: measuring nuqtas inside, guide lines |
-| r1 5, 6 | ـجـ medial jeem, two forms | traced; **needs cleanup**: guide lines, nuqtas |
-| r1 7 | جـ over ح stacked, measuring grid | traced; **needs cleanup**: grid lines and nuqtas |
-| r2 5 | حم ha before an extension | traced, clean |
-| r2 2 | حسا ha before a low letter | traced, clean |
-| r2 6 | حمل the الرحمن rule | traced, clean |
-| r2 7 | حم second | traced, clean |
-| r3 1 | لحم لحم two words | traced, clean |
-| r3 2 | حم | traced, clean |
-| r3 3 | حكم | traced, clean |
-| r3 4 | حمر حر the open ha, two words | traced, clean |
+| r1 2 | جـ initial jeem, head angle 1 | the user: good. **In the library** 2026-10-17 |
+| r1 3, 4 | جـ initial jeem, head angles 2 and 3 | cleaned 2026-10-17 (stray lines, the nuqta inside each head, spurs); awaiting the user's look (`review-1-cleaned.png`) |
+| r1 5, 6 | ـجـ medial jeem, two forms | cleaned 2026-10-17 (stray lines; on 6 the guide lines fused along both strokes); awaiting the user's look. The user's "circle" by 6 was never part of the piece |
+| r1 7 | حـ starting ha (the user) | split 2026-10-17: the old 7 was three ha's stacked in one shape, cut where each body meets the next head on the left; lines and nuqtas cleared; awaiting the user's look |
+| r1 8 | ـحـ middle ha, joined on both sides (the user) | as 7 |
+| r1 9 | ـح joined terminal ha (the user) | as 7 |
+| r2 5, 2, 6, 7 | the four long-ha words | the user: all clean. **In the library** 2026-10-17 |
+| r3 1–4 | the ha joined after and before; the open ha | the user: all clean. **In the library** 2026-10-17 |
 
 ## Sheet t10 — the seen (row images)
 
@@ -1515,6 +1511,9 @@ else on a sheet is added.
 | t8 r1 3 | Joined ending ha body, second form (ـح) | `thuluth-t8r1-3` | 2026-10-17 |
 | t8 r1 4 | Joined ending meem into a joined ending ya (ـمى) | `thuluth-t8r1-4` | 2026-10-17 |
 | t8 r1 6 | Joined ending nun body (ـن) | `thuluth-t8r1-6` | 2026-10-17 |
+| t9 r1 2 | Starting jeem, head angle 1 (جـ) | `thuluth-t9r1-2` | 2026-10-17 |
+| t9 r2 (4 pieces) | the long-ha words; see `traceMarks.py` | `thuluth-t9r2-<n>` | 2026-10-17 (all of row 2) |
+| t9 r3 (4 pieces) | the joined and open ha; see `traceMarks.py` | `thuluth-t9r3-<n>` | 2026-10-17 (all of row 3) |
 | outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1

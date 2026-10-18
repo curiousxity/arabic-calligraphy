@@ -188,7 +188,12 @@ GROUPS = [
     ("t6","18","Lam-alif with a ha body, edge case (حلا)"),
     ("t6","19","Lam ending, incomplete body, edge case (هول)"),("t6","20","Lam ending, mostly cut off, edge case (حل)"),
     ("t8r1","2","Joined ending ha body (ـح)"),("t8r1","3","Joined ending ha body, second form (ـح)"),
-    ("t8r1","4","Joined ending meem into a joined ending ya (ـمى)"),("t8r1","6","Joined ending nun body (ـن)")]),
+    ("t8r1","4","Joined ending meem into a joined ending ya (ـمى)"),("t8r1","6","Joined ending nun body (ـن)"),
+    ("t9r1","2","Starting jeem, head angle 1 (جـ)"),
+    ("t9r2","5","Ha before an extension: six nuqtas (حم)"),("t9r2","2","Ha before a low letter: six nuqtas (حسا)"),
+    ("t9r2","6","Ha, the rule for al-Rahman (حمل)"),("t9r2","7","Ha with meem, second (حم)"),
+    ("t9r3","1","Ha joined after and before, two words (لحم لحم)"),("t9r3","2","Ha with meem (حم)"),
+    ("t9r3","3","Ha before kaf and meem (حكم)"),("t9r3","4","Open ha, two words (حمر حر)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
@@ -205,6 +210,9 @@ TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t6": ("thuluth/traces/t6/t6-traced.json", "thuluth-t6-"),
           "t7r1": ("thuluth/traces/t7/t7r1-traced.json", "thuluth-t7r1-"),
           "t8r1": ("thuluth/traces/t8/t8r1-traced.json", "thuluth-t8r1-"),
+          "t9r1": ("thuluth/traces/t9/t9r1-traced.json", "thuluth-t9r1-"),
+          "t9r2": ("thuluth/traces/t9/t9r2-traced.json", "thuluth-t9r2-"),
+          "t9r3": ("thuluth/traces/t9/t9r3-traced.json", "thuluth-t9r3-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))

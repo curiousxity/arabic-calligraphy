@@ -264,8 +264,24 @@ SHEETS = {
     2: ("جـ initial jeem, head angle 1 (measuring nuqtas)", (928,160,1076,254)),
     3: ("جـ initial jeem, head angle 2", (751,143,902,257)), 4: ("جـ initial jeem, head angle 3", (588,144,734,247)),
     5: ("ـجـ medial jeem, form 1", (406,134,581,255)), 6: ("ـجـ medial jeem, form 2", (228,132,385,257)),
-    7: ("جـ over ح stacked, with its measuring grid", (18,33,215,353)),
-  }, "splits": {}, "erase": {k: ["main"] for k in (2, 3, 4, 5, 6, 7)}},
+    7: ("حـ starting ha (top of three stacked)", (18,33,215,126)),
+    8: ("ـحـ middle ha, joined both sides (middle of three)", (18,126,215,177)),
+    9: ("ـح joined terminal ha (bottom of three)", (18,177,215,353)),
+  },
+  # The user's review (2026-10-17): 7 was three ha's stacked in one shape,
+  # cut where each one's body reaches the next one's head on the left.
+  "splits": {(33, 48): ([7, 8, 9], lambda xs, ys: np.where(ys < 126, 7, np.where(ys < 177, 8, 9)))},
+  # stray lines and nuqtas (the user): a thin pass, then the nuqtas inside
+  # the heads and the spurs by box
+  "erase": {2: ["main"],
+            3: [("thin", 0, 0, 1600, 400, 3), (784, 186, 805, 215), (801, 164, 807, 168), (779, 238, 785, 243), "main"],
+            4: [("thin", 0, 0, 1600, 400, 3), (636, 178, 657, 199), (637, 218, 646, 226), "main"],
+            5: [("thin", 0, 0, 1600, 400, 3), "main"],
+            6: [("thin", 0, 0, 1600, 400, 3), ("thin", 270, 195, 360, 240, 5), ("thin", 265, 160, 325, 185, 5),
+                ("poly", [(288, 172), (306, 161), (306, 176), (288, 176)]), ("poly", [(271, 180), (289, 173), (293, 185), (275, 185)]), ("poly", [(270, 234), (296, 219), (296, 237), (270, 237)]), "main"],
+            7: [("thin", 0, 0, 1600, 400, 5), (114, 111, 121, 116), "main"],
+            8: [("thin", 0, 0, 1600, 400, 5), "main"],
+            9: [("thin", 0, 0, 1600, 400, 5), (47, 262, 51, 275), "main"]}},
   "t9r2": {"file": "../thuluth-9-row2.png", "dot": 17, "unit": 48 / 17.2, "units": {
     5: ("حم ha followed by an extension: six nuqtas", (1043,135,1506,311)),
     2: ("حسا ha followed by a low letter: still six nuqtas", (688,18,1147,248)),
@@ -460,6 +476,11 @@ def _assign(clean, units, splits):
         comp = lab == i
         ys, xs = np.nonzero(comp)
         key = (int(st[i][0]), int(st[i][1]))
+        if key in splits and len(splits[key]) == 2:   # (pieces, rule -> piece per pixel)
+            ks, rule = splits[key]; r = rule(xs, ys)
+            for kk in ks:
+                if kk in sel: sel[kk][ys[r == kk], xs[r == kk]] = True
+            continue
         if key in splits:
             a, b, rule = splits[key]; r = rule(xs, ys)
             if a in sel: sel[a][ys[r], xs[r]] = True       # either piece may not be chosen
