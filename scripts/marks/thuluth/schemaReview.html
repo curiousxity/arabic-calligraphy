@@ -1,0 +1,165 @@
+<title>Thuluth Join Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Amiri&display=swap">
+<style>
+/* Layout: a sticky tally bar over a wrapping grid of piece cards, grouped by letter form. */
+:root {
+  --paper: #f3f4f1; --card: #fbfbf9; --ink: #1b1d22; --muted: #5f646d; --line: #d9dbd5;
+  --accent: #27406b; --entry: #c2410c; --exit: #15803d; --zone: #2563eb; --anchor: #7c3aed; --tint: #e6eaf1;
+  --right: #2f6b3f; --fix: #9a3b2a;
+  --display: "Spectral", Georgia, serif; --body: "IBM Plex Sans", system-ui, sans-serif; --arabic: "Amiri", "Traditional Arabic", serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #15171b; --card: #1d2026; --ink: #e8e9ec; --muted: #9aa0aa; --line: #30343c;
+  --accent: #8fb0e6; --entry: #fb923c; --exit: #4ade80; --zone: #60a5fa; --anchor: #c4b5fd; --tint: #252b36;
+  --right: #7cc58d; --fix: #e98b76; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #15171b; --card: #1d2026; --ink: #e8e9ec; --muted: #9aa0aa; --line: #30343c;
+  --accent: #8fb0e6; --entry: #fb923c; --exit: #4ade80; --zone: #60a5fa; --anchor: #c4b5fd; --tint: #252b36;
+  --right: #7cc58d; --fix: #e98b76; color-scheme: dark }
+body { background: var(--paper); color: var(--ink); font: 15px/1.45 var(--body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1280px; margin: 0 auto; }
+header.top { padding-block: 28px 8px; }
+h1 { font: 600 2rem/1.15 var(--display); margin: 0 0 6px; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0 0 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 5px; }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); border-bottom: 1px solid var(--line); }
+.bar .wrap { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding-block: 10px; }
+.tally { display: flex; gap: 14px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.status { margin-left: auto; color: var(--muted); font-size: 13px; }
+section.form { padding-block: 22px 4px; }
+section.form h2 { font: 600 1.25rem var(--display); margin: 0 0 12px; display: flex; gap: 10px; align-items: baseline; }
+section.form h2 small { font: 400 13px var(--body); color: var(--muted); }
+.ar { font-family: var(--arabic); font-size: 1.2em; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; min-width: 0; }
+.card.fixme { border-color: var(--fix); box-shadow: 0 0 0 1px var(--fix); }
+.art { aspect-ratio: 1 / 1; max-width: 100%; display: grid; place-items: center; padding: 10px; border-bottom: 1px solid var(--line); }
+.art svg { width: 100%; height: 100%; overflow: visible; }
+.art .ink { fill: var(--ink); fill-rule: nonzero; }
+.meta { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.label { font: 600 12px var(--body); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.name { overflow-wrap: anywhere; }
+.flag { font-size: 12px; background: var(--tint); border-radius: 4px; padding: 4px 7px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.seg button { font: 500 13px var(--body); border: 0; background: transparent; color: var(--ink); padding: 7px 4px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"][data-v="right"] { background: var(--right); color: var(--card); }
+.seg button[aria-pressed="true"][data-v="fix"] { background: var(--fix); color: var(--card); }
+textarea { font: 13px var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 6px; resize: vertical; min-height: 2.6em; width: 100%; box-sizing: border-box; }
+textarea[hidden] { display: none; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+footer { color: var(--muted); font-size: 13px; padding-block: 30px 40px; }
+</style>
+
+<header class="top wrap">
+  <h1>Thuluth Join Review</h1>
+  <p class="lede">These are the pieces the app can use for <span class="ar" lang="ar" dir="rtl">أُمّ أَيْمَن الحُبّ حَيَاتِي</span>, grouped by letter and form. On each one, check where the previous letter comes in, where the next letter leaves, which strokes may lengthen and where the vowels sit. Mark it <b>Right</b>, or <b>Fix</b> and say what's wrong. Choices save as you click.</p>
+  <div class="legend">
+    <span><i style="background:var(--entry)"></i>Previous letter comes in (arrow: pen direction)</span>
+    <span><i style="background:var(--exit)"></i>Next letter leaves</span>
+    <span><i style="background:var(--zone)"></i>Stroke that may lengthen</span>
+    <span><i style="background:var(--anchor)"></i>Vowel position (above and below)</span>
+  </div>
+</header>
+<div class="bar"><div class="wrap">
+  <div class="tally" aria-live="polite"><span><span id="nDone">0</span> of <span id="nAll">0</span> checked</span><span><span id="nFix">0</span> to fix</span></div>
+  <span class="status" id="status">Loading saved choices…</span>
+</div></div>
+<main class="wrap" id="main"></main>
+<footer class="wrap">A solid line across a stroke is a clean cut: a curved join can be drawn there. A dot with no line is a touch: the previous letter's stroke rests on this one. "Stands in" means the library has no middle form for this letter, so its starting form is used.</footer>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>
+(() => {
+  const groups = JSON.parse(document.getElementById("data").textContent);
+  const verdict = new Map(), note = new Map();
+  let coll = null;
+  const key = (id) => id.replace(/[^A-Za-z0-9_-]/g, "_");
+  const NS = "http://www.w3.org/2000/svg";
+  const main = document.getElementById("main");
+  const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  const cards = [];
+  function cutSeg(c) {           // a cut {cutX, angle, window} as a drawn segment
+    const cs = Math.cos(c.angle), sn = Math.sin(c.angle), y = c.window ? c.window.y : 0, h = c.window ? c.window.half : 40;
+    const P = (t) => [c.cutX * cs - t * sn, c.cutX * sn + t * cs];
+    return [P(y - h), P(y + h)];
+  }
+  function art(p) {
+    const pad = Math.max(p.w, p.h) * 0.18 + 30;
+    const svg = el("svg", { viewBox: `${-p.w / 2 - pad} ${-p.h / 2 - pad} ${p.w + 2 * pad} ${p.h + 2 * pad}`, role: "img", "aria-label": p.name });
+    svg.append(el("path", { d: p.d, class: "ink" }));
+    const sw = Math.max(p.w, p.h) / 90;
+    for (const z of p.stretch) { const [a, b] = cutSeg(z); svg.append(el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: "var(--zone)", "stroke-width": sw * 2.2, "stroke-linecap": "round", opacity: 0.8 })); }
+    for (const [end, col] of [[p.entry, "var(--entry)"], [p.exit, "var(--exit)"]]) {
+      if (!end) continue;
+      if (end.face) { const [a, b] = cutSeg(end.face); svg.append(el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: col, "stroke-width": sw * 1.6 })); }
+      const [x, y] = end.point, L = 34, ax = x + Math.cos(end.angle) * L, ay = y + Math.sin(end.angle) * L;
+      svg.append(el("line", { x1: x, y1: y, x2: ax, y2: ay, stroke: col, "stroke-width": sw * 1.4, "stroke-linecap": "round" }));
+      svg.append(el("circle", { cx: x, cy: y, r: sw * 3.2, fill: col }));
+    }
+    for (const l of p.letters) for (const a of [l.above, l.below]) svg.append(el("circle", { cx: a[0], cy: a[1], r: sw * 2.6, fill: "none", stroke: "var(--anchor)", "stroke-width": sw }));
+    return svg;
+  }
+  for (const g of groups) {
+    const sec = document.createElement("section"); sec.className = "form";
+    const h = document.createElement("h2"); const ar = document.createElement("span"); ar.className = "ar"; ar.lang = "ar"; ar.dir = "rtl"; ar.textContent = g.glyph;
+    const sm = document.createElement("small"); sm.textContent = `${g.title} · ${g.pieces.length} piece${g.pieces.length > 1 ? "s" : ""}`;
+    h.append(ar, sm);
+    const grid = document.createElement("div"); grid.className = "grid";
+    for (const p of g.pieces) {
+      const c = document.createElement("article"); c.className = "card";
+      const a = document.createElement("div"); a.className = "art"; a.append(art(p));
+      const m = document.createElement("div"); m.className = "meta";
+      const lab = document.createElement("div"); lab.className = "label"; lab.textContent = p.id.replace("thuluth-", "");
+      const nm = document.createElement("div"); nm.className = "name"; nm.textContent = p.name;
+      m.append(lab, nm);
+      if (p.standIn) { const f = document.createElement("div"); f.className = "flag"; f.textContent = "Stands in for a middle form"; m.append(f); }
+      const seg = document.createElement("div"); seg.className = "seg"; seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Verdict");
+      const ta = document.createElement("textarea"); ta.id = `n-${key(p.uid)}`; ta.placeholder = "What should change?"; ta.hidden = true;
+      for (const [v, t] of [["right", "Right"], ["fix", "Fix"]]) {
+        const b = document.createElement("button"); b.type = "button"; b.dataset.v = v; b.textContent = t; b.id = `v-${key(p.uid)}-${v}`;
+        b.addEventListener("click", () => save(p, v, ta.value)); seg.append(b);
+      }
+      let timer = 0;
+      ta.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => save(p, "fix", ta.value), 700); });
+      m.append(seg, ta);
+      c.append(a, m); grid.append(c); cards.push({ c, seg, ta, p });
+    }
+    sec.append(h, grid); main.append(sec);
+  }
+  document.getElementById("nAll").textContent = cards.length;
+  function render() {
+    let done = 0, fix = 0;
+    for (const { c, seg, ta, p } of cards) {
+      const v = verdict.get(p.uid); if (v) done++; if (v === "fix") fix++;
+      for (const b of seg.children) b.setAttribute("aria-pressed", String(b.dataset.v === v));
+      c.classList.toggle("fixme", v === "fix"); ta.hidden = v !== "fix";
+      if (document.activeElement !== ta && note.has(p.uid)) ta.value = note.get(p.uid);
+    }
+    document.getElementById("nDone").textContent = done; document.getElementById("nFix").textContent = fix;
+  }
+  const status = (t) => { document.getElementById("status").textContent = t; };
+  let writing = Promise.resolve();
+  function save(p, v, text) {
+    verdict.set(p.uid, v); note.set(p.uid, text || ""); render();
+    if (!coll) return;
+    status("Saving…");
+    writing = writing.then(() => coll.doc(key(p.uid)).set({ id: p.id, key: p.key, verdict: v, note: text || "" }))
+      .then(() => status("Saved"), (e) => status(e && e.code === "invalid_argument" ? "You can view this page but not change it." : "That didn't save. Click it again."));
+  }
+  render();
+  (async () => {
+    let db = null;
+    try { db = window.claude ? await window.claude.use("db") : null; } catch { db = null; }
+    if (!db) { status("Choices can't be saved in this view."); return; }
+    coll = db.collection("schema");
+    coll.onSnapshot((snap) => {
+      for (const d of snap.docs) { const b = d.data(); if (!b) continue; const uid = `${b.key}:${b.id}`; verdict.set(uid, b.verdict); note.set(uid, b.note || ""); }
+      render(); status(snap.size ? `${snap.size} saved` : "Nothing checked yet");
+    }, () => status("Saved choices didn't load. Reload the page."));
+  })();
+})();
+</script>

@@ -1770,3 +1770,16 @@ still need some cleaning up."** So:
   `smoothEdges.py` at generation: the scan's pixel ripple ironed out along
   each contour (Gaussian, 9 units; a pen is 48), corners held, re-traced.
   Cached in `traces/smoothed-cache.json` by outline.
+
+## Piece schema review (tarkib, 2026-10-18)
+
+The join points, stretch zones and vowel anchors of every piece the first
+tarkib phrase (أُمّ أَيْمَن الحُبّ حَيَاتِي) can use: 142 pieces over 12 letter
+forms, on https://claude.ai/artifact/JQ2AkG2BhekVbJfn7yoFrE (built by
+`schemaReview.test.ts` from `schemaReview.html`; verdicts in its `schema`
+collection, doc id = `<skeleton>_<form>_<piece id>`). A "fix" note goes into
+`schema-overrides.json`; a "right" sets `reviewed: true` there.
+Found while building it: the vector set's Part 2 is mostly *starting*
+forms (each drawn with its next letter in grey); a letter with no middle
+form uses its starting forms as stand-ins. Open question for the user:
+bring back the retired scanned middle jeem/ha (t9r1 5, 6, 8)?
