@@ -457,7 +457,7 @@ function arrangeAt(groups: Group[], shapePx: readonly Pt[], scale: number, upm: 
  * stays `amount`'s spread clear of every filler already placed.
  * Deterministic for the same input.
  */
-function fillGaps(
+export function fillGaps(
   poly: readonly Pt[], ink: readonly Contour[], fillers: readonly FillerShape[], upm: number, order: number, amount: number
 ): StackPiece[] {
   if (fillers.length === 0) return [];
@@ -514,7 +514,7 @@ function boxMeetsInk(b: Box, probes: readonly Pt[], ink: readonly Contour[]): bo
 }
 
 /** Every piece's ink as flattened world-space contours (font units). */
-function inkContours(pieces: readonly StackPiece[]): Contour[] {
+export function inkContours(pieces: readonly StackPiece[]): Contour[] {
   return pieces.flatMap((p) => flattenContours(transformCmds(p.cmds, pieceTransform(p))));
 }
 

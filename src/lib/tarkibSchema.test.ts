@@ -71,6 +71,15 @@ describe("tarkib piece schema", () => {
     for (const s of mids.filter((m) => m.ownDots)) expect(["ج", "خ"]).toContain(s.letters[0].char);
   });
 
+  it("keeps most generated join faces: a cut window wide enough for a tapering stroke", () => {
+    // sized to the flat edge alone, 445 of 714 windows missed the stroke's
+    // second crossing and the piece could only join by touch (no climbs)
+    let exits = 0, entries = 0;
+    for (const s of lib.schema.values()) { if (s.exit?.face) exits++; if (s.entry?.face) entries++; }
+    expect(exits).toBeGreaterThan(100);
+    expect(entries).toBeGreaterThan(100);
+  });
+
   it("draws every source at one scale: the bought alifs stand within a quarter of the scans' alif", () => {
     // the bought alif cells were once cut ~1.5x too large (their upright
     // stems measured as the full pen): thuluth/nibScale.py corrects them

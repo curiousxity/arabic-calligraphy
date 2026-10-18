@@ -63,6 +63,16 @@ export function missingLetters(lib: TarkibLibrary, run: PhraseRun): string[] {
  *  the first lacks. */
 const SOURCES = [/^thuluth-v\d/, /^thuluth-w\d/, /./];
 
+/** The real forms of the best source that has any (else all of `list`,
+ *  stand-ins included): one hand per letter. */
+function sourcePool(list: PieceSchema[]): PieceSchema[] {
+  const real = list.filter((s) => !s.standIn);
+  return SOURCES.map((re) => real.filter((s) => re.test(s.itemId))).find((t) => t.length) ?? list;
+}
+
+/** The single pieces the composer may swap in for `l`: the same hand as the default. */
+export const variantsFor = (lib: TarkibLibrary, l: PhraseLetter): PieceSchema[] => sourcePool(singlesFor(lib, l));
+
 /** A plain, typical form from the best source's real forms in `list`: the
  *  one nearest (by ratio) a lower-quartile width (the less flourished: a
  *  straight alif, not a curved display one) and the median height (not the
@@ -70,9 +80,7 @@ const SOURCES = [/^thuluth-v\d/, /^thuluth-w\d/, /./];
  *  the smallest nun of a sheet, which read as a zay. A stand-in is used only
  *  when no source has a real form. */
 function typical(lib: TarkibLibrary, list: PieceSchema[]): PieceSchema | undefined {
-  const real = list.filter((s) => !s.standIn);
-  const tier = SOURCES.map((re) => real.filter((s) => re.test(s.itemId))).find((t) => t.length);
-  const pool = tier ?? list;
+  const pool = sourcePool(list);
   if (!pool.length) return undefined;
   const h = (s: PieceSchema) => lib.items.get(s.itemId)?.h || 1;
   const w = (s: PieceSchema) => lib.items.get(s.itemId)?.w || 1;

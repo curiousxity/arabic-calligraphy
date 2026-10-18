@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STACK_TEMPLATES, templatePolygon } from "./stackTemplates";
+import { PANEL_ASPECT, STACK_TEMPLATES, templatePolygon } from "./stackTemplates";
 import { GUIDE_DEFAULTS } from "./guideShapes";
 
 const bounds = (poly: Array<[number, number]>) => {
@@ -9,11 +9,21 @@ const bounds = (poly: Array<[number, number]>) => {
 };
 
 describe("templatePolygon", () => {
-  it("lists teardrop and almond", () => {
-    expect(STACK_TEMPLATES).toEqual(["teardrop", "almond"]);
+  it("lists the guide shapes and the panels", () => {
+    expect(STACK_TEMPLATES).toEqual(["teardrop", "almond", "rectangle", "square", "circle"]);
   });
 
-  it.each(STACK_TEMPLATES)("%s: closed polygon, centred on the origin, height = ink height × factor, default aspect", (t) => {
+  it.each(["rectangle", "square", "circle"] as const)("%s: centred and the asked height", (t) => {
+    const poly = templatePolygon(t, 300, 1.5);
+    expect(poly.length).toBeGreaterThan(8);
+    const b = bounds(poly);
+    expect(b.h).toBeCloseTo(450, 0);
+    expect(b.w / b.h).toBeCloseTo(t === "circle" ? 1 : PANEL_ASPECT[t], 1);
+    expect((b.x1 + b.x2) / 2).toBeCloseTo(0, 0);
+    expect((b.y1 + b.y2) / 2).toBeCloseTo(0, 0);
+  });
+
+  it.each(["teardrop", "almond"] as const)("%s: closed polygon, centred on the origin, height = ink height × factor, default aspect", (t) => {
     const poly = templatePolygon(t, 300, 1);
     expect(poly.length).toBeGreaterThan(8);
     const b = bounds(poly);

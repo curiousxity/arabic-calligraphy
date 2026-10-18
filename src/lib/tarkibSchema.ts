@@ -111,10 +111,21 @@ const boxArea = (cmds: SvgCmd[]) => { const b = outlineBounds(cmds); return (b.x
  *  An end whose face fails still joins by touch, it just cannot be spliced. */
 function legal(cmds: SvgCmd[], end: JoinEnd | undefined, keep: "near" | "far"): JoinEnd | undefined {
   if (!end?.face) return end;
-  const r = splitAtCut(cmds, end.face);
-  const ok = r && (keep === "far" ? boxArea(r.far) > boxArea(r.near) : boxArea(r.near) > boxArea(r.far));
-  return ok ? end : { point: end.point, angle: end.angle };
+  const w = end.face.window;
+  // The generator sizes the window to the flat edge it found; a few units
+  // inside, where the cut runs, a tapering stroke is wider and its second
+  // crossing fell outside (445 of 714 faces). Widened step by step, the
+  // narrowest window that splits is kept, so the cut still never reaches a
+  // neighbouring stroke.
+  for (const half of w ? WINDOW_GROWTH.map((g) => w.half * g[0] + g[1]) : [0]) {
+    const face: FaceCut = w ? { ...end.face, window: { y: w.y, half } } : end.face;
+    const r = splitAtCut(cmds, face);
+    if (r && (keep === "far" ? boxArea(r.far) > boxArea(r.near) : boxArea(r.near) > boxArea(r.far))) return { ...end, face };
+  }
+  return { point: end.point, angle: end.angle };
 }
+/** Window half-widths tried, as (factor, added units): up to half a pen more. */
+const WINDOW_GROWTH: [number, number][] = [[1, 0], [1.25, 0], [1.5, 0], [1.5, 12], [1.5, 24]];
 
 /** Smallest difference between two angles, radians. */
 const angleGap = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));

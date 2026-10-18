@@ -59,12 +59,15 @@ const FIT_MARGIN = 0.12;
 /** Ticks closer than this are one slider drag. */
 const SLIDER_SETTLE_MS = 400;
 const inkHeight = (d: StackDraft, upm: number) => { const b = inkBoundsPx(d, upm); return b.y2 - b.y1; };
-const TEMPLATE_LABELS: Record<StackTemplate, string> = { teardrop: "Teardrop", almond: "Almond" };
+const TEMPLATE_LABELS: Record<StackTemplate, string> = { teardrop: "Teardrop", almond: "Almond", rectangle: "Rectangle", square: "Square", circle: "Circle" };
 
 /** Card glyphs: schematic, not the formula (the formula is what the arrange uses). */
 const TEMPLATE_ICON: Record<StackTemplate, string> = {
   teardrop: "M14 2 C 22 14, 26 22, 26 28 C 26 35, 20 39, 14 39 C 8 39, 2 35, 2 28 C 2 22, 6 14, 14 2 Z",
   almond: "M14 1 C 24 12, 24 29, 14 40 C 4 29, 4 12, 14 1 Z",
+  rectangle: "M1 11 H 27 V 30 H 1 Z",
+  square: "M2 8 H 26 V 32 H 2 Z",
+  circle: "M14 7 A 13 13 0 1 1 13.99 7 Z",
 };
 
 const GESTURES: Array<[string, string]> = [
