@@ -1541,8 +1541,8 @@ Judgment calls for the user to confirm rather than re-review:
   2026-10-17): it repeats clean forms found elsewhere.
 - t13 16 (row 4 · 3) is two words, فبو and a waw, kept as one piece like
   the earlier approved two-word pieces.
-- t15 10 (row 2 · 7): a small dot inside the curl was left; it may be the
-  letter's own dot.
+- t15 10 (row 2 · 7): the dot inside the curl is a measuring mark (the
+  user, 2026-10-17); erased.
 - t16 8 (row 1 · 9): the dark square on top of the medial meem was kept as
   the pen's start, not a nuqta.
 - t17 18 (row 6 · 4), a construction drawing: **skipped** (the user,
