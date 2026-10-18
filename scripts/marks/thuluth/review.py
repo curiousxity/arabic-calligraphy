@@ -144,7 +144,10 @@ SHEETS = {
   "erase": {21: [(833,741)], 22: [(589,771)]}},
   # Sheet 6, lam and lam-alif (mapped 2026-10-17; sheet6-numbered.png). Pen
   # 14 px, so 48/14 units per px. Clusters 4-6, 9-12 and 22-25 are notes.
-  "t6": {"file": "../thuluth-6.webp", "dot": 14, "unit": 48 / 14, "units": {
+  # Sheet 6 is a full page scanned at sheets 1-5's size, so it takes their
+  # scale (3.0). Its pen once measured 14 px (unit 48/14), which made its
+  # pieces a fifth too large; the user: all sheets are one pen (2026-10-17).
+  "t6": {"file": "../thuluth-6.webp", "dot": 14, "unit": 3.0, "units": {
     1: ("ل lam: the alif plus the bowl of nun, qaf, sad, seen or ya", (1344,54,1487,283)),
     2: ("لا lam-alif: alif, the end of the final mursala ha, and the crooked alif", (1012,52,1151,277)),
     3: ("لا lam-alif starting with the crooked alif (with the zulf)", (633,52,850,248)),

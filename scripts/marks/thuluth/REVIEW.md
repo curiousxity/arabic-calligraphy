@@ -382,11 +382,14 @@ Dotted alternate forms on this sheet (to fill and review separately):
 
 
 Mapped and traced 2026-10-17 (`sheet6-numbered.png`, made by the new
-`mapSheet.py`). The pen measures **14 px** on this scan, so the sheet uses
-48/14 = 3.43 units per px. **Scale to check in review**: at that scale the
-lam is 712 units tall against 577 for sheet 1's lam, about a fifth taller.
-Either the letters really are drawn larger for the pen here, or the scan's
-blur makes the pen read thin. Note words beside 1, 3, 7 and 13 are dropped
+`mapSheet.py`). The pen measured 14 px here, so the sheet first used 48/14
+= 3.43 units per px, and its lam came out 712 units against 577 for sheet
+1's. **Settled 2026-10-17**: the user says every sheet is one pen, and the
+sizes differ only because the images were sent at different sizes. Sheet 6
+is a full page at sheets 1-5's size (its lam is 207 px against sheet 1's
+191), so it now takes their scale, 3.0, and its saved outlines were shrunk
+by 0.875 (shape unchanged). The lam is now 623 units. The units-tall column
+below is from before. Note words beside 1, 3, 7 and 13 are dropped
 with the new `"main"` erase (keep only the largest shape). The dotted
 alternates are thin and are cleaned away; they are listed above.
 
