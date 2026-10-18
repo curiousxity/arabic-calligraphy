@@ -147,6 +147,8 @@ GROUPS = [
     ("a","50","Small kaf"),("a","51","Mim ha"),("a","52","Seen ra"),("a","53","Ain"),("a","54","Mim with ha"),
     ("a","56","Mim with forked head"),("a","57","Mim"),("a","58","Sad ra"),("a","59","Sad ha"),("a","60","Ta"),
     ("b","23","Small hah"),("c","30","Bold sad"),("c","31","Stacked hamza"),
+    # Thuluth's two hamzas: never one in place of the other (sheet 15's notes)
+    ("t15r3","10","Alif's hamza (ع-shaped)"),("t15r3","11","Kaf's hamza (ء)"),
   ]),
   ("thuluth", "Thuluth", [
     ("t1","23","Ha (ه)"),("t1","25","Lam (ل)"),("t1","19","Ta (ط)"),
@@ -218,6 +220,7 @@ TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t9r3": ("thuluth/traces/t9/t9r3-traced.json", "thuluth-t9r3-"),
           "t10r1": ("thuluth/traces/t10/t10r1-traced.json", "thuluth-t10r1-"),
           "t10r2": ("thuluth/traces/t10/t10r2-traced.json", "thuluth-t10r2-"),
+          "t15r3": ("thuluth/traces/t15/t15r3-traced.json", "thuluth-t15r3-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))

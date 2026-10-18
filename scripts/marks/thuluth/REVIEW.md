@@ -1603,6 +1603,8 @@ else on a sheet is added.
 | t2 23 | Starting sad (صـ) | `thuluth-t2-23` | 2026-10-17 |
 | t2 28 | Waw (و) | `thuluth-t2-28` | 2026-10-17 |
 | t2 3 | Kaf, zinadi (ك) | `thuluth-t2-3` | 2026-10-17; tiny spurs removed first (the tail tip, the lower stroke, under the head, at the turn) |
+| t15 r3 10 | Alif's hamza (ع-shaped), signs group | `thuluth-t15r3-10` | 2026-10-17; "not to be used in Thuluth, Naskh or Ijaza in place of the kaf's hamza" |
+| t15 r3 11 | Kaf's hamza (ء), signs group | `thuluth-t15r3-11` | 2026-10-17; traced by hand (too small for the parts map); "not to be used in place of the alif's hamza in the three scripts" |
 | t3 (21 pieces) | see `traceMarks.py` | `thuluth-t3-<n>` | 2026-10-17 (all of sheet 3 but 15 and 16) |
 | t4 (16 pieces) | see `traceMarks.py` | `thuluth-t4-<n>` | 2026-10-17 (all of sheet 4) |
 | t5 (20 pieces) | see `traceMarks.py` | `thuluth-t5-<n>` | 2026-10-17 (all of sheet 5 but 2, 4, 12) |

@@ -489,7 +489,9 @@ DRAFT_ERASE = {
 
 # Extra pieces and splits for draft rows: units added as {n: (name, box)},
 # splits as in SHEETS.
-DRAFT_UNITS = {"t16r1": {10: ("الله the word Allah (لفظ الجلالة), split from part 1", (1521, 75, 1745, 300))}}
+DRAFT_UNITS = {"t16r1": {10: ("الله the word Allah (لفظ الجلالة), split from part 1", (1521, 75, 1745, 300))},
+               # too small for the parts map: added by hand (the user, 2026-10-17)
+               "t15r3": {11: ("ء the kaf's hamza (همزة الكاف)", (670, 380, 730, 450))}}
 DRAFT_SPLITS = {"t16r1": {(1525, 79): (1, 10, lambda xs, ys: (xs >= 1745) | ((ys >= 262) & (xs >= 1645)))}}
 
 # Pieces that are not letters (a column of measuring nuqtas alone): kept in
