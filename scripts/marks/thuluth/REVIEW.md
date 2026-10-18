@@ -1145,6 +1145,7 @@ Piece numbers below are each sheet's own (as on its `*-numbered.png`).
 | Ha (ه) | 4: 75, 79, 80, 81 | 0: none | 14: 150, 151, 152, 153, 159, 160, 162, 163, 168, 169, 170, 171, 175, 176 | 10: 92, 93, 94, 95, 96, 103, 104, 105, 106, 107 |  |
 | Waw | 2: 73, 74 | 0: none | 0: none | 2: 91, 102 |  |
 | Ya | 7: 69, 70, 71, 72, 76, 77, 78 | 10: 146, 147, 148, 154, 155, 156, 157, 161, 165, 167 | 7: 149, 158, 164, 166, 172, 173, 174 | 9: 87, 88, 89, 90, 97, 98, 99, 100, 101 |  |
+| Lam-alif (لا) | 0 in the vector sets; the scans: t1 15, t2 16, t2 17 (small and open), t6 2, 3, 7, 8, 14, 15, 16 (plain, crooked start with zulf, cut short for panels, braided, forced cases), t3 6 (two overlapping) | — (never joins forward) | — | t6 13 (joined, for tight panels); t6 17 (after a seen, سلا) and t6 18 (with a ha body, حلا) as joined words | all in the library |
 
 **Correction (2026-10-18): the starting/middle split above is wrong.** The
 tarkib schema (`pieceSchema.py`) reads where each Part 2 piece touches its
@@ -1815,40 +1816,51 @@ To take: export each sheet to SVG (PyMuPDF `get_svg_image`), then
 `fill="#…"` attributes as well as `style="fill:…"`; a dark threshold per
 sheet, since these letters are #333333, just above the current cut). There
 is no grey context to read joins from, so their join ends come from the
-pieces' own ends. **Not to be committed**: see the licence gap below.
+pieces' own ends.
+
+**Taken 2026-10-18** as sheets t37 (standalone), t38 (starting), t39
+(middle), t40 (finishing): `scripts/marks/thuluth-37-standalone.svg` … `-40-
+finishing.svg` (exported with PyMuPDF), `vectorSheet.py … grid=120,1883,7,
+715,1608,4,0 dark=60 onepercell`, 112 pieces, ids `thuluth-w1-`…`w4-`, named
+"Letter, position, n (glyph), second set". Cells are named by reading order
+(`traceMarks.py` `MIDDLE_CELLS`, `FINISHING_CELLS`); readings by position
+only carry "(?)": middle cells 0 (ث?), 19 and 20 (م?). The finishing sheet
+has no plain ب/ت, ه, ح/ع, ز, ش, ض, ظ or ى (its ya cell 27 is a yeh barree,
+ے); the starting sheet's ا د ذ ر ز و are standalone shapes. A piece that
+draws its own dots serves only its own letter (`canDraw` in
+`tarkibSchema.ts`). The composer prefers the first set and takes this set
+where the first has no real form (its middle forms above all): the two
+hands differ (this pen is lighter).
 
 ## Gaps in this log (2026-10-18)
 
 What this ledger promised, or the work needs, and does not yet have:
 
-1. **Licence: bought source files are in a public repository.** The repo
-   (curiousxity/arabic-calligraphy) is public, and the first vector set's
-   SVGs and full-sheet PNGs (`thuluth-34-endings.*`, `thuluth-35-beginnings.*`,
-   `thuluth-36-middles.*`) are committed and pushed. Using the artwork in the
-   app is the usual licence; publishing the source files usually is not.
-   For the user to decide (removing them from history is a force-push).
-2. **Middle forms** (above): only three meems. The second set fills it.
-3. **Stroke order.** The user asked (2026-10-16) that each piece's stroke
+1. ~~Licence~~: the user (2026-10-18): committing the bought files does not
+   violate the licence.
+2. ~~Middle forms~~: filled by the second set (t39).
+3. **Stroke order** (the user, 2026-10-18: keep it, in case it is needed).
+   The user asked (2026-10-16) that each piece's stroke
    order be recorded before its numbers were erased. 7 pieces have a
    record; 23 are noted as carrying stroke numbers. The numbers are still
    on the source scans, so the rest can still be read off and written down.
-4. **Vowel signs.** The library has no fatha, kasra, damma, shadda, sukun,
+4. **Vowel signs** (the user will send a copy, 2026-10-18). The library has no fatha, kasra, damma, shadda, sukun,
    tanween or madda. Sheet 19's sign rows were traced as two parts only
    (an ornamental knot and a double stroke). Tarkib needs them (plan
    Task 9); until then it borrows the bundled Thuluth font's.
-5. **Letter forms the coverage table has no row for:** lam-alif (scans t6
-   only; none in the first vector set), ta marbuta (ة), alif maqsura (ى),
+5. **Letter forms the coverage table has no row for:** ~~lam-alif~~ (row
+   added 2026-10-18), ta marbuta (ة; the second set has five), alif maqsura (ى),
    hamza alone and on its seats (أ إ آ ؤ ئ), and the word الله (scans t16).
 6. **Dots.** The first vector set and most scans draw none; the app draws
    a pen-rhombus nuqta. The second set draws real ones.
 7. **Names still provisional.** Sheets t3–t8 list "provisional name"
    columns, and the end sweep's "English names in the library, and the
    sheet-3 names" was never done.
-8. **Stale notes.** "Collection complete" says nothing has been traced
+8. **Stale notes** (the user: leave them). "Collection complete" says nothing has been traced
    (much has); open question 4 (t17 row 5, "١-٢") and the readings to
    confirm (question 6) are still open; question 7's panels were deferred
    by the user (2026-10-18), and the frames are done.
-9. **Retired middle forms.** t9r1 5, 6 (medial jeem) and 8 (middle ha) were
+9. **Retired middle forms** (the user: it does not matter now). t9r1 5, 6 (medial jeem) and 8 (middle ha) were
    retired on the wrong premise that the vector set covered them; the
    user has not yet said whether to bring them back.
 10. **Join review** of the 142 first-phrase pieces (page above) is waiting

@@ -36,8 +36,9 @@ export type PieceSchema = {
   id: string;
   /** The mark library item whose outline this is. */
   itemId: string;
-  /** Reading order, with each letter's mark anchors (piece units). */
-  letters: { skeleton: string; form: LetterForm; above: Pt; below: Pt }[];
+  /** Reading order: each letter as drawn (`char`), its skeleton and form,
+   *  and its mark anchors (piece units). */
+  letters: { char: string; skeleton: string; form: LetterForm; above: Pt; below: Pt }[];
   entry?: JoinEnd;
   exit?: JoinEnd;
   stretch: StretchZone[];
@@ -78,13 +79,13 @@ const ARABIC = /[؀-ۿ][؀-ۿ\s]*/g;
 
 /** The letters and forms a piece's library name says it draws; [] when
  *  the name says nothing readable. */
-export function formsFromName(name: string): { skeleton: string; form: LetterForm }[] {
+export function formsFromName(name: string): { char: string; skeleton: string; form: LetterForm }[] {
   // The vector set: "Ain, middle, 3 (ـعـ)".
-  const v = /, (standalone|starting|middle|finishing), \d+ \(([^)]+)\)$/.exec(name);
+  const v = /, (standalone|starting|middle|finishing), \d+ \(([^)]+)\)(, second set( \(\?\))?)?$/.exec(name);
   if (v && (POSITIONS as readonly string[]).includes(v[1])) {
     const ch = v[2].replaceAll(TATWEEL, "");
     if (!(ch in SKELETONS)) return [];
-    return [{ skeleton: skeletonFor(ch, v[1] as LetterForm), form: v[1] as LetterForm }];
+    return [{ char: ch, skeleton: skeletonFor(ch, v[1] as LetterForm), form: v[1] as LetterForm }];
   }
   // A scanned piece: the last Arabic in its name, tatweels marking joins.
   const groups = name.match(ARABIC);
@@ -99,7 +100,7 @@ export function formsFromName(name: string): { skeleton: string; form: LetterFor
     let form = l.form;
     if (k === 0 && joinsBefore) form = form === "standalone" ? "finishing" : form === "starting" ? "middle" : form;
     if (k === ls.length - 1 && joinsAfter) form = form === "standalone" ? "starting" : form === "finishing" ? "middle" : form;
-    return { skeleton: l.skeleton === "allah" ? "allah" : skeletonFor(l.char, form), form };
+    return { char: l.char, skeleton: l.skeleton === "allah" ? "allah" : skeletonFor(l.char, form), form };
   });
 }
 
@@ -152,6 +153,17 @@ function schemaOf(item: MarkItem, g: PieceGeometry | undefined): PieceSchema {
     id: item.id, itemId: item.id, letters, ...(entry ? { entry } : {}), ...(exit ? { exit } : {}), stretch,
     ownDots: (g?.dots ?? 0) > 0, ...(g?.noFreeEnd ? { noFreeEnd: true as const } : {}), reviewed: g?.reviewed ?? false,
   };
+}
+
+/**
+ * Whether piece letter `i` can draw `letter`: same skeleton and form, and,
+ * when the piece draws its own dots, the very same letter (the second set's
+ * ـجـ must not be written for ـحـ, nor a dotted ي for ئ). A dotless piece
+ * serves every letter of its skeleton; the composer adds the dots.
+ */
+export function canDraw(s: PieceSchema, i: number, letter: { char: string; skeleton: string; form: LetterForm }): boolean {
+  const l = s.letters[i];
+  return !!l && l.skeleton === letter.skeleton && l.form === letter.form && (!s.ownDots || l.char === letter.char);
 }
 
 /** Whether a piece has every face its forms need, so it can sit in a chain. */

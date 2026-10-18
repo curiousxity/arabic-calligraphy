@@ -19,11 +19,13 @@ describe("tarkib piece schema", () => {
   });
 
   it("reads letters and forms from the pieces' names", () => {
-    expect(formsFromName("Ain, middle, 3 (ـعـ)")).toEqual([{ skeleton: "ain", form: "middle" }]);
-    expect(formsFromName("Ba, nun or ya tooth, starting, 2 (بـ)")).toEqual([{ skeleton: "ba", form: "starting" }]);
-    expect(formsFromName("Qaf, middle, 1 (ـقـ)")).toEqual([{ skeleton: "fa", form: "middle" }]);
-    expect(formsFromName("Initial beh (two dots) joined to sad (بص)")).toEqual([{ skeleton: "ba", form: "starting" }, { skeleton: "sad", form: "finishing" }]);
-    expect(formsFromName("Joined ra (ـر)")).toEqual([{ skeleton: "ra", form: "finishing" }]);
+    expect(formsFromName("Ain, middle, 3 (ـعـ)")).toEqual([{ char: "ع", skeleton: "ain", form: "middle" }]);
+    expect(formsFromName("Ba, nun or ya tooth, starting, 2 (بـ)")).toEqual([{ char: "ب", skeleton: "ba", form: "starting" }]);
+    expect(formsFromName("Qaf, middle, 1 (ـقـ)")).toEqual([{ char: "ق", skeleton: "fa", form: "middle" }]);
+    expect(formsFromName("Initial beh (two dots) joined to sad (بص)")).toEqual([{ char: "ب", skeleton: "ba", form: "starting" }, { char: "ص", skeleton: "sad", form: "finishing" }]);
+    expect(formsFromName("Joined ra (ـر)")).toEqual([{ char: "ر", skeleton: "ra", form: "finishing" }]);
+    expect(formsFromName("Ta marbuta, finishing, 2 (ـة), second set")).toEqual([{ char: "ة", skeleton: "ha", form: "finishing" }]);
+    expect(formsFromName("Meem, middle, 1 (ـمـ), second set (?)")).toEqual([{ char: "م", skeleton: "meem", form: "middle" }]);
     expect(formsFromName("Ba 1½ nuqtas wide, joined to a final letter, part 10")).toEqual([]);
   });
 
@@ -61,6 +63,12 @@ describe("tarkib piece schema", () => {
       expect(s.entry!.angle).toBeCloseTo(Math.PI);
       expect(s.exit).toBeDefined();
     }
+  });
+
+  it("has the second set's real middle forms, and a dotted piece serves only its own letter", () => {
+    const mids = lib.single.get("jeem|middle")!;
+    expect(mids.some((s) => s.itemId.startsWith("thuluth-w3-") && !s.standIn)).toBe(true);
+    for (const s of mids.filter((m) => m.ownDots)) expect(["ج", "خ"]).toContain(s.letters[0].char);
   });
 
   it("has a pen-stamp nuqta: a rhombus with pen-wide sides, solid across", () => {

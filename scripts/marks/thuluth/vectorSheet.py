@@ -1,5 +1,5 @@
 """Take letter pieces straight from a vector sheet (an SVG), no tracing.
-usage: python -I -X utf8 scripts/marks/thuluth/vectorSheet.py SVG KEY OUT_DIR [unit] [grid=X0,X1,COLS,Y0,Y1,ROWS,LABEL]
+usage: python -I -X utf8 scripts/marks/thuluth/vectorSheet.py SVG KEY OUT_DIR [unit] [grid=X0,X1,COLS,Y0,Y1,ROWS,LABEL] [dark=N] [onepercell]
 
 The pieces are the dark-filled paths (the grey ones are context, the
 letters around a piece). Paths are grouped into pieces by the shapes they
@@ -16,6 +16,10 @@ A sheet laid out in cells that draw their letters at different sizes takes
 within LABEL units of a cell's top are its heading and are dropped. A small
 piece lying mostly inside a bigger one's box (a kaf's sign, a detached head)
 joins it.
+`dark=N` sets the darkest-ink cut (default 48: the second bought set's
+letters are #333333, luminance 51). `onepercell` keeps everything dark in a
+grid cell as one piece: that set has one letter per cell with its dots as
+separate shapes, which would otherwise come out as pieces of their own.
 Also writes OUT_DIR/KEY-numbered.png (the sheet with every piece
 numbered) and OUT_DIR/KEY-N.png (each piece, sheet crop and outline)."""
 import sys, os, re, json
@@ -25,16 +29,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from svgInk import parse, tf, flatten, dark_and_grey, raster
 
 svg, key, out_dir = sys.argv[1:4]
-UNIT = float(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4] != "auto" else None
+UNIT = float(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4] not in ("auto", "onepercell") and "=" not in sys.argv[4] else None
 GRID = None
+DARK = 48
+ONE_PER_CELL = "onepercell" in sys.argv[4:]
 for a in sys.argv[4:]:
     if a.startswith("grid="): GRID = [float(v) for v in a[5:].split(",")]
+    if a.startswith("dark="): DARK = float(a[5:])
 os.makedirs(out_dir, exist_ok=True)
 src = open(svg, encoding="utf-8").read()
 W = float(re.search(r'<svg[^>]*\swidth="([\d.]+)"', src).group(1))
 H = float(re.search(r'<svg[^>]*\sheight="([\d.]+)"', src).group(1))
 
-dark, grey = dark_and_grey(src)
+dark, grey = dark_and_grey(src, DARK)
 
 # rasterise every dark path (even-odd per path, then OR), 1 px per SVG unit
 shape = (int(H) + 1, int(W) + 1)
@@ -68,9 +75,15 @@ if GRID:
         top = Y0 + row * ch
         cell_of[i] = "label" if st[i][1] < top + LABEL else (row, col)
     comps = [i for i in comps if isinstance(cell_of[i], tuple)]
-    # a small piece mostly inside a bigger one's box (same cell) joins it
+    # a small piece mostly inside a bigger one's box (same cell) joins it;
+    # with `onepercell`, every piece joins its cell's largest
     joined = {}
+    if ONE_PER_CELL:
+        for cell in {cell_of[i] for i in comps}:
+            mine = sorted((i for i in comps if cell_of[i] == cell), key=lambda i: -st[i][4])
+            for i in mine[1:]: joined[i] = mine[0]
     for i in comps:
+        if i in joined: continue
         xi, yi, wi, hi, ai = st[i]
         for j in comps:
             if j == i or cell_of[j] != cell_of[i] or st[j][4] < 3 * ai: continue

@@ -14,7 +14,7 @@ import { assembleStackOutline, pieceTransform } from "./stackOutline";
 import { flattenContours, outlineBounds, type Pt } from "./strokeCuts";
 import { pointInPolygon } from "./svgPath";
 import { buildPiece } from "./tarkibPieces";
-import type { PieceSchema, TarkibLibrary } from "./tarkibSchema";
+import { canDraw, type PieceSchema, type TarkibLibrary } from "./tarkibSchema";
 import { analyzePhrase, type PhraseLetter, type PhraseRun } from "./tarkibText";
 
 const PEN = 48;
@@ -46,24 +46,36 @@ const key = (l: PhraseLetter) => `${l.skeleton}|${l.form}`;
 
 /** Does a multi-letter piece spell the run from letter `k` on? */
 function spells(s: PieceSchema, run: PhraseRun, k: number): boolean {
-  return s.letters.every((l, i) => {
-    const r = run.letters[k + i];
-    return r && r.skeleton === l.skeleton && r.form === l.form;
-  });
+  return s.letters.every((_, i) => !!run.letters[k + i] && canDraw(s, i, run.letters[k + i]));
 }
+
+/** The single-letter pieces that can draw `l`. */
+const singlesFor = (lib: TarkibLibrary, l: PhraseLetter) => (lib.single.get(key(l)) ?? []).filter((s) => canDraw(s, 0, l));
 
 /** The run's letters with no piece to draw them (their typed characters). */
 export function missingLetters(lib: TarkibLibrary, run: PhraseRun): string[] {
-  return run.letters.filter((l) => !(lib.single.get(key(l))?.length) && !(lib.multi.get(key(l)) ?? []).some((s) => s.letters.length === 1)).map((l) => l.char);
+  return run.letters.filter((l) => singlesFor(lib, l).length === 0).map((l) => l.char);
 }
 
-/** The piece of median height among `list`: a typical form, not a long
- *  display alif or a cramped one. */
+/** Where a piece comes from, best first: the first bought vector set, the
+ *  second (a lighter pen, and joins read from its own ends), the scans. A run
+ *  drawn from one hand reads as one hand; the next source fills only what
+ *  the first lacks. */
+const SOURCES = [/^thuluth-v\d/, /^thuluth-w\d/, /./];
+
+/** A plain, typical form from the best source's real forms in `list`: the
+ *  narrower half (the less flourished: a straight alif, not a curved display
+ *  one), then the median height among those (not the longest alif, not a
+ *  cramped one). A stand-in is used only when no source has a real form. */
 function typical(lib: TarkibLibrary, list: PieceSchema[]): PieceSchema | undefined {
   const real = list.filter((s) => !s.standIn);
-  const pool = real.length ? real : list;
+  const tier = SOURCES.map((re) => real.filter((s) => re.test(s.itemId))).find((t) => t.length);
+  const pool = tier ?? list;
   const h = (s: PieceSchema) => lib.items.get(s.itemId)?.h ?? 0;
-  return [...pool].sort((a, b) => h(a) - h(b))[Math.floor((pool.length - 1) / 2)];
+  const w = (s: PieceSchema) => lib.items.get(s.itemId)?.w ?? 0;
+  const ws = pool.map(w).sort((a, b) => a - b), medW = ws[Math.floor((ws.length - 1) / 2)];
+  const plain = pool.filter((s) => w(s) <= medW);
+  return plain.sort((a, b) => h(a) - h(b))[Math.floor((plain.length - 1) / 2)];
 }
 
 /** Multi-letter pieces where one spells the run (the calligrapher's own
@@ -73,7 +85,7 @@ export function defaultChoice(lib: TarkibLibrary, run: PhraseRun): RunChoice | n
   for (let k = 0; k < run.letters.length; ) {
     const l = run.letters[k];
     const multi = (lib.multi.get(key(l)) ?? []).find((s) => spells(s, run, k));
-    const pick = multi ?? typical(lib, lib.single.get(key(l)) ?? []);
+    const pick = multi ?? typical(lib, singlesFor(lib, l));
     if (!pick) return null;
     ids.push(pick.id);
     k += pick.letters.length;

@@ -55,19 +55,21 @@ def flatten(sub, steps=8):
             p = e
     return out
 
-def dark_and_grey(src):
-    """The sheet's dark (lum < 48) and grey (48-160) filled paths, each a list
-    of absolute subpaths, transforms applied."""
+def dark_and_grey(src, dark_max=48, grey_max=160):
+    """The sheet's dark (lum < dark_max) and grey (up to grey_max) filled
+    paths, each a list of absolute subpaths, transforms applied. Fills are
+    read from a style (`fill:#…`, Illustrator's SVG export) or an attribute
+    (`fill="#…"`, PyMuPDF's export of an .ai file)."""
     dark, grey = [], []
     for attrs in re.findall(r'<path(.*?)/>', src, re.S):
-        fill = re.search(r'fill:#([0-9a-f]{6})', attrs)
+        fill = re.search(r'fill(?::|=")#([0-9a-fA-F]{6})', attrs)
         if not fill: continue
-        lum = sum(int(fill.group(1)[i:i + 2], 16) for i in (0, 2, 4)) / 3
+        lum = sum(int(fill.group(1).lower()[i:i + 2], 16) for i in (0, 2, 4)) / 3
         m = re.search(r'transform="matrix\(([^)]*)\)"', attrs)
         mat = [float(v) for v in m.group(1).split(",")] if m else [1, 0, 0, 1, 0, 0]
         subs = tf(parse(re.search(r'\sd="([^"]*)"', attrs).group(1)), mat)
-        if lum < 48: dark.append(subs)
-        elif lum < 160: grey.append(subs)
+        if lum < dark_max: dark.append(subs)
+        elif lum < grey_max: grey.append(subs)
     return dark, grey
 
 def raster(paths, shape, R=1.0, ox=0.0, oy=0.0):

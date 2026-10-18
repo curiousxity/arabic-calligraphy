@@ -4,13 +4,12 @@ import { chainPhraseOnLine, chainRun, defaultChoice } from "./tarkibChain";
 import { analyzePhrase } from "./tarkibText";
 import { assembleStackOutlineReport, pieceTransform } from "./stackOutline";
 import { transformCmds } from "./stackGeometry";
-import { flattenContours, outlineBounds } from "./strokeCuts";
+import { flattenContours } from "./strokeCuts";
 import { pointInPolygon } from "./svgPath";
-import type { StackPiece } from "../types";
+import { scoreLayout } from "./tarkibScore";
 
 const lib = await loadTarkibLibrary();
 const NIB = { width: 48, minFraction: 0.5 };
-const centreX = (p: StackPiece) => { const b = outlineBounds(p.cmds); return p.x + (b.x1 + b.x2) / 2; };
 
 describe("chainRun", () => {
   it("meets every pair at its anchors and splices whatever joins it made", () => {
@@ -54,22 +53,60 @@ describe("chainRun", () => {
 });
 
 describe("defaultChoice", () => {
+  it("picks a plain alif: straight, neither the longest nor a curved display form", () => {
+    const pick = defaultChoice(lib, analyzePhrase("ا").words[0].runs[0])!.schemaIds[0];
+    const it = lib.items.get(lib.schema.get(pick)!.itemId)!;
+    expect(it.w / it.h).toBeLessThan(0.15);
+  });
+
   it("picks a typical piece, not the longest display form", () => {
     const run = analyzePhrase("ا").words[0].runs[0];
     const pick = defaultChoice(lib, run)!.schemaIds[0];
-    const hs = lib.single.get("alif|standalone")!.map((s) => lib.items.get(s.itemId)!.h).sort((a, b) => a - b);
+    const hs = lib.single.get("alif|standalone")!.filter((s) => s.itemId.startsWith("thuluth-v")).map((s) => lib.items.get(s.itemId)!.h).sort((a, b) => a - b);
     const h = lib.items.get(lib.schema.get(pick)!.itemId)!.h;
     expect(h).toBeGreaterThanOrEqual(hs[Math.floor(hs.length / 4)]);
     expect(h).toBeLessThanOrEqual(hs[Math.ceil((3 * hs.length) / 4) - 1]);
   });
 });
 
+describe("sources", () => {
+  it("prefers the first vector set, and takes a second-set piece only where the first has no real form", () => {
+    const run = analyzePhrase("الحب").words[0].runs[1];     // ل ح ب: the ح is middle
+    const ids = defaultChoice(lib, run)!.schemaIds;
+    expect(ids[0].startsWith("thuluth-v")).toBe(true);                  // starting lam: the first set has it
+    expect(lib.schema.get(ids[1])!.itemId.startsWith("thuluth-w3-")).toBe(true);   // middle ha: only the second set
+  });
+
+  it("takes the first set's alif though the scans hold more alifs", () => {
+    const pick = defaultChoice(lib, analyzePhrase("ا").words[0].runs[0])!.schemaIds[0];
+    expect(pick.startsWith("thuluth-v")).toBe(true);
+  });
+});
+
+describe("dotted pieces", () => {
+  it("never draws a letter with another letter's dots", () => {
+    for (const text of ["الحب", "حياتي", "خبز", "جبل"]) {
+      for (const run of analyzePhrase(text).words.flatMap((w) => w.runs)) {
+        const ch = defaultChoice(lib, run)!;
+        let k = 0;
+        for (const id of ch.schemaIds) {
+          const s = lib.schema.get(id)!;
+          s.letters.forEach((l, i) => { if (s.ownDots) expect(l.char, `${text} ${id}`).toBe(run.letters[k + i].char); });
+          k += s.letters.length;
+        }
+      }
+    }
+  });
+});
+
 describe("chainPhraseOnLine", () => {
-  it("reads right to left: each later letter sits to the left", () => {
-    const r = chainPhraseOnLine(lib, "أيمن");
-    if ("error" in r) throw new Error(r.error);
-    const letters = r.pieces.filter((p) => p.role === "letter" && !p.parentId).sort((a, b) => a.order - b.order);
-    for (let i = 1; i < letters.length; i++) expect(centreX(letters[i])).toBeLessThan(centreX(letters[i - 1]));
+  it("reads right to left: no later letter sits right of an earlier one, unless stacked above it", () => {
+    for (const text of ["أيمن", "حياتي", "أُمّ أَيْمَن الحُبّ حَيَاتِي"]) {
+      const r = chainPhraseOnLine(lib, text);
+      if ("error" in r) throw new Error(r.error);
+      const order = r.pieces.filter((p) => p.role === "letter" && !p.parentId).sort((a, b) => a.order - b.order).map((p) => p.id);
+      expect(scoreLayout({ pieces: r.pieces, joins: r.joins, nib: NIB, shape: [[-1, -1], [1, -1], [1, 1]], readingOrder: order, stretchUsed: {} }).order, text).toBe(0);
+    }
   });
 
   it("composes the first target, every letter there", () => {

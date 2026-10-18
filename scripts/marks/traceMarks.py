@@ -230,6 +230,40 @@ def vector_items():
     # in the picker: by letter (alphabet order), then standalone, starting, middle, finishing
     return [it for _,it in sorted(items)]
 
+# The second bought vector set (thuluth/REVIEW.md, "A second bought vector
+# set"): four sheets of 28 cells, letters with their dots. Cells are named
+# by reading order (row by row, right to left). The standalone and starting
+# sheets run through the alphabet (a letter that never joins forward stands
+# alone at the start of a word); the middle and finishing sheets list their
+# own letters, with extra variants. Readings marked (?) are by position in
+# the sequence, for the user to confirm.
+ALPHABET = "ا ب ت ث ج ح خ د ذ ر ز س ش ص ض ط ظ ع غ ف ق ك ل م ن ه و ي".split()
+LETTER_NAMES = {"ا":"Alif","ب":"Ba","ت":"Ta (ت)","ث":"Tha","ج":"Jeem","ح":"Ha (ح)","خ":"Kha","د":"Dal","ذ":"Dhal",
+    "ر":"Ra","ز":"Zay","س":"Seen","ش":"Sheen","ص":"Sad","ض":"Dad","ط":"Ta (ط)","ظ":"Za (ظ)","ع":"Ain","غ":"Ghain",
+    "ف":"Fa","ق":"Qaf","ك":"Kaf","ل":"Lam","م":"Meem","ن":"Nun","ه":"Ha (ه)","ة":"Ta marbuta","و":"Waw","ي":"Ya"}
+NON_JOINING = set("ا د ذ ر ز و".split())
+MIDDLE_CELLS = {0:"ث?",1:"ب",2:"ت",3:"ث",4:"ج",5:"ح",6:"خ",7:"س",8:"ش",9:"ص",10:"ض",11:"ط",12:"ظ",13:"ع",14:"غ",
+    15:"ف",16:"ق",17:"ك",18:"ل",19:"م?",20:"م?",21:"م",22:"ن",23:"ه",24:"ه",25:"ه",26:"ي",27:"ي"}
+FINISHING_CELLS = {0:"ا",1:"ث",2:"ج",3:"د",4:"ر",5:"ر",6:"س",7:"ص",8:"ط",9:"غ",10:"ف",11:"ق",12:"ك",13:"ل",
+    14:"م",15:"م",16:"م",17:"م",18:"ن",19:"ة",20:"ة",21:"ة",22:"ة",23:"و",24:"و",25:"ة",26:"ي",27:"ي"}
+def second_set_items():
+    here=os.path.dirname(os.path.abspath(__file__)); items=[]
+    for sheet,pos in (("t37","standalone"),("t38","starting"),("t39","middle"),("t40","finishing")):
+        with open(os.path.join(here,f"thuluth/traces/{sheet}/{sheet}r1-traced.json"),encoding="utf-8") as fh: tr=json.load(fh)
+        count={}
+        for k in sorted(tr,key=int):
+            r,c=tr[k]["cell"]; n=r*7+(6-c)
+            raw={"t39":MIDDLE_CELLS,"t40":FINISHING_CELLS}.get(sheet,{}).get(n) or ALPHABET[n]
+            ch=raw.rstrip("?"); unsure=" (?)" if raw.endswith("?") else ""
+            p="standalone" if (pos=="starting" and ch in NON_JOINING) else pos
+            glyph={"standalone":ch,"starting":ch+"ـ","middle":"ـ"+ch+"ـ","finishing":"ـ"+ch}[p]
+            name=LETTER_NAMES[ch]
+            count[(name,p)]=count.get((name,p),0)+1
+            order=ALPHABET.index(ch) if ch in ALPHABET else ALPHABET.index("ه")
+            items.append(((order,["standalone","starting","middle","finishing"].index(p),int(k)),
+                          (f"{sheet}r1",k,f"{name}, {p}, {count[(name,p)]} ({glyph}), second set{unsure}")))
+    return [it for _,it in sorted(items)]
+
 # Thuluth pieces are not traced here: scripts/marks/thuluth/ cleans the scanned
 # lesson sheets and traces each piece for review (thuluth/REVIEW.md). Only a
 # piece the user has approved is listed in GROUPS; its outline is read from the
@@ -252,6 +286,10 @@ TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t34r1": ("thuluth/traces/t34/t34r1-traced.json", "thuluth-v3-"),
           "t35r1": ("thuluth/traces/t35/t35r1-traced.json", "thuluth-v1-"),
           "t36r1": ("thuluth/traces/t36/t36r1-traced.json", "thuluth-v2-"),
+          "t37r1": ("thuluth/traces/t37/t37r1-traced.json", "thuluth-w1-"),
+          "t38r1": ("thuluth/traces/t38/t38r1-traced.json", "thuluth-w2-"),
+          "t39r1": ("thuluth/traces/t39/t39r1-traced.json", "thuluth-w3-"),
+          "t40r1": ("thuluth/traces/t40/t40r1-traced.json", "thuluth-w4-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-"),
           # frames from the panels' ornament (thuluth/traceBorder.py, tileBorder.py)
           "fr": ("thuluth/traces/frames/{}.json", "frames-")}
@@ -266,7 +304,7 @@ for _gid,_rows in KEPT.items():
             TRACED[_sh]=(f"thuluth/traces/t{_n_}/{_sh}-traced.json",f"thuluth-{_sh}-")
 for _g in GROUPS:
     if _g[0] in KEPT: _g[2].extend(tuple(r) for r in KEPT[_g[0]])
-    if _g[0]=="thuluth": _g[2].extend(vector_items())
+    if _g[0]=="thuluth": _g[2].extend(vector_items()+second_set_items())
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))
       for name,cfg in SHEETS.items()}
@@ -284,7 +322,7 @@ for name,(rel,_) in TRACED.items():
 # outline per stroke (they are overlapping shapes, and a tarkib join cut must
 # cross one contour); the frames are left as they are. Cached by outline, so
 # a re-run only redoes what changed.
-VECTOR=("t34r1","t35r1","t36r1")
+VECTOR=("t34r1","t35r1","t36r1","t37r1","t38r1","t39r1","t40r1")
 SCANNED=[n for n in TRACED if re.fullmatch(r"t\d+(r\d+)?",n) and n not in VECTOR]
 _cpath=os.path.join(HERE,"thuluth/traces/smoothed-cache.json")
 _cache=json.load(open(_cpath,encoding="utf-8")) if os.path.exists(_cpath) else {}
