@@ -95,6 +95,23 @@ that block instead of starting a placement:
 - The frame is inserted **just below** the framed block (drawn behind it),
   takes its colour, and shares its `groupId` (a new one if it had none), so
   they move together. One `pushHistory()`.
+- `frameWindow` reads ink by one scanline per row of cells. It used to test
+  every cell against every contour, which took ~17 s on the speckled corner
+  frames and would have frozen the click.
+- **Panel frames** (2026-10-18), from the grandfather's panels, ids
+  `frames-<key>` read from `scripts/marks/thuluth/traces/frames/<key>.json`:
+  two sets of corner florals (`traceBorder.py`: the ornament kept by boxes or
+  a ring, letters excluded; ordinary stretch frames) and the **rosette
+  border**, a *tile*. A whole-border trace was 521 KB and blurry, so
+  `tileBorder.py` cuts one period, folds it onto its mirror images to average
+  out the scan, and traces it once (~10 KB, `tile: {period, band}` on the
+  item). Framing a block with a tile item builds the ring in
+  `frameSelectedBlock` (`tileRing.ts`, pure): tiles along top and bottom,
+  turned 90° down the sides, counts chosen so the opening holds the padded
+  box, tile size `TILE_SHARE_OF_EM` of the block's font size, never
+  stretched. The baked ring is the block's `markD`, so nothing else changed;
+  a ring is roughly tiles × 10 KB in a save. Picked with nothing selected, a
+  tile places as a single tile. `frameWindow.test.ts` skips tile items.
 - The fit is a one-off: editing the text does not refit. A frame's Mark panel
   shows *Stretch width* / *Stretch height* (0.3–3) for adjusting by hand;
   other marks don't get those rows, though `markScaleX/Y` works on any mark.

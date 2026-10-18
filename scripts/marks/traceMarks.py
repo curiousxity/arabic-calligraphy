@@ -197,7 +197,9 @@ GROUPS = [
     ("t10r2","2","Seen joined to ra, a run (سرسرس)"),("t10r2","3","Seen with meem and ra, second (سمر)"),
     ("t10r2","4","Seen, meem, ra, seen (سمرس)")]),
   ("frames", "Frames", [
-    ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
+    ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls"),
+    ("fr","corners-1","Corner florals"),("fr","corners-2","Corner florals, dotted"),
+    ("fr","rosette","Rosette border (tiles round the selected block)")]),
 ]
 # The Thuluth vector set (bought by the user; thuluth/REVIEW.md, "Every form
 # of every letter"): every piece of its three sheets joins the Thuluth group,
@@ -250,7 +252,9 @@ TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t34r1": ("thuluth/traces/t34/t34r1-traced.json", "thuluth-v3-"),
           "t35r1": ("thuluth/traces/t35/t35r1-traced.json", "thuluth-v1-"),
           "t36r1": ("thuluth/traces/t36/t36r1-traced.json", "thuluth-v2-"),
-          "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
+          "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-"),
+          # frames from the panels' ornament (thuluth/traceBorder.py, tileBorder.py)
+          "fr": ("thuluth/traces/frames/{}.json", "frames-")}
 for _g in GROUPS:
     if _g[0]=="thuluth": _g[2].extend(vector_items())
 HERE=os.path.dirname(os.path.abspath(__file__))
@@ -280,6 +284,7 @@ for gid,title,items in GROUPS:
     for sh,k,name in items:
         v=outs[sh][k]
         mid=f"{TRACED[sh][1]}{k}" if sh in TRACED else f"{gid}-{SHEETS[sh]['prefix']}{k}"
-        print(f'    {{ id: "{mid}", name: "{name}", w: {v["w"]}, h: {v["h"]}, d: "{v["d"]}" }},')
+        tile=f', tile: {{ period: {v["tile"]["period"]}, band: {v["tile"]["band"]} }}' if "tile" in v else ""
+        print(f'    {{ id: "{mid}", name: "{name}", w: {v["w"]}, h: {v["h"]}, d: "{v["d"]}"{tile} }},')
     print("  ] },")
 print("];")

@@ -6,7 +6,8 @@ import { parseSvgPath, pointInPolygon } from "./svgPath";
 
 // Every frame in the library must have an open window that holds no ink, so
 // framed text is never covered by its own frame.
-const frames = MARK_GROUPS.find((g) => g.id === "frames")?.items ?? [];
+// A tile (a border built to fit, see tileRing.ts) is no frame by itself.
+const frames = (MARK_GROUPS.find((g) => g.id === "frames")?.items ?? []).filter((f) => !f.tile);
 
 describe("frameWindow", () => {
   it("finds the library's frames", () => {

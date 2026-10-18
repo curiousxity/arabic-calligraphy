@@ -8,6 +8,7 @@
 import { MARK_GROUPS } from "./markLibraryData";
 import { outlineBounds } from "./strokeCuts";
 import { parseSvgPath, type SvgCmd } from "./svgPath";
+import type { TileSpec } from "./tileRing";
 
 export type MarkItem = {
   id: string;
@@ -18,6 +19,9 @@ export type MarkItem = {
   h: number;
   /** Filled outline, library units, centred on the origin. */
   d: string;
+  /** Set on a border tile: framing a block repeats it round the block
+   *  (`tileRing`) instead of stretching it. */
+  tile?: TileSpec;
 };
 
 export type MarkGroup = { id: string; title: string; items: MarkItem[] };

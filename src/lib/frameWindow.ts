@@ -40,12 +40,28 @@ export function frameWindow(d: string): FrameWindow | null {
   const cell = Math.max(x1 - x0, y1 - y0) / GRID;
   const cols = Math.max(1, Math.ceil((x1 - x0) / cell)), rows = Math.max(1, Math.ceil((y1 - y0) / cell));
   const hull = convexHull(all);
-  // Ink by even-odd over every contour, so a counter reads as empty.
-  const inInk = (x: number, y: number) => contours.reduce((n, c) => (pointInPolygon(x, y, c) ? n + 1 : n), 0) % 2 === 1;
+  // Ink by even-odd over every contour, so a counter reads as empty. One
+  // scanline per row of cell centres: a speckled frame has thousands of
+  // edges, and testing each cell against all of them took seconds.
   const ink: boolean[][] = [];
   for (let r = 0; r < rows; r++) {
-    ink.push([]);
-    for (let c = 0; c < cols; c++) ink[r].push(inInk(x0 + (c + 0.5) * cell, y0 + (r + 0.5) * cell));
+    const y = y0 + (r + 0.5) * cell;
+    const xs: number[] = [];
+    for (const c of contours) {
+      for (let i = 0, j = c.length - 1; i < c.length; j = i++) {
+        const [xi, yi] = c[i], [xj, yj] = c[j];
+        if ((yi > y) !== (yj > y)) xs.push(xi + ((y - yi) / (yj - yi)) * (xj - xi));
+      }
+    }
+    xs.sort((a, b) => a - b);
+    const row: boolean[] = [];
+    let k = 0, inside = false;
+    for (let c = 0; c < cols; c++) {
+      const x = x0 + (c + 0.5) * cell;
+      while (k < xs.length && xs[k] < x) { inside = !inside; k++; }
+      row.push(inside);
+    }
+    ink.push(row);
   }
   // Free: inside the hull and at least one cell clear of ink on every side,
   // so the window never kisses the frame's line.

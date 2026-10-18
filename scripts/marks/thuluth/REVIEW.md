@@ -1722,3 +1722,21 @@ else on a sheet is added.
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1
 pieces 19 and 25) is **part of the letter**, not a direction arrow. Keep it.
+
+## Frames from the panels (2026-10-18)
+
+The user: "Definitely trace the borders." Three frames, in the library's
+Frames group, for review in the app:
+- `frames-corners-1` "Corner florals": the four corner sprays of
+  `thuluth-24-qalam-4.webp`, inverted, kept by boxes that exclude every
+  letter (a lam stem and the panel edge were first caught and boxed out).
+- `frames-corners-2` "Corner florals, dotted": the same from
+  `thuluth-24-fatir-43.webp`. The source draws them as small blots, and the
+  trace is as speckled as the scan: the user may drop it.
+- `frames-rosette` "Rosette border": the tiled border of
+  `thuluth-25-hadith.webp` as one tile (period 80 px, band 80 px, centres at
+  x 846 and 926, y 84.5), folded onto its mirror images, ink read at 110 so
+  the curls stay open. The app tiles it round the framed block.
+Panels t20–t32 as whole compositions: deferred by the user's leave
+("if you don't think it is going to help"); they stay as reference images
+for the tarkib work.

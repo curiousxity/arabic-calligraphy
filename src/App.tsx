@@ -66,7 +66,8 @@ import {
 import { DEFAULT_ATTACHMENT } from "./lib/guidePlacement";
 import type { GuideAttachment, GuideBlock, GuideParams, GuideShape, MarkBlock } from "./types";
 import { isFrameMark, markScale, MARK_UNITS_PER_EM, type MarkItem } from "./lib/markLibrary";
-import { fitFrameToRect, frameWindow } from "./lib/frameWindow";
+import { FRAME_PADDING, fitFrameToRect, frameWindow } from "./lib/frameWindow";
+import { ringCounts, TILE_SHARE_OF_EM, tileRing } from "./lib/tileRing";
 import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
@@ -2012,12 +2013,26 @@ const App: React.FC = () => {
   const frameSelectedBlock = (item: MarkItem): boolean => {
     const target = selectedBlock;
     if (!target || target.type === "mark" || target.type === "guide") return false;
-    const win = frameWindow(item.d);
     const node = stageRef.current?.findOne(`#block-${target.id}`);
-    if (!win || !node) return false;
+    if (!node) return false;
     const rect = node.getClientRect({ relativeTo: stageRef.current! });
     if (!(rect.width > 0 && rect.height > 0)) return false;
-    const fit = fitFrameToRect(win, rect, MARK_UNITS_PER_EM);
+    let markD = item.d;
+    let fit: { fontSize: number; markScaleX?: number; markScaleY?: number; x: number; y: number };
+    if (item.tile) {
+      // A border tile: build the ring round the padded box at the tile's own
+      // shape, sized from the block's font size, never stretched.
+      const fontSize = (target.fontSize ?? DEFAULT_NEW_BLOCK_FONT_SIZE) * TILE_SHARE_OF_EM * MARK_UNITS_PER_EM / item.tile.period;
+      const k = markScale(fontSize);
+      const { cols, side } = ringCounts(item.tile,
+        rect.width * (1 + 2 * FRAME_PADDING) / k, rect.height * (1 + 2 * FRAME_PADDING) / k);
+      markD = tileRing(item.d, item.tile, cols, side);
+      fit = { fontSize, x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    } else {
+      const win = frameWindow(item.d);
+      if (!win) return false;
+      fit = fitFrameToRect(win, rect, MARK_UNITS_PER_EM);
+    }
     const groupId = target.groupId ?? nextGroupIdRef.current++;
     const frame: MarkBlock = {
       ...DEFAULT_BLOCK,
@@ -2025,7 +2040,7 @@ const App: React.FC = () => {
       text: "",
       type: "mark",
       markId: item.id,
-      markD: item.d,
+      markD,
       color: target.color ?? DEFAULT_BLOCK.color,
       groupId,
       ...fit,
