@@ -154,7 +154,7 @@ GROUPS = [
     ("t2","2","Ha body, shared by ha, jim and kha (ح)"),("t2","10","Joined starting meem (مـ)"),
     ("t2","12","Ha, round (ه)"),("t2","13","Ha, round, second form (ه)"),
     ("t2","16","Small lam-alif, second form (لا)"),("t2","17","Lam-alif, open (لا)"),
-    ("t2","18","Ya (ى)"),("t2","19","Wrapped ha (ح)"),("t2","23","Starting sad (صـ)"),("t2","28","Waw (و)"),
+    ("t2","18","Ya (ى)"),("t2","19","Wrapped ha (ح)"),("t2","23","Starting sad (صـ)"),("t2","28","Waw (و)"),("t2","3","Kaf, zinadi (ك)"),
     ("t3","2","Alif (ا)"),("t3","3","Kaf, upright (ك)"),("t3","5","Lam, second form (ل)"),
     ("t3","6","Two lam-alifs, overlapping (لا لا)"),("t3","7","Ta, second form (ط)"),
     ("t3","8","Extended seen (س)"),("t3","9","Waw and long kaf (و ك)"),("t3","10","Ra, waw, dal (ر و د)"),

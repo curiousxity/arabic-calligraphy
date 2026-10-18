@@ -1400,7 +1400,10 @@ measurement marks). Traced with `traceOutline.py`; the review image and the
 traced path sit beside each source.
 
 - `outline-01.png` (2026-10-17, 652×1284): **ـم the joined ending meem**
-  (named by the user, 2026-10-17). **Taken back out of the library**
+  (named by the user, 2026-10-17). **Deleted 2026-10-17** at the user's
+  word ("forget about the color outline of the meem"); the files are in git
+  history. The notes below are kept for what they taught about sizing.
+  **Taken back out of the library**
   (the user, 2026-10-17): at 420 units it is too small, because the size
   ignored the **hat**, the joining stroke that rises into the meem from the
   letter before it. The standalone meem in the reference alphabet has no hat,
@@ -1599,6 +1602,7 @@ else on a sheet is added.
 | t2 19 | Wrapped ha (ح) | `thuluth-t2-19` | 2026-10-17 |
 | t2 23 | Starting sad (صـ) | `thuluth-t2-23` | 2026-10-17 |
 | t2 28 | Waw (و) | `thuluth-t2-28` | 2026-10-17 |
+| t2 3 | Kaf, zinadi (ك) | `thuluth-t2-3` | 2026-10-17; tiny spurs removed first (the tail tip, the lower stroke, under the head, at the turn) |
 | t3 (21 pieces) | see `traceMarks.py` | `thuluth-t3-<n>` | 2026-10-17 (all of sheet 3 but 15 and 16) |
 | t4 (16 pieces) | see `traceMarks.py` | `thuluth-t4-<n>` | 2026-10-17 (all of sheet 4) |
 | t5 (20 pieces) | see `traceMarks.py` | `thuluth-t5-<n>` | 2026-10-17 (all of sheet 5 but 2, 4, 12) |
@@ -1627,7 +1631,7 @@ else on a sheet is added.
 | t9 r3 (4 pieces) | the joined and open ha; see `traceMarks.py` | `thuluth-t9r3-<n>` | 2026-10-17 (all of row 3) |
 | t10 r1 2 | Seen with meem (سمد سملا) | `thuluth-t10r1-2` | 2026-10-17 |
 | t10 r2 (4 pieces) | the seen with meem and ra; see `traceMarks.py` | `thuluth-t10r2-<n>` | 2026-10-17 (all of row 2) |
-| outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
+| outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17; the outline itself deleted at the user's word ("forget about the color outline of the meem") |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1
 pieces 19 and 25) is **part of the letter**, not a direction arrow. Keep it.

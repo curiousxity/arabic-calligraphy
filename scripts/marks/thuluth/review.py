@@ -72,7 +72,13 @@ SHEETS = {
   # 3: the two blobs above the kaf's start are not part of the letter (the
   # user, 2026-10-17); a point picks out that separate bit. The box is a
   # stray tick rising from the top edge of the lower stroke (the user).
-  "erase": {3: [(918, 130), (963, 178, 971, 185)]},
+  # Tiny spurs the user found on the kaf (2026-10-17): the guide line fused
+  # along the tail's starting tip, a tick on the lower stroke, a stub and a
+  # small downward hook under the head, a point into the counter at the turn.
+  "erase": {3: [(918, 130), (963, 178, 971, 185),
+                ("poly", [(854, 218), (871, 218), (871, 223), (859, 226), (854, 223)]), (904, 228, 908, 231),
+                ("poly", [(980, 137), (991, 131), (1006, 131), (1006, 140), (980, 140)]),
+                ("poly", [(1097, 204), (1104, 202), (1104, 209), (1099, 209)])]},
   "splits": {
     # ص's tail runs into ط's base: the loop and the low tail are the ص.
     (542, 586): (24, 25, lambda xs, ys: (xs >= 700) | ((ys >= 768) & (xs >= 595))),
