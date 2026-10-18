@@ -539,7 +539,7 @@ this sheet; they are left for hand touch-up.
 | r1 4 | ـمى joined ending meem running into a joined ending ya body (the user) | **in the library** 2026-10-17 |
 | r1 6 | ـن joined ending nun body (the user) | **in the library** 2026-10-17 |
 | r1 7 | ـه ha, terminal (the user: correct) | **in the library** 2026-10-18 |
-| r1 8 | ـحـم middle ha with a terminal meem (the user, 2026-10-18); the meem's tail is cut off: **borrow a tail** from sheet 33 | cleaned 2026-10-17 (lines at the tail's tip, at the join and under the bowl); awaiting the user's look. Stroke order on the sheet: 1 the head of the right tooth, 2 down its curve, 3 the turn at the base, 4 over the tall loop's peak, 5 the long tail sweeping left (the ٥ in the top-right corner is a height of five nuqtas, not a stroke) |
+| r1 8 | ـحـم middle ha with a terminal meem (the user, 2026-10-18); the meem's tail is cut off: **borrow a tail** from sheet t34's Meem cell | cleaned 2026-10-17 (lines at the tail's tip, at the join and under the bowl); awaiting the user's look. Stroke order on the sheet: 1 the head of the right tooth, 2 down its curve, 3 the turn at the base, 4 over the tall loop's peak, 5 the long tail sweeping left (the ٥ in the top-right corner is a height of five nuqtas, not a stroke) |
 | r2 1 | بلب initial, medial and final behs (to name) | cleaned 2026-10-17 (the thin upright and the bottom line the user called stray, the lam's spur, ticks over the bowls); awaiting the user's look (`review-2-cleaned.png`) |
 | r2 2 | long run of joined behs (to name) | cleaned 2026-10-17 (spurs and straight lines); awaiting the user's look |
 | r2 3 | بلسة beh run (to name) | split from 4 and cleaned 2026-10-17 (stray lines, the baseline fused under the seen, spurs); awaiting the user's look. Stroke order on the sheet: 1 down the first tooth's head, 2 up into the second tooth, 3 down from the lam's top, 4 the lam's base turning left, 5 into the seen's teeth, 6 along the seen's bowl, 7 over the ta marbuta's top, 8 down its left side and back up |
@@ -1175,14 +1175,11 @@ the SVG does; the pages draw it the same way.
 Its Meem cell holds the same twenty terminal meems as sheet t33 (t34
 pieces 50-59, 69-73, 81-85): exact vectors here, so t33 is superseded.
 
-## Sheet t33 — every terminal meem (`thuluth-33-meem-terminal-src.png`)
+## Sheet t33 — deleted (2026-10-18)
 
-Sent by the user 2026-10-18 ("Lets make this easier. the attached is all
-the $ forms of meem in black"): twenty terminal meems in black, each with
-the letter before it in grey for context. A clean drawing, not a scan. The
-grey is removed in `thuluth-33-meem-terminal.png` (black kept with its own
-edge), then mapped and traced as `t33r1` (pen 12.8 px, so 3.75 units per
-px). A source for borrowing meem tails too (t8 7).
+The user's picture of the twenty terminal meems was superseded by the same
+meems as exact vectors in sheet t34's Meem cell, and deleted at the user's
+word. t8 7's missing meem tail is to be borrowed from t34 instead.
 
 ## Sheet t20 — finished pieces: al-Fatiha, line by line (white on black)
 
@@ -1689,6 +1686,8 @@ else on a sheet is added.
 | t2 23 | Starting sad (صـ) | `thuluth-t2-23` | 2026-10-17 |
 | t2 28 | Waw (و) | `thuluth-t2-28` | 2026-10-17 |
 | t2 3 | Kaf, zinadi (ك) | `thuluth-t2-3` | 2026-10-17; tiny spurs removed first (the tail tip, the lower stroke, under the head, at the turn) |
+| vector set (330 pieces) | named "Letter, position, n (glyph)" in alphabet order | `thuluth-v1-<n>` standalone (t35), `thuluth-v2-<n>` joined (t36), `thuluth-v3-<n>` finishing (t34) | 2026-10-18, all added at the user's word, to be reviewed in the app; t36's nun and ya cells left out (same drawing as its ba cell) |
+| t1 2, 19, 23, 25, 26, 30; t2 2, 10, 12, 13, 18, 28 | — | — | **removed** 2026-10-18: plain forms the vector set draws more cleanly (the user: "use the cleaner piece"); lesson-specific variants (t3-t6, the lam-alifs, edge cases, joined words) stay |
 | t15 r3 10 | Alif's hamza (ع-shaped), signs group | `thuluth-t15r3-10` | 2026-10-17; "not to be used in Thuluth, Naskh or Ijaza in place of the kaf's hamza" |
 | t15 r3 11 | Kaf's hamza (ء), signs group | `thuluth-t15r3-11` | 2026-10-17; traced by hand (too small for the parts map); "not to be used in place of the alif's hamza in the three scripts" |
 | t3 (21 pieces) | see `traceMarks.py` | `thuluth-t3-<n>` | 2026-10-17 (all of sheet 3 but 15 and 16) |

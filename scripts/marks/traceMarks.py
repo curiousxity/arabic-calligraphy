@@ -151,12 +151,8 @@ GROUPS = [
     ("t15r3","10","Alif's hamza (ع-shaped)"),("t15r3","11","Kaf's hamza (ء)"),
   ]),
   ("thuluth", "Thuluth", [
-    ("t1","23","Ha (ه)"),("t1","25","Lam (ل)"),("t1","19","Ta (ط)"),
-    ("t1","2","Small alif (ا)"),("t1","15","Small lam-alif (لا)"),("t1","26","Dal (د)"),("t1","30","Nun (ن)"),
-    ("t2","2","Ha body, shared by ha, jim and kha (ح)"),("t2","10","Joined starting meem (مـ)"),
-    ("t2","12","Ha, round (ه)"),("t2","13","Ha, round, second form (ه)"),
-    ("t2","16","Small lam-alif, second form (لا)"),("t2","17","Lam-alif, open (لا)"),
-    ("t2","18","Ya (ى)"),("t2","19","Wrapped ha (ح)"),("t2","23","Starting sad (صـ)"),("t2","28","Waw (و)"),("t2","3","Kaf, zinadi (ك)"),
+    ("t1","15","Small lam-alif (لا)"),("t2","16","Small lam-alif, second form (لا)"),("t2","17","Lam-alif, open (لا)"),
+    ("t2","19","Wrapped ha (ح)"),("t2","23","Starting sad (صـ)"),("t2","3","Kaf, zinadi (ك)"),
     ("t3","2","Alif (ا)"),("t3","3","Kaf, upright (ك)"),("t3","5","Lam, second form (ل)"),
     ("t3","6","Two lam-alifs, overlapping (لا لا)"),("t3","7","Ta, second form (ط)"),
     ("t3","8","Extended seen (س)"),("t3","9","Waw and long kaf (و ك)"),("t3","10","Ra, waw, dal (ر و د)"),
@@ -203,6 +199,35 @@ GROUPS = [
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
+# The Thuluth vector set (bought by the user; thuluth/REVIEW.md, "Every form
+# of every letter"): every piece of its three sheets joins the Thuluth group,
+# named from its cell's letter and its position. Part 2's ba, nun and ya cells
+# are one drawing (the dotless tooth), so only the ba cell's pieces are kept.
+# Where a scanned piece showed the same plain form, the vector one replaced it
+# (the user, 2026-10-18: "use the cleaner piece").
+VECTOR_LETTERS = {(0,0):("Alif","ا"),(0,1):("Ba","ب"),(0,2):("Jeem","ح"),(0,3):("Dal","د"),(0,4):("Ra","ر"),
+    (1,0):("Seen","س"),(1,1):("Sad","ص"),(1,2):("Ta","ط"),(1,3):("Ain","ع"),(1,4):("Fa","ف"),
+    (2,0):("Qaf","ق"),(2,1):("Kaf","ك"),(2,2):("Lam","ل"),(2,3):("Meem","م"),(2,4):("Nun","ن"),
+    (3,0):("Ha","ه"),(3,1):("Waw","و"),(3,2):("Ya","ى")}
+def vector_items():
+    here=os.path.dirname(os.path.abspath(__file__)); items=[]
+    with open(os.path.join(here,"thuluth/traces/t36/t36r1-forms.json"),encoding="utf-8") as fh: forms=json.load(fh)
+    for sheet,pos in (("t35","standalone"),("t36",None),("t34","finishing")):
+        with open(os.path.join(here,f"thuluth/traces/{sheet}/{sheet}r1-traced.json"),encoding="utf-8") as fh: tr=json.load(fh)
+        count={}
+        for k in sorted(tr,key=int):
+            cell=tuple(tr[k]["cell"])
+            if sheet=="t36" and cell in ((2,4),(3,2)): continue
+            name,ch=VECTOR_LETTERS[cell]
+            p=pos or ("starting" if forms.get(k)=="@" else "middle")
+            if sheet=="t36" and cell==(0,1): name="Ba, nun or ya tooth"
+            glyph={"standalone":ch,"starting":ch+"ـ","middle":"ـ"+ch+"ـ","finishing":"ـ"+ch}[p]
+            count[(name,p)]=count.get((name,p),0)+1
+            items.append(((list(VECTOR_LETTERS).index(cell),["standalone","starting","middle","finishing"].index(p),int(k)),
+                          (f"{sheet}r1",k,f"{name}, {p}, {count[(name,p)]} ({glyph})")))
+    # in the picker: by letter (alphabet order), then standalone, starting, middle, finishing
+    return [it for _,it in sorted(items)]
+
 # Thuluth pieces are not traced here: scripts/marks/thuluth/ cleans the scanned
 # lesson sheets and traces each piece for review (thuluth/REVIEW.md). Only a
 # piece the user has approved is listed in GROUPS; its outline is read from the
@@ -222,7 +247,12 @@ TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t10r1": ("thuluth/traces/t10/t10r1-traced.json", "thuluth-t10r1-"),
           "t10r2": ("thuluth/traces/t10/t10r2-traced.json", "thuluth-t10r2-"),
           "t15r3": ("thuluth/traces/t15/t15r3-traced.json", "thuluth-t15r3-"),
+          "t34r1": ("thuluth/traces/t34/t34r1-traced.json", "thuluth-v3-"),
+          "t35r1": ("thuluth/traces/t35/t35r1-traced.json", "thuluth-v1-"),
+          "t36r1": ("thuluth/traces/t36/t36r1-traced.json", "thuluth-v2-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
+for _g in GROUPS:
+    if _g[0]=="thuluth": _g[2].extend(vector_items())
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))
       for name,cfg in SHEETS.items()}
