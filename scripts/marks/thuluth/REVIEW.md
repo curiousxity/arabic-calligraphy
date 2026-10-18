@@ -598,13 +598,13 @@ the seen/sad-with-ra rule; the basmala's ba; the seen's extension).
 
 | piece | provisional name | status |
 |---|---|---|
-| r1 4 | س standalone seen (الفردي) | traced, clean (label word dropped) |
-| r1 1 | س لسه سط, joined in the scan | traced, clean (label words dropped) |
-| r1 2 | سمد سملا seen with meem | traced, clean |
-| r2 1, 3 | سمر, two forms | traced, clean |
-| r2 2 | seen joined to ra, long run | traced, clean |
-| r2 4 | سمرس | traced, clean |
-| r3 1 | سرا with a long flat seen | traced, clean |
+| r1 4 | س standalone seen (الفردي) | the user: it is seen; the note in the belly had stayed (the trace predated its cleanup). Re-traced clean 2026-10-17; awaiting the user's look (page number 1) |
+| r1 1 | س لسه سط, joined in the scan | the same leftover notes; re-traced clean 2026-10-17; awaiting the user's look (number 2) |
+| r1 2 | سمد سملا seen with meem | the user: fine. **In the library** 2026-10-17 |
+| r2 1, 3 | سمر, two forms | the user: clean. **In the library** 2026-10-17 |
+| r2 2 | seen joined to ra, long run | the user: clean. **In the library** 2026-10-17 |
+| r2 4 | سمرس | the user: clean. **In the library** 2026-10-17 |
+| r3 1 | سرا with a long flat seen | its trace had never been saved; traced 2026-10-17 (number 11) |
 | r3 2 | long seen over ح with ط, stacked | traced, clean |
 | r4 1 | medial seen (النسيم-like) | traced; **needs cleanup**: guide lines |
 | r4 2 | initial, medial and final seen, stacked | traced; **needs cleanup**: measuring nuqtas and lines; stroke numbers 1–4 to read |
@@ -1424,12 +1424,36 @@ and the pen strokes it runs along or crosses stay. Too large an r breaks a
 stroke at its thin neck (t7 r1 20 needed 3, not 5); follow it with "main" to
 drop what was cut loose.
 
-## Review pages are labelled by row (2026-10-17)
+## Review pages: one number per piece (2026-10-17)
 
-A sheet split into row images numbers each row's pieces from 1, so one page
-showing two rows had two piece 1s. `reviewSheet.py` builds a review page
-with every piece labelled "row 2 · 1", "row 3 · 1" and so on; use it for
-every page shown to the user.
+A sheet split into row images numbers each row's pieces from 1, so a page
+showing two rows repeated numbers. `reviewSheet.py N` gives every piece of
+sheet tN one number across the whole sheet, kept for good in
+`traces/tN/numbers.json` (a piece added later, such as a split, takes the
+next free number), and builds `traces/tN/page-1.png` and on, showing only
+the pieces not yet in the library, each labelled with its number and,
+smaller, its row. It removes the folder's older review pictures, so one set
+is in use. The user refers to pieces by these numbers from sheet 10 on; the
+ledger rows below keep the row and piece ("r1 4"), and this list maps them
+("r1 4" is row 1, piece 4):
+
+- **t7**: 1 = r1 2, 2 = r1 3, 3 = r1 4, 4 = r1 5, 5 = r1 9, 6 = r1 10, 7 = r1 13, 8 = r1 15, 9 = r1 19, 10 = r1 20, 11 = r2 1, 12 = r2 2, 13 = r2 3, 14 = r2 4, 15 = r2 5, 16 = r2 6, 17 = r2 7, 18 = r2 8, 19 = r3 1, 20 = r3 2, 21 = r3 3, 22 = r3 4
+- **t8**: 1 = r1 1, 2 = r1 2, 3 = r1 3, 4 = r1 4, 5 = r1 6, 6 = r1 7, 7 = r1 8, 8 = r2 1, 9 = r2 2, 10 = r2 3, 11 = r2 4, 12 = r3 1
+- **t9**: 1 = r1 2, 2 = r1 3, 3 = r1 4, 4 = r1 5, 5 = r1 6, 6 = r1 7, 7 = r1 8, 8 = r1 9, 9 = r2 5, 10 = r2 2, 11 = r2 6, 12 = r2 7, 13 = r3 1, 14 = r3 2, 15 = r3 3, 16 = r3 4
+- **t10**: 1 = r1 4, 2 = r1 1, 3 = r1 2, 4 = r2 1, 5 = r2 2, 6 = r2 3, 7 = r2 4, 8 = r3 2, 9 = r4 1, 10 = r4 2, 11 = r3 1
+- **t11**: 1 = r1 1, 2 = r1 2, 3 = r1 3, 4 = r1 4, 5 = r2 1, 6 = r2 2, 7 = r2 3, 8 = r2 4, 9 = r2 5, 10 = r2 6, 11 = r2 7, 12 = r2 8, 13 = r2 9, 14 = r3 1
+- **t12**: 1 = r1 1, 2 = r1 2, 3 = r1 3, 4 = r1 4, 5 = r1 5, 6 = r2 1, 7 = r2 2, 8 = r2 3, 9 = r3 1, 10 = r4 1, 11 = r5 1
+- **t13**: 1 = r1 1, 2 = r1 2, 3 = r1 3, 4 = r1 4, 5 = r1 5, 6 = r2 6, 7 = r2 13, 8 = r2 7, 9 = r2 8, 10 = r2 9, 11 = r2 10, 12 = r2 11, 13 = r3 12, 14 = r4 1, 15 = r4 2, 16 = r4 3
+- **t14**: 1 = r1 1, 2 = r1 2, 3 = r1 3, 4 = r1 4, 5 = r1 5, 6 = r2 6, 7 = r2 7, 8 = r2 8, 9 = r2 9, 10 = r3 1, 11 = r3 2, 12 = r3 3, 13 = r4 1, 14 = r5 1, 15 = r5 2, 16 = r5 3, 17 = r5 4, 18 = r5 5
+- **t15**: 1 = r1 1, 2 = r1 2, 3 = r1 3, 4 = r1 4, 5 = r2 1, 6 = r2 2, 7 = r2 3, 8 = r2 4, 9 = r2 5, 10 = r2 7, 11 = r2 8, 12 = r2 9, 13 = r2 10, 14 = r2 11, 15 = r3 1, 16 = r3 2, 17 = r3 3, 18 = r3 4, 19 = r3 5, 20 = r3 6, 21 = r3 7, 22 = r3 8, 23 = r3 9, 24 = r3 10
+- **t16**: 1 = r1 1, 2 = r1 3, 3 = r1 4, 4 = r1 5, 5 = r1 6, 6 = r1 7, 7 = r1 8, 8 = r1 9, 9 = r2 1, 10 = r2 2, 11 = r2 3, 12 = r2 4, 13 = r2 5, 14 = r2 6, 15 = r2 7, 16 = r3 1, 17 = r3 2, 18 = r3 3, 19 = r3 4, 20 = r3 5, 21 = r3 6, 22 = r4 1, 23 = r4 2, 24 = r4 3, 25 = r5 1, 26 = r5 2, 27 = r5 3, 28 = r5 4, 29 = r5 5, 30 = r6 1, 31 = r6 2, 32 = r6 3, 33 = r6 4, 34 = r6 5
+- **t17**: 1 = r1 1, 2 = r1 2, 3 = r1 3, 4 = r2 1, 5 = r2 2, 6 = r2 3, 7 = r3 1, 8 = r3 2, 9 = r4 1, 10 = r5 1, 11 = r5 2, 12 = r5 3, 13 = r5 4, 14 = r5 5, 15 = r6 1, 16 = r6 2, 17 = r6 3, 18 = r6 4, 19 = r6 5, 20 = r6 6, 21 = r6 7
+- **t18**: 1 = r1 1, 2 = r1 2, 3 = r1 3, 4 = r1 4, 5 = r1 5, 6 = r1 6, 7 = r1 7, 8 = r1 8
+- **t19**: 1 = r1 1, 2 = r1 2, 3 = r1 3, 4 = r1 4, 5 = r1 5
+
+Before the pages were rebuilt (2026-10-17), every piece of sheets 7–19 not
+yet in the library was traced again from the current settings: some traces
+predated their cleanup settings (t10's 1, row 1 · 4, still had its note).
 
 `erase` also takes `("poly", [(x, y), ...])`, clearing inside a polygon, for
 a guide line meeting a stroke on a slant, where a box would notch the edge.
@@ -1514,6 +1538,8 @@ else on a sheet is added.
 | t9 r1 2 | Starting jeem, head angle 1 (جـ) | `thuluth-t9r1-2` | 2026-10-17 |
 | t9 r2 (4 pieces) | the long-ha words; see `traceMarks.py` | `thuluth-t9r2-<n>` | 2026-10-17 (all of row 2) |
 | t9 r3 (4 pieces) | the joined and open ha; see `traceMarks.py` | `thuluth-t9r3-<n>` | 2026-10-17 (all of row 3) |
+| t10 r1 2 | Seen with meem (سمد سملا) | `thuluth-t10r1-2` | 2026-10-17 |
+| t10 r2 (4 pieces) | the seen with meem and ra; see `traceMarks.py` | `thuluth-t10r2-<n>` | 2026-10-17 (all of row 2) |
 | outline 01 | Joined ending meem (ـم) | `thuluth-outline-01` | removed 2026-10-17: too small (size ignored the hat); left out for now |
 
 Tip barbs (2026-10-17): the small barb at the top of an upright (sheet t1

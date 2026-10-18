@@ -193,7 +193,10 @@ GROUPS = [
     ("t9r2","5","Ha before an extension: six nuqtas (حم)"),("t9r2","2","Ha before a low letter: six nuqtas (حسا)"),
     ("t9r2","6","Ha, the rule for al-Rahman (حمل)"),("t9r2","7","Ha with meem, second (حم)"),
     ("t9r3","1","Ha joined after and before, two words (لحم لحم)"),("t9r3","2","Ha with meem (حم)"),
-    ("t9r3","3","Ha before kaf and meem (حكم)"),("t9r3","4","Open ha, two words (حمر حر)")]),
+    ("t9r3","3","Ha before kaf and meem (حكم)"),("t9r3","4","Open ha, two words (حمر حر)"),
+    ("t10r1","2","Seen with meem (سمد سملا)"),("t10r2","1","Seen with meem and ra (سمر)"),
+    ("t10r2","2","Seen joined to ra, a run (سرسرس)"),("t10r2","3","Seen with meem and ra, second (سمر)"),
+    ("t10r2","4","Seen, meem, ra, seen (سمرس)")]),
   ("frames", "Frames", [
     ("c","00","Drop frame"),("c","01","Double drop frame"),("c","02","Drop frame with curls")]),
 ]
@@ -213,6 +216,8 @@ TRACED = {"t1": ("thuluth/traces/t1/t1-traced.json", "thuluth-t1-"),
           "t9r1": ("thuluth/traces/t9/t9r1-traced.json", "thuluth-t9r1-"),
           "t9r2": ("thuluth/traces/t9/t9r2-traced.json", "thuluth-t9r2-"),
           "t9r3": ("thuluth/traces/t9/t9r3-traced.json", "thuluth-t9r3-"),
+          "t10r1": ("thuluth/traces/t10/t10r1-traced.json", "thuluth-t10r1-"),
+          "t10r2": ("thuluth/traces/t10/t10r2-traced.json", "thuluth-t10r2-"),
           "o": ("thuluth/outlines/outline-{}.json", "thuluth-outline-")}
 HERE=os.path.dirname(os.path.abspath(__file__))
 outs={name:trace_sheet(os.path.join(HERE,cfg["file"]),cfg["unit"],cfg["dilate"],cfg["row_gap"],cfg["merges"],cfg.get("seeds"))
