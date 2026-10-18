@@ -1364,13 +1364,19 @@ traced into the app. Questions to settle with the user during review:
 3. ~~Script of `thuluth-21-basmala-b.png` and `thuluth-26-closing.png`?~~
    Answered: Naskh. Both stay out of the Thuluth set.
 4. t17 row 5: which pieces the note "١-٢" means, and what the big dotted
-   overlay stands for; the words in t17 row 3.
-5. t14 row 4 (حكما): is it the example for "الكاف السيفي المفرد والوسط"?
+   overlay stands for; the words in t17 row 3. The user (2026-10-17): the
+   dotted outlines on these sheets show where other marks would go, for
+   instance when something joins there; the user will check the original
+   for "١-٢".
+5. ~~t14 row 4 (حكما)~~ Answered (the user, 2026-10-17): the kaf there is
+   the starting form, set beside the ha's body to show their angles match:
+   that portion is the same stroke.
 6. Readings marked "to confirm": t13 row 3, t15 rows 2–3, t17 row 6, t19's
    practice words and side note, t23 (al-Ahzab 33:14), t25 (the small
    block), t29 (al-Fath 48:10), t31 (al-Naml 27:6).
-7. Whether to use the corner florals (t24) and the tiled border (t25
-   hadith) as frame pieces at all.
+7. ~~Whether to use the corner florals (t24) and the tiled border (t25
+   hadith) as frame pieces~~ Yes (the user, 2026-10-17). And the panels
+   (t20-t32) are to be traced whole, as compositions. Both still to do.
 8. ~~Whether to keep t13 piece 8 (the Muhaqqaq waw) anywhere.~~ Deleted 2026-10-17.
 
 **Stroke-order numbers and arrows must go before tracing** (user,
@@ -1543,12 +1549,12 @@ Judgment calls for the user to confirm rather than re-review:
   the earlier approved two-word pieces.
 - t15 10 (row 2 · 7): the dot inside the curl is a measuring mark (the
   user, 2026-10-17); erased.
-- t16 8 (row 1 · 9): the dark square on top of the medial meem was kept as
-  the pen's start, not a nuqta.
+- t16 8 (row 1 · 9): the dark square on top of the meem is a marking nuqta
+  (the user, 2026-10-17); erased.
 - t17 18 (row 6 · 4), a construction drawing: **skipped** (the user,
   2026-10-17).
-- t17 20 (row 6 · 6): the dark shape inside the waw's head is kept as the
-  pen's turn.
+- t17 20 (row 6 · 6): the dark shape inside the waw's head is a marking
+  nuqta too (the user, 2026-10-17); erased.
 
 ## Hand touch-ups (`touchup/`)
 

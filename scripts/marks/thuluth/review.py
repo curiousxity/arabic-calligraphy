@@ -477,9 +477,9 @@ DRAFT_ERASE = {
   # measuring nuqtas fused between the uprights and in the joins; small ticks
   "t19r1": {1: [("lines", 4), "main"], 2: [("lines", 4), "main"]},   # ruled lines in ink
   "t17r6": {5: [(797, 118, 823, 141), (823, 116, 846, 139), (744, 225, 753, 236), "main"],
-            6: [(531, 180, 551, 210), "main"],
+            6: [(531, 180, 551, 210), (583, 161, 604, 185), "main"],   # + the marking nuqta inside the waw's head (the user)
             7: [(203, 183, 216, 196), "main"]},
-  "t16r1": {8: [(347, 198, 365, 219), "main"], 9: [(85, 195, 91, 202), (114, 246, 125, 251), "main"],
+  "t16r1": {8: [(347, 198, 365, 219), "main"], 9: [(85, 195, 91, 202), (114, 246, 125, 251), (83, 163, 110, 190), "main"],   # + the marking nuqta on the meem (the user)
             1: [("lines", 5), "main"], 10: [("lines", 5), (1610, 201, 1630, 223), (1651, 205, 1672, 228), (1651, 158, 1668, 182), "main", ("add", 1725, 150)]},
   "t15r3": {**{n: [("lines", 5), "main"] for n in (5, 7, 8, 9)},
             # the row of measuring nuqtas on its line, and the nuqtas on the bowl
