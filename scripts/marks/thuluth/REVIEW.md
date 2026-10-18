@@ -1840,10 +1840,15 @@ What this ledger promised, or the work needs, and does not yet have:
    violate the licence.
 2. ~~Middle forms~~: filled by the second set (t39).
 3. **Stroke order** (the user, 2026-10-18: keep it, in case it is needed).
-   The user asked (2026-10-16) that each piece's stroke
-   order be recorded before its numbers were erased. 7 pieces have a
-   record; 23 are noted as carrying stroke numbers. The numbers are still
-   on the source scans, so the rest can still be read off and written down.
+   **Kept on the original scans**: the scans under `scripts/marks/` were
+   never edited (only the traced copies were cleaned), so every number and
+   arrow is still there. Written out in this ledger so far (in the piece
+   rows, as "Stroke numbers: 1 …"): t1 26, t2 3, t3 8, 9, 22, 23, 24, t5 9,
+   t8 r1 8, r2 3, r2 4. Still only on the scans: t1 5, 9 and 12 (12 is the
+   ha's construction drawing, kept for exactly this), t2 19, t10 r4 2, t12
+   r1 5, t14 r5 1-5, t15 rows 2-3 (the ba joins), t16 rows 1-2 (meem
+   construction and joins), t17 row 6 (the ha construction sheet). Read
+   them off the scans when the app teaches or animates strokes.
 4. **Vowel signs** (the user will send a copy, 2026-10-18). The library has no fatha, kasra, damma, shadda, sukun,
    tanween or madda. Sheet 19's sign rows were traced as two parts only
    (an ornamental knot and a double stroke). Tarkib needs them (plan
