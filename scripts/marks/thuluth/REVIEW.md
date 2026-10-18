@@ -42,6 +42,11 @@ Used in reviews to say what a piece is, e.g. "ب@" (a starting ba) or
 | `)` | part of the letter: body |
 | `=` | part of the letter: tail |
 
+The shorthand is for talking, not for names (the user: symbols would not
+make valid file names). The order of the marks does not matter. In the
+library, a name spells them out in words: "Ha, terminal, second alternate,
+body (ـه)".
+
 ## Sheet t1 — `thuluth-1.webp` (1638×1024)
 
 A second scan of the same page, `thuluth-1b.webp` (1667×1032, sent 2026-10-16), is
