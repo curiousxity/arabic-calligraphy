@@ -1103,6 +1103,28 @@ it), parts 3 and 4 (small signs: an ornamental knot, a double stroke), part
 5 (سلة-like with small marks). Parts 1, 2, 5 **need cleanup**; 3 and 4 are
 small signs for the marks side, clean.
 
+## Sheet t34 — every finishing (terminal) form, as vectors (`thuluth-34-endings.svg`)
+
+Sent by the user 2026-10-18 ("this is going to be helpful"): an Inkscape
+SVG titled "Arabic alphabet - Thuluth collection - Part 3 - finishing
+letters", 18 cells (Aleph to Ya), each letter's endings in black with the
+letters before them in grey. Its file name is a stock-library number
+(shutterstock_2106672014): the user's licence must cover using it in the
+app. **Nothing is traced**: `vectorSheet.py` takes the black paths
+themselves, groups them into 107 pieces (cell headings dropped, each kaf's
+small sign joined to its kaf), and writes them in library units. The cells
+draw their letters at different sizes (the jeem and waw cells about two
+and a half times the rest), so each cell's pen is measured on its own and
+sets that cell's scale (48 units per pen). Checked against the library:
+the nun comes out 333 units against sheet 1's 331, the jeem 462 against
+454, the ta 512 against 522, the lam 673 against 577. One review page per
+letter (`traces/t34/page-NN-letter.png`, crop of the sheet beside the
+outline), numbered as on `t34r1-numbered.png`. The app fills nonzero, as
+the SVG does; the pages draw it the same way.
+
+Its Meem cell holds the same twenty terminal meems as sheet t33 (t34
+pieces 50-59, 69-73, 81-85): exact vectors here, so t33 is superseded.
+
 ## Sheet t33 — every terminal meem (`thuluth-33-meem-terminal-src.png`)
 
 Sent by the user 2026-10-18 ("Lets make this easier. the attached is all
