@@ -24,6 +24,24 @@ Statuses: `waiting` (shown, no answer yet), `cleanup` (leftover measurement
 dots or guide lines touching the letter, to remove by hand before review),
 `approved`, `redo` (with the user's note).
 
+## Shorthand for letter forms and parts (the user, 2026-10-17)
+
+Used in reviews to say what a piece is, e.g. "ب@" (a starting ba) or
+"ع$ =" (the tail of a terminal ain).
+
+| mark | meaning |
+|---|---|
+| `!` | standalone letter |
+| `@` | starting (connects forward) |
+| `#` | middle (connects both sides) |
+| `$` | terminal (connects back) |
+| `*1` | alternate form |
+| `*2` | second alternate form |
+| `*3` | third alternate form |
+| `(` | part of the letter: head |
+| `)` | part of the letter: body |
+| `=` | part of the letter: tail |
+
 ## Sheet t1 — `thuluth-1.webp` (1638×1024)
 
 A second scan of the same page, `thuluth-1b.webp` (1667×1032, sent 2026-10-16), is
