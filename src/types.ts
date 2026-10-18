@@ -283,6 +283,9 @@ export type StackPiece = {
    *  stripped on re-run and on Reset layout. */
   filler?: true;
   faces: CutFace[];
+  /** Library-built pieces only (tarkib): where this piece may lengthen,
+   *  piece-local (tarkibSchema.ts StretchZone). Hand pulls use these. */
+  stretch?: { cutX: number; angle: number; window?: { y: number; half: number }; side: "near" | "far"; min: number; max: number }[];
 };
 
 export type StackJoin = {
