@@ -8,19 +8,20 @@
 import { loadMarkGroups, type MarkItem } from "./markLibrary";
 import { outlineBounds, type Pt } from "./strokeCuts";
 import { splitAtCut } from "./stackGeometry";
+import { squareCuts } from "./tarkibEnds";
 import { parseSvgPath, type SvgCmd } from "./svgPath";
 import { analyzePhrase, LETTER_DOTS, skeletonFor, SKELETONS, type LetterForm } from "./tarkibText";
 
 /** A cut in splitAtCut's frame, piece units. The angle is the writing
  *  direction there, so an entry keeps the far side and an exit the near. */
-export type FaceCut = { cutX: number; angle: number; window?: { y: number; half: number } };
+export type FaceCut = { cutX: number; angle: number; window?: { y: number; half: number }; /** The stroke's thickness there, when measured. */ thickness?: number };
 /** Where a piece may lengthen: a cut across a straight stroke; the `side`
  *  part moves away as the stroke grows, by `min`..`max` units. */
 export type StretchZone = { cutX: number; angle: number; window?: { y: number; half: number }; side: "near" | "far"; min: number; max: number };
 /** A join end: where the neighbouring letter meets the piece, the writing
  *  direction there, and, when the end is a flat cut, the cut that frees it
  *  for a spliced join (pieceSchema.py explains the two kinds). */
-export type JoinEnd = { point: Pt; angle: number; face?: FaceCut };
+export type JoinEnd = { point: Pt; angle: number; face?: FaceCut; /** Trims at increasing depth (`face` among them): the composer picks per meeting (tarkibChain.ts). */ options?: FaceCut[] };
 /** One piece's generated geometry (pieceSchema.py). */
 export type PieceGeometry = {
   right?: JoinEnd; left?: JoinEnd;
@@ -111,26 +112,64 @@ export function formsFromName(name: string): { char: string; skeleton: string; f
 
 const boxArea = (cmds: SvgCmd[]) => { const b = outlineBounds(cmds); return (b.x2 - b.x1) * (b.y2 - b.y1); };
 
-/** A generated face is kept only if splitAtCut accepts it and the part it
- *  keeps is the larger: the generator measures pixels, splitAtCut decides.
- *  An end whose face fails still joins by touch, it just cannot be spliced. */
-function legal(cmds: SvgCmd[], end: JoinEnd | undefined, keep: "near" | "far"): JoinEnd | undefined {
-  if (!end?.face) return end;
-  const w = end.face.window;
-  // The generator sizes the window to the flat edge it found; a few units
-  // inside, where the cut runs, a tapering stroke is wider and its second
-  // crossing fell outside (445 of 714 faces). Widened step by step, the
-  // narrowest window that splits is kept, so the cut still never reaches a
-  // neighbouring stroke.
-  for (const half of w ? WINDOW_GROWTH.map((g) => w.half * g[0] + g[1]) : [0]) {
-    const face: FaceCut = w ? { ...end.face, window: { y: w.y, half } } : end.face;
+/** Units each end of a join is trimmed back from where the letters meet:
+ *  the connection is redrawn as a pen stroke across the gap (about a pen
+ *  long), bending from one end's direction into the other's, so a seam is
+ *  never two inks overlapping at an angle (the user: "the joints need to be
+ *  smooth. that is essential"). */
+export const JOIN_TRIM = PEN / 2;
+/** The trims offered per end, units: the composer takes the shallowest pair
+ *  that leaves the bridge room to taper and turn (tarkibChain.ts). */
+export const JOIN_DEPTHS = [PEN / 4, PEN / 2, (3 * PEN) / 4, PEN, 1.5 * PEN];
+/** Window half-widths tried, as (factor, added units): up to half a pen more. */
+const WINDOW_GROWTH: [number, number][] = [[1, 0], [1.25, 0], [1.5, 0], [1.5, 12], [1.5, 24]];
+const contourCount = (cmds: SvgCmd[]) => cmds.filter((c) => c.type === "M").length;
+
+/**
+ * The cut that frees a join end for a spliced pen stroke, trimmed JOIN_TRIM
+ * back into the piece (less where that will not cut): square across the
+ * stroke as measured (tarkibEnds.ts), else, failing that, tried from the
+ * generator's face (the flat edge the designer cut) and then from the
+ * meeting point itself, so an end with no flat edge is trimmed too. A cut is
+ * kept only if splitAtCut accepts it, the part kept is the larger, and the
+ * kept part has every contour the piece had: a cut that takes a meem's
+ * window with it is refused. Each window is widened in steps (the generator
+ * sized it to the flat edge, and a tapering stroke is wider a little inside)
+ * and the narrowest that splits is kept, so a cut never reaches a
+ * neighbouring stroke. An end no cut frees still joins by touch.
+ */
+function joinEnd(cmds: SvgCmd[], end: JoinEnd | undefined, keep: "near" | "far"): JoinEnd | undefined {
+  if (!end) return end;
+  const n = contourCount(cmds);
+  const deeper = keep === "far" ? 1 : -1;     // an entry keeps the far side, an exit the near
+  const c = Math.cos(end.angle), s = Math.sin(end.angle);
+  const accepts = (face: FaceCut) => {
     const r = splitAtCut(cmds, face);
-    if (r && (keep === "far" ? boxArea(r.far) > boxArea(r.near) : boxArea(r.near) > boxArea(r.far))) return { ...end, face };
+    if (!r) return false;
+    const kept = keep === "far" ? r.far : r.near, dropped = keep === "far" ? r.near : r.far;
+    return boxArea(kept) > boxArea(dropped) && contourCount(kept) === n;
+  };
+  // First choice: square across the stroke as measured (tarkibEnds.ts), at
+  // every depth the composer may pick from.
+  const inward: Pt = [deeper * c, deeper * s];
+  const cuts = squareCuts(cmds, end.point, inward, JOIN_DEPTHS, keep === "near");
+  const ok = cuts.map((f, i) => (f && accepts(f) ? { f, depth: JOIN_DEPTHS[i] } : null)).filter((o): o is { f: FaceCut; depth: number } => !!o);
+  if (ok.length) return { ...end, face: (ok.find((o) => o.depth >= JOIN_TRIM) ?? ok[ok.length - 1]).f, options: ok.map((o) => o.f) };
+  const atMeeting: FaceCut = {
+    cutX: end.point[0] * c + end.point[1] * s, angle: end.angle,
+    window: { y: -end.point[0] * s + end.point[1] * c, half: 0.75 * PEN },
+  };
+  for (const base of end.face ? [end.face, atMeeting] : [atMeeting]) {
+    const w = base.window;
+    for (const depth of [JOIN_TRIM, JOIN_TRIM / 2, 0]) {
+      for (const half of w ? WINDOW_GROWTH.map((g) => w.half * g[0] + g[1]) : [0]) {
+        const face: FaceCut = { ...base, cutX: base.cutX + deeper * depth, ...(w ? { window: { y: w.y, half } } : {}) };
+        if (accepts(face)) return { ...end, face };
+      }
+    }
   }
   return { point: end.point, angle: end.angle };
 }
-/** Window half-widths tried, as (factor, added units): up to half a pen more. */
-const WINDOW_GROWTH: [number, number][] = [[1, 0], [1.25, 0], [1.5, 0], [1.5, 12], [1.5, 24]];
 
 /** Smallest difference between two angles, radians. */
 const angleGap = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -152,8 +191,8 @@ function schemaOf(item: MarkItem, g: PieceGeometry | undefined): PieceSchema {
     forms = [{ ...forms[0], form }];
   }
   const first = forms[0]?.form, last = forms[forms.length - 1]?.form;
-  const entry = first === "middle" || first === "finishing" ? legal(cmds, g?.right, "far") : undefined;
-  const exit = last === "starting" || last === "middle" ? legal(cmds, g?.left, "near") : undefined;
+  const entry = first === "middle" || first === "finishing" ? joinEnd(cmds, g?.right, "far") : undefined;
+  const exit = last === "starting" || last === "middle" ? joinEnd(cmds, g?.left, "near") : undefined;
   // Mark anchors: each letter's share of the ink, right to left, half a pen clear.
   const n = Math.max(forms.length, 1);
   const letters = forms.map((f, k) => {

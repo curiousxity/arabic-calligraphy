@@ -8,7 +8,7 @@ import type { CutFace, StackPiece } from "../types";
 import { cmdsCentre, splitAtCut } from "./stackGeometry";
 import type { Pt } from "./strokeCuts";
 import { parseSvgPath, type SvgCmd } from "./svgPath";
-import type { TarkibLibrary } from "./tarkibSchema";
+import type { FaceCut, TarkibLibrary } from "./tarkibSchema";
 import type { PhraseLetter } from "./tarkibText";
 
 const PEN = 48;
@@ -33,7 +33,7 @@ function dotLayout(count: number, side: "above" | "below"): Pt[] {
 
 export function buildPiece(
   lib: TarkibLibrary, schemaId: string, letters: PhraseLetter | PhraseLetter[], id: string, order: number,
-  opts: { splice?: { entry?: boolean; exit?: boolean } } = {}
+  opts: { splice?: { entry?: boolean | FaceCut; exit?: boolean | FaceCut } } = {}
 ): BuiltPiece {
   const s = lib.schema.get(schemaId);
   const item = s && lib.items.get(s.itemId);
@@ -45,7 +45,7 @@ export function buildPiece(
   // An entry keeps the far side of its cut, an exit the near (tarkibSchema.ts FaceCut).
   for (const [end, keep, want] of [["entry", "far", opts.splice?.entry], ["exit", "near", opts.splice?.exit]] as const) {
     if (!want) continue;
-    const face = s[end]?.face;
+    const face = typeof want === "object" ? want : s[end]?.face;
     if (!face) throw new Error(`${schemaId}: no face at its ${end} to splice`);
     const r = splitAtCut(cmds, face);
     if (!r) throw new Error(`${schemaId}: its ${end} face no longer cuts`);

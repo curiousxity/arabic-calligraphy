@@ -14,7 +14,7 @@ import { assembleStackOutline, pieceTransform } from "./stackOutline";
 import { flattenContours, outlineBounds, type Pt } from "./strokeCuts";
 import { pointInPolygon } from "./svgPath";
 import { buildPiece } from "./tarkibPieces";
-import { canDraw, type PieceSchema, type TarkibLibrary } from "./tarkibSchema";
+import { canDraw, type FaceCut, type PieceSchema, type TarkibLibrary } from "./tarkibSchema";
 import { analyzePhrase, type PhraseLetter, type PhraseRun } from "./tarkibText";
 
 const PEN = 48;
@@ -143,6 +143,39 @@ function clearDots(pieces: StackPiece[]): StackPiece[] {
   }
   return pieces.map((p) => (moved.get(p.id) ? { ...p, y: p.y + moved.get(p.id)!, homeY: p.homeY + moved.get(p.id)! } : p));
 }
+/** A trim's centre (piece-local), its stroke's thickness, and its direction. */
+function trimGeometry(f: FaceCut): { centre: Pt; width: number; dir: Pt } {
+  const c = Math.cos(f.angle), s = Math.sin(f.angle), y = f.window?.y ?? 0;
+  return { centre: [f.cutX * c - y * s, f.cutX * s + y * c], width: f.thickness ?? PEN, dir: [c, s] };
+}
+
+/**
+ * The trims for one meeting: the shallowest pair (`a` on the exit, `b` on
+ * the entry, `offset` B's origin in A's frame) whose bridge runs forward
+ * from both ends, has room to taper between the two thicknesses (it changes
+ * by at most TAPER of its length) and room to turn between the two
+ * directions (an arc about as wide as the stroke). Failing all, the pair
+ * that misses least. The user: the joints "connect at various angles", so
+ * the bridge has to be fitted per meeting.
+ */
+const TAPER = 0.6;
+export function pickTrims(as: readonly FaceCut[], bs: readonly FaceCut[], offset: Pt): { a: FaceCut; b: FaceCut } {
+  let best: { a: FaceCut; b: FaceCut; miss: number; depth: number } | null = null;
+  as.forEach((a, i) => bs.forEach((b, j) => {
+    const ga = trimGeometry(a), gb = trimGeometry(b);
+    const v: Pt = [gb.centre[0] + offset[0] - ga.centre[0], gb.centre[1] + offset[1] - ga.centre[1]];
+    const L = Math.hypot(v[0], v[1]) || 1e-9;
+    const ahead = Math.min(v[0] * ga.dir[0] + v[1] * ga.dir[1], v[0] * gb.dir[0] + v[1] * gb.dir[1]) / L;
+    const turn = Math.acos(Math.max(-1, Math.min(1, ga.dir[0] * gb.dir[0] + ga.dir[1] * gb.dir[1])));
+    const miss = Math.max(0, 0.3 - ahead) * 4
+      + Math.max(0, Math.abs(ga.width - gb.width) - TAPER * L) / PEN
+      + Math.max(0, (turn * (ga.width + gb.width)) / 2 - L) / PEN;
+    const depth = i + j;
+    if (!best || (miss === 0 && (best.miss > 0 || depth < best.depth)) || (best.miss > 0 && miss < best.miss)) best = { a, b, miss, depth };
+  }));
+  return { a: best!.a, b: best!.b };
+}
+
 const shift = (p: StackPiece, d: Pt): StackPiece => ({ ...p, x: p.x + d[0], y: p.y + d[1], homeX: p.homeX + d[0], homeY: p.homeY + d[1] });
 
 export function chainRun(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, idPrefix: string, orderStart: number): ChainedRun {
@@ -151,13 +184,33 @@ export function chainRun(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, 
   let prevExit: { world: Pt; angle: number; pieceId: string; faceIndex?: number } | null = null;
   let baselineY: number | null = null;
   let letterAt = 0;
+  const schemas = choice.schemaIds.map((sid) => { const s = lib.schema.get(sid); if (!s) throw new Error(`no piece ${sid}`); return s; });
+  // Every meeting whose two ends can be trimmed is redrawn as a pen stroke;
+  // the rest (an end no cut frees) still join by touch.
+  const spliced = schemas.map((s, k) => k + 1 < schemas.length && !!s.exit?.face && !!schemas[k + 1].entry?.face);
+  // Each spliced meeting's trims, fitted to where the two pieces will sit
+  // (B's origin relative to A's, as placed below, before any stretch).
+  const trims = schemas.map((s, k) => {
+    if (!spliced[k]) return null;
+    const n = schemas[k + 1], ex = s.exit!, en = n.entry!;
+    const w = dir(ex.angle);
+    let off: Pt = [ex.point[0] - w[0] * OVERLAP - en.point[0], ex.point[1] - w[1] * OVERLAP - en.point[1]];
+    if (choice.climbs[k]) {
+      const it = lib.items.get(n.itemId)!;
+      off = [ex.point[0] + w[0] * JOIN_GAP - en.point[0], ex.point[1] + w[1] * JOIN_GAP - en.point[1] - it.h - PEN / 4];
+    }
+    // pickTrims (deeper trims for room) made two clean joints worse on the
+    // first target (2026-10-18): the default trims stand until the bridge's
+    // own width is right
+    void off;
+    return { a: ex.face!, b: en.face! };
+  });
   choice.schemaIds.forEach((sid, k) => {
-    const s = lib.schema.get(sid);
-    if (!s) throw new Error(`no piece ${sid}`);
+    const s = schemas[k];
     const letters = run.letters.slice(letterAt, letterAt + s.letters.length);
-    const climbIn = k > 0 && choice.climbs[k - 1], climbOut = choice.climbs[k] ?? false;
+    const climbIn = k > 0 && choice.climbs[k - 1];
     const id = `${idPrefix}${k}`;
-    const b = buildPiece(lib, sid, letters, id, orderStart + letterAt, { splice: { entry: climbIn, exit: climbOut } });
+    const b = buildPiece(lib, sid, letters, id, orderStart + letterAt, { splice: { entry: k > 0 && spliced[k - 1] ? trims[k - 1]!.b : false, exit: spliced[k] ? trims[k]!.a : false } });
     letterAt += s.letters.length;
 
     let at: Pt = [0, 0];
@@ -172,6 +225,8 @@ export function chainRun(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, 
         joins.push({ id: `j${prevExit.pieceId}-${id}`, from: { pieceId: prevExit.pieceId, faceIndex: prevExit.faceIndex }, to: { pieceId: id, faceIndex: b.entry.faceIndex }, bow: 0 });
       } else {
         at = [prevExit.world[0] - w[0] * OVERLAP - b.entry.point[0], prevExit.world[1] - w[1] * OVERLAP - b.entry.point[1]];
+        // where the letters meet; both ends trimmed back, the pen stroke spans the gap
+        if (spliced[k - 1]) joins.push({ id: `j${prevExit.pieceId}-${id}`, from: { pieceId: prevExit.pieceId, faceIndex: prevExit.faceIndex! }, to: { pieceId: id, faceIndex: b.entry.faceIndex! }, bow: 0 });
       }
       meets.push({ exit: prevExit.world, entry: [at[0] + b.entry.point[0], at[1] + b.entry.point[1]] });
     }
