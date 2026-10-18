@@ -374,11 +374,11 @@ SHEETS = {
     6: ("و gathered waw, from gathered ra and dal", (1783,159,1962,323)),
     13: ("و gathered waw, second (beside the ٦)", (1601,157,1739,294)),
     7: ("و waw (dotted alternate: the extended 4-nuqta waw, inside a nun or seen cup)", (1311,143,1461,290)),
-    8: ("و waw of 7 nuqtas: Muhaqqaq, not for Thuluth", (948,150,1145,322)),
+    # 8, the seven-nuqta Muhaqqaq waw, was deleted (the user, 2026-10-17: "keep it out")
     9: ("و waw, head open on the left", (821,149,907,267)),
     10: ("و waw, head open on the right", (482,157,644,301)),
     11: ("مو the letter before joins the waw's head from the left", (117,145,386,307)),
-  }, "splits": {}, "erase": {k: ["main"] for k in (6, 13, 7, 8, 9, 10, 11)}},
+  }, "splits": {}, "erase": {k: ["main"] for k in (6, 13, 7, 9, 10, 11)}},
   "t13r3": {"file": "../thuluth-13-row3.png", "dot": 20, "unit": 48 / 20, "units": {
     12: ("the fa head between letters, one long run", (0,0,99999,99999)),
   }, "splits": {}, "erase": {12: ["main"]}},
@@ -497,6 +497,7 @@ DRAFT_SPLITS = {"t16r1": {(1525, 79): (1, 10, lambda xs, ys: (xs >= 1745) | ((ys
 # Pieces that are not letters (a column of measuring nuqtas alone): kept in
 # the traces, left off the review pages.
 SKIP = {"t15r2 1", "t15r3 6", "t17r6 3",
+        "t13r4 1", "t17r6 4",   # construction drawings repeating clean forms (the user: skip them)
         "t16r6 5"}   # a handwritten note word, not a letter
 
 # Draft sheets written by mapSheet.py (drafts/<key>.json): every piece is

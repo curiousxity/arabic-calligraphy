@@ -789,7 +789,7 @@ as 6 and 13. Row 4's pieces are numbered 1–3 within the row.
 | r1 1–5 (fa, qaf, waw, fa, qaf) | traced, clean (5's small mark dropped) |
 | r2 6, 13 (gathered waw) | traced, clean |
 | r2 7 (waw; its dotted alternate cleaned away) | traced, clean |
-| r2 8 (Muhaqqaq waw: **keep out of Thuluth**) | traced, clean |
+| r2 8 (Muhaqqaq waw) | **deleted** 2026-10-17: the user, "keep it out. just delete it" (number 9 on the review pages stays unused) |
 | r2 9, 10 (head open left, right) | traced, clean |
 | r2 11 (مو) | traced, clean |
 | r3 12 (fa head between letters, long run) | traced, clean |
@@ -1371,7 +1371,7 @@ traced into the app. Questions to settle with the user during review:
    block), t29 (al-Fath 48:10), t31 (al-Naml 27:6).
 7. Whether to use the corner florals (t24) and the tiled border (t25
    hadith) as frame pieces at all.
-8. Whether to keep t13 piece 8 (the Muhaqqaq waw) anywhere.
+8. ~~Whether to keep t13 piece 8 (the Muhaqqaq waw) anywhere.~~ Deleted 2026-10-17.
 
 **Stroke-order numbers and arrows must go before tracing** (user,
 2026-10-16). Many lesson sheets (t1, t2, t9, t14 row 5, t15, t16, t17 row 6
@@ -1537,17 +1537,16 @@ sweep, split from 10, the lower word); **t16 35** (the word الله, split from
 1, which keeps the three lams; its alif is put back).
 
 Judgment calls for the user to confirm rather than re-review:
-- t13 14 (the fa construction drawing, row 4 · 1): the measuring nuqtas and
-  lines are gone, but small inner marks remain in the two fa heads. A hand
-  touch-up candidate.
+- t13 14 (the fa construction drawing, row 4 · 1): **skipped** (the user,
+  2026-10-17): it repeats clean forms found elsewhere.
 - t13 16 (row 4 · 3) is two words, فبو and a waw, kept as one piece like
   the earlier approved two-word pieces.
 - t15 10 (row 2 · 7): a small dot inside the curl was left; it may be the
   letter's own dot.
 - t16 8 (row 1 · 9): the dark square on top of the medial meem was kept as
   the pen's start, not a nuqta.
-- t17 18 (row 6 · 4) is a construction drawing with guide lines through the
-  strokes: a hand touch-up candidate.
+- t17 18 (row 6 · 4), a construction drawing: **skipped** (the user,
+  2026-10-17).
 - t17 20 (row 6 · 6): the dark shape inside the waw's head is kept as the
   pen's turn.
 
