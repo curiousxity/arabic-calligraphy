@@ -1740,3 +1740,22 @@ Frames group, for review in the app:
 Panels t20–t32 as whole compositions: deferred by the user's leave
 ("if you don't think it is going to help"); they stay as reference images
 for the tarkib work.
+
+## The final run-through (2026-10-18)
+
+- **Borrowed tails** (`borrowTail.py`: fits a vector piece onto the
+  piece's touch-up image by scale, turn and position, then paints in only
+  the vector ink the piece lacks, inside a box and touching its ink; the old
+  touch-up is kept as `<file>.before.png`):
+  - t7r1 2 (بص): the sad's tail tip, ~10 scan px, from t34 38 (Sad,
+    finishing). Re-traced from the touch-up.
+  - t8r1 8 (ـحـم): fitted against t34 72, 73, 81, 83 and 84. The tail is
+    already full length with its hook; nothing borrowed. Asked the user
+    which part they meant was cut off.
+- **Superseded, suggested retired**: t1 3 (kaf), t2 1 (ha body), t2 24
+  (sad, tail cut off): the vector set's standalone Kaf, Jeem and Sad.
+- **Every piece still waiting on sheets 1, 2 and 7–19** (187) is on one
+  review page with a suggestion each (keep / retire / skip; 147 / 39 / 1):
+  https://claude.ai/artifact/Rf42rdVENpkY3q4Zcbvadc . The user's choices
+  are saved in its `choices` collection (doc id = the piece's ref with `_`
+  for the space). Keep = add to the library; retire = drop; skip = leave out.
