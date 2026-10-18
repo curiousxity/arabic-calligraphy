@@ -1794,8 +1794,8 @@ bring back the retired scanned middle jeem/ha (t9r1 5, 6, 8)?
 ## A second bought vector set (2026-10-18)
 
 The user bought a second Thuluth set from another stock agency (licence
-covers it), stored at `\monas\homes\monas\Mohammed\Calligraphy
-resources	huluth`: 18 Illustrator files (PDF inside, readable with
+covers it), stored at `\\monas\homes\monas\Mohammed\Calligraphy
+resources\thuluth`: 18 Illustrator files (PDF inside, readable with
 PyMuPDF; their full names exceed Windows' path limit, so copy them under
 short names).
 - `thulth.ai`, `thulth beginning.ai`, `thulth middle.ai`, `thulth end.ai`:
