@@ -9,7 +9,7 @@ only once the user approves it in REVIEW.md. See .claude/rules/marks.md.
 <sheet> is a key of SHEETS below. Writes <out_dir>/<sheet>-review-<n>.png
 and <out_dir>/<sheet>-traced.json ({piece: {d, w, h}}).
 """
-import json, os, sys
+import json, os, re, sys
 import numpy as np, cv2, potrace
 from PIL import Image, ImageDraw, ImageFont
 
@@ -402,8 +402,23 @@ SHEETS = {
   }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4, 5)}},
   "t10r4": {"file": "../thuluth-10-row4.png", "dot": 14, "unit": 48 / 14.4, "units": {
     1: ("medial seen in an النسيم-like word (measuring grid)", (178,26,438,218)),
-    2: ("initial, medial and final seen, stacked run (stroke numbers, measuring nuqtas)", (10,280,528,500)),
-  }, "splits": {}, "erase": {1: ["main"]}},
+    2: ("سـ medial and final seen, the lower word (measuring nuqtas)", (10,280,528,500)),
+    3: ("سـ initial seen with its long sweep, the upper shape (stroke numbers 1-4)", (10,280,528,500)),
+  }, "splits": {},
+  # 1: the baseline fused under the teeth, a tick on the first tooth, and a
+  # pale line drawn across the meem's solid lower part (filled back)
+  "erase": {1: [("thin", 296, 126, 375, 134, 4), (315, 86, 321, 90),
+                ("fill", [(301, 131), (333, 131), (330, 150), (326, 157), (316, 157)]), "main"],
+            # 2: the measuring nuqtas over the lower word's teeth and the line
+            # they sit on, the nuqta between two teeth, the column of nuqtas
+            # and its tick beside the bowl
+            # The piece is two shapes once the nuqtas and lines go: 2 keeps the
+            # lower word (medial and final seen), 3 the initial seen above it
+            # with its long sweep (the user's lesson: separate shapes, separate pieces)
+            2: [(376, 358, 447, 386), (397, 386, 418, 402), ("thin", 328, 383, 380, 394, 4),
+                ("thin", 445, 372, 520, 381, 4), (458, 372, 506, 396), (309, 428, 345, 495), (306, 448, 346, 452), ("keep", 306, 416)],
+            3: [("from", 2), (376, 358, 447, 386), (397, 386, 418, 402), ("thin", 328, 383, 380, 394, 4),
+                ("thin", 445, 372, 520, 381, 4), (458, 372, 506, 396), (309, 428, 345, 495), (306, 448, 346, 452), ("keep", 91, 392)]}},
 }
 
 
@@ -418,8 +433,29 @@ for _f in sorted(_glob.glob(os.path.join(HERE, "drafts", "*.json"))):
                   "units": {int(n): (v[0], tuple(v[1])) for n, v in _d["units"].items()},
                   "erase": {int(n): ["main"] for n in _d["units"]}}
 
+LAST_GRAY = None   # the scan clean_sheet last read, for the "auto" erase
+
+# The cleanup sweep (2026-10-17): every piece of the lesson sheets 7-19 starts
+# with the "auto" erase, its disc a quarter of the pen; a piece with no "main"
+# loses separate bits under three nuqtas' area instead, so a piece of two
+# words keeps both. Pieces already in the library are never traced again, so
+# this changes nothing for them.
+for _k, _cfg in SHEETS.items():
+    _m = re.fullmatch(r"t(\d+)r\d+", _k)
+    if not _m or not 7 <= int(_m.group(1)) <= 19: continue
+    _pen = _cfg["dot"] if "unit" not in _cfg else 48 / _cfg["unit"]
+    _r = max(3, round(_pen / 4))
+    _er = _cfg.setdefault("erase", {})
+    for _n in _cfg["units"]:
+        _items = _er.get(_n, [])
+        if any(isinstance(i, tuple) and i[0] == "auto" for i in _items): continue
+        if "main" not in _items: _items = _items + [("small", round(3 * _pen * _pen))]
+        _er[_n] = [("auto", _r)] + _items
+
 def clean_sheet(path, dot):
+    global LAST_GRAY
     im = np.array(Image.open(path).convert("L"))
+    LAST_GRAY = im
     mask = (im < 140).astype(np.uint8)
     # Guide lines: long straight runs of the very thinnest ink. A pen hairline
     # is thicker (3-5 px) and survives; so do the letters' curves.
@@ -440,12 +476,61 @@ def clean_sheet(path, dot):
 
 def assign(clean, units, splits, erase=None):
     sel = _assign(clean, units, splits)
+    base = {k: v.copy() for k, v in sel.items()}
     for k, items in (erase or {}).items():
         if k not in sel: continue
         for it in items:
+            if isinstance(it, tuple) and it[0] == "from":   # ("from", j): start from
+                # piece j's pixels, for two pieces cut from one shape
+                sel[k] = base[it[1]].copy(); continue
+            if isinstance(it, tuple) and it[0] == "keep":   # ("keep", x, y): only the
+                # separate shape holding that point
+                n, lab = cv2.connectedComponents(sel[k].astype(np.uint8), connectivity=8)
+                i = lab[it[2], it[1]]
+                assert i > 0, (k, it, "point is not on the piece")
+                sel[k] = lab == i; continue
             if it == "main":   # keep only the piece's largest separate shape
                 n, lab, st, _ = cv2.connectedComponentsWithStats(sel[k].astype(np.uint8), 8)
                 if n > 2: sel[k] = lab == 1 + int(np.argmax(st[1:, 4]))
+            elif it[0] == "auto":   # ("auto", r): guide lines and pencil marks fused
+                # to the piece. Whatever a disc r px across can't fit in is a
+                # candidate; a candidate is dropped only when it is clearly lighter
+                # than the piece's own ink (pencil and printed rules are grey, a
+                # pen hairline is as dark as the stroke), so the zulf and other
+                # hairlines stay.
+                r = it[1]
+                kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (r, r))
+                core = cv2.morphologyEx(sel[k].astype(np.uint8), cv2.MORPH_OPEN, kern) > 0
+                if not core.any(): continue
+                ink = float(np.median(LAST_GRAY[core]))
+                # A candidate whose removal would cut a large part of the letter
+                # loose stays (a tail joined through a patch a guide line greyed).
+                big = 3 * (4 * r) ** 2
+                def n_big(m):
+                    n_, _, st_, _ = cv2.connectedComponentsWithStats(m.astype(np.uint8), 8)
+                    return int((st_[1:, 4] >= big).sum())
+                ys_, xs_ = np.nonzero(sel[k]); bx = (slice(max(0, ys_.min() - 2), ys_.max() + 3), slice(max(0, xs_.min() - 2), xs_.max() + 3))
+                piece = sel[k][bx].copy(); gray = LAST_GRAY[bx]; kept = n_big(piece)
+                n, lab, st, _ = cv2.connectedComponentsWithStats((piece & ~core[bx]).astype(np.uint8), 8)
+                for i in sorted(range(1, n), key=lambda i: -st[i][4]):
+                    part = lab == i
+                    # the darker quarter decides: a thin tip still holds some
+                    # ink-dark pixels, a pencil line none (t8 row 1 piece 8:
+                    # its tail tip 46, lines 73-114, against ink 32)
+                    if np.percentile(gray[part], 25) <= ink + 35: continue
+                    piece[part] = False
+                    if n_big(piece) > kept: piece[part] = True
+                sel[k][bx] = piece
+            elif it[0] == "small":   # ("small", area): drop separate bits smaller than
+                # area px (measuring nuqtas, note words), keeping every larger shape
+                n, lab, st, _ = cv2.connectedComponentsWithStats(sel[k].astype(np.uint8), 8)
+                for i in range(1, n):
+                    if st[i][4] < it[1]: sel[k][lab == i] = False
+            elif it[0] == "fill":   # ("fill", [(x, y), ...]): ink inside a polygon, for
+                # a pale guide line drawn across solid ink, which cleaning reads as a gap
+                m = np.zeros(sel[k].shape, np.uint8)
+                cv2.fillPoly(m, [np.array(it[1], np.int32)], 1)
+                sel[k][m > 0] = True
             elif it[0] == "poly":   # ("poly", [(x, y), ...]): clear inside a polygon,
                 # for an edge that runs on a slant where a box would notch it
                 m = np.zeros(sel[k].shape, np.uint8)

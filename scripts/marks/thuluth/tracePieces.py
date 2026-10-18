@@ -26,15 +26,21 @@ cfg = rv.SHEETS[sheet]
 UNIT = cfg.get("unit", 3.0)
 src = os.path.join(rv.HERE, cfg["file"])
 im, clean = rv.clean_sheet(src, cfg["dot"])
-units = {k: v for k, v in cfg["units"].items() if k in nums}
+# every piece takes part in assigning shapes, so a piece comes out the same
+# whichever others are traced with it (and one may start from another's pixels)
+units = cfg["units"]
 sel = rv.assign(clean, units, cfg["splits"], cfg.get("erase"))
-# Whiten what `erase` removed in the grey copy too: the tracer reads the scan's
-# grey edge one pixel outside each piece, which would bring an erased bit back.
-raw = rv.assign(clean, units, cfg["splits"])
-im = im.copy()
-for k in units:
-    gone = cv2.dilate((raw[k] & ~sel[k]).astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
-    im[gone & ~sel[k]] = 255
+scan = im
+
+def grey_for(k):
+    """The scan as piece k's tracer should see it. The tracer reads the grey
+    edge one pixel outside the piece, so ink there that is not the piece's (an
+    erased line, a neighbour) is whitened, or it would come back; and ink a
+    "fill" restored, which the scan shows pale, is darkened."""
+    g = scan.copy()
+    g[(scan < 140) & ~sel[k]] = 255
+    g[sel[k] & (scan >= 140)] = 60
+    return g
 color = Image.open(src).convert("RGB")
 font = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 22)
 os.makedirs(out_dir, exist_ok=True)
@@ -48,6 +54,7 @@ os.makedirs(touch_dir, exist_ok=True)
 for k in nums:
     if not sel[k].any():
         print(k, "EMPTY"); continue
+    im = grey_for(k)
     ys, xs = np.nonzero(sel[k])
     bx0, by0 = max(0, xs.min() - 6), max(0, ys.min() - 6)
     bx1, by1 = min(im.shape[1], xs.max() + 7), min(im.shape[0], ys.max() + 7)
