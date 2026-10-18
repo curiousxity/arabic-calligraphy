@@ -1103,6 +1103,56 @@ it), parts 3 and 4 (small signs: an ornamental knot, a double stroke), part
 5 (سلة-like with small marks). Parts 1, 2, 5 **need cleanup**; 3 and 4 are
 small signs for the marks side, clean.
 
+## Every form of every letter (2026-10-18)
+
+The user sent the whole vector set, which the licence covers (bought by
+the user): "Thuluth collection", Part 1 individual (standalone) letters
+(`thuluth-35-beginnings.svg`), Part 2 middle letters
+(`thuluth-36-middles.svg`) and Part 3 finishing letters
+(`thuluth-34-endings.svg`, sheet t34 above). Each was taken with
+`vectorSheet.py` (no tracing; each cell scaled by its own pen; checked
+against the library letter by letter, all within about 15%) and has one
+review page per letter in `traces/t35/`, `traces/t36/`, `traces/t34/`.
+
+Part 2 holds the forms joined on the right, both starting forms (`@`, a
+grey letter only after them) and middle forms (`#`, grey on both sides).
+The split below is **provisional**, read automatically from where the grey
+letters touch (`traces/t36/t36r1-forms.json`); crowded cells (seen, sad,
+ha) may be misread, so the user's review settles it. Part 2 has no alif,
+dal, ra or waw cell (those letters never join forward), and its ba, nun
+and ya cells share one drawing: the dotless tooth is the same for all
+three. Starting forms on the scanned sheets are listed last.
+
+Piece numbers below are each sheet's own (as on its `*-numbered.png`).
+
+| letter | `!` standalone (t35) | `@` starting (t36, provisional) | `#` middle (t36, provisional) | `$` finishing (t34) | starting forms on the scans |
+|---|---|---|---|---|---|
+| Alif | 8: 14, 15, 19, 20, 21, 22, 23, 24 | 0: none | 0: none | 7: 13, 14, 23, 24, 25, 26, 27 |  |
+| Ba (ب ت ث) | 8: 9, 10, 11, 12, 13, 16, 17, 18 | 11: 4, 5, 6, 7, 13, 14, 15, 16, 22, 23, 24 | 6: 8, 17, 21, 27, 28, 29 | 5: 10, 11, 12, 21, 22 | t7 r2 2-5 (starting teeth for ب ت ث ن), t7 r1 (the starting beh joined to each letter), t8 r1 1 (in the library) |
+| Jeem (ج ح خ) | 3: 6, 7, 8 | 4: 2, 11, 18, 20 | 8: 1, 3, 9, 10, 12, 19, 25, 26 | 2: 19, 20 | t9 r1 2-4 (three head angles; 2 in the library), t9 r1 7 (starting ha), t2 14 |
+| Dal (د ذ) | 2: 4, 5 | 0: none | 0: none | 4: 7, 8, 9, 18 |  |
+| Ra (ر ز) | 3: 1, 2, 3 | 0: none | 0: none | 10: 1, 2, 3, 4, 5, 6, 15, 16, 17, 28 |  |
+| Seen (س ش) | 7: 29, 30, 31, 41, 42, 43, 46 | 0: none | 13: 35, 36, 46, 47, 58, 59, 72, 73, 74, 75, 82, 83, 84 | 4: 42, 43, 44, 45 | t10 r4 3 |
+| Sad (ص ض) | 5: 26, 27, 28, 44, 45 | 0: none | 12: 34, 44, 45, 55, 56, 57, 69, 70, 71, 79, 80, 81 | 4: 38, 39, 40, 41 | t2 23 (in the library), t11 r1 1 |
+| Ta (ط ظ) | 3: 38, 39, 40 | 0: none | 6: 41, 42, 43, 66, 67, 68 | 2: 36, 37 |  |
+| Ain (ع غ) | 4: 34, 35, 36, 37 | 4: 32, 39, 52, 53 | 13: 30, 31, 33, 40, 51, 54, 64, 65, 76, 77, 78, 85, 86 | 4: 32, 33, 34, 35 | t12 r1 4, t2 20 |
+| Fa | 3: 25, 32, 33 | 2: 38, 60 | 7: 37, 48, 49, 50, 61, 62, 63 | 3: 29, 30, 31 | t13 r4 1 (skipped construction drawing) |
+| Qaf | 4: 63, 64, 65, 68 | 1: 119 | 8: 105, 106, 107, 120, 131, 132, 133, 134 | 4: 63, 64, 65, 86 |  |
+| Kaf | 3: 60, 61, 62 | 0: none | 7: 102, 103, 104, 127, 128, 129, 130 | 6: 60, 61, 62, 78, 79, 80 | t14 r2 6, t14 r5 3, t14 r4 (the kaf beside the ha's body) |
+| Lam | 4: 56, 57, 58, 59 | 0: none | 13: 97, 98, 99, 100, 101, 117, 118, 125, 126, 142, 143, 144, 145 | 4: 74, 75, 76, 77 |  |
+| Meem | 4: 52, 53, 54, 55 | 5: 94, 95, 96, 113, 115 | 8: 92, 93, 114, 116, 138, 139, 140, 141 | 20: 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 69, 70, 71, 72, 73, 81, 82, 83, 84, 85 | t2 8, t2 10 (in the library) |
+| Nun | 7: 47, 48, 49, 50, 51, 66, 67 | 11: 87, 88, 89, 90, 108, 109, 110, 111, 122, 123, 124 | 6: 91, 112, 121, 135, 136, 137 | 7: 46, 47, 48, 49, 66, 67, 68 |  |
+| Ha (ه) | 4: 75, 79, 80, 81 | 0: none | 14: 150, 151, 152, 153, 159, 160, 162, 163, 168, 169, 170, 171, 175, 176 | 10: 92, 93, 94, 95, 96, 103, 104, 105, 106, 107 |  |
+| Waw | 2: 73, 74 | 0: none | 0: none | 2: 91, 102 |  |
+| Ya | 7: 69, 70, 71, 72, 76, 77, 78 | 10: 146, 147, 148, 154, 155, 156, 157, 161, 165, 167 | 7: 149, 158, 164, 166, 172, 173, 174 | 9: 87, 88, 89, 90, 97, 98, 99, 100, 101 |  |
+
+How much each letter varies (from the counts): the alif, ba, seen, nun and
+ya have the most standalone shapes (7-8 each: lengths and tail curves);
+the meem has the most finishing shapes (20); the ain the most joined ones
+(17). The jeem, ta and waw are drawn in few shapes. The ha (ه) changes the
+most between positions: round alone, a knot or loops when finishing, a
+hooked form in the middle.
+
 ## Sheet t34 — every finishing (terminal) form, as vectors (`thuluth-34-endings.svg`)
 
 Sent by the user 2026-10-18 ("this is going to be helpful"): an Inkscape
