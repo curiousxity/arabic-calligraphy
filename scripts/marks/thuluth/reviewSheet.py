@@ -38,7 +38,7 @@ with open(npath, "w", encoding="utf-8", newline="\n") as fh: json.dump(numbers, 
 
 with open(os.path.join(HERE, "..", "traceMarks.py"), encoding="utf-8") as fh:
     approved = {f"{s} {k}" for s, k in re.findall(r'\("(t\d+(?:r\d+)?)","(\d+)"', fh.read())}
-pending = [(int(n), p) for n, p in numbers.items() if p in pieces and p not in approved]
+pending = [(int(n), p) for n, p in numbers.items() if p in pieces and p not in approved and p not in rv.SKIP]
 pending.sort()
 
 for old in glob.glob(os.path.join(folder, "*review*.png")) + glob.glob(os.path.join(folder, "page-*.png")):

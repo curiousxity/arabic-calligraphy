@@ -335,7 +335,11 @@ SHEETS = {
     3: ("بلغب cup ain and snake-sad ain in one run", (593,13,985,219)),
     4: ("عغع initial, medial and final ain (measuring nuqtas, stroke numbers)", (363,54,677,284)),
     5: ("نابتغا snake ain (عين ثعباني), stroke numbers", (42,16,218,208)),
-  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4, 5)}},
+  }, "splits": {},
+  # measuring nuqtas fused to the letters: on 1's head, inside 4's lower loop,
+  # the column inside 5's ain; a construction-line tick inside 1's bowl
+  "erase": {1: [(1362, 84, 1382, 106), (1374, 160, 1381, 167), "main"], 2: ["main"], 3: ["main"],
+            4: [(381, 215, 398, 235), "main"], 5: [(115, 142, 138, 179), "main"]}},
   "t12r2": {"file": "../thuluth-12-row2.png", "dot": 14, "unit": 48 / 14, "units": {
     1: ("بالعمر ain words, start of the practice line", (978,61,1389,302)),
     2: ("على عسلى ain over a long seen with a returned ya", (387,51,1000,352)),
@@ -373,14 +377,30 @@ SHEETS = {
     1: ("وففـ fa start, middle, end: before tall letters (measuring marks)", (813,113,1204,286)),
     2: ("فح fa head stacked on ha", (714,41,912,346)),
     3: ("و فبو extended joined fa with final waw: before low letters", (83,90,673,321)),
-  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3)}},
+  }, "splits": {},
+  "erase": {
+    # 1, a construction drawing: the measuring nuqtas over both heads, the
+    # lines boxing them, the arrow, the baseline, a nuqta by the waw's tail
+    1: [(985, 120, 1010, 148), ("thin", 983, 144, 1036, 156, 4), ("thin", 986, 150, 996, 200, 4), ("thin", 1025, 140, 1036, 215, 4),
+        (1063, 135, 1113, 160), ("thin", 1057, 150, 1068, 215, 4), ("thin", 1104, 140, 1116, 215, 4),
+        (1078, 249, 1105, 280), ("thin", 1078, 228, 1100, 250, 5), ("thin", 900, 244, 1200, 256, 5),
+        (1168, 218, 1195, 250), (1028, 208, 1040, 226), (976, 193, 988, 205), "main"],
+    2: ["main"],
+    # 3 is two words, فبو and a waw, so separate shapes stay ("small", not
+    # "main"); its drawn guide lines and the measuring nuqtas between them go
+    3: [("thin", 170, 92, 460, 128, 5), (171, 118, 199, 152), (260, 100, 278, 113), ("thin", 275, 160, 462, 190, 5),
+        ("thin", 215, 220, 290, 233, 5), ("thin", 405, 198, 500, 213, 5), (238, 198, 262, 228), (458, 176, 482, 204), (430, 95, 450, 102), (405, 209, 425, 215), (462, 224, 472, 232),
+        ("small", 1400)]}},
   # Sheet 14, kaf and its kinds (mapped 2026-10-17, parts mode). Rows 1-3
   # keep the sheet's own numbers.
   "t14r1": {"file": "../thuluth-14-row1.webp", "dot": 18, "unit": 48 / 18, "units": {
     1: ("ك single kaf (المفرد)", (1703,65,1867,304)), 2: ("ك final kaf (النهائي)", (1322,58,1527,301)),
     3: ("ك extended kaf (المرسل)", (832,54,1178,295)), 4: ("ك zinadi kaf (الزنادي)", (399,118,752,281)),
     5: ("كد zinadi kaf joined into a following letter", (20,115,379,274)),
-  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4, 5)}},
+  }, "splits": {},
+  # the kaf's small sign is part of the letter (as on sheet 3); the notes go
+  "erase": {1: ["main", ("add", 1796, 210)], 2: ["main", ("add", 1426, 194)], 3: ["main", ("add", 1046, 206)],
+            4: ["main"], 5: ["main"]}},
   "t14r2": {"file": "../thuluth-14-row2.webp", "dot": 18, "unit": 48 / 18.4, "units": {
     6: ("ك saifi kaf, initial joined", (1727,46,1978,317)), 7: ("ك saifi kaf, single and joined", (1145,49,1409,321)),
     8: ("كرا model of the medial saifi kaf", (533,31,832,380)), 9: ("مكا saifi kaf, medial and final, joined", (28,34,311,323)),
@@ -399,7 +419,14 @@ SHEETS = {
     3: ("كا initial saifi kaf (to name)", (702,138,869,370)),
     4: ("بكر saifi kaf, single and medial (to name)", (374,109,679,395)),
     5: ("بكلا saifi kaf, single and medial (to name)", (65,118,389,375)),
-  }, "splits": {}, "erase": {k: ["main"] for k in (1, 2, 3, 4, 5)}},
+  }, "splits": {},
+  "erase": {
+    1: ["main", ("add", 1576, 270)],   # the kaf's small sign stays
+    # 2: the measuring nuqtas inside the left kaf's bowl, specks and a spur
+    2: [(987, 283, 1002, 303), (997, 331, 1013, 349), (1040, 323, 1058, 347), (1363, 207, 1376, 213), "main"],
+    # 3: a dark guide line under the upper stroke, ticks in the corner and bowl
+    3: [("thin", 745, 198, 800, 220, 5), (747, 239, 754, 244), (729, 248, 737, 264), (780, 328, 788, 334), "main"],
+    4: ["main"], 5: ["main"]}},
   "t10r4": {"file": "../thuluth-10-row4.png", "dot": 14, "unit": 48 / 14.4, "units": {
     1: ("medial seen in an النسيم-like word (measuring grid)", (178,26,438,218)),
     2: ("سـ medial and final seen, the lower word (measuring nuqtas)", (10,280,528,500)),
@@ -422,6 +449,29 @@ SHEETS = {
 }
 
 
+# Cleanup for draft pieces, by sheet key and piece; a piece not listed keeps
+# only its main shape. (The sweep's "auto" erase is put in front either way.)
+DRAFT_ERASE = {
+  "t15r1": {4: [("thin", 350, 195, 385, 236, 5), (356, 222, 364, 228), (329, 249, 349, 268), "main"]},   # the arrow into the kaf
+  # rows 2 and 3 are ruled in ink: their lines go by length
+  "t15r2": {**{n: [("lines", 4), "main"] for n in (3, 4)},
+            10: [("lines", 4), (345, 240, 356, 251), (338, 293, 375, 300), (191, 178, 199, 218), "main"], 5: [("lines", 4), "main", ("add", 1229, 200)],
+            # measuring nuqtas sitting on the strokes, and ruled-line remnants
+            7: [("lines", 4), (1080, 278, 1112, 294), (933, 286, 955, 295), (1014, 242, 1022, 249), "main"],
+            8: [("lines", 4), (746, 160, 783, 188), (786, 185, 802, 212), (660, 243, 684, 262), ("thin", 695, 276, 825, 290, 6), "main"],
+            9: [("lines", 4), (403, 174, 458, 180), (416, 179, 436, 201), (415, 201, 436, 226), ("thin", 418, 196, 452, 203, 5),
+                ("thin", 480, 280, 525, 290, 5), "main"]},
+  "t15r3": {**{n: [("lines", 5), "main"] for n in (5, 7, 8, 9)},
+            # the row of measuring nuqtas on its line, and the nuqtas on the bowl
+            1: [("lines", 5), (1795, 193, 1960, 232), ("thin", 1771, 225, 1975, 240, 5), (1935, 259, 1992, 283), "main"],
+            2: [("lines", 5), (1562, 183, 1588, 210), (1651, 161, 1662, 174), ("thin", 1652, 153, 1690, 163, 5), (1680, 198, 1725, 212), "main"],
+            3: [("lines", 5), (1468, 149, 1497, 157), ("thin", 1355, 275, 1400, 298, 4), (1440, 258, 1447, 266), "main"]},
+}
+
+# Pieces that are not letters (a column of measuring nuqtas alone): kept in
+# the traces, left off the review pages.
+SKIP = {"t15r2 1", "t15r3 6"}
+
 # Draft sheets written by mapSheet.py (drafts/<key>.json): every piece is
 # "part N" and keeps only its main shape. A SHEETS entry of the same key wins.
 import json as _json, glob as _glob
@@ -431,7 +481,7 @@ for _f in sorted(_glob.glob(os.path.join(HERE, "drafts", "*.json"))):
     with open(_f, encoding="utf-8") as _fh: _d = _json.load(_fh)
     SHEETS[_k] = {"file": _d["file"], "dot": _d["dot"], "unit": _d["unit"], "splits": {},
                   "units": {int(n): (v[0], tuple(v[1])) for n, v in _d["units"].items()},
-                  "erase": {int(n): ["main"] for n in _d["units"]}}
+                  "erase": {int(n): DRAFT_ERASE.get(_k, {}).get(int(n), ["main"]) for n in _d["units"]}}
 
 LAST_GRAY = None   # the scan clean_sheet last read, for the "auto" erase
 
@@ -483,6 +533,16 @@ def assign(clean, units, splits, erase=None):
             if isinstance(it, tuple) and it[0] == "from":   # ("from", j): start from
                 # piece j's pixels, for two pieces cut from one shape
                 sel[k] = base[it[1]].copy(); continue
+            if isinstance(it, tuple) and it[0] == "add":   # ("add", x, y): put back the
+                # piece's separate shape at that point, which "main" dropped
+                # (a kaf's small sign)
+                # (the shape may have been given to a piece of its own)
+                for src in [base[k]] + list(base.values()):
+                    n, lab = cv2.connectedComponents(src.astype(np.uint8), connectivity=8)
+                    if lab[it[2], it[1]] > 0: break
+                i = lab[it[2], it[1]]
+                assert i > 0, (k, it, "point is not on any piece")
+                sel[k] |= lab == i; continue
             if isinstance(it, tuple) and it[0] == "keep":   # ("keep", x, y): only the
                 # separate shape holding that point
                 n, lab = cv2.connectedComponents(sel[k].astype(np.uint8), connectivity=8)
@@ -521,6 +581,24 @@ def assign(clean, units, splits, erase=None):
                     piece[part] = False
                     if n_big(piece) > kept: piece[part] = True
                 sel[k][bx] = piece
+            elif it[0] == "lines":   # ("lines", r): ruled lines drawn in ink, as dark
+                # as the letters. A thin candidate (as in "auto") is dropped when
+                # it is long, at least six discs, where a tapering tip is short;
+                # never one that would cut a large part loose.
+                r = it[1]
+                kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (r, r))
+                core = cv2.morphologyEx(sel[k].astype(np.uint8), cv2.MORPH_OPEN, kern) > 0
+                big = 3 * (4 * r) ** 2
+                def n_big(m):
+                    n_, _, st_, _ = cv2.connectedComponentsWithStats(m.astype(np.uint8), 8)
+                    return int((st_[1:, 4] >= big).sum())
+                kept = n_big(sel[k])
+                n, lab, st, _ = cv2.connectedComponentsWithStats((sel[k] & ~core).astype(np.uint8), 8)
+                for i in sorted(range(1, n), key=lambda i: -st[i][4]):
+                    if max(st[i][2], st[i][3]) < 6 * r: continue
+                    part = lab == i
+                    sel[k][part] = False
+                    if n_big(sel[k]) > kept: sel[k][part] = True
             elif it[0] == "small":   # ("small", area): drop separate bits smaller than
                 # area px (measuring nuqtas, note words), keeping every larger shape
                 n, lab, st, _ = cv2.connectedComponentsWithStats(sel[k].astype(np.uint8), 8)
