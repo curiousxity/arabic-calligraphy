@@ -71,6 +71,16 @@ describe("tarkib piece schema", () => {
     for (const s of mids.filter((m) => m.ownDots)) expect(["ج", "خ"]).toContain(s.letters[0].char);
   });
 
+  it("a second-set piece of a dotted letter draws its own dots, even a touching pair", () => {
+    // the ya's two dots are one shape on that sheet; read as no dots, the
+    // composer added a second pair under it
+    const ya = [...lib.schema.values()].find((s) => s.itemId === "thuluth-w3-27")!;
+    expect(ya.letters[0].char).toBe("ي");
+    expect(ya.ownDots).toBe(true);
+    const alif = [...lib.schema.values()].find((s) => s.itemId.startsWith("thuluth-w1-") && s.letters[0]?.char === "ا")!;
+    expect(alif.ownDots).toBe(false);
+  });
+
   it("keeps most generated join faces: a cut window wide enough for a tapering stroke", () => {
     // sized to the flat edge alone, 445 of 714 windows missed the stroke's
     // second crossing and the piece could only join by touch (no climbs)

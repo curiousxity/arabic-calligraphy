@@ -50,7 +50,8 @@ export const SKELETONS: Record<string, string> = {
 const NO_FORWARD_JOIN = new Set(["ا", "أ", "إ", "آ", "د", "ذ", "ر", "ز", "و", "ؤ", "ة", "ء", "لا", "لأ", "لإ", "لآ", "الله"]);
 
 type Dots = PhraseLetter["dots"];
-const DOTS: Record<string, Dots> = {
+/** The dots each letter takes (a letter not listed has none). */
+export const LETTER_DOTS: Record<string, Dots> = {
   "ب": { count: 1, side: "below" }, "ت": { count: 2, side: "above" }, "ث": { count: 3, side: "above" },
   "ج": { count: 1, side: "below" }, "خ": { count: 1, side: "above" }, "ذ": { count: 1, side: "above" },
   "ز": { count: 1, side: "above" }, "ش": { count: 3, side: "above" }, "ض": { count: 1, side: "above" },
@@ -138,7 +139,7 @@ export function analyzePhrase(text: string): PhraseAnalysis {
         letters: rs.map((r, k): PhraseLetter => {
           const form: LetterForm = rs.length === 1 ? "standalone" : k === 0 ? "starting" : k === rs.length - 1 ? "finishing" : "middle";
           const joined = form === "starting" || form === "middle";
-          let dots = DOTS[r.char] ?? NO_DOTS;
+          let dots = LETTER_DOTS[r.char] ?? NO_DOTS;
           if (r.char === "ي" && !joined) dots = { count: 2, side: "below" };
           if (r.char === "ئ" || r.char === "ى") dots = NO_DOTS;
           return { char: r.char, skeleton: skeletonFor(r.char, form), form, dots, marks: r.marks, at: r.at,

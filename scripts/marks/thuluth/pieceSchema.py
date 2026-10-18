@@ -41,7 +41,10 @@ tipped with the nib. The vector set draws no dots and the scans rarely keep
 them; the library's generic "Nuqta" (dots-44) rescaled to one pen across
 was a third too small beside the letters.
 Overrides (`schema-overrides.json`, {id: {right|left|zones|dots|reviewed|
-noFreeEnd}}) are applied last."""
+noFreeEnd|use}}) are applied last. `use` is the user's word on where a
+form belongs: "never" (a special case the composer leaves alone, such as the
+footed alifs) or "opening" (only as a composition's first letter: the
+curved alifs)."""
 import sys, os, re, json, math
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

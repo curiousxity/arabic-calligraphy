@@ -49,12 +49,14 @@ function spells(s: PieceSchema, run: PhraseRun, k: number): boolean {
   return s.letters.every((_, i) => !!run.letters[k + i] && canDraw(s, i, run.letters[k + i]));
 }
 
-/** The single-letter pieces that can draw `l`. */
-const singlesFor = (lib: TarkibLibrary, l: PhraseLetter) => (lib.single.get(key(l)) ?? []).filter((s) => canDraw(s, 0, l));
+/** The single-letter pieces that can draw `l`, where the user allows them
+ *  (`use`): never a special case, a curved alif only as the `opening` letter. */
+const singlesFor = (lib: TarkibLibrary, l: PhraseLetter, opening = false) =>
+  (lib.single.get(key(l)) ?? []).filter((s) => canDraw(s, 0, l) && s.use !== "never" && (s.use !== "opening" || opening));
 
 /** The run's letters with no piece to draw them (their typed characters). */
 export function missingLetters(lib: TarkibLibrary, run: PhraseRun): string[] {
-  return run.letters.filter((l) => singlesFor(lib, l).length === 0).map((l) => l.char);
+  return run.letters.filter((l) => singlesFor(lib, l, true).length === 0).map((l) => l.char);
 }
 
 /** Where a piece comes from, best first: the first bought vector set, the
@@ -71,7 +73,7 @@ function sourcePool(list: PieceSchema[]): PieceSchema[] {
 }
 
 /** The single pieces the composer may swap in for `l`: the same hand as the default. */
-export const variantsFor = (lib: TarkibLibrary, l: PhraseLetter): PieceSchema[] => sourcePool(singlesFor(lib, l));
+export const variantsFor = (lib: TarkibLibrary, l: PhraseLetter, opening = false): PieceSchema[] => sourcePool(singlesFor(lib, l, opening));
 
 /** A plain, typical form from the best source's real forms in `list`: the
  *  one nearest (by ratio) a lower-quartile width (the less flourished: a
@@ -90,14 +92,16 @@ function typical(lib: TarkibLibrary, list: PieceSchema[]): PieceSchema | undefin
   return pool.reduce((best, s) => (off(s) < off(best) ? s : best));
 }
 
-/** Multi-letter pieces where one spells the run (the calligrapher's own
+/** `opening`: the run's first letter opens the composition (where a curved
+ *  alif may stand).
+ *  Multi-letter pieces where one spells the run (the calligrapher's own
  *  joins), a typical single piece elsewhere. Null if a letter has none. */
-export function defaultChoice(lib: TarkibLibrary, run: PhraseRun): RunChoice | null {
+export function defaultChoice(lib: TarkibLibrary, run: PhraseRun, opening = false): RunChoice | null {
   const ids: string[] = [];
   for (let k = 0; k < run.letters.length; ) {
     const l = run.letters[k];
-    const multi = (lib.multi.get(key(l)) ?? []).find((s) => spells(s, run, k));
-    const pick = multi ?? typical(lib, singlesFor(lib, l));
+    const multi = (lib.multi.get(key(l)) ?? []).find((s) => s.use !== "never" && spells(s, run, k));
+    const pick = multi ?? typical(lib, singlesFor(lib, l, opening && k === 0));
     if (!pick) return null;
     ids.push(pick.id);
     k += pick.letters.length;
@@ -212,7 +216,7 @@ export function chainPhraseOnLine(lib: TarkibLibrary, text: string): LineResult 
   let cursor = 0, order = 0;
   a.words.forEach((w, wi) => {
     w.runs.forEach((r, ri) => {
-      const choice = defaultChoice(lib, r);
+      const choice = defaultChoice(lib, r, wi === 0 && ri === 0);
       if (!choice) throw new Error(`no pieces for ${r.letters.map((l) => l.char).join("")}`);
       const c = chainRun(lib, r, choice, `w${wi}r${ri}p`, order);
       order += r.letters.length;

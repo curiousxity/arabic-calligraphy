@@ -9,7 +9,7 @@ import { loadMarkGroups, type MarkItem } from "./markLibrary";
 import { outlineBounds, type Pt } from "./strokeCuts";
 import { splitAtCut } from "./stackGeometry";
 import { parseSvgPath, type SvgCmd } from "./svgPath";
-import { analyzePhrase, skeletonFor, SKELETONS, type LetterForm } from "./tarkibText";
+import { analyzePhrase, LETTER_DOTS, skeletonFor, SKELETONS, type LetterForm } from "./tarkibText";
 
 /** A cut in splitAtCut's frame, piece units. The angle is the writing
  *  direction there, so an entry keeps the far side and an exit the near. */
@@ -30,7 +30,11 @@ export type PieceGeometry = {
   foot?: Pt;
   reviewed?: boolean;
   noFreeEnd?: boolean;
+  use?: PieceUse;
 };
+/** Where the user allows a form (schema-overrides.json): "never" composed
+ *  (a special case, kept in the library), or only as the "opening" letter. */
+export type PieceUse = "never" | "opening";
 export type PieceSchema = {
   /** Schema id: the library id, or `<library id>@middle` for a stand-in. */
   id: string;
@@ -44,6 +48,7 @@ export type PieceSchema = {
   stretch: StretchZone[];
   ownDots: boolean;
   noFreeEnd?: true;
+  use?: PieceUse;
   reviewed: boolean;
   /** A starting form standing in for a middle form the library lacks
    *  (Part 2 of the vector set is mostly starting forms); the composer
@@ -134,6 +139,10 @@ const angleGap = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), 
  *  middle forms by an automatic guess (REVIEW.md); its join faces settle it:
  *  a joined piece touched by a previous letter is middle, else starting. */
 const PROVISIONAL_FORMS = "thuluth-v2-";
+/** The second bought set draws every dotted letter with its dots. Its pairs
+ *  and triples touch, one shape, which the generator's one-dot test cannot
+ *  count, so the letter's own spelling says it. */
+const DOTTED_SOURCE = "thuluth-w";
 
 function schemaOf(item: MarkItem, g: PieceGeometry | undefined): PieceSchema {
   const cmds = parseSvgPath(item.d);
@@ -162,7 +171,8 @@ function schemaOf(item: MarkItem, g: PieceGeometry | undefined): PieceSchema {
   }
   return {
     id: item.id, itemId: item.id, letters, ...(entry ? { entry } : {}), ...(exit ? { exit } : {}), stretch,
-    ownDots: (g?.dots ?? 0) > 0, ...(g?.noFreeEnd ? { noFreeEnd: true as const } : {}), reviewed: g?.reviewed ?? false,
+    ownDots: (g?.dots ?? 0) > 0 || (item.id.startsWith(DOTTED_SOURCE) && forms.some((f) => (LETTER_DOTS[f.char]?.count ?? 0) > 0)),
+    ...(g?.noFreeEnd ? { noFreeEnd: true as const } : {}), ...(g?.use ? { use: g.use } : {}), reviewed: g?.reviewed ?? false,
   };
 }
 

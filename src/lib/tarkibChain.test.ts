@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadTarkibLibrary } from "./tarkibSchema";
-import { chainPhraseOnLine, chainRun, defaultChoice } from "./tarkibChain";
+import { chainPhraseOnLine, chainRun, defaultChoice, variantsFor } from "./tarkibChain";
 import { analyzePhrase } from "./tarkibText";
 import { assembleStackOutlineReport, pieceTransform } from "./stackOutline";
 import { transformCmds } from "./stackGeometry";
@@ -76,6 +76,18 @@ describe("typical forms", () => {
     const nun = lib.items.get(lib.schema.get(ids[ids.length - 1])!.itemId)!;
     const ws = lib.single.get("nun|finishing")!.filter((s) => s.itemId.startsWith("thuluth-v")).map((s) => lib.items.get(s.itemId)!.w);
     expect(nun.w).toBeGreaterThan(Math.min(...ws));
+  });
+});
+
+describe("alif use (the user, 2026-10-18)", () => {
+  const alif = analyzePhrase("ا").words[0].runs[0].letters[0];
+  const ids = (opening: boolean) => variantsFor(lib, alif, opening).map((s) => s.itemId);
+  it("never offers the footed alifs, a special case", () => {
+    for (const o of [false, true]) for (const id of ["thuluth-v1-15", "thuluth-v1-21", "thuluth-v1-22"]) expect(ids(o)).not.toContain(id);
+  });
+  it("offers the curved alifs only as the opening letter", () => {
+    expect(ids(false)).not.toContain("thuluth-v1-23");
+    expect(ids(true)).toContain("thuluth-v1-23");
   });
 });
 

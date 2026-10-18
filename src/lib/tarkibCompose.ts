@@ -273,7 +273,7 @@ export function composeInShape(lib: TarkibLibrary, input: ComposeInput, onProgre
     const i = Math.floor(rng() * runs.length), c = l.choices[i], st = starts(c);
     const k = Math.floor(rng() * c.schemaIds.length);
     if (lib.schema.get(c.schemaIds[k])!.letters.length !== 1) return false;
-    const alts = variantsFor(lib, runs[i].run.letters[st[k]]).filter((s) => s.id !== c.schemaIds[k]);
+    const alts = variantsFor(lib, runs[i].run.letters[st[k]], i === 0 && st[k] === 0).filter((s) => s.id !== c.schemaIds[k]);
     if (!alts.length) return false;
     c.schemaIds[k] = pick(alts).id;
     delete c.stretch[`${runs[i].prefix}${k}`];
@@ -318,7 +318,7 @@ export function composeInShape(lib: TarkibLibrary, input: ComposeInput, onProgre
   };
 
   // --- seed: the default pieces, broken into k tiers of even width -------
-  const base: RunChoice[] = runs.map((r) => defaultChoice(lib, r.run)!);
+  const base: RunChoice[] = runs.map((r, i) => defaultChoice(lib, r.run, i === 0)!);
   const widths = base.map((c, i) => { const ch = chained(i, c); return ch ? ch.box.x2 - ch.box.x1 : 0; });
   const total = widths.reduce((x, y) => x + y, 0);
   const seeds: Layout[] = [];

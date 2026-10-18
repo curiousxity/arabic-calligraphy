@@ -1,1 +1,7 @@
-{}
+{
+  "thuluth-v1-15": {"use": "never"},
+  "thuluth-v1-21": {"use": "never"},
+  "thuluth-v1-22": {"use": "never"},
+  "thuluth-v1-23": {"use": "opening"},
+  "thuluth-v1-24": {"use": "opening"}
+}
