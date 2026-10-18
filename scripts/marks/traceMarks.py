@@ -280,20 +280,24 @@ for name,(rel,_) in TRACED.items():
         with open(os.path.join(HERE,rel),encoding="utf-8") as fh: outs[name]=json.load(fh)
     SHEETS[name]={"prefix":None}
 # Scanned pieces get their edges smoothed (thuluth/smoothEdges.py: the scan's
-# pixel ripple, corners held); the vector set and the frames are clean
-# already. Cached by outline, so a re-run only smooths what changed.
-SCANNED=[n for n in TRACED if re.fullmatch(r"t\d+(r\d+)?",n) and n not in ("t34r1","t35r1","t36r1")]
+# pixel ripple, corners held). The vector set's pieces are merged into one
+# outline per stroke (they are overlapping shapes, and a tarkib join cut must
+# cross one contour); the frames are left as they are. Cached by outline, so
+# a re-run only redoes what changed.
+VECTOR=("t34r1","t35r1","t36r1")
+SCANNED=[n for n in TRACED if re.fullmatch(r"t\d+(r\d+)?",n) and n not in VECTOR]
 _cpath=os.path.join(HERE,"thuluth/traces/smoothed-cache.json")
 _cache=json.load(open(_cpath,encoding="utf-8")) if os.path.exists(_cpath) else {}
 _used={(sh,k) for _,_,items in GROUPS for sh,k,_ in items}
 _spec=importlib.util.spec_from_file_location("smoothEdges",os.path.join(HERE,"thuluth/smoothEdges.py"))
 _sm=importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_sm)
 _fresh={}
-for name in SCANNED:
+for name in SCANNED+list(VECTOR):
+    fix=_sm.union_piece if name in VECTOR else _sm.smooth_piece
     for k,v in list(outs[name].items()):
         if (name,k) not in _used: continue
-        h=hashlib.sha1(v["d"].encode()).hexdigest()
-        if h not in _cache: _cache[h]=_sm.smooth_piece(v["d"])
+        h=("u:" if name in VECTOR else "")+hashlib.sha1(v["d"].encode()).hexdigest()
+        if h not in _cache: _cache[h]=fix(v["d"])
         _fresh[h]=_cache[h]
         outs[name][k]={**v,**_cache[h]}
 with open(_cpath,"w",encoding="utf-8",newline="\n") as fh: json.dump(_fresh,fh,separators=(",",":"))

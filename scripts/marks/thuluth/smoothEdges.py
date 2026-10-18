@@ -91,14 +91,43 @@ def smooth_d(d):
         out.append("Z")
     return "".join(out)
 
-def smooth_piece(d):
-    """smooth_d, recentred on the new outline's box: {d, w, h}."""
-    sd = smooth_d(d)
+def union_piece(d, px=4.0):
+    """The vector set's pieces are several overlapping shapes that the app
+    fills together (nonzero). Merged into one outline per stroke, so a join
+    cut crosses one contour (splitAtCut refuses two): filled by winding
+    number at `px` per unit, traced once with tight tolerances so the
+    designer's flat cut edges stay straight. Recentred: {d, w, h}."""
+    cs = contours(d)
+    pts = np.vstack(cs); x0, y0 = pts.min(0) - 4; x1, y1 = pts.max(0) + 4
+    W, H = int((x1 - x0) * px) + 1, int((y1 - y0) * px) + 1
+    acc = np.zeros((H, W), np.int32)
+    for c in cs:
+        one = np.zeros((H, W), np.uint8)
+        cv2.fillPoly(one, [np.round((c - [x0, y0]) * px * 16).astype(np.int32)], 1, lineType=cv2.LINE_8, shift=4)
+        area = 0.5 * np.sum(c[:-1, 0] * c[1:, 1] - c[1:, 0] * c[:-1, 1])
+        acc += one.astype(np.int32) * (1 if area > 0 else -1)
+    m = acc != 0
+    pl = potrace.Bitmap(~m).trace(turdsize=int(2 * px * px), alphamax=0.9, opticurve=True, opttolerance=0.2)
+    f = lambda p: f"{p.x / px + x0:.1f} {p.y / px + y0:.1f}"
+    out = []
+    for curve in pl:
+        out.append("M" + f(curve.start_point))
+        for sg in curve.segments:
+            if sg.is_corner: out.append("L" + f(sg.c) + "L" + f(sg.end_point))
+            else: out.append("C" + f(sg.c1) + " " + f(sg.c2) + " " + f(sg.end_point))
+        out.append("Z")
+    return recentre("".join(out))
+
+def recentre(sd):
     pts = np.vstack(contours(sd)); x0, y0 = pts.min(0); x1, y1 = pts.max(0)
     mx, my = (x0 + x1) / 2, (y0 + y1) / 2
     shifted = re.sub(r"(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)",
                      lambda m: f"{float(m.group(1)) - mx:.0f} {float(m.group(2)) - my:.0f}", sd)
     return {"d": shifted, "w": round(x1 - x0), "h": round(y1 - y0)}
+
+def smooth_piece(d):
+    """smooth_d, recentred on the new outline's box: {d, w, h}."""
+    return recentre(smooth_d(d))
 
 if __name__ == "__main__":
     import json
