@@ -1432,6 +1432,22 @@ ha, so it was used for `outline-01`, and turned out too small (see above):
 a joined form carries a hat the standalone form lacks, so match like with
 like.
 
+## Second reference alphabet (`reference/alphabet-2.webp`)
+
+Supplied by the user 2026-10-17 as the size reference: all isolated
+letters at one size, for proportions only (it carries a logo; never
+traced). Heights against its alif (133 px): lam 1.29, kaf 1.04 (the user:
+"the lam and kaf are slightly different"), ta 1.03, ain 1.17, qaf 0.87,
+meem 0.86, sad 0.82, dal 0.74, ra 0.71, seen 0.68, nun 0.65, ba 0.62, waw
+0.60, ha (ه) 0.53, ya 0.81.
+
+**Scale check (2026-10-17).** With the library alif at about 509 units, a
+standalone letter from each sheet was set against the height this
+reference predicts. All fall within about 12% (t1's lam 0.88, t6's lam
+0.95 after its rescale, t14's kaf 1.12, the rest 0.9-1.08), so the sheets
+share one scale and no other rescale is needed. (t12's cup ain reads 0.39
+only because the cup ain is a different, tail-less form.)
+
 ## Smoother tracing (2026-10-17)
 
 The user found the traced letters pixelated. Two causes, both fixed: the
