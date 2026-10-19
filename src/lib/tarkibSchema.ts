@@ -7,14 +7,15 @@
  */
 import { loadMarkGroups, type MarkItem } from "./markLibrary";
 import { outlineBounds, type Pt } from "./strokeCuts";
-import { splitAtCut } from "./stackGeometry";
+import { splitAtCut, toSegments } from "./stackGeometry";
+import { outlineTangents } from "./stackJoin";
 import { squareCuts, stubArea, STUB_TOL } from "./tarkibEnds";
 import { parseSvgPath, type SvgCmd } from "./svgPath";
 import { analyzePhrase, LETTER_DOTS, skeletonFor, SKELETONS, type LetterForm } from "./tarkibText";
 
 /** A cut in splitAtCut's frame, piece units. The angle is the writing
  *  direction there, so an entry keeps the far side and an exit the near. */
-export type FaceCut = { cutX: number; angle: number; window?: { y: number; half: number }; /** The stroke's thickness there, when measured. */ thickness?: number; /** Square units of the old end the trim leaves standing (tarkibEnds.ts stubArea). */ stub?: number; /** Units in from where the letters meet (0: the designer's own flat end). */ depth?: number; /** The cut's two outline points, piece units (splitAtCut's face). */ ends?: [Pt, Pt] };
+export type FaceCut = { cutX: number; angle: number; window?: { y: number; half: number }; /** The stroke's thickness there, when measured. */ thickness?: number; /** Square units of the old end the trim leaves standing (tarkibEnds.ts stubArea). */ stub?: number; /** Units in from where the letters meet (0: the designer's own flat end). */ depth?: number; /** The cut's two outline points, piece units (splitAtCut's face). */ ends?: [Pt, Pt]; /** The kept outline's direction at each of `ends`, out of the piece (stackJoin.ts outlineTangents). */ dirs?: [Pt, Pt] };
 /** Where a piece may lengthen: a cut across a straight stroke; the `side`
  *  part moves away as the stroke grows, by `min`..`max` units. */
 export type StretchZone = { cutX: number; angle: number; window?: { y: number; half: number }; side: "near" | "far"; min: number; max: number };
@@ -158,7 +159,8 @@ function joinEnd(cmds: SvgCmd[], end: JoinEnd | undefined, keep: "near" | "far")
   // end's corner standing beside the bridge, a step (tarkibEnds.ts leavesStub).
   const graded = (face: FaceCut): FaceCut => {
     const r = splitAtCut(cmds, face)!, t: Pt = [Math.cos(face.angle), Math.sin(face.angle)];
-    return { ...face, ends: [r.nearFace.a, r.nearFace.b], stub: stubArea(keep === "far" ? r.far : r.near, r.nearFace, keep === "far" ? t : [-t[0], -t[1]]) };
+    const kept = keep === "far" ? r.far : r.near, dirs = outlineTangents(toSegments(kept), r.nearFace);
+    return { ...face, ends: [r.nearFace.a, r.nearFace.b], ...(dirs ? { dirs: [dirs.a, dirs.b] as [Pt, Pt] } : {}), stub: stubArea(kept, r.nearFace, keep === "far" ? t : [-t[0], -t[1]]) };
   };
   const clean = (face: FaceCut) => (face.stub ?? 0) <= STUB_TOL;
   // First choice: square across the stroke as measured (tarkibEnds.ts), at
@@ -166,9 +168,14 @@ function joinEnd(cmds: SvgCmd[], end: JoinEnd | undefined, keep: "near" | "far")
   const inward: Pt = [deeper * c, deeper * s];
   // Where the designer cut the end flat, the walk starts from that edge's
   // middle: the meeting point may sit at one corner of it, and a cut from a
-  // corner runs diagonally and leaves the rest of the end standing.
+  // corner runs diagonally and leaves the rest of the end standing. The
+  // middle of where it crosses the ink, not of its window: a lam's window sat
+  // centred below its foot, and the walk from there never met the stroke.
+  // A cut at the very tip crosses nothing; moved in a little, it does.
   const g = end.face, gc = Math.cos(g?.angle ?? 0), gs = Math.sin(g?.angle ?? 0);
-  const start: Pt = g?.window ? [g.cutX * gc - g.window.y * gs, g.cutX * gs + g.window.y * gc] : end.point;
+  const across = g && [0, JOIN_TRIM / 4, JOIN_TRIM / 2, JOIN_TRIM].map((d) => splitAtCut(cmds, { ...g, cutX: g.cutX + deeper * d })).find((r) => r);
+  const start: Pt = across ? [(across.nearFace.a[0] + across.nearFace.b[0]) / 2, (across.nearFace.a[1] + across.nearFace.b[1]) / 2]
+    : g?.window ? [g.cutX * gc - g.window.y * gs, g.cutX * gs + g.window.y * gc] : end.point;
   const cuts = squareCuts(cmds, start, inward, JOIN_DEPTHS, keep === "near");
   const found = cuts.map((f, i) => (f && accepts(f) ? { f: { ...graded(f), depth: JOIN_DEPTHS[i] } as FaceCut, depth: JOIN_DEPTHS[i] } : null)).filter((o): o is { f: FaceCut; depth: number } => !!o);
   // a cut far wider than the shallowest crossed a junction, not the stroke

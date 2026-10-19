@@ -9,7 +9,7 @@
  */
 import type { CutFace, StackJoin, StackPiece } from "../types";
 import { splitPieceAtCut } from "./stackConvert";
-import { joinEdges, joinFloor } from "./stackJoin";
+import { joinEdges, joinFloor, seamEdges } from "./stackJoin";
 import { transformCmds } from "./stackGeometry";
 import { assembleStackOutline, pieceTransform } from "./stackOutline";
 import { flattenContours, outlineBounds, type Pt } from "./strokeCuts";
@@ -195,21 +195,26 @@ function trimGeometry(f: FaceCut): { centre: Pt; width: number; dir: Pt } {
   return { centre: [f.cutX * c - y * s, f.cutX * s + y * c], width: f.thickness ?? PEN, dir: [c, s] };
 }
 
-/** A trim as the face a bridge starts from, `at` added: the cut's own two
- *  outline points where known (a face the generator guessed can be far wider
- *  than a pen), else its stroke's thickness square across it. An exit's trim
- *  points out along the travel and an entry's in, so both put `a` on the
- *  same side (no twist). */
-function trimFace(f: FaceCut, at: Pt, entry: boolean): CutFace {
+/** A trim as the face a bridge starts from, `at` added, with the letter's
+ *  outline direction at each of its points where known (`dirs`): the cut's
+ *  own two outline points where known (a face the generator guessed can be
+ *  far wider than a pen), else its stroke's thickness square across it. */
+type TrimFace = { face: CutFace; dirs?: { a: Pt; b: Pt } };
+function trimFace(f: FaceCut, at: Pt, entry: boolean): TrimFace {
   const g = trimGeometry(f), n: Pt = [g.dir[1], -g.dir[0]], h = g.width / 2;
   const tangent = entry ? f.angle + Math.PI : f.angle;
   if (f.ends) {
     const [p, q] = f.ends.map((e): Pt => [e[0] + at[0], e[1] + at[1]]);
-    const side = (p[0] - q[0]) * n[0] + (p[1] - q[1]) * n[1];
-    return side >= 0 ? { a: p, b: q, tangent } : { a: q, b: p, tangent };
+    return { face: { a: p, b: q, tangent }, ...(f.dirs ? { dirs: { a: f.dirs[0], b: f.dirs[1] } } : {}) };
   }
   const m: Pt = [g.centre[0] + at[0], g.centre[1] + at[1]];
-  return { a: [m[0] + n[0] * h, m[1] + n[1] * h], b: [m[0] - n[0] * h, m[1] - n[1] * h], tangent };
+  return { face: { a: [m[0] + n[0] * h, m[1] + n[1] * h], b: [m[0] - n[0] * h, m[1] - n[1] * h], tangent } };
+}
+
+/** `entry` relabelled to pair with `exit` as the chain will pair them (crossesOver). */
+function paired(exit: TrimFace, entry: TrimFace): TrimFace {
+  if (!crossesOver(exit.face.a, exit.face.b, entry.face.a, entry.face.b)) return entry;
+  return { face: { ...entry.face, a: entry.face.b, b: entry.face.a }, ...(entry.dirs ? { dirs: { a: entry.dirs.b, b: entry.dirs.a } } : {}) };
 }
 
 /** Units: the tightest a bridge's edge may bend. Measured on the first
@@ -218,10 +223,19 @@ function trimFace(f: FaceCut, at: Pt, entry: boolean): CutFace {
  *  ya, an S) at 10.4. At 20 the trims were driven deep, into a junction. */
 export const BRIDGE_RADIUS = 10;
 
+/** The bridge from face A to face B as the outline draws a tarkib join
+ *  (stackOutline.ts, bow 0): edges continuing both letters' outlines where
+ *  their directions are known and that reads as one stroke (`seam`), else
+ *  the centre-line bridge. */
+export function bridgeOf(A: CutFace, B: CutFace, tA?: { a: Pt; b: Pt }, tB?: { a: Pt; b: Pt }): { edgeA: Pt[]; edgeB: Pt[]; seam: boolean } {
+  const s = tA && tB ? seamEdges(A, B, tA, tB) : null;
+  return s ? { ...s, seam: true } : { ...joinEdges(A, B, 0, joinFloor(A, B, NIB.minFraction)), seam: false };
+}
+
 /** The tightest bend, units, on either edge of the bridge from face A to
- *  face B, drawn as the outline draws it (stackOutline.ts, bow 0). */
-export function bridgeRadius(A: CutFace, B: CutFace): number {
-  const { edgeA, edgeB } = joinEdges(A, B, 0, joinFloor(A, B, NIB.minFraction));
+ *  face B, drawn as bridgeOf draws it. */
+export function bridgeRadius(A: CutFace, B: CutFace, tA?: { a: Pt; b: Pt }, tB?: { a: Pt; b: Pt }): number {
+  const { edgeA, edgeB } = bridgeOf(A, B, tA, tB);
   let r = Infinity;
   for (const e of [edgeA, edgeB]) for (let i = 1; i + 1 < e.length; i++) {
     const u: Pt = [e[i][0] - e[i - 1][0], e[i][1] - e[i - 1][1]], v: Pt = [e[i + 1][0] - e[i][0], e[i + 1][1] - e[i][1]];
@@ -248,6 +262,9 @@ export function bridgeRadius(A: CutFace, B: CutFace): number {
  * offset: the composer asks again and again.
  */
 const TAPER = 0.6;
+/** The miss, in pens, of a pair whose seam edges would cross or pinch and
+ *  fall back to the centre-line bridge, which meets the letters at a corner. */
+const NO_SEAM = 0.25;
 export type TrimPick = { a: FaceCut; b: FaceCut; miss: number; depth: number };
 const trimMemo = new WeakMap<readonly FaceCut[], WeakMap<readonly FaceCut[], Map<string, TrimPick>>>();
 export function pickTrims(as: readonly FaceCut[], bs: readonly FaceCut[], offset: Pt): TrimPick {
@@ -268,10 +285,14 @@ export function pickTrims(as: readonly FaceCut[], bs: readonly FaceCut[], offset
     const room = Math.max(0, 0.3 - ahead) * 4
       + Math.max(0, Math.abs(ga.width - gb.width) - TAPER * L) / PEN
       + Math.max(0, (turn * (ga.width + gb.width)) / 2 - L) / PEN;
-    const miss = room + Math.max(0, BRIDGE_RADIUS - bridgeRadius(trimFace(a, [0, 0], false), trimFace(b, offset, true))) / PEN;
+    const fa = trimFace(a, [0, 0], false), fb = paired(fa, trimFace(b, offset, true));
+    const drawn = bridgeOf(fa.face, fb.face, fa.dirs, fb.dirs);
+    const bend = Math.max(0, BRIDGE_RADIUS - bridgeRadius(fa.face, fb.face, fa.dirs, fb.dirs)) / PEN + (drawn.seam ? 0 : NO_SEAM);
+    const miss = room + bend;
     const depth = (a.depth ?? 0) + (b.depth ?? 0);
-    // 0: meets all; 1: meets all but the bend; 2: neither
-    const tier = miss === 0 ? 0 : room === 0 ? 1 : 2;
+    // 0: meets all; 1: meets all but the bend or the seam; 2: neither.
+    // Within 1, a pair drawn with seam edges first, then the shallowest.
+    const tier = miss === 0 ? 0 : room === 0 ? (drawn.seam ? 1 : 1.5) : 2;
     if (!best || tier < best.tier || (tier === best.tier && (tier < 2 ? depth < best.depth : room < best.room))) best = { a, b, miss, depth, tier, room };
   }
   const pick: TrimPick = { a: best!.a, b: best!.b, miss: best!.miss, depth: best!.depth };
@@ -288,12 +309,19 @@ export function pickTrims(as: readonly FaceCut[], bs: readonly FaceCut[], offset
  */
 function alignFace(prev: StackPiece, exitIndex: number, entry: StackPiece["faces"][number], at: Pt): StackPiece["faces"][number] {
   const ex = prev.faces[exitIndex];
-  const ea: Pt = [ex.a[0] + prev.x, ex.a[1] + prev.y], eb: Pt = [ex.b[0] + prev.x, ex.b[1] + prev.y];
-  const na: Pt = [entry.a[0] + at[0], entry.a[1] + at[1]], nb: Pt = [entry.b[0] + at[0], entry.b[1] + at[1]];
+  const flip = crossesOver([ex.a[0] + prev.x, ex.a[1] + prev.y], [ex.b[0] + prev.x, ex.b[1] + prev.y], [entry.a[0] + at[0], entry.a[1] + at[1]], [entry.b[0] + at[0], entry.b[1] + at[1]]);
+  return flip ? { ...entry, a: entry.b, b: entry.a } : entry;
+}
+
+/** Would pairing exit point `ea` with entry point `na` (and `eb` with `nb`)
+ *  cross the bridge over? Each pair must lie on the same side of the line
+ *  between the two faces' middles. One rule for the trims scored and the
+ *  joins drawn: they disagreed once, and a pair scored clean drew crossed. */
+function crossesOver(ea: Pt, eb: Pt, na: Pt, nb: Pt): boolean {
   const m1: Pt = [(ea[0] + eb[0]) / 2, (ea[1] + eb[1]) / 2], m2: Pt = [(na[0] + nb[0]) / 2, (na[1] + nb[1]) / 2];
   const t: Pt = [m2[0] - m1[0], m2[1] - m1[1]];
   const side = (p: Pt, m: Pt) => Math.sign(t[0] * (p[1] - m[1]) - t[1] * (p[0] - m[0]));
-  return side(ea, m1) === side(na, m2) ? entry : { ...entry, a: entry.b, b: entry.a };
+  return side(ea, m1) !== side(na, m2);
 }
 
 const shift = (p: StackPiece, d: Pt): StackPiece => ({ ...p, x: p.x + d[0], y: p.y + d[1], homeX: p.homeX + d[0], homeY: p.homeY + d[1] });
@@ -344,7 +372,7 @@ export function chainRun(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, 
         // where the letters meet; both ends trimmed back, the pen stroke spans the gap
         if (spliced[k - 1]) {
           b.piece.faces[b.entry.faceIndex!] = alignFace(pieces.find((p) => p.id === prevExit!.pieceId)!, prevExit.faceIndex!, b.piece.faces[b.entry.faceIndex!], at);
-          joins.push({ id: `j${prevExit.pieceId}-${id}`, from: { pieceId: prevExit.pieceId, faceIndex: prevExit.faceIndex! }, to: { pieceId: id, faceIndex: b.entry.faceIndex! }, bow: 0 });
+          joins.push({ id: `j${prevExit.pieceId}-${id}`, from: { pieceId: prevExit.pieceId, faceIndex: prevExit.faceIndex! }, to: { pieceId: id, faceIndex: b.entry.faceIndex! }, bow: 0, seam: true });
         }
       }
       meets.push({ exit: prevExit.world, entry: [at[0] + b.entry.point[0], at[1] + b.entry.point[1]] });

@@ -119,6 +119,24 @@ outlines, shadows and SVG export are seam-free. Bridges are matched by
 point equality after the same transform is applied to commands and faces;
 keep `transformCmds` and `transformFace` arithmetically identical.
 
+**A `seam` join departs from "the face vector is the nib"** (`seamEdges`,
+`outlineTangents`, `stackJoin.ts`; since 2026-10-18, set only by tarkib). Its
+two edges are each one cubic continuing a letter's outline: leaving A's at
+A.a in the direction that outline runs there and arriving on B's the same
+way, spliced in as `C` segments, not samples. An edge offset from one centre
+line met a tapering or curving letter at 3 to 35 degrees, and the user's
+standard is that "you should not be able to tell there was a joint at all".
+The outline direction is a quadratic fitted to the first 4 units of outline
+(a chord leans into a curving edge; the first segment follows whatever the
+designer's outline does in its first unit: a step two units wide sent one
+seam off 45 degrees). Where the two cubics would cross, or the stroke between
+them pinch under 0.85 or swell past 1.3 of the faces' interpolated
+thickness, the centre-line join is drawn instead. `bow` and `depth` scale
+each edge's handles as `joinHandles` does, so the editor's bend drag still
+does something, but its handle sits on the centre-line cubic, which no
+longer matches the drawn edges exactly. Old saves have no `seam` and draw
+as before.
+
 **Near is left is later.** HarfBuzz's RTL glyph array is in visual order
 (index 0 leftmost = last in text). `splitAtCut`'s *near* side (x < cut in
 the stroke's frame) is visually left, which is the **later** letter in

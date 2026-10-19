@@ -6,7 +6,7 @@ import type { Pt } from "./strokeCuts";
 import {
   type PieceTransform, transformCmds, transformFace, transformPt, toSegments, fromSegments, cmdsCentre,
 } from "./stackGeometry";
-import { joinEdges, joinFloor, spliceJoin } from "./stackJoin";
+import { joinEdges, joinFloor, outlineTangents, seamEdges, spliceJoin } from "./stackJoin";
 
 export const pieceTransform = (p: StackPiece): PieceTransform =>
   ({ x: p.x, y: p.y, rotation: p.rotation, pivot: p.pivot });
@@ -38,7 +38,9 @@ export function assembleStackOutlineReport(
     if (!from || !to || !fa || !fb) { skipped++; continue; }
     const A = transformFace(fa, pieceTransform(from));
     const B = transformFace(fb, pieceTransform(to));
-    const edges = joinEdges(A, B, j.bow, joinFloor(A, B, nib.minFraction), 24, j.depth ?? 0, j.profile);
+    const tA = j.seam ? outlineTangents(pool, A) : null, tB = j.seam ? outlineTangents(pool, B) : null;
+    const edges = (tA && tB && seamEdges(A, B, tA, tB, j.bow, j.depth ?? 0))
+      || joinEdges(A, B, j.bow, joinFloor(A, B, nib.minFraction), 24, j.depth ?? 0, j.profile);
     const spliced = spliceJoin(pool, A, B, edges);
     if (spliced) pool = spliced;
     else skipped++;

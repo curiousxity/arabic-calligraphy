@@ -302,6 +302,12 @@ export type StackJoin = {
    *  interpolation of the two faces. Absent = linear (every join today). A
    *  curve converted from a letter carries its own sampled width here. */
   profile?: number[];
+  /** Draw the two edges each as its own curve continuing the two letters'
+   *  outlines (`seamEdges`), not offset from one centre line: no corner where
+   *  the join meets a tapering or curving letter. Tarkib joins set it; where
+   *  the edges would cross or pinch the centre-line join is drawn. Absent =
+   *  the centre line (every join before 2026-10-18). */
+  seam?: boolean;
   /** The bend double-click returns to. Absent = { bow: 0, depth: 0 }. A
    *  curve converted from a letter rests at the bend that reproduces it. */
   rest?: { bow: number; depth: number };

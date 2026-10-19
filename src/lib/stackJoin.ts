@@ -333,7 +333,7 @@ const polyline = (pts: Pt[]): Seg[] => {
  * what makes a join seam-free under outlines, shadows and SVG export.
  */
 export function spliceJoin(
-  contours: Seg[][], faceN: CutFace, faceF: CutFace, edges: { edgeA: Pt[]; edgeB: Pt[] }
+  contours: Seg[][], faceN: CutFace, faceF: CutFace, edges: { edgeA: Pt[]; edgeB: Pt[]; curveA?: [Pt, Pt, Pt, Pt]; curveB?: [Pt, Pt, Pt, Pt] }
 ): Seg[][] | null {
   const n = findBridge(contours, faceN);
   // Faces that coincide (a fresh split) share points, so F must look elsewhere.
@@ -345,13 +345,137 @@ export function spliceJoin(
   const nEndsAtA = n.startsAtA;                 // bridge a→b means the walk ends at a
   const out = nEndsAtA ? edges.edgeA : edges.edgeB;   // leave N at the point it ended on
   const back = nEndsAtA ? edges.edgeB : edges.edgeA;
+  // an edge that is one cubic (seamEdges) goes in as that curve, not its samples
+  const outCurve = nEndsAtA ? edges.curveA : edges.curveB, backCurve = nEndsAtA ? edges.curveB : edges.curveA;
+  const outSegs: Seg[] = outCurve ? [{ type: "C", p: outCurve }] : polyline(out);
+  const backSegs: Seg[] = backCurve ? [{ type: "C", p: [...backCurve].reverse() }] : polyline([...back].reverse());
 
   // F's walk must start at the same label N ended on.
   let fWalk = walkWithout(contours[f.contour], f.seg);
   const fWalkStartsAtA = !f.startsAtA;          // bridge b→a means the walk starts at a
   if (fWalkStartsAtA !== nEndsAtA) fWalk = reversed(fWalk);
 
-  const merged: Seg[] = [...nWalk, ...polyline(out), ...fWalk, ...polyline([...back].reverse())];
+  const merged: Seg[] = [...nWalk, ...outSegs, ...fWalk, ...backSegs];
   const rest = contours.filter((_, i) => i !== n.contour && i !== f.contour);
   return [...rest, merged];
+}
+
+/** A seam edge pair narrower or wider than this share of the faces'
+ *  interpolated thickness falls back to the centre-line bridge. */
+const SEAM_WAIST = 0.85;
+const SEAM_BULGE = 1.3;
+/** Units of outline beside a cut its direction is fitted over. */
+const TANGENT_REACH = 4;
+
+/** A segment's points, its curve sampled finely. */
+function segPoints(s: Seg): Pt[] {
+  if (s.type === "L") return s.p;
+  const out: Pt[] = [];
+  for (let i = 0; i <= 32; i++) {
+    const t = i / 32, u = 1 - t;
+    out.push(s.type === "Q"
+      ? [u * u * s.p[0][0] + 2 * u * t * s.p[1][0] + t * t * s.p[2][0], u * u * s.p[0][1] + 2 * u * t * s.p[1][1] + t * t * s.p[2][1]]
+      : bezierAt(s.p as [Pt, Pt, Pt, Pt], t));
+  }
+  return out;
+}
+
+/** The direction the outline leaves `from` along `pts` (points running away
+ *  from it): a curve p(s) = from + v·s + a·s²/2 fitted by least squares to
+ *  the first TANGENT_REACH units, its v. A chord leans into a curving edge
+ *  (3 to 20 degrees off on a lam's foot), and the first segment alone
+ *  follows whatever the designer's outline does in its first unit (a ya's
+ *  end has a step two units wide that sent the seam off 45 degrees). */
+function leaving(from: Pt, pts: Pt[]): Pt {
+  let s = 0, prev = from, s2 = 0, s3 = 0, s4 = 0;
+  const bx = [0, 0], by = [0, 0];
+  for (const p of pts) {
+    s += Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+    prev = p;
+    if (s < 1e-9) continue;
+    if (s > TANGENT_REACH) break;
+    const dx = p[0] - from[0], dy = p[1] - from[1];
+    s2 += s * s; s3 += (s * s * s) / 2; s4 += (s * s * s * s) / 4;
+    bx[0] += s * dx; bx[1] += (s * s * dx) / 2; by[0] += s * dy; by[1] += (s * s * dy) / 2;
+  }
+  const det = s2 * s4 - s3 * s3;
+  const v: Pt = Math.abs(det) > 1e-12
+    ? [(bx[0] * s4 - bx[1] * s3) / det, (by[0] * s4 - by[1] * s3) / det]
+    : [prev[0] - from[0], prev[1] - from[1]];
+  const l = Math.hypot(v[0], v[1]) || 1;
+  return [v[0] / l, v[1] / l];
+}
+
+/**
+ * Where the outline runs as it reaches each of a face's two points: unit
+ * vectors pointing out of the letter (`leaving`, reversed), from
+ * `contours`, which must still carry the face's straight bridge edge. Null
+ * when the face is not found.
+ */
+export function outlineTangents(contours: Seg[][], f: CutFace): { a: Pt; b: Pt } | null {
+  const found = findBridge(contours, f);
+  if (!found) return null;
+  const segs = contours[found.contour], n = segs.length;
+  // the bridge runs p0 -> p1; the outline arrives at p0 and leaves from p1
+  const p0 = segs[found.seg].p[0], p1 = segs[found.seg].p[1];
+  const before: Pt[] = [], after: Pt[] = [];
+  for (let k = 1; k < n && before.length < 400; k++) before.push(...[...segPoints(segs[(found.seg - k + n) % n])].reverse());
+  for (let k = 1; k < n && after.length < 400; k++) after.push(...segPoints(segs[(found.seg + k) % n]));
+  const back = (v: Pt): Pt => [-v[0], -v[1]];
+  const t0 = back(leaving(p0, before)), t1 = back(leaving(p1, after));
+  return found.startsAtA ? { a: t0, b: t1 } : { a: t1, b: t0 };
+}
+
+/**
+ * A join's two edges drawn each as its own cubic, leaving A's outline at
+ * A.a (and A.b) in the direction that outline runs there (`tA`, out of A)
+ * and arriving on B's along B's (`tB`, out of B): no corner at any of the
+ * four seams, where an edge offset from one centre line meets a tapering or
+ * curving letter at an angle (the tarkib seams, 3 to 35 degrees). Handles
+ * are each edge's chord/3 scaled by `bow` and `depth` as `joinHandles`.
+ * Null where it would not read as one stroke — a tangent pointing back into
+ * its letter, the two edges crossing, or the stroke pinching below SEAM_WAIST
+ * or swelling past SEAM_BULGE of the faces' interpolated thickness — and the
+ * caller draws the centre-line bridge (`joinEdges`) instead.
+ */
+export function seamEdges(
+  A: CutFace, B: CutFace, tA: { a: Pt; b: Pt }, tB: { a: Pt; b: Pt }, bow = 0, depth = 0, samples = 24
+): { edgeA: Pt[]; edgeB: Pt[]; curveA: [Pt, Pt, Pt, Pt]; curveB: [Pt, Pt, Pt, Pt] } | null {
+  const r = seamReport(A, B, tA, tB, bow, depth, samples);
+  return r.ok ? { edgeA: r.edgeA, edgeB: r.edgeB, curveA: r.curveA, curveB: r.curveB } : null;
+}
+
+/** seamEdges with its verdict: the two edges, the narrowest and widest the
+ *  stroke runs between them (shares of the faces' interpolated thickness),
+ *  and why they would not do (`ok` false): "tangent", "cross", or "width". */
+export function seamReport(
+  A: CutFace, B: CutFace, tA: { a: Pt; b: Pt }, tB: { a: Pt; b: Pt }, bow = 0, depth = 0, samples = 24
+): { edgeA: Pt[]; edgeB: Pt[]; curveA: [Pt, Pt, Pt, Pt]; curveB: [Pt, Pt, Pt, Pt]; ok: boolean; why?: "tangent" | "cross" | "width"; narrowest: number; widest: number } {
+  const outA: Pt = [Math.cos(A.tangent), Math.sin(A.tangent)], outB: Pt = [Math.cos(B.tangent), Math.sin(B.tangent)];
+  const dot = (u: Pt, v: Pt) => u[0] * v[0] + u[1] * v[1];
+  const bad = [tA.a, tA.b].some((t) => dot(t, outA) < 0.3) || [tB.a, tB.b].some((t) => dot(t, outB) < 0.3);
+  const curve = (p: Pt, tp: Pt, q: Pt, tq: Pt): [Pt, Pt, Pt, Pt] => {
+    const [h0, h1] = joinHandles(Math.hypot(q[0] - p[0], q[1] - p[1]), bow, depth);
+    return [p, [p[0] + tp[0] * h0, p[1] + tp[1] * h0], [q[0] + tq[0] * h1, q[1] + tq[1] * h1], q];
+  };
+  const curveA = curve(A.a, tA.a, B.a, tB.a), curveB = curve(A.b, tA.b, B.b, tB.b);
+  const sample = (cl: [Pt, Pt, Pt, Pt]) => Array.from({ length: samples + 1 }, (_, i) => bezierAt(cl, i / samples));
+  const edgeA = sample(curveA), edgeB = sample(curveB);
+  // the two edges must not cross
+  const cross = (p1: Pt, p2: Pt, q1: Pt, q2: Pt) => {
+    const s = (o: Pt, p: Pt, q: Pt) => (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+    return s(p1, p2, q1) * s(p1, p2, q2) < 0 && s(q1, q2, p1) * s(q1, q2, p2) < 0;
+  };
+  let crossed = false;
+  for (let i = 0; i < samples && !crossed; i++) for (let k = 0; k < samples; k++) if (cross(edgeA[i], edgeA[i + 1], edgeB[k], edgeB[k + 1])) { crossed = true; break; }
+  // the width across: each point of one edge to the nearest point of the other
+  const wA = faceThickness(A), wB = faceThickness(B);
+  let narrowest = Infinity, widest = 0;
+  for (let i = 1; i < samples; i++) {
+    const t = i / samples, w = wA * (1 - t) + wB * t;
+    const d = Math.min(...edgeB.map((q) => Math.hypot(q[0] - edgeA[i][0], q[1] - edgeA[i][1]))) / w;
+    narrowest = Math.min(narrowest, d); widest = Math.max(widest, d);
+  }
+  const why = bad ? "tangent" : crossed ? "cross" : narrowest < SEAM_WAIST || widest > SEAM_BULGE ? "width" : undefined;
+  return { edgeA, edgeB, curveA, curveB, ok: !why, ...(why ? { why } : {}), narrowest, widest };
 }

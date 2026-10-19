@@ -160,6 +160,16 @@ export function squareCuts(cmds: SvgCmd[], meeting: Pt, inward: Pt, depths: read
   let dir = unit(inward), c: Pt = meeting;
   // the meeting point is on or just outside the ink's edge: step in until inside
   for (let k = 0; k < 8 && !insideInk(contours, c); k++) c = [c[0] + dir[0] * WALK_STEP, c[1] + dir[1] * WALK_STEP];
+  // a meeting point off to one side of a tapering tip (a lam's foot): the
+  // middle of the ink within half a pen of it instead
+  if (!insideInk(contours, c)) {
+    const ink: Pt[] = [];
+    for (let dx = -24; dx <= 24; dx += 3) for (let dy = -24; dy <= 24; dy += 3) {
+      const p: Pt = [meeting[0] + dx, meeting[1] + dy];
+      if (dx * dx + dy * dy <= 576 && insideInk(contours, p)) ink.push(p);
+    }
+    if (ink.length) c = [ink.reduce((t, p) => t + p[0], 0) / ink.length, ink.reduce((t, p) => t + p[1], 0) / ink.length];
+  }
   if (!insideInk(contours, c)) return out;
   let x = crossSection(contours, c, dir, FIRST_CONE);
   if (!x) return out;

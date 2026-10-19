@@ -3,7 +3,8 @@ import { loadTarkibLibrary } from "./tarkibSchema";
 import { BRIDGE_RADIUS, bridgeRadius, chainPhraseOnLine, chainRun, defaultChoice, endFit, fittingVariants, FIT_SLACK, OVERLAP, pickTrims, variantsFor } from "./tarkibChain";
 import { analyzePhrase } from "./tarkibText";
 import { assembleStackOutlineReport, pieceTransform } from "./stackOutline";
-import { transformCmds } from "./stackGeometry";
+import { toSegments, transformCmds } from "./stackGeometry";
+import { outlineTangents } from "./stackJoin";
 import { flattenContours } from "./strokeCuts";
 import { pointInPolygon } from "./svgPath";
 import { scoreLayout } from "./tarkibScore";
@@ -116,6 +117,62 @@ describe("joins (the user: smooth joints are essential)", () => {
     }
   });
 
+  it("leaves no corner where a bridge meets a letter: the drawn outline turns there no more than beside it", () => {
+    // the user: "in a proper joint, you should not be able to tell there was
+    // a joint at all". Bridges offset from a centre line met the letters'
+    // edges at 3 to 35 degrees.
+    let seams = 0;
+    for (const run of analyzePhrase("أُمّ أَيْمَن الحُبّ حَيَاتِي").words.flatMap((w) => w.runs)) {
+      if (run.letters.length < 2) continue;
+      const c = chainRun(lib, run, defaultChoice(lib, run)!, "p", 0);
+      // finely flattened: the test reads the outline's curves, not its facets
+      const outline = flattenContours(assembleStackOutlineReport(c.pieces, c.joins, NIB).cmds, 256);
+      const byId = new Map(c.pieces.map((p) => [p.id, p]));
+      for (const j of c.joins) {
+        for (const [pid, fi] of [[j.from.pieceId, j.from.faceIndex], [j.to.pieceId, j.to.faceIndex]] as const) {
+          const q = byId.get(pid)!, f = q.faces[fi];
+          for (const e of [f.a, f.b]) {
+            const w: [number, number] = [e[0] + q.x, e[1] + q.y];
+            for (const raw of outline) {
+              const i = raw.findIndex((p) => Math.hypot(p[0] - w[0], p[1] - w[1]) < 1e-3);
+              if (i < 0) continue;
+              // the outline as the eye reads it: points two units (1/24 of a
+              // pen) apart along it. A split leaves slivers a hundredth of a
+              // unit long at a cut, and a cut beside a corner the designer drew
+              // leaves a stub a third of a unit long; a corner at the seam
+              // itself turns as sharply at any spacing (it was 10 to 34 degrees).
+              const along = (dir: 1 | -1, n: number) => {
+                const pts: number[][] = [];
+                let prev = raw[i], need = 2;
+                for (let k = 1; pts.length < n && k < raw.length; k++) {
+                  const q = raw[(i + dir * k + raw.length * 4) % raw.length];
+                  let d = Math.hypot(q[0] - prev[0], q[1] - prev[1]);
+                  while (d >= need && pts.length < n) {
+                    const t = need / d;
+                    prev = [prev[0] + (q[0] - prev[0]) * t, prev[1] + (q[1] - prev[1]) * t];
+                    pts.push(prev); d -= need; need = 2;
+                  }
+                  need -= d; prev = q;
+                }
+                return pts;
+              };
+              const ring = [...along(-1, 3).reverse(), raw[i], ...along(1, 3)];
+              const at = (k: number) => ring[3 + k];
+              const turn = (k: number) => {
+                const u = [at(k)[0] - at(k - 1)[0], at(k)[1] - at(k - 1)[1]], v = [at(k + 1)[0] - at(k)[0], at(k + 1)[1] - at(k)[1]];
+                return (Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / Math.hypot(u[0], u[1]) / Math.hypot(v[0], v[1])))) * 180) / Math.PI;
+              };
+              expect(turn(0) - Math.max(turn(-1), turn(1)), `${run.letters.map((l) => l.char).join("")} ${j.id} ${pid}`).toBeLessThan(4);
+              seams++;
+              break;
+            }
+          }
+        }
+      }
+    }
+    expect(seams).toBeGreaterThanOrEqual(16);
+  });
+
   it("bends no bridge of the first target tighter than BRIDGE_RADIUS where some trims allow it", () => {
     // ha into a flat-entry ba, trimmed shallow, bent its inner edge at a
     // radius of 6 units: a visible pinch. The lam into the ha has no trims
@@ -133,7 +190,10 @@ describe("joins (the user: smooth joints are essential)", () => {
         const w = [Math.cos(p.exit!.angle), Math.sin(p.exit!.angle)];
         const off: [number, number] = [p.exit!.point[0] - w[0] * OVERLAP - q.entry!.point[0], p.exit!.point[1] - w[1] * OVERLAP - q.entry!.point[1]];
         if (pickTrims(p.exit!.options ?? [p.exit!.face!], q.entry!.options ?? [q.entry!.face!], off).miss > 0) continue;
-        expect(bridgeRadius(at(A.faces[j.from.faceIndex], A), at(B.faces[j.to.faceIndex], B)), j.id).toBeGreaterThanOrEqual(BRIDGE_RADIUS);
+        // the bridge as drawn: seam edges along the letters' outlines where they work
+        const pool = c.pieces.flatMap((q) => toSegments(transformCmds(q.cmds, pieceTransform(q))));
+        const fa = at(A.faces[j.from.faceIndex], A), fb = at(B.faces[j.to.faceIndex], B);
+        expect(bridgeRadius(fa, fb, outlineTangents(pool, fa) ?? undefined, outlineTangents(pool, fb) ?? undefined), j.id).toBeGreaterThanOrEqual(BRIDGE_RADIUS);
         n++;
       }
     }
