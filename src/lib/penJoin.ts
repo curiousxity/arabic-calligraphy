@@ -70,6 +70,8 @@ export function assembleRun(lib: PenLibrary, formIds: string[], joins: JoinDefau
   if (joins.length !== Math.max(0, formIds.length - 1)) throw new Error(`a run of ${formIds.length} letters needs ${formIds.length - 1} joins`);
   const out: RunStrokes = { body: null, joinSegs: [], strokes: [], drawn: [], dots: [], origins: [] };
   let origin: Pt = at;
+  // the path the next letter's body joins: the run's body, or the stroke a lifted pen began
+  let cur: PenPath | null = null;
   formIds.forEach((id, k) => {
     if (k > 0) {
       const exit = formExit(lib, formIds[k - 1]), entry = formEntry(lib, id);
@@ -86,12 +88,14 @@ export function assembleRun(lib: PenLibrary, formIds: string[], joins: JoinDefau
     out.drawn.push(...f.drawn);
     out.dots.push(...f.dots);
     if (!f.body) return;
-    if (!out.body) { out.body = f.body; return; }
-    const body = out.body, from = body.segs[body.segs.length - 1]?.to ?? body.start, to = f.body.start;
+    if (!out.body) { out.body = cur = f.body; return; }
+    if (joins[k - 1].lift || !cur) { out.strokes.push(f.body); cur = f.body; return; }
+    const body = cur, from = body.segs[body.segs.length - 1]?.to ?? body.start, to = f.body.start;
     if (Math.hypot(to.p[0] - from.p[0], to.p[1] - from.p[1]) > 1e-9) {
       const exit = formExit(lib, formIds[k - 1])!, entry = formEntry(lib, id)!;
       const { c1, c2 } = joinCubic(from.p, exit.dir, endCurvature(body), to.p, entry.dir, startCurvature(f.body));
-      out.joinSegs.push(body.segs.length);
+      // joinSegs index the run's body; a join inside a stroke begun after a lifted pen is not listed
+      if (body === out.body) out.joinSegs.push(body.segs.length);
       body.segs.push({ c1, c2, to });
     }
     body.segs.push(...f.body.segs);

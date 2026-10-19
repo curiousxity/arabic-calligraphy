@@ -55,8 +55,9 @@ export type Form = {
   /** Body segment index, and how many nuqta it may lengthen by. */
   stretch?: { seg: number; min: number; max: number }[];
 };
-/** Nuqta: leftward distance from exit to entry, and upward climb. */
-export type JoinDefault = { gap: number; rise: number };
+/** Nuqta: leftward distance from exit to entry, and upward climb. `lift`: the pen comes off the paper, so the
+ *  next letter starts a stroke of its own (placed by gap and rise as before) instead of joining this one. */
+export type JoinDefault = { gap: number; rise: number; lift?: boolean };
 export type PenLibrary = { parts: Map<string, Part>; forms: Map<string, Form>; joins: Record<string, JoinDefault> };
 
 let shipped: PenLibrary | null = null;

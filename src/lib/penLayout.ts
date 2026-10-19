@@ -2,10 +2,10 @@
  * A phrase written with the pen on one line: which form each letter takes
  * and how its joins sit (the layout, which a tarkib block stores and the
  * later editing work pins), and the ink that layout draws. Runs read right
- * to left from x = 0 on the baseline y = 0, kept RUN_GAP apart inside a
- * word and WORD_GAP between words, measured ink to ink at the same height:
- * a run slides in over another's tail or under its head where their ink
- * does not meet, as a line of Thuluth is spaced. Pure; must not
+ * to left from x = 0 on the baseline y = 0. Each run sits as far right as
+ * it can while keeping RUN_GAP (inside a word) or WORD_GAP (between words)
+ * clear of all the ink before it, in any direction, so a word tucks in over
+ * another's tail or under its head as a line of Thuluth is spaced. Pure; must not
  * import ./harfbuzz. See .claude/rules/tarkib.md.
  */
 import { assembleRun } from "./penJoin";
@@ -19,12 +19,13 @@ export type PenRun = { forms: string[]; joins: JoinDefault[]; hamza?: { index: n
 /** wordStarts: the run index where each word begins. */
 export type PenLayout = { runs: PenRun[]; wordStarts: number[] };
 
-/** Nuqta between runs of one word, ink to ink. */
-export const RUN_GAP = 0.6;
-/** Nuqta between words, ink to ink: about one nuqta between the words of the book's Fatiha lines. */
-export const WORD_GAP = 1;
-/** Nuqta of height within which two runs' ink counts as side by side for spacing. */
-export const SPACING_CLEARANCE = 0.5;
+/** Nuqta a run keeps clear of the ink before it in its own word, measured on the studio reference (أم أيمن). */
+export const RUN_GAP = 0.85;
+/** Nuqta a word keeps clear of the ink before it, measured on the same reference. */
+export const WORD_GAP = 0.9;
+/** Units a run slides at a time while looking for its place (the result is refined to SLIDE_TOL). */
+const SLIDE = 4;
+const SLIDE_TOL = 0.25;
 /** Units the fitted ink may stray from the swept ink. */
 const FIT_TOL = 0.25;
 /** The lowest stroke opacity a block may have. */
@@ -54,7 +55,8 @@ export function defaultLayout(lib: PenLibrary, phrase: string): PenLayout | { mi
         const letter = BASE[l.char] ?? l.char;
         const form = [...lib.forms.values()].find((f) => f.letter === letter && f.form === l.form);
         if (form) forms.push(form.id); else miss(letter);
-        if (l.hamza) {
+        // Thuluth writes the alif bare: a hamza over or under an alif is left out (the user's ruling, 2026-10-19)
+        if (l.hamza && letter !== "ا") {
           if (lib.parts.has(HAMZA_PART)) hamza.push({ index: i, side: l.hamza }); else miss("ء");
         }
       });
@@ -73,35 +75,44 @@ const boundsOf = (polys: Polygon[][]): Bounds => {
   }
   return b;
 };
-/** Height bands (units) for spacing: the leftmost or rightmost ink in each. */
-const BAND = 4;
-function profile(polys: Polygon[][], pick: (a: number, b: number) => number, start: number): Map<number, number> {
-  const out = new Map<number, number>();
+/** Points along every outline edge, at most two units apart. */
+function outlinePoints(polys: Polygon[][]): Pt[] {
+  const out: Pt[] = [];
   for (const ps of polys) for (const poly of ps) for (const ring of poly) for (let i = 0; i < ring.length; i++) {
-    // edges as well as points: a long straight edge has no points in between
-    const p = ring[i], q = ring[(i + 1) % ring.length], n = Math.max(1, Math.ceil(Math.abs(q[1] - p[1]) / BAND));
-    for (let j = 0; j <= n; j++) {
-      const x = p[0] + ((q[0] - p[0]) * j) / n, band = Math.floor((p[1] + ((q[1] - p[1]) * j) / n) / BAND);
-      out.set(band, pick(out.get(band) ?? start, x));
-    }
+    const p = ring[i], q = ring[(i + 1) % ring.length], n = Math.max(1, Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / 2));
+    for (let j = 0; j < n; j++) out.push([p[0] + ((q[0] - p[0]) * j) / n, p[1] + ((q[1] - p[1]) * j) / n]);
   }
   return out;
 }
-/** The x shift that sets `next` (laid with its own coordinates) `gap` units left of `placed`'s ink at the
- *  nearest pair of heights within SPACING_CLEARANCE, or null when no heights pair up. */
-function clearShift(placed: Polygon[][], next: Polygon[][], gap: number): number | null {
-  const left = profile(placed, Math.min, Infinity), right = profile(next, Math.max, -Infinity);
-  const reach = Math.ceil((SPACING_CLEARANCE * NUQTA) / BAND);
-  let shift: number | null = null;
-  for (const [band, r] of right) {
-    for (let d = -reach; d <= reach; d++) {
-      const l = left.get(band + d);
-      if (l === undefined) continue;
-      const s = l - gap - r;
-      if (shift === null || s < shift) shift = s;
-    }
+/** Placed ink bucketed by cells `gap` wide, to ask quickly whether any of it lies within `gap` of a point. */
+function nearIndex(points: Pt[], gap: number): (x: number, y: number) => boolean {
+  const cells = new Map<string, Pt[]>();
+  for (const p of points) {
+    const k = `${Math.floor(p[0] / gap)},${Math.floor(p[1] / gap)}`;
+    const c = cells.get(k);
+    if (c) c.push(p); else cells.set(k, [p]);
   }
-  return shift;
+  return (x, y) => {
+    const cx = Math.floor(x / gap), cy = Math.floor(y / gap);
+    for (let i = cx - 1; i <= cx + 1; i++) for (let j = cy - 1; j <= cy + 1; j++) {
+      for (const p of cells.get(`${i},${j}`) ?? []) if (Math.hypot(p[0] - x, p[1] - y) < gap) return true;
+    }
+    return false;
+  };
+}
+/** The largest x shift, at most `start`, at which `next`'s ink keeps `gap` clear of the placed ink. */
+function clearShift(placed: Pt[], next: Pt[], gap: number, start: number): number {
+  const near = nearIndex(placed, gap);
+  const clashes = (dx: number) => next.some(([x, y]) => near(x + dx, y));
+  if (!clashes(start)) return start;
+  let hit = start, dx = start;
+  while (clashes(dx)) { hit = dx; dx -= SLIDE; }
+  // the first clear shift lies between the last clash and dx
+  while (hit - dx > SLIDE_TOL) {
+    const mid = (hit + dx) / 2;
+    if (clashes(mid)) hit = mid; else dx = mid;
+  }
+  return dx;
 }
 const move = (polys: Polygon[], dx: number): Polygon[] => polys.map((poly) => poly.map((ring) => ring.map(([x, y]) => [x + dx, y] as Pt)));
 
@@ -113,6 +124,8 @@ export type LayoutGeometry = {
   bounds: Bounds;
   /** Each run's ink bounds, in layout order. */
   runs: Bounds[];
+  /** For each entry of `strokes`, the run it belongs to (runs overlap where a word tucks in over another). */
+  strokeRuns: number[];
 };
 
 const memo = new WeakMap<PenLibrary, Map<string, LayoutGeometry>>();
@@ -125,8 +138,7 @@ export function layoutGeometry(lib: PenLibrary, layout: PenLayout): LayoutGeomet
   const hit = byKey.get(key);
   if (hit) return hit;
 
-  const all: Polygon[][] = [], runBounds: Bounds[] = [];
-  let cursor = 0;
+  const all: Polygon[][] = [], runBounds: Bounds[] = [], strokeRuns: number[] = [];
   layout.runs.forEach((run, k) => {
     const r = assembleRun(lib, run.forms, run.joins, [0, 0]);
     const paths: PenPath[] = [...(r.body ? [r.body] : []), ...r.strokes];
@@ -141,16 +153,14 @@ export function layoutGeometry(lib: PenLibrary, layout: PenLayout): LayoutGeomet
     const inks: Polygon[][] = [...paths.map((p) => sweepPath(p, PEN)), ...drawn.map((d) => [d])].filter((ps) => ps.length > 0);
     const b = boundsOf(inks);
     let dx = Number.isFinite(b.x2) ? -b.x2 : 0;
-    if (k > 0) {
+    if (k > 0 && Number.isFinite(b.x2)) {
       const gap = (layout.wordStarts.includes(k) ? WORD_GAP : RUN_GAP) * NUQTA;
-      const shift = clearShift(all, inks, gap);
-      // ink that never sits beside the phrase so far (a lone dot well above it) keeps the bounding boxes apart
-      dx = shift ?? cursor - gap - (Number.isFinite(b.x2) ? b.x2 : 0);
+      // reading right to left: a run never starts right of the one before it
+      dx = clearShift(outlinePoints(all), outlinePoints(inks), gap, runBounds[k - 1].x2 - b.x2);
     }
-    for (const ink of inks) all.push(move(ink, dx));
-    const placed = Number.isFinite(b.x1) ? { x1: b.x1 + dx, y1: b.y1, x2: b.x2 + dx, y2: b.y2 } : { x1: cursor, y1: 0, x2: cursor, y2: 0 };
-    runBounds.push(placed);
-    cursor = Math.min(cursor, placed.x1);
+    for (const ink of inks) { all.push(move(ink, dx)); strokeRuns.push(k); }
+    const prevX1 = runBounds.length ? runBounds[runBounds.length - 1].x1 : 0;
+    runBounds.push(Number.isFinite(b.x1) ? { x1: b.x1 + dx, y1: b.y1, x2: b.x2 + dx, y2: b.y2 } : { x1: prevX1, y1: 0, x2: prevX1, y2: 0 });
   });
 
   const out: LayoutGeometry = {
@@ -158,6 +168,7 @@ export function layoutGeometry(lib: PenLibrary, layout: PenLayout): LayoutGeomet
     union: fitPolygons(unionPolygons(all), FIT_TOL),
     bounds: boundsOf(all),
     runs: runBounds,
+    strokeRuns,
   };
   byKey.set(key, out);
   return out;

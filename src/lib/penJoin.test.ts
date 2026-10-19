@@ -65,4 +65,17 @@ describe("joins and the word as one pen path", () => {
     expect(up.origins[1][1] - flat.origins[1][1]).toBeCloseTo(-NUQTA, 6);
     expect(up.origins[1][0]).toBeCloseTo(flat.origins[1][0], 6);
   });
+
+  it("lifts the pen where the join says so: the next letter starts a stroke of its own, placed as before", () => {
+    // the studio's nun after a middle meem (أيمن, 2026-10-19): the meem's exit ends, the nun starts fresh at its arm
+    const joined = assembleRun(fixture, ["t.starting", "t.middle", "t.finishing"], [{ gap: 0.5, rise: 0 }, { gap: 0.3, rise: 1 }], [0, 0]);
+    const lifted = assembleRun(fixture, ["t.starting", "t.middle", "t.finishing"], [{ gap: 0.5, rise: 0 }, { gap: 0.3, rise: 1, lift: true }], [0, 0]);
+    expect(lifted.body!.segs).toHaveLength(3);
+    expect(lifted.joinSegs).toEqual([1]);
+    expect(lifted.strokes).toHaveLength(1);
+    expect(lifted.origins).toEqual(joined.origins);
+    const end = joined.body!.segs[joined.body!.segs.length - 1].to.p;
+    const liftedEnd = lifted.strokes[0].segs[lifted.strokes[0].segs.length - 1].to.p;
+    expect(liftedEnd).toEqual(end);
+  });
 });
