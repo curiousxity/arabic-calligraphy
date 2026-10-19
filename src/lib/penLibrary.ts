@@ -20,8 +20,16 @@ import type { LetterForm } from "./tarkibText";
 export const PEN = 48;
 /** The rhombic dot, measured on its diagonal: about 1.4 pens. */
 export const NUQTA = 1.4 * PEN;
-/** Default nib angle (degrees) where a node gives none. Measured off the plates; revisit with evidence. */
-export const DEFAULT_ANGLE = 70;
+/** Default nib angle (degrees, counter-clockwise from the baseline as the
+ *  reader sees it) where a node gives none: the nib edge slopes down to the
+ *  right. Measured 2026-10-19 on the book's alif plate: its dots' edges run
+ *  at 147 and 70 degrees, its alif (direction -86) is 0.72 pen wide, which
+ *  only a nib near 140-147 gives; the vector set agrees (flat entries 0.56 of
+ *  a pen, the meem's falling tail a full pen). */
+export const DEFAULT_ANGLE = 145;
+/** The direction a dot is pulled (degrees, as DEFAULT_ANGLE), one pen long:
+ *  the plate's dots are rhombi with edges at 147 and 70 degrees. */
+export const DOT_PULL = 70;
 /** Body parts meet within this many nuqta. */
 const MEET = 0.01;
 
@@ -144,9 +152,9 @@ export function partPaths(lib: PenLibrary, partId: string, at: Pt): { strokes: P
   return { strokes: (part.paths ?? []).map((p) => toPath(p, [0, 0], at)), drawn };
 }
 
-/** The pen's own stamp at a dot centre: one pen width pulled along the nib's normal. */
+/** The pen's own stamp at a dot centre: the nib pulled one pen width along DOT_PULL. */
 function dotPath(c: Pt): PenPath {
-  const a = (DEFAULT_ANGLE * Math.PI) / 180, n: Pt = [Math.sin(a), Math.cos(a)], h = PEN / 2;
+  const a = (DOT_PULL * Math.PI) / 180, n: Pt = [Math.cos(a), -Math.sin(a)], h = PEN / 2;
   const p0: Pt = [c[0] - n[0] * h, c[1] - n[1] * h], p1: Pt = [c[0] + n[0] * h, c[1] + n[1] * h];
   const third = (t: number): Pt => [p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t];
   return { start: { p: p0, angle: DEFAULT_ANGLE }, segs: [{ c1: third(1 / 3), c2: third(2 / 3), to: { p: p1, angle: DEFAULT_ANGLE } }] };

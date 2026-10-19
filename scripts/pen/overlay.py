@@ -26,7 +26,8 @@ def pts(ring):
     return np.round(np.array(ring, dtype=np.float64) * (1 << SUB)).astype(np.int32)
 
 def main(json_path, out_dir):
-    items = json.load(open(json_path, encoding="utf-8"))["items"]
+    doc = json.load(open(json_path, encoding="utf-8"))
+    items, zoom = doc["items"], doc.get("zoom", 1)
     for it in items:
         if it["plate"]:
             img = load(it["plate"])
@@ -56,6 +57,8 @@ def main(json_path, out_dir):
                 mx, my = (x2 - x1) * 0.5 + 40, (y2 - y1) * 0.5 + 40
                 h, w = img.shape[:2]
                 img = img[max(0, int(y1 - my)):min(h, int(y2 + my)), max(0, int(x1 - mx)):min(w, int(x2 + mx))]
+        if zoom != 1:
+            img = cv2.resize(img, None, fx=zoom, fy=zoom, interpolation=cv2.INTER_CUBIC)
         name = "".join(c if c.isalnum() or c in "._-" else "_" for c in it["name"])
         target = os.path.join(out_dir, f"{name}.png")
         ok, buf = cv2.imencode(".png", img)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ANGLE, formEntry, formExit, formPaths, loadPenLibrary, NUQTA, PEN, validateLibrary, type Form, type Part, type PenLibrary } from "./penLibrary";
+import { DEFAULT_ANGLE, DOT_PULL, formEntry, formExit, formPaths, loadPenLibrary, NUQTA, PEN, validateLibrary, type Form, type Part, type PenLibrary } from "./penLibrary";
 import { polygonArea, sweepPath } from "./penSweep";
 
 const straight = (a: [number, number], b: [number, number]) => ({
@@ -51,11 +51,12 @@ describe("the stroke library", () => {
     expect(formExit(fixture, "ba.finishing.t")!.dir).toEqual([-1, 0]);
   });
 
-  it("makes a dot the pen's own stamp: one pen pulled along the nib's normal", () => {
+  it("makes a dot the pen's own stamp: the nib pulled one pen along DOT_PULL", () => {
     const { dots } = formPaths(fixture, "ba.finishing.t", [0, 0]);
     expect(dots).toHaveLength(1);
-    const area = polygonArea(sweepPath(dots[0], PEN));
-    expect(Math.abs(area - PEN * PEN) / (PEN * PEN)).toBeLessThan(0.01);
+    // a rhombus with sides of one pen, at the nib's angle and the pull's
+    const want = PEN * PEN * Math.abs(Math.sin(((DOT_PULL - DEFAULT_ANGLE) * Math.PI) / 180));
+    expect(Math.abs(polygonArea(sweepPath(dots[0], PEN)) - want) / want).toBeLessThan(0.01);
   });
 
   it("ships a library that validates", () => {

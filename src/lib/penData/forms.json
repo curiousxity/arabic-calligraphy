@@ -1,1 +1,150 @@
-[]
+[
+ {
+  "id": "alif.standalone.1",
+  "letter": "ا",
+  "form": "standalone",
+  "parts": [
+   {
+    "part": "alif-stem",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   },
+   {
+    "part": "alif-head",
+    "at": [
+     0,
+     0
+    ]
+   }
+  ],
+  "anchors": {
+   "above": [
+    -0.35,
+    -8.35
+   ],
+   "below": [
+    -0.1,
+    0.8
+   ]
+  }
+ },
+ {
+  "id": "meem.standalone.1",
+  "letter": "م",
+  "form": "standalone",
+  "parts": [
+   {
+    "part": "meem-standalone",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "anchors": {
+   "above": [
+    -1.0,
+    -2.0
+   ],
+   "below": [
+    -3.5,
+    3.6
+   ]
+  }
+ },
+ {
+  "id": "ya.starting.1",
+  "letter": "ي",
+  "form": "starting",
+  "parts": [
+   {
+    "part": "tooth-start",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "dots": [
+   [
+    0.0,
+    1.1
+   ],
+   [
+    0.95,
+    0.95
+   ]
+  ],
+  "anchors": {
+   "above": [
+    0.1,
+    -2.2
+   ],
+   "below": [
+    0.1,
+    1.8
+   ]
+  }
+ },
+ {
+  "id": "meem.middle.1",
+  "letter": "م",
+  "form": "middle",
+  "parts": [
+   {
+    "part": "meem-middle",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "anchors": {
+   "above": [
+    -0.8,
+    -1.2
+   ],
+   "below": [
+    -0.7,
+    2.0
+   ]
+  }
+ },
+ {
+  "id": "nun.finishing.1",
+  "letter": "ن",
+  "form": "finishing",
+  "parts": [
+   {
+    "part": "nun-bowl",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "dots": [
+   [
+    -2.0,
+    -0.55
+   ]
+  ],
+  "anchors": {
+   "above": [
+    -2.0,
+    -1.5
+   ],
+   "below": [
+    -2.4,
+    2.4
+   ]
+  }
+ }
+]

@@ -1,5 +1,5 @@
 // The authoring preview for the stroke library. Run:
-//   npx --yes tsx scripts/pen/preview.mjs <formId>... [--phrase "أم أيمن"] [--out DIR] [--blank]
+//   npx --yes tsx scripts/pen/preview.mjs <formId>... [--phrase "أم أيمن"] [--out DIR] [--blank] [--zoom N]
 //
 // Each form is drawn on its reference plate (scripts/pen/plates.json maps a
 // form id to { file, originPx, pxPerNuqta, vector?, vectorAt? }, with file
@@ -26,12 +26,13 @@ const { flattenContours } = await import("../../src/lib/strokeCuts.ts");
 
 const args = process.argv.slice(2);
 let out = path.join(ROOT, ".superpowers/pen-preview");
-let phrase = null, blank = false;
+let phrase = null, blank = false, zoom = 1;
 const ids = [];
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--out") out = path.resolve(args[++i]);
   else if (args[i] === "--phrase") phrase = args[++i];
   else if (args[i] === "--blank") blank = true;
+  else if (args[i] === "--zoom") zoom = Number(args[++i]);
   else ids.push(args[i]);
 }
 if (!ids.length && !phrase) {
@@ -66,6 +67,6 @@ if (phrase) {
 
 fs.mkdirSync(out, { recursive: true });
 const json = path.join(out, "preview.json");
-fs.writeFileSync(json, JSON.stringify({ items }));
+fs.writeFileSync(json, JSON.stringify({ items, zoom }));
 const r = spawnSync("python", ["-I", "-X", "utf8", path.join(DIR, "overlay.py"), json, out], { stdio: "inherit" });
 process.exit(r.status ?? 1);

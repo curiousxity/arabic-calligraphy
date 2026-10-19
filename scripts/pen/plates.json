@@ -1,1 +1,26 @@
-{}
+{
+ "alif.standalone.1": {
+  "file": "books/f9_R.png",
+  "originPx": [
+   1400,
+   972
+  ],
+  "pxPerNuqta": 43
+ },
+ "meem.standalone.1": {
+  "file": "books/f24_R.png",
+  "originPx": [
+   1550,
+   1900
+  ],
+  "pxPerNuqta": 43
+ },
+ "meem.middle.1": {
+  "file": "books/f24_L.png",
+  "originPx": [
+   905,
+   615
+  ],
+  "pxPerNuqta": 43
+ }
+}
