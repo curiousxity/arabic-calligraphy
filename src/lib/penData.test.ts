@@ -56,12 +56,20 @@ function cornersNear(cmds: ReturnType<typeof fitPolygons>, at: Pt[]): number[] {
   return out;
 }
 
-/** The join nodes of a word's runs: each join cubic's two ends. */
+/** Points along each join of a word's runs: a quarter, half and three quarters of the way along its cubic.
+ *  Not its ends: a join may run in under a letter's own body (the middle meem takes its join along its base),
+ *  where the letter's strokes cross with inside corners that are the letter's, not the join's. */
 function joinNodes(phrase: string): { cmds: ReturnType<typeof fitPolygons>; nodes: Pt[] }[] {
   const layout = defaultLayout(lib, phrase) as PenLayout;
   return layout.runs.filter((r) => r.forms.length > 1).map((r) => {
     const run = assembleRun(lib, r.forms, r.joins, [0, 0]);
-    const nodes = run.joinSegs.flatMap((k) => [k === 0 ? run.body!.start.p : run.body!.segs[k - 1].to.p, run.body!.segs[k].to.p]);
+    const nodes = run.joinSegs.flatMap((k) => {
+      const a = k === 0 ? run.body!.start.p : run.body!.segs[k - 1].to.p, s = run.body!.segs[k];
+      return [0.25, 0.5, 0.75].map((t): Pt => {
+        const u = 1 - t;
+        return [u * u * u * a[0] + 3 * u * u * t * s.c1[0] + 3 * u * t * t * s.c2[0] + t * t * t * s.to.p[0], u * u * u * a[1] + 3 * u * u * t * s.c1[1] + 3 * u * t * t * s.c2[1] + t * t * t * s.to.p[1]];
+      });
+    });
     return { cmds: fitPolygons(sweepPath(run.body!, PEN), 0.25), nodes };
   });
 }
@@ -75,7 +83,7 @@ describe("the stroke library: أم أيمن", () => {
     expect(h).toBeLessThanOrEqual(8);
   });
 
-  it("joins every join point of أيمن with no corner on the ink", () => {
+  it("joins every letter of أيمن with no corner along the join", () => {
     const words = joinNodes("أيمن");
     expect(words.length).toBeGreaterThan(0);
     for (const w of words) {
@@ -109,6 +117,35 @@ describe("the stroke library: أم أيمن", () => {
       const nodes = [body!.start, ...body!.segs.map((s) => s.to)];
       expect(nodes.every((n) => (n.width ?? 1) <= 1), id).toBe(true);
       expect(polygonArea(sweepPath(body!, PEN)), id).toBeLessThanOrEqual(pathLength(body!) * PEN * 1.02 + PEN * PEN);
+    }
+  });
+
+  it("keeps every stroke along the line thick: the nib turns with the stroke rather than running along its edge", () => {
+    // Thuluth's horizontals are its heaviest strokes. Where the pen travels within 30° of the line, the nib's breadth
+    // across the travel, width·W·|sin(φ−θ)|, stays at least half a pen; only a lifted nib (a taper, width < 0.5) may thin it
+    const thinAt = (path: PenPath) => {
+      const out: string[] = [];
+      let from = path.start;
+      path.segs.forEach((s, k) => {
+        for (let i = 1; i < 32; i++) {
+          const t = i / 32, u = 1 - t;
+          const w = (from.width ?? 1) + ((s.to.width ?? 1) - (from.width ?? 1)) * t;
+          if (Math.min(from.width ?? 1, s.to.width ?? 1) < 0.5) continue;
+          const d = [3 * u * u * (s.c1[0] - from.p[0]) + 6 * u * t * (s.c2[0] - s.c1[0]) + 3 * t * t * (s.to.p[0] - s.c2[0]), 3 * u * u * (s.c1[1] - from.p[1]) + 6 * u * t * (s.c2[1] - s.c1[1]) + 3 * t * t * (s.to.p[1] - s.c2[1])];
+          const phi = Math.atan2(-d[1], d[0]), theta = ((from.angle + (s.to.angle - from.angle) * t) * Math.PI) / 180;
+          if (Math.abs(Math.sin(phi)) > Math.sin(Math.PI / 6)) continue;
+          if (w * Math.abs(Math.sin(phi - theta)) < 0.5) out.push(`seg ${k} t=${t.toFixed(2)}`);
+        }
+        from = s.to;
+      });
+      return out;
+    };
+    for (const id of ["alif.standalone.1", "meem.standalone.1", "ya.starting.1", "meem.middle.1", "nun.finishing.1"]) {
+      const { body, strokes } = formPaths(lib, id, [0, 0]);
+      for (const p of [body!, ...strokes]) expect(thinAt(p), id).toEqual([]);
+    }
+    for (const r of (defaultLayout(lib, "أيمن") as PenLayout).runs.filter((r) => r.forms.length > 1)) {
+      expect(thinAt(assembleRun(lib, r.forms, r.joins, [0, 0]).body!), "أيمن").toEqual([]);
     }
   });
 

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { fitPolygons, fitRing } from "./penFit";
 import { sweepPath, type Pt, type Ring } from "./penSweep";
 import type { SvgCmd } from "./svgPath";
+import handleBlowup from "./penFit.handleBlowup.json";
+import type { Polygon } from "./penSweep";
 
 /** The fitted outline as points: each C sampled at 64 steps, each L as its end. */
 function trace(cmds: SvgCmd[]): Pt[][] {
@@ -78,5 +80,25 @@ describe("fitting curves to the ink", () => {
   it("fits a swept stroke's outline within a quarter unit", () => {
     const polys = sweepPath({ start: { p: [0, 0], angle: 70 }, segs: [{ c1: [-100, 120], c2: [-300, 120], to: { p: [-400, 0], angle: 70 } }] }, 48);
     expect(maxDeviation(fitPolygons(polys, 0.25), polys[0][0])).toBeLessThan(0.25);
+  });
+
+  it("keeps every handle near the ink, even where the least-squares solve goes singular", () => {
+    // a small hamza's ink (2026-10-19) on which a run's handles came out tens of millions of units long:
+    // Newton reparameterisation pushed every sample to the curve's ends, so the error check passed
+    const polys = handleBlowup as Polygon[];
+    const pts = polys.flat(2);
+    const [x1, x2] = [Math.min(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[0]))];
+    const [y1, y2] = [Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[1]))];
+    const reach = Math.max(x2 - x1, y2 - y1);
+    for (const c of fitPolygons(polys, 0.25)) {
+      if (c.type !== "C") continue;
+      for (const [x, y] of [[c.x1, c.y1], [c.x2, c.y2]]) {
+        expect(x).toBeGreaterThan(x1 - reach);
+        expect(x).toBeLessThan(x2 + reach);
+        expect(y).toBeGreaterThan(y1 - reach);
+        expect(y).toBeLessThan(y2 + reach);
+      }
+    }
+    for (const ring of polys.flat()) expect(maxDeviation(fitRing(ring, 0.25), ring)).toBeLessThan(0.25);
   });
 });

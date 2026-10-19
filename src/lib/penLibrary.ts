@@ -18,8 +18,10 @@ import type { LetterForm } from "./tarkibText";
 
 /** Units per pen width (the mark library's scale). */
 export const PEN = 48;
-/** The rhombic dot, measured on its diagonal: about 1.4 pens. */
-export const NUQTA = 1.4 * PEN;
+/** The rhombic dot, measured on its long diagonal: the nib (25.5 px on the
+ *  book plate) pulled 1.08 pens at DOT_PULL gives 1.65 pens (45 px); only
+ *  that makes the 7-dot alif 12 pens tall, as on the plate. */
+export const NUQTA = 1.65 * PEN;
 /** Default nib angle (degrees, counter-clockwise from the baseline as the
  *  reader sees it) where a node gives none: the nib edge slopes down to the
  *  right. Measured 2026-10-19 on the book's alif plate: its dots' edges run

@@ -2,5 +2,13 @@
  "*": {
   "gap": 0.5,
   "rise": 0
+ },
+ "ya.starting.1>meem.middle.1": {
+  "gap": 0.45,
+  "rise": 0
+ },
+ "meem.middle.1>nun.finishing.1": {
+  "gap": 0.5,
+  "rise": -0.35
  }
 }

@@ -84,7 +84,11 @@ function generate(pts: Pt[], u: number[], t1: Pt, t2: Pt): Cubic {
   let alpha1 = det === 0 ? 0 : (x0 * c11 - x1 * c01) / det;
   let alpha2 = det === 0 ? 0 : (c00 * x1 - c01 * x0) / det;
   const segLen = len(sub(last, first)), eps = 1e-6 * segLen;
-  if (alpha1 < eps || alpha2 < eps) { alpha1 = segLen / 3; alpha2 = segLen / 3; }
+  // a handle longer than the run itself comes from a near-singular solve, never from the ink: Newton
+  // reparameterisation would then crowd every sample onto the curve's ends and pass the error check
+  let arc = 0;
+  for (let i = 1; i < pts.length; i++) arc += len(sub(pts[i], pts[i - 1]));
+  if (!(alpha1 >= eps && alpha2 >= eps && alpha1 <= arc && alpha2 <= arc)) { alpha1 = segLen / 3; alpha2 = segLen / 3; }
   return [first, add(first, mul(t1, alpha1)), add(last, mul(t2, alpha2)), last];
 }
 
@@ -94,7 +98,21 @@ function maxError(pts: Pt[], c: Cubic, u: number[]): { err: number; at: number }
     const d = len(sub(bez(c, u[i]), pts[i]));
     if (d > err) { err = d; at = i; }
   }
+  // the other way too: a curve can pass every sample at its own parameter yet loop away between
+  // them (handles crossing over), so the curve's own points must also lie near the ink
+  for (let k = 1; k < 16; k++) {
+    const q = bez(c, k / 16);
+    let best = Infinity;
+    for (let i = 1; i < pts.length; i++) best = Math.min(best, segDist(q, pts[i - 1], pts[i]));
+    if (best > err) err = best;
+  }
   return { err, at };
+}
+
+function segDist(p: Pt, a: Pt, b: Pt): number {
+  const e = sub(b, a), L2 = dot(e, e) || 1;
+  const t = Math.max(0, Math.min(1, dot(sub(p, a), e) / L2));
+  return len(sub(add(a, mul(e, t)), p));
 }
 
 function reparam(pts: Pt[], u: number[], c: Cubic): number[] {
@@ -118,6 +136,8 @@ function fitRun(pts: Pt[], t1: Pt, t2: Pt, tol: number, out: Cubic[]): void {
   if (err < tol * 4) {
     for (let k = 0; k < REPARAM; k++) {
       u = reparam(pts, u, c);
+      // samples out of order (or crowded onto one parameter) no longer describe the ink: split instead
+      if (u.some((t, i) => i > 0 && t <= u[i - 1])) break;
       c = generate(pts, u, t1, t2);
       ({ err, at } = maxError(pts, c, u));
       if (err < tol) { out.push(c); return; }

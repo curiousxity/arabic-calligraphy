@@ -127,8 +127,22 @@ export function unionPolygons(polys: Polygon[][]): Polygon[] {
   let level = polys.filter((m) => m.length > 0);
   if (level.length === 0) return [];
   const merge = (ms: Polygon[][]): Polygon[] => {
-    const [first, ...rest] = ms as unknown as [Pt[][][], ...Pt[][][][]];
-    return clean(union(first, ...rest) as unknown as Polygon[]);
+    // polygon-clipping can fail to close a ring when nearly coincident edges meet ("Unable to complete
+    // output ring"); snapping every point to a coarser grid moves those edges apart or onto each other
+    for (const grid of [0, 1 / 256, 1 / 32, 1 / 4]) {
+      try {
+        const [first, ...rest] = (grid ? snap(ms, grid) : ms) as unknown as [Pt[][][], ...Pt[][][][]];
+        return clean(union(first, ...rest) as unknown as Polygon[]);
+      } catch {
+        // try the next grid
+      }
+    }
+    // still failing: merge the halves apart, then together
+    if (ms.length > 2) {
+      const h = ms.length >> 1;
+      return merge([merge(ms.slice(0, h)), merge(ms.slice(h))]);
+    }
+    throw new Error("penSweep: the stamps of a pen path could not be unioned");
   };
   // one set still goes through union once, which resolves its own overlaps
   do {
@@ -137,6 +151,11 @@ export function unionPolygons(polys: Polygon[][]): Polygon[] {
     level = next.filter((m) => m.length > 0);
   } while (level.length > 1);
   return level[0] ?? [];
+}
+
+/** Every point rounded to a multiple of `grid` units. */
+function snap(ms: Polygon[][], grid: number): Polygon[][] {
+  return ms.map((polys) => polys.map((poly) => poly.map((ring) => ring.map(([x, y]) => [Math.round(x / grid) * grid, Math.round(y / grid) * grid] as Pt))));
 }
 
 /** polygon-clipping's rings repeat their first point last; drop it and collinear points. */

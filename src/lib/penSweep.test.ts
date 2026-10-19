@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { polygonArea, sweepPath, type NibNode, type PenPath, type Pt } from "./penSweep";
+import unionFailure from "./penSweep.unionFailure.json";
 
 const lerp = (a: Pt, b: Pt, t: number): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 const node = (x: number, y: number, angle = 90, extra: Partial<NibNode> = {}): NibNode => ({ p: [x, y], angle, ...extra });
@@ -45,5 +46,12 @@ describe("the nib sweep", () => {
     const polys = sweepPath(p, 48);
     expect(polys).toHaveLength(1);
     expect(polys[0]).toHaveLength(1);
+  });
+
+  it("sweeps a path whose stamps polygon-clipping cannot union in one pass", () => {
+    // a real word body (أيمن, 2026-10-19) on which the library throws "Unable to complete output ring"
+    const polys = sweepPath(unionFailure as PenPath, 48);
+    expect(polys.length).toBeGreaterThan(0);
+    expect(polygonArea(polys)).toBeGreaterThan(0);
   });
 });
