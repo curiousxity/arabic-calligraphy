@@ -166,8 +166,8 @@ describe("the stroke library: أم أيمن", () => {
       return out;
     };
     for (const id of ["alif.standalone.1", "meem.standalone.1", "ya.starting.1", "meem.middle.1", "nun.finishing.1"]) {
-      const { body, strokes } = formPaths(lib, id, [0, 0]);
-      for (const p of [body!, ...strokes]) expect(thinAt(p), id).toEqual([]);
+      const { body, exit, strokes } = formPaths(lib, id, [0, 0]);
+      for (const p of [body!, ...(exit ? [exit] : []), ...strokes]) expect(thinAt(p), id).toEqual([]);
     }
     for (const r of (defaultLayout(lib, "أيمن") as PenLayout).runs.filter((r) => r.forms.length > 1)) {
       expect(thinAt(assembleRun(lib, r.forms, r.joins, [0, 0]).body!), "أيمن").toEqual([]);
