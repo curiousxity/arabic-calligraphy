@@ -1,15 +1,15 @@
 {
  "parts": {
   "alif-stem": {
-   "name": "Alif: the stem pulled down from under its head, narrowing to its foot; the head and its flag strokes of their own (studio reference)",
+   "name": "Alif, as the studio builds it: the stem, narrowing to its foot; the head, a diamond pull; the flag, a wedge off the head's edge",
    "paths": [
     [
      {
       "p": [
-       -0.783,
-       -7.049
+       -0.771,
+       -7.316
       ],
-      "angle": 129.8
+      "angle": 121.0
      },
      {
       "p": [
@@ -20,242 +20,254 @@
      },
      {
       "p": [
-       -0.568,
-       -5.287
+       -0.566,
+       -5.285
       ],
-      "angle": 130.6
+      "angle": 130.7
      },
      {
       "p": [
-       -0.455,
-       -4.407
+       -0.454,
+       -4.413
       ],
-      "angle": 131.3
+      "angle": 131.7
      },
      {
       "p": [
        -0.335,
-       -3.528
+       -3.52
       ],
-      "angle": 131.2
+      "angle": 132.2
      },
      {
       "p": [
-       -0.226,
-       -2.648
+       -0.229,
+       -2.644
       ],
-      "angle": 128.0
+      "angle": 128.3
      },
      {
       "p": [
-       -0.155,
-       -1.763
+       -0.158,
+       -1.673
       ],
-      "angle": 121.0
+      "angle": 122.0
      },
      {
       "p": [
-       -0.156,
-       -0.876
+       -0.186,
+       -0.767
       ],
       "angle": 105.5
      },
      {
       "p": [
        -0.283,
-       0.0
+       -0.045
       ],
-      "angle": 83.0,
+      "angle": 91.0,
       "width": 0.15
      }
     ],
     [
      {
       "p": [
-       -0.911,
-       -7.532
+       -0.907,
+       -7.57
       ],
-      "angle": 71.6
+      "angle": 57.9,
+      "width": 1.0
      },
      {
       "p": [
-       -0.62,
-       -6.794
+       -0.609,
+       -6.749
       ],
-      "angle": 71.6
+      "angle": 57.9,
+      "width": 1.0
      }
     ],
     [
      {
       "p": [
-       -0.586,
-       -6.973
+       -0.544,
+       -6.952
       ],
-      "angle": 136.6,
-      "width": 0.8
+      "angle": 69.5,
+      "width": 0.618
      },
      {
       "p": [
-       -0.284,
-       -6.324
+       -0.24,
+       -6.286
       ],
-      "angle": 136.6,
-      "width": 0.08
+      "angle": 69.5,
+      "width": 0.021
      }
     ]
    ]
   },
   "meem-standalone": {
-   "name": "Meem, standalone: over the top of the head, round under it, then the long tail down and to the left, tapering to a hair (studio reference)",
+   "name": "Meem, standalone, as the studio builds it: three pieces from one point at the head's left, the arch over the top, the band under it, and the long tail tapering to a hair",
    "paths": [
     [
      {
       "p": [
-       -1.442,
-       -1.849
+       -1.332,
+       -1.872
       ],
-      "angle": 121.3
+      "angle": 59.8
      },
      {
       "p": [
-       -1.142,
-       -2.271
+       -1.037,
+       -2.263
       ],
-      "angle": 75.3
+      "angle": 1.4
      },
      {
       "p": [
-       -0.663,
-       -2.381
+       -0.583,
+       -2.551
       ],
-      "angle": 38.7
+      "angle": -91.0
      },
      {
       "p": [
-       -0.238,
-       -2.126
+       -0.208,
+       -2.144
       ],
-      "angle": -23.8
+      "angle": -100.2
      },
      {
       "p": [
-       -0.097,
-       -1.628
+       -0.069,
+       -1.551
       ],
-      "angle": -66.0
+      "angle": -99.7
      },
      {
       "p": [
-       -0.096,
-       -1.109
+       -0.053,
+       -1.29
       ],
-      "angle": -85.7,
-      "corner": true
+      "angle": -101.8
+     }
+    ],
+    [
+     {
+      "p": [
+       -1.523,
+       -1.864
+      ],
+      "angle": 76.3
      },
      {
       "p": [
-       -0.547,
-       -1.271
+       -0.83,
+       -1.453
       ],
-      "angle": -123.8
+      "angle": 79.1
      },
      {
       "p": [
-       -0.986,
-       -1.524
+       -0.044,
+       -1.353
       ],
-      "angle": -128.6
+      "angle": 80.4
+     }
+    ],
+    [
+     {
+      "p": [
+       -1.492,
+       -1.884
+      ],
+      "angle": 76.5
      },
      {
       "p": [
-       -1.41,
-       -1.809
+       -1.84,
+       -1.073
       ],
-      "angle": -159.4
+      "angle": 77.3
      },
      {
       "p": [
-       -1.888,
-       -1.081
-      ],
-      "angle": -145.4
-     },
-     {
-      "p": [
-       -2.445,
+       -2.407,
        -0.426
       ],
-      "angle": -173.1
+      "angle": 80.2
      },
      {
       "p": [
-       -3.136,
-       0.09
+       -3.125,
+       0.091
       ],
-      "angle": -191.7
+      "angle": 79.4
      },
      {
       "p": [
-       -3.877,
+       -3.866,
        0.531
       ],
-      "angle": -201.1
+      "angle": 79.6
      },
      {
       "p": [
-       -4.642,
+       -4.633,
        0.929
       ],
-      "angle": -206.7
+      "angle": 79.6
      },
      {
       "p": [
-       -5.421,
-       1.298
+       -5.418,
+       1.299
       ],
-      "angle": -210.6
+      "angle": 79.4
      },
      {
       "p": [
-       -6.212,
-       1.642
+       -6.207,
+       1.643
       ],
-      "angle": -212.8
+      "angle": 80.1
      },
      {
       "p": [
-       -7.02,
-       1.944
+       -7.06,
+       1.953
       ],
-      "angle": -209.0
+      "angle": 69.2
      },
      {
       "p": [
-       -7.856,
-       2.154
+       -7.94,
+       2.129
       ],
-      "angle": -193.0
+      "angle": 32.1
      },
      {
       "p": [
-       -8.693,
-       2.36
+       -8.742,
+       2.359
       ],
-      "angle": -173.3
+      "angle": 21.6
      },
      {
       "p": [
-       -9.518,
-       2.613
+       -9.513,
+       2.614
       ],
-      "angle": -164.5,
+      "angle": 19.6,
       "width": 0.05
      }
     ]
    ]
   },
   "tooth-start": {
-   "name": "Ya/ba tooth, starting, stacked: the descent from its head onto the next letter; the head and its hat strokes of their own (studio reference)",
+   "name": "Ya/ba tooth, starting, stacked: the descent from inside its head onto the next letter; the head, a diamond pull; the hat, a wedge off the head's edge (studio reference)",
    "paths": [
     [
      {
@@ -267,10 +279,10 @@
      },
      {
       "p": [
-       -0.229,
-       -2.412
+       -0.177,
+       -2.41
       ],
-      "angle": 126.0
+      "angle": 124.5
      },
      {
       "p": [
@@ -279,8 +291,8 @@
       ],
       "angle": 135.7,
       "dir": [
-       0.277,
-       0.92
+       0.243,
+       0.833
       ]
      }
     ],
@@ -288,40 +300,42 @@
      {
       "p": [
        -0.407,
-       -2.888
+       -2.924
       ],
-      "angle": 78.0
+      "angle": 69.7,
+      "width": 1.0
      },
      {
       "p": [
-       -0.143,
-       -2.548
+       -0.085,
+       -2.427
       ],
-      "angle": 78.0
+      "angle": 69.7,
+      "width": 1.0
      }
     ],
     [
      {
       "p": [
-       -0.098,
+       -0.162,
        -2.7
       ],
-      "angle": 85.0,
-      "width": 0.8
+      "angle": 77.4,
+      "width": 0.849
      },
      {
       "p": [
-       0.188,
-       -2.454
+       0.182,
+       -2.48
       ],
-      "angle": 85.0,
-      "width": 0.05
+      "angle": 77.4,
+      "width": 0.018
      }
     ]
    ]
   },
   "meem-middle": {
-   "name": "Meem, middle, under a stacked tooth: round its loop, then over the top and out to the left (studio reference)",
+   "name": "Meem, middle, under a stacked tooth: the pen comes in round the loop; the band over the top and out to the left is a piece of its own, and the pen leaves by it (studio reference)",
    "paths": [
     [
      {
@@ -331,185 +345,255 @@
       ],
       "angle": 135.7,
       "dir": [
-       0.277,
-       0.92
+       0.243,
+       0.833
       ]
      },
      {
       "p": [
-       0.048,
-       -1.492
+       0.059,
+       -1.513
       ],
-      "angle": 151.8
+      "angle": 150.2
      },
      {
       "p": [
-       0.321,
-       -0.965
+       0.293,
+       -1.051
       ],
-      "angle": 179.7
+      "angle": 170.9
      },
      {
       "p": [
-       0.799,
-       -0.66
+       0.559,
+       -0.689
       ],
-      "angle": 218.4
+      "angle": 200.3
      },
      {
       "p": [
-       1.38,
-       -0.687
+       0.838,
+       -0.462
       ],
-      "angle": 258.8
+      "angle": 230.0
      },
      {
       "p": [
-       1.263,
-       -1.235
+       1.101,
+       -0.403
       ],
-      "angle": 362.8
+      "angle": 250.6
      },
      {
       "p": [
-       0.733,
-       -1.443
+       1.32,
+       -0.533
       ],
-      "angle": 433.6
+      "angle": 259.1
      },
      {
       "p": [
-       0.166,
-       -1.274
+       1.484,
+       -0.853
       ],
-      "angle": 439.8
+      "angle": 262.3
+     }
+    ],
+    [
+     {
+      "p": [
+       1.285,
+       -0.886
+      ],
+      "angle": 128.2
      },
      {
       "p": [
-       -0.359,
-       -0.997
+       1.054,
+       -1.389
       ],
-      "angle": 439.8
+      "angle": 237.9
      },
      {
       "p": [
-       -0.874,
-       -0.7
+       0.49,
+       -1.404
       ],
-      "angle": 439.8
+      "angle": 262.0
      },
      {
       "p": [
-       -1.411,
-       -0.448
+       -0.015,
+       -1.19
       ],
-      "angle": 444.0
+      "angle": 259.7
      },
      {
       "p": [
-       -2.035,
-       0.13
+       -0.484,
+       -0.925
       ],
-      "angle": 450.2
+      "angle": 259.8
+     },
+     {
+      "p": [
+       -0.957,
+       -0.649
+      ],
+      "angle": 259.9
+     },
+     {
+      "p": [
+       -1.468,
+       -0.413
+      ],
+      "angle": 260.1
+     },
+     {
+      "p": [
+       -1.782,
+       -0.357
+      ],
+      "angle": 260.4
      }
     ]
-   ]
+   ],
+   "exit": 1
   },
   "nun-bowl": {
-   "name": "Nun, finishing: a fresh stroke from the beak of its arm, round the bowl to a thin tip (studio reference)",
+   "name": "Nun, finishing, as the studio builds it: the arm from its beak, the bowl tucked under the arm's foot, and the knot where the incoming stroke meets the arm",
    "paths": [
     [
      {
       "p": [
-       -2.447,
-       -1.201
+       -2.294,
+       -0.995
       ],
-      "angle": 87.0
+      "angle": 121.2
      },
      {
       "p": [
-       -2.143,
-       -0.39
+       -2.287,
+       -0.457
       ],
-      "angle": 71.0
+      "angle": 149.1
      },
+     {
+      "p": [
+       -2.148,
+       -0.031
+      ],
+      "angle": 124.6
+     },
+     {
+      "p": [
+       -2.094,
+       0.599
+      ],
+      "angle": 91.5
+     }
+    ],
+    [
      {
       "p": [
        -2.121,
-       0.479
+       0.947
       ],
-      "angle": 58.2
+      "angle": 72.5
      },
      {
       "p": [
-       -2.454,
-       1.253
+       -2.817,
+       1.514
       ],
-      "angle": 60.6
+      "angle": 77.1
      },
      {
       "p": [
-       -3.172,
-       1.746
+       -3.495,
+       1.957
       ],
-      "angle": 75.7
+      "angle": 79.9
      },
      {
       "p": [
-       -3.932,
-       2.171
+       -4.234,
+       2.312
       ],
-      "angle": 80.3
+      "angle": 81.2
      },
      {
       "p": [
-       -4.749,
-       2.472
+       -5.027,
+       2.549
       ],
-      "angle": 80.4
+      "angle": 80.9
      },
      {
       "p": [
-       -5.607,
-       2.61
+       -6.016,
+       2.617
       ],
-      "angle": 75.3
+      "angle": 77.2
      },
      {
       "p": [
-       -6.467,
-       2.504
+       -6.707,
+       2.4
       ],
-      "angle": 45.8
+      "angle": 34.9
      },
      {
       "p": [
        -7.111,
-       1.951
+       1.826
       ],
-      "angle": -22.6
+      "angle": -36.5
      },
      {
       "p": [
-       -7.275,
-       1.105
+       -7.251,
+       1.139
       ],
-      "angle": -75.4
+      "angle": -80.6
      },
      {
       "p": [
-       -7.13,
-       0.248
+       -7.123,
+       0.22
       ],
-      "angle": -99.5
+      "angle": -110.4
      },
      {
       "p": [
-       -6.813,
-       -0.563
+       -6.83,
+       -0.575
       ],
-      "angle": -107.5,
+      "angle": -123.8,
       "width": 0.1
+     }
+    ],
+    [
+     {
+      "p": [
+       -1.744,
+       -0.345
+      ],
+      "angle": 80.1
+     },
+     {
+      "p": [
+       -2.127,
+       -0.439
+      ],
+      "angle": 80.5
+     },
+     {
+      "p": [
+       -2.276,
+       -0.581
+      ],
+      "angle": 80.2
      }
     ]
    ]
@@ -757,8 +841,8 @@
    "rise": 0
   },
   "meem.middle.1>nun.finishing.1": {
-   "gap": 0.412,
-   "rise": 1.331,
+   "gap": 0.512,
+   "rise": 0.638,
    "lift": true
   }
  }

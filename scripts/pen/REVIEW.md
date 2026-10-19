@@ -8,15 +8,16 @@ author, and no plate or vector-set outline is copied into the library.
 
 | form id | drafted | reference | user verdict | date |
 |---|---|---|---|---|
-| alif.standalone.1 | 2026-10-19, fifth draft: the studio's alif (diamond head, flag, slim stem) | | |
+| alif.standalone.1 | 2026-10-19, sixth draft: as the studio builds it, three pieces each fitted to its studio piece; the flag hangs off the head's edge; the foot ends on the line | the studio (أم أيمن), piece by piece | | |
 | (book alif) | 2026-10-19, third draft | book plate f9 at its own pen (25.5 px); foot narrowed evenly | | |
-| meem.standalone.1 | 2026-10-19, fifth draft: the studio's meem, long straight tail (the user: "use the alternate version of the meem") | | |
+| meem.standalone.1 | 2026-10-19, sixth draft: as the studio builds it, the arch, the bottom band and the tail from one point (the user: "use the alternate version of the meem") | the studio, piece by piece | | |
 | (book meem) | 2026-10-19, third draft | book plate f24 at its own pen (23 px, so the meem is 13% larger than the second draft); the doubled node that notched the tail's turn removed | | |
-| ya.starting.1 | 2026-10-19, fifth draft: smooth paths, the head a diamond stamp with its hat | | |
+| ya.starting.1 | 2026-10-19, sixth draft: the head a diamond pull, the hat a wedge hanging off its edge, both fitted to the studio's; the studio's dot shape | the studio, piece by piece | | |
 | (fourth-draft ya) | 2026-10-19, fourth draft | the user's studio (أيمن), read from its vector outlines: head pulled down straight into the descent | | |
-| meem.middle.1 | 2026-10-19, fourth draft | the studio: the ya's stroke runs on round a loop with its counter, over the top and out to the left | | |
-| nun.finishing.1 | 2026-10-19, fourth draft | the studio: a fresh stroke (pen lifted) from the beak of its arm, round the bowl to a thin tip; dot over the bowl | | |
+| meem.middle.1 | 2026-10-19, sixth draft: two pieces, the loop (the pen comes in) and the exit band over the top (the pen leaves by it) | the studio, piece by piece | | |
+| nun.finishing.1 | 2026-10-19, sixth draft: three pieces after the pen lifts, the arm (a leaf from its beak), the bowl tucked under the arm's foot, the knot over the seam with the meem's exit; dot over the bowl | the studio, piece by piece | | |
 | hamza (part) | 2026-10-19, third draft — no longer drawn over an alif (the user: Thuluth's alif needs no hamza) | book plate f23, one stroke, two nuqta across (MEB hamza measure), just above the alif's head | | |
+| (fifth drafts) | 2026-10-19 | analysed with the user: each letter was one continuous stroke where the studio builds it from overlapping pieces, so the nib pinched where the pieces meet (the meem's head, the nun's arm); the flag and hat floated off their heads. The user: "Yes. Do both" (record it, redraw as pieces) | superseded | 2026-10-19 |
 | (fourth drafts) | 2026-10-19 | the user: use the studio's meem; draw ours as smoothly as the studio's; the ya has a hat; the nun too irregular | rejected | 2026-10-19 |
 | (third drafts) | 2026-10-19 | the user: hamza too big and not needed on the alif; scale by the stroke, to 0.1 nuqta; middle meem's head too thin; nun's body and tail off; the studio's rendering given as the reference | rejected (meem standalone kept: "fine") | 2026-10-19 |
 | (second drafts) | 2026-10-19 | the user: size and spacing to come from the references, hamza likewise, joins off (stack them), meem jagged, a nuqta on the nun's tail | rejected | 2026-10-19 |

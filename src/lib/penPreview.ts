@@ -46,7 +46,7 @@ type Units = { inks: Polygon[][]; centre: Pt[][]; nodes: Pt[] };
 
 function formUnits(lib: PenLibrary, id: string, at: Pt): Units {
   const f = formPaths(lib, id, at);
-  const paths = [...(f.body ? [f.body] : []), ...f.strokes, ...f.dots];
+  const paths = [...(f.body ? [f.body] : []), ...(f.exit ? [f.exit] : []), ...f.strokes, ...f.dots];
   return {
     inks: [...paths.map((p) => sweepPath(p, PEN)), ...f.drawn.map((d) => [d])],
     centre: paths.map(centreLine),

@@ -19,10 +19,13 @@ export type PenRun = { forms: string[]; joins: JoinDefault[]; hamza?: { index: n
 /** wordStarts: the run index where each word begins. */
 export type PenLayout = { runs: PenRun[]; wordStarts: number[] };
 
-/** Nuqta a run keeps clear of the ink before it in its own word, measured on the studio reference (أم أيمن). */
+/** Nuqta a run keeps clear of the ink before it in its own word. The studio reference (أم أيمن, 2026-10-19, once
+ *  our letters matched its outlines) keeps every letter group 0.86 to 0.89 clear of the ink before it, inside a word
+ *  or between words alike: the meem 0.89 from its alif, أيمن's alif 0.86 from أم's meem, يمن 0.87 from its alif and,
+ *  with the ya's dots, 0.87 from أم's meem tail. That is a clearance of at least 0.85 everywhere. */
 export const RUN_GAP = 0.85;
-/** Nuqta a word keeps clear of the ink before it, measured on the same reference. */
-export const WORD_GAP = 0.9;
+/** Nuqta a word keeps clear of the ink before it: the same as inside a word, on the same reference. */
+export const WORD_GAP = 0.85;
 /** Units a run slides at a time while looking for its place (the result is refined to SLIDE_TOL). */
 const SLIDE = 4;
 const SLIDE_TOL = 0.25;

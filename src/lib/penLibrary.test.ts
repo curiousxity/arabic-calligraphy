@@ -51,12 +51,38 @@ describe("the stroke library", () => {
     expect(formExit(fixture, "ba.finishing.t")!.dir).toEqual([-1, 0]);
   });
 
-  it("makes a dot the pen's own stamp: the nib pulled one pen along DOT_PULL", () => {
+  it("leaves a letter by the piece its part names: the exit is that piece's end, and the piece is no plain stroke", () => {
+    // the studio's middle meem: the loop takes the pen in, and a band of its own carries it out over the top
+    const loop: Part = { id: "loop", name: "loop", paths: [straight([0, 0], [1, 0]), straight([0.5, -0.5], [-3, 0.2])], exit: 1 };
+    const l = lib([{ id: "meem.middle.t", letter: "م", form: "middle", parts: [{ part: "loop", at: [0, 0], body: true }], anchors: { above: [0, -1], below: [0, 1] } }], [loop]);
+    const { body, exit, strokes } = formPaths(l, "meem.middle.t", [0, 0]);
+    expect(body!.segs[0].to.p).toEqual([NUQTA, 0]);
+    expect(exit!.start.p).toEqual([0.5 * NUQTA, -0.5 * NUQTA]);
+    expect(strokes).toHaveLength(0);
+    expect(formExit(l, "meem.middle.t")!.p).toEqual([-3 * NUQTA, 0.2 * NUQTA]);
+    expect(formEntry(l, "meem.middle.t")!.p).toEqual([0, 0]);
+    expect(formPaths(fixture, "ba.finishing.t", [0, 0]).exit).toBeNull();
+  });
+
+  it("reports an exit piece a part does not have", () => {
+    const bad = lib([{ id: "meem.middle.t", letter: "م", form: "middle", parts: [{ part: "flat", at: [0, 0], body: true }], anchors: { above: [0, -1], below: [0, 1] } }], [{ ...parts[1], exit: 1 }]);
+    expect(validateLibrary(bad)).toContain("meem.middle.t: body part flat has no piece 2 to leave by");
+  });
+
+  it("makes a dot the studio's: the nib, one pen at 149°, pulled 1.06 pens along 64° about the dot's centre", () => {
+    // read off the studio's dots (أم أيمن, 2026-10-19): sides of 1.00 pen at 149.4° and 1.06 pens at 64.4°
     const { dots } = formPaths(fixture, "ba.finishing.t", [0, 0]);
     expect(dots).toHaveLength(1);
-    // a rhombus with sides of one pen, at the nib's angle and the pull's
-    const want = PEN * PEN * Math.abs(Math.sin(((DOT_PULL - DEFAULT_ANGLE) * Math.PI) / 180));
-    expect(Math.abs(polygonArea(sweepPath(dots[0], PEN)) - want) / want).toBeLessThan(0.01);
+    const d = dots[0], end = d.segs[0].to;
+    expect(d.start.angle).toBe(149);
+    expect(end.angle).toBe(149);
+    const pull = [end.p[0] - d.start.p[0], end.p[1] - d.start.p[1]];
+    expect(Math.hypot(pull[0], pull[1]) / PEN).toBeCloseTo(1.06, 6);
+    expect((Math.atan2(-pull[1], pull[0]) * 180) / Math.PI).toBeCloseTo(DOT_PULL, 6);
+    expect(DOT_PULL).toBe(64);
+    expect([(d.start.p[0] + end.p[0]) / 2, (d.start.p[1] + end.p[1]) / 2]).toEqual([-NUQTA, NUQTA]);
+    const want = 1.06 * PEN * PEN * Math.abs(Math.sin(((DOT_PULL - 149) * Math.PI) / 180));
+    expect(Math.abs(polygonArea(sweepPath(d, PEN)) - want) / want).toBeLessThan(0.01);
   });
 
   it("ships a library that validates", () => {

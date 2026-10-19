@@ -18,9 +18,11 @@ import type { LetterForm } from "./tarkibText";
 
 /** Units per pen width (the mark library's scale). */
 export const PEN = 48;
-/** The rhombic dot, measured on its long diagonal: the nib (25.5 px on the
- *  book plate) pulled 1.08 pens at DOT_PULL gives 1.65 pens (45 px); only
- *  that makes the 7-dot alif 12 pens tall, as on the plate. */
+/** The nuqta as a measure: 1.65 pens. The book's rhombic dot, measured on
+ *  its long diagonal (the nib, 25.5 px on the plate, pulled 1.08 pens at
+ *  70°), gives 1.65 pens (45 px); only that makes the 7-dot alif 12 pens
+ *  tall, as on the plate. The studio reference agrees: 44.7 px to its
+ *  27.1 px pen. The dot drawn is the studio's (DOT_PULL). */
 export const NUQTA = 1.65 * PEN;
 /** Default nib angle (degrees, counter-clockwise from the baseline as the
  *  reader sees it) where a node gives none: the nib edge slopes down to the
@@ -29,17 +31,23 @@ export const NUQTA = 1.65 * PEN;
  *  only a nib near 140-147 gives; the vector set agrees (flat entries 0.56 of
  *  a pen, the meem's falling tail a full pen). */
 export const DEFAULT_ANGLE = 145;
-/** The direction a dot is pulled (degrees, as DEFAULT_ANGLE), one pen long:
- *  the plate's dots are rhombi with edges at 147 and 70 degrees. */
-export const DOT_PULL = 70;
+/** The direction a dot is pulled (degrees, as DEFAULT_ANGLE), DOT_LENGTH pens long, with the nib at DOT_NIB:
+ *  the studio reference's dots (أم أيمن, 2026-10-19) are rhombi with sides of 1.00 pen at 149.4 degrees and
+ *  1.06 pens at 64.4 (the book's plate: 147 and 70, one pen). Their shape sets how close a word's dots may
+ *  tuck in under another's tail. */
+export const DOT_PULL = 64;
+const DOT_NIB = 149;
+const DOT_LENGTH = 1.06;
 /** Body parts meet within this many nuqta. */
 const MEET = 0.01;
 
 // All library coordinates below are nuqta, y down, origin on the baseline at the form's right edge.
 export type LibNode = { p: Pt; angle?: number; width?: number; keep?: "a" | "b" };
 export type LibPath = { start: LibNode; segs: { c1: Pt; c2: Pt; to: LibNode }[] };
-/** `drawn`: closed SVG path "d" strings, filled rather than swept. */
-export type Part = { id: string; name: string; paths?: LibPath[]; drawn?: string[] };
+/** `drawn`: closed SVG path "d" strings, filled rather than swept. `exit`: in a body part, the index of the
+ *  piece the pen leaves the letter by, when that is not the piece it came in by (paths[0]): the studio's middle
+ *  meem takes the pen in round its loop and out along a band of its own. */
+export type Part = { id: string; name: string; paths?: LibPath[]; drawn?: string[]; exit?: number };
 export type PlacedPart = { part: string; at: Pt; body?: true };
 export type Form = {
   /** e.g. "ya.starting.1" */
@@ -91,7 +99,11 @@ export function validateLibrary(lib: PenLibrary): string[] {
     for (const pp of missing) out.push(`${f.id}: no part ${pp.part}`);
     if (missing.length) continue;
     const body = f.parts.filter((pp) => pp.body);
-    for (const pp of body) if (!lib.parts.get(pp.part)!.paths?.length) out.push(`${f.id}: body part ${pp.part} has no path`);
+    for (const pp of body) {
+      const part = lib.parts.get(pp.part)!;
+      if (!part.paths?.length) out.push(`${f.id}: body part ${pp.part} has no path`);
+      else if (part.exit !== undefined && !part.paths[part.exit]) out.push(`${f.id}: body part ${pp.part} has no piece ${part.exit + 1} to leave by`);
+    }
     for (let i = 1; i < body.length; i++) {
       const a = lib.parts.get(body[i - 1].part)!.paths?.[0], b = lib.parts.get(body[i].part)!.paths?.[0];
       if (a && b && !near(shift(pathEnd(a), body[i - 1].at), shift(b.start.p, body[i].at), MEET)) out.push(`${f.id}: body parts ${i} and ${i + 1} do not meet`);
@@ -121,11 +133,12 @@ const toPath = (p: LibPath, off: Pt, at: Pt): PenPath => ({
   segs: p.segs.map((s) => ({ c1: toNode({ p: s.c1 }, off, at).p, c2: toNode({ p: s.c2 }, off, at).p, to: toNode(s.to, off, at) })),
 });
 
-/** A form's ink paths in units, placed at `at` (units): the body as one path, then the separate strokes. */
-export function formPaths(lib: PenLibrary, formId: string, at: Pt): { body: PenPath | null; strokes: PenPath[]; drawn: Polygon[]; dots: PenPath[] } {
+/** A form's ink paths in units, placed at `at` (units): the body as one path, the piece the pen leaves by when
+ *  that is not the body (else null), then the separate strokes. */
+export function formPaths(lib: PenLibrary, formId: string, at: Pt): { body: PenPath | null; exit: PenPath | null; strokes: PenPath[]; drawn: Polygon[]; dots: PenPath[] } {
   const f = lib.forms.get(formId);
   if (!f) throw new Error(`no form ${formId}`);
-  let body: PenPath | null = null;
+  let body: PenPath | null = null, exit: PenPath | null = null;
   const strokes: PenPath[] = [], drawn: Polygon[] = [];
   for (const pp of f.parts) {
     const part = lib.parts.get(pp.part);
@@ -134,6 +147,7 @@ export function formPaths(lib: PenLibrary, formId: string, at: Pt): { body: PenP
     paths.forEach((p, i) => {
       const path = toPath(p, pp.at, at);
       if (pp.body && i === 0) body = body ? { start: body.start, segs: [...body.segs, ...path.segs] } : path;
+      else if (pp.body && i === part.exit) exit = path;
       else strokes.push(path);
     });
     for (const d of part.drawn ?? []) {
@@ -141,7 +155,7 @@ export function formPaths(lib: PenLibrary, formId: string, at: Pt): { body: PenP
     }
   }
   const dots = (f.dots ?? []).map((d) => dotPath([at[0] + d[0] * NUQTA, at[1] + d[1] * NUQTA]));
-  return { body, strokes, drawn, dots };
+  return { body, exit, strokes, drawn, dots };
 }
 
 /** One part on its own (a hamza, a sign), placed at `at` (units): its paths and drawn shapes. */
@@ -155,12 +169,12 @@ export function partPaths(lib: PenLibrary, partId: string, at: Pt): { strokes: P
   return { strokes: (part.paths ?? []).map((p) => toPath(p, [0, 0], at)), drawn };
 }
 
-/** The pen's own stamp at a dot centre: the nib pulled one pen width along DOT_PULL. */
+/** The pen's own stamp at a dot centre: the nib, at DOT_NIB, pulled DOT_LENGTH pens along DOT_PULL. */
 function dotPath(c: Pt): PenPath {
-  const a = (DOT_PULL * Math.PI) / 180, n: Pt = [Math.cos(a), -Math.sin(a)], h = PEN / 2;
+  const a = (DOT_PULL * Math.PI) / 180, n: Pt = [Math.cos(a), -Math.sin(a)], h = (DOT_LENGTH * PEN) / 2;
   const p0: Pt = [c[0] - n[0] * h, c[1] - n[1] * h], p1: Pt = [c[0] + n[0] * h, c[1] + n[1] * h];
   const third = (t: number): Pt => [p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t];
-  return { start: { p: p0, angle: DEFAULT_ANGLE }, segs: [{ c1: third(1 / 3), c2: third(2 / 3), to: { p: p1, angle: DEFAULT_ANGLE } }] };
+  return { start: { p: p0, angle: DOT_NIB }, segs: [{ c1: third(1 / 3), c2: third(2 / 3), to: { p: p1, angle: DOT_NIB } }] };
 }
 
 const unit = (v: Pt): Pt => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
@@ -177,7 +191,7 @@ export function formEntry(lib: PenLibrary, formId: string): { p: Pt; dir: Pt; an
 
 /** Where the pen leaves a form's body, in units at the origin, and its direction of travel. */
 export function formExit(lib: PenLibrary, formId: string): { p: Pt; dir: Pt; angle: number } | null {
-  const { body } = formPaths(lib, formId, [0, 0]);
+  const f = formPaths(lib, formId, [0, 0]), body = f.exit ?? f.body;
   if (!body || !body.segs.length) return null;
   const s = body.segs[body.segs.length - 1], p = s.to.p;
   const prev = differs(s.c2, p) ? s.c2 : differs(s.c1, p) ? s.c1 : body.segs.length > 1 ? body.segs[body.segs.length - 2].to.p : body.start.p;

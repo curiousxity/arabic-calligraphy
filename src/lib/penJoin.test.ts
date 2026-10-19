@@ -66,6 +66,23 @@ describe("joins and the word as one pen path", () => {
     expect(up.origins[1][0]).toBeCloseTo(flat.origins[1][0], 6);
   });
 
+  it("joins the next letter onto the piece its predecessor leaves by, not onto the piece it came in by", () => {
+    const pieces: Part[] = [...parts, { id: "loop", name: "loop", paths: [parts[1].paths![0], { start: { p: [-1, -0.5] }, segs: [{ c1: [-2, -0.5], c2: [-3, -0.2], to: { p: [-4, 0] } }] }], exit: 1 }];
+    const lib: PenLibrary = { ...fixture, parts: new Map(pieces.map((p) => [p.id, p])), forms: new Map([...fixture.forms, ["l.middle", { ...forms[1], id: "l.middle", parts: [{ part: "loop", at: [0, 0], body: true }] }]]) };
+    const run = assembleRun(lib, ["t.starting", "l.middle", "t.finishing"], [{ gap: 0.5, rise: 0 }, { gap: 0.3, rise: 0 }], [0, 0]);
+    // the body runs from the tooth into the loop and stops there; the exit piece carries the join and the finishing flat
+    expect(run.body!.segs).toHaveLength(3);
+    expect(run.joinSegs).toEqual([1]);
+    expect(run.strokes).toHaveLength(1);
+    const out = run.strokes[0];
+    expect(out.segs).toHaveLength(3);
+    expect(turnDeg(out, 1)).toBeLessThan(0.5);
+    expect(turnDeg(out, 2)).toBeLessThan(0.5);
+    // the finishing letter is placed from the exit piece's end
+    const end = run.origins[1][0] - 4 * NUQTA;
+    expect(run.origins[2][0]).toBeCloseTo(end - 0.3 * NUQTA, 6);
+  });
+
   it("lifts the pen where the join says so: the next letter starts a stroke of its own, placed as before", () => {
     // the studio's nun after a middle meem (أيمن, 2026-10-19): the meem's exit ends, the nun starts fresh at its arm
     const joined = assembleRun(fixture, ["t.starting", "t.middle", "t.finishing"], [{ gap: 0.5, rise: 0 }, { gap: 0.3, rise: 1 }], [0, 0]);

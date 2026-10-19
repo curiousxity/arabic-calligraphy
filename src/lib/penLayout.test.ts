@@ -96,9 +96,12 @@ describe("the phrase laid out on a line", () => {
     expect(closest([...inks[0], ...inks[1]], inks[2])).toBeGreaterThanOrEqual(WORD_GAP * NUQTA - 1);
   });
 
-  it("spaces as the studio reference does: 0.85 nuqta inside a word, 0.9 between words", () => {
-    expect(RUN_GAP).toBe(0.85);
-    expect(WORD_GAP).toBe(0.9);
+  it("places each letter group of أم أيمن where the studio reference does, to 0.1 nuqta", () => {
+    // the right edge of each group's ink, nuqta left of the first alif's, read off the studio's own outlines
+    // (2026-10-19): the meem of أم, the alif of أيمن, and يمن tucked in under the meem's tail
+    const lib = loadPenLibrary(), g = layoutGeometry(lib, defaultLayout(lib, "أم أيمن") as PenLayout);
+    const at = g.runs.map((b) => (b.x2 - g.runs[0].x2) / NUQTA);
+    [0, -1.184, -6.144, -6.528].forEach((want, k) => expect(Math.abs(at[k] - want), `group ${k}`).toBeLessThan(0.1));
   });
 
   it("clamps stroke opacity", () => {

@@ -75,6 +75,8 @@ def main():
             part["paths"] = [path(ns) for ns in p["paths"]]
         if p.get("drawn"):
             part["drawn"] = p["drawn"]
+        if "exit" in p:
+            part["exit"] = p["exit"]
         parts.append(part)
     dump = lambda name, v: open(os.path.join(DATA, name), "w", encoding="utf-8", newline="\n").write(json.dumps(v, ensure_ascii=False, indent=1) + "\n")
     dump("parts.json", parts)

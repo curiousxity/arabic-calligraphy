@@ -88,8 +88,10 @@ export function assembleRun(lib: PenLibrary, formIds: string[], joins: JoinDefau
     out.drawn.push(...f.drawn);
     out.dots.push(...f.dots);
     if (!f.body) return;
-    if (!out.body) { out.body = cur = f.body; return; }
-    if (joins[k - 1].lift || !cur) { out.strokes.push(f.body); cur = f.body; return; }
+    // a letter that leaves by a piece of its own hands the next join to that piece
+    const leave = () => { if (f.exit) { out.strokes.push(f.exit); cur = f.exit; } };
+    if (!out.body) { out.body = cur = f.body; leave(); return; }
+    if (joins[k - 1].lift || !cur) { out.strokes.push(f.body); cur = f.body; leave(); return; }
     const body = cur, from = body.segs[body.segs.length - 1]?.to ?? body.start, to = f.body.start;
     if (Math.hypot(to.p[0] - from.p[0], to.p[1] - from.p[1]) > 1e-9) {
       const exit = formExit(lib, formIds[k - 1])!, entry = formEntry(lib, id)!;
@@ -99,6 +101,7 @@ export function assembleRun(lib: PenLibrary, formIds: string[], joins: JoinDefau
       body.segs.push({ c1, c2, to });
     }
     body.segs.push(...f.body.segs);
+    leave();
   });
   return out;
 }
