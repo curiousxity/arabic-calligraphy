@@ -42,13 +42,26 @@ measure; the real unit is the pen.
    the previous point, and unwrap by 180°, since a nib at θ and at θ + 180°
    is the same nib. A 180° jump in the stored angle would spin the nib
    through the stroke.
-4. **Place nodes every ~0.4 nuqta** along the centre line, each with its
-   angle (`scripts/pen/build.py` makes Catmull-Rom cubics through them).
+4. **Smooth, then place few nodes.** `scripts/pen/ribbon.py`'s
+   `smooth_path` smooths the centre line and the unwrapped nib angle along
+   the band, then puts nodes about 0.9 nuqta apart by arc length (0.5–0.6
+   round tight curves such as a meem's head). Nodes every 0.4 nuqta taken
+   straight from samples made the nun's bowl irregular (rejected 2026-10-19:
+   "the noon stroke is too irregular … all of their strokes are just
+   smoother"). `scripts/pen/build.py` makes Catmull-Rom cubics through the
+   nodes.
 5. **Check at three times the size** against the reference before showing
    anyone. Any notch, spike, step or kink is a defect.
 6. **Raster plates:** `fit.py` moves nodes and turns the nib to match the
    ink. Start its angles from the measured widths (step 3). Its search
    cannot jump between the two angle branches by itself.
+
+7. **Stamps are pulls, not bands.** An alif's diamond head, a ya's head
+   and its hat are the nib set down and pulled a short way. Read the
+   diamond's four corners: one pair of sides is the nib (its angle), the
+   other is the pull. Draw a two-node pull at that angle, from the middle of
+   one nib side to the middle of the other. Reading a stamp as a band gives
+   spikes.
 
 ### Traps found the hard way
 
@@ -62,6 +75,12 @@ measure; the real unit is the pen.
   A flat nib there leaves a square cut.
 - **Thin parts:** lift the nib gradually (width share) on the side away from
   the outer edge, or the outer edge steps.
+- **A band's own sharp end above a stamp** reads as a spike. Start the band
+  inside the stamp (the ya's descent begins inside its head's diamond).
+- **The studio's bands keep nearly full breadth round their curves.** So
+  the nib turns with the stroke through a bowl or a long tail (as much as
+  180–280° over a nun's bowl or a meem). That is the studio's look, and the
+  user chose it.
 - **A stroke split between two letters** keeps its tangent at the split
   (`dir` on both nodes). Split above any place where the stroke crosses
   itself, or the crossing reads as a corner at the join.
@@ -78,31 +97,40 @@ measure; the real unit is the pen.
 
 ## Letters
 
-### Alif (ا), standalone
+### Alif (ا), standalone (studio, adopted 2026-10-19)
 
-- **Height:** 7.9 nuqta, head included (studio 7.87; book plate 9 ≈ 8.0).
-- **One stroke:** flick up from the right on the nib's edge (a thin
-  diagonal flag), turn at the top, then pull the stem down. The stem is
-  slightly bowed, about 0.3–0.4 nuqta wide. The foot narrows evenly to a
-  slanted end.
+- **Height:** 7.87 nuqta, from the head's top to a hairline foot on the line.
+- **Head:** a diamond stamp. The nib is set at 71.6° and pulled down and
+  right from (−0.91, −7.53) to (−0.62, −6.79), measured from the alif's
+  right edge on the line.
+- **Flag:** a wedge off the head's right corner, down to a point 0.3 right
+  of the stem.
+- **Stem:** from inside the head, slightly bowed, 0.3–0.35 nuqta wide,
+  narrowing to the foot.
+- **The book's alif** (plate 9: one stroke, head flicked up on the nib's
+  edge) is heavier, and its foot keeps the next word further away.
 - **No hamza over the alif in Thuluth.** The hamza of أ/إ is left out (the
   user's ruling).
 
-### Meem (م), standalone
+### Meem (م), standalone (studio, adopted 2026-10-19: "use the alternate version of the meem")
 
-- **Head:** a small loop with a counter. Its bottom sits about 1.1 nuqta
-  above the line (studio 1.07), its top about 2.9 above.
-- **Book plate 24 form:** the head written with a turning nib (about
-  82–140°), the tail sweeping down-left, then rising as a hairline on the
-  nib lifted from the inside. The user approved this meem on 2026-10-19.
-- **The studio's form:** instead runs the tail down-left in a long straight
-  taper (to about 10.7 nuqta left of the alif and 2.6 below the line), with
-  no rising hook.
+- **Head:** a loop with a counter. Its bottom is 1.07 nuqta above the line,
+  its top 2.86 above, and it is 1.6 nuqta wide.
+- **Order:** start thin at the head's left, go over the top to a point at
+  its right, come back under it to the left, then run straight on into the
+  tail.
+- **Tail:** a long taper down and to the left, to 9.5 nuqta left of the
+  head's right edge and 2.6 below the line, ending in a hair. No rising hook. Words after
+  it tuck in over it.
+- **The book's form** (plate 24, the tail rising again as a hairline) was
+  set aside.
 
 ### Ya (ي), starting, stacked on a meem
 
-- **Head:** top 3.2 nuqta above the line. The head is the nib pulled down
-  (at about 130°), continuing straight into the descent with no corner.
+- **Head:** top 3.2 nuqta above the line. The head is a diamond stamp,
+  the nib set at 78°.
+- **Hat:** a wedge off the head's right corner, down to a point (the user:
+  "their ya stroke has a hat").
 - **Descent:** comes down slightly right and becomes the meem's loop (see
   below). The ي hands over to the meem 2.1 nuqta above the line, above where
   the stroke later crosses itself.

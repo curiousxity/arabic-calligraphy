@@ -129,7 +129,8 @@ describe("the stroke library: أم أيمن", () => {
   it("keeps every stroke along the line thick: the nib turns with the stroke rather than running along its edge", () => {
     // Thuluth's horizontals are its heaviest strokes. Where the pen travels within 30° of the line, the nib's breadth
     // across the travel, width·W·|sin(φ−θ)|, stays at least half a pen; only a lifted nib (a taper, width < 0.5) may thin it,
-    // or the stroke passing back over its own ink (a meem's head written down and up again), where the thin pass never shows
+    // the stroke passing back over its own ink (a meem's head written down and up again), where the thin pass never shows,
+    // or a stroke's tapering end (the studio meem's tail thins all the way to a hair)
     const thinAt = (path: PenPath) => {
       const out: string[] = [];
       const centre: { k: number; q: Pt }[] = [];
@@ -142,19 +143,25 @@ describe("the stroke library: أم أيمن", () => {
         prev = s.to;
       });
       const overOwnInk = (k: number, q: Pt) => centre.some((c) => Math.abs(c.k - k) >= 2 && Math.hypot(c.q[0] - q[0], c.q[1] - q[1]) < PEN / 2);
+      const samples: { k: number; t: number; thick: number; flat: boolean; lifted: boolean; q: Pt }[] = [];
       let from = path.start;
       path.segs.forEach((s, k) => {
         for (let i = 1; i < 32; i++) {
           const t = i / 32, u = 1 - t;
           const w = (from.width ?? 1) + ((s.to.width ?? 1) - (from.width ?? 1)) * t;
-          if (Math.min(from.width ?? 1, s.to.width ?? 1) < 0.5) continue;
           const d = [3 * u * u * (s.c1[0] - from.p[0]) + 6 * u * t * (s.c2[0] - s.c1[0]) + 3 * t * t * (s.to.p[0] - s.c2[0]), 3 * u * u * (s.c1[1] - from.p[1]) + 6 * u * t * (s.c2[1] - s.c1[1]) + 3 * t * t * (s.to.p[1] - s.c2[1])];
           const phi = Math.atan2(-d[1], d[0]), theta = ((from.angle + (s.to.angle - from.angle) * t) * Math.PI) / 180;
-          if (Math.abs(Math.sin(phi)) > Math.sin(Math.PI / 6)) continue;
           const q: Pt = [u * u * u * from.p[0] + 3 * u * u * t * s.c1[0] + 3 * u * t * t * s.c2[0] + t * t * t * s.to.p[0], u * u * u * from.p[1] + 3 * u * u * t * s.c1[1] + 3 * u * t * t * s.c2[1] + t * t * t * s.to.p[1]];
-          if (w * Math.abs(Math.sin(phi - theta)) < 0.5 && !overOwnInk(k, q)) out.push(`seg ${k} t=${t.toFixed(2)}`);
+          samples.push({ k, t, thick: w * Math.abs(Math.sin(phi - theta)), flat: Math.abs(Math.sin(phi)) <= Math.sin(Math.PI / 6), lifted: Math.min(from.width ?? 1, s.to.width ?? 1) < 0.5, q });
         }
         from = s.to;
+      });
+      // the final taper: from where the stroke last stops thinning, all the way to its end
+      let taper = samples.length;
+      while (taper > 0 && samples[taper - 1].thick <= (samples[taper - 2]?.thick ?? Infinity) + 0.02) taper--;
+      samples.forEach((m, i) => {
+        if (i >= taper || m.lifted || !m.flat) return;
+        if (m.thick < 0.5 && !overOwnInk(m.k, m.q)) out.push(`seg ${m.k} t=${m.t.toFixed(2)}`);
       });
       return out;
     };

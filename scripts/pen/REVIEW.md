@@ -8,12 +8,16 @@ author, and no plate or vector-set outline is copied into the library.
 
 | form id | drafted | reference | user verdict | date |
 |---|---|---|---|---|
-| alif.standalone.1 | 2026-10-19, third draft | book plate f9 at its own pen (25.5 px); foot narrowed evenly | | |
-| meem.standalone.1 | 2026-10-19, third draft | book plate f24 at its own pen (23 px, so the meem is 13% larger than the second draft); the doubled node that notched the tail's turn removed | | |
-| ya.starting.1 | 2026-10-19, fourth draft | the user's studio (أيمن), read from its vector outlines: head pulled down straight into the descent | | |
+| alif.standalone.1 | 2026-10-19, fifth draft: the studio's alif (diamond head, flag, slim stem) | | |
+| (book alif) | 2026-10-19, third draft | book plate f9 at its own pen (25.5 px); foot narrowed evenly | | |
+| meem.standalone.1 | 2026-10-19, fifth draft: the studio's meem, long straight tail (the user: "use the alternate version of the meem") | | |
+| (book meem) | 2026-10-19, third draft | book plate f24 at its own pen (23 px, so the meem is 13% larger than the second draft); the doubled node that notched the tail's turn removed | | |
+| ya.starting.1 | 2026-10-19, fifth draft: smooth paths, the head a diamond stamp with its hat | | |
+| (fourth-draft ya) | 2026-10-19, fourth draft | the user's studio (أيمن), read from its vector outlines: head pulled down straight into the descent | | |
 | meem.middle.1 | 2026-10-19, fourth draft | the studio: the ya's stroke runs on round a loop with its counter, over the top and out to the left | | |
 | nun.finishing.1 | 2026-10-19, fourth draft | the studio: a fresh stroke (pen lifted) from the beak of its arm, round the bowl to a thin tip; dot over the bowl | | |
 | hamza (part) | 2026-10-19, third draft — no longer drawn over an alif (the user: Thuluth's alif needs no hamza) | book plate f23, one stroke, two nuqta across (MEB hamza measure), just above the alif's head | | |
+| (fourth drafts) | 2026-10-19 | the user: use the studio's meem; draw ours as smoothly as the studio's; the ya has a hat; the nun too irregular | rejected | 2026-10-19 |
 | (third drafts) | 2026-10-19 | the user: hamza too big and not needed on the alif; scale by the stroke, to 0.1 nuqta; middle meem's head too thin; nun's body and tail off; the studio's rendering given as the reference | rejected (meem standalone kept: "fine") | 2026-10-19 |
 | (second drafts) | 2026-10-19 | the user: size and spacing to come from the references, hamza likewise, joins off (stack them), meem jagged, a nuqta on the nun's tail | rejected | 2026-10-19 |
 | (first drafts) | 2026-10-19 | rejected by the user: "looks like a kid drew it. You have to vary the nib angle" | rejected | 2026-10-19 |
