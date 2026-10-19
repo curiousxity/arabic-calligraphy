@@ -9,7 +9,12 @@
  * turning nib converge on the true sweep as the steps shrink, so stamping
  * stays correct there. Pure. See .claude/rules/tarkib.md.
  */
-import { union } from "polygon-clipping";
+import * as clipping from "polygon-clipping";
+
+// The package's ES build has only a default export (Node and tsx see that);
+// Vite's interop also exposes the named one. Take whichever is there.
+const pc = clipping as unknown as { union?: typeof clipping.union; default?: { union: typeof clipping.union } };
+const union = pc.union ?? pc.default!.union;
 
 export type Pt = [number, number];
 /** Closed, no repeated last point. */
