@@ -5,7 +5,8 @@
    1400,
    972
   ],
-  "pxPerNuqta": 43
+  "pxPerNuqta": 43,
+  "penPx": 25.5
  },
  "meem.standalone.1": {
   "file": "books/f24_R.png",
@@ -13,7 +14,8 @@
    1550,
    1900
   ],
-  "pxPerNuqta": 43
+  "pxPerNuqta": 43,
+  "penPx": 23.04
  },
  "nun.finishing.1": {
   "file": "books/f23_R.png",
@@ -21,6 +23,8 @@
    1144.75,
    1899.3
   ],
-  "pxPerNuqta": 43
- }
+  "pxPerNuqta": 43,
+  "penPx": 28.7
+ },
+ "_note": "penPx: the reference's own pen width in plate pixels, found by scripts/pen/fit.py --fit-pen; library nuqta are 1.65 of it"
 }

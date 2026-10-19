@@ -6,10 +6,12 @@ The spec is what Claude authors over the reference plates: each part's pen
 paths as lists of nodes in nuqta (y down), drawn parts as SVG "d" strings,
 the forms as penLibrary.ts `Form`s, and the join defaults. A node is
 [x, y], [x, y, width], [x, y, width, keep] or an object
-{ "p": [x, y], "width": w, "keep": "a"|"b", "angle": deg, "corner": true }.
+{ "p": [x, y], "width": w, "keep": "a"|"b", "angle": deg, "corner": true,
+"dir": [dx, dy] }.
 Between nodes the path is a cubic whose handles follow Catmull-Rom tangents
 (a third of the neighbouring chord), so a path through smooth nodes is smooth;
-a "corner" node takes one-sided tangents. Never edit penData by hand: edit the
+a "corner" node takes one-sided tangents, and a node's "dir" sets its tangent
+outright (a path split between two forms keeps the tangent it had whole). Never edit penData by hand: edit the
 spec and rebuild. See .claude/rules/tarkib.md."""
 import json, math, os
 
@@ -41,12 +43,12 @@ def path(nodes):
         raise SystemExit("a path needs two nodes")
     # tangent directions: central differences, one-sided at the ends and at corners
     def tan(i, side):
+        if "dir" in ns[i] and not ns[i].get("corner"):
+            return unit(ns[i]["dir"])
         if i == 0 or (ns[i].get("corner") and side == "out"):
             return unit([P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]])
         if i == k - 1 or (ns[i].get("corner") and side == "in"):
             return unit([P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]])
-        if "dir" in ns[i]:
-            return unit(ns[i]["dir"])
         return unit([P[i + 1][0] - P[i - 1][0], P[i + 1][1] - P[i - 1][1]])
     segs = []
     for i in range(k - 1):

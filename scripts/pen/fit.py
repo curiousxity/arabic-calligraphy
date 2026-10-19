@@ -39,6 +39,10 @@ BLUR = 2.0             # px: the loss compares inks blurred this much
 TURN_COST = 5e-5       # per degree squared of nib turn between neighbouring nodes, x ink area
 BEND_COST = 0.02       # per nuqta squared of a node's offset from its neighbours' midpoint: keeps the path from wobbling
 WIDTH_COST = 0.05      # per squared change of the width share between neighbouring nodes: tapers stay gradual
+ROUGH_COST = 5.0       # per unit of ink a small opening and closing would change (notches, slivers, nicks), x ink area
+TIGHT_COST = 0.02      # per sample where the path turns tighter than half the pen's swept breadth (the nib's flat end would show)
+SMOOTH_COST = 2e-4     # per degree squared of a node's nib angle off its neighbours' mean
+SMOOTH_W_COST = 0.2    # per squared width share off its neighbours' mean
 PARTIAL_COST = 0.02    # per squared lift of the nib (1 - width share): thickness comes from turning the nib, lifting is for tapers
 
 
@@ -117,6 +121,8 @@ def main():
     ap.add_argument("--pin", type=int, nargs="*", default=[], help="nodes whose position stays put (their nib still turns)")
     ap.add_argument("--window", type=int, default=0, help="fit this many nodes at a time, sliding by half, instead of all at once")
     ap.add_argument("--others", help="the part's other strokes, held still and drawn with this one (a JSON list of node lists)")
+    ap.add_argument("--fit-pen", action="store_true",
+                    help="fit the reference's pen width too, and give the nodes in the library's nuqta (1.65 of that pen)")
     ap.add_argument("--save", help="write the fitted node list to this JSON file")
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--out", default=os.path.join(HERE, "..", "..", ".superpowers", "pen-preview"))
@@ -125,7 +131,8 @@ def main():
     spec_file = os.path.join(HERE, "spec.json")
     spec = json.load(open(spec_file, encoding="utf-8"))
     nodes = nodes_of(json.loads(a.nodes) if a.nodes else spec["parts"][a.part]["paths"][a.path])
-    pen = a.pen or a.ppn / NUQTA_PENS
+    pen0 = a.pen or a.ppn / NUQTA_PENS
+    pen_box = [pen0]       # the pen in plate px; --fit-pen lets the fit move it
     plate = load(os.path.join(PLATES, a.plate))
 
     # work in a crop around the starting path, three pens of room
@@ -133,8 +140,8 @@ def main():
         return np.array([a.origin[0] + (q[0] + a.at[0]) * a.ppn, a.origin[1] + (q[1] + a.at[1]) * a.ppn])
     other_nodes = [nodes_of(o) for o in json.loads(a.others)] if a.others else []
     pts = np.array([to_px_full(n["p"]) for n in nodes + [m for o in other_nodes for m in o]])
-    x1, y1 = np.floor(pts.min(0) - 3 * pen).astype(int)
-    x2, y2 = np.ceil(pts.max(0) + 3 * pen).astype(int)
+    x1, y1 = np.floor(pts.min(0) - 3 * pen0).astype(int)
+    x2, y2 = np.ceil(pts.max(0) + 3 * pen0).astype(int)
     x1, y1 = max(0, x1), max(0, y1)
     crop = plate[y1:y2, x1:x2]
     shape = crop.shape[:2]
@@ -142,11 +149,11 @@ def main():
 
     others = np.zeros(shape)
     for o in other_nodes:
-        others = np.maximum(others, render(build_path(o), to_px, pen, shape))
+        others = np.maximum(others, render(build_path(o), to_px, pen0, shape))
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     _, ink = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    start_ink = np.maximum(render(build_path(nodes), to_px, pen, shape), others) > 0.5
-    reach = cv2.dilate(start_ink.astype(np.uint8), np.ones((5, 5), np.uint8), iterations=int(pen / 4))
+    start_ink = np.maximum(render(build_path(nodes), to_px, pen0, shape), others) > 0.5
+    reach = cv2.dilate(start_ink.astype(np.uint8), np.ones((5, 5), np.uint8), iterations=int(pen0 / 4))
     n_lab, lab = cv2.connectedComponents((ink > 0).astype(np.uint8))
     keep_labels = set(np.unique(lab[(reach > 0) & (ink > 0)])) - {0}
     target = np.isin(lab, list(keep_labels)).astype(np.float64)
@@ -156,6 +163,9 @@ def main():
         cv2.rectangle(care, tuple(np.round(np.minimum(p1, p2)).astype(int)), tuple(np.round(np.maximum(p1, p2)).astype(int)), 0, -1)
     target *= care
     tb = cv2.GaussianBlur(target, (0, 0), BLUR)
+    kr = max(1, int(round(pen0 / 6)))
+    kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * kr + 1, 2 * kr + 1))
+    broad = cv2.morphologyEx((target > 0.5).astype(np.uint8), cv2.MORPH_OPEN, kern)
     area = target.sum()
 
     # parameters: per node x, y (nuqta), angle (deg), width share
@@ -169,6 +179,8 @@ def main():
             if free_pos and i not in a.pin:
                 v += [n["p"][0], n["p"][1]]
             v += [n["angle"], n.get("width", 1)]
+        if a.fit_pen:
+            v.append(pen_box[0])
         return np.array(v, float)
 
     def unpack(v):
@@ -187,12 +199,22 @@ def main():
                 else:
                     m.pop("width", None)
             out.append(m)
+        if a.fit_pen:
+            pen_box[0] = max(5.0, abs(float(v[-1])))
         return out
 
     def loss(v):
         ns = unpack(v)
-        r = cv2.GaussianBlur(np.maximum(render(build_path(ns), to_px, pen, shape, 2.0), others) * care, (0, 0), BLUR)
+        raw = np.maximum(render(build_path(ns), to_px, pen_box[0], shape, 2.0), others) * care
+        r = cv2.GaussianBlur(raw, (0, 0), BLUR)
+        # an edge a calligrapher would call jagged: notches and cracks a closing a sixth of a pen across would fill,
+        # and nicks an opening would shave, though only where the reference's own ink is that broad (not its hairlines)
+        rb = (raw > 0.5).astype(np.uint8)
+        rough = float((cv2.morphologyEx(rb, cv2.MORPH_CLOSE, kern) - rb).sum() + ((rb - cv2.morphologyEx(rb, cv2.MORPH_OPEN, kern)) * broad).sum())
         turn = sum((ns[i + 1]["angle"] - ns[i]["angle"]) ** 2 for i in range(len(ns) - 1))
+        # the nib turns and lifts evenly: a node's angle and width close to its neighbours' mean (a kink in either is a notch on the edge)
+        smooth = sum((ns[i - 1]["angle"] - 2 * ns[i]["angle"] + ns[i + 1]["angle"]) ** 2 for i in range(1, len(ns) - 1) if not ns[i].get("corner"))
+        smooth_w = sum((ns[i - 1].get("width", 1) - 2 * ns[i].get("width", 1) + ns[i + 1].get("width", 1)) ** 2 for i in range(1, len(ns) - 1))
         bend = sum((ns[i]["p"][0] - (ns[i - 1]["p"][0] + ns[i + 1]["p"][0]) / 2) ** 2 + (ns[i]["p"][1] - (ns[i - 1]["p"][1] + ns[i + 1]["p"][1]) / 2) ** 2 for i in range(1, len(ns) - 1) if not ns[i].get("corner"))
         # a path doubling back on itself between nodes is a fold, not a stroke (corners excepted)
         fold = 0.0
@@ -202,10 +224,29 @@ def main():
             u = np.subtract(ns[i]["p"], ns[i - 1]["p"]); w_ = np.subtract(ns[i + 1]["p"], ns[i]["p"])
             c = float(u @ w_) / (np.hypot(*u) * np.hypot(*w_) + 1e-9)
             fold += max(0.0, -0.3 - c) ** 2
+        # a turn tighter than half the pen shows the nib's flat end as a facet on the outside and a crease inside
+        tight = 0.0
+        prev = None
+        built = build_path(ns)
+        for seg_i, sg in enumerate(built["segs"]):
+            frm = built["start"] if seg_i == 0 else built["segs"][seg_i - 1]["to"]
+            if frm.get("corner") or ns[seg_i].get("corner") or ns[seg_i + 1].get("corner"):
+                continue
+            P0, P1, P2, P3 = (np.array(q, float) * a.ppn for q in (frm["p"], sg["c1"], sg["c2"], sg["to"]["p"]))
+            w0, w1 = frm.get("width", 1), sg["to"].get("width", 1)
+            for t in (0.125, 0.375, 0.625, 0.875):
+                u = 1 - t
+                d1 = 3 * u * u * (P1 - P0) + 6 * u * t * (P2 - P1) + 3 * t * t * (P3 - P2)
+                d2 = 6 * u * (P2 - 2 * P1 + P0) + 6 * t * (P3 - 2 * P2 + P1)
+                sp = np.hypot(*d1)
+                if sp < 1e-6:
+                    continue
+                kappa = abs(d1[0] * d2[1] - d1[1] * d2[0]) / sp ** 3
+                tight += min(1.0, max(0.0, kappa * pen0 * (w0 + (w1 - w0) * t) / 2 - 1)) ** 2
         lift = sum((1 - n.get("width", 1)) ** 2 for n in ns)
         dw = sum((ns[i + 1].get("width", 1) - ns[i].get("width", 1)) ** 2 for i in range(len(ns) - 1))
         over = sum(max(0, n.get("width", 1) - 1) ** 2 for n in ns)
-        return float(((r - tb) ** 2).sum()) / area + TURN_COST * turn / len(ns) + (BEND_COST * bend + WIDTH_COST * dw + PARTIAL_COST * lift) / len(ns) + 10 * over + fold
+        return float(((r - tb) ** 2).sum()) / area + TURN_COST * turn / len(ns) + (BEND_COST * bend + WIDTH_COST * dw + PARTIAL_COST * lift) / len(ns) + 10 * over + fold + (SMOOTH_COST * smooth + SMOOTH_W_COST * smooth_w) / len(ns) + ROUGH_COST * rough / area + TIGHT_COST * tight / len(ns)
 
     full = (lo, hi)
     windows = [full]
@@ -222,11 +263,16 @@ def main():
     v = pack(nodes)
     fitted = unpack(v)
 
-    ink_fit = (np.maximum(render(build_path(fitted), to_px, pen, shape), others) * care) > 0.5
+    ink_fit = (np.maximum(render(build_path(fitted), to_px, pen_box[0], shape), others) * care) > 0.5
     T = target > 0.5
     cover = (ink_fit & T).sum() / T.sum()
     spill = (ink_fit & ~T).sum() / T.sum()
-    print(f"coverage {cover:.3f}  spill {spill:.3f}")
+    print(f"coverage {cover:.3f}  spill {spill:.3f}  pen {pen_box[0]:.2f} px")
+    if a.fit_pen:
+        # library nuqta are 1.65 of this reference's pen: the letter keeps its size measured in pens
+        k = a.ppn / (pen_box[0] * NUQTA_PENS)
+        print(f"nodes rescaled by {k:.3f} into the library's nuqta")
+        fitted = [dict(n, p=[n["p"][0] * k, n["p"][1] * k]) for n in fitted]
     for i, n in enumerate(fitted):
         print(i, [round(c, 3) for c in n["p"]], round(n["angle"], 1), round(n.get("width", 1), 2), n.get("keep", ""))
 

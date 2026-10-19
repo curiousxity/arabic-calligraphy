@@ -53,11 +53,13 @@ function corners(r: Ring): number[] {
     const a = unit(sub(p, along(r, i, -1, CORNER_REACH))), b = unit(sub(along(r, i, 1, CORNER_REACH), p));
     return (Math.acos(Math.max(-1, Math.min(1, dot(a, b)))) * 180) / Math.PI;
   });
-  // one corner per cluster of neighbouring candidates: the sharpest
+  // one corner per cluster of candidates: the sharpest. A neighbour counts as the same cluster only when it
+  // lies within CORNER_REACH; on a sparse ring (a straight pull's four points) every point is its own corner
   const out: number[] = [];
   for (let i = 0; i < r.length; i++) {
     if (turn[i] <= CORNER_DEG) continue;
-    const prev = turn[(i - 1 + r.length) % r.length], next = turn[(i + 1) % r.length];
+    const ip = (i - 1 + r.length) % r.length, inx = (i + 1) % r.length;
+    const prev = len(sub(r[ip], r[i])) <= CORNER_REACH ? turn[ip] : 0, next = len(sub(r[inx], r[i])) <= CORNER_REACH ? turn[inx] : 0;
     if (turn[i] >= prev && turn[i] > next) out.push(i);
   }
   return out;

@@ -101,4 +101,13 @@ describe("fitting curves to the ink", () => {
     }
     for (const ring of polys.flat()) expect(maxDeviation(fitRing(ring, 0.25), ring)).toBeLessThan(0.25);
   });
+
+  it("keeps all four corners of a straight pull's parallelogram, sharp and acute alike", () => {
+    // a nib pulled straight down sweeps a four-point parallelogram; its acute corners sit beside obtuse ones,
+    // and were once smoothed into curves bulging five units past the ink
+    const ring: Ring = [[-19.7, -489], [19.7, -461.4], [19.7, 13.8], [-19.7, -13.8]];
+    const cmds = fitRing(ring, 0.25);
+    expect(maxDeviation(cmds, ring)).toBeLessThan(0.25);
+    expect(cornerCount(cmds, 30)).toBe(4);
+  });
 });

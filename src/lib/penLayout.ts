@@ -3,7 +3,9 @@
  * and how its joins sit (the layout, which a tarkib block stores and the
  * later editing work pins), and the ink that layout draws. Runs read right
  * to left from x = 0 on the baseline y = 0, kept RUN_GAP apart inside a
- * word and WORD_GAP between words, measured ink to ink. Pure; must not
+ * word and WORD_GAP between words, measured ink to ink at the same height:
+ * a run slides in over another's tail or under its head where their ink
+ * does not meet, as a line of Thuluth is spaced. Pure; must not
  * import ./harfbuzz. See .claude/rules/tarkib.md.
  */
 import { assembleRun } from "./penJoin";
@@ -19,8 +21,10 @@ export type PenLayout = { runs: PenRun[]; wordStarts: number[] };
 
 /** Nuqta between runs of one word, ink to ink. */
 export const RUN_GAP = 0.6;
-/** Nuqta between words, ink to ink. */
-export const WORD_GAP = 2;
+/** Nuqta between words, ink to ink: about one nuqta between the words of the book's Fatiha lines. */
+export const WORD_GAP = 1;
+/** Nuqta of height within which two runs' ink counts as side by side for spacing. */
+export const SPACING_CLEARANCE = 0.5;
 /** Units the fitted ink may stray from the swept ink. */
 const FIT_TOL = 0.25;
 /** The lowest stroke opacity a block may have. */
@@ -69,6 +73,36 @@ const boundsOf = (polys: Polygon[][]): Bounds => {
   }
   return b;
 };
+/** Height bands (units) for spacing: the leftmost or rightmost ink in each. */
+const BAND = 4;
+function profile(polys: Polygon[][], pick: (a: number, b: number) => number, start: number): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const ps of polys) for (const poly of ps) for (const ring of poly) for (let i = 0; i < ring.length; i++) {
+    // edges as well as points: a long straight edge has no points in between
+    const p = ring[i], q = ring[(i + 1) % ring.length], n = Math.max(1, Math.ceil(Math.abs(q[1] - p[1]) / BAND));
+    for (let j = 0; j <= n; j++) {
+      const x = p[0] + ((q[0] - p[0]) * j) / n, band = Math.floor((p[1] + ((q[1] - p[1]) * j) / n) / BAND);
+      out.set(band, pick(out.get(band) ?? start, x));
+    }
+  }
+  return out;
+}
+/** The x shift that sets `next` (laid with its own coordinates) `gap` units left of `placed`'s ink at the
+ *  nearest pair of heights within SPACING_CLEARANCE, or null when no heights pair up. */
+function clearShift(placed: Polygon[][], next: Polygon[][], gap: number): number | null {
+  const left = profile(placed, Math.min, Infinity), right = profile(next, Math.max, -Infinity);
+  const reach = Math.ceil((SPACING_CLEARANCE * NUQTA) / BAND);
+  let shift: number | null = null;
+  for (const [band, r] of right) {
+    for (let d = -reach; d <= reach; d++) {
+      const l = left.get(band + d);
+      if (l === undefined) continue;
+      const s = l - gap - r;
+      if (shift === null || s < shift) shift = s;
+    }
+  }
+  return shift;
+}
 const move = (polys: Polygon[], dx: number): Polygon[] => polys.map((poly) => poly.map((ring) => ring.map(([x, y]) => [x + dx, y] as Pt)));
 
 export type LayoutGeometry = {
@@ -106,12 +140,17 @@ export function layoutGeometry(lib: PenLibrary, layout: PenLayout): LayoutGeomet
     paths.push(...r.dots);
     const inks: Polygon[][] = [...paths.map((p) => sweepPath(p, PEN)), ...drawn.map((d) => [d])].filter((ps) => ps.length > 0);
     const b = boundsOf(inks);
-    if (k > 0) cursor -= (layout.wordStarts.includes(k) ? WORD_GAP : RUN_GAP) * NUQTA;
-    const dx = Number.isFinite(b.x2) ? cursor - b.x2 : cursor;
+    let dx = Number.isFinite(b.x2) ? -b.x2 : 0;
+    if (k > 0) {
+      const gap = (layout.wordStarts.includes(k) ? WORD_GAP : RUN_GAP) * NUQTA;
+      const shift = clearShift(all, inks, gap);
+      // ink that never sits beside the phrase so far (a lone dot well above it) keeps the bounding boxes apart
+      dx = shift ?? cursor - gap - (Number.isFinite(b.x2) ? b.x2 : 0);
+    }
     for (const ink of inks) all.push(move(ink, dx));
     const placed = Number.isFinite(b.x1) ? { x1: b.x1 + dx, y1: b.y1, x2: b.x2 + dx, y2: b.y2 } : { x1: cursor, y1: 0, x2: cursor, y2: 0 };
     runBounds.push(placed);
-    cursor = placed.x1;
+    cursor = Math.min(cursor, placed.x1);
   });
 
   const out: LayoutGeometry = {

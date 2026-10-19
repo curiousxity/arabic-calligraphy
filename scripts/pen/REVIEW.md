@@ -8,12 +8,13 @@ author, and no plate or vector-set outline is copied into the library.
 
 | form id | drafted | reference | user verdict | date |
 |---|---|---|---|---|
-| alif.standalone.1 | 2026-10-19, redrawn same day | book plate f9; one stroke: head flicked up on the nib's edge, stem pulled down; fitted (96% of the plate's ink covered) | | |
-| meem.standalone.1 | 2026-10-19, redrawn same day | book plate f24 (standalone meem "used in Thuluth"); nib turning 82–140° through the head and tail; fitted (97%) | | |
-| ya.starting.1 | 2026-10-19, redrawn same day | vector set v2-24 (tooth); fitted (98%) | | |
-| meem.middle.1 | 2026-10-19, redrawn same day | vector set v2-141; the join runs in along its base; fitted (98%) | | |
-| nun.finishing.1 | 2026-10-19, redrawn same day | book plate f23 (بن); fitted (92%) | | |
-| hamza (part) | 2026-10-19, redrawn same day | book plate f23 (hamza), one stroke, at 0.75 size over the alif | | |
+| alif.standalone.1 | 2026-10-19, third draft | book plate f9 at its own pen (25.5 px); foot narrowed evenly | | |
+| meem.standalone.1 | 2026-10-19, third draft | book plate f24 at its own pen (23 px, so the meem is 13% larger than the second draft); the doubled node that notched the tail's turn removed | | |
+| ya.starting.1 | 2026-10-19, third draft | book plate f16 (بمـ): stacked tooth with its hooked head, the upper half of one stroke split mid-diagonal; two dots side by side under the junction where the plate's ba dot sits (MEB: ya's starting forms) | | |
+| meem.middle.1 | 2026-10-19, third draft | book plate f16 (بمـ): the lower half of that stroke, the head as a drop, out along the line into the nun with no join | | |
+| nun.finishing.1 | 2026-10-19, third draft | book plate f23 at its own pen (28.7 px); the square on its tail was a dot, now gone; its dot near the arm (MEB: "nun'un noktası kola yakın konulur") | | |
+| hamza (part) | 2026-10-19, third draft | book plate f23, one stroke, two nuqta across (MEB hamza measure), just above the alif's head | | |
+| (second drafts) | 2026-10-19 | the user: size and spacing to come from the references, hamza likewise, joins off (stack them), meem jagged, a nuqta on the nun's tail | rejected | 2026-10-19 |
 | (first drafts) | 2026-10-19 | rejected by the user: "looks like a kid drew it. You have to vary the nib angle" | rejected | 2026-10-19 |
 
 Measured on the plates (2026-10-19): nib at 145 degrees (edge sloping down to the right); a dot is the nib pulled 1.08 pens at 70 degrees, so a nuqta is 1.65 pens; the alif 7-7.5 nuqta.

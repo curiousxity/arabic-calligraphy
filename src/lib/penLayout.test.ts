@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { clampStrokeOpacity, defaultLayout, layoutGeometry, RUN_GAP, WORD_GAP, type PenLayout } from "./penLayout";
+import { clampStrokeOpacity, defaultLayout, layoutGeometry, RUN_GAP, SPACING_CLEARANCE, WORD_GAP, type PenLayout } from "./penLayout";
+import { flattenContours } from "./strokeCuts";
 import { loadPenLibrary, NUQTA, type Form, type Part, type PenLibrary } from "./penLibrary";
 import type { Pt } from "./penSweep";
 
@@ -25,6 +26,20 @@ const fixtureFull = lib(forms, parts);
 const emptyLib = lib([], []);
 const shipped = (phrase: string) => !("missing" in defaultLayout(loadPenLibrary(), phrase));
 
+/** Each run's ink points, from the layout's strokes in drawing order (each run's paths, then hamzas, then dots). */
+function runInks(g: ReturnType<typeof layoutGeometry>, l: PenLayout): Pt[][] {
+  const pts = g.strokes.map((s) => flattenContours(s, 8).flat());
+  // strokes are pushed run by run; split them by which run's bounds hold them
+  return g.runs.map((b) => pts.filter((ps) => ps.every(([x]) => x >= b.x1 - 1 && x <= b.x2 + 1)).flat()).slice(0, l.runs.length);
+}
+/** The least horizontal distance from a later run's ink to an earlier run's (on its left side), over points
+ *  within SPACING_CLEARANCE of each other in height. */
+function closestAcross(earlier: Pt[], later: Pt[]): number {
+  let best = Infinity;
+  for (const p of earlier) for (const q of later) if (Math.abs(p[1] - q[1]) <= SPACING_CLEARANCE * NUQTA) best = Math.min(best, p[0] - q[0]);
+  return best;
+}
+
 describe("the phrase laid out on a line", () => {
   it("reports the letters with no pen forms", () => {
     expect(defaultLayout(emptyLib, "أم")).toEqual({ missing: ["ا", "ء", "م"] });
@@ -42,17 +57,28 @@ describe("the phrase laid out on a line", () => {
     expect(defaultLayout(fixtureFull, "أُمّ أَيْمَن")).toEqual(defaultLayout(fixtureFull, "أم أيمن"));
   });
 
-  it("keeps runs and words apart by RUN_GAP and WORD_GAP, right to left", () => {
+  it("keeps runs and words apart by RUN_GAP and WORD_GAP, ink to ink at the same height, right to left", () => {
     const l = defaultLayout(fixtureFull, "أم أيمن") as PenLayout;
     const g = layoutGeometry(fixtureFull, l);
     expect(g.runs[0].x2).toBeCloseTo(0, 6);
-    for (let k = 0; k + 1 < g.runs.length; k++) {
-      const gap = l.wordStarts.includes(k + 1) ? WORD_GAP : RUN_GAP;
-      expect(g.runs[k + 1].x2).toBeCloseTo(g.runs[k].x1 - gap * NUQTA, 6);
+    const inks = runInks(g, l);
+    for (let k = 0; k + 1 < inks.length; k++) {
+      const gap = (l.wordStarts.includes(k + 1) ? WORD_GAP : RUN_GAP) * NUQTA;
+      expect(closestAcross(inks[k], inks[k + 1]), `runs ${k} and ${k + 1}`).toBeCloseTo(gap, 0);
     }
     // one entry per stroke: 4 run bodies, 2 hamzas, 2 dots
     expect(g.strokes).toHaveLength(8);
     expect(g.union.some((c) => c.type === "M")).toBe(true);
+  });
+
+  it("tucks a word in over the one before where their ink does not meet, as the masters space a line", () => {
+    // the standalone meem's tail sweeps down and left under the line; أيمن's alif stands over it
+    const lib = loadPenLibrary();
+    const l = defaultLayout(lib, "أم أيمن") as PenLayout;
+    const g = layoutGeometry(lib, l);
+    expect(g.runs[2].x2).toBeGreaterThan(g.runs[1].x1);
+    const inks = runInks(g, l);
+    expect(closestAcross(inks[1], inks[2])).toBeGreaterThanOrEqual(WORD_GAP * NUQTA - 1);
   });
 
   it("clamps stroke opacity", () => {
