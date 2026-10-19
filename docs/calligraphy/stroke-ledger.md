@@ -186,6 +186,10 @@ measure; the real unit is the pen.
 
 ## Letters
 
+The five forms of أم أيمن below were approved by the user on 2026-10-19
+("Very nice. Yes. Im happy"), along with the dot and the spacing. They are
+the worked example for every letter after them.
+
 Each letter is listed as its pieces, in the order the pen draws them, with
 how closely each matches its studio piece (overlap; outline gap for 95% of
 its length). Coordinates are in each letter's own frame: x from the
