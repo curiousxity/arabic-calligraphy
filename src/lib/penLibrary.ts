@@ -133,6 +133,17 @@ export function formPaths(lib: PenLibrary, formId: string, at: Pt): { body: PenP
   return { body, strokes, drawn, dots };
 }
 
+/** One part on its own (a hamza, a sign), placed at `at` (units): its paths and drawn shapes. */
+export function partPaths(lib: PenLibrary, partId: string, at: Pt): { strokes: PenPath[]; drawn: Polygon[] } {
+  const part = lib.parts.get(partId);
+  if (!part) throw new Error(`no part ${partId}`);
+  const drawn: Polygon[] = [];
+  for (const d of part.drawn ?? []) {
+    for (const c of flattenContours(parseSvgPath(d), 16)) drawn.push([c.map((q) => [at[0] + q[0] * NUQTA, at[1] + q[1] * NUQTA] as Pt)]);
+  }
+  return { strokes: (part.paths ?? []).map((p) => toPath(p, [0, 0], at)), drawn };
+}
+
 /** The pen's own stamp at a dot centre: one pen width pulled along the nib's normal. */
 function dotPath(c: Pt): PenPath {
   const a = (DEFAULT_ANGLE * Math.PI) / 180, n: Pt = [Math.sin(a), Math.cos(a)], h = PEN / 2;
