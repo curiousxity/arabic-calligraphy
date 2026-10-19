@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { squareCuts } from "./tarkibEnds";
+import { leavesStub, squareCuts } from "./tarkibEnds";
+import { splitAtCut } from "./stackGeometry";
 import { parseSvgPath } from "./svgPath";
 
 describe("squareCuts", () => {
@@ -16,5 +17,23 @@ describe("squareCuts", () => {
     expect(Math.abs(Math.cos(cut!.angle - a))).toBeGreaterThan(0.97);
     expect(cut!.thickness).toBeGreaterThan(36);
     expect(cut!.thickness).toBeLessThan(46);
+  });
+});
+
+describe("leavesStub", () => {
+  // a bar 40 thick running right, its end cut on a slant: the top corner at
+  // x 100, the bottom at x 60
+  const bar = parseSvgPath("M-100 -20L100 -20L60 20L-100 20Z");
+  const keptAt = (x: number) => {
+    const r = splitAtCut(bar, { cutX: x, angle: 0 })!;
+    return { kept: r.near, face: r.nearFace };
+  };
+  it("finds the old end's corner left standing by a cut that runs out through it", () => {
+    const { kept, face } = keptAt(90);
+    expect(leavesStub(kept, face, [-1, 0])).toBe(true);
+  });
+  it("passes a cut made behind the old end, across the whole stroke", () => {
+    const { kept, face } = keptAt(50);
+    expect(leavesStub(kept, face, [-1, 0])).toBe(false);
   });
 });

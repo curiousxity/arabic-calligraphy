@@ -3,6 +3,7 @@ import { loadMarkGroups } from "./markLibrary";
 import { analyzePhrase } from "./tarkibText";
 import { formsFromName, loadTarkibLibrary } from "./tarkibSchema";
 import { splitAtCut } from "./stackGeometry";
+import { leavesStub } from "./tarkibEnds";
 import { parseSvgPath } from "./svgPath";
 import { flattenContours, outlineBounds } from "./strokeCuts";
 import { pointInPolygon } from "./svgPath";
@@ -92,6 +93,28 @@ describe("tarkib piece schema", () => {
         expect(count(keep === "far" ? r.far : r.near), `${s.id} ${end}`).toBe(count(cmds));
       }
     }
+  });
+
+  it("offers only trims that leave no corner of the old end standing, wherever one does", () => {
+    // the alif foot (thuluth-v3-25) and the ha (thuluth-w3-6) of the first
+    // target: their shallow trims ran out through the designer's slanted end
+    // and left its corner as a step beside the bridge
+    let checked = 0;
+    for (const s of lib.schema.values()) {
+      const cmds = parseSvgPath(lib.items.get(s.itemId)!.d);
+      for (const [end, keep] of [["entry", "far"], ["exit", "near"]] as const) {
+        const e = s[end];
+        if (!e?.options) continue;
+        const stub = e.options.map((f) => {
+          const r = splitAtCut(cmds, f)!;
+          const t: [number, number] = [Math.cos(f.angle), Math.sin(f.angle)];
+          return leavesStub(keep === "far" ? r.far : r.near, r.nearFace, keep === "far" ? t : [-t[0], -t[1]]);
+        });
+        if (stub.includes(false)) { expect(stub, `${s.id} ${end}`).not.toContain(true); checked++; }
+      }
+    }
+    expect(checked).toBeGreaterThan(100);
+    for (const id of ["thuluth-v3-25", "thuluth-w3-6"]) expect(lib.schema.get(id)?.entry?.options?.length, id).toBeGreaterThan(0);
   });
 
   it("keeps most generated join faces: a cut window wide enough for a tapering stroke", () => {

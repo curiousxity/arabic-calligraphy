@@ -8,13 +8,13 @@
 import { loadMarkGroups, type MarkItem } from "./markLibrary";
 import { outlineBounds, type Pt } from "./strokeCuts";
 import { splitAtCut } from "./stackGeometry";
-import { squareCuts } from "./tarkibEnds";
+import { squareCuts, stubArea, STUB_TOL } from "./tarkibEnds";
 import { parseSvgPath, type SvgCmd } from "./svgPath";
 import { analyzePhrase, LETTER_DOTS, skeletonFor, SKELETONS, type LetterForm } from "./tarkibText";
 
 /** A cut in splitAtCut's frame, piece units. The angle is the writing
  *  direction there, so an entry keeps the far side and an exit the near. */
-export type FaceCut = { cutX: number; angle: number; window?: { y: number; half: number }; /** The stroke's thickness there, when measured. */ thickness?: number };
+export type FaceCut = { cutX: number; angle: number; window?: { y: number; half: number }; /** The stroke's thickness there, when measured. */ thickness?: number; /** Square units of the old end the trim leaves standing (tarkibEnds.ts stubArea). */ stub?: number; /** Units in from where the letters meet (0: the designer's own flat end). */ depth?: number; /** The cut's two outline points, piece units (splitAtCut's face). */ ends?: [Pt, Pt] };
 /** Where a piece may lengthen: a cut across a straight stroke; the `side`
  *  part moves away as the stroke grows, by `min`..`max` units. */
 export type StretchZone = { cutX: number; angle: number; window?: { y: number; half: number }; side: "near" | "far"; min: number; max: number };
@@ -123,6 +123,9 @@ const FLAT_SQUARE = 0.45;
 /** The trims offered per end, units: the composer takes the shallowest pair
  *  that leaves the bridge room to taper and turn (tarkibChain.ts). */
 export const JOIN_DEPTHS = [PEN / 4, PEN / 2, (3 * PEN) / 4, PEN, 1.5 * PEN];
+/** A trim more than this many times as wide as the shallowest at its end
+ *  cuts across a junction, and is not offered. */
+const JUNCTION = 1.3;
 /** Window half-widths tried, as (factor, added units): up to half a pen more. */
 const WINDOW_GROWTH: [number, number][] = [[1, 0], [1.25, 0], [1.5, 0], [1.5, 12], [1.5, 24]];
 const contourCount = (cmds: SvgCmd[]) => cmds.filter((c) => c.type === "M").length;
@@ -151,6 +154,13 @@ function joinEnd(cmds: SvgCmd[], end: JoinEnd | undefined, keep: "near" | "far")
     const kept = keep === "far" ? r.far : r.near, dropped = keep === "far" ? r.near : r.far;
     return boxArea(kept) > boxArea(dropped) && contourCount(kept) === n;
   };
+  // A trim that runs out through the designer's slanted end leaves that
+  // end's corner standing beside the bridge, a step (tarkibEnds.ts leavesStub).
+  const graded = (face: FaceCut): FaceCut => {
+    const r = splitAtCut(cmds, face)!, t: Pt = [Math.cos(face.angle), Math.sin(face.angle)];
+    return { ...face, ends: [r.nearFace.a, r.nearFace.b], stub: stubArea(keep === "far" ? r.far : r.near, r.nearFace, keep === "far" ? t : [-t[0], -t[1]]) };
+  };
+  const clean = (face: FaceCut) => (face.stub ?? 0) <= STUB_TOL;
   // First choice: square across the stroke as measured (tarkibEnds.ts), at
   // every depth the composer may pick from.
   const inward: Pt = [deeper * c, deeper * s];
@@ -160,7 +170,12 @@ function joinEnd(cmds: SvgCmd[], end: JoinEnd | undefined, keep: "near" | "far")
   const g = end.face, gc = Math.cos(g?.angle ?? 0), gs = Math.sin(g?.angle ?? 0);
   const start: Pt = g?.window ? [g.cutX * gc - g.window.y * gs, g.cutX * gs + g.window.y * gc] : end.point;
   const cuts = squareCuts(cmds, start, inward, JOIN_DEPTHS, keep === "near");
-  const ok = cuts.map((f, i) => (f && accepts(f) ? { f, depth: JOIN_DEPTHS[i] } : null)).filter((o): o is { f: FaceCut; depth: number } => !!o);
+  const found = cuts.map((f, i) => (f && accepts(f) ? { f: { ...graded(f), depth: JOIN_DEPTHS[i] } as FaceCut, depth: JOIN_DEPTHS[i] } : null)).filter((o): o is { f: FaceCut; depth: number } => !!o);
+  // a cut far wider than the shallowest crossed a junction, not the stroke
+  // (the ha's deep cuts ran across its crossing, 65 and 100 wide on a 46 stroke)
+  const all = found.filter((o) => (o.f.thickness ?? 0) <= JUNCTION * (found[0].f.thickness ?? Infinity));
+  // only the clean trims, where there is any; else all (a step beats no splice)
+  const tidy = all.filter((o) => clean(o.f)), ok = tidy.length ? tidy : all;
   // The designer's own flat end, where there is one and it lies square
   // across the stroke as measured: the join is made right there (a trim
   // inside it left the end's corner standing as a step).
@@ -169,11 +184,11 @@ function joinEnd(cmds: SvgCmd[], end: JoinEnd | undefined, keep: "near" | "far")
     const w = g.window;
     for (const half of WINDOW_GROWTH.map((k) => w.half * k[0] + k[1])) {
       const f: FaceCut = { ...g, window: { y: w.y, half }, thickness: ok[0].f.thickness };
-      if (accepts(f)) { flat = f; break; }
+      if (accepts(f)) { flat = { ...graded(f), depth: 0 }; break; }
     }
-    if (flat && angleGap(flat.angle, ok[0].f.angle) > FLAT_SQUARE) flat = null;
+    if (flat && (angleGap(flat.angle, ok[0].f.angle) > FLAT_SQUARE || (tidy.length && !clean(flat)))) flat = null;
   }
-  if (flat) return { ...end, face: flat, options: [flat, ...ok.map((o) => o.f)] };
+  if (flat) return { ...end, face: flat, options: [flat, ...(tidy.length || !clean(flat) ? ok : []).map((o) => o.f)] };
   if (ok.length) return { ...end, face: (ok.find((o) => o.depth >= JOIN_TRIM) ?? ok[ok.length - 1]).f, options: ok.map((o) => o.f) };
   const atMeeting: FaceCut = {
     cutX: end.point[0] * c + end.point[1] * s, angle: end.angle,
@@ -184,7 +199,7 @@ function joinEnd(cmds: SvgCmd[], end: JoinEnd | undefined, keep: "near" | "far")
     for (const depth of [JOIN_TRIM, JOIN_TRIM / 2, 0]) {
       for (const half of w ? WINDOW_GROWTH.map((g) => w.half * g[0] + g[1]) : [0]) {
         const face: FaceCut = { ...base, cutX: base.cutX + deeper * depth, ...(w ? { window: { y: w.y, half } } : {}) };
-        if (accepts(face)) return { ...end, face };
+        if (accepts(face)) return { ...end, face: { ...graded(face), depth } };
       }
     }
   }

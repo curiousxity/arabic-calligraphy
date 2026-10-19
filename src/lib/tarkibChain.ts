@@ -7,8 +7,9 @@
  * climbs into the tier above, and only between flat cut faces. Pure. See
  * .claude/rules/tarkib.md.
  */
-import type { StackJoin, StackPiece } from "../types";
+import type { CutFace, StackJoin, StackPiece } from "../types";
 import { splitPieceAtCut } from "./stackConvert";
+import { joinEdges, joinFloor } from "./stackJoin";
 import { transformCmds } from "./stackGeometry";
 import { assembleStackOutline, pieceTransform } from "./stackOutline";
 import { flattenContours, outlineBounds, type Pt } from "./strokeCuts";
@@ -75,38 +76,83 @@ function sourcePool(list: PieceSchema[]): PieceSchema[] {
 /** The single pieces the composer may swap in for `l`: the same hand as the default. */
 export const variantsFor = (lib: TarkibLibrary, l: PhraseLetter, opening = false): PieceSchema[] => sourcePool(singlesFor(lib, l, opening));
 
+/** How well `next`'s entry continues `prev`'s exit, placed as chainRun
+ *  places them: the trims' miss (pickTrims: a bridge with no room, or
+ *  bending tighter than BRIDGE_RADIUS), how deep the two trims cut (a deep
+ *  trim eats the letter: half a unit per pen), the change in thickness (per
+ *  pen) and, lightly (TURN_COST per radian), the turn between the two
+ *  trimmed ends. The bought set draws a letter's forms per predecessor (its
+ *  finishing nuns: after a tooth, flat from the right, after a meem's or
+ *  ha's tail), and the form drawn for the neighbour meets it with a gentle
+ *  bridge, shallow trims, at its weight, heading on. The turn weighs little
+ *  because a wide turn can be the designer's own: a hanging ha meets a ba
+ *  that rises into it in a U. An end not measured scores FIT_UNKNOWN. */
+export function endFit(prev: PieceSchema, next: PieceSchema): number {
+  const ex = prev.exit, en = next.entry;
+  if (ex?.face?.thickness === undefined || en?.face?.thickness === undefined) return FIT_UNKNOWN;
+  const w = dir(ex.angle);
+  const t = pickTrims(ex.options ?? [ex.face], en.options ?? [en.face], [ex.point[0] - w[0] * OVERLAP - en.point[0], ex.point[1] - w[1] * OVERLAP - en.point[1]]);
+  const turn = Math.abs(Math.atan2(Math.sin(t.a.angle - t.b.angle), Math.cos(t.a.angle - t.b.angle)));
+  return t.miss + (0.5 * ((t.a.depth ?? 0) + (t.b.depth ?? 0))) / PEN + Math.abs((t.a.thickness ?? PEN) - (t.b.thickness ?? PEN)) / PEN + TURN_COST * turn;
+}
+const TURN_COST = 0.3;
+/** endFit where an end was never measured (a touch join, or a face only the
+ *  generator's guess frees): worse than a measured end that meets
+ *  reasonably. One such alif brought a hairline sliver. */
+const FIT_UNKNOWN = 1;
+/** How much worse than the form in place a swapped-in form may fit its
+ *  neighbours (endFit, summed over both). */
+export const FIT_SLACK = 0.35;
+
 /** A plain, typical form from the best source's real forms in `list`: the
  *  one nearest (by ratio) a lower-quartile width (the less flourished: a
  *  straight alif, not a curved display one) and the median height (not the
  *  longest alif, not a cramped one). Taking the narrower half outright picked
- *  the smallest nun of a sheet, which read as a zay. A stand-in is used only
- *  when no source has a real form. */
-function typical(lib: TarkibLibrary, list: PieceSchema[]): PieceSchema | undefined {
+ *  the smallest nun of a sheet, which read as a zay. After `prev`, how well
+ *  the form's entry fits prev's exit (endFit) counts as much as typicality
+ *  (both are of a size: a log ratio, radians). A stand-in is used only when
+ *  no source has a real form. */
+function typical(lib: TarkibLibrary, list: PieceSchema[], prev?: PieceSchema): PieceSchema | undefined {
   const pool = sourcePool(list);
   if (!pool.length) return undefined;
   const h = (s: PieceSchema) => lib.items.get(s.itemId)?.h || 1;
   const w = (s: PieceSchema) => lib.items.get(s.itemId)?.w || 1;
   const at = (xs: number[], q: number) => xs.sort((a, b) => a - b)[Math.floor((xs.length - 1) * q)];
   const tw = at(pool.map(w), 0.25), th = at(pool.map(h), 0.5);
-  const off = (s: PieceSchema) => Math.abs(Math.log(w(s) / tw)) + Math.abs(Math.log(h(s) / th));
+  const off = (s: PieceSchema) => Math.abs(Math.log(w(s) / tw)) + Math.abs(Math.log(h(s) / th)) + (prev ? endFit(prev, s) : 0);
   return pool.reduce((best, s) => (off(s) < off(best) ? s : best));
 }
 
 /** `opening`: the run's first letter opens the composition (where a curved
  *  alif may stand).
  *  Multi-letter pieces where one spells the run (the calligrapher's own
- *  joins), a typical single piece elsewhere. Null if a letter has none. */
+ *  joins), a typical single piece elsewhere, each fitted to the one before
+ *  (endFit). Null if a letter has none. */
 export function defaultChoice(lib: TarkibLibrary, run: PhraseRun, opening = false): RunChoice | null {
   const ids: string[] = [];
+  let prev: PieceSchema | undefined;
   for (let k = 0; k < run.letters.length; ) {
     const l = run.letters[k];
     const multi = (lib.multi.get(key(l)) ?? []).find((s) => s.use !== "never" && spells(s, run, k));
-    const pick = multi ?? typical(lib, singlesFor(lib, l, opening && k === 0));
+    const pick = multi ?? typical(lib, singlesFor(lib, l, opening && k === 0), prev);
     if (!pick) return null;
     ids.push(pick.id);
+    prev = pick;
     k += pick.letters.length;
   }
   return { schemaIds: ids, climbs: ids.slice(1).map(() => false), stretch: {} };
+}
+
+/** The forms the composer may swap in for piece `k` of `choice` (a single
+ *  letter): the same hand (variantsFor), fitting their neighbours (endFit,
+ *  both sides summed) no worse than the form in place by FIT_SLACK. */
+export function fittingVariants(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, k: number, opening = false): PieceSchema[] {
+  const at = choice.schemaIds.slice(0, k).reduce((n, id) => n + lib.schema.get(id)!.letters.length, 0);
+  const prev = k > 0 ? lib.schema.get(choice.schemaIds[k - 1]) : undefined;
+  const next = k + 1 < choice.schemaIds.length ? lib.schema.get(choice.schemaIds[k + 1]) : undefined;
+  const fit = (s: PieceSchema) => (prev ? endFit(prev, s) : 0) + (next ? endFit(s, next) : 0);
+  const limit = fit(lib.schema.get(choice.schemaIds[k])!) + FIT_SLACK;
+  return variantsFor(lib, run.letters[at], opening && at === 0).filter((s) => s.id !== choice.schemaIds[k] && fit(s) <= limit);
 }
 
 const dir = (a: number): Pt => [Math.cos(a), Math.sin(a)];
@@ -149,31 +195,88 @@ function trimGeometry(f: FaceCut): { centre: Pt; width: number; dir: Pt } {
   return { centre: [f.cutX * c - y * s, f.cutX * s + y * c], width: f.thickness ?? PEN, dir: [c, s] };
 }
 
+/** A trim as the face a bridge starts from, `at` added: the cut's own two
+ *  outline points where known (a face the generator guessed can be far wider
+ *  than a pen), else its stroke's thickness square across it. An exit's trim
+ *  points out along the travel and an entry's in, so both put `a` on the
+ *  same side (no twist). */
+function trimFace(f: FaceCut, at: Pt, entry: boolean): CutFace {
+  const g = trimGeometry(f), n: Pt = [g.dir[1], -g.dir[0]], h = g.width / 2;
+  const tangent = entry ? f.angle + Math.PI : f.angle;
+  if (f.ends) {
+    const [p, q] = f.ends.map((e): Pt => [e[0] + at[0], e[1] + at[1]]);
+    const side = (p[0] - q[0]) * n[0] + (p[1] - q[1]) * n[1];
+    return side >= 0 ? { a: p, b: q, tangent } : { a: q, b: p, tangent };
+  }
+  const m: Pt = [g.centre[0] + at[0], g.centre[1] + at[1]];
+  return { a: [m[0] + n[0] * h, m[1] + n[1] * h], b: [m[0] - n[0] * h, m[1] - n[1] * h], tangent };
+}
+
+/** Units: the tightest a bridge's edge may bend. Measured on the first
+ *  target: a pinch on the inside of a turn (ha into a flat-entry ba,
+ *  trimmed shallow) bent at 6, the tightest join that reads clean (ha into
+ *  ya, an S) at 10.4. At 20 the trims were driven deep, into a junction. */
+export const BRIDGE_RADIUS = 10;
+
+/** The tightest bend, units, on either edge of the bridge from face A to
+ *  face B, drawn as the outline draws it (stackOutline.ts, bow 0). */
+export function bridgeRadius(A: CutFace, B: CutFace): number {
+  const { edgeA, edgeB } = joinEdges(A, B, 0, joinFloor(A, B, NIB.minFraction));
+  let r = Infinity;
+  for (const e of [edgeA, edgeB]) for (let i = 1; i + 1 < e.length; i++) {
+    const u: Pt = [e[i][0] - e[i - 1][0], e[i][1] - e[i - 1][1]], v: Pt = [e[i + 1][0] - e[i][0], e[i + 1][1] - e[i][1]];
+    const lu = Math.hypot(u[0], u[1]), lv = Math.hypot(v[0], v[1]);
+    if (lu < 1e-6 || lv < 1e-6) continue;
+    const turn = Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / lu / lv)));
+    if (turn > 1e-6) r = Math.min(r, (lu + lv) / 2 / turn);
+  }
+  return r;
+}
+
 /**
  * The trims for one meeting: the shallowest pair (`a` on the exit, `b` on
  * the entry, `offset` B's origin in A's frame) whose bridge runs forward
  * from both ends, has room to taper between the two thicknesses (it changes
- * by at most TAPER of its length) and room to turn between the two
- * directions (an arc about as wide as the stroke). Failing all, the pair
- * that misses least. The user: the joints "connect at various angles", so
- * the bridge has to be fitted per meeting.
+ * by at most TAPER of its length), room to turn between the two directions
+ * (an arc about as wide as the stroke), and bends neither edge tighter than
+ * BRIDGE_RADIUS. Where no pair bends that gently, the shallowest that meets
+ * the rest: trims driven deep to chase the bend read worse than the bend
+ * (the lam into the ha). Failing that too, the pair that misses least.
+ * `miss` is the shortfall on all of them (0 when met), `depth` the two
+ * trims' depths summed. The user: the joints "connect at various angles",
+ * so the bridge has to be fitted per meeting. Memoised per option lists and
+ * offset: the composer asks again and again.
  */
 const TAPER = 0.6;
-export function pickTrims(as: readonly FaceCut[], bs: readonly FaceCut[], offset: Pt): { a: FaceCut; b: FaceCut } {
-  let best: { a: FaceCut; b: FaceCut; miss: number; depth: number } | null = null;
-  as.forEach((a, i) => bs.forEach((b, j) => {
+export type TrimPick = { a: FaceCut; b: FaceCut; miss: number; depth: number };
+const trimMemo = new WeakMap<readonly FaceCut[], WeakMap<readonly FaceCut[], Map<string, TrimPick>>>();
+export function pickTrims(as: readonly FaceCut[], bs: readonly FaceCut[], offset: Pt): TrimPick {
+  const key = `${offset[0].toFixed(3)},${offset[1].toFixed(3)}`;
+  let byB = trimMemo.get(as);
+  if (!byB) trimMemo.set(as, (byB = new WeakMap()));
+  let byOff = byB.get(bs);
+  if (!byOff) byB.set(bs, (byOff = new Map()));
+  const hit = byOff.get(key);
+  if (hit) return hit;
+  let best: (TrimPick & { tier: number; room: number }) | null = null;
+  for (const a of as) for (const b of bs) {
     const ga = trimGeometry(a), gb = trimGeometry(b);
     const v: Pt = [gb.centre[0] + offset[0] - ga.centre[0], gb.centre[1] + offset[1] - ga.centre[1]];
     const L = Math.hypot(v[0], v[1]) || 1e-9;
     const ahead = Math.min(v[0] * ga.dir[0] + v[1] * ga.dir[1], v[0] * gb.dir[0] + v[1] * gb.dir[1]) / L;
     const turn = Math.acos(Math.max(-1, Math.min(1, ga.dir[0] * gb.dir[0] + ga.dir[1] * gb.dir[1])));
-    const miss = Math.max(0, 0.3 - ahead) * 4
+    const room = Math.max(0, 0.3 - ahead) * 4
       + Math.max(0, Math.abs(ga.width - gb.width) - TAPER * L) / PEN
       + Math.max(0, (turn * (ga.width + gb.width)) / 2 - L) / PEN;
-    const depth = i + j;
-    if (!best || (miss === 0 && (best.miss > 0 || depth < best.depth)) || (best.miss > 0 && miss < best.miss)) best = { a, b, miss, depth };
-  }));
-  return { a: best!.a, b: best!.b };
+    const miss = room + Math.max(0, BRIDGE_RADIUS - bridgeRadius(trimFace(a, [0, 0], false), trimFace(b, offset, true))) / PEN;
+    const depth = (a.depth ?? 0) + (b.depth ?? 0);
+    // 0: meets all; 1: meets all but the bend; 2: neither
+    const tier = miss === 0 ? 0 : room === 0 ? 1 : 2;
+    if (!best || tier < best.tier || (tier === best.tier && (tier < 2 ? depth < best.depth : room < best.room))) best = { a, b, miss, depth, tier, room };
+  }
+  const pick: TrimPick = { a: best!.a, b: best!.b, miss: best!.miss, depth: best!.depth };
+  byOff.set(key, pick);
+  return pick;
 }
 
 /**

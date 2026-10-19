@@ -87,6 +87,65 @@ const faceAt = (x: { centre: Pt; thickness: number; tangent: Pt }, outward: bool
   };
 };
 
+/** How far behind a trim's face, units, the outline is followed for a stub. */
+const STUB_DEPTH = 24;
+/** The outline may spread past the face's ends by STUB_SLOPE per unit
+ *  behind it: a stroke that flares a little is no step. */
+const STUB_SLOPE = 0.3;
+/** Square units of old end a trim may leave standing: measured on the first
+ *  target, clean trims score 0-15 and a visible step 40 and more. */
+export const STUB_TOL = 20;
+
+/**
+ * How much of the old end a trim leaves standing beside its face, square
+ * units: `kept` is the part kept, holding the face `a`-`b` as one edge. A
+ * square cut made too shallow runs out through a slanted end the designer
+ * cut, and the outline leaving the face's end then runs sideways along that
+ * old end, a step beside the bridge. A clean trim's outline leaves both
+ * ends of the face going back into the stroke (`inward`); what spreads
+ * wider than STUB_SLOPE allows, over the first STUB_DEPTH units behind the
+ * face, is summed as area.
+ */
+export function stubArea(kept: SvgCmd[], face: { a: Pt; b: Pt }, inward: Pt): number {
+  const n = unit(inward), span = Math.hypot(face.b[0] - face.a[0], face.b[1] - face.a[1]);
+  const u: Pt = [(face.b[0] - face.a[0]) / (span || 1), (face.b[1] - face.a[1]) / (span || 1)];
+  const near = (p: Pt, q: Pt) => Math.abs(p[0] - q[0]) + Math.abs(p[1] - q[1]) < 1e-3;
+  for (const raw of flattenContours(kept)) {
+    // the flattened outline repeats a point where segments meet: drop repeats
+    const c = raw.filter((p, i) => !near(p, raw[(i + 1) % raw.length]));
+    const ia = c.findIndex((p) => near(p, face.a)), ib = c.findIndex((p) => near(p, face.b));
+    if (ia < 0 || ib < 0 || (Math.abs(ia - ib) !== 1 && Math.abs(ia - ib) !== c.length - 1)) continue;
+    let area = 0;
+    // walk away from the face from each of its ends
+    for (const [from, other] of [[ia, ib], [ib, ia]]) {
+      const step = (from + 1) % c.length === other ? -1 : 1;
+      let arc = 0, prev = c[from], lastDepth = 0;
+      walk: for (let k = 1; k < c.length && arc < 3 * STUB_DEPTH; k++) {
+        const q = c[(from + step * k + c.length * k) % c.length];
+        const len = Math.hypot(q[0] - prev[0], q[1] - prev[1]), m = Math.max(1, Math.ceil(len / 2));
+        // along the edge in steps of about 2 units: a straight old end is one long edge
+        for (let i = 1; i <= m; i++) {
+          const d: Pt = [prev[0] + ((q[0] - prev[0]) * i) / m - face.a[0], prev[1] + ((q[1] - prev[1]) * i) / m - face.a[1]];
+          const depth = d[0] * n[0] + d[1] * n[1], lateral = d[0] * u[0] + d[1] * u[1];
+          if (depth > STUB_DEPTH) break walk;
+          const outside = from === ia ? -lateral : lateral - span;
+          // ink in front of the face counts whole; beside it, past the flare
+          const excess = Math.max(0, depth < 0 ? Math.max(outside, -depth) : outside - STUB_SLOPE * depth);
+          area += excess * Math.max(Math.abs(depth - lastDepth), len / m / 4);
+          lastDepth = depth;
+        }
+        arc += len;
+        prev = q;
+      }
+    }
+    return area;
+  }
+  return 0;
+}
+
+/** Does a trim leave a visible step (stubArea)? */
+export const leavesStub = (kept: SvgCmd[], face: { a: Pt; b: Pt }, inward: Pt) => stubArea(kept, face, inward) > STUB_TOL;
+
 /**
  * Square cuts at each of `depths` (units, ascending) into the stroke from
  * `meeting`, walking in along `inward` once (the stroke's middle re-found

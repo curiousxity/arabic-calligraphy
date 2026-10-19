@@ -16,7 +16,7 @@ import { flattenContours, outlineBounds, type Pt } from "./strokeCuts";
 import { transformCmds } from "./stackGeometry";
 import { pieceTransform } from "./stackOutline";
 import { canClimb } from "./tarkibClimb";
-import { chainRun, defaultChoice, missingLetters, variantsFor, RUN_GAP, WORD_GAP, type ChainedRun, type RunChoice } from "./tarkibChain";
+import { chainRun, defaultChoice, fittingVariants, missingLetters, RUN_GAP, WORD_GAP, type ChainedRun, type RunChoice } from "./tarkibChain";
 import type { TarkibLibrary } from "./tarkibSchema";
 import { scoreLayout, type TarkibScore } from "./tarkibScore";
 import type { SignSet } from "./tarkibSigns";
@@ -270,10 +270,10 @@ export function composeInShape(lib: TarkibLibrary, input: ComposeInput, onProgre
   const starts = (c: RunChoice) => { const out: number[] = []; let k = 0; for (const id of c.schemaIds) { out.push(k); k += lib.schema.get(id)!.letters.length; } return out; };
 
   const swapVariant = (l: Layout): boolean => {
-    const i = Math.floor(rng() * runs.length), c = l.choices[i], st = starts(c);
+    const i = Math.floor(rng() * runs.length), c = l.choices[i];
     const k = Math.floor(rng() * c.schemaIds.length);
     if (lib.schema.get(c.schemaIds[k])!.letters.length !== 1) return false;
-    const alts = variantsFor(lib, runs[i].run.letters[st[k]], i === 0 && st[k] === 0).filter((s) => s.id !== c.schemaIds[k]);
+    const alts = fittingVariants(lib, runs[i].run, c, k, i === 0);
     if (!alts.length) return false;
     c.schemaIds[k] = pick(alts).id;
     delete c.stretch[`${runs[i].prefix}${k}`];

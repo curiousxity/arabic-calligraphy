@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadTarkibLibrary } from "./tarkibSchema";
-import { chainPhraseOnLine, chainRun, defaultChoice, variantsFor } from "./tarkibChain";
+import { BRIDGE_RADIUS, bridgeRadius, chainPhraseOnLine, chainRun, defaultChoice, endFit, fittingVariants, FIT_SLACK, OVERLAP, pickTrims, variantsFor } from "./tarkibChain";
 import { analyzePhrase } from "./tarkibText";
 import { assembleStackOutlineReport, pieceTransform } from "./stackOutline";
 import { transformCmds } from "./stackGeometry";
@@ -70,6 +70,24 @@ describe("defaultChoice", () => {
   });
 });
 
+describe("matching ends (a calligrapher picks the form drawn for its neighbour)", () => {
+  const ymn = analyzePhrase("أيمن").words[0].runs[1];      // ي م ن
+  it("after a meem, takes the nun drawn to follow a meem, not one drawn after a tooth", () => {
+    // the bought set draws its finishing nuns per predecessor: 46-49 after a
+    // tooth, 66 flat from the right, 67-68 after a meem's or ha's tail
+    const meem = lib.schema.get("thuluth-v2-141")!;
+    expect(endFit(meem, lib.schema.get("thuluth-v3-67")!)).toBeLessThan(endFit(meem, lib.schema.get("thuluth-v3-46")!));
+    expect(defaultChoice(lib, ymn)!.schemaIds[2]).toBe("thuluth-v3-67");
+  });
+  it("offers the composer only variants whose ends fit their neighbours about as well", () => {
+    const choice = defaultChoice(lib, ymn)!;
+    const alts = fittingVariants(lib, ymn, choice, 2);
+    const meem = lib.schema.get(choice.schemaIds[1])!;
+    expect(alts.map((s) => s.id)).not.toContain("thuluth-v3-46");
+    for (const s of alts) expect(endFit(meem, s)).toBeLessThanOrEqual(endFit(meem, lib.schema.get(choice.schemaIds[2])!) + FIT_SLACK);
+  });
+});
+
 describe("typical forms", () => {
   it("does not pick a sheet's smallest form: a final nun reads as a nun, not a zay", () => {
     const run = analyzePhrase("أيمن").words[0].runs[1];        // ي م ن
@@ -96,6 +114,30 @@ describe("joins (the user: smooth joints are essential)", () => {
         expect(cross, `${text} ${j.id}`).toBe(false);
       }
     }
+  });
+
+  it("bends no bridge of the first target tighter than BRIDGE_RADIUS where some trims allow it", () => {
+    // ha into a flat-entry ba, trimmed shallow, bent its inner edge at a
+    // radius of 6 units: a visible pinch. The lam into the ha has no trims
+    // that bend so gently, and keeps its shallow pair.
+    let n = 0;
+    for (const run of analyzePhrase("أُمّ أَيْمَن الحُبّ حَيَاتِي").words.flatMap((w) => w.runs)) {
+      if (run.letters.length < 2) continue;
+      const ch = defaultChoice(lib, run)!, c = chainRun(lib, run, ch, "p", 0);
+      const byId = new Map(c.pieces.map((p) => [p.id, p]));
+      for (const j of c.joins) {
+        const A = byId.get(j.from.pieceId)!, B = byId.get(j.to.pieceId)!;
+        const at = (f: StackPiece["faces"][number], q: StackPiece) => ({ ...f, a: [f.a[0] + q.x, f.a[1] + q.y] as [number, number], b: [f.b[0] + q.x, f.b[1] + q.y] as [number, number] });
+        const k = Number(j.from.pieceId.slice(1));
+        const p = lib.schema.get(ch.schemaIds[k])!, q = lib.schema.get(ch.schemaIds[k + 1])!;
+        const w = [Math.cos(p.exit!.angle), Math.sin(p.exit!.angle)];
+        const off: [number, number] = [p.exit!.point[0] - w[0] * OVERLAP - q.entry!.point[0], p.exit!.point[1] - w[1] * OVERLAP - q.entry!.point[1]];
+        if (pickTrims(p.exit!.options ?? [p.exit!.face!], q.entry!.options ?? [q.entry!.face!], off).miss > 0) continue;
+        expect(bridgeRadius(at(A.faces[j.from.faceIndex], A), at(B.faces[j.to.faceIndex], B)), j.id).toBeGreaterThanOrEqual(BRIDGE_RADIUS);
+        n++;
+      }
+    }
+    expect(n).toBeGreaterThanOrEqual(4);
   });
 });
 
