@@ -82,6 +82,39 @@ describe("tarkib piece schema", () => {
     expect(alif.ownDots).toBe(false);
   });
 
+  it("joins and stretches a piece that draws its own dots on its body, never on its dots", () => {
+    // the user: the alif of حياتي was "joined to the nuqta of the ya, not the
+    // ya body". Touching dots are one shape too big for a single nuqta, and
+    // the generator took the blob for the letter's leftmost ink.
+    const shoelace = (k: number[][]) => Math.abs(k.reduce((t, p, i) => { const q = k[(i + 1) % k.length]; return t + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+    const near = (k: number[][], p: number[]) => k.some((a, i) => {
+      const b = k[(i + 1) % k.length], e = [b[0] - a[0], b[1] - a[1]], L2 = e[0] * e[0] + e[1] * e[1] || 1;
+      const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * e[0] + (p[1] - a[1]) * e[1]) / L2));
+      return Math.hypot(a[0] + e[0] * t - p[0], a[1] + e[1] * t - p[1]) < 6;
+    });
+    let n = 0;
+    for (const s of lib.schema.values()) {
+      if (!s.ownDots || s.standIn) continue;
+      const cs = flattenContours(parseSvgPath(lib.items.get(s.itemId)!.d));
+      if (cs.length < 2) continue;
+      // the body: the contour enclosing the most area
+      const body = cs.reduce((a, b) => (shoelace(b) > shoelace(a) ? b : a));
+      const onBody = (p: number[]) => pointInPolygon(p[0], p[1], body as Array<[number, number]>) || near(body, p);
+      for (const end of ["entry", "exit"] as const) {
+        const e = s[end];
+        if (!e) continue;
+        expect(onBody(e.point), `${s.itemId} ${end} at ${e.point}`).toBe(true);
+        n++;
+      }
+      for (const z of s.stretch) {
+        const c = Math.cos(z.angle), sn = Math.sin(z.angle), y = z.window?.y ?? 0;
+        const mid = [z.cutX * c - y * sn, z.cutX * sn + y * c];
+        expect(onBody(mid), `${s.itemId} stretch zone at ${mid.map((v) => v.toFixed(0))}`).toBe(true);
+      }
+    }
+    expect(n).toBeGreaterThanOrEqual(20);
+  });
+
   it("never trims away a counter: every join cut keeps all the piece's contours", () => {
     const count = (c: SvgCmd[]) => c.filter((k) => k.type === "M").length;
     for (const s of lib.schema.values()) {

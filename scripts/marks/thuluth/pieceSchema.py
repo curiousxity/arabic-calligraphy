@@ -35,6 +35,10 @@ Per piece, in library units (48 per pen, y down, centred):
   previous letter's stroke would land if this piece stood in for a middle
   form the library lacks (tarkibSchema.ts, `standIn`).
 - `dots`: how many separate nuqta-sized blobs the piece draws.
+Ends, zones and the foot are read from the letter's body only (`body_of`):
+a dotted letter's dots are dropped first. Two or three touching dots are
+one blob too big for a nuqta, and the ya of the second set (w3-27) took its
+dot pair for its leftmost ink: the next letter joined onto the dots.
 `NUQTA_D`: the nuqta, the pen's own stamp: a rhombus whose *side* is the
 pen width (48 units, the nib's edge), so its diagonals are about 1.4 pens,
 tipped with the nib. The vector set draws no dots and the scans rarely keep
@@ -45,7 +49,7 @@ noFreeEnd|use}}) are applied last. `use` is the user's word on where a
 form belongs: "never" (a special case the composer leaves alone, such as the
 footed alifs) or "opening" (only as a composition's first letter: the
 curved alifs)."""
-import sys, os, re, json, math
+import sys, os, re, json, math, copy
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from joinGeometry import library, Ink, end_run, contours, PEN
@@ -164,6 +168,29 @@ def dot_blobs(ink):
         if 0.6 * PEN <= max(w, h) <= 1.6 * PEN and max(w, h) / max(1, min(w, h)) < 1.8: out.append((x0, y0, x1, y1))
     return out
 
+DOTTED = set("بتثجخذزشضظغفقنية")
+DOT_CLUSTER = (3.5 * PEN, 2.0 * PEN, 4.5 * 2100)   # longest side, shortest side, area: up to three fused nuqtas
+
+def body_of(ink, name):
+    """`ink` without its dots, where the piece's letters (the Arabic in its
+    name's brackets) are dotted: every blob but the largest that is no bigger
+    than three fused nuqtas. Undotted letters keep every blob: a kaf's
+    stroke or a lam-alif's second stroke is the letter."""
+    letters = "".join(re.findall(r"\(([^)]*)\)", name))
+    if not DOTTED & set(letters): return ink
+    n, lab, st, _ = cv2.connectedComponentsWithStats(ink.m.astype(np.uint8), 8)
+    if n < 3: return ink
+    big = 1 + int(np.argmax(st[1:, 4]))
+    drop = [i for i in range(1, n) if i != big
+            and max(st[i][2], st[i][3]) <= DOT_CLUSTER[0] and min(st[i][2], st[i][3]) <= DOT_CLUSTER[1] and st[i][4] <= DOT_CLUSTER[2]]
+    if not drop: return ink
+    body = copy.copy(ink)
+    body.m = ink.m & ~np.isin(lab, drop)
+    ys, xs = np.nonzero(body.m)
+    body.xmin, body.xmax = xs.min() + ink.x0, xs.max() + ink.x0
+    body.ymin, body.ymax = ys.min() + ink.y0, ys.max() + ink.y0
+    return body
+
 SHEET_OF = {"thuluth-v1-": ("t35", "thuluth-35-beginnings.svg"), "thuluth-v2-": ("t36", "thuluth-36-middles.svg"),
             "thuluth-v3-": ("t34", "thuluth-34-endings.svg")}
 _sheets = {}
@@ -255,20 +282,21 @@ overrides = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__
 geo, nuqta, counts = {}, None, {"pieces": 0, "right": 0, "left": 0, "contact": 0, "zones": 0}
 for i, n, w, h, d in library():
     ink = Ink(d); segs = segments(d); g = {}
+    body = body_of(ink, n)
     if i[:11] in SHEET_OF:
-        g.update(contact_faces(i, ink, segs)); counts["contact"] += len(g)
+        g.update(contact_faces(i, body, segs)); counts["contact"] += len(g)
     else:
         for side in ("right", "left"):
-            f = flat_face(ink, segs, side) or run_face(ink, side)
+            f = flat_face(body, segs, side) or run_face(body, side)
             if f: g[side] = f
     counts["right"] += "right" in g; counts["left"] += "left" in g
-    z = zones(ink)
+    z = zones(body)
     if z: g["zones"] = z; counts["zones"] += 1
     g["dots"] = len(dot_blobs(ink))
-    ys, xs = np.nonzero(ink.m)
+    ys, xs = np.nonzero(body.m)
     low = ys >= np.percentile(ys, 70)
     k = np.argmax(np.where(low, xs, -1))
-    g["foot"] = [float(xs[k] + ink.x0), float(ys[k] + ink.y0)]
+    g["foot"] = [float(xs[k] + body.x0), float(ys[k] + body.y0)]
     g.update(overrides.get(i, {}))
     geo[i] = g; counts["pieces"] += 1
 # corners: top, right, bottom, left; the top and bottom lean with the nib
