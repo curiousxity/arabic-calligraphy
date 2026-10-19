@@ -479,3 +479,156 @@ export function seamReport(
   const why = bad ? "tangent" : crossed ? "cross" : narrowest < SEAM_WAIST || widest > SEAM_BULGE ? "width" : undefined;
   return { edgeA, edgeB, curveA, curveB, ok: !why, ...(why ? { why } : {}), narrowest, widest };
 }
+
+/** Units of ink outline ahead of a trim searched for a landing (two pens). */
+const LANDING_REACH = 96;
+/** Units between the landing points tried along the outline. */
+const LANDING_STEP = 3;
+/** Units: a landing's outer edge bends no tighter than this where any
+ *  landing can. The edge is an S (the stroke's edge runs a few units above
+ *  the ink's, nearly parallel), and a cubic S bends most at its two ends,
+ *  so this is the bend at the seams: read two units a step, as the tests
+ *  read an outline, radius 30 turns 3.8 degrees a step, under the 4-degree
+ *  corner line. A shorter landing (BRIDGE_RADIUS 10, chord 17 on the ya into
+ *  the meem) landed as a visible bump. */
+export const LANDING_RADIUS = 30;
+
+export type Landing = {
+  /** The edge from the trim's clear corner onto the ink's outline, one cubic. */
+  outer: [Pt, Pt, Pt, Pt];
+  /** The edge from the trim's buried corner into the ink, one cubic. */
+  inner: [Pt, Pt, Pt, Pt];
+  /** Where the outer edge lands, on the outline. */
+  q: Pt;
+  /** Where the inner edge ends, inside the ink under `q`. */
+  q2: Pt;
+  /** The outer edge's tightest bend, units. */
+  radius: number;
+  /** Whether the clear corner is the face's `a`. */
+  outerIsA: boolean;
+};
+
+/** Nonzero winding: is `p` inked by the flattened contours? */
+function inked(polys: readonly Pt[][], p: Pt): boolean {
+  let w = 0;
+  for (const poly of polys) for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const cr = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+    if (a[1] <= p[1]) { if (b[1] > p[1] && cr > 0) w++; }
+    else if (b[1] <= p[1] && cr < 0) w--;
+  }
+  return w !== 0;
+}
+
+/** The tightest bend, units, along a sampled edge: at each point, the mean
+ *  of the two steps over the turn between them. */
+export function tightestRadius(e: readonly Pt[]): number {
+  let r = Infinity;
+  for (let i = 1; i + 1 < e.length; i++) {
+    const u: Pt = [e[i][0] - e[i - 1][0], e[i][1] - e[i - 1][1]], v: Pt = [e[i + 1][0] - e[i][0], e[i + 1][1] - e[i][1]];
+    const lu = Math.hypot(u[0], u[1]), lv = Math.hypot(v[0], v[1]);
+    if (lu < 1e-6 || lv < 1e-6) continue;
+    const turn = Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / lu / lv)));
+    if (turn > 1e-6) r = Math.min(r, (lu + lv) / 2 / turn);
+  }
+  return r;
+}
+
+/**
+ * Where a trimmed stroke meets ink that cannot be trimmed (a middle meem's
+ * head: its window would go), one corner of the trim stands clear of the
+ * ink and the other is buried in it. The join is a landing, the way a pen
+ * runs into a loop it then draws: the clear corner's edge continues the
+ * stroke's outline (`tA`, out of the piece, as outlineTangents gives it) and
+ * arrives running along the ink's outline at `q`, the nearest point ahead
+ * where one cubic between them bends no tighter than `minRadius` and stays
+ * clear of the ink until it lands (failing that, the gentlest that stays
+ * clear); the buried corner's edge dives into the ink under `q`, where the
+ * ink covers it. `ink` is the contours landed on, the stroke's own excluded.
+ * Null where the trim is wholly clear or wholly buried, where the ink ahead
+ * has no smooth stretch to land on, or where the inner edge cannot be kept
+ * inside the ink (a nick would show).
+ */
+export function landingEdges(A: CutFace, tA: { a: Pt; b: Pt }, ink: readonly Seg[][], minRadius: number): Landing | null {
+  const polys = ink.map((c) => c.flatMap(segPoints).filter((p, i, all) => i === 0 || !near(p, all[i - 1])));
+  const inA = inked(polys, A.a), inB = inked(polys, A.b);
+  if (inA === inB) return null;
+  const outerIsA = !inA;
+  const P = outerIsA ? A.a : A.b, tP = outerIsA ? tA.a : tA.b;
+  const P2 = outerIsA ? A.b : A.a, tP2 = outerIsA ? tA.b : tA.a;
+  const dot = (u: Pt, v: Pt) => u[0] * v[0] + u[1] * v[1];
+  const unit = (v: Pt): Pt => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
+  // one cubic from p along tp to q arriving along tq, handles a third of the chord
+  const cubic = (p: Pt, tp: Pt, q: Pt, tq: Pt): [Pt, Pt, Pt, Pt] => {
+    const h = Math.hypot(q[0] - p[0], q[1] - p[1]) / 3;
+    return [p, [p[0] + tp[0] * h, p[1] + tp[1] * h], [q[0] - tq[0] * h, q[1] - tq[1] * h], q];
+  };
+  const sample = (c: [Pt, Pt, Pt, Pt]) => Array.from({ length: 25 }, (_, i) => bezierAt(c, i / 24));
+  let best: { q: Pt; t: Pt; outer: [Pt, Pt, Pt, Pt]; radius: number; chord: number } | null = null;
+  for (const poly of polys) {
+    const n = poly.length;
+    let since = Infinity;
+    for (let i = 0; i < n; i++) {
+      const q = poly[i];
+      since += Math.hypot(q[0] - poly[(i - 1 + n) % n][0], q[1] - poly[(i - 1 + n) % n][1]);
+      if (since < LANDING_STEP) continue;
+      since = 0;
+      const chord = Math.hypot(q[0] - P[0], q[1] - P[1]);
+      if (chord < 2 || chord > LANDING_REACH) continue;
+      // ahead of the corner
+      if (dot([q[0] - P[0], q[1] - P[1]], tP) < 0.3 * chord) continue;
+      // the outline's direction at q, fitted both ways: a corner of the ink is no landing
+      const ahead: Pt[] = [], behind: Pt[] = [];
+      for (let k = 1; k < n && ahead.length < 400; k++) ahead.push(poly[(i + k) % n]);
+      for (let k = 1; k < n && behind.length < 400; k++) behind.push(poly[(i - k + n) % n]);
+      const f = leaving(q, ahead), b = leaving(q, behind);
+      if (dot(f, b) > -0.9) continue;
+      let t = unit([f[0] - b[0], f[1] - b[1]]);
+      if (dot(t, tP) < 0) t = [-t[0], -t[1]];
+      if (dot(t, tP) < 0.5) continue;
+      const outer = cubic(P, tP, q, t);
+      const pts = sample(outer);
+      // clear of the ink until it lands
+      if (pts.slice(1, -2).some((p) => inked(polys, p))) continue;
+      const radius = tightestRadius(pts);
+      const ok = radius >= minRadius;
+      if (!best || (ok && (best.radius < minRadius || chord < best.chord)) || (!ok && best.radius < minRadius && radius > best.radius))
+        best = { q, t, outer, radius, chord };
+    }
+  }
+  if (!best) return null;
+  // the inner edge: into the ink under the landing, by up to the stroke's thickness
+  const perp: Pt = [-best.t[1], best.t[0]];
+  const nrm: Pt = inked(polys, [best.q[0] + perp[0] * 2, best.q[1] + perp[1] * 2]) ? perp : [-perp[0], -perp[1]];
+  const w = faceThickness(A);
+  let depth = 0;
+  while (depth + 1 <= w && inked(polys, [best.q[0] + nrm[0] * (depth + 1), best.q[1] + nrm[1] * (depth + 1)])) depth++;
+  for (let d = Math.max(1, depth - 1); ; d = Math.floor(d / 2)) {
+    const q2: Pt = [best.q[0] + nrm[0] * d, best.q[1] + nrm[1] * d];
+    const inner = cubic(P2, tP2, q2, best.t);
+    if (sample(inner).slice(1).every((p) => inked(polys, p))) return { outer: best.outer, inner, q: best.q, q2, radius: best.radius, outerIsA };
+    if (d <= 1) return null;
+  }
+}
+
+/**
+ * The contour carrying face `A`'s bridge edge, extended by its landing on
+ * the other contours (landingEdges): the bridge edge replaced by the outer
+ * cubic, a step across inside the ink, and the inner cubic back. The ink's
+ * own contours are untouched; the overlap draws as one under nonzero fill.
+ * Null where nothing lands.
+ */
+export function landJoin(contours: Seg[][], A: CutFace, tA: { a: Pt; b: Pt }, minRadius: number): Seg[][] | null {
+  const n = findBridge(contours, A);
+  if (!n) return null;
+  const rest = contours.filter((_, i) => i !== n.contour);
+  const L = landingEdges(A, tA, rest, minRadius);
+  if (!L) return null;
+  // the walk ends at the point the bridge edge started from (spliceJoin)
+  const walk = walkWithout(contours[n.contour], n.seg);
+  const endsAtOuter = n.startsAtA === L.outerIsA;
+  const tail: Seg[] = endsAtOuter
+    ? [{ type: "C", p: L.outer }, { type: "L", p: [L.q, L.q2] }, { type: "C", p: [...L.inner].reverse() }]
+    : [{ type: "C", p: L.inner }, { type: "L", p: [L.q2, L.q] }, { type: "C", p: [...L.outer].reverse() }];
+  return [...rest, [...walk, ...tail]];
+}

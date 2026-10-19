@@ -6,7 +6,7 @@ import type { Pt } from "./strokeCuts";
 import {
   type PieceTransform, transformCmds, transformFace, transformPt, toSegments, fromSegments, cmdsCentre,
 } from "./stackGeometry";
-import { joinEdges, joinFloor, outlineTangents, seamEdges, spliceJoin } from "./stackJoin";
+import { joinEdges, joinFloor, LANDING_RADIUS, landJoin, outlineTangents, seamEdges, spliceJoin } from "./stackJoin";
 
 export const pieceTransform = (p: StackPiece): PieceTransform =>
   ({ x: p.x, y: p.y, rotation: p.rotation, pivot: p.pivot });
@@ -35,6 +35,15 @@ export function assembleStackOutlineReport(
   for (const j of js) {
     const from = byId.get(j.from.pieceId), to = byId.get(j.to.pieceId);
     const fa = from?.faces[j.from.faceIndex], fb = to?.faces[j.to.faceIndex];
+    if (j.land) {
+      // onto the ink ahead of the trim, whichever piece's: `to` names the letter meant
+      if (!from || !to || !fa) { skipped++; continue; }
+      const A = transformFace(fa, pieceTransform(from));
+      const tA = outlineTangents(pool, A);
+      const landed = tA && landJoin(pool, A, tA, LANDING_RADIUS);
+      if (landed) pool = landed; else skipped++;
+      continue;
+    }
     if (!from || !to || !fa || !fb) { skipped++; continue; }
     const A = transformFace(fa, pieceTransform(from));
     const B = transformFace(fb, pieceTransform(to));

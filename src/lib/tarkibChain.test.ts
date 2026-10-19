@@ -106,6 +106,7 @@ describe("joins (the user: smooth joints are essential)", () => {
       const c = chainRun(lib, run, defaultChoice(lib, run)!, "p", 0);
       const byId = new Map(c.pieces.map((p) => [p.id, p]));
       for (const j of c.joins) {
+        if (j.land) continue;   // a landing has a face at one end only: its own test above
         const A = byId.get(j.from.pieceId)!, B = byId.get(j.to.pieceId)!;
         const fa = A.faces[j.from.faceIndex], fb = B.faces[j.to.faceIndex];
         const w = (p: [number, number], q: StackPiece): [number, number] => [p[0] + q.x, p[1] + q.y];
@@ -115,6 +116,103 @@ describe("joins (the user: smooth joints are essential)", () => {
         expect(cross, `${text} ${j.id}`).toBe(false);
       }
     }
+  });
+
+  it("lands a trimmed exit on an entry that cannot be trimmed: the ya of أيمن flows onto the meem's head as one stroke", () => {
+    // a middle meem's head cannot be trimmed without its window, so the ya
+    // only touched it, its flat end standing a quarter pen above the head
+    // (a 66-degree corner). Now the ya is trimmed and a bridge lands its
+    // top edge on the head's outline, the bottom edge diving into the ink.
+    const run = analyzePhrase("أَيْمَن").words[0].runs.find((r) => r.letters.length >= 3)!;
+    const c = chainRun(lib, run, defaultChoice(lib, run)!, "p", 0);
+    const j = c.joins.find((x) => x.from.pieceId === "p0" && x.to.pieceId === "p1")!;
+    expect(j?.land).toBe(true);
+    const ya = c.pieces.find((p) => p.id === "p0")!, meem = c.pieces.find((p) => p.id === "p1")!;
+    const f = ya.faces[j.from.faceIndex];
+    expect(f).toBeDefined();
+    const rep = assembleStackOutlineReport(c.pieces, c.joins, NIB);
+    expect(rep.skipped).toBe(0);
+    const outline = flattenContours(rep.cmds, 256);
+    const head = flattenContours(transformCmds(meem.cmds, pieceTransform(meem)), 256);
+    const inHead = (p: number[]) => head.reduce((n, k) => n + (pointInPolygon(p[0], p[1], k as Array<[number, number]>) ? 1 : 0), 0) % 2 === 1;
+    const nearestEdge = (p: number[]) => {
+      let best = { d: Infinity, dir: [1, 0] };
+      for (const k of head) for (let i = 0; i < k.length; i++) {
+        const a = k[i], b = k[(i + 1) % k.length], e = [b[0] - a[0], b[1] - a[1]], L = Math.hypot(e[0], e[1]) || 1;
+        const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * e[0] + (p[1] - a[1]) * e[1]) / (L * L)));
+        const d = Math.hypot(a[0] + e[0] * t - p[0], a[1] + e[1] * t - p[1]);
+        if (d < best.d) best = { d, dir: [e[0] / L, e[1] / L] };
+      }
+      return best;
+    };
+    // the ya's corner standing clear of the head
+    const corner = [f.a, f.b].map((e) => [e[0] + ya.x, e[1] + ya.y]).find((w) => !inHead(w))!;
+    expect(corner).toBeDefined();
+    const raw = outline.find((k) => k.some((p) => Math.hypot(p[0] - corner[0], p[1] - corner[1]) < 1e-3))!;
+    const i0 = raw.findIndex((p) => Math.hypot(p[0] - corner[0], p[1] - corner[1]) < 1e-3);
+    // walk from the corner the way the bridge goes (away from the ya's own
+    // outline: the side whose next point is not on the ya), two units a step
+    const yaPts = flattenContours(transformCmds(ya.cmds, pieceTransform(ya)), 256).flat();
+    const onYa = (p: number[]) => yaPts.some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-3);
+    const dir = onYa(raw[(i0 + 1) % raw.length]) ? -1 : 1;
+    const along = (d: 1 | -1, n: number) => {
+      const pts: number[][] = [];
+      let prev = raw[i0], need = 2;
+      for (let k = 1; pts.length < n && k < raw.length; k++) {
+        const q = raw[(i0 + d * k + raw.length * 4) % raw.length];
+        let dd = Math.hypot(q[0] - prev[0], q[1] - prev[1]);
+        while (dd >= need && pts.length < n) {
+          const t = need / dd;
+          prev = [prev[0] + (q[0] - prev[0]) * t, prev[1] + (q[1] - prev[1]) * t];
+          pts.push(prev); dd -= need; need = 2;
+        }
+        need -= dd; prev = q;
+      }
+      return pts;
+    };
+    // the bridge ends where the drawn outline reaches the head's outline
+    // (the landing is a point of the head's own outline); then the head's
+    // outline carries on from there
+    let iq = -1;
+    for (let k = 1; k < raw.length; k++) {
+      const q = raw[(i0 + dir * k + raw.length * 4) % raw.length];
+      if (nearestEdge(q).d < 0.02) { iq = (i0 + dir * k + raw.length * 4) % raw.length; break; }
+      if (inHead(q) && nearestEdge(q).d > 1) break;
+    }
+    expect(iq, "the bridge reaches the head").toBeGreaterThanOrEqual(0);
+    const q = raw[iq];
+    // the bridge, two units a step from the corner, ending at the landing
+    const bridge = along(dir, 80).filter((p) => Math.hypot(p[0] - q[0], p[1] - q[1]) > 1 && Math.hypot(p[0] - corner[0], p[1] - corner[1]) < Math.hypot(q[0] - corner[0], q[1] - corner[1]));
+    expect(bridge.length).toBeGreaterThan(3);
+    // the head's outline beyond the landing, two units a step, the way the bridge travels
+    const travel = [q[0] - bridge[bridge.length - 1][0], q[1] - bridge[bridge.length - 1][1]];
+    const hk = head.find((k) => k.some((p) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.02))!;
+    const hi = hk.findIndex((p) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.02);
+    const hdir = (hk[(hi + 1) % hk.length][0] - q[0]) * travel[0] + (hk[(hi + 1) % hk.length][1] - q[1]) * travel[1] > 0 ? 1 : -1;
+    const after: number[][] = [];
+    let prev = q, need = 2;
+    for (let k = 1; after.length < 3 && k < hk.length; k++) {
+      const p = hk[(hi + hdir * k + hk.length * 4) % hk.length];
+      let dd = Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+      while (dd >= need && after.length < 3) {
+        const t = need / dd;
+        prev = [prev[0] + (p[0] - prev[0]) * t, prev[1] + (p[1] - prev[1]) * t];
+        after.push(prev); dd -= need; need = 2;
+      }
+      need -= dd; prev = p;
+    }
+    const turnDeg = (u: number[], v: number[]) => (Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / Math.hypot(u[0], u[1]) / Math.hypot(v[0], v[1])))) * 180) / Math.PI;
+    // three steps back along the ya, the corner, the bridge, the landing, three steps on along the head
+    const ring = [...along(-dir as 1 | -1, 3).reverse(), raw[i0], ...bridge, q, ...after];
+    const turns = ring.slice(1, -1).map((_, k) => {
+      const u = [ring[k + 1][0] - ring[k][0], ring[k + 1][1] - ring[k][1]], v = [ring[k + 2][0] - ring[k + 1][0], ring[k + 2][1] - ring[k + 1][1]];
+      return turnDeg(u, v);
+    });
+    // no corner anywhere, the two seams included: the outline turns at no
+    // point more than 4 degrees beyond what it turns beside it (the seam
+    // test's measure). A bend turns evenly; a corner turns at one point.
+    for (let k = 1; k + 1 < turns.length; k++)
+      expect(turns[k] - Math.max(turns[k - 1], turns[k + 1]), `step ${k} of ${turns.map((t) => t.toFixed(1)).join(" ")}`).toBeLessThan(4);
   });
 
   it("leaves no corner where a bridge meets a letter: the drawn outline turns there no more than beside it", () => {
@@ -129,6 +227,7 @@ describe("joins (the user: smooth joints are essential)", () => {
       const outline = flattenContours(assembleStackOutlineReport(c.pieces, c.joins, NIB).cmds, 256);
       const byId = new Map(c.pieces.map((p) => [p.id, p]));
       for (const j of c.joins) {
+        if (j.land) continue;   // a landing has a face at one end only: its own test above
         for (const [pid, fi] of [[j.from.pieceId, j.from.faceIndex], [j.to.pieceId, j.to.faceIndex]] as const) {
           const q = byId.get(pid)!, f = q.faces[fi];
           for (const e of [f.a, f.b]) {
@@ -183,6 +282,7 @@ describe("joins (the user: smooth joints are essential)", () => {
       const ch = defaultChoice(lib, run)!, c = chainRun(lib, run, ch, "p", 0);
       const byId = new Map(c.pieces.map((p) => [p.id, p]));
       for (const j of c.joins) {
+        if (j.land) continue;   // a landing has a face at one end only: its own test above
         const A = byId.get(j.from.pieceId)!, B = byId.get(j.to.pieceId)!;
         const at = (f: StackPiece["faces"][number], q: StackPiece) => ({ ...f, a: [f.a[0] + q.x, f.a[1] + q.y] as [number, number], b: [f.b[0] + q.x, f.b[1] + q.y] as [number, number] });
         const k = Number(j.from.pieceId.slice(1));

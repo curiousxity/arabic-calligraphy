@@ -137,6 +137,23 @@ does something, but its handle sits on the centre-line cubic, which no
 longer matches the drawn edges exactly. Old saves have no `seam` and draw
 as before.
 
+**A `land` join has a face at one end only** (`landJoin`, `landingEdges`,
+`stackJoin.ts`; `to.faceIndex` is -1). Where an exit can be trimmed but the
+entry cannot (a middle meem's head: any trim takes its window), the trim's
+one corner standing clear of the ink is landed on the ink's outline ahead,
+one cubic leaving along the stroke's edge and arriving along the ink's at
+the nearest point where it bends no tighter than `LANDING_RADIUS` and stays
+clear until it lands; the buried corner's edge dives into the ink. The
+stroke's own contour is extended, the ink's left alone: they overlap, which
+nonzero fill draws as one. That edge is an S a few units deep, and a cubic
+S bends most at its ends, so the radius (30) is set by the seams, not the
+middle: read two units a step, under the 4-degree corner line the tests
+use. A landing with the trim bridges' radius (10) landed as a bump. The
+overlay offers no bend on it and the converter skips it (no face to pair);
+`splitPieceAtCut` leaves a -1 index on the body. Before 2026-10-19 such a
+meeting was a touch, the designer's flat end standing a quarter pen proud
+of the head.
+
 **Near is left is later.** HarfBuzz's RTL glyph array is in visual order
 (index 0 leftmost = last in text). `splitAtCut`'s *near* side (x < cut in
 the stroke's frame) is visually left, which is the **later** letter in

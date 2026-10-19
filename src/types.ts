@@ -308,6 +308,12 @@ export type StackJoin = {
    *  the edges would cross or pinch the centre-line join is drawn. Absent =
    *  the centre line (every join before 2026-10-18). */
   seam?: boolean;
+  /** The exit is trimmed but the entry cannot be (a middle meem's head: its
+   *  window would go). The join lands the trim's clear corner on the ink
+   *  ahead, one cubic arriving along that ink's outline, and buries the other
+   *  corner's edge in the ink (`landJoin`). `to.faceIndex` is -1: there is no
+   *  face at that end, so nothing bends, converts or re-pairs this join. */
+  land?: true;
   /** The bend double-click returns to. Absent = { bow: 0, depth: 0 }. A
    *  curve converted from a letter rests at the bend that reproduces it. */
   rest?: { bow: number; depth: number };

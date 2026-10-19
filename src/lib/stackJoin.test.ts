@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   joinCenterline, joinEdges, joinFloor, joinHandles, faceThickness, solveJoinDrag, spliceJoin, MIN_HANDLE,
+  landingEdges, landJoin,
 } from "./stackJoin";
 import { splitAtCut, toSegments, fromSegments, type Seg } from "./stackGeometry";
 import { flattenContours } from "./strokeCuts";
@@ -355,5 +356,66 @@ describe("spliceJoin", () => {
     const r = splitAtCut(BAR, { cutX: 40, angle: 0 })!;
     const pool = toSegments(r.near);
     expect(spliceJoin(pool, r.nearFace, r.farFace, joinEdges(r.nearFace, r.farFace, 0, 3))).toBeNull();
+  });
+});
+
+describe("landing: a trimmed stroke onto ink that cannot be trimmed", () => {
+  // A bar 20 thick ending at x = 100, its top corner clear of a disc that
+  // swallows its bottom corner: the ya's tail on a middle meem's head.
+  const bar: Seg[] = [
+    { type: "L", p: [[0, -10], [100, -10]] }, { type: "L", p: [[100, -10], [100, 10]] },
+    { type: "L", p: [[100, 10], [0, 10]] }, { type: "L", p: [[0, 10], [0, -10]] },
+  ];
+  const C: P = [130, 25], R = 40;
+  const disc: Seg[] = Array.from({ length: 64 }, (_, i) => {
+    const a = (i / 64) * 2 * Math.PI, b = ((i + 1) / 64) * 2 * Math.PI;
+    return { type: "L" as const, p: [[C[0] + R * Math.cos(a), C[1] + R * Math.sin(a)], [C[0] + R * Math.cos(b), C[1] + R * Math.sin(b)]] as P[] };
+  });
+  const face: CutFace = { a: [100, -10], b: [100, 10], tangent: 0 };
+  const tA = { a: [1, 0] as P, b: [1, 0] as P };
+  const bez = (c: [P, P, P, P], t: number): P => {
+    const u = 1 - t;
+    return [u * u * u * c[0][0] + 3 * u * u * t * c[1][0] + 3 * u * t * t * c[2][0] + t * t * t * c[3][0],
+      u * u * u * c[0][1] + 3 * u * u * t * c[1][1] + 3 * u * t * t * c[2][1] + t * t * t * c[3][1]];
+  };
+  const inDisc = (p: P) => dist(p, C) < R;
+
+  it("lands the clear corner on the ink's outline, leaving along the stroke and arriving along the outline", () => {
+    const L = landingEdges(face, tA, [disc], 10)!;
+    expect(L).not.toBeNull();
+    expect(L.outer[0]).toEqual([100, -10]);
+    // on the disc, ahead of the corner
+    expect(Math.abs(dist(L.q, C) - R)).toBeLessThan(0.5);
+    expect(L.q[0]).toBeGreaterThan(100);
+    // leaves along the bar's top edge
+    const h0: P = [L.outer[1][0] - L.outer[0][0], L.outer[1][1] - L.outer[0][1]];
+    expect(Math.abs(Math.atan2(h0[1], h0[0]))).toBeLessThan(0.01);
+    // arrives along the disc's edge: the last handle is perpendicular to the radius
+    const h1: P = [L.outer[3][0] - L.outer[2][0], L.outer[3][1] - L.outer[2][1]], rad: P = [L.q[0] - C[0], L.q[1] - C[1]];
+    expect(Math.abs(h1[0] * rad[0] + h1[1] * rad[1]) / Math.hypot(h1[0], h1[1]) / R).toBeLessThan(0.03);
+    // the outer edge stays clear of the ink until it lands; the inner edge stays inside it
+    for (let i = 1; i < 23; i++) expect(inDisc(bez(L.outer, i / 24)), `outer ${i}`).toBe(false);
+    for (let i = 1; i <= 24; i++) expect(inDisc(bez(L.inner, i / 24)), `inner ${i}`).toBe(true);
+    expect(L.radius).toBeGreaterThanOrEqual(10);
+  });
+
+  it("is null where the trim is wholly clear of the ink, or wholly inside it", () => {
+    expect(landingEdges({ a: [100, -40], b: [100, -20], tangent: 0 }, tA, [disc], 10)).toBeNull();
+    expect(landingEdges({ a: [120, 10], b: [120, 30], tangent: 0 }, tA, [disc], 10)).toBeNull();
+  });
+
+  it("landJoin extends the stroke's contour onto the ink and leaves the ink's own contour alone", () => {
+    const out = landJoin([bar, disc], face, tA, 10)!;
+    expect(out).not.toBeNull();
+    expect(out.length).toBe(2);
+    expect(out).toContain(disc);
+    const ext = out.find((c) => c !== disc)!;
+    // the bar's own edges survive, the face edge is gone, and the contour passes through the landing
+    expect(ext.some((sg) => sg.type === "L" && dist(sg.p[0], [0, -10]) < 1e-9 && dist(sg.p[1], [100, -10]) < 1e-9)).toBe(true);
+    expect(ext.some((sg) => sg.type === "L" && dist(sg.p[0], [100, -10]) < 1e-9 && dist(sg.p[1], [100, 10]) < 1e-9)).toBe(false);
+    const L = landingEdges(face, tA, [disc], 10)!;
+    expect(ext.some((sg) => sg.p.some((q) => dist(q, L.q) < 1e-9))).toBe(true);
+    // closed: each segment starts where the one before ends
+    for (let i = 0; i < ext.length; i++) expect(dist(ext[i].p[ext[i].p.length - 1], ext[(i + 1) % ext.length].p[0])).toBeLessThan(1e-9);
   });
 });

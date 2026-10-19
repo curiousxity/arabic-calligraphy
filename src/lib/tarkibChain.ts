@@ -9,11 +9,11 @@
  */
 import type { CutFace, StackJoin, StackPiece } from "../types";
 import { splitPieceAtCut } from "./stackConvert";
-import { joinEdges, joinFloor, seamEdges } from "./stackJoin";
-import { transformCmds } from "./stackGeometry";
+import { joinEdges, joinFloor, LANDING_RADIUS, landingEdges, seamEdges } from "./stackJoin";
+import { toSegments, transformCmds, type Seg } from "./stackGeometry";
 import { assembleStackOutline, pieceTransform } from "./stackOutline";
 import { flattenContours, outlineBounds, type Pt } from "./strokeCuts";
-import { pointInPolygon } from "./svgPath";
+import { parseSvgPath, pointInPolygon, type SvgCmd } from "./svgPath";
 import { buildPiece } from "./tarkibPieces";
 import { canDraw, type FaceCut, type PieceSchema, type TarkibLibrary } from "./tarkibSchema";
 import { analyzePhrase, type PhraseLetter, type PhraseRun } from "./tarkibText";
@@ -326,6 +326,34 @@ function crossesOver(ea: Pt, eb: Pt, na: Pt, nb: Pt): boolean {
 
 const shift = (p: StackPiece, d: Pt): StackPiece => ({ ...p, x: p.x + d[0], y: p.y + d[1], homeX: p.homeX + d[0], homeY: p.homeY + d[1] });
 
+/** The trim for an exit landing on an entry that cannot be trimmed (a middle
+ *  meem's head; stackJoin.ts landingEdges): the shallowest whose landing
+ *  bends no tighter than LANDING_RADIUS, else the gentlest that lands at
+ *  all; null where no trim lands. `ink` is the next piece's outline, `offset`
+ *  its origin in the exit piece's frame; memoised per option list, next
+ *  piece and offset like pickTrims. */
+const landMemo = new WeakMap<readonly FaceCut[], Map<string, { a: FaceCut; radius: number } | null>>();
+export function pickLanding(as: readonly FaceCut[], inkId: string, ink: SvgCmd[], offset: Pt): { a: FaceCut; radius: number } | null {
+  const key = `${inkId}|${offset[0].toFixed(3)},${offset[1].toFixed(3)}`;
+  let byKey = landMemo.get(as);
+  if (!byKey) landMemo.set(as, (byKey = new Map()));
+  const hit = byKey.get(key);
+  if (hit !== undefined) return hit;
+  const segs: Seg[][] = toSegments(transformCmds(ink, { x: offset[0], y: offset[1], rotation: 0, pivot: [0, 0] }));
+  let best: { a: FaceCut; radius: number } | null = null;
+  for (const a of as) {
+    const fa = trimFace(a, [0, 0], false);
+    if (!fa.dirs) continue;
+    const L = landingEdges(fa.face, fa.dirs, segs, LANDING_RADIUS);
+    if (!L) continue;
+    const ok = L.radius >= LANDING_RADIUS;
+    if (!best || (ok && (best.radius < LANDING_RADIUS || (a.depth ?? 0) < (best.a.depth ?? 0))) || (!ok && best.radius < LANDING_RADIUS && L.radius > best.radius))
+      best = { a, radius: L.radius };
+  }
+  byKey.set(key, best);
+  return best;
+}
+
 export function chainRun(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, idPrefix: string, orderStart: number): ChainedRun {
   let pieces: StackPiece[] = [], joins: StackJoin[] = [];
   const meets: ChainedRun["meets"] = [];
@@ -349,12 +377,20 @@ export function chainRun(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, 
     }
     return pickTrims(ex.options ?? [ex.face!], en.options ?? [en.face!], off);
   });
+  // A meeting whose exit can be trimmed but whose entry cannot (a middle
+  // meem's head) lands the trimmed exit on the entry's ink instead.
+  const landings = schemas.map((s, k) => {
+    if (spliced[k] || k + 1 >= schemas.length || choice.climbs[k] || !s.exit?.face || !schemas[k + 1].entry || schemas[k + 1].entry!.face) return null;
+    const n = schemas[k + 1], ex = s.exit, en = n.entry!, w = dir(ex.angle);
+    const off: Pt = [ex.point[0] - w[0] * OVERLAP - en.point[0], ex.point[1] - w[1] * OVERLAP - en.point[1]];
+    return pickLanding(ex.options ?? [ex.face!], choice.schemaIds[k + 1], parseSvgPath(lib.items.get(n.itemId)!.d), off);
+  });
   choice.schemaIds.forEach((sid, k) => {
     const s = schemas[k];
     const letters = run.letters.slice(letterAt, letterAt + s.letters.length);
     const climbIn = k > 0 && choice.climbs[k - 1];
     const id = `${idPrefix}${k}`;
-    const b = buildPiece(lib, sid, letters, id, orderStart + letterAt, { splice: { entry: k > 0 && spliced[k - 1] ? trims[k - 1]!.b : false, exit: spliced[k] ? trims[k]!.a : false } });
+    const b = buildPiece(lib, sid, letters, id, orderStart + letterAt, { splice: { entry: k > 0 && spliced[k - 1] ? trims[k - 1]!.b : false, exit: spliced[k] ? trims[k]!.a : landings[k] ? landings[k]!.a : false } });
     letterAt += s.letters.length;
 
     let at: Pt = [0, 0];
@@ -373,6 +409,9 @@ export function chainRun(lib: TarkibLibrary, run: PhraseRun, choice: RunChoice, 
         if (spliced[k - 1]) {
           b.piece.faces[b.entry.faceIndex!] = alignFace(pieces.find((p) => p.id === prevExit!.pieceId)!, prevExit.faceIndex!, b.piece.faces[b.entry.faceIndex!], at);
           joins.push({ id: `j${prevExit.pieceId}-${id}`, from: { pieceId: prevExit.pieceId, faceIndex: prevExit.faceIndex! }, to: { pieceId: id, faceIndex: b.entry.faceIndex! }, bow: 0, seam: true });
+        } else if (landings[k - 1] && prevExit.faceIndex !== undefined) {
+          // the exit trimmed, the entry's ink untouched: the trim lands on it (types.ts StackJoin.land)
+          joins.push({ id: `j${prevExit.pieceId}-${id}`, from: { pieceId: prevExit.pieceId, faceIndex: prevExit.faceIndex }, to: { pieceId: id, faceIndex: -1 }, bow: 0, land: true });
         }
       }
       meets.push({ exit: prevExit.world, entry: [at[0] + b.entry.point[0], at[1] + b.entry.point[1]] });
