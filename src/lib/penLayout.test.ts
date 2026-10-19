@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultLayout, layoutGeometry, RUN_GAP, WORD_GAP, type PenLayout } from "./penLayout";
+import { clampStrokeOpacity, defaultLayout, layoutGeometry, RUN_GAP, WORD_GAP, type PenLayout } from "./penLayout";
 import { loadPenLibrary, NUQTA, type Form, type Part, type PenLibrary } from "./penLibrary";
 import type { Pt } from "./penSweep";
 
@@ -53,6 +53,13 @@ describe("the phrase laid out on a line", () => {
     // one entry per stroke: 4 run bodies, 2 hamzas, 2 dots
     expect(g.strokes).toHaveLength(8);
     expect(g.union.some((c) => c.type === "M")).toBe(true);
+  });
+
+  it("clamps stroke opacity", () => {
+    expect(clampStrokeOpacity(undefined)).toBe(1);
+    expect(clampStrokeOpacity(0)).toBe(0.1);
+    expect(clampStrokeOpacity(1.4)).toBe(1);
+    expect(clampStrokeOpacity(0.55)).toBe(0.55);
   });
 
   it.skipIf(!shipped("أم أيمن الحب حياتي"))("lays the first target out in under 250 ms", () => {

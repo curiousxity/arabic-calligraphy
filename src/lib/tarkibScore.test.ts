@@ -85,5 +85,6 @@ describe("scoreLayout", () => {
     }
     expect(best).toBeLessThan(150);
     expect(s.total).toBeGreaterThan(0);
-  });
+    // loading the piece library under the full suite's load takes most of the default 5 s; the timing above is what is tested
+  }, 30_000);
 });

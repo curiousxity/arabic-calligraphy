@@ -5,7 +5,8 @@ export type BlockType =
   | "mirror"
   | "guide"
   | "stack"
-  | "mark";
+  | "mark"
+  | "tarkib";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 
@@ -50,6 +51,7 @@ import type { DetachedMarkOverride } from "./lib/detachedMarks";
 import type { BlockFill } from "./lib/blockFill";
 import type { SvgCmd } from "./lib/svgPath";
 import type { Pt } from "./lib/strokeCuts";
+import type { PenLayout } from "./lib/penLayout";
 // ---- /STREAM-F ----
 
 type BlockCommon = {
@@ -250,6 +252,19 @@ export type MarkBlock = BlockCommon & {
   markScaleY?: number;
 };
 
+/** A phrase written with the pen from the stroke library (penLayout.ts): the
+ *  forms and joins chosen for `text`, redrawn from them whenever they
+ *  change, never stored as an outline. Size is `fontSize` at 400 units per
+ *  em, as a mark. See .claude/rules/tarkib.md. */
+export type TarkibBlock = BlockCommon & {
+  type: "tarkib";
+  /** Forms and joins chosen for `text`, the phrase as typed. */
+  layout: PenLayout;
+  /** Each stroke's opacity, 0.1..1; absent = 1 (one solid ink). Below 1 the
+   *  strokes are filled one by one, so the ink deepens where they cross. */
+  strokeOpacity?: number;
+};
+
 /** The two outline points on a cut line and the stroke's outward direction
  *  there (radians, pointing away from the piece), piece-local font units. */
 export type CutFace = { a: Pt; b: Pt; tangent: number };
@@ -398,4 +413,5 @@ export type Block =
   | MirrorBlock
   | GuideBlock
   | StackBlock
-  | MarkBlock;
+  | MarkBlock
+  | TarkibBlock;

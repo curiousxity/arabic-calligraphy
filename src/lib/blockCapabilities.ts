@@ -83,3 +83,7 @@ export const supportsDetachedMarks = (
 
 export const isStackBlock = (b: Block): b is Extract<Block, { type: "stack" }> =>
   b.type === "stack";
+
+/** A phrase written with the pen (TarkibView): it has no font, kashida, alternates or diacritic tools. */
+export const isTarkibBlock = (b: Block): b is Extract<Block, { type: "tarkib" }> =>
+  b.type === "tarkib";

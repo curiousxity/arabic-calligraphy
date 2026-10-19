@@ -68,7 +68,7 @@ import type { GuideAttachment, GuideBlock, GuideParams, GuideShape, MarkBlock } 
 import { isFrameMark, markScale, MARK_UNITS_PER_EM, type MarkItem } from "./lib/markLibrary";
 import { FRAME_PADDING, fitFrameToRect, frameWindow } from "./lib/frameWindow";
 import { ringCounts, TILE_SHARE_OF_EM, tileRing } from "./lib/tileRing";
-import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
+import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut, TarkibBlock } from "./types";
 import type { Session } from "@supabase/supabase-js";
 import {
   isCloudConfigured,
@@ -159,9 +159,10 @@ import {
 import type { TextBlock, VerseLayout, VerseSettings } from "./types";
 import { buildCutPlan, cutAdvanceTotal, outlineBounds, remapCutsForEdits } from "./lib/strokeCuts";
 import { remapMarksForEdits } from "./lib/detachedMarks";
-import { FALLBACK_NIB_FLOOR, nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
-import { loadTarkibLibrary, TARKIB_FONT, TARKIB_SIGNS_FONT } from "./lib/tarkibSchema";
-import { chainPhraseOnLine } from "./lib/tarkibChain";
+import { nibFloorFraction, nuqtaUnits } from "./lib/nuqta";
+import { TARKIB_FONT, TARKIB_SIGNS_FONT } from "./lib/tarkibSchema";
+import { loadPenLibrary } from "./lib/penLibrary";
+import { defaultLayout } from "./lib/penLayout";
 import { fontSupportsKashida, shapeText } from "./lib/harfbuzz";
 import { convertRunToStack, fillerShapes, teardropShape, type UnjoinedPair } from "./lib/stackConvert";
 import { assembleStackOutline } from "./lib/stackOutline";
@@ -2996,36 +2997,30 @@ const App: React.FC = () => {
    * (they are keyed by glyph index, which an insertion shifts). A tatweel is
    * kept only at a slot it actually made joinable; the status says how many.
    */
-  // Tarkib: the selected text composed from the Thuluth piece library, for
-  // now on one line (the joins are what the user checks first). A stack
-  // block in library units, so the stack editor's tools apply. See
-  // .claude/rules/tarkib.md.
+  // Tarkib: the selected text written with the pen from the stroke library
+  // (penLayout.ts), for now on one line. A tarkib block stores the forms and
+  // joins and is redrawn from them. See .claude/rules/tarkib.md.
   const composeSelectedInThuluth = async () => {
     const source = selectedBlock;
     if (!source || source.type !== "text") return;
     if (source.text.trim() === "") { setExportStatus("Type some text into this block first."); return; }
     try {
-      const lib = await loadTarkibLibrary();
-      const r = chainPhraseOnLine(lib, source.text);
-      if ("error" in r) { setExportStatus(`Can't compose: no Thuluth pieces for ${r.letters.join(" ")}`); return; }
-      const stack: StackBlock = {
-        id: source.id, type: "stack", name: source.name, text: source.text, x: source.x, y: source.y,
+      const layout = defaultLayout(loadPenLibrary(), source.text);
+      if ("missing" in layout) { setExportStatus(`No pen forms yet for: ${layout.missing.join(" ")}`); return; }
+      const tarkib: TarkibBlock = {
+        id: source.id, type: "tarkib", name: source.name, text: source.text, x: source.x, y: source.y,
         fontSize: source.fontSize, color: source.color, fontFamily: source.fontFamily, opacity: source.opacity,
         stroke: source.stroke, strokeWidth: source.strokeWidth, shadowColor: source.shadowColor,
         shadowBlur: source.shadowBlur, shadowOffsetX: source.shadowOffsetX, shadowOffsetY: source.shadowOffsetY,
         shadowOpacity: source.shadowOpacity, locked: source.locked, rotation: source.rotation,
         groupId: source.groupId, fill: source.fill,
-        source: { text: source.text, fontFamily: TARKIB_FONT },
-        unitsPerEm: MARK_UNITS_PER_EM,
-        nib: { width: 48, minFraction: FALLBACK_NIB_FLOOR },
-        pieces: r.pieces, joins: r.joins,
-        tarkib: { phrase: source.text, target: { kind: "line" }, seed: 0, pieceIds: r.pieceIds },
+        layout,
       };
-      replaceBlockWithHistory(source.id, stack);
-      setExportStatus("Composed in Thuluth from the piece library.");
+      replaceBlockWithHistory(source.id, tarkib);
+      setExportStatus("Written with the pen from the stroke library.");
     } catch (err) {
       console.error("tarkib composition failed", err);
-      setExportStatus("Could not compose this block in Thuluth.");
+      setExportStatus("Could not write this block with the pen.");
     }
   };
 

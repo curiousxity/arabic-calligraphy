@@ -25,7 +25,7 @@ const blockTypeIcon = (b: Block) =>
     <ShapesIcon size={13} />
   ) : b.type === "guide" ? (
     "◯"
-  ) : b.type === "mark" ? (
+  ) : b.type === "mark" || b.type === "tarkib" ? (
     "✒"
   ) : (
     "T"
@@ -36,6 +36,7 @@ const defaultLabel = (b: Block) =>
   b.type === "guide" ? `Guide · ${GUIDE_SHAPE_LABELS[b.guideShape]}`
   : b.type === "stack" ? `Stack · ${b.source.text}`
   : b.type === "mark" ? `Mark · ${findMark(b.markId)?.name ?? "custom"}`
+  : b.type === "tarkib" ? `Tarkib · ${b.text}`
   : `Block ${b.id}`;
 
 export type LayersPanelProps = {

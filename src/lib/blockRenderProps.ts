@@ -1,4 +1,5 @@
 import type { Block } from "../types";
+import { clampStrokeOpacity } from "./penLayout";
 
 /**
  * What a block's own fields say about how to draw it, per block type.
@@ -104,6 +105,13 @@ export const stackProps = (b: Extract<Block, { type: "stack" }>) => ({
   joins: b.joins ?? [],
   nib: b.nib,
   unitsPerEm: b.unitsPerEm,
+});
+
+export const tarkibProps = (b: Extract<Block, { type: "tarkib" }>) => ({
+  ...typographicProps(b),
+  // `?? empty`: like stackProps, a hand-edited save is not validated on load.
+  layout: b.layout ?? { runs: [], wordStarts: [] },
+  strokeOpacity: clampStrokeOpacity(b.strokeOpacity),
 });
 
 export const markProps = (b: Extract<Block, { type: "mark" }>) => ({

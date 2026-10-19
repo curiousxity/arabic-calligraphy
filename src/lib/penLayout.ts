@@ -26,6 +26,12 @@ const FIT_TOL = 0.25;
 /** The lowest stroke opacity a block may have. */
 export const STROKE_OPACITY_MIN = 0.1;
 
+/** A block's stroke opacity: absent means 1, and never below STROKE_OPACITY_MIN. */
+export function clampStrokeOpacity(v: number | undefined): number {
+  if (v === undefined || !Number.isFinite(v)) return 1;
+  return Math.min(1, Math.max(STROKE_OPACITY_MIN, v));
+}
+
 /** The letter a hamza or madda sits on. */
 const BASE: Record<string, string> = { "أ": "ا", "إ": "ا", "آ": "ا", "ؤ": "و", "ئ": "ي" };
 const HAMZA_PART = "hamza";

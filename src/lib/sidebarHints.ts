@@ -24,6 +24,8 @@ export const SIDEBAR_HINTS: Record<string, string> = {
   Verse: "This block is one line of a verse. Make all its lines the same width here.",
   Mirror: "Repeat another block as a mirror image or in a circle. It updates when the original changes.",
   "Shape Fill": "Repeats the text in rows to fill an uploaded shape.",
+  Tarkib: "A phrase written with the pen, stroke by stroke, from the stroke library.",
+  "Stroke opacity": "Makes each pen stroke see-through, so the ink deepens where strokes cross and you can see how the writing was built.",
   Curve: "Text that follows a curved line. Change the curve's shape and how the text sits on it.",
   Guide: "A helper shape for laying out text along it. Guides never appear in exports.",
   "Stacked composition": "Letters baked into pieces you can drag and stack on top of each other.",

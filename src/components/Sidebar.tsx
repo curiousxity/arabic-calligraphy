@@ -23,6 +23,7 @@ import { CurvePanel } from "./sidebar/CurvePanel";
 import { ShapeFillPanel } from "./sidebar/ShapeFillPanel";
 import { BlockControlsPanel } from "./sidebar/BlockControlsPanel";
 import { MarkPanel } from "./sidebar/MarkPanel";
+import { TarkibPanel } from "./sidebar/TarkibPanel";
 import { MarkPicker } from "./sidebar/MarkPicker";
 import type { MarkItem } from "../lib/markLibrary";
 import { TypographyPanel } from "./sidebar/TypographyPanel";
@@ -1425,6 +1426,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
+        {selectedBlock?.type === "tarkib" && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Tarkib" isOpen={showMark} onToggle={() => setShowMark((v) => !v)}>
+              <TarkibPanel block={selectedBlock} onUpdate={onUpdateSelectedBlock} />
+            </CollapsibleSection>
+          </div>
+        )}
+
         {selectedBlock && selectedBlock.type === "textPath" && (
           <CurvePanel
             selectedBlock={selectedBlock}
@@ -1437,7 +1446,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         )}
 
-        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && selectedBlock.type !== "mark" && (
+        {selectedBlock && selectedBlock.type !== "mirror" && selectedBlock.type !== "guide" && selectedBlock.type !== "mark" && selectedBlock.type !== "tarkib" && (
           <TypographyPanel
             selectedBlock={selectedBlock}
             onUpdateSelectedBlock={onUpdateSelectedBlock}
