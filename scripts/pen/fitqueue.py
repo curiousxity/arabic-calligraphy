@@ -6,7 +6,9 @@
 
     from fitqueue import submit, wait                      the reading side: hand jobs over, collect results
 
-QUEUE is any folder every computer can reach (a NAS share). A job is one fitjob.py input file. Each submit copies
+QUEUE is any folder every computer can reach (a NAS share). QUEUE/workers.json, if there, sets how many jobs each
+computer runs at once ({"<host>": n}), read as the worker goes, so the reading side can tune a worker without
+anyone restarting it. A job is one fitjob.py input file. Each submit copies
 the fitting code into QUEUE/code, and a worker runs every job from a local snapshot of that copy, in a process of its
 own, so a worker needs no repository, picks up a code change with its next job, and is never caught mid-update.
 A job is claimed by renaming it from todo/ to running/, which only one worker can do, so any number of workers on
@@ -101,6 +103,13 @@ def _requeue(q, stem):
         pass
 
 
+def _jobs_for(q, default):
+    try:
+        return max(1, int(json.load(open(os.path.join(q, "workers.json"), encoding="utf-8"))[HOST]))
+    except (OSError, ValueError, KeyError, TypeError):
+        return default
+
+
 PACKAGES = {"numpy": "numpy", "scipy": "scipy", "cv2": "opencv-python-headless"}
 
 
@@ -155,6 +164,7 @@ def work(q, jobs):
                     _write(os.path.join(q, "failed", stem + ".log"), open(log, "rb").read())
                     os.replace(held, os.path.join(q, "failed", stem + ".json"))
                     print(f"FAILED {stem} (see failed/{stem}.log)", flush=True)
+            jobs = _jobs_for(q, jobs)
             while len(active) < jobs and not updated:
                 todo = sorted(f for f in os.listdir(os.path.join(q, "todo")) if f.endswith(".json"))
                 if not todo:
