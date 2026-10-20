@@ -224,6 +224,14 @@ the two Beirut volumes and Hashim's book (low resolution). The scans are
 - **2026-10-20, the user: where the studio and a master's plate disagree,
   the master's plate wins.** The studio is the starting outline and the
   piece split; the plates judge the shape and the stroke order.
+- **2026-10-20, the user: Jawad Sabti's plate leads, Hashim al-Baghdadi
+  fills its gaps and gives the marks and fillers; İzzet is a check only.**
+  Sabti al-Najafi (d.) is an Iraqi teacher whose practice notebooks
+  (kurrāsāt) circulate widely and who is listed among Iraqi calligraphers in
+  al-Jubūrī's *Mawsūʿat al-khaṭṭ al-ʿarabī* [A]; a respected teacher rather
+  than a master of Hashim's rank [I]. So where Sabti and Hashim differ on a
+  letter's shape, the difference goes to the user rather than being settled
+  silently.
 
 ## What this changes from Thuluth [I]
 
