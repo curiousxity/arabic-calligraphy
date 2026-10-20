@@ -25,18 +25,21 @@ try:
 except ImportError:  # no torch: available() is False and refine() is the CPU's
     torch = None
 
-# (raster px to the nuqta, softness px, steps, start rate). No coarse stage: a blurred grid rounds a hairline end off
-# and the fit chases the rounding (studio alif stem: 0.906 with a 30 px stage first, 0.925 without)
-STAGES = ((90, 0.4, 150, 0.004), (150, 0.3, 150, 0.002))
+# Schedules of stages (raster px to the nuqta, softness px, steps, start rate); refine runs each and keeps the best by
+# the CPU's measure. Fine and sharp suits long strokes (a blurred coarse grid rounds a hairline end off and the fit
+# chases it: studio alif stem 0.906 coarse-first, 0.927 not); coarse first suits small ones, which need to travel
+# further from their start (the alif's flag: 0.84 coarse-first, 0.72 not). Measured on the CPU, 2026-10-19.
+SCHEDULES = (((90, 0.4, 150, 0.004), (150, 0.3, 150, 0.002)),
+             ((30, 1.0, 250, 0.02), (90, 0.6, 150, 0.006)))
 STEP_PX = 3     # most either nib end moves between placements, raster px; each quad spans two steps, so every
                 # inked pixel lies a step deep inside one and the ink is solid (0.9 and more at a softness of 0.6)
 CHUNK = 24      # quads per block, each block inks only the pixels round it
 UNSUPPORTED = ("dir", "corner", "keep", "tin", "tout")
 
 
-# off until its fits match pieces.refine's on the studio strokes (on 2026-10-19 it drifted: 0.82 -> 0.63 where the CPU
-# reached 0.91); fitjob then fits on the CPU even where there is a GPU
-READY = False
+# on: with both schedules it matches pieces.refine on the studio's alif strokes (0.927 / 0.923 / 0.84 against the
+# CPU's 0.948 / 0.908 / 0.81, with tighter outlines)
+READY = True
 
 
 def available():
@@ -123,6 +126,15 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
     """pieces.refine's signature and result (new nodes, their score); `iters` and `res` only matter on the CPU."""
     if torch is None or any(k in q for q in nodes for k in UNSUPPORTED):
         return cpu_refine(nodes, pieces, origin, ppn, pen_px, rough, edge, iters, fixed, others, res)
+    best = (nodes, score([nodes, *others], pieces, origin, ppn, pen_px))  # never hand back worse than it was given
+    for stages in SCHEDULES:
+        out, s = _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages)
+        if s["iou"] - s["gap95"] > best[1]["iou"] - best[1]["gap95"]:
+            best = (out, s)
+    return [dict(q) for q in best[0]], best[1]
+
+
+def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages):
     dev = _device()
     rings = [ref_ring(p) for p in pieces]
     pts = np.concatenate(rings)
@@ -140,7 +152,7 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
     def unpack():
         return base + v * scale * free
 
-    for px_per_nuqta, soft, steps, rate in STAGES:
+    for px_per_nuqta, soft, steps, rate in stages:
         r = px_per_nuqta / ppn
         W, H = int((x2 - x1) * r) + 1, int((y2 - y1) * r) + 1
         to_px = lambda q: np.round((np.asarray(q) - [x1, y1]) * r * 16).astype(np.int32)
@@ -176,8 +188,4 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
             sched.step()
     a = unpack().detach().cpu().numpy()
     out = [{**q, "p": [round(float(a[i, 0]), 3), round(float(a[i, 1]), 3)], "angle": round(float(a[i, 2]), 1)} for i, q in enumerate(nodes)]
-    s, s0 = score([out, *others], pieces, origin, ppn, pen_px), score([nodes, *others], pieces, origin, ppn, pen_px)
-    # never hand back worse than it was given, by the CPU's own measure
-    if s0["iou"] - s0["gap95"] > s["iou"] - s["gap95"]:
-        return [dict(q) for q in nodes], s0
-    return out, s
+    return out, score([out, *others], pieces, origin, ppn, pen_px)
