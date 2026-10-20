@@ -29,15 +29,16 @@ except ImportError:  # no torch: available() is False and refine() is the CPU's
 # the CPU's measure. Fine and sharp suits long strokes (a blurred coarse grid rounds a hairline end off and the fit
 # chases it: studio alif stem 0.906 coarse-first, 0.927 not); coarse first suits small ones, which need to travel
 # further from their start (the alif's flag: 0.84 coarse-first, 0.72 not). Measured on the CPU, 2026-10-19.
-SCHEDULES = (((90, 0.4, 150, 0.004), (150, 0.3, 150, 0.002)),
-             ((30, 1.0, 250, 0.02), (90, 0.6, 150, 0.006)))
+# The user, 2026-10-19: accuracy before time. So three stages, the last on a 200 px grid, and twice the steps.
+SCHEDULES = (((90, 0.4, 300, 0.004), (150, 0.3, 300, 0.002), (200, 0.25, 200, 0.001)),
+             ((30, 1.0, 400, 0.02), (90, 0.6, 300, 0.006), (200, 0.25, 200, 0.001)))
 STEP_PX = 3     # most either nib end moves between placements, raster px; each quad spans two steps, so every
                 # inked pixel lies a step deep inside one and the ink is solid (0.9 and more at a softness of 0.6)
 CHUNK = 24      # quads per block, each block inks only the pixels round it
 BATCH_CELLS = 3e7  # most (quad edge, pixel) pairs in one batch, ~120 MB a tensor: a long stroke on the fine grid
                    # would otherwise build several GB at once, and nine jobs doing so crashed Geekmini's 4070
 RELAYOUT = 25   # steps between recounts of the placements, and between checks that the cost is still falling
-SETTLED = 5e-5  # a fall in cost over RELAYOUT steps smaller than this, three times running, ends the stage
+SETTLED = 2e-5  # a fall in cost over RELAYOUT steps smaller than this, four times running, ends the stage
 UNSUPPORTED = ("dir", "corner", "keep", "tin", "tout")
 
 
@@ -258,7 +259,7 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
                 c = float(cost.detach())
                 still = still + 1 if last is not None and last - c < SETTLED else 0
                 last = c
-                if still >= 3:
+                if still >= 4:
                     break
     a = unpack().detach().cpu().numpy()
     out = [{**q, "p": [round(float(a[i, 0]), 3), round(float(a[i, 1]), 3)], "angle": round(float(a[i, 2]), 1)} for i, q in enumerate(nodes)]

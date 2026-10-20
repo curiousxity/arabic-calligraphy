@@ -428,10 +428,29 @@ the compute note in Claude's memory). It's fitted as in method step 5:
 - a band from the stroke's outline, a band from its skeleton, and a pull,
   keeping the best;
 - refined on Geekmini's RTX 4070 by gradient descent (`gpufit.py`).
-**A second pass** refits every stroke under 0.90 with nodes 0.45 nuqta
-apart instead of 0.9, and the better of the two fits is kept. A tight turn
-needs the closer nodes: the final alifs' feet, cut off on a diagonal at
-0.85–0.88, turn into the flat tail at 0.93–0.95.
+**Accuracy before time** (the user, 2026-10-19: "I would prioritize
+accuracy over time"). Every fit is tight:
+- nodes 0.3 nuqta apart, where they were 0.9;
+- the outline gap weighed three times;
+- three GPU stages, the last on a 200 px-to-the-nuqta grid, run until
+  the cost stops falling.
+
+Nodes 0.9 apart missed the slanted start of the curved alif (the user
+saw it) and the turn of a final alif's foot, and the overlap barely
+notices either. The curved alif's head was 0.22 nuqta off and is 0.12
+tight. A stroke whose best fit is still under 0.92 overlap, or more than
+0.12 nuqta off anywhere, is fitted tighter again: nodes 0.2 apart, the
+outline weighed five times. The best fit by the CPU's own score is kept.
+
+**The user's fixes** (`fixes.json` in the authoring scripts) override
+that choice. Two kinds so far:
+- **refit:** closer nodes and a heavier outline, for a shape a nib makes
+  but the fit missed.
+- **fill:** the studio's own outline as a filled mark, for marks a
+  calligrapher fills in with a fine pen instead of writing with the nib.
+  The alif's hat is one: the user, "the calligrapher makes a mark and then
+  fills the rest of the shape in with a fine tip pen". No nib path makes
+  it, so no fit can.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
