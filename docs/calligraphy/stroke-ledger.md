@@ -287,8 +287,11 @@ Three pieces, after the pen lifts at the meem's exit (a `lift` join):
 
 Nine forms, matched to the studio's own line of أم أيمن الحب حياتي and
 recorded under the user's standing instruction (matched within reason:
-overlap 0.92 for the phrase against 0.90 for the approved أم أيمن, side by
-side in `comparisons/alhubb-hayati.png`; awaiting the user's look).
+overlap 0.92 for the phrase against 0.90 for the approved أم أيمن; awaiting
+the user's look). The user then named two joins that did not work, ya into
+alif in حياتي and ta into ya. Refitted at their joins (see Joins), the phrase
+overlaps the studio by **0.956**, side by side in
+`comparisons/alhubb-hayati.png`.
 Coordinates here are in each **letter group's** frame (x from the group's
 right-most ink, y from the line), as the library stores them. Every join
 inside these words is a lift: the next letter's first piece starts where
@@ -450,7 +453,11 @@ that choice. Two kinds so far:
   calligrapher fills in with a fine pen instead of writing with the nib.
   The alif's hat is one: the user, "the calligrapher makes a mark and then
   fills the rest of the shape in with a fine tip pen". No nib path makes
-  it, so no fit can.
+  it, so no fit can. The jim's starting mark, the small slanted block where
+  its head begins, is another (the user, 2026-10-19: "those are all fill
+  ins"; 20 shapes, 10 distinct strokes). Measuring each stroke's widest
+  point against the nib does **not** find fills: 245 strokes are wider than
+  1.15 nibs somewhere, and neither of these is among them. Ask the user.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
@@ -464,6 +471,34 @@ recorded: by the user's standing instruction, a group that matches within
 reason is recorded and work moves on. The user looks periodically.
 
 ## Joins
+
+**Fit each stroke with its neighbours' ground ignored** (2026-10-19). A
+stroke fitted alone against its own reference piece is penalised for any
+ink outside that piece, and at a join the neighbouring piece sits exactly
+where the corner should be filled. So every end was pulled back from its
+corner, and every join was left with a notch: a wedge of paper where the
+studio has ink. The user saw it at ya into alif in حياتي, and in the jim's
+head (092). Now the shape's other strokes go with each stroke as ground
+where ink counts neither for nor against it (`ignore` in `fitjob.py`,
+`gpufit.refine` and `pieces.refine`). The stroke runs on through the corner
+and its neighbour covers the rest. Measured on الحب حياتي, in square nuqta
+of studio ink within 0.8 nuqta of the join left bare:
+
+| join | before | after |
+|---|---|---|
+| curved alif into lam | 0.060 | 0.003 |
+| ya into alif (حياتي) | 0.068 | 0.010 |
+| ha into ba | 0.018 | 0.006 |
+| the final ya's two strokes | 0.027 | 0.014 |
+
+How far our ink strays outside both studio pieces fell too (the curved
+alif 0.195 → 0.087 nuqta, the ba's start 0.230 → 0.021). A stroke's score
+against its own piece alone can fall, because its ink now lies on its
+neighbour's ground; judge a join on both pieces. Two joins did not improve
+(ha into ya 0.014 → 0.017, ta into ya 0.004 → 0.007), and those strokes
+kept their earlier fits. The catalogue's first fits carry their shapes'
+other strokes as `ignore`, and strokes fitted before this get a join refit
+(`<name>.j`) from their best fit.
 
 - **A tooth onto a meem:** stacked. The tooth's stroke runs on and becomes
   the meem's loop, one stroke split between the two letters with gap 0 and
