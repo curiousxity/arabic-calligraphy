@@ -219,6 +219,12 @@ the two Beirut volumes and Hashim's book (low resolution). The scans are
     the ha's knotted head built from three or four overlapping pieces, as the
     Thuluth studio builds its letters.
 
+## Decisions
+
+- **2026-10-20, the user: where the studio and a master's plate disagree,
+  the master's plate wins.** The studio is the starting outline and the
+  piece split; the plates judge the shape and the stroke order.
+
 ## What this changes from Thuluth [I]
 
 1. The nib is held steeper; Thuluth's 145–149° and its 1.65 pens to the nuqta
