@@ -162,6 +162,18 @@ measure; the real unit is the pen.
   the nib turns with the stroke through a bowl or a long tail (as much as
   180–280° over a nun's bowl or a meem). That is the studio's look, and the
   user chose it.
+- **A rounded start the fitter can't reach.** The ha's head in الحب starts
+  where the lam's foot does, and a nib's start is a straight edge, so the
+  corner came out square where the studio's curves (the user: "this is
+  bothering me"). Closer nodes and a heavier outline weight barely moved it:
+  the curve needs the nib to start at another slant, or partly lifted, and
+  turn at once, which is too far from the fit for its small steps. A search
+  over the start finds it: for each stroke, the first node at nib angles
+  40–100° and widths 1, 0.75 and 0.5 (a lifted corner), one node 0.06 nuqta
+  in, the first five nodes refined and the rest held, each judged only on
+  the ink within 0.35 nuqta of the corner. Both strokes starting at 80° and
+  half width halved the difference (0.0051 → 0.0025 square nuqta; the
+  outlines at most 0.030 → 0.015 nuqta apart).
 - **A stroke split between two letters** keeps its tangent at the split
   (`dir` on both nodes). Split above any place where the stroke crosses
   itself, or the crossing reads as a corner at the join.
