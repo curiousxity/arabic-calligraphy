@@ -92,9 +92,11 @@ Thuluth's method (stroke-ledger.md) with these changes, worked out on the
 - **Tried and dropped: counting a band along the letter's edge** (`.e`, the
   neighbours' ground ignored only 0.12 nuqta in from the outline). It
   changed nothing: the worst spots were tail tips, not joins.
-- **What the trims leave is the tail tips**, which end in a needle where the
-  studio's extracted outline ends blunt; Hashim's tails end sharp, so they
-  stand.
+- **What the trims leave is the tail tips.** The fitter ends a tail in a
+  needle where the studio's extracted outline ends blunt (an artefact of the
+  extraction, as far as can be seen: Hashim's tails end sharp). How far the
+  needle should run past the studio's end has not been measured against the
+  plate.
 
 ## Pilot: ورد (2026-10-20)
 

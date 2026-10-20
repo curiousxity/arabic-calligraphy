@@ -18,6 +18,14 @@ Current: **0.1.x**, pre-1.0, actively developed.
 
 ---
 
+## In progress
+
+- **Pen-drawn Jali Diwani** (branch `claude/jali-diwani`, from 2026-10-20):
+  the first three forms (و ر د, pilot ورد) fitted to the studio and checked
+  against Hashim's plate, awaiting the user's look; nothing in the app yet.
+  Method: [jali-diwani-ledger.md](docs/calligraphy/jali-diwani-ledger.md);
+  verdicts: [REVIEW-jali-diwani.md](scripts/pen/REVIEW-jali-diwani.md).
+
 ## Known limitations
 
 Real, reproducible, and currently unfixed. Each says whether it is a
