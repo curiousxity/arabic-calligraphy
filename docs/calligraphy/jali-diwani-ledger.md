@@ -23,7 +23,15 @@ kaf's flourish, the lam-alifs) and is a second opinion on the rest.
 
 Measured 2026-10-20.
 
-- **Nib edge at about 62°** (y up: the edge rises to the right). From nine
+- **The nib rests at about 80° in Hashim's hand and the studio's**, steeper
+  than Sabti's 62° (below). Hashim's dots on his p. 65 are nearly square,
+  sides about 40 px at 74–83° and 33–39 px at 151–159°; his strokes'
+  thickness tops out at about 42 px, so the nib is the 40 px side, at 79°,
+  pulled about 0.93 pen along 156°. The studio agrees: fitting ورد, 125 of
+  317 nodes' nib angles fell between 70° and 90°, the clear peak. Within a
+  stroke the nib turns far from it (to 0–20° into the tapering tails), so
+  fit with the angle free, as Thuluth's are.
+- **Sabti's nib edge sits at about 62°** (y up: the edge rises to the right). From nine
   dots on Sabti's plate: their nib sides run 59–69°, two at 51–53°. This is
   the 60° the Arabic sources give, and it is far from Thuluth's 145–149°.
   It is why uprights come out thin and horizontals thick: an upright crosses
@@ -47,6 +55,68 @@ Measured 2026-10-20.
   stroke in the studio is 3.65 units against 3.6.
 - Sabti's plate has no printed shadow: the heavy bands under the bowls are
   the pen's own ink, swelling and thinning smoothly round the curve.
+
+## Fitting the studio's shapes (the method as it stands)
+
+Thuluth's method (stroke-ledger.md) with these changes, worked out on the
+ورد pilot, 2026-10-20. The tools are in `scripts/pen/jalidiwani/`.
+
+- **Scale in the transform.** Each studio piece goes to the fitter as
+  `[[S, S, 0, 0], d]` with S = 25.9 / 4.644 = 5.577, so the fitter works at
+  Thuluth's 25.9 px to the nuqta; the pen is 3.6 × S = 20.08 px. The data is
+  never rescaled.
+- **The frame's x is the right-most ink plus the stamp's 2-unit margin.**
+  `inkbox.json` is measured inside a 2-unit margin; Thuluth's catalogue
+  leaves it off (0.08 nuqta there), here it is 0.43 nuqta, so it goes back
+  on.
+- **Jobs go straight into the queue's `todo/`; code is never synced.** The
+  queue runs the Thuluth session's fitting code, which is newer than this
+  branch's (`pieces.py` differs); `fitqueue.submit` would copy ours over it.
+  Names start `jd-`, which the queue ranks with one-off jobs, ahead of
+  Thuluth's catalogue.
+- **First fits, then Thuluth's second pass** (`.u`: nodes 0.2 nuqta apart,
+  outline weighed five times) for every stroke under 0.92 overlap or more
+  than 0.12 nuqta off anywhere. On ورد the second pass took the shapes from
+  0.95–0.97 overlap to 0.96–0.98.
+- **Then a whole-shape end trim** (`jdtrim.py`): drop a stroke's end nodes
+  one at a time while the shape's overlap holds (within 0.0005), its worst
+  poke-out past the studio's outline shrinks, and its worst shortfall grows
+  no more than 0.02 nuqta. fitjob's `trim_ends` judges a stroke alone with
+  its neighbours' ground ignored, so it leaves a hairline that ends past the
+  letter's outline (the dal's head: a 0.13-nuqta needle, gone) and a tail
+  run on to a needle (the waw's and ra's tips: 0.20 → 0.12, 0.30 → 0.22).
+- **Measure the poke-out and the shortfall, not only the overlap.** A sliver
+  has almost no area, so overlap misses it; the sheets print, per shape, how
+  far our ink lies outside the studio's and the studio's outside ours, in
+  nuqta (`jdsheet.py`, and `jdpoke.py` finds the spots).
+- **Tried and dropped: counting a band along the letter's edge** (`.e`, the
+  neighbours' ground ignored only 0.12 nuqta in from the outline). It
+  changed nothing: the worst spots were tail tips, not joins.
+- **What the trims leave is the tail tips**, which end in a needle where the
+  studio's extracted outline ends blunt; Hashim's tails end sharp, so they
+  stand.
+
+## Pilot: ورد (2026-10-20)
+
+Every letter isolated, every letter on Hashim's p. 65 and Sabti's plate, so
+no joins: a test of heads, tails and hairlines. All ten isolated waw, ra and
+dal shapes in the studio were fitted; Hashim's p. 65 chose among them
+(`HarfCanvas side-by-side/Jali Diwani/pilot ورد/` on the NAS: all
+candidates beside Hashim, the chosen three, and the three at 3×).
+
+| letter | studio shape | why this one | overlap | out / short (nuqta) |
+|---|---|---|---|---|
+| و | 690 (v02), 3 pieces: head top, head underside, tail | Hashim's waw: a full round head and a long tail; 689 is the same form, shorter; 691 is a curled form | 0.976 | 0.12 (tail tip) / 0.01 |
+| ر | 243 (v02), 2 pieces: the head dropped straight, then the body | Hashim's plain ra almost exactly, pointed head included; 244 and 245 are the diagonal forms, 246 Hashim's other (U-shaped) ra | 0.967 | 0.22 (tail tip) / 0.04 |
+| د | 237 (v01), 2 pieces: the hooked head, then the body | the studio's only isolated dal; Hashim's head is a little smaller and rounder, and the studio's letter about 20% heavier for its height | 0.966 | 0.05 / 0.07 |
+
+Left at 3×, all under 0.08 nuqta: a point at the top of the waw's head and
+a step under the dal's head where its two pieces meet. The ra's head ends
+pointed and slanted where the studio's is rounded, and the dal's head starts
+rounded where the studio's is cut straight; Hashim's are pointed and
+rounded, so those stand (the plate wins). Recorded in
+`scripts/pen/REVIEW-jali-diwani.md` under the within-reason rule, awaiting
+the user's look.
 
 ## Sabti's moves, letter by letter
 
