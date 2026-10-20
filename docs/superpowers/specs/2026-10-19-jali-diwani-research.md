@@ -191,7 +191,33 @@ the two Beirut volumes and Hashim's book (low resolution). The scans are
   file names as Thuluth (`db.json` 317 KB, `stamps.pack.json` 675 KB, plus
   `rest.json`, `inkbox.json`, `dots.json`, `pairs.json`, `stretch.json`,
   `marks.json`, `marks-kinds.json`, `fum.json`); no join, bowl or entry files
-  as Thuluth has. Not yet saved locally.
+  as Thuluth has. Saved locally 2026-10-20 with the user's OK (the files are
+  public; fetched directly, never committed). What they hold [A, read from
+  the files]:
+  - **739 shapes in 21 groups**, keyed `001`… as Thuluth's. Forms: Pairs 191,
+    Medial 167, Initial 138, Initial & Medial 104, Final 55, Isolated 51,
+    Isolated & Final 33. Biggest groups: Jim Ha Kha 124, Ba Ta Tha 87, Ayn
+    Ghayn 85, Kaf Lam 85 (kaf and lam are mostly one group here).
+  - **Units: 4.644 to the dot** (4.615–4.667 over every shape), against
+    Thuluth's 25.9; outlines to 0.01 unit, so 0.002 dot.
+  - **1–11 strokes a shape** (median 3), split `s0, s1…` as Thuluth; every
+    outline has the stroke count `db.json` gives.
+  - **Less finished than Thuluth's.** Every status is a first extraction
+    (`extracted_v1` 688, `extracted_low` 50, one hamza from a mark); none is
+    marked verified or corrected. Its own match score (`iou`) is mean 0.89,
+    lowest 0.78, against Thuluth's 0.94. The low ones cluster in Kaf Lam (12)
+    and Jim Ha Kha (10).
+  - Pairs are all `status: "guess"`, each naming the single shape it was
+    matched to. `join-rules.json` is empty.
+  - `marks.json` (68) and `fum.json` (3, "frequently used modules") cite a
+    "Jali Diwani key.pdf" as their source; `marks-kinds.json` names crowns
+    (small, middle, tall) and nuqtas among 55 kinds.
+  - Alif: 12 isolated and 13 final, one stroke each except three finals of
+    3–5, in lengths from 4.7 to 10.6 dots. The single dot measure doesn't
+    hold here: the studio's alifs run long and curved.
+  - Looked at as sheets (scratchpad `studio-sheets/`): hairline tails, and
+    the ha's knotted head built from three or four overlapping pieces, as the
+    Thuluth studio builds its letters.
 
 ## What this changes from Thuluth [I]
 
