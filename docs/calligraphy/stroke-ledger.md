@@ -393,6 +393,52 @@ the last one's exit ends, within 0.2 nuqta.
   with the ي's first piece, which covers that corner).
 - No dots (the studio's).
 
+## The studio catalogue
+
+From 2026-10-19 every shape the studio offers is fitted from its own
+catalogue rather than from words written on its canvas. Shape by shape,
+with overlaps and side-by-side sheets, the results are in
+[studio-catalogue.md](studio-catalogue.md).
+
+**The source.** The studio loads its whole letter library as data files
+(`db.json`, `stamps.pack.json` and smaller join and dot files). The user
+gave the OK to download them on 2026-10-19. They stay in Claude's scratch
+folder and are not committed; only our fitted strokes go into the project.
+- There are 1,337 entries in all 22 letter groups. Each has its group, form
+  (Isolated, Initial, Medial, Final, Pairs, and some combined forms),
+  variant number, width and height in nuqta, and joining points.
+- Each entry's outline comes already split into its pen strokes (`s0`,
+  `s1`, …), the same pieces the canvas draws.
+- 556 entries are pair halves (`pair_of`): the studio's two-letter pairs
+  cut in two. Another 153 are twins (`twin_of`) of other shapes. Neither
+  is fitted again, which leaves **500 single shapes and 281 pairs, 2,500
+  distinct strokes**. A stroke drawn the same in two shapes is fitted once
+  and moved into place.
+
+**Units and the line.** The catalogue is drawn at 25.9 units to the nuqta
+in every entry, and the pen is 25.9 / 1.65 units wide.
+- In an unjoined shape the line lies 3.0 units below the value in
+  `rest.json`. This is measured on the studio canvas for its standalone
+  meem (552) and its final nun (631).
+- A joined shape is placed by its entry and exit points (`entry`, `exit`
+  in `db.json`), so it needs no line of its own.
+
+**Fitting.** Each stroke is one job in the folder queue (`fitqueue.py`, see
+the compute note in Claude's memory). It's fitted as in method step 5:
+- a band from the stroke's outline, a band from its skeleton, and a pull,
+  keeping the best;
+- refined on Geekmini's RTX 4070 by gradient descent (`gpufit.py`).
+**A second pass** refits every stroke under 0.90 with nodes 0.45 nuqta
+apart instead of 0.9, and the better of the two fits is kept. A tight turn
+needs the closer nodes: the final alifs' feet, cut off on a diagonal at
+0.85–0.88, turn into the flat tail at 0.93–0.95.
+
+**Judging a group.** Each letter group and form has a sheet of every
+shape, ours beside the studio's, with the shape's overlap. A shape under
+0.85 is marked in red. Each sheet is checked by eye before its group is
+recorded: by the user's standing instruction, a group that matches within
+reason is recorded and work moves on. The user looks periodically.
+
 ## Joins
 
 - **A tooth onto a meem:** stacked. The tooth's stroke runs on and becomes
