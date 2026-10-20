@@ -263,6 +263,9 @@ the two Beirut volumes and Hashim's book (low resolution). The scans are
   Diwani.** A form matched to its reference within reason may be recorded
   in `REVIEW.md` before the user has looked, marked as awaiting the user's
   look. ورد is the first test.
+- **2026-10-20, the user: Jali Diwani only for now; plain Diwani is a
+  "maybe"** on the deferred list (`.claude/rules/deferred-features.md`).
+  Hashim's Diwani plate is still used for move order.
 
 ## What this changes from Thuluth [I]
 

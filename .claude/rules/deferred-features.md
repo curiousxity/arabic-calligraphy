@@ -63,6 +63,15 @@ These are capabilities that have been explicitly identified as valuable but deli
   Wessam), which would need a different notion of "body" than touch
   connectivity.
 
+- **Pen-drawn plain Diwani — maybe** (raised 2026-10-20). The drawn-letter
+  library is being built for Jali Diwani after Thuluth (see
+  `docs/calligraphy/jali-diwani-ledger.md`); plain Diwani was considered as
+  a first stage and set aside by the user: "lets stick to jali for now and
+  put plain diwani in the to do list with a 'maybe'". If taken up: the
+  studio has no Diwani set, so letters would be fitted to Hashim's printed
+  Diwani alphabet (his *Qawāʿid* p. 59, which numbers every move), and the
+  two bundled Diwani fonts already cover Diwani text.
+
 ## Roadmap: towards a pen that behaves like a calligrapher's
 
 Raised 2026-10-16 while comparing HarfCanvas with Kelk. The gap is that Kelk
