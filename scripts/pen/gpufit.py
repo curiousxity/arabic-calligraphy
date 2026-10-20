@@ -187,20 +187,41 @@ def _ink_loop(ea, eb, x1, y1, r, H, W, soft):
     return torch.sigmoid(depth * r / soft)
 
 
-def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5, ignore=()):
+def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5, ignore=(),
+           bend="position"):
     """pieces.refine's signature and result (new nodes, their score); `iters` and `res` only matter on the CPU.
-    `ignore`: pieces whose ground counts neither way (pieces.ignore_mask)."""
+    `ignore`: pieces whose ground counts neither way (pieces.ignore_mask). `bend`: as pieces.shape_cost."""
     if torch is None or any(k in q for q in nodes for k in UNSUPPORTED):
-        return cpu_refine(nodes, pieces, origin, ppn, pen_px, rough, edge, iters, fixed, others, res, ignore)
+        return cpu_refine(nodes, pieces, origin, ppn, pen_px, rough, edge, iters, fixed, others, res, ignore, bend)
     best = (nodes, score([nodes, *others], pieces, origin, ppn, pen_px, ignore))  # never hand back worse than it was given
     for stages in SCHEDULES:
-        out, s = _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore)
+        out, s = _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore, bend)
         if s["iou"] - s["gap95"] > best[1]["iou"] - best[1]["gap95"]:
             best = (out, s)
     return [dict(q) for q in best[0]], best[1]
 
 
-def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore=()):
+def shape_cost(a, rough, bend="position"):
+    """pieces.shape_cost on the GPU (no corners: a path with them goes to the CPU), differentiable."""
+    n = len(a)
+    cost = a.new_zeros(())
+    if n > 3:
+        if bend == "heading":
+            ch = torch.diff(a[:, :2], dim=0)
+            L = ch.norm(dim=1) + 1e-9
+            h = torch.atan2(ch[:, 1], ch[:, 0])
+            dh = torch.remainder(torch.diff(h) + math.pi, 2 * math.pi) - math.pi
+            cost = cost + rough * ((torch.diff(dh / ((L[1:] + L[:-1]) / 2)) * 0.8) ** 2).sum()
+        else:
+            cost = cost + rough * ((torch.diff(a[:, :2], 3, dim=0) / 0.1) ** 2).sum()
+    if n > 2:
+        cost = cost + rough * ((torch.diff(a[:, 2], 2) / 30) ** 2).sum()
+    ch = torch.diff(a[:, :2], dim=0)
+    cos = (ch[1:] * ch[:-1]).sum(1) / (ch[1:].norm(dim=1) * ch[:-1].norm(dim=1) + 1e-9)
+    return cost + torch.relu(-cos).sum() * 10
+
+
+def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore=(), bend="position"):
     dev = _device()
     rings = [ref_ring(p) for p in pieces]
     ignored = [ref_ring(p) for p in ignore]
@@ -250,14 +271,7 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
             inter = (A * Bt).sum()
             iou = inter / (A.sum() + Bt.sum() - inter)
             gap = (A.sum() + Bt.sum() - 2 * inter) / perim / px_per_nuqta
-            cost = 1 - iou + edge * gap
-            if n > 3:
-                cost = cost + rough * ((torch.diff(a[:, :2], 3, dim=0) / 0.1) ** 2).sum()
-            if n > 2:
-                cost = cost + rough * ((torch.diff(a[:, 2], 2) / 30) ** 2).sum()
-            ch = torch.diff(a[:, :2], dim=0)
-            cos = (ch[1:] * ch[:-1]).sum(1) / (ch[1:].norm(dim=1) * ch[:-1].norm(dim=1) + 1e-9)
-            cost = cost + torch.relu(-cos).sum() * 10
+            cost = 1 - iou + edge * gap + shape_cost(a, rough, bend)
             cost.backward()
             opt.step()
             sched.step()

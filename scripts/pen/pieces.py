@@ -140,15 +140,34 @@ def fit_pull(piece, origin, ppn, pen_px, start, free_width=True):
     return out, round(1 - r.fun, 3)
 
 
-def shape_cost(a, corners, rough):
+def heading_bend(a):
+    """Changes of curvature along a centre line, rows (x, y, ...): the turn at each inner node (the chord headings'
+    difference) over the mean of its two chords is the curvature there, and its differences, times 0.8 (which puts
+    a wiggle 0.08 nuqta high at the usual spacing near the position term's price), are returned. Zero on any steady arc, however
+    tight: a tooth's rounded top costs nothing for being round (Fable, 2026-10-20). Row j is about nodes j+1, j+2."""
+    ch = np.diff(a[:, :2], axis=0)
+    L = np.linalg.norm(ch, axis=1) + 1e-9
+    h = np.arctan2(ch[:, 1], ch[:, 0])
+    dh = (np.diff(h) + np.pi) % (2 * np.pi) - np.pi
+    return np.diff(dh / ((L[1:] + L[:-1]) / 2)) * 0.8
+
+
+def shape_cost(a, corners, rough, bend="position"):
     """refine's price on a path's shape, rows (x, y, nib angle): rough * (changes of bend along the centre line, and
     of the nib's rate of turning), plus a heavy one for doubling back, since a fold can hide under ink already drawn
     and cost nothing in overlap. A node in `corners` (the spec's "corner": a tooth's tip, where the pen goes up and
-    comes straight back) is excused both its bend and its fold; the nib's turning still counts there."""
+    comes straight back) is excused both its bend and its fold; the nib's turning still counts there. `bend`:
+    "position" (third differences of the nodes, which also price a steady curve by how tight it is) or "heading"
+    (heading_bend, which does not)."""
     n = len(a)
-    bend = np.diff(a[:, :2], 3, axis=0) / 0.1 if n > 3 else np.zeros((1, 2))
-    if n > 3:
-        bend = bend[[j for j in range(n - 3) if not {j + 1, j + 2} & corners]] if corners else bend
+    if bend == "heading":
+        bend = heading_bend(a) if n > 3 else np.zeros(1)
+        if n > 3 and corners:
+            bend = bend[[j for j in range(n - 3) if not {j + 1, j + 2} & corners]]
+    else:
+        bend = np.diff(a[:, :2], 3, axis=0) / 0.1 if n > 3 else np.zeros((1, 2))
+        if n > 3:
+            bend = bend[[j for j in range(n - 3) if not {j + 1, j + 2} & corners]] if corners else bend
     turn = np.diff(a[:, 2], 2) / 30 if n > 2 else np.zeros(1)
     ch = np.diff(a[:, :2], axis=0)
     cos = np.sum(ch[1:] * ch[:-1], 1) / (np.linalg.norm(ch[1:], axis=1) * np.linalg.norm(ch[:-1], axis=1) + 1e-9)
@@ -156,7 +175,8 @@ def shape_cost(a, corners, rough):
     return rough * (np.sum(bend ** 2) + np.sum(turn ** 2)) + fold
 
 
-def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5, ignore=()):
+def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5, ignore=(),
+           bend="position"):
     """Nudge a band's nodes (positions and nib angles; end widths stay) to cover its reference pieces, smoothly:
     cost = 1 - overlap + edge * (mean outline gap both ways, nuqta) + rough * (changes of bend along the centre
     line, and of the nib's rate of turning). A steady curve costs nothing; a wiggle does. The outline term is what holds thin ends: a hair overshooting a pointed end, or
@@ -164,7 +184,7 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
     their score. `fixed`: indices of nodes that stay put (a node shared with another letter's stroke);
     `others`: paths already drawn over the same pieces (spec node lists), counted as ink but not moved. `res`: the
     raster's share of the scoring resolution (a coarse first pass at 0.25 is four times quicker). `ignore`: pieces
-    whose ground counts neither way (ignore_mask)."""
+    whose ground counts neither way (ignore_mask). `bend`: shape_cost's bend term."""
     from scipy.optimize import minimize
     rings = [ref_ring(r) for r in pieces]
     win = Window(np.concatenate(rings), margin=pen_px)
@@ -205,7 +225,7 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
             A &= keep
         iou = (A & B).sum() / max(1, (A | B).sum())
         gap = (outline_gap(A, B).mean() + outline_gap(B, A).mean()) / sub / ppn
-        return 1 - iou + edge * gap + shape_cost(a, corners, rough)
+        return 1 - iou + edge * gap + shape_cost(a, corners, rough, bend)
 
     corners = {i for i, q in enumerate(nodes) if q.get("corner")}
 
@@ -221,8 +241,9 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
     return outn, score([outn, *others], pieces, origin, ppn, pen_px, ignore)
 
 
-def overshoot(nodes, pieces, origin, ppn, pen_px):
-    """How far (nuqta) our ink strays outside the reference pieces at its worst, and the overlap."""
+def overshoot(nodes, pieces, origin, ppn, pen_px, near=None, radius=0.5):
+    """How far (nuqta) our ink strays outside the reference pieces at its worst, and the overlap. `near`: a point
+    (nuqta, the nodes' frame); only ink within `radius` nuqta of it counts towards the worst."""
     rings = [ref_ring(r) for r in pieces]
     hulls = path_hulls(nodes, origin, ppn, pen_px, step=0.25)
     win = Window(np.concatenate([np.concatenate(rings), np.concatenate(hulls)]))
@@ -231,6 +252,10 @@ def overshoot(nodes, pieces, origin, ppn, pen_px):
     for r in rings:
         B |= win.poly(r)
     out = (A & ~B.astype(bool)).astype(bool)
+    if near is not None:
+        c = np.asarray(near) * ppn + origin
+        yy, xx = np.mgrid[0:win.H, 0:win.W]
+        out &= np.hypot(xx / SUB + win.x1 - c[0], yy / SUB + win.y1 - c[1]) < radius * ppn
     dist = cv2.distanceTransform((1 - B).astype(np.uint8), cv2.DIST_L2, 5)
     worst = float(dist[out].max()) / SUB / ppn if out.any() else 0.0
     return worst, float((A & B).sum() / max(1, (A | B).sum()))
@@ -239,20 +264,24 @@ def overshoot(nodes, pieces, origin, ppn, pen_px):
 def trim_ends(nodes, pieces, origin, ppn, pen_px, step=0.1, tol=0.005):
     """Pull each end node back toward its neighbour, a tenth of the way at a time, while that lessens how far the
     ink strays outside the reference and costs no more than `tol` of overlap: a hairline end the overlap cannot
-    see otherwise overshoots the reference's point (the ta's band, the alif's foot)."""
+    see otherwise overshoots the reference's point (the ta's band, the alif's foot). Each end is judged by the ink
+    within half a nuqta of where it began: judged by the stroke's worst anywhere, an end spur was never trimmed
+    while the other end strayed further (119.s1's 0.020 nuqta spur, 2026-10-20)."""
     nodes = [dict(n) for n in nodes]
-    worst, iou = overshoot(nodes, pieces, origin, ppn, pen_px)
+    _, iou = overshoot(nodes, pieces, origin, ppn, pen_px)
     for end, nb in ((0, 1), (-1, -2)):
+        at = nodes[end]["p"]
+        worst = overshoot(nodes, pieces, origin, ppn, pen_px, near=at)[0]
         for _ in range(8):
             a, b = np.array(nodes[end]["p"]), np.array(nodes[nb]["p"])
             trial = [dict(n) for n in nodes]
             trial[end] = {**trial[end], "p": [round(float(v), 3) for v in a + (b - a) * step]}
-            w, i = overshoot(trial, pieces, origin, ppn, pen_px)
+            w, i = overshoot(trial, pieces, origin, ppn, pen_px, near=at)
             if w < worst - 0.005 and i >= iou - tol:
                 nodes, worst = trial, w
             else:
                 break
-    return nodes, worst
+    return nodes, overshoot(nodes, pieces, origin, ppn, pen_px)[0]
 
 
 def _thin(m):

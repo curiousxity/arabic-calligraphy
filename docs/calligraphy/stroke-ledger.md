@@ -476,7 +476,11 @@ that choice. Two kinds so far:
   fills the rest of the shape in with a fine tip pen". No nib path makes
   it, so no fit can. The jim's starting mark, the small slanted block where
   its head begins, is another (the user, 2026-10-19: "those are all fill
-  ins"; 20 shapes, 10 distinct strokes). Measuring each stroke's widest
+  ins"; 20 shapes, 10 distinct strokes). The isolated dal's head is two
+  more: its slanted starting block and its hat (the user, 2026-10-20:
+  "yes. same thing with the hat on alif"; 146 and 147, three distinct
+  strokes; the final dals have neither). Fitted with the nib, they left a
+  step along the head's top edge. Measuring each stroke's widest
   point against the nib does **not** find fills: 245 strokes are wider than
   1.15 nibs somewhere, and neither of these is among them. Ask the user.
   The fine pen fills up to the nib's strokes, so paper shut in against a
