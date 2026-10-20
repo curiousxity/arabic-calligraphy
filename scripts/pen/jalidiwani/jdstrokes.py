@@ -5,12 +5,12 @@ import numpy as np, cv2
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(sys.argv[1], "code"))
 argv = sys.argv; sys.argv = argv[:4]
 import jdsheet
-from jdcatalog import strokes, origin, PPN, PEN, T
+from jdcatalog import strokes, origin, transform, PPN, PEN
 from pieces import ref_ring, path_hulls
 PX = float(argv[3]); SC = PX / PPN; COL = [(220, 60, 50), (40, 120, 230), (30, 160, 80), (230, 150, 20)]
 tiles = []
 for k in argv[4:]:
-    d_of = dict(strokes(k)); rings = [ref_ring([T, d_of[s]]) for s, _ in jdsheet.reg["shapes"][k]]
+    d_of = dict(strokes(k)); rings = [ref_ring([transform(k), d_of[s]]) for s, _ in jdsheet.reg["shapes"][k]]
     fits = [(s, jdsheet.result(jdsheet.reg["fits"][h]["job"])) for s, h in jdsheet.reg["shapes"][k]]
     pts = np.concatenate(rings); x1, y1 = pts.min(0) - 6; x2, y2 = pts.max(0) + 6
     W, H = int((x2 - x1) * SC), int((y2 - y1) * SC)

@@ -7,7 +7,7 @@ python jdedge.py QUEUE id [id ...]"""
 import json, os, socket, sys
 import numpy as np, cv2
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(sys.argv[1], "code"))
-from jdcatalog import strokes, job, T, PPN
+from jdcatalog import strokes, job, transform, PPN
 from pieces import ref_ring
 BAND, RS = 0.12, 8  # nuqta; raster px per screen px
 q, ids = sys.argv[1], sys.argv[2:]
@@ -16,7 +16,7 @@ for k in ids:
     st = strokes(k)
     if len(st) < 2:
         continue
-    rings = {sid: ref_ring([T, d]) for sid, d in st}
+    rings = {sid: ref_ring([transform(k), d]) for sid, d in st}
     pts = np.concatenate(list(rings.values())); x0, y0 = pts.min(0) - 4; W, H = ((pts.max(0) - [x0, y0] + 8) * RS).astype(int)
     P = lambda r: np.round((r - [x0, y0]) * RS).astype(np.int32)
     M = {}

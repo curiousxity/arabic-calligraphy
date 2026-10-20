@@ -6,7 +6,7 @@ import numpy as np, cv2
 from PIL import Image, ImageDraw, ImageFont
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(sys.argv[1], "code"))  # the queue's own code draws what it fitted
-from jdcatalog import db, strokes, origin, PPN, PEN, T
+from jdcatalog import db, strokes, origin, transform, PPN, PEN
 from pieces import ref_ring, path_hulls
 q, out, PX, ids = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.argv[4:]
 reg = json.load(open(os.path.join(os.environ.get("JD_WORK") or HERE, "registry.json")))
@@ -34,15 +34,15 @@ NODES = os.environ.get("JD_NODES", "")  # a folder of <id>.json {sid: nodes} (jd
 
 def shape(k):
     hulls, rings, info = [], [], []
-    d_of = dict(strokes(k))
+    d_of = dict(strokes(k)); Tk = transform(k)
     f = os.path.join(NODES, k + ".json") if NODES else ""
     if f and os.path.exists(f):
         for sid, nodes in json.load(open(f)).items():
-            rings.append(ref_ring([T, d_of[sid]])); hulls += path_hulls(nodes, np.array(origin(k)), PPN, PEN)
+            rings.append(ref_ring([Tk, d_of[sid]])); hulls += path_hulls(nodes, np.array(origin(k)), PPN, PEN)
             info.append(f"{sid}: trimmed, {len(nodes)} nodes")
         return hulls, rings, info
     for sid, h in reg["shapes"][k]:
-        rings.append(ref_ring([T, d_of[sid]]))
+        rings.append(ref_ring([Tk, d_of[sid]]))
         r = result(reg["fits"][h]["job"])
         if r is None:
             info.append(f"{sid}: waiting"); continue
@@ -97,7 +97,7 @@ if __name__ == "__main__":
     W = max(sum(t.width for t in ts) + 4 * PAD for _, ts in cells)
     H = sum(max(t.height for t in ts) + 2 * PAD + 22 for _, ts in cells) + 40
     sheet = Image.new("RGB", (W, H), "white"); d = ImageDraw.Draw(sheet)
-    d.text((PAD, 8), "ours | studio | difference (red: ours only, blue: studio only, grey: both)", fill=(60, 60, 60), font=fnt)
+    d.text((PAD, 8), "ours | reference (the studio; Hashim's p. 65 for plate shapes) | difference (red: ours only, blue: reference only, grey: both)", fill=(60, 60, 60), font=fnt)
     y = 40
     for label, ts in cells:
         d.text((PAD, y), label, fill=(20, 20, 20), font=fnt); y += 22

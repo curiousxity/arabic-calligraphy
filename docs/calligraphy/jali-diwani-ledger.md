@@ -97,6 +97,28 @@ Thuluth's method (stroke-ledger.md) with these changes, worked out on the
   extraction, as far as can be seen: Hashim's tails end sharp). How far the
   needle should run past the studio's end has not been measured against the
   plate.
+- **Where the plate wins, the letter is fitted to Hashim's page itself**
+  (`jdplatecut.py`; first used for the dal, below). His page gives a
+  silhouette, not strokes, so the studio's stroke split for the same letter
+  is scaled to his letter's height and laid over it, and each of his ink
+  pixels goes to the stroke it falls in (the pieces overlap where the
+  studio's do). The silhouette is cut from the full-resolution scan (40 px
+  to the nib), smoothed by about a pixel against the scan's edge fuzz, and
+  written as cubic curves between its corners. The pieces go to the fitter
+  with the transform `PEN / 40`, so the fit is in the same units as every
+  studio letter. Scores against a scan sit below the studio's (print spread
+  takes the thickest strokes past the nib, which the fit cannot follow), so
+  "within reason" for a plate-fitted letter is judged against the scan, and
+  the number is given as it is. The plate is a reference only: the pieces
+  are what the pen is fitted to, as the studio's are, and no outline from
+  the page enters the library.
+- **"Heavier" is read in pens before anything is refitted.** The pen is the
+  unit, so a letter that looks heavier for its height is either the same
+  strokes on a shorter letter (a size difference) or thicker strokes (a
+  different hand). The dal: the studio's is 4.2 pens tall with strokes one
+  nib wide (1.01 pen at the thickest); Hashim's is 5.95 pens tall with the
+  same nib (1.14 at the thickest, print spread included). Same strokes,
+  bigger letter: his dal is about 40% taller for the nib, not drawn lighter.
 
 ## Pilot: ورد (2026-10-20)
 
@@ -110,15 +132,29 @@ candidates beside Hashim, the chosen three, and the three at 3×).
 |---|---|---|---|---|
 | و | 690 (v02), 3 pieces: head top, head underside, tail | Hashim's waw: a full round head and a long tail; 689 is the same form, shorter; 691 is a curled form | 0.976 | 0.12 (tail tip) / 0.01 |
 | ر | 243 (v02), 2 pieces: the head dropped straight, then the body | Hashim's plain ra almost exactly, pointed head included; 244 and 245 are the diagonal forms, 246 Hashim's other (U-shaped) ra | 0.967 | 0.22 (tail tip) / 0.04 |
-| د | 237 (v01), 2 pieces: the hooked head, then the body | the studio's only isolated dal; Hashim's head is a little smaller and rounder, and the studio's letter about 20% heavier for its height | 0.966 | 0.05 / 0.07 |
+| د | **Hashim's p. 65 dal itself** (`h65-dal`), 2 pieces cut with the studio's 237 split as the guide: the body (s0), the hooked head (s1) | the studio's only isolated dal (237) is 4.2 pens tall against Hashim's 5.95, the same nib: the plate wins, so his letter was fitted (the user, 2026-10-20: "pick one and trace it"). The studio's 237 was fitted first (0.966, 0.05 / 0.07) and is kept as a fit, not as the dal | 0.954 against the scan | 0.36 (tail tip) / 0.06 |
 
-Left at 3×, all under 0.08 nuqta: a point at the top of the waw's head and
-a step under the dal's head where its two pieces meet. The ra's head ends
-pointed and slanted where the studio's is rounded, and the dal's head starts
-rounded where the studio's is cut straight; Hashim's are pointed and
-rounded, so those stand (the plate wins). Recorded in
-`scripts/pen/REVIEW-jali-diwani.md` under the within-reason rule, awaiting
-the user's look.
+Left at 3×: a point at the top of the waw's head and a step under the
+dal's head where its two pieces meet, both under 0.08 nuqta; and the dal's
+tail, which the fit runs 0.36 nuqta past the end of Hashim's printed
+hairline into a needle, as the waw's and ra's tails do past the studio's
+(the tail-tip question above). The dal's head starts in a slanted cut where
+Hashim's is a blunt round (a 0.06-nuqta sliver), and its underside is a
+hair thinner than his. The ra's head ends pointed and slanted where the
+studio's is rounded, and the dal's head starts rounded where the studio's
+is cut straight; Hashim's are pointed and rounded, so those stand (the
+plate wins). Recorded in `scripts/pen/REVIEW-jali-diwani.md` under the
+within-reason rule, awaiting the user's look.
+
+The dal is the first letter fitted to the plate rather than the studio, and
+sets the precedent: the head's second pass took its body from 0.970 to
+0.972 while the head stayed at 0.937 (band fit, 0.06 nuqta max gap), the
+whole letter 0.954. The head's thickest run is 1.14 pens on the page, which
+a one-nib pen cannot reach, so the head's overlap sits lower than any
+studio stroke's for the same closeness. Fitted strokes run from the tail to
+the junction (s0) and from the junction round to the head's cap (s1): the
+fitter's own direction, not Sabti's writing order, which the move tables
+below record.
 
 ## Sabti's moves, letter by letter
 
