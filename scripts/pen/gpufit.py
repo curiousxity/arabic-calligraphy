@@ -188,11 +188,12 @@ def _ink_loop(ea, eb, x1, y1, r, H, W, soft):
 
 
 def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5, ignore=(),
-           bend="position"):
+           bend="position", hold=()):
     """pieces.refine's signature and result (new nodes, their score); `iters` and `res` only matter on the CPU.
-    `ignore`: pieces whose ground counts neither way (pieces.ignore_mask). `bend`: as pieces.shape_cost."""
-    if torch is None or any(k in q for q in nodes for k in UNSUPPORTED):
-        return cpu_refine(nodes, pieces, origin, ppn, pen_px, rough, edge, iters, fixed, others, res, ignore, bend)
+    `ignore`: pieces whose ground counts neither way (pieces.ignore_mask). `bend`: as pieces.shape_cost. `hold`:
+    as pieces.refine, which takes such a job (the GPU path does not hold angles)."""
+    if torch is None or hold or any(k in q for q in nodes for k in UNSUPPORTED):
+        return cpu_refine(nodes, pieces, origin, ppn, pen_px, rough, edge, iters, fixed, others, res, ignore, bend, hold)
     best = (nodes, score([nodes, *others], pieces, origin, ppn, pen_px, ignore))  # never hand back worse than it was given
     for stages in SCHEDULES:
         out, s = _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore, bend)

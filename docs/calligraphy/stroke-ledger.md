@@ -498,6 +498,57 @@ that choice. Two kinds so far:
   then the area.** The hook covers a little of the studio's ink, so on
   area alone the search put a start with the hook back on top. By worst
   miss, 0.137 → 0.085 nuqta, and the end is one clean slanted cut.
+- **Spurs at joins: judge each end on its own** (the user, 2026-10-20: the
+  dal's bottom join, and the jim's heads where its strokes meet, in 119,
+  123, 124, 128, 129, 130, 133 and 144). `trim_ends` stepped an end back
+  only while the stroke's worst overshoot fell, and that worst was taken
+  over the whole stroke. So a spur at one end survived whenever the other
+  end strayed further. Now each end is judged by the overshoot within half
+  a nuqta of where it was (`overshoot(..., near=)`). Trimmed again
+  (`retrim.py`), most of the reported spurs went; the 119's corner is
+  clean. The ends still straying get the end search (`endsearch.py`): the
+  end node's nib angle in 20° steps up to 80° either side of its
+  neighbour's, width 1, 0.75 or 0.5, the five end nodes free, judged on the
+  whole shape (the other strokes as fitted, fills as their outline) within
+  half a nuqta of the end, worst miss first. The dal's bottom join went
+  0.258 → 0.089 nuqta (146) and 0.101 → 0.015 (147); the jim 144's 0.076 →
+  0.007. Search one end of a stroke per round: both ends start from the
+  same fit, so writing the second throws the first away.
+- **A tighter turn is not a better turn.** The ba's tooth comes to a
+  narrow, nearly pointed top that our fits round into a low hump, 0.1–0.4
+  nuqta short. Two tries, both rejected by eye:
+  - a corner node at the top (bend and fold excused there). The overlap
+    rose, but the cusp showed the nib's straight edge as a flat peak, and
+    the nodes either side crossed over and left nicks;
+  - nodes 0.1 nuqta apart over the top, free. The tip's worst miss fell
+    (080 0.222 → 0.045 nuqta, overlap 0.786 → 0.876), and the tops came
+    out notched and kinked. Nothing prices spacing or the nib's turning
+    per length, so the free nodes slid into clumps (chords down to 0.012
+    nuqta, flat facets between them) and the nib pivoted in place (up to
+    2,956° per nuqta). Past about 190° per nuqta one end of the nib runs
+    backwards, which draws a knot. This run was meant to try a bend that
+    charges a change of curvature rather than curvature itself
+    (`bend="heading"`). At that roughness the bend hardly counted, so it
+    proved nothing either way. On four good strokes it was no worse than
+    the old one.
+
+  The studio writes the tooth at a constant nib, about 78°. Its inner V is
+  the outer peak moved by one vector, 0.67 nuqta along 258°, the same in
+  076, 080 and 085c. The outer top is a tight arc, radius 0.11–0.18 nuqta.
+  The old fits made a hump because one node turning the centre line 130°
+  costs about 6 in fold, forty times the overlap it buys, so the turn was
+  spread over two nodes. Some (085c) spun the nib 90° instead to fake the
+  point. A score can rise while the shape gets worse. Fable's notch judge
+  (`notch.py`) must pass before a tooth's number counts. It checks:
+  - nodes no closer than 0.15 nuqta;
+  - the nib turning no more than 120° a nuqta;
+  - a turn of no more than 90° at any node but a corner;
+  - no sharp inward corner on our outline that the studio's hasn't got.
+- **Strokes wider than the nib.** 510 of the 2,500 distinct strokes are
+  wider than 1.08 nibs over more than a fifth of their length: the jim's
+  head bar about 1.15, the 144's bowl 1.37. One nib can't reach the outer
+  edge, which leaves a thin strip of the studio's ink along the jim heads'
+  top. Wider nib, second pass, or fill: asked of the user, 2026-10-20.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides

@@ -176,7 +176,7 @@ def shape_cost(a, corners, rough, bend="position"):
 
 
 def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5, ignore=(),
-           bend="position"):
+           bend="position", hold=()):
     """Nudge a band's nodes (positions and nib angles; end widths stay) to cover its reference pieces, smoothly:
     cost = 1 - overlap + edge * (mean outline gap both ways, nuqta) + rough * (changes of bend along the centre
     line, and of the nib's rate of turning). A steady curve costs nothing; a wiggle does. The outline term is what holds thin ends: a hair overshooting a pointed end, or
@@ -184,7 +184,8 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
     their score. `fixed`: indices of nodes that stay put (a node shared with another letter's stroke);
     `others`: paths already drawn over the same pieces (spec node lists), counted as ink but not moved. `res`: the
     raster's share of the scoring resolution (a coarse first pass at 0.25 is four times quicker). `ignore`: pieces
-    whose ground counts neither way (ignore_mask). `bend`: shape_cost's bend term."""
+    whose ground counts neither way (ignore_mask). `bend`: shape_cost's bend term. `hold`: indices of nodes whose
+    nib angle stays put while they move (a tooth's top at the studio's constant nib)."""
     from scipy.optimize import minimize
     rings = [ref_ring(r) for r in pieces]
     win = Window(np.concatenate(rings), margin=pen_px)
@@ -208,9 +209,11 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
     for h in [h for p in others for h in path_hulls(p, origin, ppn, pen_px, step=1.0)]:
         cv2.fillConvexPoly(O, cv2.convexHull(px(h)), 1, cv2.LINE_8, 4)
 
+    turn = np.array([[1, 1, 0 if i in hold or i - n in hold else 10] for i in free], float).reshape(-1, 3)
+
     def unpack(v):
         a = base.copy()
-        a[free] += v.reshape(-1, 3) * [1, 1, 10]
+        a[free] += v.reshape(-1, 3) * turn
         return a
 
     def make(a):
