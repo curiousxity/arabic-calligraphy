@@ -34,6 +34,8 @@ SCHEDULES = (((90, 0.4, 150, 0.004), (150, 0.3, 150, 0.002)),
 STEP_PX = 3     # most either nib end moves between placements, raster px; each quad spans two steps, so every
                 # inked pixel lies a step deep inside one and the ink is solid (0.9 and more at a softness of 0.6)
 CHUNK = 24      # quads per block, each block inks only the pixels round it
+RELAYOUT = 25   # steps between recounts of the placements, and between checks that the cost is still falling
+SETTLED = 5e-5  # a fall in cost over RELAYOUT steps smaller than this, three times running, ends the stage
 UNSUPPORTED = ("dir", "corner", "keep", "tin", "tout")
 
 
@@ -63,27 +65,41 @@ def _controls(P):
     return P[:-1] + t[:-1] * chord / 3, P[1:] - t[1:] * chord / 3
 
 
-def _placements(a, widths, origin, ppn, pen, r):
-    """Nib ends (n, 2) and (n, 2) in screen units along the path, about STEP_PX raster px apart."""
+def _curve(a, widths, origin, ppn, pen, seg, t):
+    """Nib ends at parameters t of segments seg (tensors of one shape), screen units."""
     P, ang = a[:, :2], a[:, 2]
     c1, c2 = _controls(P)
-    ends_a, ends_b = [], []
-    for i in range(P.shape[0] - 1):
-        def at(t):
-            u = 1 - t
-            c = (u ** 3)[:, None] * P[i] + (3 * u * u * t)[:, None] * c1[i] + (3 * u * t * t)[:, None] * c2[i] + (t ** 3)[:, None] * P[i + 1]
-            th = torch.deg2rad(ang[i] + (ang[i + 1] - ang[i]) * t)
-            w = (widths[i] + (widths[i + 1] - widths[i]) * t) * pen
-            n = torch.stack([torch.cos(th), -torch.sin(th)], 1) * (w / 2)[:, None]
-            c = c * ppn + origin
-            return c + n, c - n
-        with torch.no_grad():  # how many placements: from the ends' travel over a coarse pass
-            ea, eb = at(torch.linspace(0, 1, 33, device=a.device))
-            travel = torch.maximum((ea[1:] - ea[:-1]).norm(dim=1), (eb[1:] - eb[:-1]).norm(dim=1)).sum() * r
-            n = int(max(2, math.ceil(float(travel) / STEP_PX)))
-        ea, eb = at(torch.linspace(0, 1, n + 1, device=a.device)[:-1] if i < P.shape[0] - 2 else torch.linspace(0, 1, n + 1, device=a.device))
-        ends_a.append(ea); ends_b.append(eb)
-    return torch.cat(ends_a), torch.cat(ends_b)
+    u = (1 - t)[..., None]
+    tt = t[..., None]
+    c = u ** 3 * P[seg] + 3 * u * u * tt * c1[seg] + 3 * u * tt * tt * c2[seg] + tt ** 3 * P[seg + 1]
+    th = torch.deg2rad(ang[seg] + (ang[seg + 1] - ang[seg]) * t)
+    w = (widths[seg] + (widths[seg + 1] - widths[seg]) * t) * pen
+    n = torch.stack([torch.cos(th), -torch.sin(th)], -1) * (w / 2)[..., None]
+    c = c * ppn + origin
+    return c + n, c - n
+
+
+def _layout(a, widths, origin, ppn, pen, r):
+    """Where to place the nib: (segment, t) for each placement, about STEP_PX raster px apart, counted from the
+    ends' travel over a coarse pass; each segment's end left to the next, the last one's kept."""
+    with torch.no_grad():
+        k = a.shape[0] - 1
+        seg = torch.arange(k, device=a.device)[:, None].expand(k, 33)
+        t = torch.linspace(0, 1, 33, device=a.device)[None].expand(k, 33)
+        ea, eb = _curve(a, widths, origin, ppn, pen, seg, t)
+        travel = torch.maximum((ea[:, 1:] - ea[:, :-1]).norm(dim=-1), (eb[:, 1:] - eb[:, :-1]).norm(dim=-1)).sum(1) * r
+        counts = (travel / STEP_PX).ceil().clamp_min(2).long().tolist()
+    segs, ts = [], []
+    for i, n in enumerate(counts):
+        ts.append(torch.linspace(0, 1, n + 1)[: n + (1 if i == k - 1 else 0)])
+        segs.append(torch.full((ts[-1].shape[0],), i, dtype=torch.long))
+    return torch.cat(segs).to(a.device), torch.cat(ts).to(a.device)
+
+
+def _placements(a, widths, origin, ppn, pen, r, layout=None):
+    """Nib ends (n, 2) and (n, 2) in screen units along the path, about STEP_PX raster px apart."""
+    seg, t = layout if layout is not None else _layout(a, widths, origin, ppn, pen, r)
+    return _curve(a, widths, origin, ppn, pen, seg, t)
 
 
 def _ink(ea, eb, x1, y1, r, H, W, soft):
@@ -210,10 +226,13 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
         Ot = torch.tensor(Om, dtype=torch.float32, device=dev)
         opt = torch.optim.Adam([v], lr=rate)
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, steps, rate / 10)
-        for _ in range(steps):
+        layout, last, still = None, None, 0
+        for step in range(steps):
             opt.zero_grad()
             a = unpack()
-            ea, eb = _placements(a, widths, org, ppn, pen_px, r)
+            if step % RELAYOUT == 0:  # how many placements per segment: recounted now and then, as the path moves
+                layout = _layout(a.detach(), widths, org, ppn, pen_px, r)
+            ea, eb = _placements(a, widths, org, ppn, pen_px, r, layout)
             A = 1 - (1 - _ink(ea, eb, x1, y1, r, H, W, soft)) * (1 - Ot)
             inter = (A * Bt).sum()
             iou = inter / (A.sum() + Bt.sum() - inter)
@@ -229,6 +248,13 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
             cost.backward()
             opt.step()
             sched.step()
+            # stop once the cost has settled (checked every RELAYOUT steps, the one sync with the GPU)
+            if step % RELAYOUT == RELAYOUT - 1:
+                c = float(cost.detach())
+                still = still + 1 if last is not None and last - c < SETTLED else 0
+                last = c
+                if still >= 3:
+                    break
     a = unpack().detach().cpu().numpy()
     out = [{**q, "p": [round(float(a[i, 0]), 3), round(float(a[i, 1]), 3)], "angle": round(float(a[i, 2]), 1)} for i, q in enumerate(nodes)]
     return out, score([out, *others], pieces, origin, ppn, pen_px)
