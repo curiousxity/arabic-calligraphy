@@ -34,6 +34,8 @@ SCHEDULES = (((90, 0.4, 150, 0.004), (150, 0.3, 150, 0.002)),
 STEP_PX = 3     # most either nib end moves between placements, raster px; each quad spans two steps, so every
                 # inked pixel lies a step deep inside one and the ink is solid (0.9 and more at a softness of 0.6)
 CHUNK = 24      # quads per block, each block inks only the pixels round it
+BATCH_CELLS = 3e7  # most (quad edge, pixel) pairs in one batch, ~120 MB a tensor: a long stroke on the fine grid
+                   # would otherwise build several GB at once, and nine jobs doing so crashed Geekmini's 4070
 RELAYOUT = 25   # steps between recounts of the placements, and between checks that the cost is still falling
 SETTLED = 5e-5  # a fall in cost over RELAYOUT steps smaller than this, three times running, ends the stage
 UNSUPPORTED = ("dir", "corner", "keep", "tin", "tout")
@@ -138,10 +140,13 @@ def _ink(ea, eb, x1, y1, r, H, W, soft):
         flat = torch.where(inside, ii[:, :, None] * W + jj[:, None, :], torch.full_like(inside, H * W, dtype=torch.long))
     xs = (float(x1) + jj.float() / float(r))[:, None, None, None, :]         # pixel centres where cv2 puts them
     ys = (float(y1) + ii.float() / float(r))[:, None, None, :, None]
-    sd = N[..., 0, None, None] * xs + N[..., 1, None, None] * ys - off[..., None, None]   # (nc, CHUNK, 4, hh, ww)
-    d = sd.min(2).values.max(1).values                                       # each pixel's deepest quad, per block
-    depth = torch.full((H * W + 1,), -1e9, device=V.device, dtype=d.dtype)
-    depth = depth.scatter_reduce(0, flat.reshape(-1), d.reshape(-1), reduce="amax", include_self=True)
+    depth = torch.full((H * W + 1,), -1e9, device=V.device, dtype=V.dtype)
+    per = max(1, int(BATCH_CELLS // (CHUNK * 4 * hh * ww)))                  # blocks per batch
+    for b in range(0, nc, per):
+        sl = slice(b, b + per)
+        sd = N[sl, ..., 0, None, None] * xs[sl] + N[sl, ..., 1, None, None] * ys[sl] - off[sl, ..., None, None]  # (n, CHUNK, 4, hh, ww)
+        d = sd.min(2).values.max(1).values                                   # each pixel's deepest quad, per block
+        depth = depth.scatter_reduce(0, flat[sl].reshape(-1), d.reshape(-1), reduce="amax", include_self=True)
     return torch.sigmoid(depth[: H * W].view(H, W) * r / soft)
 
 
