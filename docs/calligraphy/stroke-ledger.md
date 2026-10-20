@@ -175,6 +175,11 @@ measure; the real unit is the pen.
   alif, أيمن's alif 0.86 from أم's meem, يمن 0.87 from its alif and 0.87
   (its ي's dots) from أم's meem tail. An earlier 0.85 / 0.9 split was read
   off our own rougher letters.
+- **Dots keep 0.55 nuqta**, wherever a dot is one of the two (`DOT_GAP`).
+  In the studio's حياتي the ت's dots sit 0.56 from the alif before them,
+  while the ت's body keeps 0.88. With dots held to 0.85 like bodies, تي
+  stood 0.3 nuqta too far left, pushed away by its own dots. Measured on الحب حياتي, which is also in
+  the layout test.
 - A word may tuck in over another's tail or under its head. The studio's
   يمن sits under the meem of أم, its ي dots under the tail.
 - **The tuck is fragile.** If a group can't keep its clearance in the
@@ -277,6 +282,116 @@ Three pieces, after the pen lifts at the meem's exit (a `lift` join):
 - **Dot:** above the left part of the bowl, 0.3 above the line. The Ministry
   book's rule is that the dot sits near the arm. The studio's sits over the
   bowl, and its placement is the one used here.
+
+### الحب حياتي (studio, matched 2026-10-19)
+
+Nine forms, matched to the studio's own line of أم أيمن الحب حياتي and
+recorded under the user's standing instruction (matched within reason:
+overlap 0.92 for the phrase against 0.90 for the approved أم أيمن, side by
+side in `comparisons/alhubb-hayati.png`; awaiting the user's look).
+Coordinates here are in each **letter group's** frame (x from the group's
+right-most ink, y from the line), as the library stores them. Every join
+inside these words is a lift: the next letter's first piece starts where
+the last one's exit ends, within 0.2 nuqta.
+
+**Studio facts found on the way:**
+- The studio draws a join twice: each joined letter carries the pieces it
+  shares with its neighbour, without a letter index (`data-l`) on the copy.
+  Count each piece once.
+- The studio writes the final ي of حياتي **without dots** (the ت above it
+  has its own).
+- **The curved alif joins a lam.** The alif that begins الحب is written as
+  one sweep from below the line up into the lam's top, and the two are one
+  letter group. The user: "this particular variant of alif can join to the
+  next letter if the next letter is a lam." The layout does this only for a
+  word's opening alif directly before a lam, and only where the library has
+  that alif's joining form.
+- **Dots may come closer than bodies.** تي's dots sit 0.56 nuqta from the
+  alif before them while its body keeps 0.88; see Spacing.
+- **The studio's alif heads differ between compositions.** In its line of
+  all four words the two alifs of أم أيمن have their heads drawn lower than
+  in its أم أيمن alone (against the line, ours score 0.85 instead of 0.90).
+  The approved form follows the أم أيمن capture.
+
+#### Alif (ا), joining a lam (الحب)
+
+- **Sweep:** one band of 13 nodes from below the line, (−1.80, 2.35), up
+  and over to the lam's top at (−3.41, −6.54). The nib turns the whole way,
+  from −124° through 0° to 70° (0.95; 0.06).
+
+#### Lam (ل), starting (الحب)
+
+- **Stem:** down from its top, (−3.21, −6.46) to (−2.92, −2.75), the nib
+  from 61° to 80° (0.98; 0.01).
+- **Foot:** a band of its own out to the left, (−2.89, −2.79) to (−5.05,
+  −2.01), the nib held at 80–82°. The pen leaves by it (0.99; 0.01).
+
+#### Ha (ح), middle (الحب)
+
+- **Head:** written left to right from the lam's foot, (−5.04, −2.06) to
+  (−0.29, −1.84), the nib easing from 81° to 68° (0.98; 0.02).
+- **Down:** back down to the left into the ب, to (−4.45, −0.32), the nib
+  from 66° to 81°. The pen leaves by it (0.97; 0.03).
+
+#### Ba (ب), finishing (الحب)
+
+- **Start:** a short turned-up stroke, (−4.40, −0.35) to (−5.04, −1.49),
+  the nib at 77–82° (0.94; 0.05).
+- **Bowl:** the boat, 11 nodes from (−5.08, −1.28) to a thin tip at
+  (−11.83, −1.00), the nib held at 78–87° (0.96; 0.03). Read off the
+  piece's skeleton: a band started from its outline made the bottom too
+  thin.
+- **Dot:** under the bowl at (−7.22, 1.39).
+
+#### Ha (ح), starting (حيا)
+
+- **Top:** the head written left to right, (−4.83, −2.29) to (−0.11,
+  −1.62), the nib at 56–61° (0.91; 0.08).
+- **Hook:** the small turn at the head's left end, (−4.94, −2.12) to
+  (−3.69, −1.99), the nib at 61–63° (0.92; 0.05).
+- **Down:** back down to the left into the ي, to (−4.66, −0.34), the nib
+  from 58° to 81°. The pen leaves by it (0.95; 0.03).
+
+#### Ya (ي), middle (حيا)
+
+- **Up:** to its tooth, (−4.60, −0.42) to (−5.82, −1.21), the nib at
+  81–90° (0.95; 0.03).
+- **Down:** into the alif, (−5.67, −1.43) to (−7.15, −0.30), the nib from
+  70° to 80°. The pen leaves by it (0.93; 0.04).
+- **Dots:** two under the line at (−5.91, 0.84) and (−6.85, 0.99).
+
+#### Alif (ا), finishing (حيا)
+
+- **Stem:** from the join on the line, (−7.29, −0.16), up to its top at
+  (−8.97, −6.76), the nib turning from 44° at the foot to 70° (0.91; 0.08).
+  The weakest piece of the phrase, where the studio's foot curls into the
+  line. A refit with the outline weighed six times (`edge` 6) brought it up
+  from 0.88.
+
+#### Ta (ت), starting (تي)
+
+- **Tooth:** down from its head, (−1.10, −2.79) to (−0.14, −1.01), the nib
+  at 78–83° (0.94; 0.03).
+- **Head:** two short pieces over the tooth's top: a pull at 144°, (−0.95,
+  −3.09) to (−0.96, −2.41) (0.92; 0.04), and a three-node turn from 45° to
+  111° (0.76; 0.08, the weakest fit in the phrase, on a piece a quarter
+  nuqta long).
+- **Band:** out to the left into the ي, (−0.10, −1.17) to (−1.86, −0.42),
+  the nib held at 78–80°. The pen leaves by it (0.99; 0.01).
+- **Dots:** two above, at (−0.40, −4.36) and (−1.35, −4.20).
+
+#### Ya (ي), finishing (تي)
+
+- **In:** from the ت's band, (−1.87, −0.39), round to the right to (0.03,
+  0.32), the nib turning from 82° to −36° (0.95; 0.04).
+- **Bowl:** from (0.05, 0.54) back out to the left under the line to a
+  thin tip at (−5.66, −0.29), 12 nodes, the nib turning from 17° to −110°
+  (0.95; 0.06). Its start was trimmed 0.10 nuqta by hand: with the nib
+  nearly flat there, half the nib stood 0.14 right of the studio's bowl and
+  moved the whole تي 0.14 in the placement test. `trim_ends` would not take
+  the cut because it costs 0.006 of the bowl's own overlap (0.004 counted
+  with the ي's first piece, which covers that corner).
+- No dots (the studio's).
 
 ## Joins
 

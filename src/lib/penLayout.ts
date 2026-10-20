@@ -4,7 +4,8 @@
  * later editing work pins), and the ink that layout draws. Runs read right
  * to left from x = 0 on the baseline y = 0. Each run sits as far right as
  * it can while keeping RUN_GAP (inside a word) or WORD_GAP (between words)
- * clear of all the ink before it, in any direction, so a word tucks in over
+ * clear of all the ink before it, in any direction (DOT_GAP wherever a dot
+ * is one of the two), so a word tucks in over
  * another's tail or under its head as a line of Thuluth is spaced. Pure; must not
  * import ./harfbuzz. See .claude/rules/tarkib.md.
  */
@@ -26,6 +27,9 @@ export type PenLayout = { runs: PenRun[]; wordStarts: number[] };
 export const RUN_GAP = 0.85;
 /** Nuqta a word keeps clear of the ink before it: the same as inside a word, on the same reference. */
 export const WORD_GAP = 0.85;
+/** Nuqta a dot keeps clear of other ink, of either run, where letter bodies keep RUN_GAP or WORD_GAP. The studio's
+ *  الحب حياتي (2026-10-19) sets تي's dots 0.56 from the alif before them while its body stays 0.88 clear. */
+export const DOT_GAP = 0.55;
 /** Units a run slides at a time while looking for its place (the result is refined to SLIDE_TOL). */
 const SLIDE = 4;
 const SLIDE_TOL = 0.25;
@@ -49,12 +53,22 @@ export function defaultLayout(lib: PenLibrary, phrase: string): PenLayout | { mi
   const missing: string[] = [];
   const miss = (c: string) => { if (!missing.includes(c)) missing.push(c); };
   const runs: PenRun[] = [], wordStarts: number[] = [];
+  const curvedAlif = [...lib.forms.values()].some((f) => f.letter === "ا" && f.form === "starting");
   for (const word of analyzePhrase(phrase).words) {
     wordStarts.push(runs.length);
-    for (const run of word.runs) {
+    for (let r = 0; r < word.runs.length; r++) {
+      let letters = word.runs[r].letters.map((l) => ({ ...l, form: l.form as string }));
+      // Thuluth's curved alif joins a lam written after it (the studio's الحب; the user, 2026-10-19: "this particular
+      // variant of alif can join to the next letter if the next letter is a lam"): a lone alif and the run after it,
+      // when that run starts with a lam, are one run, the alif in its joining form
+      const next = word.runs[r + 1];
+      if (curvedAlif && letters.length === 1 && (BASE[letters[0].char] ?? letters[0].char) === "ا" && next?.letters[0].char === "ل") {
+        letters = [{ ...letters[0], form: "starting" }, ...next.letters.map((l) => ({ ...l, form: l.form as string }))];
+        r++;
+      }
       const forms: string[] = [];
       const hamza: NonNullable<PenRun["hamza"]> = [];
-      run.letters.forEach((l, i) => {
+      letters.forEach((l, i) => {
         const letter = BASE[l.char] ?? l.char;
         const form = [...lib.forms.values()].find((f) => f.letter === letter && f.form === l.form);
         if (form) forms.push(form.id); else miss(letter);
@@ -103,10 +117,8 @@ function nearIndex(points: Pt[], gap: number): (x: number, y: number) => boolean
     return false;
   };
 }
-/** The largest x shift, at most `start`, at which `next`'s ink keeps `gap` clear of the placed ink. */
-function clearShift(placed: Pt[], next: Pt[], gap: number, start: number): number {
-  const near = nearIndex(placed, gap);
-  const clashes = (dx: number) => next.some(([x, y]) => near(x + dx, y));
+/** The largest x shift, at most `start`, at which nothing clashes. */
+function clearShift(clashes: (dx: number) => boolean, start: number): number {
   if (!clashes(start)) return start;
   let hit = start, dx = start;
   while (clashes(dx)) { hit = dx; dx -= SLIDE; }
@@ -142,6 +154,8 @@ export function layoutGeometry(lib: PenLibrary, layout: PenLayout): LayoutGeomet
   if (hit) return hit;
 
   const all: Polygon[][] = [], runBounds: Bounds[] = [], strokeRuns: number[] = [];
+  // the placed ink's outline points: dots apart, for their closer clearance
+  const placedBody: Pt[] = [], placedDots: Pt[] = [];
   layout.runs.forEach((run, k) => {
     const r = assembleRun(lib, run.forms, run.joins, [0, 0]);
     const paths: PenPath[] = [...(r.body ? [r.body] : []), ...r.strokes];
@@ -152,16 +166,23 @@ export function layoutGeometry(lib: PenLibrary, layout: PenLayout): LayoutGeomet
       paths.push(...p.strokes);
       drawn.push(...p.drawn);
     }
-    paths.push(...r.dots);
-    const inks: Polygon[][] = [...paths.map((p) => sweepPath(p, PEN)), ...drawn.map((d) => [d])].filter((ps) => ps.length > 0);
+    const bodyInks: Polygon[][] = [...paths.map((p) => sweepPath(p, PEN)), ...drawn.map((d) => [d])].filter((ps) => ps.length > 0);
+    const dotInks = r.dots.map((p) => sweepPath(p, PEN)).filter((ps) => ps.length > 0);
+    const inks = [...bodyInks, ...dotInks];
     const b = boundsOf(inks);
+    const body = outlinePoints(bodyInks), dots = outlinePoints(dotInks);
     let dx = Number.isFinite(b.x2) ? -b.x2 : 0;
     if (k > 0 && Number.isFinite(b.x2)) {
-      const gap = (layout.wordStarts.includes(k) ? WORD_GAP : RUN_GAP) * NUQTA;
+      const gap = (layout.wordStarts.includes(k) ? WORD_GAP : RUN_GAP) * NUQTA, dotGap = DOT_GAP * NUQTA;
+      const nearBody = nearIndex(placedBody, gap), nearDots = nearIndex(placedDots, dotGap), nearAny = nearIndex([...placedBody, ...placedDots], dotGap);
+      const clashes = (dx: number) =>
+        body.some(([x, y]) => nearBody(x + dx, y) || nearDots(x + dx, y)) || dots.some(([x, y]) => nearAny(x + dx, y));
       // reading right to left: a run never starts right of the one before it
-      dx = clearShift(outlinePoints(all), outlinePoints(inks), gap, runBounds[k - 1].x2 - b.x2);
+      dx = clearShift(clashes, runBounds[k - 1].x2 - b.x2);
     }
     for (const ink of inks) { all.push(move(ink, dx)); strokeRuns.push(k); }
+    for (const [x, y] of body) placedBody.push([x + dx, y]);
+    for (const [x, y] of dots) placedDots.push([x + dx, y]);
     const prevX1 = runBounds.length ? runBounds[runBounds.length - 1].x1 : 0;
     runBounds.push(Number.isFinite(b.x1) ? { x1: b.x1 + dx, y1: b.y1, x2: b.x2 + dx, y2: b.y2 } : { x1: prevX1, y1: 0, x2: prevX1, y2: 0 });
   });

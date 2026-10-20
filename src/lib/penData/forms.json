@@ -139,5 +139,256 @@
     2.4
    ]
   }
+ },
+ {
+  "id": "alif.starting.1",
+  "letter": "ا",
+  "form": "starting",
+  "parts": [
+   {
+    "part": "alif-curve",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "anchors": {
+   "above": [
+    -1.806,
+    -7.037
+   ],
+   "below": [
+    -1.806,
+    2.848
+   ]
+  }
+ },
+ {
+  "id": "lam.starting.1",
+  "letter": "ل",
+  "form": "starting",
+  "parts": [
+   {
+    "part": "lam-start",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "anchors": {
+   "above": [
+    -3.971,
+    -6.965
+   ],
+   "below": [
+    -3.971,
+    -1.506
+   ]
+  }
+ },
+ {
+  "id": "ha.middle.1",
+  "letter": "ح",
+  "form": "middle",
+  "parts": [
+   {
+    "part": "ha-middle",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "anchors": {
+   "above": [
+    -2.663,
+    -2.558
+   ],
+   "below": [
+    -2.663,
+    0.179
+   ]
+  }
+ },
+ {
+  "id": "ba.finishing.1",
+  "letter": "ب",
+  "form": "finishing",
+  "parts": [
+   {
+    "part": "ba-finish",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "dots": [
+   [
+    -7.218,
+    1.393
+   ]
+  ],
+  "anchors": {
+   "above": [
+    -8.116,
+    -1.985
+   ],
+   "below": [
+    -8.116,
+    0.74
+   ]
+  }
+ },
+ {
+  "id": "ha.starting.1",
+  "letter": "ح",
+  "form": "starting",
+  "parts": [
+   {
+    "part": "ha-start",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "anchors": {
+   "above": [
+    -2.526,
+    -2.795
+   ],
+   "below": [
+    -2.526,
+    0.161
+   ]
+  }
+ },
+ {
+  "id": "ya.middle.1",
+  "letter": "ي",
+  "form": "middle",
+  "parts": [
+   {
+    "part": "ya-middle",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "dots": [
+   [
+    -5.905,
+    0.837
+   ],
+   [
+    -6.849,
+    0.991
+   ]
+  ],
+  "anchors": {
+   "above": [
+    -5.876,
+    -1.926
+   ],
+   "below": [
+    -5.876,
+    0.195
+   ]
+  }
+ },
+ {
+  "id": "alif.finishing.1",
+  "letter": "ا",
+  "form": "finishing",
+  "parts": [
+   {
+    "part": "alif-finish",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "anchors": {
+   "above": [
+    -8.132,
+    -7.261
+   ],
+   "below": [
+    -8.132,
+    0.34
+   ]
+  }
+ },
+ {
+  "id": "ta.starting.1",
+  "letter": "ت",
+  "form": "starting",
+  "parts": [
+   {
+    "part": "ta-start",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "dots": [
+   [
+    -0.403,
+    -4.356
+   ],
+   [
+    -1.347,
+    -4.202
+   ]
+  ],
+  "anchors": {
+   "above": [
+    -0.98,
+    -3.586
+   ],
+   "below": [
+    -0.98,
+    0.078
+   ]
+  }
+ },
+ {
+  "id": "ya.finishing.1",
+  "letter": "ي",
+  "form": "finishing",
+  "parts": [
+   {
+    "part": "ya-finish",
+    "at": [
+     0,
+     0
+    ],
+    "body": true
+   }
+  ],
+  "anchors": {
+   "above": [
+    -2.901,
+    -0.887
+   ],
+   "below": [
+    -2.901,
+    3.205
+   ]
+  }
  }
 ]

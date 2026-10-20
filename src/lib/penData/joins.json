@@ -11,5 +11,35 @@
   "gap": 0.512,
   "rise": 0.638,
   "lift": true
+ },
+ "alif.starting.1>lam.starting.1": {
+  "gap": -0.195,
+  "rise": -0.072,
+  "lift": true
+ },
+ "lam.starting.1>ha.middle.1": {
+  "gap": -0.014,
+  "rise": 0.052,
+  "lift": true
+ },
+ "ha.middle.1>ba.finishing.1": {
+  "gap": -0.042,
+  "rise": 0.025,
+  "lift": true
+ },
+ "ha.starting.1>ya.middle.1": {
+  "gap": -0.06,
+  "rise": 0.082,
+  "lift": true
+ },
+ "ya.middle.1>alif.finishing.1": {
+  "gap": 0.139,
+  "rise": -0.145,
+  "lift": true
+ },
+ "ta.starting.1>ya.finishing.1": {
+  "gap": 0.008,
+  "rise": -0.035,
+  "lift": true
  }
 }

@@ -27,6 +27,14 @@ regression, and what it would take to fix.
   an edited mark can shift which mark the edit lands on after re-shaping.
   They are re-validated each render against whether the glyph is still a
   mark, and dropped rather than misapplied.
+- **The pen-drawn letters lay out slowly**: the first layout of أم أيمن الحب حياتي
+  takes about 2.7 s against the 250 ms the stroke-tarkib spec aims for (it is
+  memoised after that). Not a regression: the timing test only began to run once
+  that phrase entered the library, and is skipped until this is fixed. Most of the
+  time is the nib sweep (`penSweep.ts` stamps every unit and unions the stamps);
+  a coarser step was tried and loosens the sweep's precision tests while still
+  missing the target, so the fix is a different sweep (outline rails, stamping
+  only where the nib turns), or laying out off the main thread.
 - **A dot dragged across a stroke cut on the same letter gets cut**: mark
   translation runs before cut surgery. See
   [detached-marks.md](.claude/rules/detached-marks.md).

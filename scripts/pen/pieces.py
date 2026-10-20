@@ -127,18 +127,19 @@ def fit_pull(piece, origin, ppn, pen_px, start, free_width=True):
     return out, round(1 - r.fun, 3)
 
 
-def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=()):
+def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5):
     """Nudge a band's nodes (positions and nib angles; end widths stay) to cover its reference pieces, smoothly:
     cost = 1 - overlap + edge * (mean outline gap both ways, nuqta) + rough * (changes of bend along the centre
     line, and of the nib's rate of turning). A steady curve costs nothing; a wiggle does. The outline term is what holds thin ends: a hair overshooting a pointed end, or
     stopping short of it, hardly changes the overlap. Powell's method, a few sweeps. Returns new spec nodes and
     their score. `fixed`: indices of nodes that stay put (a node shared with another letter's stroke);
-    `others`: paths already drawn over the same pieces (spec node lists), counted as ink but not moved."""
+    `others`: paths already drawn over the same pieces (spec node lists), counted as ink but not moved. `res`: the
+    raster's share of the scoring resolution (a coarse first pass at 0.25 is four times quicker)."""
     from scipy.optimize import minimize
     rings = [ref_ring(r) for r in pieces]
     win = Window(np.concatenate(rings), margin=pen_px)
-    win.W, win.H = win.W // 2, win.H // 2
-    sub = SUB / 2
+    win.W, win.H = int(win.W * res), int(win.H * res)
+    sub = SUB * res
     px = lambda q: np.round((np.asarray(q) - [win.x1, win.y1]) * sub * 16).astype(np.int32)
     B = np.zeros((win.H, win.W), np.uint8)
     for r in rings:
@@ -183,3 +184,114 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
         q["p"] = [round(q["p"][0], 3), round(q["p"][1], 3)]
         q["angle"] = round(q["angle"], 1)
     return outn, score([outn, *others], pieces, origin, ppn, pen_px)
+
+
+def overshoot(nodes, pieces, origin, ppn, pen_px):
+    """How far (nuqta) our ink strays outside the reference pieces at its worst, and the overlap."""
+    rings = [ref_ring(r) for r in pieces]
+    hulls = path_hulls(nodes, origin, ppn, pen_px, step=0.25)
+    win = Window(np.concatenate([np.concatenate(rings), np.concatenate(hulls)]))
+    A = win.hulls(hulls)
+    B = np.zeros_like(A)
+    for r in rings:
+        B |= win.poly(r)
+    out = (A & ~B.astype(bool)).astype(bool)
+    dist = cv2.distanceTransform((1 - B).astype(np.uint8), cv2.DIST_L2, 5)
+    worst = float(dist[out].max()) / SUB / ppn if out.any() else 0.0
+    return worst, float((A & B).sum() / max(1, (A | B).sum()))
+
+
+def trim_ends(nodes, pieces, origin, ppn, pen_px, step=0.1, tol=0.005):
+    """Pull each end node back toward its neighbour, a tenth of the way at a time, while that lessens how far the
+    ink strays outside the reference and costs no more than `tol` of overlap: a hairline end the overlap cannot
+    see otherwise overshoots the reference's point (the ta's band, the alif's foot)."""
+    nodes = [dict(n) for n in nodes]
+    worst, iou = overshoot(nodes, pieces, origin, ppn, pen_px)
+    for end, nb in ((0, 1), (-1, -2)):
+        for _ in range(8):
+            a, b = np.array(nodes[end]["p"]), np.array(nodes[nb]["p"])
+            trial = [dict(n) for n in nodes]
+            trial[end] = {**trial[end], "p": [round(float(v), 3) for v in a + (b - a) * step]}
+            w, i = overshoot(trial, pieces, origin, ppn, pen_px)
+            if w < worst - 0.005 and i >= iou - tol:
+                nodes, worst = trial, w
+            else:
+                break
+    return nodes, worst
+
+
+def _thin(m):
+    """Zhang-Suen thinning of a 0/1 mask to a one-pixel skeleton."""
+    m = np.pad(m.astype(np.uint8), 1)
+    while True:
+        changed = False
+        for step in (0, 1):
+            P = [np.roll(np.roll(m, -dy, 0), -dx, 1) for dy, dx in ((-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1))]
+            B = sum(P)
+            A = sum(((P[i] == 0) & (P[(i + 1) % 8] == 1)).astype(np.uint8) for i in range(8))
+            if step == 0:
+                c = (P[0] * P[2] * P[4] == 0) & (P[2] * P[4] * P[6] == 0)
+            else:
+                c = (P[0] * P[2] * P[6] == 0) & (P[0] * P[4] * P[6] == 0)
+            kill = (m == 1) & (B >= 2) & (B <= 6) & (A == 1) & c
+            if kill.any():
+                m[kill] = 0
+                changed = True
+        if not changed:
+            return m[1:-1, 1:-1]
+
+
+def skeleton_samples(piece, pen_px, sub=4):
+    """Centre samples [x, y, w, phi, off] (screen px, degrees) of a band read off its skeleton, not by pairing its
+    two sides: works where one side is far longer than the other (a crescent) or the band curls (a final alif
+    turning in from the line). The skeleton's longest path, carried out to the piece's own ends."""
+    from collections import deque
+    ring = ref_ring(piece)
+    x1, y1 = ring.min(0) - 4
+    W, H = (ring.max(0) - ring.min(0) + 8) * sub
+    m = np.zeros((int(H) + 1, int(W) + 1), np.uint8)
+    cv2.fillPoly(m, [np.round((ring - [x1, y1]) * sub * 16).astype(np.int32)], 1, cv2.LINE_8, 4)
+    dt = cv2.distanceTransform(m, cv2.DIST_L2, 5)
+    sk = _thin(m)
+    pts = {tuple(p) for p in np.argwhere(sk)}
+    nb = lambda p: [(p[0] + dy, p[1] + dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1) if (dy or dx) and (p[0] + dy, p[1] + dx) in pts]
+    def far(src):
+        prev, q, last = {src: None}, deque([src]), src
+        while q:
+            last = q.popleft()
+            for n in nb(last):
+                if n not in prev:
+                    prev[n] = last
+                    q.append(n)
+        return last, prev
+    a, _ = far(next(iter(pts)))
+    b, prev = far(a)
+    path, p = [], b
+    while p is not None:
+        path.append(p)
+        p = prev[p]
+    path = np.array(path[::-1], float)  # (row, col)
+    # carry each end out to the outline along its own direction
+    def extend(path, at_start):
+        e, f = (path[0], path[min(6, len(path) - 1)]) if at_start else (path[-1], path[max(-7, -len(path))])
+        d = (e - f) / (np.linalg.norm(e - f) or 1)
+        ext, q = [], e.copy()
+        while True:
+            q = q + d
+            r, c = int(round(q[0])), int(round(q[1]))
+            if not (0 <= r < m.shape[0] and 0 <= c < m.shape[1]) or not m[r, c]:
+                break
+            ext.append(q.copy())
+        ext = np.array(ext).reshape(-1, 2)
+        return np.vstack([ext[::-1], path]) if at_start else np.vstack([path, ext])
+    path = extend(extend(path, True), False)
+    xy = np.c_[path[:, 1] / sub + x1, path[:, 0] / sub + y1]
+    w = np.array([2 * dt[min(int(round(r)), m.shape[0] - 1), min(int(round(c)), m.shape[1] - 1)] / sub for r, c in path])
+    step = max(1, len(xy) // 80)
+    xy, w = xy[::step], w[::step]
+    out = []
+    for k in range(len(xy)):
+        k0, k1 = max(0, k - 2), min(len(xy) - 1, k + 2)
+        phi = math.degrees(math.atan2(-(xy[k1, 1] - xy[k0, 1]), xy[k1, 0] - xy[k0, 0]))
+        out.append([float(xy[k, 0]), float(xy[k, 1]), float(w[k]), phi, math.degrees(math.asin(min(1.0, w[k] / pen_px)))])
+    return out

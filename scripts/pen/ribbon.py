@@ -15,7 +15,7 @@ import sys, json, math, re
 import numpy as np
 
 def parse(d):
-    toks = re.findall(r"[MCZ]|-?\d*\.?\d+", d)
+    toks = re.findall(r"[MCLZ]|-?\d*\.?\d+", d)
     segs, cur, i = [], None, 0
     while i < len(toks):
         t = toks[i]
@@ -23,6 +23,9 @@ def parse(d):
         elif t == "C":
             p = [float(v) for v in toks[i+1:i+7]]
             segs.append((cur, (p[0], p[1]), (p[2], p[3]), (p[4], p[5]))); cur = (p[4], p[5]); i += 7
+        elif t == "L":
+            p = (float(toks[i+1]), float(toks[i+2]))
+            segs.append((cur, cur, p, p)); cur = p; i += 3
         elif t == "Z":
             if math.dist(cur, start) > 1e-6: segs.append((cur, cur, start, start))
             i += 1
