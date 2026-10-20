@@ -172,6 +172,27 @@ series (https://www.youtube.com/watch?v=OnZapTz27SI and parts 2–3); Mustafa
 Omari's single letters on the Alqalam channel; Calligrapher's Diaries' Celî
 Dîvânî lesson 1 (https://www.youtube.com/watch?v=NcXtO4Ia5pQ).
 
+## References in hand (2026-10-20)
+
+Downloaded with the user's OK into Claude's scratch folder (never committed):
+the two Beirut volumes and Hashim's book (low resolution). The scans are
+1-bit, about 300 dpi of the printed page.
+
+- **Jali volume, p. 9 (right):** *Mufradāt khaṭṭ al-Jalī al-Dīwānī*, Jawad
+  Sabti al-Najafi's alphabet "with the movement of each letter": every form
+  drawn large with **direction arrows and numbered moves** (up to 11 for a
+  kaf with its ornaments). The only stroke-order source found so far.
+- **Jali volume, p. 8:** Mehmed İzzet's single Jali Diwani letters on Turkish
+  rules (top); Hashim al-Baghdadi's Jali Diwani alphabet **with its tashkīlāt,
+  the marks and fillers**, in two rows (bottom).
+- **Diwani volume, p. 9:** Ghazlan Bey's Diwani alphabet "weighed with small
+  circles" (dot ladders beside each letter), and İzzet's joined letters.
+- **The studio** serves Jali Diwani from `/studios/jali-diwani/` with the same
+  file names as Thuluth (`db.json` 317 KB, `stamps.pack.json` 675 KB, plus
+  `rest.json`, `inkbox.json`, `dots.json`, `pairs.json`, `stretch.json`,
+  `marks.json`, `marks-kinds.json`, `fum.json`); no join, bowl or entry files
+  as Thuluth has. Not yet saved locally.
+
 ## What this changes from Thuluth [I]
 
 1. The nib is held steeper; Thuluth's 145–149° and its 1.65 pens to the nuqta
