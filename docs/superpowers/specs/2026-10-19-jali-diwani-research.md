@@ -249,6 +249,20 @@ the two Beirut volumes and Hashim's book (low resolution). The scans are
   than a master of Hashim's rank [I]. So where Sabti and Hashim differ on a
   letter's shape, the difference goes to the user rather than being settled
   silently.
+- **2026-10-20, superseded the same day: Hashim leads, Sabti supplements.**
+  Once the user's own 600 dpi copy of Hashim's book turned up, the user
+  asked why Sabti was needed at all. Now: **Hashim's Jali Diwani alphabet
+  (his book p. 65) judges shape; his compositions (pp. 66–67) judge joins
+  and fillers; his numbered Diwani plate (p. 59) gives the move order** for
+  every move the two scripts share. **Sabti's plate gives the order only of
+  what Jali Diwani adds and p. 59 doesn't number**: the head curls on ا ل ك,
+  the kaf's flourish, the lam-alifs. Checked first: Sabti's shapes follow
+  Hashim's closely (his three lam-alifs are Hashim's three); Sabti draws the
+  head curls heavier.
+- **2026-10-20, the user: the Thuluth "within reason" rule applies to Jali
+  Diwani.** A form matched to its reference within reason may be recorded
+  in `REVIEW.md` before the user has looked, marked as awaiting the user's
+  look. ورد is the first test.
 
 ## What this changes from Thuluth [I]
 

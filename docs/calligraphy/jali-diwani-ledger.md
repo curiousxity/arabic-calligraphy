@@ -12,8 +12,12 @@ material only: the app credits no calligrapher.
 The research behind it, and the decisions the user has made, are in
 [the Jali Diwani research note](../superpowers/specs/2026-10-19-jali-diwani-research.md).
 In short: the studio gives the starting outline and the piece split; **a
-master's plate wins where they disagree**; Jawad Sabti's plate (numbered
-moves) leads, Hashim al-Baghdadi's fills its gaps and gives the marks.
+master's plate wins where they disagree**. Hashim al-Baghdadi leads: his
+Jali Diwani alphabet (his book p. 65) for shape, his compositions (pp.
+66–67) for joins and fillers, his numbered Diwani plate (p. 59) for the
+order of the moves the two scripts share. Jawad Sabti's numbered Jali
+Diwani plate gives the order of what Jali Diwani adds (head curls, the
+kaf's flourish, the lam-alifs) and is a second opinion on the rest.
 
 ## Units and the pen
 
