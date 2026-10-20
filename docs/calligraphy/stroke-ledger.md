@@ -434,7 +434,12 @@ needs the closer nodes: the final alifs' feet, cut off on a diagonal at
 0.85–0.88, turn into the flat tail at 0.93–0.95.
 
 **Judging a group.** Each letter group and form has a sheet of every
-shape, ours beside the studio's, with the shape's overlap. A shape under
+shape, ours beside the studio's, with the shape's overlap. Both sides
+are drawn at four times the size and scaled down alike. Drawn straight
+from the nib's overlapping stamps, ours looked stepped beside the
+studio's single outline; the app draws ours as one smooth outline (the
+user, on the first alif sheets: "the studio's are still smoother", which
+this was). A shape under
 0.85 is marked in red. Each sheet is checked by eye before its group is
 recorded: by the user's standing instruction, a group that matches within
 reason is recorded and work moves on. The user looks periodically.
