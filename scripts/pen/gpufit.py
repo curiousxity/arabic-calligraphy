@@ -87,6 +87,49 @@ def _placements(a, widths, origin, ppn, pen, r):
 
 
 def _ink(ea, eb, x1, y1, r, H, W, soft):
+    """Soft ink on the grid: each pixel by its depth inside the quad (placement i to i + 2) it is deepest in. The quads
+    go in blocks of CHUNK, each block over a window of the grid just round it, all blocks in one batch."""
+    V = torch.stack([ea[:-2], eb[:-2], eb[2:], ea[2:]], 1)                    # (q, 4, 2)
+    # corners in order round their centre: where the nib turns across its travel the quad would cross itself (a
+    # bow-tie inking almost nothing); pieces.path_hulls takes the hull for the same reason
+    with torch.no_grad():
+        c = V.mean(1, keepdim=True)
+        order = torch.atan2(V[..., 1] - c[..., 1], V[..., 0] - c[..., 0]).argsort(1)
+    V = torch.gather(V, 1, order[..., None].expand(-1, -1, 2))
+    q = V.shape[0]
+    pad = (-q) % CHUNK
+    if pad:  # the last quad again: a repeat changes no pixel's deepest
+        V = torch.cat([V, V[-1:].expand(pad, -1, -1)])
+    nc = V.shape[0] // CHUNK
+    V = V.view(nc, CHUNK, 4, 2)
+    E = torch.roll(V, -1, 2) - V
+    area = (V[..., 0] * torch.roll(V, -1, 2)[..., 1] - torch.roll(V, -1, 2)[..., 0] * V[..., 1]).sum(2)
+    L = E.norm(dim=-1)
+    N = torch.stack([-E[..., 1], E[..., 0]], -1) * (torch.sign(area)[..., None] / L.clamp_min(1e-9))[..., None]
+    off = (V * N).sum(-1)                                                    # (nc, CHUNK, 4)
+    off = torch.where(L > 1e-6, off, torch.full_like(off, -1e9))             # a zero-length edge bounds nothing
+    with torch.no_grad():
+        m = 4 * soft / r
+        lo = V.reshape(nc, -1, 2).min(1).values - m
+        hi = V.reshape(nc, -1, 2).max(1).values + m
+        j0 = ((lo[:, 0] - x1) * r).floor().clamp(0, W - 1).long()
+        i0 = ((lo[:, 1] - y1) * r).floor().clamp(0, H - 1).long()
+        ww = int(((hi[:, 0] - x1) * r).ceil().clamp(max=W).sub(j0).max()) + 1
+        hh = int(((hi[:, 1] - y1) * r).ceil().clamp(max=H).sub(i0).max()) + 1
+        jj = j0[:, None] + torch.arange(ww, device=V.device)[None]           # (nc, ww)
+        ii = i0[:, None] + torch.arange(hh, device=V.device)[None]           # (nc, hh)
+        inside = (ii < H)[:, :, None] & (jj < W)[:, None, :]
+        flat = torch.where(inside, ii[:, :, None] * W + jj[:, None, :], torch.full_like(inside, H * W, dtype=torch.long))
+    xs = (float(x1) + jj.float() / float(r))[:, None, None, None, :]         # pixel centres where cv2 puts them
+    ys = (float(y1) + ii.float() / float(r))[:, None, None, :, None]
+    sd = N[..., 0, None, None] * xs + N[..., 1, None, None] * ys - off[..., None, None]   # (nc, CHUNK, 4, hh, ww)
+    d = sd.min(2).values.max(1).values                                       # each pixel's deepest quad, per block
+    depth = torch.full((H * W + 1,), -1e9, device=V.device, dtype=d.dtype)
+    depth = depth.scatter_reduce(0, flat.reshape(-1), d.reshape(-1), reduce="amax", include_self=True)
+    return torch.sigmoid(depth[: H * W].view(H, W) * r / soft)
+
+
+def _ink_loop(ea, eb, x1, y1, r, H, W, soft):
     """Soft ink on the grid: each pixel by its depth inside the quad (placement i to i + 2) it is deepest in."""
     V = torch.stack([ea[:-2], eb[:-2], eb[2:], ea[2:]], 1)                    # (q, 4, 2)
     # corners in order round their centre: where the nib turns across its travel the quad would cross itself (a

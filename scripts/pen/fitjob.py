@@ -42,13 +42,14 @@ def _from_samples(samples, piece, O, PPN, PEN, spacing=None):
 
 
 def fit(piece, O, PPN, PEN, log=print, spacing=None):
-    cands = []
+    cands, t0 = [], time.time()
+    lap = lambda: "%.0fs" % (time.time() - t0)
     b = bands([piece], PEN)[0]
     if b:
         p, s = _from_samples(b, piece, O, PPN, PEN, spacing)
-        cands.append(("band", p, s)); log("band", round(s["iou"], 4))
+        cands.append(("band", p, s)); log("band", round(s["iou"], 4), lap())
     p, s = _from_samples(skeleton_samples(piece, PEN), piece, O, PPN, PEN, spacing)
-    cands.append(("skeleton", p, s)); log("skeleton", round(s["iou"], 4))
+    cands.append(("skeleton", p, s)); log("skeleton", round(s["iou"], 4), lap())
     # a pull: along the piece's long axis, the nib at whichever of six angles starts best
     r = (ref_ring(piece) - O) / PPN
     c = r.mean(0); _, _, vt = np.linalg.svd(r - c); ax = vt[0]
@@ -61,7 +62,7 @@ def fit(piece, O, PPN, PEN, log=print, spacing=None):
             best = (ang, s["iou"])
     p, _ = fit_pull(piece, O, PPN, PEN, [a0[0], a0[1], a1[0], a1[1], best[0], 1, 1])
     s = score([p], [piece], O, PPN, PEN)
-    cands.append(("pull", p, s)); log("pull", round(s["iou"], 4))
+    cands.append(("pull", p, s)); log("pull", round(s["iou"], 4), lap())
     kind, p, s = max(cands, key=lambda c: c[2]["iou"] - c[2]["gap95"])
     return kind, p, {k: v for k, _, v in cands}
 
