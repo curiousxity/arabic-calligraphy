@@ -23,7 +23,11 @@ Measured 2026-10-20.
   dots on Sabti's plate: their nib sides run 59–69°, two at 51–53°. This is
   the 60° the Arabic sources give, and it is far from Thuluth's 145–149°.
   It is why uprights come out thin and horizontals thick: an upright crosses
-  the edge at under 30°.
+  the edge at 28°, so a fixed nib draws it 0.47 pen wide. Measured on the
+  plate: Sabti's alif stem is 13–22 px down its length against a 40 px nib
+  (0.35–0.55 pen); the lam's flat bowl bottom reaches the full 41 px. The
+  nib still turns within a stroke (θ = φ ± asin(w/pen), as in Thuluth); 62°
+  is where it rests, and the fits will show how far it moves.
 - **A dot** is the nib (1.00 pen, about 40 px on the plate) pulled about
   0.7 pen along about 150°. Both its diagonals are about 1.25 pens, the
   longer near vertical, so a ladder of dots stood point to point measures
@@ -51,7 +55,10 @@ Read 2026-10-20 from the scan enlarged 4–8× (scratchpad `crops/sabti_w/`).
 The arrows are clear throughout; the digits are small, written along their
 arrows (so turned), and some are uncertain. His ٢ is written like a small Y.
 The plate shows isolated letters only, so medial and initial forms and the
-joins come from the studio and the videos.
+joins come from the studio, Hashim's Diwani plate (his book p. 59, which
+numbers the moves of joined forms too) and his Jali Diwani compositions
+(pp. 66–67). Hashim's p. 59 confirms the alif and lam below and the reading
+of ٢.
 
 ### What every letter shares
 

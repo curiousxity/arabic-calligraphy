@@ -187,6 +187,23 @@ the two Beirut volumes and Hashim's book (low resolution). The scans are
   the marks and fillers**, in two rows (bottom).
 - **Diwani volume, p. 9:** Ghazlan Bey's Diwani alphabet "weighed with small
   circles" (dot ladders beside each letter), and İzzet's joined letters.
+- **The user's own copy of Hashim's *Qawāʿid al-khaṭṭ al-ʿarabī*** (2nd ed.
+  1982, 78 spreads at about 7000×5100 px, so about 600 dpi, in colour) on
+  the NAS (`Calligraphy resources/Rules of Arabic Calligraphy - Hashim
+  Muhammad al-Baghdadi (2nd ed 1982).pdf`), read in place. Far sharper than
+  the NYU copy:
+  - **p. 59: Hashim's Diwani alphabet with arrows and numbered moves on every
+    letter**, isolated forms in rows 1–2 and joined (initial and medial)
+    forms in row 3. Diwani, not Jali Diwani, but the basic moves are shared;
+    it confirms Sabti's alif and lam (١ the body down, ٢ the tail out to the
+    left, ٣ a fine hairline drawn down after) and that Sabti's Y-like digit
+    is ٢.
+  - **p. 65: Hashim's Jali Diwani alphabet and its tashkīlāt** (the plate
+    the Beirut volume reprints on p. 8), at full resolution.
+  - **pp. 66–67: Hashim's Jali Diwani compositions** (Sūrat al-Aʿlā; a
+    hadith and a saying of ʿAlī), full of joined letters, lines rising left
+    and fillers: the reference for joins and composition.
+  - pp. 58, 60: Diwani text pages.
 - **The studio** serves Jali Diwani from `/studios/jali-diwani/` with the same
   file names as Thuluth (`db.json` 317 KB, `stamps.pack.json` 675 KB, plus
   `rest.json`, `inkbox.json`, `dots.json`, `pairs.json`, `stretch.json`,
