@@ -84,9 +84,20 @@ def outline_gap(a, b):
     return dist[edge(a)]
 
 
-def score(mine, refs, origin, ppn, pen_px):
+def ignore_mask(B, ignore, poly):
+    """Where ink is neither right nor wrong: the reference pieces of a stroke's neighbours in the same shape, less
+    this stroke's own. Judged with its neighbours' territory blanked, a stroke may run on through the corner where
+    the two meet, instead of stopping short of it (the notch at every join, 2026-10-19)."""
+    D = np.zeros_like(B)
+    for p in ignore:
+        D |= poly(ref_ring(p))
+    return D & ~B.astype(bool)
+
+
+def score(mine, refs, origin, ppn, pen_px, ignore=()):
     """How closely a list of our paths (spec node lists) covers a list of reference pieces: overlap (intersection
-    over union) and the outline gap both ways, in nuqta (largest, and the 95th percentile)."""
+    over union) and the outline gap both ways, in nuqta (largest, and the 95th percentile). `ignore`: pieces whose
+    ground is neither counted for nor against (ignore_mask)."""
     rings = [ref_ring(r) for r in refs]
     hulls = [h for nodes in mine for h in path_hulls(nodes, origin, ppn, pen_px)]
     win = Window(np.concatenate([np.concatenate(rings), np.concatenate(hulls)]))
@@ -94,6 +105,8 @@ def score(mine, refs, origin, ppn, pen_px):
     B = np.zeros_like(A)
     for r in rings:
         B |= win.poly(r)
+    if ignore:
+        A &= ~ignore_mask(B, ignore, win.poly)
     iou = (A & B).sum() / max(1, (A | B).sum())
     g = np.r_[outline_gap(A, B), outline_gap(B, A)] / SUB / ppn
     return {"iou": round(float(iou), 3), "gap_max": round(float(g.max()), 3), "gap95": round(float(np.percentile(g, 95)), 3)}
@@ -127,23 +140,31 @@ def fit_pull(piece, origin, ppn, pen_px, start, free_width=True):
     return out, round(1 - r.fun, 3)
 
 
-def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5):
+def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5, ignore=()):
     """Nudge a band's nodes (positions and nib angles; end widths stay) to cover its reference pieces, smoothly:
     cost = 1 - overlap + edge * (mean outline gap both ways, nuqta) + rough * (changes of bend along the centre
     line, and of the nib's rate of turning). A steady curve costs nothing; a wiggle does. The outline term is what holds thin ends: a hair overshooting a pointed end, or
     stopping short of it, hardly changes the overlap. Powell's method, a few sweeps. Returns new spec nodes and
     their score. `fixed`: indices of nodes that stay put (a node shared with another letter's stroke);
     `others`: paths already drawn over the same pieces (spec node lists), counted as ink but not moved. `res`: the
-    raster's share of the scoring resolution (a coarse first pass at 0.25 is four times quicker)."""
+    raster's share of the scoring resolution (a coarse first pass at 0.25 is four times quicker). `ignore`: pieces
+    whose ground counts neither way (ignore_mask)."""
     from scipy.optimize import minimize
     rings = [ref_ring(r) for r in pieces]
     win = Window(np.concatenate(rings), margin=pen_px)
     win.W, win.H = int(win.W * res), int(win.H * res)
     sub = SUB * res
     px = lambda q: np.round((np.asarray(q) - [win.x1, win.y1]) * sub * 16).astype(np.int32)
+
+    def poly(r):
+        m = np.zeros((win.H, win.W), np.uint8)
+        cv2.fillPoly(m, [px(r)], 1, cv2.LINE_8, 4)
+        return m
+
     B = np.zeros((win.H, win.W), np.uint8)
     for r in rings:
-        cv2.fillPoly(B, [px(r)], 1, cv2.LINE_8, 4)
+        B |= poly(r)
+    keep = ~ignore_mask(B, ignore, poly) if ignore else None
     n = len(nodes)
     base = np.array([[q["p"][0], q["p"][1], q["angle"]] for q in nodes], float)
     free = [i for i in range(n) if i not in fixed and i - n not in fixed]
@@ -164,6 +185,8 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
         A = O.copy()
         for h in path_hulls(make(a), origin, ppn, pen_px, step=1.0):
             cv2.fillConvexPoly(A, cv2.convexHull(px(h)), 1, cv2.LINE_8, 4)
+        if keep is not None:
+            A &= keep
         iou = (A & B).sum() / max(1, (A | B).sum())
         gap = (outline_gap(A, B).mean() + outline_gap(B, A).mean()) / sub / ppn
         bend = np.diff(a[:, :2], 3, axis=0) / 0.1 if n > 3 else np.zeros((1, 2))
@@ -183,7 +206,7 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
     for q in outn:
         q["p"] = [round(q["p"][0], 3), round(q["p"][1], 3)]
         q["angle"] = round(q["angle"], 1)
-    return outn, score([outn, *others], pieces, origin, ppn, pen_px)
+    return outn, score([outn, *others], pieces, origin, ppn, pen_px, ignore)
 
 
 def overshoot(nodes, pieces, origin, ppn, pen_px):

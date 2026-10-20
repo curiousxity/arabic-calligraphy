@@ -14,7 +14,9 @@ A job is self-contained, so it can run on a computer without the repository:
     edge     "fit" only: the weight of the outline gap in the refine (default EDGE); higher holds small features, a
              slanted start or a hook, that the overlap barely sees
     trim     true (default): trim hairline overshoot from both ends afterwards
-The result: {name, kind, nodes, score, all, seconds, host, cpus, gpu}."""
+    ignore   the shape's other strokes, as pieces: ground where ink counts neither way (pieces.ignore_mask), so the
+             stroke runs on through the corner where it meets a neighbour instead of stopping short of it
+The result: {name, kind, nodes, score, all, seconds, host, cpus, gpu, settings}."""
 import json, math, os, socket, sys, time
 import numpy as np
 
@@ -32,29 +34,29 @@ except ImportError:  # a worker's snapshot from before gpufit.py
     GPU = False
 
 
-def _from_samples(samples, piece, O, PPN, PEN, spacing=SPACING, edge=EDGE):
+def _from_samples(samples, piece, O, PPN, PEN, spacing=SPACING, edge=EDGE, ignore=()):
     """A band through centre samples: the nib hint that starts best, then refined coarse and fine."""
     L = sum(math.dist(samples[i][:2], samples[i + 1][:2]) for i in range(len(samples) - 1)) / PPN
     best = None
     for h in (0, 45, 90, 135):
         p = smooth_path(samples, PEN, O, PPN, spacing or SPACING, hint=h)
-        s = score([p], [piece], O, PPN, PEN)
+        s = score([p], [piece], O, PPN, PEN, ignore)
         if best is None or s["iou"] > best[1]["iou"]:
             best = (p, s)
     if GPU:
-        return gpufit.refine(best[0], [piece], O, PPN, PEN, rough=0.05, edge=edge)
-    p, _ = refine(best[0], [piece], O, PPN, PEN, rough=0.05, edge=edge, res=0.25, iters=2)
-    return refine(p, [piece], O, PPN, PEN, rough=0.05, edge=edge, iters=1)
+        return gpufit.refine(best[0], [piece], O, PPN, PEN, rough=0.05, edge=edge, ignore=ignore)
+    p, _ = refine(best[0], [piece], O, PPN, PEN, rough=0.05, edge=edge, res=0.25, iters=2, ignore=ignore)
+    return refine(p, [piece], O, PPN, PEN, rough=0.05, edge=edge, iters=1, ignore=ignore)
 
 
-def fit(piece, O, PPN, PEN, log=print, spacing=SPACING, edge=EDGE):
+def fit(piece, O, PPN, PEN, log=print, spacing=SPACING, edge=EDGE, ignore=()):
     cands, t0 = [], time.time()
     lap = lambda: "%.0fs" % (time.time() - t0)
     b = bands([piece], PEN)[0]
     if b:
-        p, s = _from_samples(b, piece, O, PPN, PEN, spacing, edge)
+        p, s = _from_samples(b, piece, O, PPN, PEN, spacing, edge, ignore)
         cands.append(("band", p, s)); log("band", round(s["iou"], 4), lap())
-    p, s = _from_samples(skeleton_samples(piece, PEN), piece, O, PPN, PEN, spacing, edge)
+    p, s = _from_samples(skeleton_samples(piece, PEN), piece, O, PPN, PEN, spacing, edge, ignore)
     cands.append(("skeleton", p, s)); log("skeleton", round(s["iou"], 4), lap())
     # a pull: along the piece's long axis, the nib at whichever of six angles starts best
     r = (ref_ring(piece) - O) / PPN
@@ -67,7 +69,7 @@ def fit(piece, O, PPN, PEN, log=print, spacing=SPACING, edge=EDGE):
         if best is None or s["iou"] > best[1]:
             best = (ang, s["iou"])
     p, _ = fit_pull(piece, O, PPN, PEN, [a0[0], a0[1], a1[0], a1[1], best[0], 1, 1])
-    s = score([p], [piece], O, PPN, PEN)
+    s = score([p], [piece], O, PPN, PEN, ignore)
     cands.append(("pull", p, s)); log("pull", round(s["iou"], 4), lap())
     kind, p, s = max(cands, key=lambda c: c[2]["iou"] - c[2]["gap95"])
     return kind, p, {k: v for k, _, v in cands}
@@ -77,17 +79,18 @@ def run(job, log=print):
     t = time.time()
     piece, O, PPN, PEN = job["piece"], np.asarray(job["origin"], float), float(job["ppn"]), float(job["pen"])
     pieces = job.get("pieces") or [piece]
+    ignore = job.get("ignore") or []
     if job.get("mode", "fit") == "refine":
-        p, s = (gpufit.refine if GPU else refine)(job["start"], pieces, O, PPN, PEN, **job.get("refine", {}))
+        p, s = (gpufit.refine if GPU else refine)(job["start"], pieces, O, PPN, PEN, ignore=ignore, **job.get("refine", {}))
         kind, alls = "refine", {"refine": s}
     else:
-        kind, p, alls = fit(piece, O, PPN, PEN, log, job.get("spacing", SPACING), job.get("edge", EDGE))
+        kind, p, alls = fit(piece, O, PPN, PEN, log, job.get("spacing", SPACING), job.get("edge", EDGE), ignore)
     if job.get("trim", True):
-        p, _ = trim_ends(p, pieces, O, PPN, PEN)
-    s = score([p], pieces, O, PPN, PEN)
+        p, _ = trim_ends(p, pieces + ignore, O, PPN, PEN)  # ink on a neighbour's ground is not overshoot
+    s = score([p], pieces, O, PPN, PEN, ignore)
     return {"name": job["name"], "kind": kind, "nodes": p, "score": s, "all": alls,
             "seconds": round(time.time() - t), "host": socket.gethostname(), "cpus": os.cpu_count(), "gpu": GPU,
-            "settings": {"spacing": job.get("spacing", SPACING), "edge": job.get("edge", EDGE)}}
+            "settings": {"spacing": job.get("spacing", SPACING), "edge": job.get("edge", EDGE), "ignore": bool(ignore)}}
 
 
 def _plain(v):

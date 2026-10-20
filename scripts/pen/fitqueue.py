@@ -113,6 +113,16 @@ def _jobs_for(q, default):
 PACKAGES = {"numpy": "numpy", "scipy": "scipy", "cv2": "opencv-python-headless"}
 
 
+def _rank(f):
+    """The order jobs are taken in: the user's fixes (<name>.f) first, then one-off jobs (a name not starting with a
+    digit: someone is waiting on them), then the catalogue's first fits and join refits (.j), second passes (.r, .t,
+    .u) last; by name within each. Second passes of early letters otherwise go ahead of the first fits of later
+    ones, and a whole letter group the user is waiting to see stays blank (2026-10-19)."""
+    parts = f[:-5].split(".")
+    tag = parts[-1] if len(parts) > 2 else ""
+    return (0 if tag == "f" else 1 if not f[:1].isdigit() else 3 if tag in ("r", "t", "u") else 2, f)
+
+
 def work(q, jobs):
     # a worker without its packages would take every job and fail it: refuse to start instead
     missing = []
@@ -166,7 +176,7 @@ def work(q, jobs):
                     print(f"FAILED {stem} (see failed/{stem}.log)", flush=True)
             jobs = _jobs_for(q, jobs)
             while len(active) < jobs and not updated:
-                todo = sorted(f for f in os.listdir(os.path.join(q, "todo")) if f.endswith(".json"))
+                todo = sorted((f for f in os.listdir(os.path.join(q, "todo")) if f.endswith(".json")), key=_rank)
                 if not todo:
                     break
                 stem = todo[0][:-5]

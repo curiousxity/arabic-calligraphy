@@ -187,21 +187,23 @@ def _ink_loop(ea, eb, x1, y1, r, H, W, soft):
     return torch.sigmoid(depth * r / soft)
 
 
-def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5):
-    """pieces.refine's signature and result (new nodes, their score); `iters` and `res` only matter on the CPU."""
+def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5, ignore=()):
+    """pieces.refine's signature and result (new nodes, their score); `iters` and `res` only matter on the CPU.
+    `ignore`: pieces whose ground counts neither way (pieces.ignore_mask)."""
     if torch is None or any(k in q for q in nodes for k in UNSUPPORTED):
-        return cpu_refine(nodes, pieces, origin, ppn, pen_px, rough, edge, iters, fixed, others, res)
-    best = (nodes, score([nodes, *others], pieces, origin, ppn, pen_px))  # never hand back worse than it was given
+        return cpu_refine(nodes, pieces, origin, ppn, pen_px, rough, edge, iters, fixed, others, res, ignore)
+    best = (nodes, score([nodes, *others], pieces, origin, ppn, pen_px, ignore))  # never hand back worse than it was given
     for stages in SCHEDULES:
-        out, s = _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages)
+        out, s = _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore)
         if s["iou"] - s["gap95"] > best[1]["iou"] - best[1]["gap95"]:
             best = (out, s)
     return [dict(q) for q in best[0]], best[1]
 
 
-def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages):
+def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore=()):
     dev = _device()
     rings = [ref_ring(p) for p in pieces]
+    ignored = [ref_ring(p) for p in ignore]
     pts = np.concatenate(rings)
     x1, y1 = pts.min(0) - pen_px * 1.5
     x2, y2 = pts.max(0) + pen_px * 1.5
@@ -227,9 +229,14 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
         Om = np.zeros((H, W), np.uint8)
         for h in other_hulls:
             cv2.fillConvexPoly(Om, cv2.convexHull(to_px(h)), 1, cv2.LINE_8, 4)
+        Dm = np.zeros((H, W), np.uint8)  # the neighbours' ground: ink there is neither right nor wrong
+        for ring in ignored:
+            cv2.fillPoly(Dm, [to_px(ring)], 1, cv2.LINE_8, 4)
+        Dm &= ~Bm.astype(bool)
         perim = max(1.0, float((cv2.morphologyEx(Bm, cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8)) > 0).sum()) / 2)
         Bt = torch.tensor(Bm, dtype=torch.float32, device=dev)
         Ot = torch.tensor(Om, dtype=torch.float32, device=dev)
+        Kt = torch.tensor(1 - Dm, dtype=torch.float32, device=dev)
         opt = torch.optim.Adam([v], lr=rate)
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, steps, rate / 10)
         layout, last, still = None, None, 0
@@ -239,7 +246,7 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
             if step % RELAYOUT == 0:  # how many placements per segment: recounted now and then, as the path moves
                 layout = _layout(a.detach(), widths, org, ppn, pen_px, r)
             ea, eb = _placements(a, widths, org, ppn, pen_px, r, layout)
-            A = 1 - (1 - _ink(ea, eb, x1, y1, r, H, W, soft)) * (1 - Ot)
+            A = (1 - (1 - _ink(ea, eb, x1, y1, r, H, W, soft)) * (1 - Ot)) * Kt
             inter = (A * Bt).sum()
             iou = inter / (A.sum() + Bt.sum() - inter)
             gap = (A.sum() + Bt.sum() - 2 * inter) / perim / px_per_nuqta
@@ -263,4 +270,4 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
                     break
     a = unpack().detach().cpu().numpy()
     out = [{**q, "p": [round(float(a[i, 0]), 3), round(float(a[i, 1]), 3)], "angle": round(float(a[i, 2]), 1)} for i, q in enumerate(nodes)]
-    return out, score([out, *others], pieces, origin, ppn, pen_px)
+    return out, score([out, *others], pieces, origin, ppn, pen_px, ignore)
