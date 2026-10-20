@@ -429,6 +429,15 @@ folder and are not committed; only our fitted strokes go into the project.
   is fitted again, which leaves **500 single shapes and 281 pairs, 2,500
   distinct strokes**. A stroke drawn the same in two shapes is fitted once
   and moved into place.
+- **But a reused stroke can overshoot.** The match is on the stroke's
+  outline alone, while the fit ignores its neighbours' ground (see
+  [Joins](#joins)). So its ends may run into a neighbour that the shape it
+  is moved into doesn't have. The Ba 047 showed a block of ink the studio
+  hasn't got (the user, 2026-10-20). `split.py` measures each reused
+  stroke's ink outside the new shape's studio ink, against the same at
+  home. Where it grows by more than 0.01 square nuqta, the stroke gets its
+  own fit in that shape, refined from the moved one. 19 of the first 229
+  did. Run it again as each group's first fits land.
 
 **Units and the line.** The catalogue is drawn at 25.9 units to the nuqta
 in every entry, and the pen is 25.9 / 1.65 units wide.
@@ -470,6 +479,21 @@ that choice. Two kinds so far:
   ins"; 20 shapes, 10 distinct strokes). Measuring each stroke's widest
   point against the nib does **not** find fills: 245 strokes are wider than
   1.15 nibs somewhere, and neither of these is among them. Ask the user.
+  The fine pen fills up to the nib's strokes, so paper shut in against a
+  filled mark is part of it. A nib's straight edge can't follow the
+  curved edge of a fill exactly: the alif 001's stem stopped 0.006 nuqta
+  short of its hat and left a speck (2026-10-20). The sheets fill any such
+  enclosed paper that touches a fill; the app must do the same.
+- **A local search, by script** (`fix_alif.py` and its kind). The fix is
+  written as the stroke's `.f` result and marked with a `how` so
+  `fixes.py` never queues it again. The alif 005's top end curled back on
+  itself: the nib swung about 115° in seven nodes, a hook the studio
+  hasn't got. The curled nodes were dropped and the end searched (nib
+  angle in 10° steps either side of the next node's, width 1 or 0.75; the
+  first five nodes free, the rest held). **Choose by the worst miss first,
+  then the area.** The hook covers a little of the studio's ink, so on
+  area alone the search put a start with the hook back on top. By worst
+  miss, 0.137 → 0.085 nuqta, and the end is one clean slanted cut.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
@@ -481,6 +505,10 @@ this was). A shape under
 0.85 is marked in red. Each sheet is checked by eye before its group is
 recorded: by the user's standing instruction, a group that matches within
 reason is recorded and work moves on. The user looks periodically.
+A group enters [studio-catalogue.md](studio-catalogue.md) only once the
+user has approved it (`approved.json` in the authoring scripts, with
+their words). **Alif: approved 2026-10-20**, after the fixes to 001 and
+005: "the fixes worked really well and you can now add all alifs".
 
 ## Joins
 

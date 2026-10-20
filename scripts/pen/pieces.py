@@ -140,6 +140,22 @@ def fit_pull(piece, origin, ppn, pen_px, start, free_width=True):
     return out, round(1 - r.fun, 3)
 
 
+def shape_cost(a, corners, rough):
+    """refine's price on a path's shape, rows (x, y, nib angle): rough * (changes of bend along the centre line, and
+    of the nib's rate of turning), plus a heavy one for doubling back, since a fold can hide under ink already drawn
+    and cost nothing in overlap. A node in `corners` (the spec's "corner": a tooth's tip, where the pen goes up and
+    comes straight back) is excused both its bend and its fold; the nib's turning still counts there."""
+    n = len(a)
+    bend = np.diff(a[:, :2], 3, axis=0) / 0.1 if n > 3 else np.zeros((1, 2))
+    if n > 3:
+        bend = bend[[j for j in range(n - 3) if not {j + 1, j + 2} & corners]] if corners else bend
+    turn = np.diff(a[:, 2], 2) / 30 if n > 2 else np.zeros(1)
+    ch = np.diff(a[:, :2], axis=0)
+    cos = np.sum(ch[1:] * ch[:-1], 1) / (np.linalg.norm(ch[1:], axis=1) * np.linalg.norm(ch[:-1], axis=1) + 1e-9)
+    fold = np.sum([max(0, -c) for j, c in enumerate(cos) if j + 1 not in corners]) * 10
+    return rough * (np.sum(bend ** 2) + np.sum(turn ** 2)) + fold
+
+
 def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5, ignore=()):
     """Nudge a band's nodes (positions and nib angles; end widths stay) to cover its reference pieces, smoothly:
     cost = 1 - overlap + edge * (mean outline gap both ways, nuqta) + rough * (changes of bend along the centre
@@ -189,13 +205,9 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
             A &= keep
         iou = (A & B).sum() / max(1, (A | B).sum())
         gap = (outline_gap(A, B).mean() + outline_gap(B, A).mean()) / sub / ppn
-        bend = np.diff(a[:, :2], 3, axis=0) / 0.1 if n > 3 else np.zeros((1, 2))
-        turn = np.diff(a[:, 2], 2) / 30 if n > 2 else np.zeros(1)
-        # a stroke doubling back on itself can hide under ink already drawn and cost nothing in overlap
-        ch = np.diff(a[:, :2], axis=0)
-        cos = np.sum(ch[1:] * ch[:-1], 1) / (np.linalg.norm(ch[1:], axis=1) * np.linalg.norm(ch[:-1], axis=1) + 1e-9)
-        fold = np.sum(np.maximum(0, -cos)) * 10
-        return 1 - iou + edge * gap + rough * (np.sum(bend ** 2) + np.sum(turn ** 2)) + fold
+        return 1 - iou + edge * gap + shape_cost(a, corners, rough)
+
+    corners = {i for i, q in enumerate(nodes) if q.get("corner")}
 
     v = np.zeros((len(free) * 3,))
     for _ in range(iters):
