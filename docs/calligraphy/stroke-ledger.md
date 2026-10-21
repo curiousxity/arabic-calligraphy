@@ -49,6 +49,22 @@ measure; the real unit is the pen.
    only one nib angle at each point, so it can't reproduce two pieces that
    meet at different angles (see the first trap below). Draw one path per
    piece; a letter's entry and exit may be on different pieces.
+
+   **Check the writing order before splitting.** The Turkish Ministry of
+   Education Thuluth textbook (`hat10.pdf`, PDF pages 76–94, the
+   "YAZILIŞI" panel on each letter's page) numbers each letter's pen
+   strokes, draws their direction with arrows, and shows the letter pulled
+   apart into its pieces. It covers alif, ba, jim, dal, ra, sin, sad, ta,
+   ayn, fa, qaf, kaf, lam, mim, nun, waw, ha, lam-alif and ya. The numbered
+   pieces are for the standalone letters; the joined forms on those pages
+   are photos with no numbers. The 120 photos of letters being written
+   (PDF pages 99–118) are too small, at 260 px, to show where the pen
+   lifts. The scanned books in the same folder give dot measurements only,
+   with no writing order. Example: the jim is (1) a short tick at the
+   head's left end, (2) the top bar pushed left to right from that tick,
+   (3) a new stroke from the bar's right end curving down to the left,
+   (4) the bowl and tail. So the head's left end is a separate piece, not
+   the bar turning a corner.
 1. **Prefer a vector reference.** Raster plates are a fallback. Usable vector
    sources: the user's studio (its SVG paths, read from the page) and the
    Turkish Ministry of Education Thuluth book (`hat10.pdf`, letters stored
