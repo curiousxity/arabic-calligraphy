@@ -19,6 +19,15 @@ order of the moves the two scripts share. Jawad Sabti's numbered Jali
 Diwani plate gives the order of what Jali Diwani adds (head curls, the
 kaf's flourish, the lam-alifs) and is a second opinion on the rest.
 
+**Since 2026-10-21 every letter is fitted to Hashim's page itself**, the
+studio's stroke split only guiding the cut (`jdplatecut.py`): the user
+chose his proportions for the whole alphabet ("hashim"), and the studio's
+letters are 20–45% smaller for the pen than his (waw 1.20× in height, ra
+1.36×, dal 1.42×). **Tail tips stop where the reference's ink stops**
+(`jdtip.py`; the user: "stop it until the reference ink stops"). Smoothing
+work is for Jali Diwani only; where its forms sit beside Thuluth's in the
+app is left for later.
+
 ## Units and the pen
 
 Measured 2026-10-20.
@@ -94,9 +103,14 @@ Thuluth's method (stroke-ledger.md) with these changes, worked out on the
   changed nothing: the worst spots were tail tips, not joins.
 - **What the trims leave is the tail tips.** The fitter ends a tail in a
   needle where the studio's extracted outline ends blunt (an artefact of the
-  extraction, as far as can be seen: Hashim's tails end sharp). How far the
-  needle should run past the studio's end has not been measured against the
-  plate.
+  extraction, as far as can be seen: Hashim's tails end sharp). The user
+  ruled (2026-10-21) that the tip stops where the reference's ink stops:
+  `jdtip.py` pulls each end back 0.05 nuqta at a time while that lessens
+  the ink outside the reference within half a nuqta of the end, stopping
+  if the shortfall there would grow more than 0.03 nuqta. On the studio's
+  ورد letters: the waw's tail 0.12 → 0.04 nuqta out, the ra's 0.22 → 0.02,
+  the dal's 0.04 → 0.01. On a scan the shortfall guard stops it earlier
+  (Hashim's dal 0.35 → 0.17), since print frays the hairline's last part.
 - **Smoothness is measured beside overlap** (`jdsmooth.py`; the user,
   2026-10-21: "the studio has smoother strokes"). *Sharp*: places our
   outline turns more than 18° over 0.05 nuqta each way with no such turn in
