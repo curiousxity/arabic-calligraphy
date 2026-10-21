@@ -566,6 +566,39 @@ that choice. Two kinds so far:
   the spike, because rounding straightened their downstroke out of its
   curve into the tail. 080, 085c and 085d still have the lump under the
   top and keep their old fits.
+
+  The user, 2026-10-21: "85b is fine"; 076, 077b, 078 and 078b "need the
+  tops to be more rounded"; 068 and 069 "are the same stroke and they
+  suffer from the same problem". Measured: our outer top's radius was a
+  quarter of the studio's on 077b, 078 and 078b, two-thirds on 076.
+  Fable found one cause under all of them. The tooth is written with a pen
+  1.12 nibs wide (the apex to the inner V, 1.117 to 1.124 nibs on all
+  seven teeth, 085b too), so one standard nib could match the outer top or
+  the inner V, never both. And the studio's top is not an arc: a tight
+  bend on one side eases into a long gentle curve on the other.
+  The method that worked, in steps:
+  - **Build the top; don't refine it** (`tooth5.py`). The path is the
+    studio's outer outline moved back by half the pen, nodes close where
+    it turns tight and wider as the turn dies out, all fixed.
+  - **Build down to where the body already lies on the track**
+    (`tooth6.py`): the descent to 1.2 nuqta (0.9 on 078 and 078b). A
+    shorter build left a step where it met the old body.
+  - **Write it with the wider pen** (`tooth8.py`): every node width 1.12,
+    the old body free. With the narrow pen the old body had turned the nib
+    8–12° in one chord at the handover to fake the width, which nicked
+    the inner edge.
+  - **Spread any nib turn along the build** (`tooth9.py`). The rising
+    stroke is written 4–7° steeper than the top, so the built nodes turn
+    from 78° to the body's angle gradually, each placed from the outline
+    for its own angle.
+  - **068 and 069 start with the pen set down square:** one straight cut
+    the pen's own length at its own angle, then the pen moves right and
+    up. The whole rising side is built, nothing free on it.
+  
+  Overlap now: 076 0.98, 077b 0.96, 078 0.97, 078b 0.98, 068 0.94, 069
+  0.93. The judge: Fable's gates (`tooth8.py judge`) catch the causes, a
+  nib jump at a handover and chords out of proportion, not the look; every
+  join was checked in close-up before it was kept.
 - **End searches can spoil what the number doesn't see.** A second round
   searched 16 more ends. Ten were kept: 147's inner corner at the bottom
   join, 144, 129, 130, 123. Seven were put back by eye:
@@ -582,6 +615,10 @@ that choice. Two kinds so far:
   head bar about 1.15, the 144's bowl 1.37. One nib can't reach the outer
   edge, which leaves a thin strip of the studio's ink along the jim heads'
   top. Wider nib, second pass, or fill: asked of the user, 2026-10-20.
+  The user, 2026-10-21, yes to a wider pen for the ba's teeth. A node's
+  `width` above 1 is now a wider pen, up to 1.5 (`WIDEST` in `pieces.py`,
+  `fit.py` and `penSweep.ts`). A stroke written with a wider pen carries
+  the same width on every node.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
