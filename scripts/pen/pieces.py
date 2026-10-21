@@ -17,6 +17,7 @@ from build import path as build_path  # noqa: E402
 from ribbon import parse, ring_samples  # noqa: E402
 
 SUB = 8  # raster px per screen px
+WIDEST = 1.5  # a node's width above 1: the stroke is written with a wider pen (penSweep.ts WIDEST)
 
 
 def ref_ring(piece):
@@ -28,7 +29,7 @@ def ref_ring(piece):
 
 def nib_ends(c, angle, width, pen):
     u = np.array([math.cos(math.radians(angle)), -math.sin(math.radians(angle))])
-    w = max(0.0, min(1.0, width)) * pen
+    w = max(0.0, min(WIDEST, width)) * pen
     return c + u * w / 2, c - u * w / 2
 
 

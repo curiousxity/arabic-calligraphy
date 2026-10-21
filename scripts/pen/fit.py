@@ -35,6 +35,7 @@ PLATES = os.environ.get("HARF_PLATES", "//monas/homes/monas/Mohammed/Calligraphy
 NUQTA_PENS = 1.65      # penLibrary.ts NUQTA / PEN
 DEFAULT_ANGLE = 145
 SUB = 4                # cv2 sub-pixel bits
+WIDEST = 1.5           # a node's width above 1: a wider pen (penSweep.ts WIDEST)
 BLUR = 2.0             # px: the loss compares inks blurred this much
 TURN_COST = 5e-5       # per degree squared of nib turn between neighbouring nodes, x ink area
 BEND_COST = 0.02       # per nuqta squared of a node's offset from its neighbours' midpoint: keeps the path from wobbling
@@ -61,7 +62,7 @@ def bez(p0, p1, p2, p3, t):
 def nib_ends(c, ang, wid, keep, pen):
     a = np.radians(ang)
     u = np.stack([np.cos(a), -np.sin(a)], 1)
-    w = np.clip(wid, 0, 1)[:, None] * pen
+    w = np.clip(wid, 0, WIDEST)[:, None] * pen
     h = pen / 2
     if keep == "a":
         A = c + u * h

@@ -16,6 +16,9 @@ import * as clipping from "polygon-clipping";
 const pc = clipping as unknown as { union?: typeof clipping.union; default?: { union: typeof clipping.union } };
 const union = pc.union ?? pc.default!.union;
 
+/** The widest pen a stroke may be written with, in pens (a node's `width`). */
+export const WIDEST = 1.5;
+
 export type Pt = [number, number];
 /** Closed, no repeated last point. */
 export type Ring = Pt[];
@@ -24,7 +27,7 @@ export type Polygon = Ring[];
 /** A node on a pen path. `angle`: the nib edge's angle in degrees from the
  *  baseline, counter-clockwise as the reader sees it (the y-down direction
  *  is (cos a, -sin a)). `width`: share of the pen in contact, 0..1 (1 when
- *  absent). `keep`: which end of the nib stays down when width < 1
+ *  absent); above 1, the stroke is written with a wider pen, up to WIDEST. `keep`: which end of the nib stays down when width < 1
  *  ("a" = the end at +direction, "b" = the other; centred when absent). */
 export type NibNode = { p: Pt; angle: number; width?: number; keep?: "a" | "b" };
 /** A pen path in units: a start node and cubic segments. */
@@ -48,7 +51,7 @@ const bez = (p0: Pt, p1: Pt, p2: Pt, p3: Pt, t: number): Pt => {
 /** The nib's two ends ("a", "b") at a centre point. */
 function nibEnds(c: Pt, angleDeg: number, width: number, keep: "a" | "b" | undefined, pen: number): [Pt, Pt] {
   const a = (angleDeg * Math.PI) / 180, u: Pt = [Math.cos(a), -Math.sin(a)];
-  const w = Math.max(0, Math.min(1, width)) * pen, h = pen / 2;
+  const w = Math.max(0, Math.min(WIDEST, width)) * pen, h = pen / 2;
   if (keep === "a") {
     const A: Pt = [c[0] + u[0] * h, c[1] + u[1] * h];
     return [A, [A[0] - u[0] * w, A[1] - u[1] * w]];

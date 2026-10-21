@@ -13,6 +13,13 @@ describe("the nib sweep", () => {
     expect(Math.abs(area - want) / want).toBeLessThan(0.01);
   });
 
+  it("writes a stroke with a wider pen when its nodes' width is above 1, up to 1.5 pens", () => {
+    const area = (width: number) =>
+      polygonArea(sweepPath(line(node(0, 0, 60, { width }), node(-300, 0, 60, { width })), 48));
+    expect(area(1.12) / area(1)).toBeCloseTo(1.12, 2);
+    expect(area(3) / area(1)).toBeCloseTo(1.5, 2);
+  });
+
   it("draws a downstroke thin and a horizontal thick with the nib near vertical", () => {
     const down = polygonArea(sweepPath(line(node(0, 0, 80), node(0, 300, 80)), 48));
     const across = polygonArea(sweepPath(line(node(0, 0, 80), node(-300, 0, 80)), 48));
