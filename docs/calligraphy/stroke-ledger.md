@@ -663,8 +663,10 @@ that choice. Two kinds so far:
   top. Wider nib, second pass, or fill: asked of the user, 2026-10-20.
   The user, 2026-10-21, yes to a wider pen for the ba's teeth. A node's
   `width` above 1 is now a wider pen, up to 1.5 (`WIDEST` in `pieces.py`,
-  `fit.py` and `penSweep.ts`). A stroke written with a wider pen carries
-  the same width on every node.
+  `fit.py` and `penSweep.ts`). The width is set per node and blends
+  along each segment. Most wider strokes carry one width on every node.
+  092's bowl is the first whose width changes along it (see "092's
+  lower stroke" below).
   The jim heads' bars (Fable, `t14.py`, 2026-10-21) are each one wider
   stroke, not two overlapping: the cut at the bar's right end equals the
   chord through the ink along the nib's line all along the bar, and the
@@ -766,6 +768,40 @@ are not clean yet:
 The bars of 117, 119, 120 and 095 run 0.05–0.07 under their top edge
 along their length. That may also need a wider pen, as with 116, 091
 and 130.
+
+**092's lower stroke written with a pen as wide as its band (Fable's
+`t18.py`, 2026-10-21).** The user: "Now there is a step off at the lower
+stroke." The step was not at the join. It was about 3 nuqta down the
+bowl, where the rebuilt start handed over to the kept body. Along the
+flat bottom the studio's band is 0.80–0.83 nuqta across, which is
+1.32–1.37 nibs. The kept body was on the standard pen, centred in the
+band, and left 0.10–0.12 bare on each side for about 4 nuqta. The
+rebuilt start rode the outer edge, so at the handover both edges
+stepped by 0.10 (worst miss 0.152). Fixing the start alone could not
+remove it.
+
+Kept: each node's width is the ink's chord along its own nib line,
+capped at 1.5, and widened only where the standard nib's end stands
+inside the ink. The width is 1.0 for the first 0.6 nuqta, rises to 1.25
+by 2 nuqta, holds 1.35 along the bottom, and comes back to 1.0 over the
+tail's first nuqta. The start rides the outer edge, with the nib rolling
+4.9° a chord at most. The body's nodes are re-centred on their chords
+(moved 0.04 at most). The tail's last five nodes are untouched. Rejected:
+the standard pen with the start moved to the band's middle. It removed
+the jog, but the bare strips stayed (0.899, worst 0.132).
+
+092 overlap 0.899 → 0.973. Worst miss at the join 0.064 → 0.050, and
+along the bottom 0.132 → 0.025. Gates on the built part: 4.9° a chord,
+chord ratio 1.5, widths 1.35 at most. 092.s3 is used by 092 only. Still
+there:
+- a bare wedge 0.05 deep on the inner side at the set-down;
+- the tail tip's old over-ink (0.136);
+- the nib's angle reverses 5° across the handover, though the outline
+  is clean.
+
+Either the pen changes width, or the start and the tail are separate
+motions. Which story the app tells is the user's call. A refine with the
+widths held (`t18.092.s3.w`) is queued.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
