@@ -686,6 +686,39 @@ that choice. Two kinds so far:
   wide pen there folds or stops short (0.922, and one build diverged on
   the GPU). Fable's reading: the pen lifted, and the lower stroke sets
   down under the blob, as 068/069's did. Asked of the user.
+  The user, 2026-10-21, said yes, on the textbook's writing order for the
+  jim (the head's left end is a separate piece; see step 0 above). Kept
+  (Fable's `t16.py`):
+  - **The bar** keeps the wide pen's body, cut at x −5.32 just before the
+    curl, with the nib held at 95–96° over the last stretch. The curl
+    and the spike are gone. The textbook's own cut, earlier at −5.03,
+    leaves a strip of studio ink bare. The blob under the shoulder is
+    0.70–0.75 nuqta tall, and one standard nib is 0.606. The worst miss
+    at the elbow is 0.127 for the cut at −5.03 and 0.082 for the cut at
+    −5.32.
+  - **Both lower strokes** set down there on the standard pen and run
+    down the studio's outer edge (the union of the bar's and the lower
+    stroke's pieces), with nodes 0.1 apart. The nib rolls from 96° to
+    105–110° round the shoulder and back to the kept body's angle,
+    at most 4.9° a chord. The new nodes are added before the kept body.
+    The two strokes are 091.s4, used by 091 and 092, and 129.s4, used by
+    129 and 133.
+  - **The textbook's separate tick**, tried as an extra stroke, made a
+    square end against the studio's round shoulder (worst miss 0.15).
+    The studio's shoulder is one smooth outer edge, so one stroke that
+    sets down at its top matches better.
+  - **The queue's refines** of the handover returned their starts
+    unchanged, so the build is what was kept.
+
+  Scores: 091 0.904 → 0.938, 092 0.855 → 0.893, 129 0.924 → 0.961,
+  133 0.929 → 0.962. The elbow's worst miss went from 0.10 to
+  0.06–0.08. Still visible: the hollow under the bar's left end is
+  filled about 0.05 deep, because the 1.23 pen is taller than the band
+  there. There is a faint ripple, 0.02 or less, at the top of the
+  shoulder. 091/092's lower stroke is short by 0.07 along its lower-left
+  edge, which was already there before. The new fits' own piece scores
+  look poor, because each now covers ink on the other's piece; judge
+  them by the sheet.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
