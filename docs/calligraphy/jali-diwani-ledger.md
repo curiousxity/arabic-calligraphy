@@ -97,6 +97,30 @@ Thuluth's method (stroke-ledger.md) with these changes, worked out on the
   extraction, as far as can be seen: Hashim's tails end sharp). How far the
   needle should run past the studio's end has not been measured against the
   plate.
+- **Smoothness is measured beside overlap** (`jdsmooth.py`; the user,
+  2026-10-21: "the studio has smoother strokes"). *Sharp*: places our
+  outline turns more than 18° over 0.05 nuqta each way with no such turn in
+  the reference within 0.12 nuqta. *Bends*: sign changes of the outline's
+  curvature beyond a dead band, ours and the reference's; on a wobbling edge
+  every wobble counts. Bends mean nothing against a scan (Hashim's dal
+  reads 28 from print fuzz).
+- **Where the roughness is: joins, caps and tips, not edges.** On the ورد
+  letters every sharp turn ours has and the studio lacks sits where one
+  stroke's end meets another (the waw's head, the dal's right side), at a
+  nib cap (the ra's head), inside one stroke where the nib turns fast round
+  the dal's head (the underside's notch: the swept edge folds), or at a tail
+  tip. None is along an edge.
+- **Tried and dropped: fewer, evenly spaced nodes** (`jdsmoothjobs.py`,
+  2026-10-21). Each stroke resampled to nodes 0.4 or 0.6 nuqta apart and
+  refined with the smoothness weight at 0.05 or 0.30. The overlap fell 0.01–
+  0.03 (the waw 0.974 → 0.948, its head flattened), the sharp turns and bends
+  did not move, and on five of the nine strokes the refine handed back its
+  start unchanged, so the batch mostly tested resampling. Node density was
+  never where the roughness was.
+- **Before 2026-10-21 the sheets drew the reference as polygons**:
+  `pieces.ref_ring` samples a piece in its own units, every 0.2 nuqta at the
+  studio's scale. The sheets now sample in screen px (`jdcatalog.ring`); the
+  pilot's numbers moved by at most 0.004 and the table below stands.
 - **Where the plate wins, the letter is fitted to Hashim's page itself**
   (`jdplatecut.py`; first used for the dal, below). His page gives a
   silhouette, not strokes, so the studio's stroke split for the same letter

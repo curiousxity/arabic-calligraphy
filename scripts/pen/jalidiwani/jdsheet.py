@@ -6,7 +6,7 @@ import numpy as np, cv2
 from PIL import Image, ImageDraw, ImageFont
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(sys.argv[1], "code"))  # the queue's own code draws what it fitted
-from jdcatalog import db, strokes, origin, transform, PPN, PEN
+from jdcatalog import db, strokes, origin, transform, ring, PPN, PEN
 from pieces import ref_ring, path_hulls
 q, out, PX, ids = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.argv[4:]
 reg = json.load(open(os.path.join(os.environ.get("JD_WORK") or HERE, "registry.json")))
@@ -38,11 +38,11 @@ def shape(k):
     f = os.path.join(NODES, k + ".json") if NODES else ""
     if f and os.path.exists(f):
         for sid, nodes in json.load(open(f)).items():
-            rings.append(ref_ring([Tk, d_of[sid]])); hulls += path_hulls(nodes, np.array(origin(k)), PPN, PEN)
+            rings.append(ring(k, d_of[sid])); hulls += path_hulls(nodes, np.array(origin(k)), PPN, PEN)
             info.append(f"{sid}: trimmed, {len(nodes)} nodes")
         return hulls, rings, info
     for sid, h in reg["shapes"][k]:
-        rings.append(ref_ring([Tk, d_of[sid]]))
+        rings.append(ring(k, d_of[sid]))
         r = result(reg["fits"][h]["job"])
         if r is None:
             info.append(f"{sid}: waiting"); continue

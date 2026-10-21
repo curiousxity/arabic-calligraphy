@@ -36,6 +36,17 @@ def transform(k):
     return plates[k]["T"] if k in plates else T
 
 
+def ring(k, d, fine=4):
+    """The outline of stroke d of shape k in screen px, sampled `fine` points to the screen px. pieces.ref_ring samples
+    in the piece's own units before scaling, a point every 0.2 nuqta for the studio's, which draws its curves as
+    polygons on a sheet at 80+ px to the nuqta."""
+    from ribbon import parse, ring_samples  # the queue's code, on the path wherever this is called from a sheet
+    a, dd, e, f = transform(k)
+    segs = [tuple((x * a * fine, y * dd * fine) for x, y in s) for s in parse(d)]
+    r = ring_samples(segs)[0] / fine
+    return r + [e, f]
+
+
 def key(d):
     """The outline moved to its own corner, hashed: the same stroke drawn in two shapes has one key."""
     nums = [float(x) for x in re.findall(r"-?\d+\.?\d*", d)]
