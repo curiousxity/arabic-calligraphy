@@ -720,6 +720,53 @@ that choice. Two kinds so far:
   look poor, because each now covers ink on the other's piece; judge
   them by the sheet.
 
+**Ends rebuilt at a join (Fable's `t17*.py`, 2026-10-21).** The user
+flagged several joins:
+- a spur under 116's right tip (also 128, the same strokes);
+- the head's right end, where the two head strokes meet, in 117, 119
+  and 120;
+- a step on 092's belly;
+- a spur where 154's head (the ra) meets its body.
+
+In each, the faulty end was taken back to a node that still fits. It was
+then rebuilt on the studio's ink, with nodes about 0.1 nuqta apart, the
+nib's outer end following the outer edge, and the nib turning at most 5°
+a chord. Trimming alone made 116 worse. At these heads the bar's piece
+and the lower stroke's piece end on one shared cut, at about 80° and 1.1
+nibs. A 1.0 pen can't span that cut, so each fit had centred on it and
+left a corner bare or poking out. Now the bar's last nib lies along the
+cut from its top corner, and the lower stroke sets down along it from
+its bottom corner (the textbook's order: the bar pushed to the right,
+then a new stroke set down under its right end).
+
+| shape | overlap before → after | worst miss at the join, before → after (nuqta) |
+|---|---|---|
+| 116 | 0.906 → 0.908 | 0.072 → 0.038 |
+| 128 | 0.974 → 0.977 | 0.072 → 0.038 |
+| 117 | 0.933 → 0.942 | 0.100 → 0.067 |
+| 119 | 0.934 → 0.943 | 0.116 → 0.041 |
+| 120 | 0.954 → 0.958 | 0.071 → 0.038 |
+| 095 | 0.903 → 0.905 | 0.119 → 0.074 |
+| 092 | 0.895 → 0.899 | 0.075 → 0.064 |
+| 154 | 0.9635 → 0.9641 | 0.064 → 0.026 |
+
+095 shares its lower stroke with 119. The queue's refines of 116's
+handover moved nothing, so the builds were kept. The refines for the
+other shapes are queued.
+
+At three times the size, the spurs and the zigzag are gone, but these
+are not clean yet:
+- 117 and 119 have small ripples on the lower edge near the join;
+- 154 has a small kink on the body's right edge;
+- **092's belly now ripples instead of stepping.** Its kept bowl fit is
+  poor (0.774 on its own piece). The start of the belly is wider than one
+  pen allows at any angle, so a wider pen for the bowl's start is the
+  next fix.
+
+The bars of 117, 119, 120 and 095 run 0.05–0.07 under their top edge
+along their length. That may also need a wider pen, as with 116, 091
+and 130.
+
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
 are drawn at four times the size and scaled down alike. Drawn straight
