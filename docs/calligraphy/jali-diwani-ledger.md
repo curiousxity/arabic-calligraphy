@@ -117,6 +117,17 @@ Thuluth's method (stroke-ledger.md) with these changes, worked out on the
   did not move, and on five of the nine strokes the refine handed back its
   start unchanged, so the batch mostly tested resampling. Node density was
   never where the roughness was.
+- **Whole-letter refits (`.w`, `jdwhole.py`, 2026-10-21): mixed.** Each
+  stroke refined from its trimmed nodes, scored as its union with the
+  others (held at their trimmed nodes) against the whole letter. The waw
+  0.974 → 0.977, its worst poke-out 0.12 → 0.07 nuqta, one sharp turn fewer
+  (a small point at the top of its head is left). The ra's poke-out
+  0.22 → 0.06 but its head went angular, a corner standing up at the right
+  (0.966 → 0.960): worse to the eye. The studio dal 0.962 → 0.966 with the
+  notch under its head unchanged; Hashim's dal 0.954 → 0.957 with three
+  more sharp turns. The notch under the dal's head is inside one stroke and
+  no pass has moved it. The tight fits stay the record; the waw's `.w` is a
+  candidate.
 - **Before 2026-10-21 the sheets drew the reference as polygons**:
   `pieces.ref_ring` samples a piece in its own units, every 0.2 nuqta at the
   studio's scale. The sheets now sample in screen px (`jdcatalog.ring`); the
