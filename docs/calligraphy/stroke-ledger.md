@@ -612,7 +612,21 @@ that choice. Two kinds so far:
   where the studio's is round. Three attempts to fix them (a built block
   edge and a stroke 2 riding deeper at the top; the same with the old
   block kept; the old fit with only the block's nib smoothed) each scored
-  lower (0.936–0.947) and showed new steps, and were put back. The judge: Fable's gates (`tooth8.py judge`) catch the causes, a
+  lower (0.936–0.947) and showed new steps, and were put back. The user,
+  2026-10-21, on the block: "I think it is just one motion of the pen".
+  The kept stroke 1 had set the pen down and turned it in place (+9° then
+  back), then stopped turning at the seventh node: the corner. Rebuilt as
+  one motion (Fable, `t13.py`, variant c): the path is the studio's outer
+  edge moved back by half the pen, every nib held to the profile measured
+  on the studio's band (−100° at the set-down, rolling to −112° up the
+  rise, −102° over the top), with a pen 1.12 wide, since the block's cut
+  is 1.116 nibs with nothing overlapping it. So the "overlap explains the
+  wider pen" above holds for the top only, not the block. Kept with the
+  t10 stroke 2: 068 0.956, 069 0.955; the block's worst miss 0.049 →
+  0.016. The V is still a little pointed. Stroke 1 with a standard pen
+  (variants a, b) and the wide stroke 1 with a rebuilt stroke 2 scored
+  lower.
+  The judge: Fable's gates (`tooth8.py judge`) catch the causes, a
   nib jump at a handover and chords out of proportion, not the look; every
   join was checked in close-up before it was kept.
 - **End searches can spoil what the number doesn't see.** A second round
