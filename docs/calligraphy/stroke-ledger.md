@@ -558,6 +558,14 @@ that choice. Two kinds so far:
   and 048, still wrong. The nib-turning guard is judged over the whole
   stroke, so it fails fits whose only fast turn is far from the top. Use it
   near the tooth.
+
+  Then the spike was rounded (`tooth4.py`). The corner became three nodes
+  0.12 nuqta apart, all at the corner's nib angle, with the whole stroke
+  free. Kept for 076 (0.94), 085b (0.73 → 0.92), 068 and 069: their tops
+  are now narrow and rounded like the studio's. 077b, 078 and 078b kept
+  the spike, because rounding straightened their downstroke out of its
+  curve into the tail. 080, 085c and 085d still have the lump under the
+  top and keep their old fits.
 - **End searches can spoil what the number doesn't see.** A second round
   searched 16 more ends. Ten were kept: 147's inner corner at the bottom
   join, 144, 129, 130, 123. Seven were put back by eye:
