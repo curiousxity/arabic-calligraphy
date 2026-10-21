@@ -596,7 +596,23 @@ that choice. Two kinds so far:
     up. The whole rising side is built, nothing free on it.
   
   Overlap now: 076 0.98, 077b 0.96, 078 0.97, 078b 0.98, 068 0.94, 069
-  0.93. The judge: Fable's gates (`tooth8.py judge`) catch the causes, a
+  0.93.
+- **One studio outline can be two pen strokes.** The user, 2026-10-21:
+  "some of the problems we are seeing are because some of these marks are
+  drawn as one continuous stroke". 069 (and 068, the same stroke) is two,
+  confirmed on a picture: the start block rising to the tooth's top, then
+  from the top down into the tail. The studio's piece is cut by the line
+  through the tooth's outer apex and its inner V (`twostroke.py`), and each
+  stroke is fitted against its own half with the other half ignored, a
+  standard pen. The sheet draws both (`fixes.json` "with"). Against the
+  whole piece: 068 0.939 → 0.956, 069 0.933 → 0.953, above the one stroke
+  with a pen 1.12 wide. So the tooth's "wider pen" here was two strokes
+  overlapping at the top. Two faults remain by eye: the block's top edge
+  turns at a corner where the studio's curves, and the inner V is pointed
+  where the studio's is round. Three attempts to fix them (a built block
+  edge and a stroke 2 riding deeper at the top; the same with the old
+  block kept; the old fit with only the block's nib smoothed) each scored
+  lower (0.936–0.947) and showed new steps, and were put back. The judge: Fable's gates (`tooth8.py judge`) catch the causes, a
   nib jump at a handover and chords out of proportion, not the look; every
   join was checked in close-up before it was kept.
 - **End searches can spoil what the number doesn't see.** A second round
