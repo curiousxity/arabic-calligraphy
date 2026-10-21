@@ -1,29 +1,43 @@
-"""A letter cut from Hashim's p. 65 as fitting pieces, where the plate wins over the studio (the dal, 2026-10-20).
+"""A letter or word cut from Hashim's page as fitting pieces, where the plate wins over the studio (the dal,
+2026-10-20; every letter since 2026-10-21).
 
-python jdplatecut.py NAME vx,vy STUDIO_ID OUT_CHECK.png
-NAME: the plate shape's key (e.g. h65-dal); vx,vy: a point on the letter in page-65 view coordinates (1800 px wide,
-as jdplate.py); STUDIO_ID: the studio shape whose stroke split guides the cut. Hashim's page gives a silhouette only,
-so the studio's strokes are scaled to his letter's height, laid over it, and each of his ink pixels goes to the
-stroke(s) it falls in (the rest to the nearest), so the pieces overlap where the studio's do. Each piece's outline
-is smoothed (the scan's edge fuzz, about a pixel at 40 px to the nib) and written as cubic curves between its
+python jdplatecut.py NAME vx,vy OUT_CHECK.png (--guide STUDIO_ID | --cuts CUTS --seeds SEEDS) [--page PNG]
+                     [--view X,Y] [--nib PX]
+NAME: the plate shape's key (e.g. h65-dal); vx,vy: a point on the ink in view coordinates (the page 1800 px wide;
+--view: the view point at the image's top-left corner, 300,380 for the p. 65 rows; --page: the full-resolution
+render, 7015 px to the page's width, default JD_HASHIM65). The page gives a silhouette only; it is split into pieces
+one of two ways:
+- --guide STUDIO_ID: the studio's strokes for the same letter are scaled to his letter's height and laid over it, and
+  each ink pixel goes to the stroke(s) it falls in (the rest to the nearest), so the pieces overlap where the
+  studio's do. For a letter standing alone (the p. 65 alphabet).
+- --cuts "x0,y0,x1,y1;..." --seeds "s0:x,y;s1:x,y": straight cuts through the ink, in the image's px, chosen by eye
+  where one stroke meets the next, and a point inside each piece. For a word in a composition, where no studio shape
+  matches his stretched forms; the cut is shown to the user before anything is fitted.
+Each piece's outline is smoothed (the scan's edge fuzz, about a pixel) and written as cubic curves between its
 corners, the short cap segments the fitter's band finder looks for. Writes JD_WORK/plates.json[NAME] =
-{"T", "origin", "strokes": [[sid, d], ...], "source"} in page px, 40 px to the nib, so T = PEN / 40; jdcatalog
+{"T", "origin", "strokes": [[sid, d], ...], "source"} in page px, --nib px to the nib, so T = PEN / nib; jdcatalog
 serves it beside the studio's shapes. Never copies the plate into the library: the pieces are references the pen is
 fitted to, as the studio's are."""
-import json, os, sys
+import argparse, json, os, sys
 import numpy as np, cv2
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(1, os.path.dirname(HERE))
 from jdcatalog import strokes, PEN, PEN_U, WORK
 from ribbon import parse, ring_samples  # the branch's own copy: only the outline reader is needed here
 sys.stdout.reconfigure(encoding="utf-8")
-name, pt, sid_studio, check = sys.argv[1:5]
-NIB = 40.0                                   # Hashim's nib on the page, px (ledger: Units and the pen)
+ap = argparse.ArgumentParser()
+ap.add_argument("name"); ap.add_argument("pt"); ap.add_argument("check")
+ap.add_argument("--guide"); ap.add_argument("--cuts"); ap.add_argument("--seeds")
+ap.add_argument("--page", default=os.environ.get("JD_HASHIM65")); ap.add_argument("--view", default="300,380")
+ap.add_argument("--nib", type=float, default=40.0)  # Hashim's nib on p. 65, px (ledger: Units and the pen)
+a = ap.parse_args()
+name, pt, check, NIB = a.name, a.pt, a.check, a.nib
 K = 7015 / 1800                              # page px per view px
+VX, VY = map(float, a.view.split(","))
 
-im = cv2.imread(os.environ["JD_HASHIM65"], 0)
+im = cv2.imread(a.page, 0)
 ink = cv2.morphologyEx((im < 150).astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
 n, lab, st, cen = cv2.connectedComponentsWithStats(ink, 8)
-vx, vy = map(float, pt.split(",")); x, y = int((vx - 300) * K), int((vy - 380) * K)
+vx, vy = map(float, pt.split(",")); x, y = int((vx - VX) * K), int((vy - VY) * K)
 r = lab[y - 40:y + 40, x - 40:x + 40]; ids, c = np.unique(r[r > 0], return_counts=True); i = ids[np.argmax(c)]
 m = (lab == i).astype(np.uint8); ys, xs = np.nonzero(m)
 y0, y1, x0, x1 = ys.min() - 8, ys.max() + 9, xs.min() - 8, xs.max() + 9
@@ -31,23 +45,45 @@ m = m[y0:y1, x0:x1]
 m = (cv2.GaussianBlur(m.astype(np.float32), (0, 0), 1.2) > 0.5).astype(np.uint8)  # the scan's edge fuzz
 ys, xs = np.nonzero(m); H = ys.max() - ys.min() + 1
 
-# the studio's strokes scaled to his letter's height and laid over it, top and right edges together
-Su = NIB / PEN_U
-rings = [(sid, ring_samples(parse(d))[0] * Su) for sid, d in strokes(sid_studio)]
-pts = np.concatenate([r for _, r in rings]); sc = H / (pts[:, 1].max() - pts[:, 1].min())
-pts *= sc; dx, dy = xs.max() - pts[:, 0].max(), ys.min() - pts[:, 1].min()
-regions = []
-for sid, ring in rings:
-    z = np.zeros_like(m); cv2.fillPoly(z, [np.round((ring * sc + [dx, dy]) * 16).astype(np.int32)], 1, cv2.LINE_8, 4)
-    regions.append((sid, cv2.dilate(z, np.ones((9, 9), np.uint8))))
-own = [m & z for _, z in regions]
-left = m & (1 - np.maximum.reduce([z for _, z in regions]))
-if left.any():
-    dts = [cv2.distanceTransform((1 - z).astype(np.uint8), cv2.DIST_L2, 5) for _, z in regions]
-    near = np.argmin(np.stack(dts), 0)
-    for j in range(len(own)): own[j] |= left & (near == j)
-print(f"{name}: {m.sum() / NIB ** 2:.2f} pen^2 of ink, {H / NIB:.2f} pens tall; studio {sid_studio} scaled x{sc:.3f} in pens to the height;",
-      "; ".join(f"{sid} {o.sum() / NIB ** 2:.2f} pen^2" for (sid, _), o in zip(regions, own)), f"(left over {left.sum() / NIB ** 2:.2f})")
+if a.guide:
+    # the studio's strokes scaled to his letter's height and laid over it, top and right edges together
+    Su = NIB / PEN_U
+    rings = [(sid, ring_samples(parse(d))[0] * Su) for sid, d in strokes(a.guide)]
+    pts = np.concatenate([r for _, r in rings]); sc = H / (pts[:, 1].max() - pts[:, 1].min())
+    pts *= sc; dx, dy = xs.max() - pts[:, 0].max(), ys.min() - pts[:, 1].min()
+    regions = []
+    for sid, ring in rings:
+        z = np.zeros_like(m); cv2.fillPoly(z, [np.round((ring * sc + [dx, dy]) * 16).astype(np.int32)], 1, cv2.LINE_8, 4)
+        regions.append((sid, cv2.dilate(z, np.ones((9, 9), np.uint8))))
+    own = [m & z for _, z in regions]
+    left = m & (1 - np.maximum.reduce([z for _, z in regions]))
+    if left.any():
+        dts = [cv2.distanceTransform((1 - z).astype(np.uint8), cv2.DIST_L2, 5) for _, z in regions]
+        near = np.argmin(np.stack(dts), 0)
+        for j in range(len(own)): own[j] |= left & (near == j)
+    how = f"cut with the studio's {a.guide} strokes as the guide"
+    print(f"{name}: {m.sum() / NIB ** 2:.2f} pen^2 of ink, {H / NIB:.2f} pens tall; studio {a.guide} scaled x{sc:.3f} in pens to the height;",
+          "; ".join(f"{sid} {o.sum() / NIB ** 2:.2f} pen^2" for (sid, _), o in zip(regions, own)), f"(left over {left.sum() / NIB ** 2:.2f})")
+else:
+    # cut lines drawn two px wide through the ink; each piece is the part holding its seed, the cut ink split
+    # between the pieces either side so nothing is lost
+    cut = np.zeros_like(m)
+    for seg in a.cuts.split(";"):
+        p, q = np.array(seg.split(","), float).reshape(2, 2)
+        cv2.line(cut, tuple(int(v) for v in p - [x0, y0]), tuple(int(v) for v in q - [x0, y0]), 1, 2)
+    parts = cv2.connectedComponents((m & (1 - cut)).astype(np.uint8), connectivity=4)[1]
+    regions, own = [], []
+    for s in a.seeds.split(";"):
+        sid, xy = s.split(":"); sx, sy = map(int, xy.split(",")); k = parts[sy - y0, sx - x0]
+        assert k > 0, f"seed {sid} is not on the ink"
+        regions.append((sid, None)); own.append((parts == k).astype(np.uint8))
+    dts = np.stack([cv2.distanceTransform((1 - o).astype(np.uint8), cv2.DIST_L2, 5) for o in own])
+    near = np.argmin(dts, 0)
+    for j in range(len(own)): own[j] |= m & cut & (near == j)
+    rest = m & (1 - np.maximum.reduce(own))
+    how = f"cut by hand at {a.cuts}"
+    print(f"{name}: {m.sum() / NIB ** 2:.2f} pen^2 of ink, {H / NIB:.2f} pens tall;",
+          "; ".join(f"{sid} {o.sum() / NIB ** 2:.2f} pen^2" for (sid, _), o in zip(regions, own)), f"(in no piece {rest.sum() / NIB ** 2:.2f})")
 
 
 def cubic_fit(P):
@@ -86,7 +122,7 @@ def outline(mask):
 
 
 plate = {"T": [PEN / NIB, PEN / NIB, 0, 0], "origin": [float(xs.max() + x0 + 1) * PEN / NIB, 0.0], "strokes": [],
-         "source": f"Hashim p. 65 at view {pt}, cut with the studio's {sid_studio} strokes as the guide", "nib_px": NIB}
+         "source": f"Hashim, {os.path.basename(a.page)} at view {pt}, {how}", "nib_px": NIB}
 chk = np.full((*m.shape, 3), 255, np.uint8); chk[m > 0] = (200, 200, 200)
 cols = [(30, 80, 220), (200, 30, 30), (30, 160, 60), (160, 60, 200)]
 for j, ((sid, _), o) in enumerate(zip(regions, own)):
