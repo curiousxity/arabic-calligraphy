@@ -22,7 +22,7 @@ inkbox = json.load(open(os.path.join(DATA, "inkbox.json"), encoding="utf-8"))
 _pf = os.path.join(WORK, "plates.json")
 plates = json.load(open(_pf, encoding="utf-8")) if os.path.exists(_pf) else {}
 for _k, _p in plates.items():
-    db.setdefault(_k, {"group": "plate", "form": _k, "variant": "hashim-p65"})
+    db.setdefault(_k, {"group": "plate", "form": _k, "variant": "hashim"})
 
 
 def strokes(k):

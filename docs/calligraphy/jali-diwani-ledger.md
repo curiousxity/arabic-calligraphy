@@ -217,6 +217,28 @@ the junction (s0) and from the junction round to the head's cap (s1): the
 fitter's own direction, not Sabti's writing order, which the move tables
 below record.
 
+## The first join: على (2026-10-21)
+
+ربك on Hashim's p. 66 is one piece of ink with the سم of اسم and the ال of
+الأعلى, and his kaf there is stretched to the line; the user chose to start
+joins with a word that stands as its own piece of ink instead: على, the end
+of الأعلى. No studio shape matches a composition's forms, so the silhouette
+was cut by hand (`jdplatecut.py --cuts`), two straight cuts placed by eye:
+along the lam's stem where the ayn's jaw runs into it, and where the ayn's
+head meets its jaw. The cut was shown to the user before fitting. Page 66's
+pen measures as p. 65's (the thickest strokes 44 px on both; two dots read
+about 10% smaller), so the nib is taken as 40 px.
+
+- **The lam and ya are one stroke**: down the stem, the small elbow at its
+  foot, round the bottom and up to the ya's tip. Fitted as two (cut at the
+  lam's foot) it came out 0.941 with a seam where the ya starts; as one,
+  0.948. The user left the choice to the look.
+- **The whole-word refit helped here** (`jdwhole.py`): 0.948 → 0.952, the
+  worst poke-out 0.12 → 0.09 nuqta, the join of the ayn's jaw into the lam
+  smoother. The crotch where the jaw meets the stem is Hashim's own.
+- Left: the ayn's head ends in the nib's flat cut where his is a little
+  rounder, and the lam's elbow sits a hair outside his.
+
 ## Sabti's moves, letter by letter
 
 How Sabti writes each letter on his plate (Beirut Jali volume, p. 9): the

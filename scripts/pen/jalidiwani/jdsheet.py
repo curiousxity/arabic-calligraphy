@@ -47,7 +47,9 @@ def shape(k):
         if r is None:
             info.append(f"{sid}: waiting"); continue
         k0 = reg["fits"][h]["job"][3:].split(".")[0]
-        assert k0 == k, "a stroke shared with another shape needs its corner offset"
+        # two cuts of one plate word share their frame, so a stroke they share needs no offset
+        assert k0 == k or (origin(k0) == origin(k) and transform(k0) == transform(k)), \
+            "a stroke shared with another shape needs its corner offset"
         hulls += path_hulls(r["nodes"], np.array(origin(k)), PPN, PEN)
         info.append(f"{sid}: {r['name'][-2:] if r['name'][-2:] in ('.u', '.e') else 'first'} {r['kind']} {r['score']['iou']:.3f} gap95 {r['score']['gap95']:.2f} max {r['score']['gap_max']:.2f}")
     return hulls, rings, info
@@ -97,7 +99,7 @@ if __name__ == "__main__":
     W = max(sum(t.width for t in ts) + 4 * PAD for _, ts in cells)
     H = sum(max(t.height for t in ts) + 2 * PAD + 22 for _, ts in cells) + 40
     sheet = Image.new("RGB", (W, H), "white"); d = ImageDraw.Draw(sheet)
-    d.text((PAD, 8), "ours | reference (the studio; Hashim's p. 65 for plate shapes) | difference (red: ours only, blue: reference only, grey: both)", fill=(60, 60, 60), font=fnt)
+    d.text((PAD, 8), "ours | reference (the studio; Hashim's page for plate shapes) | difference (red: ours only, blue: reference only, grey: both)", fill=(60, 60, 60), font=fnt)
     y = 40
     for label, ts in cells:
         d.text((PAD, y), label, fill=(20, 20, 20), font=fnt); y += 22
