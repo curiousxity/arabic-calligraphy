@@ -661,6 +661,15 @@ that choice. Two kinds so far:
   → 0.973, 129 0.924 → 0.962) but leave a spike at the head's left elbow
   where the bar comes down into the lower stroke; held back for an end
   fix. The held-nib variants (h) overshot the top edge.
+  The end fix (`t15.py`): the elbow lies on the neighbours' ignored
+  ground, so a refine is blind there and the elbow is built instead,
+  its nodes on the band's centre, the nib turning 2.5° a chord. 116 kept
+  that way: 116 0.864 → 0.906, 128 0.891 → 0.974, the elbow clean. The
+  spur under 116's right tip is 116.s2's end, not the bar. 091 not kept:
+  the band narrows below a 1.23 pen's height before the elbow, so a rigid
+  wide pen there folds or stops short (0.922, and one build diverged on
+  the GPU). Fable's reading: the pen lifted, and the lower stroke sets
+  down under the blob, as 068/069's did. Asked of the user.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
