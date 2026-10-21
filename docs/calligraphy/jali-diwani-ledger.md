@@ -195,6 +195,18 @@ is cut straight; Hashim's are pointed and rounded, so those stand (the
 plate wins). Recorded in `scripts/pen/REVIEW-jali-diwani.md` under the
 within-reason rule, awaiting the user's look.
 
+**ورد from Hashim's page (2026-10-21).** With every letter to Hashim's
+proportions, the waw and ra were cut from his p. 65 as the dal was (the
+studio's 690 and 243 splits as the guides) and fitted, second-passed,
+trimmed and tip-clipped (`jdtip.py`, hairline ends only: an end is a tip
+when its ink is under 0.35 pen wide, so a head's broad cap is never pulled
+back). Against the scan: waw 0.966 (0.10 out, 0.03 short), ra 0.962 (0.13
+out where his tail's print frays), dal 0.952 (0.17 out, the same). The
+waw's first fits stuck two caps out of its head as barbs (0.928); the
+second passes took them in. Left at about 10×: under the dal's head and the
+waw's, and where the waw's tail leaves its head, our edge runs a hair
+inside his (`h65_example.png` on the NAS).
+
 The dal is the first letter fitted to the plate rather than the studio, and
 sets the precedent: the head's second pass took its body from 0.970 to
 0.972 while the head stayed at 0.937 (band fit, 0.06 nuqta max gap), the
