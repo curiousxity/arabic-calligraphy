@@ -544,6 +544,31 @@ that choice. Two kinds so far:
   - the nib turning no more than 120° a nuqta;
   - a turn of no more than 90° at any node but a corner;
   - no sharp inward corner on our outline that the studio's hasn't got.
+
+  The third try followed that (`tooth3.py`). One node became a corner,
+  half a nib below the studio's tip, with its nib held at 78° (`hold` in
+  `pieces.refine`, so the job runs on the processor). Three ways: the corner
+  and one node either side free; those three held at 78°; and the whole
+  stroke free about the held corner. The whole stroke free won on every
+  tooth. Six kept (2026-10-20): 076 0.84 → 0.94, 077b 0.83 → 0.93, 078
+  0.82 → 0.93, 078b 0.83 → 0.95, 068 0.65 → 0.88, 069 0.70 → 0.89. The
+  body now follows the studio's, but the top is a sharp spike where the
+  studio's is a narrow rounded point. Rejected by eye: 080 and 085b–d,
+  which have a lump on the inside of the rising stroke just under the top,
+  and 048, still wrong. The nib-turning guard is judged over the whole
+  stroke, so it fails fits whose only fast turn is far from the top. Use it
+  near the tooth.
+- **End searches can spoil what the number doesn't see.** A second round
+  searched 16 more ends. Ten were kept: 147's inner corner at the bottom
+  join, 144, 129, 130, 123. Seven were put back by eye:
+  - 119 (both ends): the head's tip went blunt and notched;
+  - 116 (three): a blob at the lower join;
+  - 133.s2: a crack along the head's top;
+  - 124.s2: its lower-left end went wavy, with a hook.
+
+  Every end fix is looked at in close-up before it is kept. The step
+  that's left at the jim heads' tip is where our top bar, thinner than the
+  studio's, meets the lower stroke's end: the wide-stroke question.
 - **Strokes wider than the nib.** 510 of the 2,500 distinct strokes are
   wider than 1.08 nibs over more than a fifth of their length: the jim's
   head bar about 1.15, the 144's bowl 1.37. One nib can't reach the outer
