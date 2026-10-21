@@ -238,6 +238,9 @@ about 10% smaller), so the nib is taken as 40 px.
   smoother. The crotch where the jaw meets the stem is Hashim's own.
 - Left: the ayn's head ends in the nib's flat cut where his is a little
   rounder, and the lam's elbow sits a hair outside his.
+- Approved by the user the same day ("It looks pretty good"): one cut by
+  hand, fitted stroke by stroke, then refitted as a whole word, is how a
+  join from his page is made.
 
 ## Sabti's moves, letter by letter
 
