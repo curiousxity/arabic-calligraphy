@@ -649,6 +649,18 @@ that choice. Two kinds so far:
   `width` above 1 is now a wider pen, up to 1.5 (`WIDEST` in `pieces.py`,
   `fit.py` and `penSweep.ts`). A stroke written with a wider pen carries
   the same width on every node.
+  The jim heads' bars (Fable, `t14.py`, 2026-10-21) are each one wider
+  stroke, not two overlapping: the cut at the bar's right end equals the
+  chord through the ink along the nib's line all along the bar, and the
+  chord's profile is smooth. Three pens, not one: 116.s1 (116, 128) 1.30
+  nibs, 091.s3 (091, 092, 129, 133) 1.23, 130.s1 1.13. Built from the kept
+  fit with the measured width on every node, the first node moved to the
+  cut's middle at the cut's heading, the last chords densified, then
+  refined with the neighbours ignored. 130 kept: 0.954 → 0.982, the step
+  at the tip gone. 116 and 091 lift every shape that uses them (128 0.891
+  → 0.973, 129 0.924 → 0.962) but leave a spike at the head's left elbow
+  where the bar comes down into the lower stroke; held back for an end
+  fix. The held-nib variants (h) overshot the top edge.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
