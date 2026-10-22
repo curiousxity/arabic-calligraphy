@@ -897,7 +897,17 @@ here is the outline's curvature wobble at the 95th percentile, per nuqta.
   studio's is straight.
 
 In the app this would be a pass after `sweepPath` on the outline it
-returns. Not built; the user's call.
+returns. The user said yes, 2026-10-22. Built as `src/lib/outlineSmooth.ts`,
+applied in `penLayout.ts` before the curves are fitted, with these
+settings:
+- resampled every 0.01 nuqta;
+- no point moves more than 0.015;
+- a turn of more than 40° over 0.08 counts as a corner and stays;
+- samples within 0.12 of a corner stay where they are.
+
+The sheets draw ours the same way (`scripts/pen/outline.py` with the
+same steps and settings, applied in `sheet.py`), and their overlaps are
+measured on the smoothed ink.
 
 **Sin Shin complete; hooks at the teeth (Fable's `t22*.py`,
 2026-10-22).** The last five strokes (170.s1, 171.s0, 172.s1, 172.s4,
@@ -946,6 +956,42 @@ Still visible at 3x:
 `split.py` found one reused stroke overshooting: 172.s1 in 196, by
 +0.298 sq nuqta (the dark bulb at 196's left end). It has its own fit
 queued as 196.s1.
+
+Second pass (`t22b`):
+- **The double point was on tooth 1.** The bowl stroke's first nib stood
+  0.1–0.15 right of the studio's topmost point. Its upper end now sits at
+  that point, the pen lifted to 0.35 of its width (0.5 on 214c). The miss
+  at the tip fell 0.127 → 0.04–0.05.
+- **The bowl's handover:** the standard-width nodes are centred on the
+  ink's chord, with the pen set to the chord's width: 0.80–0.88 where the
+  band is thinner than a nib, then 1.0, then 1.36 up the climb. This is
+  the pen changing width along a stroke again, as on 092. The bump and
+  the nick are gone.
+- **The second valley:** 209.s3, 210.s3 and 214b.s2 are widened to the
+  chord (1.31 at most). The bare strip fell 0.132 → 0.035.
+
+Overlap: 209 0.892 → 0.955, 210 0.907 → 0.959, 214b 0.907 → 0.944, 214c
+0.916 → 0.924, 219 0.955 → 0.961. Still visible: the tip ends in a flat
+cap about 0.2 wide where the studio's is a hooked point, and a bare
+sliver 0.04–0.06 runs along the bowl's upper edge.
+
+**The GPU refiner and widened strokes.** The four refines of widened
+strokes came back unmoved and scored 0.44 against the build's 0.87 on
+the same piece. The refiner seems not to honour `width`, or scores it
+differently. Check `fitjob.py`/`gpufit` before queuing refines of any
+widened stroke.
+
+**Choosing a stroke's pass by the sheet (`pick.py`).** `result()` takes
+the pass that best fits the stroke's own piece. The second passes (`.t`,
+2026-10-21) won there but lost whole shapes, because the neighbours'
+ground is ignored in a pass's own score:
+- 049 0.928 → 0.805;
+- 053 0.947 → 0.862;
+- 082 0.941 → 0.890.
+
+`pick.py` tries every finished pass in every shape that uses the stroke,
+and records the best mean overlap as fixes.json's `use`, which
+`result()` honours. Run over all 781 shapes on 2026-10-22.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
