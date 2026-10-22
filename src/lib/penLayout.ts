@@ -12,6 +12,7 @@
 import { assembleRun } from "./penJoin";
 import { fitPolygons } from "./penFit";
 import { NUQTA, PEN, partPaths, type JoinDefault, type PenLibrary } from "./penLibrary";
+import { smoothPolygons, type SmoothOpts } from "./outlineSmooth";
 import { sweepPath, unionPolygons, type PenPath, type Polygon, type Pt } from "./penSweep";
 import type { SvgCmd } from "./svgPath";
 import { analyzePhrase } from "./tarkibText";
@@ -35,6 +36,9 @@ const SLIDE = 4;
 const SLIDE_TOL = 0.25;
 /** Units the fitted ink may stray from the swept ink. */
 const FIT_TOL = 0.25;
+/** The swept outline's smoothing before it is fitted (outlineSmooth.ts): no point moves more than 0.015 nuqta, and
+ *  a turn of more than 40 degrees over 0.08 nuqta stays a corner (the ledger's smoothing test, 2026-10-22). */
+const SMOOTH: SmoothOpts = { step: 0.01 * NUQTA, tol: 0.015 * NUQTA, cornerDeg: 40, cornerArm: 0.08 * NUQTA, cornerPad: 0.12 * NUQTA };
 /** The lowest stroke opacity a block may have. */
 export const STROKE_OPACITY_MIN = 0.1;
 
@@ -188,8 +192,8 @@ export function layoutGeometry(lib: PenLibrary, layout: PenLayout): LayoutGeomet
   });
 
   const out: LayoutGeometry = {
-    strokes: all.map((ps) => fitPolygons(ps, FIT_TOL)),
-    union: fitPolygons(unionPolygons(all), FIT_TOL),
+    strokes: all.map((ps) => fitPolygons(smoothPolygons(ps, SMOOTH), FIT_TOL)),
+    union: fitPolygons(smoothPolygons(unionPolygons(all), SMOOTH), FIT_TOL),
     bounds: boundsOf(all),
     runs: runBounds,
     strokeRuns,
