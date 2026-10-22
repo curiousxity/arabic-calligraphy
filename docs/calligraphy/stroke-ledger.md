@@ -899,6 +899,54 @@ here is the outline's curvature wobble at the 95th percentile, per nuqta.
 In the app this would be a pass after `sweepPath` on the outline it
 returns. Not built; the user's call.
 
+**Sin Shin complete; hooks at the teeth (Fable's `t22*.py`,
+2026-10-22).** The last five strokes (170.s1, 171.s0, 172.s1, 172.s4,
+184.s5) were fitted on the Geekmini, so all 68 Sin Shin shapes now have
+every stroke. 184.s5 had failed on 2026-10-20 when a diverged fit asked
+for a 238 GiB window. `pieces.score` and `overshoot` now score ink more
+than 20 nuqta (`RUNAWAY`) past the reference as hopeless, without
+rastering it.
+
+Before the user's review, the Medial sheet showed barbs at the teeth.
+They came from two constructions, repeated through shared strokes:
+- **A beak in the valley and a forked second tooth.** The bowl between
+  teeth 1 and 2 spun its last nibs flat under the valley, where the
+  studio climbs tooth 2's right face as a thin wedge. The tooth stroke's
+  last nib ran 0.2 past the tip. Now the bowl's lower end rides the outer
+  edge round the bottom and up the wedge, widened to the ink's chord
+  (1.36 at most). The tooth stroke's end rides tooth 2's left face to the
+  tip.
+- **A barb on tooth 1's right cut.** A start spun 40° → −94° in 0.15
+  nuqta. Now it rides the tooth's bottom edge to the cut's corner and
+  lays its nib along the 80° cut, widened to 1.10.
+
+Thirteen strokes in eleven shapes were fixed, and every sharer improved:
+
+| shape | overlap |
+|---|---|
+| 209 | 0.837 → 0.892 |
+| 210 | 0.862 → 0.907 |
+| 214b | 0.874 → 0.907 |
+| 214c | 0.901 → 0.916 |
+| 219 | 0.942 → 0.955 |
+| 213 | 0.895 → 0.901 |
+| 228 | 0.947 → 0.952 |
+| 214 | 0.937 → 0.943 |
+| 215 | 0.908 → 0.919 |
+| 229 | 0.940 → 0.947 |
+| 230 | 0.952 → 0.956 |
+
+Still visible at 3x:
+- tooth 2's tip is still double-pointed;
+- a bump on the bowl's lower edge, and a nick on its upper edge, where
+  the standard-width nodes meet the widened ones;
+- on 209, 210 and 214b, the second valley is 0.13–0.17 shallower than
+  the studio's, because 209.s3's band is wider than one nib.
+
+`split.py` found one reused stroke overshooting: 172.s1 in 196, by
++0.298 sq nuqta (the dark bulb at 196's left end). It has its own fit
+queued as 196.s1.
+
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
 are drawn at four times the size and scaled down alike. Drawn straight
