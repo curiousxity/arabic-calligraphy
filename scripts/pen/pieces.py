@@ -17,6 +17,7 @@ from build import path as build_path  # noqa: E402
 from ribbon import parse, ring_samples  # noqa: E402
 
 SUB = 8  # raster px per screen px
+RUNAWAY = 20  # nuqta: ink this far beyond the reference is a fit that has run off, scored without rastering
 WIDEST = 1.5  # a node's width above 1: the stroke is written with a wider pen (penSweep.ts WIDEST)
 
 
@@ -77,6 +78,13 @@ class Window:
         return m
 
 
+def runaway(rings, hulls, ppn):
+    """How far (nuqta) our ink reaches beyond the reference's box. A diverged fit once asked numpy for a 238 GiB
+    window (184.s5, 2026-10-20); a smaller one could fill a worker's memory and stall the machine instead."""
+    pts, ink = np.concatenate(rings), np.concatenate(hulls)
+    return float(max(0.0, *(pts.min(0) - ink.min(0)), *(ink.max(0) - pts.max(0)))) / ppn
+
+
 def outline_gap(a, b):
     """Distances (raster px) from each outline pixel of mask a to the outline of mask b."""
     edge = lambda m: cv2.morphologyEx(m, cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8)) > 0
@@ -101,6 +109,9 @@ def score(mine, refs, origin, ppn, pen_px, ignore=()):
     ground is neither counted for nor against (ignore_mask)."""
     rings = [ref_ring(r) for r in refs]
     hulls = [h for nodes in mine for h in path_hulls(nodes, origin, ppn, pen_px)]
+    far = runaway(rings, hulls, ppn)
+    if far > RUNAWAY:
+        return {"iou": 0.0, "gap_max": round(far, 3), "gap95": round(far, 3)}
     win = Window(np.concatenate([np.concatenate(rings), np.concatenate(hulls)]))
     A = win.hulls(hulls)
     B = np.zeros_like(A)
@@ -250,6 +261,9 @@ def overshoot(nodes, pieces, origin, ppn, pen_px, near=None, radius=0.5):
     (nuqta, the nodes' frame); only ink within `radius` nuqta of it counts towards the worst."""
     rings = [ref_ring(r) for r in pieces]
     hulls = path_hulls(nodes, origin, ppn, pen_px, step=0.25)
+    far = runaway(rings, hulls, ppn)
+    if far > RUNAWAY:
+        return far, 0.0
     win = Window(np.concatenate([np.concatenate(rings), np.concatenate(hulls)]))
     A = win.hulls(hulls)
     B = np.zeros_like(A)
