@@ -801,7 +801,103 @@ there:
 
 Either the pen changes width, or the start and the tail are separate
 motions. Which story the app tells is the user's call. A refine with the
-widths held (`t18.092.s3.w`) is queued.
+widths held (`t18.092.s3.w`) is queued. It came back (2026-10-22) at
+0.980, but it broke the chord gate (5.09) and was not kept.
+
+**Approved by the user, 2026-10-22:**
+- Ra Zay Isolated;
+- Ra Zay Final 158 and 159;
+- Jim pair 093.
+
+**Ra finals' spurs (Fable's `t20*.py`, 2026-10-22).** The user flagged
+spurs on 161–165 and 600. The method is the one used for 154: the faulty
+end is taken back to a node that still fits, then rebuilt riding the
+studio's edge. Where the head under a hat is only 0.7–0.8 nib wide, the
+nib lifts on its inner side.
+
+| shape | where the spur was | overlap | worst miss at the join |
+|---|---|---|---|
+| 162 | the hat's (162.s2) last nib swung to 185° and poked out of the head's right edge | 0.979 → 0.981 | 0.175 → 0.040 |
+| 163 | the body's (163.s1) last nib stuck up past the head's right edge | 0.958 → 0.958 | 0.040 → 0.013 |
+| 164 | the head stroke (164.s1) ended with an upright nib, 0.15 below the body; the hat's (164.s0) first nib poked out of the head's left edge | 0.961 → 0.964 | 0.150 → 0.020; 0.130 → 0.031 |
+| 165 | the same head-stroke spur, through 164.s1 | 0.946 → 0.946 | 0.149 → 0.020 |
+
+Not kept:
+- **600:** its spur is the same as 164's. The rebuild cut the miss from
+  0.149 to 0.044, but overlap fell 0.9745 → 0.9740. The spur's ink had
+  been filling a bare wedge at the end of the body.
+- **161:** the head's top point stands 0.061 above the studio's, and the
+  join has a step of 0.019. Neither would build without costing overlap.
+
+The tail-tip hairs were left alone: 158 and 159 have the same and are
+approved. Still visible at 3x:
+- small nicks on the left edge of 162's and 164's stems;
+- the bars of 163.s2 and 165.s2 round off the studio's square cut, the
+  jim-bar problem;
+- the hats of 161, 162 and 164 are bands 0.4–0.7 nib wide under a piece
+  about 1.1 nibs tall. Whether to write them with a lifted nib or fill
+  them, as the alif's and dal's hats are, is the user's call.
+
+**Jim pairs' joins (Fable's `t21*.py`, 2026-10-22).** The user: "94 v2
+and 95 v3 gap where the letters join … 99 v7 is bad."
+- **094:** the jim's lower stroke and the ba's stroke end on one cut
+  (80°, 1.11 nibs), as at the jim heads. Both ends were centred on it,
+  which left a V-notch at the top and a spur below. Now each rides its
+  own edge to its corner and lays its last nib along the cut. Both are
+  widened to the ink's chord (1.10 at most). 0.955 → 0.961; worst miss
+  at the join 0.100 → 0.019.
+- **095:** a sliver of paper along the seam. The next letter's bar is
+  1.10 nibs across along its whole length, so it is now written with a
+  pen as wide as its band (1.06–1.09). 0.905 → 0.916; worst miss at the
+  join 0.211 → 0.077. The rest of the miss lies under 095.s2, which was
+  left alone because it was in the smoothing test.
+- **099:** three faults fixed:
+  - the same shared-cut notch at the jim–sin join;
+  - the second tooth was forked: 099.s3's end hooked back and spun its
+    nib flat, and 099.s5 started upright against an 80.5° cut;
+  - the thin start ran 0.12 past the studio's point.
+
+  0.957 → 0.963. 178, which shares 099.s5, went 0.946 → 0.948.
+
+  Still visible on 099: a spur and notch at the first tooth's tip (0.08),
+  the third tooth's tip (0.05), and a sag of 0.07 in the valley between
+  teeth 2 and 3.
+
+Method note: `t16.place` puts the nib's extreme point on the edge's
+tangent. Where the nib lies nearly along the edge, as on a tooth's face,
+that runs the end far ahead. `t21_build.place_end` puts the end itself
+on the edge instead. The GPU refines of these builds gained 0.0007 at
+most, moved ends by up to 0.23 and brought notches back, so none was
+kept.
+
+**Smoothing test (Fable's `t19*.py`, 2026-10-22).** The user: "there are
+just some subtle irregularities in all of our shapes that the studio just
+does not have." Tested on 092, 117, 119 and 095. Our edges change
+direction at the nodes, with lumps and kinks of 10–15° every 0.1–0.3
+nuqta, because the path's curvature jumps at each node. The measure
+here is the outline's curvature wobble at the 95th percentile, per nuqta.
+
+| shape | before | fairing | fairing + smooth outline | studio |
+|---|---|---|---|---|
+| 092 | 0.63 | 0.49 | 0.35 | 0.33 |
+| 117 | 0.58 | 0.28 | 0.27 | 0.25 |
+| 119 | 0.66 | 0.48 | 0.44 | 0.32 |
+| 095 | 0.24 | 0.23 | 0.20 | 0.24 |
+
+- **Fairing the strokes** (penalised second differences per channel,
+  ends pinned, overlap down by 0.005 at most, no local miss up by more
+  than 0.01) does not help visibly. It sharpened the elbow notches.
+  Loosened, it folded the elbows.
+- **Smoothing the drawn outline** (corners kept, each run between corners
+  smoothed, outline moved 0.015 nuqta at most) reaches the studio's
+  smoothness on 092, 117 and 095. Overlap is within ±0.004. It also fills
+  092's pinhole at the elbow.
+- **What is left is shape, not wobble:** the elbows of 092, 119 and 095
+  sit lower than the studio's, and 117's lower stroke bends where the
+  studio's is straight.
+
+In the app this would be a pass after `sweepPath` on the outline it
+returns. Not built; the user's call.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
