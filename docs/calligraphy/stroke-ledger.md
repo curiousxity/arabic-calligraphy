@@ -1448,6 +1448,40 @@ side-by-side/decisions/`, and the picture is deleted once answered.
    versions. Biggest gains: 007 0.922 → 0.970, 002 0.930 → 0.963, 093
    0.949 → 0.979, 085b 0.919 → 0.937. 158 and 159 changed nothing.
 
+**The held strokes (2026-10-23).** The nine strokes held from the pass for
+a nick were tried again. `widen.py` gained two settings for this:
+- `WIDEN_PASSES` smooths the added width and the moves more than once;
+- `WIDEN_TAPER "a b"` eases the widening off over the first a and last b
+  nodes.
+
+The taper puts the lift rule into the widening. Where a stroke hands over
+to another at a lift, the two must meet with the same pen. A widened end
+beside a standard-pen neighbour leaves a step.
+
+| stroke | kept as | shapes |
+|---|---|---|
+| 165.s2 | smoothed 3× (its nick was already there at a join) | 165 0.953 → 0.974, 242 0.970 → 0.977 |
+| 722.s0 | smoothed 3× (the same) | 722 0.951 → 0.965 |
+| 719.s0 | smoothed 3×, eased off over the last 5 nodes before the tail | 719 0.898 → 0.939, 720 0.925 → 0.954 |
+| 180.s5 | smoothed 3×, eased off 3 nodes at each end | 180 0.949 → 0.970 |
+| 556.s3 | the same | 556 0.959 → 0.972 |
+
+Still held: 436.s2 and 438.s1 (a notch at the counter's corner), 723.s0
+(a notch on the inner edge), and 066.s0 (gains too little). They keep the
+standard pen.
+
+**The hamza H01 (0.874), the last shape under 0.90.** Its two head
+strokes spin the nib 150° and more over less than a nuqta, faking the
+shape. The course (lesson 31) writes the hamza's head like the ain's, and
+of the ain's head (lesson 13): "Part of the head is drawn with a pen
+stroke; the rest is finished with the tip of the pen." So the head may be
+a fill mark, like the alif's hats and the jim's starting marks.
+- Filling the top piece (H01.s1): 0.928.
+- Filling both head pieces (H01.s0, H01.s1): 0.955.
+
+Fills have always been the user's call, so this went to the decisions
+folder as decision 7.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
