@@ -10,6 +10,7 @@ against the video's frames before it is relied on. Measurements are in nuqta. Th
 How these notes relate to the others:
 - **[stroke-ledger.md](stroke-ledger.md)** records what we built and kept, and why.
 - **These notes** are the course's method, as taught.
+- **[video-notes.md](video-notes.md)** has notes from the single videos sent outside the course.
 
 Where the two meet, the ledger says so. A letter may follow a lesson video instead of the
 studio (the user, 2026-10-23: "It is fine if it matches the video").

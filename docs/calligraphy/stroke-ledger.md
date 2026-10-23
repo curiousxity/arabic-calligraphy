@@ -11,7 +11,9 @@ app credits no calligrapher.
 **How the letters are taught:** [thuluth-course.md](thuluth-course.md) has
 the steps of a 34-lesson Thuluth course on video, letter by letter. It
 covers stroke order, nib angles, lifts and measurements, plus composing.
-Read a letter's lesson before fitting it.
+Read a letter's lesson before fitting it. Notes from the single videos the
+user sent outside the course (meem, ya, a vector sheet's tour) are in
+[video-notes.md](video-notes.md).
 
 **What it is for.** These drawn letters are for the stacked compositions
 (tarkib) only. Plain text keeps using the fonts, which already render
