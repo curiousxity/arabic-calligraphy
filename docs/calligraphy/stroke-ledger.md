@@ -1246,6 +1246,23 @@ Wherever a letter's strokes are first fitted as one and then split at a
 lift, the split keeps the joint clean. Fitting each stroke on its own
 never lines them up.
 
+**Kept (2026-10-23).** The user: "The 2 stroke ya seems better to me. 553
+also seems better. Small spur that needs to be fixed."
+- **The ya:** split at the lift on 718, 719 and 720 (heads from
+  `me/yapin`, S-curves from `me/yasplit`). The `merged` marks are gone, so
+  the sheet draws two strokes.
+- **553b's arch:** the refit from the video's order, its left end on the
+  left side's first node (`553b.s0.w1`).
+- **553b's spur:** the bar's end and the arch's start already nearly met at
+  the head's bottom right (0.05 nuqta apart, nib 84° and 77°), and the
+  arch's first stamp poked out below the bar as a spur. Now the two share
+  one node, 8% along the arch's first chord, at the arch's nib angle
+  (77.2°). The spur is gone and the right edge stays on the studio's
+  (0.9618 → 0.9620). The same point at 20% along also clears it, but
+  leaves the right side short of the studio's. A small wedge is still
+  inside the counter's top-left corner; changing the angle there (80°,
+  95°) swelled the outer edge, so it was left.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
