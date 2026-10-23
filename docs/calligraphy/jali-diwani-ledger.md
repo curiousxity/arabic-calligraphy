@@ -298,6 +298,51 @@ results) and the queue's `done/` (`jd-c11-*` to `jd-c14-*`).
 - The laptop-side scripts (placing, sheets, tip trim, run-on) and their
   results are in `harf-research/laptop/` on the NAS.
 
+## The lam and short ya of p. 67's على (2026-10-23)
+
+- **The cut came from the user's hand.** Both of my readings of where the
+  ya runs were wrong. The user traced the lam and ya on the السعد word
+  and the ya's tail on the انفسهم one: the lam stops where it meets the
+  ain's arm; the ya starts under it, goes down, kinks right, sweeps into
+  the bowl, and its tail rises up the left (the course's ya shape 1,
+  lesson 11).
+- **Cutting along a trace.** Disks along the trace under-filled where the
+  trace ran off-centre and bulged at crossings. What works is a ribbon
+  across the stroke: the trace is moved onto the middle of his stroke,
+  his ink is measured edge to edge at each step, and a side that bulges
+  out over a short stretch (another letter touching or crossing) is
+  bridged from either side. His own widening is gradual and is kept. A
+  first try that held the width at any sudden jump never let go, and left
+  the ya thin. Where the user marked "bleeding" (yellow) or "not filled"
+  (purple) on the cut, the edge is bridged or takes his full ink there.
+- **The ya is two moves.** As one stroke it spilled onto paper on the
+  inside of its kink: one pen stroke cannot turn that sharp an inside
+  corner. Split at the bend (the course's "down", then "back"), each half
+  taken from the approved cut so that together they are exactly it, with
+  an overlap across the corner. The user asked for the split.
+- **Marks the user draws on the fit are off-limits.** Three spills on the
+  انفسهم word (under the ain's head, both sides of the ya's kink) did not
+  move when the outline was weighed three times as much (edge 15): under
+  the ain's head the "spill" was the crossing letter's ink, which the
+  carried ain's run-on cap had taken into its cut. Taking each mark out of
+  the letter and out of the neutral ground, so the pen there counts as
+  outside, cleared them (0.920 -> 0.934, worst miss 0.26 -> 0.17 nuqta).
+- **What I fixed that was not asked.** I read "a large spur at the ain and
+  the ya)" as the strokes' overlapping ends inside the letter, and refitted
+  the ya's moves each against its own piece. The user: "you fixed the
+  wrong thing"; set aside. Overlapping ends hidden inside the ink are
+  fine; ask for a drawing before acting on a spur.
+- **The ain's head waits for the narrow pen.** Inside its curl our pen
+  spills onto paper by up to 0.10 nuqta and leaves a strip of his ink
+  bare underneath; the approved ain did too (0.12). The course writes the
+  head's top with a pen a third of the main nib (lesson 6). The user
+  chose to leave it until the fitter has a second, narrower nib.
+- **Result.** Both على's, the whole letter with the ain: overlap 0.947
+  (near السعد) and 0.934 (before انفسهم), worst miss 0.19 and 0.17
+  nuqta. Approved by the user ("Yes"). The nodes, cuts and scripts are in
+  `harf-research/laptop/c15/` on the NAS (`approved_ala_p67.json`), the
+  queue runs in its `done/` (`jd-c15-*`, `jd-c15s-*`, `jd-c15f-*`).
+
 ## Sabti's moves, letter by letter
 
 How Sabti writes each letter on his plate (Beirut Jali volume, p. 9): the
