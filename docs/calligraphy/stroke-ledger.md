@@ -264,6 +264,21 @@ Three pieces, all from one point at the head's left (about (−1.4, −1.87)):
   above, and it is 1.6 nuqta wide.
 - **The book's form** (plate 24, the tail rising again as a hairline) was
   set aside.
+- **How the pen writes it** (a lesson video the user pointed to,
+  2026-10-23): three strokes with the pen lifted between them, as the
+  studio's pieces are.
+  1. The arch begins at the head's left with a short climb up and to the
+     right, goes over the top and comes down the right side. The right
+     side goes down to the head's bottom right at full width, ending in a
+     flat cut.
+  2. The bottom band starts under that cut and runs right to left,
+     closing the counter.
+  3. The tail is a new stroke from the head's lower left.
+
+  The straight-tailed meem (553b) is the same: arch from the left, then
+  the left side down across the bar, then the bar from the right running
+  on down into the tail in one stroke. Writing the head and the bar as one
+  stroke (`merge.py`) was wrong for both.
 
 ### Ya (ي), starting, stacked on a meem
 
@@ -1146,6 +1161,22 @@ searched) and keeps the rest:
   past the studio's and leave the shoulder thin.
 
 Not kept. It goes back to the user with the 719 close-up.
+
+**The mim's joints after the video (2026-10-23).** The user pointed to a
+lesson video for the meem (its order is under the Meem's method). In 552
+the fitted bottom band opens with a hook down the head's bottom right, its
+nib spinning about 150° (27° to −128°). That hook is what fills the
+corner and leaves the notch inside the counter. The arch's right side
+thins to a hair there instead of coming down full width.
+- **The hook dropped, the nib held at the band's own angle:** the notch
+  goes, but the corner is left bare (0.968 → 0.947).
+- **Also holding the arch's right side flat (125–150°) to fill the
+  corner:** the side swells into the counter and spikes out at the bottom
+  (0.940). The fitted path runs along the inside of that side, so angles
+  alone can't move it there.
+
+Not kept. Moving the path needs a refit from the video's order, with the
+nib's turning limited. It goes back to the user.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
