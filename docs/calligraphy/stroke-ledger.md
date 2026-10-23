@@ -1128,6 +1128,25 @@ point. Five tries, none clean:
 
 It goes back to the user.
 
+**The pen climbs first (2026-10-23).** The user: "The pen moves up first
+for a very short stroke." The fit already climbed, about 0.6 nuqta from the
+tip, but it spun the nib while climbing. `SCRATCH/me/upstart.py` swaps the
+nodes before node j for one straight climb (length, lean and nib angle
+searched) and keeps the rest:
+- **The nib held over the climb, the old angles after it:** the search picked
+  a 0.4 nuqta climb leaning 30° left, nib 70–80°. The point lands where the
+  studio's does. But the nib then swings back (70° → 11° → 52° → 99°), which
+  leaves a jagged step on the right edge and a notch inside. Nothing better
+  for 718.
+- **The nib turning one way only (`UP_RAMP=1`, eased from the climb's angle
+  to node 5's):** this scores worse than now on all three, yet by eye it is
+  the cleanest start so far on 719 (0.4 nuqta, −30°, nib 75°): a sharp
+  point, no step, no notch, the inner edge curving down. Its right shoulder
+  is narrower than the studio's. Flatter nibs (55–65°) push the point out
+  past the studio's and leave the shoulder thin.
+
+Not kept. It goes back to the user with the 719 close-up.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
