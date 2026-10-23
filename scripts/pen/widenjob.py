@@ -80,7 +80,7 @@ def widen(nodes, piece, nib, short=0.01, passes=1, move=1.0, ends=True, taper=(0
                 ds[i] = (2 * d0[i] + d0[j]) / 3; ms[i] = (2 * m0[i] + m0[j]) / 3
     # taper (a, b): the added width and moves eased to nothing over the first a and last b nodes, where the stroke
     # hands over to another at a lift and must meet it with the same pen (719's S-curve into its tail)
-    ta, tb = taper
+    ta, tb = (min(int(v), len(ds)) for v in taper)  # never past the stroke's own nodes (043.s1 has two)
     for n_, idx in ((ta, range(ta)), (tb, range(len(ds) - tb, len(ds)))):
         for k_, i in enumerate(idx):
             f = (k_ / n_) if n_ and idx.start == 0 else ((len(ds) - 1 - i) / n_ if n_ else 1)

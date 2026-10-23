@@ -1532,6 +1532,38 @@ outlines, and those are only on the laptop.
   were run three ways: the old `widen.py`, the new job on the laptop, and
   the new job on the Geekmini. All three gave the same nodes and the same
   numbers to the fourth decimal. Nothing from the check was adopted.
+  (212.s1 and the first three were already widened, so their "after" is
+  the pen widened twice. That is no candidate.)
+
+**The first settings grid on the Geekmini (`wjob.py grid` / `pick`,
+2026-10-23).** It covered 13 strokes still on the standard pen: the four
+held ones (436.s2, 438.s1, 723.s0, 066.s0) and every unwidened stroke of
+the lowest Sin shapes (204, 212, 189) and of 043 and 743.
+- **The grid:** each stroke under 96 settings. Smoothing passes 1, 2, 3
+  or 5; moves at full, half or none; eased off over 0, 2, 3 or 5 nodes at
+  either end. That made 1,248 jobs, about 25 minutes on the worker.
+- **Where the time goes:** a job computes for about 1 second. Its other
+  ~6 seconds go to the queue: a fresh Python, NAS reads and writes,
+  listing a 1,000-file todo folder. The worker runs 6 at once
+  (`workers.json`). A GPU would not help. Batching the settings of one
+  stroke into one job would.
+- **A crash:** 043.s1 has two nodes, and a taper longer than the stroke
+  indexed past it (60 jobs failed). `widen()` now clamps the taper to the
+  stroke.
+- **Passed the gate, kept after a close-up:** 189.s2, smoothed twice,
+  moves halved, eased off over its first 3 nodes (p2m05t3-0). 189 0.923
+  → 0.934. The bowl takes the studio's weight with no new notch.
+- **Passed the gate, dropped by eye:** 212.s2 (+0.003) and 066.s0
+  (+0.004). Each adds a nick on its inner edge.
+- **Nothing passed:** 018.s0, 043.s1, 189.s0, 189.s4, 189.s5, 212.s0,
+  743.s0. The Sin teeth are not a pen-width problem.
+- **Asked the user:** on 436.s2, 438.s1 and 723.s0 every setting leaves
+  the notch, the end tapers included. That is the third way tried on
+  them, so they went to the user as decisions 11 (the qaf's counter
+  tooth) and 12 (ya 723's inner dent). Each image shows the gain against
+  the flaw.
+
+After: mean overlap 0.969 over 781 shapes; under 0.95, 39.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
