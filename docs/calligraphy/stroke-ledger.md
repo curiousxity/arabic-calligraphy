@@ -1693,6 +1693,39 @@ and Final (28); Kaf Isolated (30) and Initial (31).
   - **Three ways tried,** so it went to the user as decision 13: keep the
     hook, or remove it with the rounder left-eye corner.
 
+**Review 24, the hamza H01: "a bit too pointy" (2026-10-23).** The tail
+(H01.s2, the one nib stroke left after decision 7) thins to a point and
+runs on past the studio's broad, square-cut end. Over its last stretch
+the nib lies almost along the stroke. The letter is 1.5 nuqta across, so
+the nib covers much of it.
+- **Tried:**
+  - cutting the end and turning its nib (every cut loses 0.025 or more);
+  - `eyetune.py` with the nib angle as well (`EYETUNE_ANGLES=1`, 0.962,
+    still pointy);
+  - the wider pen, 96 settings, none passing.
+- **Decision 14:** keep the nib's point, or fill the tail with the pen's
+  tip too (0.979).
+
+**Review 35, Laam Alif Isolated: "spurs on the left head caps"
+(2026-10-23).** The caps were filled with the fine pen from the studio
+outline, as the alif's and Ra's hats are: 518.s6 and 575.s6 (in 714,
+714a, 518, 575, 666), and 715.s0 and 715.s1. 714 0.979 → 0.982, 715
+0.967 → 0.969, 714a 0.980 → 0.984. The rest rose a little.
+
+**Review 49, Qaaf Isolated 437: "spurs at ((^ and ()^" (2026-10-23).**
+Both came from 436.s1 (in 436 and 437): its start at the head-body joint
+and its end where the two head strokes meet. Cut back 0.15 and 0.06
+nuqta along its path. 437 0.936 → 0.938, 436 0.957 → 0.958. The same
+hair went from 436.
+
+**Review 62, Ta 274: "fix the head cap" (2026-10-23).** The cap pieces
+274.s0 and 102.s7 were filled with the fine pen. They are used in 46
+shapes, mostly Ta Za, and in one pair each of eight other groups. None
+fell, mean +0.0014, 274 0.971 → 0.976. Every group they touch was
+redrawn and its review copy refreshed.
+
+The user added `` ` `` for a spur to the shorthand (2026-10-23).
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
