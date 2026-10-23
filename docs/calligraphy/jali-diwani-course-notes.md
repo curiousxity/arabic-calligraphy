@@ -112,6 +112,22 @@ Our approved dal (h65-dal, two pieces) matches.
 3. **Ha's body** (08:29-08:36): down the left side and round the bottom.
 4. **The ha's head, last** (08:38-08:42), on top.
 
+### Lam, the kaf/lam body (lesson 8, 00:25-01:29)
+1. **Stem** (00:25-00:31): the alif stroke, top to bottom; the pen lifts at the foot.
+2. **Bowl** (00:44-00:49): a new move set down at the stem's foot, curving left, round and up like a nun.
+3. **Thin return** (01:01-01:06): a hairline back up to the right.
+4. **Head decoration** (01:11-01:29): last, at the top of the stem.
+
+### على, the word Ali (lesson 11, 04:11-04:44)
+1. **Ain's body** (04:13-04:22): the initial ain's ba-like move, up then down.
+2. **Lam** (04:23-04:25): the stem, down to the line. He pauses here to talk; the pen leaves the paper.
+3. **Ya** (04:26-04:34): from the lam's foot, the ya runs down and back (his shape 1 first, then shape 2 at 04:46).
+4. **Ain's head** (04:37-04:41): added after the lam and ya, on the right of the lam.
+5. **The ya's dots** (04:42-04:44).
+
+Our على (h66-ala) has the ain's jaw running into the lam, the lam and ya as one stroke, and the head on its own: the
+same order, with his lam and ya written as one run broken only by his pause.
+
 ### What could not be read from the frames
 - The camera pans and zooms within a lesson, so timing his ink pixel by pixel (to colour a letter by when it
   appeared) was not possible; the order above was read by eye.
