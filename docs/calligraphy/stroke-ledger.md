@@ -1482,6 +1482,12 @@ a fill mark, like the alif's hats and the jim's starting marks.
 Fills have always been the user's call, so this went to the decisions
 folder as decision 7.
 
+**Decision 7 (2026-10-23): option 3.** The user: "fill both pieces of the
+hamza's head". H01.s0 and H01.s1 are filled marks now (`fill` in
+`fixes.json`), and the tail stays a nib stroke. H01 0.874 → 0.955, and no
+shape is left under 0.90 except 080, the user's old fit. The picture is
+in the fixes folder ("Hamza H01 - head filled with the pen's tip").
+
 **Reused strokes given their own fits (`SCRATCH/me/split2.py`,
 2026-10-23).** 527, 527a and 429 each had a block of ink past the end of
 their bottom stroke. The stroke was fitted in another shape and moved in,
