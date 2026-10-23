@@ -1095,6 +1095,39 @@ same thing with the meem."
   With the two end-tuning runs, that is the mim's third failed fix. It
   goes back to the user.
 
+**The ya's S-curve into its tail, `))^` (2026-10-22).** The user: "there
+are still step-offs at ))^".
+- **What was tuned:** `joint.py`, with the bend gate, on the merged
+  stroke's last end and the tail's first end, in 718, 719 and 720. The
+  tails are 718.s0, 630.s0 (shared with 630 and 726) and 720.s2 (shared
+  with 724).
+- **Result:** the spikes and the sliver at the V are gone, and the outer
+  edge runs straight down as the studio's does.
+- **What was saved:** only these ends were kept, as `.f`. The head's
+  first four nodes were put back from the merge, since that run had also
+  tuned the opening and it did not come right (below). `keep.py` scores a
+  merged stroke against its first piece alone, so the gap it prints there
+  (2.7) means nothing; the sheet scores the whole shape.
+
+**The ya's opening cut, not solved (2026-10-22).** The user: "the starting
+strokes of 718, 719, and 720 on the top right are showing a start at the
+wrong angle." The fit makes the head's thick bulb by spinning the nib
+about 130° over its first four nodes (−30° to 95°). So the first stamp
+lies at a slant no pen holds there, and it leaves a straight cut with a
+notch on the inside. The studio's inner edge curves down to a sharp
+point. Five tries, none clean:
+1. **Searching the first nodes' angle over the whole half-turn
+   (`startangle.py`):** the ink near the tip prefers the low angle, so
+   nothing changed.
+2. **Holding the studio's steep slant:** the bulb thins to a hairline.
+3. **A narrow opening stamp at −45°:** good on 719, but it bares the
+   bulb on 718 and 720.
+4. **`joint.py` from there:** it can't win the bulb back.
+5. **Narrowing only the opening stamp:** the cut and notch go, but the end
+   is blunt and stops short of the studio's point.
+
+It goes back to the user.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
