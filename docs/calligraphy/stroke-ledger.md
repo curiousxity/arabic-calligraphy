@@ -1178,6 +1178,35 @@ thins to a hair there instead of coming down full width.
 Not kept. Moving the path needs a refit from the video's order, with the
 nib's turning limited. It goes back to the user.
 
+**The refits from the video's order (`SCRATCH/me/qmim.py`, 2026-10-23).**
+The user: "Add it to the queue."
+- **552, the arch refined beside the hookless band:** the band was held
+  fixed as ink, and the arch's two lowest nodes held the nib at 125°
+  (`.w1`) or 140° (`.w2`). Both came back worse (0.968 → 0.954, 0.951).
+  The right side bulges into the counter, and the bottom right still
+  spikes. Not kept.
+- **553b, the arch's left end pinned to the left side's first node:** the
+  spike at the top left goes, and the outer edge runs into the left side
+  as the studio's does (0.958 → 0.962). A small sliver is left inside the
+  counter's top-left corner. For the user's approval.
+
+**The ya's head in a lesson video (2026-10-23).** The user pointed to a
+second video, for the ya.
+- **The head:** the pen lands under the right dot and climbs straight up
+  half a nuqta with the nib held at about 40°. That makes a thick bulb,
+  its sharp corner pointing down and to the left. Without lifting, it
+  rolls over the top and sweeps down to the left into a hair.
+- **The S-curve:** the pen lifts after the head and is set down again at
+  the head's end, then goes down to the right, curving at both ends.
+- **The tail:** it starts at the S-curve's end, goes down to the left 2.5
+  nuqta, then straight left and up into the curve.
+
+Built on 719 with the video's nib (40°, a straight climb of 0.5 nuqta,
+then turning one way), the point lands at the bottom left, as in the
+video. The studio's point is at the bottom right, so the studio's hand
+needs the steeper nib (75°, leaning 30° left) shown before. Not kept;
+the user decides between them.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
