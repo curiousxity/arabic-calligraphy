@@ -1411,6 +1411,43 @@ All 781 shapes on the sheets, before → after:
 
 (Alif, Jim Ha Kha and Hamza are unchanged by this pass.)
 
+**The user's decisions (2026-10-23).** From now on each open question
+goes to the user as one picture in the NAS folder `HarfCanvas
+side-by-side/decisions/`, and the picture is deleted once answered.
+1. **A pen that changes width along a stroke:** kept ("option 2"). This
+   answers the question left open at 092. The wider pen stays on the
+   jim group and every other group.
+2. **The Ra finals' hats (161, 162, 164):** filled with the fine pen, as
+   the alif's and dal's hats are. The user: "i cant tell the difference.
+   option 2 is fine". 161.s0, 162.s2 and 164.s0 are now `fill`.
+   161 0.978 → 0.981, 162 0.977 → 0.980, 164 0.962 → 0.976 (with the
+   wider pen's gains).
+3. **Ba medial 080:** back to the old fit ("go back to the old fit"); the
+   refit's `use: ".v"` is gone. 0.938 → 0.887, and the notch at its end
+   is gone. Widening the old fit gained only 0.002, under the gate, so it
+   stays on the standard pen.
+4. **Mim 552's head corner:** "try", by the split-at-the-lift rule
+   (`SCRATCH/me/split552.py`). The arch (552.s2) ends at the head's
+   bottom right, nib 96.7°. The bottom band (552.s1) had opened with a
+   hook there, its nib spinning 27° → −94°. That hook made the notch
+   inside the counter and the spur under the corner.
+   - **The fix:** the band's first three nodes were dropped. It now
+     starts on the arch's corner node, at the same nib line (−83.3°), and
+     runs on from its fourth node.
+   - **What was searched:** moving the shared node along the arch's first
+     chord (0–30%) only made it worse, and joining at the band's second
+     or third node was close behind.
+   - **Result:** overlap 0.971 → 0.974; worst miss within 0.5 nuqta of
+     the corner 0.094 → 0.031. At three times the size, the notch and
+     the spur are both gone.
+   - **Still there:** the counter's top is more pointed than the
+     studio's round one. That is the arch's own shape.
+5. **Mim 553b's small wedge:** left ("leave").
+6. **The wider pen on approved shapes:** yes ("option 2"). 19 strokes
+   kept, after the same close-up check. The approval stands on the wider
+   versions. Biggest gains: 007 0.922 → 0.970, 002 0.930 → 0.963, 093
+   0.949 → 0.979, 085b 0.919 → 0.937. 158 and 159 changed nothing.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
