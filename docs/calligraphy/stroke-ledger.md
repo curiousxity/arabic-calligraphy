@@ -1767,6 +1767,31 @@ joins.
   0.960 → 0.964. The wedge, the square corner and the left spur are
   gone, and a small notch is left on the joint's outer edge.
 
+**Review 15, Fa Final 432–435: "irregularities in the windows"
+(2026-10-23).** Each loop is three strokes meeting around the counter:
+the loop, a short inner stroke and the body. Each shape has its own.
+Where they met, they left notches and spurs.
+- **The tuning:** `eyetune.py`, nib angles too, on every node inside each
+  window (8 to 24 nodes a shape), the window weighed ×10. All four ran at
+  once on the laptop.
+- **Result:** 432 0.958 → 0.974, 433 0.954 → 0.963, 434 0.966 → 0.973,
+  435 0.968 → 0.979. Clean close up, and the windows now take the
+  studio's shape.
+
+**Review 05, Ayn Ghayn Final 370 and 371: "the initial ( stroke from the
+joining previous word ... looks like a blob" (2026-10-23).** The head's
+first stroke, where the pen arrives from the previous letter, began as a
+blunt lump. The studio's begins with a slanted point.
+- **The fix:** the first four nodes of 370.s1 (used in 370 and 371) and
+  370.s0 were tuned with the start weighed ×15. 370 0.968 → 0.973, 371
+  0.973 → 0.975.
+- **The user's wider point:** "You are going to have to have some joining
+  logic when we actually join." When the library builds words, each
+  letter's entry stroke must be fitted or blended with the previous
+  letter's exit as one pen stroke, sharing nib angle and width at the
+  lift, not pasted beside it as the isolated studio piece. Noted for that
+  work.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
