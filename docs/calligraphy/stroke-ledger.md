@@ -1070,8 +1070,30 @@ was kept:
   studio's all along, and the tuner was compensating for that at the
   joint.
 
-The next idea, writing the head and the S-curve as one stroke, waits on
-the user.
+**One continuous stroke (`SCRATCH/me/merge.py`, 2026-10-22).** The
+user: "redraw the ya's head and its S-curve as one continuous stroke.
+same thing with the meem."
+- **The method:** the pieces' current paths are chained in writing order,
+  each handover made where the two paths come closest in the last and
+  first thirds. The chain is refined on the queue against all of its
+  studio pieces at once (`fitjob.py` refine with `pieces`), the shape's
+  other strokes as ground. The first job draws the result (`use: ".m"`).
+  Each absorbed job is marked `merged: [first job]`, and `sheet.py` draws
+  nothing for it in a shape that holds the stroke it went into.
+- **Kept, the ya:** 718 (718.s2 + 718.s1), 719 (719.s1 + 719.s0) and 720
+  (720.s1 + 719.s0; the S-curve is shared, so each ya's own head takes it
+  in). The notch and spur where head met S-curve (`((^`) are gone, and
+  the outline flows through as the studio's does. Overlap barely moved:
+  718 0.905 → 0.904, 719 0.905 → 0.898, 720 0.917 → 0.915. The S-curve
+  is still thinner than the studio's, and a small spike stays where the
+  S-curve meets the body (`()^`).
+- **Not kept, the mim:**
+  - 552 (the loop backwards from its left, then the bar) left a lump
+    inside the counter, where the path turns back sharply into the bar;
+  - 553b (tail, bar, loop, left side) looks as before, spur included.
+
+  With the two end-tuning runs, that is the mim's third failed fix. It
+  goes back to the user.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
