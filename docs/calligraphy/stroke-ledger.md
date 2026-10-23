@@ -1505,6 +1505,28 @@ After the whole day: mean overlap 0.950 → 0.969 over 781 shapes; under
 0.95, 309 → 40; under 0.90, 2 (H01, waiting on decision 7; 080, the
 user's old fit).
 
+**The wider pen on the Geekmini (`scripts/pen/widenjob.py`,
+`SCRATCH/me/wjob.py`, 2026-10-23).** The user asked for widening passes
+to run on the worker. Until now the worker could only fit a stroke.
+Judging a widened stroke needs the sheets, the registry and the studio's
+outlines, and those are only on the laptop.
+- **The job:** `fitjob.py` has a third mode, "widen". It widens one stroke
+  and judges it, before and after, on every shape that draws it.
+- **What the laptop does:** the job carries everything the worker needs.
+  `wjob.py queue` works out every other stroke of each shape on the
+  laptop, as the sheet draws it at that moment, and puts their nodes in
+  the job. The worker reads nothing but the job. A fix adopted while jobs
+  wait can't change what they measure.
+- **Collecting:** `wjob.py collect` writes the candidates in `widen.py`'s
+  form, so `combo.py`, `widezoom.py` and `keep.py` run on them unchanged.
+  It flags any shape whose "before" differs from the sheet's score.
+- **One copy of the method:** `widen.py` now imports its method from
+  `widenjob.py`, so the laptop and the worker run the same code.
+- **The check:** five strokes (589.s0, 683.s0, 684.s3, 189.s0, 212.s1)
+  were run three ways: the old `widen.py`, the new job on the laptop, and
+  the new job on the Geekmini. All three gave the same nodes and the same
+  numbers to the fourth decimal. Nothing from the check was adopted.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
