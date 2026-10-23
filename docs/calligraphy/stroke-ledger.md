@@ -1294,6 +1294,56 @@ stroke:
 width along the bowl, as 092's does, which is still the user's call
 (see 092).
 
+**The same pen over the whole jim group (2026-10-23).** The rule was run
+on all 219 of the group's distinct strokes, with fill marks and merged
+strokes left out. A stroke was kept only if every shape that draws it
+gained at least 0.003 or held, lost no more than 0.001, and its worst
+miss grew no more than 0.005.
+- 101 strokes passed. 118 changed nothing, because the standard pen
+  already covers them. None got worse.
+- 093's two strokes were left out: the user approved 093 as it is
+  (2026-10-22).
+- **The eye check.** Every stretch widened past 1.15 nibs (29 strokes) was
+  looked at three times larger: now, after and studio. Each was closer
+  to the studio's. One fault came from the rule itself. Each stroke's
+  end nodes were kept at their old width, so beside a widened neighbour
+  the first stamp was narrower and cut a step into the end (108's head
+  tip). Now an end takes the added width it shares with its one
+  neighbour ([2, 1]). Only the added width is smoothed, so a thin start
+  such as 144's 0.5 stays thin.
+- 108's tip still showed a nick on the cut. The bar, now wider, stops
+  just above where the lower stroke ends. The bar's last nib was
+  lengthened 0.08 nibs down the cut, eased over three nodes. That left
+  a hairline; a longer nib overshot the studio.
+- **Kept:** 99 strokes, as `.f` (`me/wdgood2`).
+
+62 shapes draw them (the jim group's, plus 233, 360b–d, 702, 705 and
+707, which share strokes). Their mean overlap went from 0.948 to 0.977,
+the lowest is now 233 at 0.954, and no worst miss grew. By form, the jim
+group was 0.940–0.965 and is now 0.976–0.981.
+
+| shape | before | after |
+|---|---|---|
+| 135 | 0.898 | 0.984 |
+| 116 | 0.908 | 0.980 |
+| 095 | 0.916 | 0.977 |
+| 108 | 0.916 | 0.976 |
+| 142 | 0.920 | 0.967 |
+| 132 | 0.925 | 0.982 |
+| 131 | 0.926 | 0.968 |
+| 101 | 0.930 | 0.980 |
+
+Small faults left, all smaller than before:
+- a hairline nick at 108's head tip;
+- a tiny step near 131's head tip;
+- a tick at the end of 132's bar;
+- a spike at the top right of 112's head;
+- the left points of 131 and 142.
+
+510 strokes across the catalogue are wider than 1.08 nibs over a fifth
+of their length (see "Strokes wider than the nib"). The other groups are
+next, if the user agrees.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
