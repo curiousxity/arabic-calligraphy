@@ -1482,6 +1482,29 @@ a fill mark, like the alif's hats and the jim's starting marks.
 Fills have always been the user's call, so this went to the decisions
 folder as decision 7.
 
+**Reused strokes given their own fits (`SCRATCH/me/split2.py`,
+2026-10-23).** 527, 527a and 429 each had a block of ink past the end of
+their bottom stroke. The stroke was fitted in another shape and moved in,
+and in its home shape the studio's piece runs that far. Trimming the end
+(`hair.py`) stopped at 0.2 nuqta, because the home shape (506) would
+lose.
+- **The measure:** `split.py` (see "a reused stroke can overshoot") had
+  not been run since the early fits. Run again, 85 of 757 reused strokes
+  overshoot by more than 0.01 square nuqta.
+- **The change:** `split2.py` is the same measure in two steps. `queue`
+  sends the own fits to the Geekmini without touching the registry, so
+  the sheets never show a shape waiting. `adopt` switches a shape to its
+  own fit only once the fit is back and the shape's overlap rises.
+- **Result:** all 85 came back. 77 were adopted. Eight weren't, because
+  they didn't help (049 would have fallen 0.958 → 0.937).
+- **Gains:** 527a 0.911 → 0.979, 527 0.917 → 0.974, 429 0.910 → 0.953,
+  524a 0.931 → 0.973, 524 0.936 → 0.974, 526 0.941 → 0.968, 486 0.960 →
+  0.975. No shape fell.
+
+After the whole day: mean overlap 0.950 → 0.969 over 781 shapes; under
+0.95, 309 → 40; under 0.90, 2 (H01, waiting on decision 7; 080, the
+user's old fit).
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
