@@ -1633,6 +1633,21 @@ the studio's ink.
   remaining misses are this and thin edge slivers, near what a
   nib-stroke model reaches.
 
+**Library review begun (2026-10-23, "Lets do 1").** Every group and form
+sheet not yet approved went into the NAS folder `HarfCanvas
+side-by-side/review/`. That is 68 sheets, numbered and named with their
+shape count, mean and lowest overlap. The user approves or flags them by
+number.
+- **An approved sheet** goes into `approved.json` as "Group - Form", with
+  the user's words, and its file moves to `review/approved/`.
+- **A group** enters `studio-catalogue.md` (`catalogue.py`) once all its
+  sheets are approved.
+- **Approved before the wider pen:** Ra Zay Isolated and Sin Shin
+  Isolated and Initial were approved on 10-22 and have been widened since,
+  so they are listed again for the user to confirm.
+- **The catalogue's Alif section** was regenerated: mean 0.956 → 0.971,
+  lowest 0.922 → 0.955.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,

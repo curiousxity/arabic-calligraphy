@@ -10,23 +10,23 @@ Letter groups approved by the user so far: 1 of 22; shapes 16 of 781.
 
 Approved 2026-10-20: "the fixes worked really well and you can now add all alifs".
 
-16 shapes, 19 strokes; overlap mean 0.956, lowest 0.922.
+16 shapes, 19 strokes; overlap mean 0.971, lowest 0.955.
 
 | id | form | variant | strokes | overlap | sheet |
 |---|---|---|---|---|---|
-| 001 | Isolated | 1 | 3 | 0.984 | [Isolated](comparisons/studio/Alif%20-%20Isolated.png) |
-| 002 | Isolated | 2 | 1 | 0.931 | [Isolated](comparisons/studio/Alif%20-%20Isolated.png) |
-| 003 | Isolated | 3 | 2 | 0.946 | [Isolated](comparisons/studio/Alif%20-%20Isolated.png) |
-| 003b | Isolated | 3b | 1 | 0.974 | [Isolated](comparisons/studio/Alif%20-%20Isolated.png) |
-| 003c | Isolated | 3c | 1 | 0.961 | [Isolated](comparisons/studio/Alif%20-%20Isolated.png) |
-| 004 | Medial | 1 | 1 | 0.948 | [Medial](comparisons/studio/Alif%20-%20Medial.png) |
-| 005 | Medial | 2 | 1 | 0.948 | [Medial](comparisons/studio/Alif%20-%20Medial.png) |
-| 006 | Medial | 3 | 1 | 0.964 | [Medial](comparisons/studio/Alif%20-%20Medial.png) |
-| 007 | Medial | 4 | 1 | 0.922 | [Medial](comparisons/studio/Alif%20-%20Medial.png) |
-| 008 | Final | 1 | 1 | 0.958 | [Final](comparisons/studio/Alif%20-%20Final.png) |
-| 009 | Final | 2 | 1 | 0.957 | [Final](comparisons/studio/Alif%20-%20Final.png) |
-| 010 | Final | 3 | 1 | 0.959 | [Final](comparisons/studio/Alif%20-%20Final.png) |
-| 011 | Final | 4 | 1 | 0.958 | [Final](comparisons/studio/Alif%20-%20Final.png) |
-| 012 | Final | 5 | 1 | 0.955 | [Final](comparisons/studio/Alif%20-%20Final.png) |
-| 013 | Final | 6 | 1 | 0.965 | [Final](comparisons/studio/Alif%20-%20Final.png) |
-| 014 | Final | 7 | 1 | 0.958 | [Final](comparisons/studio/Alif%20-%20Final.png) |
+| 001 | Isolated | 1 | 3 | 0.982 | [Isolated](comparisons/studio/Alif%20-%20Isolated.png) |
+| 002 | Isolated | 2 | 1 | 0.963 | [Isolated](comparisons/studio/Alif%20-%20Isolated.png) |
+| 003 | Isolated | 3 | 2 | 0.957 | [Isolated](comparisons/studio/Alif%20-%20Isolated.png) |
+| 003b | Isolated | 3b | 1 | 0.980 | [Isolated](comparisons/studio/Alif%20-%20Isolated.png) |
+| 003c | Isolated | 3c | 1 | 0.977 | [Isolated](comparisons/studio/Alif%20-%20Isolated.png) |
+| 004 | Medial | 1 | 1 | 0.966 | [Medial](comparisons/studio/Alif%20-%20Medial.png) |
+| 005 | Medial | 2 | 1 | 0.975 | [Medial](comparisons/studio/Alif%20-%20Medial.png) |
+| 006 | Medial | 3 | 1 | 0.966 | [Medial](comparisons/studio/Alif%20-%20Medial.png) |
+| 007 | Medial | 4 | 1 | 0.970 | [Medial](comparisons/studio/Alif%20-%20Medial.png) |
+| 008 | Final | 1 | 1 | 0.957 | [Final](comparisons/studio/Alif%20-%20Final.png) |
+| 009 | Final | 2 | 1 | 0.955 | [Final](comparisons/studio/Alif%20-%20Final.png) |
+| 010 | Final | 3 | 1 | 0.966 | [Final](comparisons/studio/Alif%20-%20Final.png) |
+| 011 | Final | 4 | 1 | 0.975 | [Final](comparisons/studio/Alif%20-%20Final.png) |
+| 012 | Final | 5 | 1 | 0.977 | [Final](comparisons/studio/Alif%20-%20Final.png) |
+| 013 | Final | 6 | 1 | 0.981 | [Final](comparisons/studio/Alif%20-%20Final.png) |
+| 014 | Final | 7 | 1 | 0.982 | [Final](comparisons/studio/Alif%20-%20Final.png) |
