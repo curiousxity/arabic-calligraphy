@@ -991,7 +991,68 @@ ground is ignored in a pass's own score:
 
 `pick.py` tries every finished pass in every shape that uses the stroke,
 and records the best mean overlap as fixes.json's `use`, which
-`result()` honours. Run over all 781 shapes on 2026-10-22.
+`result()` honours. Run over all 781 shapes on 2026-10-22. 72 strokes
+changed pass and 11 shapes rose by more than 0.01. Under 0.85 now: Jim
+101 (0.80), Ba 048 (0.81) and 728 (0.83).
+
+**Approved by the user, 2026-10-22:**
+- Sin Shin Isolated and Initial, apart from the shapes fixed below;
+- Alif Isolated and Final.
+
+The user's shorthand gained `^` for a joint. From 2026-10-22 the work is
+done without Fable; its scripts are still used as tools.
+
+**Hairs at stroke ends (`SCRATCH/me/hair.py`, 2026-10-22).** The user:
+"196, 200, 201, 204, 205, 206 and 207 all have the middle of the shin
+taller than the first."
+- **The cause:** in each shape, the stroke ending at the middle tooth ran
+  on past the studio's tip, and the nib's full width stood up past its
+  last node. The tooth was 0.28–0.39 nuqta too tall, measured at the
+  tips.
+- **Why the old measure missed it:** a thin sliver up the side of the
+  studio's tooth stays close to the studio's ink everywhere, so its
+  distance from that ink is small. `reach` measures how much further our
+  ink goes than the studio's past the end, along the stroke's last
+  direction.
+- **The fix:** each end is shortened along its own path (by 0.05 up to
+  0.4 nuqta) and written with less of the nib (down to 0.3), keeping
+  whichever choice reaches least while no sharer's sheet overlap drops.
+
+Kept:
+- 178.s2 (178, 180, 196, 201);
+- 200.s2;
+- 189.s0;
+- 204.s2;
+- 205.s2;
+- 195.s2 (195, 206, 217, 227);
+- 207.s2.
+
+Every middle-tooth tip is now within 0.03 of the studio's, and overlaps
+rose 0.000–0.006.
+
+167's spur at the joint was two ends running past it, 167.s3's and
+167.s4's. They were trimmed the same way (167 0.953 → 0.954, and 170,
+which shares 167.s3, rose too).
+
+**Joints (`SCRATCH/me/joint.py`, 2026-10-22).** The user: "552, 553 and
+553b the mim strokes need to join better." A joint end is an end within
+0.5 nuqta of another stroke's path. Each joint end is first tried
+lengthened 0.05–0.3 along its last chord, for a stroke that stops short.
+Its last four nodes are then tuned by coordinate descent:
+- position in steps of 0.06, 0.03 and 0.014 nuqta;
+- nib angle in steps of 6°, 3° and 1.4°;
+- pen width 0.25–1.5.
+
+The aim is to shrink the mismatched area within 0.35 of the joint, plus
+half its worst point. No sharer's overlap may drop, neither worst point
+may grow, the nib may turn at most max(5°, the stroke's own) per chord,
+and the chord ratio stays at most max(2.5, the stroke's own).
+
+On 553 the loop's left side, where the top stroke 553.s1 and the
+downstroke 553.s0 begin, now curves round as the studio's does: s0 is
+lengthened 0.1 up into the joint. 553 went 0.966 → 0.973, and the bar's
+right end lost its bare corner. 552, 553b and the ya's 718–720 are in
+progress.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
