@@ -293,7 +293,10 @@ results) and the queue's `done/` (`jd-c11-*` to `jd-c14-*`).
   letter cut the cap off. Adding his ink beyond that free end to the
   letter (not the end that joins the lam, and only the cap, not the
   slivers of crossing letters beside it) and polishing again lets the
-  stroke reach it.
+  stroke reach it (0.87 -> 0.90 against the letter with the cap). Both
+  p. 67 ayns approved by the user ("Yes they look fine").
+- The laptop-side scripts (placing, sheets, tip trim, run-on) and their
+  results are in `harf-research/laptop/` on the NAS.
 
 ## Sabti's moves, letter by letter
 
