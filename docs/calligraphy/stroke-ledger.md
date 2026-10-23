@@ -1648,6 +1648,10 @@ number.
 - **The catalogue's Alif section** was regenerated: mean 0.956 → 0.971,
   lowest 0.922 → 0.955.
 
+Approved in review:
+- 2026-10-23, "01, 02, 03, 04, all good": Ayn Ghayn Isolated, Initial,
+  Initial & Medial, and Medial.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
