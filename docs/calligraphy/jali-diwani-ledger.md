@@ -28,6 +28,16 @@ letters are 20–45% smaller for the pen than his (waw 1.20× in height, ra
 work is for Jali Diwani only; where its forms sit beside Thuluth's in the
 app is left for later.
 
+**Since 2026-10-23 the order and direction of the pen's moves are also
+read from the user's Jali Diwani video course** (14 lessons, notes in
+[jali-diwani-course-notes.md](jali-diwani-course-notes.md); the videos are
+not kept in the repository). Its teacher is not Hashim, so his plates still
+set the proportions; the course shows what a page cannot: which move comes
+first, which way it runs, where the pen lifts. It agrees with the splits
+already approved (the waw's cup, closing move and tail; the dal's hook and
+alif ending; the initial ain's body before its head) and adds that heads,
+caps and the ha's top are separate strokes written last.
+
 ## Units and the pen
 
 Measured 2026-10-20.
