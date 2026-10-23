@@ -1220,6 +1220,27 @@ video. Overlap falls, because the studio's point is elsewhere: 718 0.905 →
 **A lesson video is a reference too.** Where the user gives one, the
 letter may follow the video instead of the studio.
 
+**Two strokes that meet where the pen lifts (2026-10-23).** The user, of
+the ya drawn as a head and an S-curve: "the strokes don't line up ... is
+there a solution". The rule: the next stroke starts where the last one
+ended, at the same place and nib angle, as a pen is set down where it
+lifted.
+- **Refitting the S-curve with its first node pinned to the head's end**
+  (`SCRATCH/me/qya.py`, `<job>.p`, the head held beside it as ink): the
+  lift came out clean, but the S-curve's far end lost its tuning into the
+  tail. It left spikes on the outer edge, and on 719 and 720 a wedge into
+  the counter.
+- **Splitting the kept one-stroke path at the lift** (`SCRATCH/me/yasplit`,
+  head = nodes up to the lift, S-curve = nodes from it on, so the two share
+  that node): both joints stay as clean as one stroke (718 0.890 → 0.890,
+  719 0.883 → 0.883, 720 0.903 → 0.902). 720 uses 719's S-curve, and its
+  head ends 0.016 nuqta from 719's, leaving a slight bump where the
+  S-curve meets the tail. For the user's approval.
+
+Wherever a letter's strokes are first fitted as one and then split at a
+lift, the split keeps the joint clean. Fitting each stroke on its own
+never lines them up.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
