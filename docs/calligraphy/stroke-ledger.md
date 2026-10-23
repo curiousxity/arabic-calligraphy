@@ -1666,6 +1666,33 @@ poked out past the lower stroke.
   outline over a thousandth of overlap, as in decisions 11 and 12. The
   sheet is redrawn and back in review.
 
+Approved in review, 2026-10-23: Jim Ha Kha Isolated (25, "25 is fine")
+and Final (28); Kaf Isolated (30) and Initial (31).
+
+**Review 19, Ha Isolated 643: "spur on the left and divot on the right
+[of] the right eye" (2026-10-23).**
+- **The divot:** 643.s2 runs along the eye's floor and curls up into its
+  right corner, the nib turning 133° → 258° over its last three nodes.
+  The floor sagged into a rounded pocket where the studio's runs straight
+  into a sharp corner.
+  - **Tried and dropped:** holding or slowing the nib turn (0.940, 0.950)
+    and widening the end (0.957).
+  - **The fix:** a new tool, `eyetune.py`. It moves chosen nodes in
+    0.04/0.02/0.01 nuqta steps, scored on overlap less the mismatch inside
+    a window around the flaw. It started from the GPU polish of 643.s2
+    (`.q`, which had not passed the gate this afternoon). A second run
+    with the window weighed ×15 took out a nick the first run left. 643
+    0.963 → 0.974, kept.
+  - **Dropped along the way:** smoothing those nodes widened the nick.
+    The tuned 643.s1 rounded the left eye's corner, so s1 stays as it was.
+- **The spur:** a small hook at the right eye's top-left corner, where
+  the tail stroke 643.s0 and 643.s1 end under the ink.
+  - **Tried:** cutting 643.s4's end (no change) and tuning s1's nodes (no
+    change). Cutting 0.1 nuqta off s0's end and tuning its last nodes
+    clears the hook, but rounds the left eye's lower-right corner.
+  - **Three ways tried,** so it went to the user as decision 13: keep the
+    hook, or remove it with the rounder left-eye corner.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
