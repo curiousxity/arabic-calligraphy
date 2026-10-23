@@ -1346,6 +1346,71 @@ Small faults left, all smaller than before:
 of their length (see "Strokes wider than the nib"). The other groups are
 next, if the user agrees.
 
+**The same pen over every other group (2026-10-23).** The user: "yes.
+run the same pass." The rule and the gate were the same as for the jim,
+with ends sharing their neighbour's widening from the start. The pass
+covered 2,278 distinct strokes. It left out fill marks, merged strokes,
+the jim group (done), and every stroke of a shape the user has approved
+(the alifs, Ra Zay Isolated, 158, 159, 093). Whether those get the wider
+pen too is a question in the decisions folder.
+- **The numbers:** 964 strokes passed, 1,307 changed nothing, and 7
+  failed the gate (on worst miss).
+- **Held for the user:** 080.s0. Whether 080 keeps its refit is an open
+  question, and the wider pen was built on the refit.
+- **Judged together:** the 626 shapes that draw the passing strokes. None
+  fell, and no worst miss grew. Their mean overlap went from 0.947 to
+  0.968. The ya finals rose most: 728 0.828 → 0.977, 732 0.856 → 0.975,
+  729 0.881 → 0.977.
+- **The eye check:** the 90 strokes widened past 1.2 nibs were looked at
+  three times larger: now, after, studio. Nine came back with a new
+  small nick or bump, and are not kept: 165.s2, 180.s5, 436.s2, 438.s1,
+  556.s3, 719.s0, 722.s0, 723.s0 and 066.s0. Their files are in
+  `me/wpass/held`, for an end fix later.
+- **Kept:** 954 strokes as `.f` (`me/wpass/good`). The 119 widened only
+  1.15–1.2 nibs were not looked at close up. They show on the redrawn
+  sheets.
+- **A slip, found on the redrawn sheets and put right:** `keep.py`
+  rewrote each kept stroke's `fixes.json` entry and dropped its other
+  keys.
+  - 068.s0 and 069.s0 lost `with`, their second pen stroke, and half of
+    each shape vanished (0.95 → 0.72 and 0.76). The key is restored,
+    and their widened strokes stay. Both had been judged with the second
+    stroke drawn, and both now score above where they began.
+  - 085b.s0 lost `accepted` ("85b is fine", 2026-10-21) and was widened
+    though the user had accepted it. It is back as accepted (the widened
+    file is in `me/wpass/held`) and is part of the decision on approved
+    shapes.
+  - `keep.py` now keeps every key but `use` and `merged`.
+
+All 781 shapes on the sheets, before → after:
+- **Mean overlap:** 0.950 → 0.967.
+- **Under 0.90:** 18 → 2 (H01 0.874, 719 0.898).
+- **Under 0.95:** 309 → 65.
+- **Fell:** none.
+
+| group | shapes | before | after |
+|---|---|---|---|
+| Ya | 16 | 0.909 | 0.965 |
+| Sin Shin | 68 | 0.935 | 0.960 |
+| Fa | 7 | 0.942 | 0.965 |
+| Fa Qaaf | 55 | 0.944 | 0.962 |
+| Qaaf | 6 | 0.944 | 0.961 |
+| Kaf | 52 | 0.946 | 0.974 |
+| Ba Ta Tha | 81 | 0.947 | 0.962 |
+| Ha | 71 | 0.947 | 0.965 |
+| Sad Dad | 42 | 0.947 | 0.969 |
+| Mim | 82 | 0.949 | 0.963 |
+| Ta Za | 41 | 0.951 | 0.973 |
+| Waw | 6 | 0.954 | 0.972 |
+| Lam | 75 | 0.958 | 0.969 |
+| Nun | 9 | 0.958 | 0.976 |
+| Ayn Ghayn | 63 | 0.959 | 0.975 |
+| Dal Dhal | 8 | 0.963 | 0.978 |
+| Ra Zay | 12 | 0.968 | 0.971 |
+| Laam Alif | 5 | 0.972 | 0.976 |
+
+(Alif, Jim Ha Kha and Hamza are unchanged by this pass.)
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
