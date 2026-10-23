@@ -1578,6 +1578,45 @@ later pass widens them again.
 and 723.s0 exactly, in about 1 minute instead of 4. `wjob.py grid` now
 submits one job per stroke, and `pick` reads both forms.
 
+**The shapes under 0.95 (2026-10-23, "Let's do 3 2 and 4").** There were
+38, leaving out 080 (the user's old fit). Everything ran on the Geekmini,
+in three passes. Each was judged by the sheets and then by eye close up,
+and every kept change has a before/after/studio picture in the fixes
+folder.
+1. **Tight refits** (`vpass.py`, `<job>.v`, nodes 0.15 nuqta apart,
+   outline ×8). They went to the 49 strokes never refitted before. 28
+   passed `vjudge.py` and 25 were kept.
+   - **Dropped by eye:** 413.s0 (a hairline spur off the head, in 413 and
+     420), 436.s2 (kinks in the qaf's counter, which decision 11 had just
+     kept clean), 212.s2 (a kink where the tooth meets the bowl).
+   - **Gains:** 215 0.924 → 0.944, 054 0.932 → 0.970, 044 0.927 →
+     0.948, 066 0.933 → 0.956.
+2. **Polishes of hand-fixed strokes** (`qpass.py`, `<job>.q`). Each is a
+   GPU refine from the nodes drawn now, with the widths held. They went to
+   the 45 strokes with "refit", which pass 1 leaves alone. 19 passed and 17
+   were kept. `vjudge.py` judges them with `VJUDGE_SUFFIX=q`, and
+   `keep.py` writes them as `.f`.
+   - **Dropped by eye:** 719.s0 (opens a sliver of paper inside 720's
+     S-curve), 020.s0 (puts a corner into the lower edge at 045's start).
+   - **Changed before keeping:** 719.s1. The polish had moved its end 0.8
+     nuqta off the node it shares with 719.s0, which left a spur at the
+     lift. With the end put back on that node (the lift rule), 719 went
+     0.939 → 0.956, clean, the head's hook as the studio's.
+   - **Gains:** 204 0.910 → 0.954 (the first hump, low by ~0.15 nuqta, now
+     in place; the shortened tooth tips held), 071 0.941 → 0.964, 046
+     0.941 → 0.968, 261 0.933 → 0.952, 709 0.939 → 0.957.
+3. **The wider pen on the 25 refits** (the batched grid). 25 jobs held
+   2,400 settings and took a few minutes. 16 passed the gate, and all 16
+   were clean close up. 215, 225 and 401 each lost a small notch. Gains:
+   066 0.956 → 0.970, 401 0.962 → 0.973, 044 0.948 → 0.955.
+
+After: mean overlap 0.970 over 781 shapes. Under 0.95: 39 → 17. Under
+0.93: 4 (080, 043, 743, 413).
+- **043 and 743:** no refit passed, so they are as they were. Both are
+  small shapes, and their misses are thin slivers along the edges and
+  the cut at one end.
+- **The other 13** sit between 0.936 and 0.949.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
