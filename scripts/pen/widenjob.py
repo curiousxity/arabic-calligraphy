@@ -10,6 +10,7 @@ every other stroke of each shape to its nodes before it submits.
     piece, origin, ppn, pen   the stroke's studio piece, as a fit job's
     start     the stroke's nodes now
     short, passes, move, ends, taper    widen() below
+    variants  optional: [{tag, short, passes, ...}], every setting run in this one job (run() below)
     px, up, fill_max, fill_gaps         the sheet's scale and pocket filling (sheet.py's PX, UP, FILL_MAX, FILL_GAPS)
     shapes    {shape: {rings: [svg d], fill: [ring index], targets: [delta], others: [{nodes, origin, delta}]}}:
               the studio's outlines, which of them are filled marks, where this stroke sits in the shape (screen px
@@ -142,12 +143,26 @@ def judge(job, nodes, sh):
 
 
 def run(job):
+    """One setting (the job's own fields), or every one in `variants` ([{tag, short, passes, ...}], each falling back
+    to the job's fields): a stroke's whole settings grid in one job, its 'before' judged once. A job costs ~6 s of
+    queue (a fresh Python, NAS reads and writes) for ~1 s of work, so 96 single-setting jobs spent most of their
+    time waiting (2026-10-23)."""
     t = time.time()
     ppn, pen = float(job["ppn"]), float(job["pen"])
-    nodes = widen(job["start"], Piece(job["piece"], job["origin"], ppn), pen / ppn, job.get("short", 0.01),
-                  job.get("passes", 1), job.get("move", 1.0), job.get("ends", True), tuple(job.get("taper", (0, 0))))
-    res = {k: {"before": judge(job, job["start"], sh), "after": judge(job, nodes, sh)} for k, sh in job["shapes"].items()}
-    return {"name": job["name"], "kind": "widen", "job": job["job"], "nodes": nodes, "judge": res,
-            "score": {"iou": min((v["after"][0] for v in res.values()), default=0.0)},
+    piece = Piece(job["piece"], job["origin"], ppn)
+    before = {k: judge(job, job["start"], sh) for k, sh in job["shapes"].items()}
+    keys = ("short", "passes", "move", "ends", "taper")
+    out = []
+    for v in job.get("variants") or [{}]:
+        st = {**{k: job.get(k) for k in keys}, **{k: v[k] for k in keys if k in v}}
+        nodes = widen(job["start"], piece, pen / ppn, st["short"] if st["short"] is not None else 0.01,
+                      st["passes"] or 1, 1.0 if st["move"] is None else st["move"],
+                      True if st["ends"] is None else st["ends"], tuple(st["taper"] or (0, 0)))
+        res = {k: {"before": before[k], "after": judge(job, nodes, sh)} for k, sh in job["shapes"].items()}
+        out.append({"tag": v.get("tag", ""), "settings": st, "nodes": nodes, "judge": res})
+    one = out[0]
+    return {"name": job["name"], "kind": "widen", "job": job["job"], "nodes": one["nodes"], "judge": one["judge"],
+            **({"variants": out} if job.get("variants") else {}),
+            "score": {"iou": max(min((x["after"][0] for x in o["judge"].values()), default=0.0) for o in out)},
             "seconds": round(time.time() - t), "host": socket.gethostname(), "cpus": os.cpu_count(), "gpu": False,
-            "settings": {k: job.get(k) for k in ("short", "passes", "move", "ends", "taper")}}
+            "settings": one["settings"]}

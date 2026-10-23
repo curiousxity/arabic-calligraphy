@@ -1565,6 +1565,19 @@ the lowest Sin shapes (204, 212, 189) and of 043 and 743.
 
 After: mean overlap 0.969 over 781 shapes; under 0.95, 39.
 
+**Decisions 11 and 12 (2026-10-23): the standard pen.** The user:
+"Standard pens for both 11 and 12". 436.s2, 438.s1 and 723.s0 keep the
+standard pen, so the qaf's counter and ya 723's bend stay as they were. A
+clean outline is worth more than the overlap. Each now carries
+`standard_pen` in `fixes.json`, and `wjob.py` skips those strokes, so no
+later pass widens them again.
+
+**A stroke's whole grid in one job (2026-10-23).** A widen job may carry
+`variants`, a list of settings. The worker runs them all, judging
+"before" once. The batched grid matched the 192 single jobs for 436.s2
+and 723.s0 exactly, in about 1 minute instead of 4. `wjob.py grid` now
+submits one job per stroke, and `pick` reads both forms.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
