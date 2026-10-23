@@ -1051,8 +1051,72 @@ and the chord ratio stays at most max(2.5, the stroke's own).
 On 553 the loop's left side, where the top stroke 553.s1 and the
 downstroke 553.s0 begin, now curves round as the studio's does: s0 is
 lengthened 0.1 up into the joint. 553 went 0.966 → 0.973, and the bar's
-right end lost its bare corner. 552, 553b and the ya's 718–720 are in
-progress.
+right end lost its bare corner.
+
+552, 553b and the ya's 718–720 did not come right, and nothing from them
+was kept:
+- **The first run bought zigzags.** The path's bend swung back and forth
+  by up to 68° between neighbouring nodes. That covered the studio's ink
+  and raised the overlap, but drew a wavy dent in the ya's head. The
+  tuner now also refuses any node whose path bend moves more than 8°
+  from the stroke's own (`BEND`).
+- **The second run was smooth but only partly better.** The spike where
+  the ya's head meets its body (`()^`) went from 719 and 720. The
+  head-head joint (`((^`) kept its notch and spur. 552 gained a spike,
+  and 553b's square corner went round.
+- **Why end-tuning can't fix it:** two separate strokes meet at each of
+  these joints, each with its own nib cut, and the studio's outline flows
+  straight through. The ya's S-curve is also 15–20% thinner than the
+  studio's all along, and the tuner was compensating for that at the
+  joint.
+
+The next idea, writing the head and the S-curve as one stroke, waits on
+the user.
+
+**Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
+2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
+everything under 0.95. That was 343 shapes, most on pages already passed,
+and many are held down by the studio's pen changing width, which a refit
+cannot follow.
+- **The refit:** every stroke was fitted afresh as `<job>.v`, with nodes
+  0.15 nuqta apart and the outline weighed eight times, its neighbours as
+  ground. 90 strokes went to the Geekmini. Fill marks and strokes already
+  rebuilt by hand were left alone.
+- **The automatic judge:** a `.v` replaced what the sheet draws only if
+  every shape using the stroke gained at least 0.002 on average, none lost
+  more than 0.001, and none's worst miss grew more than 0.005.
+- **The eye check:** the judge passed 26. Looking at them turned down 7
+  more:
+  - 475.s0, 452.s3 (the kaf's tail in 475 and 486), 195.s3, 729.s0 and
+    728.s0 came back wavy or hooked at an end;
+  - 189.s1 notched 204's last tooth;
+  - 174.s2 notched 197's.
+
+  The worst-miss measure doesn't see a wave. A count of bends on the
+  outline didn't separate good from bad either, so the eye decides.
+- **Kept as `use: ".v"`:** H01.s0, H01.s1, 085d.s0, 016.s0, 085c.s0,
+  554.s0, 237.s0, 174.s1, 377.s1, 080.s0, 223.s2, 342.s1, 412.s0, 412.s1,
+  412.s2, 500.s3, 577.s0, 578.s1 and 718.s1.
+- **Overruled the worst-miss gate:** 048.s0 and 055.s0 each improved by
+  about 0.05, but their tips ran on past the studio's. Each was cut back
+  0.25 nuqta (`hair.py`) and kept as `.f`.
+
+| shape | before | after |
+|---|---|---|
+| 048 | 0.812 | 0.935 |
+| 085d | 0.872 | 0.943 |
+| 085c | 0.880 | 0.942 |
+| 080 | 0.887 | 0.938 |
+| 055 | 0.890 | 0.938 |
+| 412 | 0.899 | 0.957 |
+| 223 | 0.898 | 0.933 |
+| 524a | 0.899 | 0.931 |
+| 578 | 0.881 | 0.930 |
+| 718 | 0.890 | 0.905 |
+
+412's sharers 419, 426, 427 and 428 rose about 0.04 each. Shapes under
+0.90 went from 32 to 20. 080's end gained a small step, and is kept for
+the user to judge on the sheet.
 
 **Judging a group.** Each letter group and form has a sheet of every
 shape, ours beside the studio's, with the shape's overlap. Both sides
