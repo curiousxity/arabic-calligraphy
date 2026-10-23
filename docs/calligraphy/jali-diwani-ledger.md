@@ -252,6 +252,49 @@ about 10% smaller), so the nib is taken as 40 px.
   hand, fitted stroke by stroke, then refitted as a whole word, is how a
   join from his page is made.
 
+## Carrying approved strokes onto his other words (2026-10-22/23)
+
+Cutting every word by hand does not scale, and the user cannot mark the
+strokes by hand, so the cut is now carried: an approved letter's **pen strokes**
+are moved onto the same letter form where Hashim writes it again, then
+polished against his ink. The research runs (tests 1-10 and the queue
+rounds) are on the NAS in `harf-research` (`done/` the scripts, `out/` the
+results) and the queue's `done/` (`jd-c11-*` to `jd-c14-*`).
+
+- **What did not work.** Finding cuts from the outline alone (notches
+  where one stroke meets the next) finds every bend too. Carrying a whole
+  word breaks wherever Hashim writes one of its letters in another form
+  (his على on p. 67 has a short ya, not p. 66's bowl), so templates are
+  per **letter form**. Carrying an outline and cutting his ink by it could
+  not tell "his letter is wider here" from "another letter crosses here",
+  so it spilled into crossing letters, and its patches covered the waw but
+  "the strokes don't make sense" (the user).
+- **What works.** Place the approved letter on his: a search over size
+  (0.55-1.25), slant and turn scored by how close its outline lies to his
+  edges, how much of its inside is on ink, and how much of **his ink just
+  outside it** is left uncovered (without that last term a small template
+  wins by hiding inside a thick stroke); then bend it gently onto his
+  edges, undoing a bend that crumples. The approved strokes' nodes go
+  through the same placement and bending, the nib staying Hashim's 40 px.
+  The queue then polishes each stroke against the whole letter with the
+  others held as ink (as `jdwhole.py`), twice, the tail tips trimmed to
+  his ink between rounds (`jdtip.py`'s rule).
+- **His letter for the polish** is his ink joined to the letter within
+  12 px of the strokes, the rest of his ink nearby neutral. A crossing
+  letter then counts only as far as the pen reaches. A letter cut from a
+  word (the ain from على) does not score the edge where it was cut.
+- **Results.** The three waws on p. 66 (two in والذي, أحوى): overlap
+  0.96-0.97, approved by the user ("Waw strokes are fine"). The ain
+  carried from على onto p. 67's two على's: 0.92 and 0.93, against a
+  ceiling of 0.94 (the approved ain itself, unmoved, scores 0.94 against
+  its own word cut this way, the ink at the lam's join being the lam's).
+- **An end that stops short.** In the على before انفسهم the ain's body
+  stops short of the rounded cap where his pen started it: the 12 px
+  letter cut the cap off. Adding his ink beyond that free end to the
+  letter (not the end that joins the lam, and only the cap, not the
+  slivers of crossing letters beside it) and polishing again lets the
+  stroke reach it.
+
 ## Sabti's moves, letter by letter
 
 How Sabti writes each letter on his plate (Beirut Jali volume, p. 9): the
