@@ -8,6 +8,11 @@ record. Each form's verdict lives in `scripts/pen/REVIEW.md`, and the
 user's word there decides. The references are research material only: the
 app credits no calligrapher.
 
+**How the letters are taught:** [thuluth-course.md](thuluth-course.md) has
+the steps of a 34-lesson Thuluth course on video, letter by letter. It
+covers stroke order, nib angles, lifts and measurements, plus composing.
+Read a letter's lesson before fitting it.
+
 **What it is for.** These drawn letters are for the stacked compositions
 (tarkib) only. Plain text keeps using the fonts, which already render
 Thuluth well. Drawing letters stroke by stroke is what separates
