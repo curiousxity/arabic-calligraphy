@@ -1617,6 +1617,22 @@ After: mean overlap 0.970 over 781 shapes. Under 0.95: 39 → 17. Under
   the cut at one end.
 - **The other 13** sit between 0.936 and 0.949.
 
+**Hairs at the ends of the remaining 17 (`hair.py scan` / `trim`,
+2026-10-23, "Next").** Ten stroke ends strayed more than 0.1 nuqta past
+the studio's ink.
+- **Trimmed and kept (8):** 189.s3, 189.s4, 212.s1, 216.s0 (its start,
+  0.32 → 0.09 nuqta), 216.s1 (in 216, 217, 221 and 227), 216.s2, 253.s0
+  and 396.s3 (0.39 → 0.21). Every shape using them kept or raised its
+  overlap, and the close-ups are clean.
+- **Not trimmed:** 743.s0, 189.s5, 216.s0's end and 744.s0. Every trim
+  that would remove their hair loses overlap somewhere.
+- **The gains are small** (216 0.937 → 0.940). The mean holds at 0.970,
+  with 17 shapes under 0.95.
+- **What is left in the Sin teeth:** the tooth tips stand as thin spikes
+  where the studio's are a little shorter and rounder. Most of the
+  remaining misses are this and thin edge slivers, near what a
+  nib-stroke model reaches.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
