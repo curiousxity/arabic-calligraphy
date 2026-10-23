@@ -1207,6 +1207,19 @@ video. The studio's point is at the bottom right, so the studio's hand
 needs the steeper nib (75°, leaning 30° left) shown before. Not kept;
 the user decides between them.
 
+**Kept: the video's head on all three ya (2026-10-23).** The user: "It
+doesn't have to match the studio. It is fine if it matches the video."
+On 718.s2, 719.s1 and 720.s1, the nodes before node 1 became a straight
+climb of 0.5 nuqta with the nib at 40°. The nib then turns one way to
+node 5's angle (`SCRATCH/me/yavid`, kept with `keep.py`). The slanted cut
+and its notch are gone, and the point sits at the bottom left as in the
+video. Overlap falls, because the studio's point is elsewhere: 718 0.905 →
+0.890, 719 0.901 → 0.883, 720 0.915 → 0.903; Ya isolated mean 0.898 →
+0.889.
+
+**A lesson video is a reference too.** Where the user gives one, the
+letter may follow the video instead of the studio.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
