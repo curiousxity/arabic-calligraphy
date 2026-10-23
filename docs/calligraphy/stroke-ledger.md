@@ -1726,6 +1726,47 @@ redrawn and its review copy refreshed.
 
 The user added `` ` `` for a spur to the shorthand (2026-10-23).
 
+Approved in review, 2026-10-23: Reset Final (53), Qaaf Final (50), Nun
+Final (48).
+
+**Spurs at a head-body joint: 234, 600, 628, 630 (reviews 54, 52, 47,
+2026-10-23).** All four had the same flaw. The end of one stroke at the
+joint poked a hair a pixel or two wide out past the edge of the stroke it
+joins.
+- **A new tool, `spurcut.py`.** It cuts an end back by the shortest of a
+  ladder of lengths that clears the hair, with at most `SPUR_SLACK` of
+  overlap lost in any shape that uses the stroke.
+- **Measured by pixels, not distance:** a hair this thin stays close to
+  the studio's ink, so `hair.stray` reads it as small. It is judged by
+  its loose pixels within 0.35 nuqta of the end instead.
+- **Run across every end, it cut too much,** since edge slivers count
+  as loose pixels as well. So only the six ends with the hairs were cut:
+  101.s5's start (0.25), 600.s0's start (0.16), 600.s1's end (0.35),
+  628.s2's start (0.2), 628.s3's end (0.25) and 630.s1's end (0.13).
+- **Result:** clean close up in all four. 234 0.976 → 0.977, 600 0.970 →
+  0.972, 628 0.979 → 0.979, 630 0.978 → 0.978; 101 (it shares 101.s5)
+  0.980 → 0.982.
+
+**Review 16, Fa Qaaf Initial 403 and 409 (2026-10-23, "Big problems at
+403v4", "Problems on both").**
+- **The flaw in both:** the head does not run down into the body. In
+  403, the head's outer stroke (376.s0) and the body (403.s2) began side
+  by side, sharing neither a node nor a nib line (the lift rule). That
+  left a wedge of paper inside the corner, the body's square corner
+  poking out, a spur on the head's left and a deep counter. In 409, the
+  head's lower edge broke into steps where it meets the body.
+- **The Geekmini:** all six strokes (376.s0, 376.s1, 403.s2, 392.s0,
+  392.s1, 409.s2) got a tight refit (`.v2`) and a GPU polish from their
+  drawn nodes with the outline ×16 (`.q2`). Every combination was scored
+  on both shapes that use them.
+- **409:** the three polishes. 409 0.955 → 0.974, 392 0.968 → 0.973. The
+  head now flows into the body.
+- **403:** 376.s0 refitted and 376.s1 polished, then `eyetune.py` (nib
+  angles too) on the first nodes of 376.s0 and 403.s2 together, twice,
+  the second time with the joint weighed ×25. 403 0.967 → 0.978, 376
+  0.960 → 0.964. The wedge, the square corner and the left spur are
+  gone, and a small notch is left on the joint's outer edge.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
