@@ -523,7 +523,12 @@ that choice. Two kinds so far:
   filled mark is part of it. A nib's straight edge can't follow the
   curved edge of a fill exactly: the alif 001's stem stopped 0.006 nuqta
   short of its hat and left a speck (2026-10-20). The sheets fill any such
-  enclosed paper that touches a fill; the app must do the same.
+  enclosed paper that touches a fill; the app must do the same. Only a
+  sliver, though: at most 0.5 square nuqta. The jim 101's head closes its
+  counter against the starting mark, and the rule filled the whole counter
+  (3 square nuqta, 3% inked in the studio). That one fill was all of 101's
+  low score: 0.80 → 0.93 once the counter stayed open (2026-10-23). No
+  other shape had a pocket bigger than a speck.
 - **A local search, by script** (`fix_alif.py` and its kind). The fix is
   written as the stroke's `.f` result and marked with a `how` so
   `fixes.py` never queues it again. The alif 005's top end curled back on
@@ -1262,6 +1267,32 @@ also seems better. Small spur that needs to be fixed."
   leaves the right side short of the studio's. A small wedge is still
   inside the counter's top-left corner; changing the angle there (80°,
   95°) swelled the outer edge, so it was left.
+
+**The jim's bowls with a pen as wide as the band (`SCRATCH/me/widen.py`,
+2026-10-23).** The user picked the jim group next. After 101 (its
+counter, see "fill" above), the lowest were the isolated 090 and the
+final 144, both 0.88. Both missed in one place: the bottom of the bowl.
+The studio's band there is 1.3–1.35 nibs across, and our standard pen,
+centred in it, left a strip bare along both edges. This is 092's case
+("092's lower stroke" above), so the same rule, made general for any
+stroke:
+- Where the standard nib's end stands more than 0.01 nuqta inside the
+  studio's piece, the node's width is the ink's chord along its own nib
+  line, 0.005 inside both edges, capped at 1.5 nibs. The node moves to the
+  chord's middle.
+- The widths and moves are smoothed over three nodes ([1, 2, 1]), so a
+  single wide node never bulges. Nib angles stay as they were.
+- Kept for the bowls (144.s1, 090.s0, widest 1.35) and the head bars
+  (144.s0 1.09, 090.s2 1.18). Nodes moved 0.05 nuqta at most.
+
+| shape | before | after | worst miss (nuqta) |
+|---|---|---|---|
+| 144 | 0.876 | 0.977 | 0.126 → 0.050 |
+| 090 | 0.878 | 0.978 | 0.156 → 0.141 |
+
+090's worst miss is the bar's right corner, unchanged. The pen changes
+width along the bowl, as 092's does, which is still the user's call
+(see 092).
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
