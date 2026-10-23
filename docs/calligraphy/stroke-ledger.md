@@ -1651,6 +1651,20 @@ number.
 Approved in review:
 - 2026-10-23, "01, 02, 03, 04, all good": Ayn Ghayn Isolated, Initial,
   Initial & Medial, and Medial.
+- 2026-10-23, "7 and 10 good": Ba Ta Tha Isolated and Final.
+
+**Review 12, Dal Dhal Isolated: "spur at ))^" (2026-10-23).** At the
+joint of the dal's two body strokes, the end of 146.s3 (used in 146 and
+147) left a small hair on the outer edge of the elbow. Its nib corner
+poked out past the lower stroke.
+- **Not the lower stroke:** trimming the start of 146.s2 left the hair
+  where it was.
+- **The scan missed it** at 0.1 nuqta. `hair.py trim` refuses the cut,
+  because 146 loses 0.001.
+- **The fix:** `hair.cut` 0.06 nuqta off 146.s3's end, by hand. 146
+  0.980 → 0.979, 147 0.984 → 0.985, and the hair is gone in both. A clean
+  outline over a thousandth of overlap, as in decisions 11 and 12. The
+  sheet is redrawn and back in review.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
