@@ -6,6 +6,10 @@ judged on every shape that draws the strokes, as the comparison sheets draw it (
                      overlap of every shape minus win_w/100 x each window's mismatch (plus perim_w x its edge length
                      against the studio's, so a spike or notch counts though it adds little area); no shape may fall
                      more than `floor` below where it began
+    search "hair"    SCRATCH/me/autocut.py, one hair at one stroke end: the end cut back along its path (CUTS), its
+                     node's nib turned (TURNS) or narrowed (WIDTHS), or turned and narrowed; of those that bring our
+                     ink within CLEAR of the studio's within R of the hair without any shape losing more than
+                     `slack`, the one with the most overlap over the shapes is kept (none: the stroke as it was)
     search "joint"   joint.py, one stroke end: first lengthened if that helps, then its last K nodes moved, turned and
                      widened in JOINT_STEPS, shrinking the mismatch within R of the joint with its worst point weighed
                      in; no shape's overlap may fall, no worst miss within R may grow past where it began + 0.005,
@@ -18,7 +22,9 @@ Like a widen job it is self-contained: the reading side (SCRATCH/me/tjob.py) res
              "joint" has one stroke, with `end` (0 or -1) and idx its last K nodes
     shapes   {shape: {rings, fill, others, tuned: {job: [delta, ...]}, windows: [[x0, y0, x1, y1]], at: [x, y]}}:
              as a widen job's, with each tuned stroke's placements; windows and the joint's point in screen px
-             (the shape's own frame), so they hold when the frame's corner moves with the ink
+             (the shape's own frame), so they hold when the frame's corner moves with the ink; optional close:
+             [[x0, y0, x1, y1, r]], boxes (screen px) where the studio's ink is closed with a disc of r nuqta before
+             judging, for a notch the user said the studio should not have either (401's and 409's necks)
     win_w, perim_w, angles, floor    "window"'s weights (defaults 10, 0, true, 0.001)
 The result: {name, kind "tune", job (the first stroke), jobs {job: nodes}, judge {shape: {before, after}}, score,
 seconds, host, cpus, gpu, settings}; before and after are [overlap, worst miss in nuqta]."""
@@ -56,6 +62,11 @@ class Shapes:
                 hulls += [hh + np.asarray(d) for hh in path_hulls(cur[j], o, self.ppn, self.pen)]
         corner = np.concatenate(rings + hulls).min(0) - 2  # widenjob.masks()'s own corner
         A, B = masks(hulls, rings, fills, self.S, self.up, self.pxn, self.job["fill_max"], self.job["fill_gaps"])
+        for c in self.job["shapes"][k].get("close", []):
+            (x0, y0), (x1, y1) = self.px(c[:2], corner).astype(int), self.px(c[2:4], corner).astype(int)
+            r = max(1, int(c[4] * self.pxn)); x0, y0 = max(0, x0), max(0, y0)
+            disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+            B[y0:y1, x0:x1] |= cv2.morphologyEx(B, cv2.MORPH_CLOSE, disc)[y0:y1, x0:x1]
         return smooth_mask(A, self.pxn), B, corner
 
     def px(self, p, corner):
@@ -192,6 +203,67 @@ def joint(job, sh):
     return {j: nodes}
 
 
+CUTS = (0.03, 0.05, 0.08, 0.12, 0.16, 0.2, 0.25, 0.3, 0.4)
+TURNS = (-60, -45, -30, -20, -10, 10, 20, 30, 45, 60)
+WIDTHS = (0.8, 0.6, 0.4)
+CLEAR, HAIR_R = 0.02, 0.2
+
+
+def cut(nodes, e, d):
+    """hair.py's cut: the stroke shortened by d nuqta at end e, measured along its nodes; None if too little is left."""
+    ns = [dict(n) for n in (nodes if e == -1 else nodes[::-1])]
+    left = d
+    while len(ns) > 2:
+        a, b = np.array(ns[-2]["p"]), np.array(ns[-1]["p"]); L = float(np.linalg.norm(b - a))
+        if L > left:
+            t = 1 - left / L
+            q = dict(ns[-1]); q["p"] = [round(float(v), 4) for v in a + (b - a) * t]
+            for key in ("angle", "width"):
+                if key in ns[-1] or key in ns[-2]:
+                    dflt = 1 if key == "width" else 145
+                    va, vb = ns[-2].get(key, dflt), ns[-1].get(key, dflt)
+                    q[key] = round(float(va + (vb - va) * t), 3)
+            ns[-1] = q
+            return ns if e == -1 else ns[::-1]
+        left -= L; ns.pop()
+    return None
+
+
+def hair(job, sh):
+    (j, s), = job["strokes"].items()
+    e, slack = int(s["end"]), job.get("slack", 0.0015)
+    k0 = job["at_shape"]
+
+    def reach(ns):
+        A, B, c0 = sh.draw(k0, {j: ns}); at = sh.px(job["shapes"][k0]["at"], c0)
+        yy, xx = np.ogrid[:A.shape[0], :A.shape[1]]
+        m = (A == 1) & (B == 0) & ((xx - at[0]) ** 2 + (yy - at[1]) ** 2 < (HAIR_R * sh.pxn) ** 2)
+        return float(cv2.distanceTransform((1 - B).astype(np.uint8), cv2.DIST_L2, 5)[m].max() / sh.pxn) if m.any() else 0.0
+
+    def ious(ns):
+        return {k: iou(*sh.draw(k, {j: ns})[:2]) for k in job["shapes"]}
+
+    base = s["start"]; i0 = ious(base); pick = None
+    tries = [(f"cut {d}", cut(base, e, d)) for d in CUTS]
+    for da in TURNS:
+        for w in (None,) + WIDTHS:
+            ns = [dict(n) for n in base]; q = ns[e]; q["angle"] = round(q.get("angle", 145) + da, 2)
+            if w:
+                q["width"] = round(q.get("width", 1.0) * w, 3)
+            tries.append((f"nib {da:+d}" + (f" width x{w}" if w else ""), ns))
+    for w in WIDTHS:
+        ns = [dict(n) for n in base]; ns[e]["width"] = round(ns[e].get("width", 1.0) * w, 3)
+        tries.append((f"width x{w}", ns))
+    for how, ns in tries:
+        if ns is None or reach(ns) >= CLEAR:
+            continue
+        i1 = ious(ns)
+        if all(i1[k] >= i0[k] - slack for k in i1) and (pick is None or sum(i1.values()) > sum(pick[2].values())):
+            pick = (how, ns, i1)
+    job["_how"] = pick[0] if pick else None
+    return {j: pick[1] if pick else base}
+
+
 def run(job):
     t = time.time()
     sh = Shapes(job)
@@ -203,7 +275,7 @@ def run(job):
             A, B, _ = sh.draw(k, cur); out[k] = [round(iou(A, B), 4), worst(A, B, sh.pxn)]
         return out
     before = verdict(start)
-    cur = joint(job, sh) if job["search"] == "joint" else window(job, sh)
+    cur = {"joint": joint, "hair": hair}.get(job["search"], window)(job, sh)
     after = verdict(cur)
     keys = ("search", "win_w", "perim_w", "angles", "floor")
     return {"name": job["name"], "kind": "tune", "job": next(iter(job["strokes"])), "jobs": cur,
@@ -211,4 +283,4 @@ def run(job):
             "judge": {k: {"before": before[k], "after": after[k]} for k in job["shapes"]},
             "score": {"iou": min((v[0] for v in after.values()), default=0.0)},
             "seconds": round(time.time() - t), "host": socket.gethostname(), "cpus": os.cpu_count(), "gpu": False,
-            "settings": {k: job.get(k) for k in keys}}
+            "settings": {**{k: job.get(k) for k in keys}, "how": job.get("_how")}}

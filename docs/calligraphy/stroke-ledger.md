@@ -1862,6 +1862,39 @@ item; the shorthand gained `&` (defect) and `%` (window).
   tall sheets could not be read ("split and rerender the others because i
   cant see them").
 
+**Decisions 13, 18 and 19, 2026-10-24.**
+- **Decision 13, Ha 643** ("13, 2 but both %need to be smoother. There is
+  also a ` on the left"): the tail stroke cut back so the hook in the
+  right eye's corner goes, then both eyes smoothed and the hair on the
+  left eye's outer edge cleared. Coordinate tuning could not do it: moving
+  nodes, turning and narrowing the nib left the left eye's corner round
+  and the right eye's floor stepped, and put a kink in the outer edge.
+  What did it is a **stroke built from the studio's band**
+  (`SCRATCH/me/chord.py`). A studio piece is a band between two long
+  edges. Walk both edges together by arc length; at each step the nib is
+  the chord from one edge to the other. Its middle is the node, its
+  direction the nib angle and its length the pen's width (0.3 to 1.5, the
+  pen changing width as decision 01 allows). The swept edges are then the
+  studio's own edges, so a window they bound is the studio's.
+  `chordfit.py` then moves the four edge ends a few ring points at a time
+  for the most overlap, since an end that runs on under a neighbour beats
+  one that stops at the piece's cap. 643.s0-s3 rebuilt this way: 643
+  0.974 -> 0.989, both eyes' corners sharp, the hook and the hair gone.
+- **Decision 18, Mim 552** ("18 1. The % needs to be smoother. No peak"):
+  the tuned head kept, then its arch (552.s2) rebuilt from its band, inner
+  edge ring points 20 to 73 against outer 15 down to 92, 20 nodes. The
+  window's top is the studio's smooth arc and the peak is gone: 552
+  0.981 -> 0.983. The peak was the inner edge of a broad nib turning
+  tighter than half its width, which no node move undoes.
+- **Decision 19, Ha-Sad 653** ("19 is not fixed. The fork is still
+  there"): the fork was a slit of paper between the loop's end (653.s6)
+  and the inner stroke's (653.s5), too thin for the overlap or the edge
+  length to notice. `eyetune.py` gained **`SLIT_W`**: paper a disc of
+  `SLIT_R` (0.06 nuqta) would close where the studio has ink, and ink it
+  would open where the studio has paper, counted by area. Tuning the two
+  ends' last nodes with it closed the fork (653 0.9736 -> 0.9737).
+  `EYETUNE_WIDTHS=1` lets eyetune narrow or widen the nib too.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
