@@ -1791,6 +1791,12 @@ blunt lump. The studio's begins with a slanted point.
   letter's exit as one pen stroke, sharing nib angle and width at the
   lift, not pasted beside it as the isolated studio piece. Noted for that
   work.
+- **Second look:** "15 ok. 370 ok. 371 still has a bulbous configuration.
+  Even the studio's 409 is incorrect" (2026-10-23). Fa Final approved,
+  and 370 too. 371 and 409 went back to the user as clean pictures
+  (ours beside the studio) to mark. The point about 409 is that the
+  studio is not the last word there: its own neck has a step where the
+  head meets the body.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
