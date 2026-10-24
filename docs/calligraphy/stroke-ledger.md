@@ -1954,6 +1954,42 @@ item; the shorthand gained `&` (defect) and `%` (window).
   after of a shape are drawn in frames that differ by the ink's extent.
   The first `bapic.py` scored the after against the before's studio mask,
   which showed 414 falling (0.969 -> 0.962) when it rose (-> 0.977).
+- **The band method for every stroke on the sheets in review** (the user,
+  2026-10-24: "Yes"). That was 1140 strokes on 19 sheets, all built and
+  sent to the GPU. The first nine sheets to finish (05, 11, 18, 27, 51,
+  55, 58, 60, 64; 561 strokes) were judged as the user asked for "the ones
+  that are done".
+  - vjudge passed 278 polished and 268 as built: 320 strokes, 42 of them
+    as built.
+  - The defect scan moved to the Geekmini at the user's word ("If you can
+    transfer this job to the geekmini do it"). The scripts and the data
+    they read go to the queue as one zip, and a "scan" job runs them
+    there (`scanq.py`, `scripts/pen/scanjob.py`). It is about ten times
+    the laptop's speed and matched the laptop's result on every shape.
+    Twelve scans at once had run the laptop out of memory.
+  - Over 182 shapes the 320 cleared 631 faults, and 59 shapes gained one.
+    The 206 strokes whose shapes stayed clean were kept. Each of the
+    other 114 was then tried alone over those 206, and 50 passed.
+  - Together, two shapes still gained a fault. 382 had a notch where the
+    unchanged 382.s4 met the rebuilt strokes; 382.s3 went back. In 311,
+    294.s2 and 294.s3 each passed alone but not together; 294.s2 went
+    back.
+  - Kept: 254 strokes. Over the 182 shapes, 489 faults went and none was
+    added; mean overlap rose 0.007.
+
+  | sheet | mean before | mean after | lowest before | lowest after |
+  |---|---|---|---|---|
+  | 05 Ayn Ghayn final | 0.974 | 0.983 | 0.973 | 0.980 |
+  | 11 Ba Ta Tha pairs | 0.969 | 0.980 | 0.952 | 0.961 |
+  | 18 Fa Qaaf pairs | 0.968 | 0.983 | 0.948 | 0.975 |
+  | 27 Jim Ha Kha medial | 0.981 | 0.986 | 0.967 | 0.967 |
+  | 51 Ra Zay isolated | 0.975 | 0.982 | 0.973 | 0.976 |
+  | 55 Sad Dad initial and medial | 0.969 | 0.976 | 0.946 | 0.946 |
+  | 58 Sin Shin initial | 0.961 | 0.971 | 0.951 | 0.951 |
+  | 60 Sin Shin final | 0.966 | 0.981 | 0.953 | 0.974 |
+  | 64 Ta Za pairs | 0.975 | 0.982 | 0.967 | 0.977 |
+
+  The other ten sheets follow when the GPU finishes them.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not

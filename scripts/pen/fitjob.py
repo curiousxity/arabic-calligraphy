@@ -11,7 +11,8 @@ A job is self-contained, so it can run on a computer without the repository:
              the job's `refine` options through (rough, edge, iters, res, fixed, others) against `pieces`
              (default: [piece]); "widen": the stroke `start` written with a pen as wide as its band and judged on
              every shape that draws it (widenjob.py, which documents its own fields); "tune": chosen nodes of fitted
-             strokes moved to clear a window or a joint, judged the same way (tunejob.py)
+             strokes moved to clear a window or a joint, judged the same way (tunejob.py); "scan": a laptop
+             script run here from a bundle of its files (scanjob.py)
     spacing  "fit" only: nuqta between a band's nodes (default SPACING); closer for a curl
     edge     "fit" only: the weight of the outline gap in the refine (default EDGE); higher holds small features, a
              slanted start or a hook, that the overlap barely sees
@@ -84,6 +85,9 @@ def run(job, log=print):
     if job.get("mode") == "tune":
         import tunejob
         return tunejob.run(job)
+    if job.get("mode") == "scan":
+        import scanjob
+        return scanjob.run(job)
     t = time.time()
     piece, O, PPN, PEN = job["piece"], np.asarray(job["origin"], float), float(job["ppn"]), float(job["pen"])
     pieces = job.get("pieces") or [piece]
@@ -115,6 +119,7 @@ def _plain(v):
 if __name__ == "__main__":
     job_f, out_f = sys.argv[1:3]
     job = json.load(open(job_f, encoding="utf-8"))
+    job["_queue"] = os.path.dirname(os.path.dirname(os.path.abspath(job_f)))  # the job sits in the queue's running/
     res = run(job, lambda *a: print(job["name"], *a, flush=True))
     with open(out_f, "w", encoding="utf-8") as f:
         json.dump(_plain(res), f)
