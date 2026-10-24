@@ -10,7 +10,8 @@ A job is self-contained, so it can run on a computer without the repository:
              docs/calligraphy/stroke-ledger.md); "refine": polish `start` (spec nodes) with pieces.refine, passing
              the job's `refine` options through (rough, edge, iters, res, fixed, others) against `pieces`
              (default: [piece]); "widen": the stroke `start` written with a pen as wide as its band and judged on
-             every shape that draws it (widenjob.py, which documents its own fields)
+             every shape that draws it (widenjob.py, which documents its own fields); "tune": chosen nodes of fitted
+             strokes moved to clear a window or a joint, judged the same way (tunejob.py)
     spacing  "fit" only: nuqta between a band's nodes (default SPACING); closer for a curl
     edge     "fit" only: the weight of the outline gap in the refine (default EDGE); higher holds small features, a
              slanted start or a hook, that the overlap barely sees
@@ -80,6 +81,9 @@ def run(job, log=print):
     if job.get("mode") == "widen":
         import widenjob
         return widenjob.run(job)
+    if job.get("mode") == "tune":
+        import tunejob
+        return tunejob.run(job)
     t = time.time()
     piece, O, PPN, PEN = job["piece"], np.asarray(job["origin"], float), float(job["ppn"]), float(job["pen"])
     pieces = job.get("pieces") or [piece]

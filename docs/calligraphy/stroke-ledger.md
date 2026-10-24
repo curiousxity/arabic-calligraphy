@@ -1797,6 +1797,70 @@ blunt lump. The studio's begins with a slanted point.
   (ours beside the studio) to mark. The point about 409 is that the
   studio is not the last word there: its own neck has a step where the
   head meets the body.
+- **Third look:** "5 371 the right connecting stroke is bloby", and later
+  "still bloby on the right where it connects to the prior letter". 371.s0
+  started with the nib spinning about 130 degrees over its first four nodes,
+  which drew a round lump. Setting the start angles alone, or a straight
+  run out to the end, did worse. `eyetune.py` on its first seven nodes,
+  the end weighed x25, gave the studio's square cut (0.975 -> 0.978). The
+  review copy of sheet 05 the user saw was older than this fix, so it was
+  refreshed and the close-up sent for a further look.
+
+**Reviews of 2026-10-23, second round.** The user's words are quoted per
+item; the shorthand gained `&` (defect) and `%` (window).
+- **Approved:** 13, 37 and 40 ("13 good", "37 ok", "40 ok"); 12 ("12 is
+  good"), which completes Dal Dhal, the second whole group in the
+  catalogue after Alif; 15, and 370 on sheet 05.
+- **Filled with the fine pen** (the outline drawn as a filled mark, as the
+  alif's and Ra's hats are): 714's right hat (496.s2, 501.s0; "35 714 right
+  hat`"), 717's hat (717.s0, 717.s1; "36 717v2 hat`"), the hamza's tail
+  (H01.s2; "24 right still too pointy", which settles decision 14 as
+  option 2), and the kaf's S mark (032.s4, 185.s8, 032.s2; 290.s9, 185.s9,
+  492.s0; 442.s4, 442.s5, 442.s6; "33 s in kaaf ` and ^&"). Every shape
+  sharing those pieces held or rose (the S mark: 491 0.968 -> 0.978, 492
+  0.971 -> 0.982, 442a 0.974 -> 0.982; 714 0.982 -> 0.984; H01 0.955 ->
+  0.979).
+- **A fill can't take a head with a window.** The Fa head's two pieces
+  outline the counter between them, and each piece's outline filled
+  closes it (372 0.968 -> 0.949). Heads with windows stay pen strokes.
+- **Cuts:** 642.s4's end 0.2 ("19 642 ` bottom right"); 656.s6's start 0.8
+  and 656.s7's 0.13 ("656 v13 `"); 373.s0's start 0.3, a hair below the
+  Fa's neck in 373 and 374 that cutting its end did not touch.
+- **553's head hair** ("553v2 ((`"): it was the start of 553.s0's nib edge,
+  not an overshoot, so cuts lost overlap without clearing it. Its first
+  node's nib turned 10 degrees and narrowed to 0.6 width cleared it.
+- **The Fa necks** ("14 ()^ still wrong. Maybe use the videos as a
+  reference"): the course (lesson 15) writes the head as two moves that
+  stop square and are rounded with the pen's tip, then the Ba body from a
+  1-nuqta neck. Our inner stroke ended in a tooth and a notch at the neck.
+  `eyetune.py` on the neck's nodes, then a second pass with **the edge's
+  length weighed** (`PERIM_W`: our edge length in the window against the
+  studio's, so a spike or notch counts though it adds little area; also
+  `EXTRA_WIN`, a window on each sharer) cleared them: 372 0.968 -> 0.975,
+  373 0.971 -> 0.976, 374 0.973 -> 0.972 after the hair cut.
+- **62's right joint** ("62 ))` right"): the ends of 274.s3/275.s4 and the
+  shared body 274.s2 tuned with both shapes' joints weighed.
+- **Sheet 23** ("653v10 saad ((^ issues. 656 v13 ` 657 v14 waw ((^` and ha %`
+  659v16 ha laam ^&"): 657's waw head and ha window corner, and 659's
+  ha-lam joint tuned with the edge length weighed (657 0.965 -> 0.968,
+  659 0.965 -> 0.967; 683, sharing 657.s1, held).
+- **Windows** ("49 % on all", "552 top window defect"): 438's took the
+  studio's pointed shape (0.964 -> 0.971). 436/437's and 552's did not come
+  clean in three laptop passes, nor 653's fork with tuning, cuts or a
+  shared end point: 552 and 653 are decisions 18 and 19; 436/437 went to
+  the GPU polish below.
+- **Sheet 11** ("11 ^ issues"): every stroke of its 25 shapes polished on
+  the Geekmini's GPU (`qpass.py` with `QPASS_ALL=1 QPASS_SUFFIX=qj`:
+  gpufit.refine from the nodes drawn now, outline x8), to be judged by
+  `vjudge.py` (`VJUDGE_SUFFIX=qj`). The user asked for the GPU: the
+  coordinate searches are one-node-at-a-time and suit a CPU, so a "tune"
+  mode for the worker's CPUs (`scripts/pen/tunejob.py`, `SCRATCH/me/tjob.py`:
+  eyetune's windows and joint.py's joint ends, self-contained like a widen
+  job) exists for local cleanup after it.
+- **Review pages:** every sheet of more than four shapes is now a folder
+  of pages, four pairs a page (`SCRATCH/me/splitsheet.py`), because the
+  tall sheets could not be read ("split and rerender the others because i
+  cant see them").
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not

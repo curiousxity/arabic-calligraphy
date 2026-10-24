@@ -16,7 +16,7 @@ any number of computers can share a queue. Results land in done/ (or failed/, wi
 import hashlib, json, os, shutil, socket, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CODE = ["fitjob.py", "gpufit.py", "pieces.py", "ribbon.py", "build.py", "widenjob.py", "outline.py", "fitqueue.py"]
+CODE = ["fitjob.py", "gpufit.py", "pieces.py", "ribbon.py", "build.py", "widenjob.py", "tunejob.py", "outline.py", "fitqueue.py"]
 ROOT = ["start-worker.bat", "install-packages.bat", "README.txt"]  # fitqueue/, at the queue's top, for whoever sets a worker up
 DIRS = ["todo", "running", "done", "failed", "code"]
 HOST = socket.gethostname()
