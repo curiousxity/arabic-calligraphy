@@ -1947,6 +1947,9 @@ item; the shorthand gained `&` (defect) and `%` (window).
 
   Before/after pictures are in the NAS fixes folder ("rebuilt from the
   studio's bands").
+- **Approved after the rebuild:** "436 437 and 414 are good". The Qaaf
+  catalogue rises to mean 0.976, lowest 0.960 (from 0.963 and 0.938).
+  414 is one shape of sheet 17, which is not yet approved as a whole.
 - **A picture's overlap is scored in its own frame.** The before and the
   after of a shape are drawn in frames that differ by the ink's extent.
   The first `bapic.py` scored the after against the before's studio mask,

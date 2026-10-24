@@ -52,12 +52,12 @@ Approved 2026-10-23: both sheets approved ("12 is good", "13 good").
 
 Approved 2026-10-23: both sheets approved ("50 ok", "49 ok").
 
-6 shapes, 18 strokes; overlap mean 0.963, lowest 0.938.
+6 shapes, 18 strokes; overlap mean 0.976, lowest 0.960.
 
 | id | form | variant | strokes | overlap | sheet |
 |---|---|---|---|---|---|
-| 436 | Isolated | 1 | 3 | 0.958 | [Isolated](comparisons/studio/Qaaf%20-%20Isolated.png) |
-| 437 | Isolated | 2 | 3 | 0.938 | [Isolated](comparisons/studio/Qaaf%20-%20Isolated.png) |
+| 436 | Isolated | 1 | 3 | 0.988 | [Isolated](comparisons/studio/Qaaf%20-%20Isolated.png) |
+| 437 | Isolated | 2 | 3 | 0.986 | [Isolated](comparisons/studio/Qaaf%20-%20Isolated.png) |
 | 438 | Isolated | 3 | 3 | 0.971 | [Isolated](comparisons/studio/Qaaf%20-%20Isolated.png) |
 | 439 | Final | 1 | 3 | 0.975 | [Final](comparisons/studio/Qaaf%20-%20Final.png) |
 | 440 | Final | 2 | 3 | 0.975 | [Final](comparisons/studio/Qaaf%20-%20Final.png) |
