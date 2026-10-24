@@ -1990,6 +1990,45 @@ item; the shorthand gained `&` (defect) and `%` (window).
   | 64 Ta Za pairs | 0.975 | 0.982 | 0.967 | 0.977 |
 
   The other ten sheets follow when the GPU finishes them.
+- **Review by marked pictures** (the user, 2026-10-24: "I can do the same if
+  you give me inline photos"). The pages go to the user as pictures; they
+  ring approved shapes in green and faults in red. A red ring's place on
+  the page gives a point on the shape and the stroke nodes within 0.4
+  nuqta of it (`marks.py`).
+- **Two ways to fix a mark, both on the Geekmini.**
+  - A window search (`tjob.py window`, CPU) moves and turns only the
+    nodes under the mark, judged on every shape drawing the stroke.
+  - A GPU polish (`gpumark.py`) refines the stroke with every other node
+    held (`fixed`). The user asked whether the GPU was in use; these fixes
+    had been CPU searches.
+
+  At each mark the one leaving less mismatch within 0.3 nuqta won, then a
+  before/after defect scan. The window search won at most marks. The GPU
+  polish moves only where overlap rises, and a 0.03-0.1 nuqta point barely
+  changes overlap, so it often handed the stroke back unchanged.
+- **Kept: 44 strokes on 21 shapes:**
+  - sheet 58: 196, 199-201, 204-207;
+  - sheet 18: 376, 378, 382, 385, 386, 390, 393;
+  - 371, 154, 030, 033, 277, 279.
+
+  Across 52 shapes, 21 faults went; the new ones are at the scanner's
+  floor (0.031-0.041).
+- **Not fixed.** 377's V needs ink the studio doesn't have: closing it in
+  the target also thickened the head's underside. 202, 203, 023, 031, 041
+  and 276 didn't improve. 028, 032, 040, 142, 384 and 392 traded the
+  marked fault for a new one of 0.05-0.28 (a fix to 382.s4 put a 0.18
+  point on 502 and 651, which share it).
+- **Approved by the user's green rings:**
+  - 197, 198, 208, 375, 379, 380, 381, 383, 387, 388, 389, 391, 394;
+  - 370, 155, 156, 022, 024-027, 029, 038, 039, 278;
+  - all of sheet 27 but 142 ("Only 1 problem in 27. The remaining marks
+    in 27 are ok").
+- **The review record had drifted.** Two `splitsheet.py` runs at once each
+  saved the whole record. The second save undid the first's renames, and
+  35 sheets were left pointing at folders that were gone. So the band
+  rebuild saw 19 sheets in review where there were 49. The record was
+  rebuilt from the folder, and `splitsheet.py` now saves only its own
+  sheets. The 30 missed sheets' 1137 strokes went to the GPU the same way.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
