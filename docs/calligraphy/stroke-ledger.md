@@ -1894,6 +1894,63 @@ item; the shorthand gained `&` (defect) and `%` (window).
   would open where the studio has paper, counted by area. Tuning the two
   ends' last nodes with it closed the fork (653 0.9736 -> 0.9737).
   `EYETUNE_WIDTHS=1` lets eyetune narrow or widen the nib too.
+- **Hairs, everywhere still in review.** 485 hair jobs on the Geekmini
+  (`tjob.py hair`, one per hair at a joint or sideways off a free end:
+  cut the end back, turn the nib, narrow it). 338 strokes came back
+  changed. 19 failed the gate: some shape lost more than 0.001, or its
+  worst miss grew more than 0.005. A before/after defect scan then found
+  that 124 shapes gained a new or deeper fault, nearly all notches where
+  a cut end bares the studio's ink. Kept: the 162 strokes whose every
+  shape came out clean, 173 shapes. That cleared 206 faults with no new
+  ones, and mean overlap rose 0.0006. **A hair cut needs the scan after
+  it;** the overlap alone passes a cut that leaves a notch.
+- **The band method for every flagged shape** (the user, 2026-10-24,
+  "yes", to using it beyond 643 and 552). `chord.py auto` finds a piece's
+  two edges from the fitted stroke: its first and last nibs' corners land
+  on the studio ring. The start cap is the short way between the first
+  two, and each edge walks away from it to the first end corner. A shared
+  stroke is built from its home shape's piece, in that shape's frame.
+  Built straight from the band, before any fitting, 372 went 0.975 ->
+  0.982, 373/374 0.978 -> 0.986 and 400 0.961 -> 0.968; 403 and 409 fell a
+  little. The end search ran on the laptop until the user asked for the
+  GPU ("from now on, i want you to try to run everything you can via the
+  geekmini gpu"). Each band is now polished on the GPU instead
+  (`bandq.py`: refine mode, from the band, widths held, outline x8) and
+  judged against both the band as built (`.br`) and the stroke drawn now.
+  108 strokes in 27 groups of shapes that share strokes; none failed on
+  the GPU. vjudge passed 64 polished and 58 as built. Each stroke took the
+  polished one where it passed, else the band as built (6). Over the 57
+  shapes drawing them, mean overlap rose 0.010, and every shape gained
+  (0.0015 to 0.048). 185 faults went and 18 shapes gained one, most at
+  the scanner's floor (0.031, an end's corner a hair round). Three were
+  real:
+  - 230.s3 put a tooth on 495 and 495a and reshaped 438's window, so it
+    was dropped.
+  - 373.s0's band start left a hair under 374; a 0.05 cut cleared it.
+  - 229/230's tip ends in a small fork (0.03) where it had a 0.115 hair;
+    kept as the lesser fault.
+
+  Kept: 69 strokes. Some of the gains:
+
+  | shape | before | after |
+  |---|---|---|
+  | 437 | 0.938 | 0.986 |
+  | 413 | 0.932 | 0.973 |
+  | 436 | 0.958 | 0.988 |
+  | 429 | 0.954 | 0.978 |
+  | 400 | 0.961 | 0.978 |
+  | 670 | 0.969 | 0.987 |
+  | 228 | 0.967 | 0.985 |
+  | 372 | 0.975 | 0.989 |
+  | 401 | 0.976 | 0.984 |
+  | 637 | 0.982 | 0.989 |
+
+  Before/after pictures are in the NAS fixes folder ("rebuilt from the
+  studio's bands").
+- **A picture's overlap is scored in its own frame.** The before and the
+  after of a shape are drawn in frames that differ by the ink's extent.
+  The first `bapic.py` scored the after against the before's studio mask,
+  which showed 414 falling (0.969 -> 0.962) when it rose (-> 0.977).
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
