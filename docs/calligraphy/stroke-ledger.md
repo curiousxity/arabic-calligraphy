@@ -2262,6 +2262,44 @@ item; the shorthand gained `&` (defect) and `%` (window).
     shorten it but cannot widen it.
   - *Queue names:* a scan the worker takes before its rename to `fast-`
     finishes as `scan-`, so a watch counts both.
+- **Round nine of end pages, and the window judge** (2026-10-25). Of
+  eleven rings on batch 9, 361, 367 and 317b cleared in one round, while
+  321's and 336's joint notches only shrank. 201's tooth spike did not
+  move in two rounds. A review of the six open decisions (the user asked
+  for Fable's opinion) found the cause of most returns-unchanged:
+  - *The judge did not excuse a neighbour's ground.* `gpufit.refine` keeps
+    its start unless a schedule beats it on `iou - gap95 - corner *
+    window_worst`. The corner term in the cost excuses ink on the
+    neighbours' pieces (`ignore`), but `window_worst` counted it as a
+    worst miss. So a stroke run on through a joint, the very thing that
+    fills a rounded peak, was judged worse and thrown away. Fixed: the
+    judge leaves out ink on the `ignore` ground (commit 36e9735).
+    Afterwards:
+    - 250's notch went 0.0105 → 0.0039;
+    - 248's edge went 0.0156 → 0.0064 (positions only, `GPU_WIDTHS=0`,
+      spread 2; a width pinned at a clamp had gamed the window).
+  - *Don't send the neighbours along as `others` for a ring round.* The
+    judge's `gap95` then reads the neighbours' whole outline (about 9
+    nuqta), which drowns any gain at the ring, and every job came back as
+    it went in. `gpumark.py` leaves them out (`GPU_OTHERS=1` sends them).
+  - *A spike can be another stroke's start.* 189's head spike was s4's
+    start stamp, 0.16 nuqta from the ring and never freed. A trim at that
+    tip (`tjob.py hairat`) took it off, leaving a low stub where the
+    studio has a small rounded hump.
+  - *Not cleared:*
+    - 432: a hairpin (100° of nib turn between nodes 0.08 apart),
+      re-laid on an even arc (`SCRATCH/me/reseed.py`, bend by heading),
+      rounded its corner but cost the letter 0.005 of overlap.
+    - 190: a gentler smoothness weight (`GPU_ROUGH=0.005`) left the tip
+      worse.
+    - 470: the trim changed nothing, because the miss is studio ink left
+      bare, not a spur.
+    - 201: the spike goes only when the shared 178.s2 moves, which costs
+      196 0.0035 of overlap; that went to the user as decision 07.
+    - 321's notch did not move again.
+
+  Decisions 02, 05 and 06 were retired as fixed. Each has a
+  before/after/studio picture in the fixes folder.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
