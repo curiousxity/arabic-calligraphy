@@ -2330,14 +2330,54 @@ item; the shorthand gained `&` (defect) and `%` (window).
     where 180.s1 meets 175.s3, which 18 shapes share, and 180.s1 had
     only four nodes from the first tooth's tip to that corner. Every
     round could only pull the whole stroke, so one try raised the
-    tooth's tip. Next: midpoints added (four nodes to seven), the
+    tooth's tip. Midpoints were added (four nodes to seven), the
     tooth's nodes held, and the end polished (`SCRATCH/me/job45.py`).
+    The GPU handed the seed back unchanged. At the sheets' resolution
+    the step is 0.02 nuqta of our ink past the studio's (a fifth of the
+    0.1-nuqta scale), and it shows only in the 3× close-up. The studio's
+    rounded corner there lies on 175.s3's ground, so 180.s1's own target
+    never asks for it. The user took "now" (2026-10-25, "Ok" to accepting
+    it as a subtle joint irregularity).
   - *What these taught:*
     - When a width-free round gains, look at the widths it chose: a
       width at a clamp, or a swing along the stroke, is the window
       being gamed.
     - A stroke with few nodes cannot change its end without moving its
       other end.
+
+- **Round ten of end pages, and every old ring measured again**
+  (2026-10-25):
+  - *End pages 10:* all eight touch-ups were marked green. Seven
+    scanned clean and were kept (645.s6, 647.s6, 549.s2, 646.s6, 648.s5,
+    744.s0, 432.s0). 743.s0's scan flagged the tail's bottom point at
+    0.064 nuqta. It was a point before the touch-up too, and a GPU round
+    on it came back unchanged, so the user decides (decision 15).
+  - *The user's rings on those pages* (645's lower joint, two on 647's
+    loop, 646's top-bar tip) were polished on the GPU (`gpumark` g48)
+    and kept after a clean scan. 646's tip barely moved the mismatch
+    area (0.0058 → 0.0054) but lost its jag and hook. The picture, not
+    the number, showed that.
+  - *Every ring ever marked* (360, from every `marks.json`) was measured
+    on the letters as kept now (`SCRATCH/me/ringcheck.py`: the deepest
+    ink off the studio's either way within 0.25 nuqta of the ring):
+    - 337 were under 0.05 nuqta. 23 were at 0.05 or more, 7 of them at
+      0.1 or more.
+    - 392's right ring was left out, since it differs from the studio on
+      purpose (the user's fill).
+    - The other 21 rings were rerun on the GPU with the fixed window
+      judge (g47). Fourteen came back better, and every shape they touch
+      scanned clean except 572. Kept: 041, 461, 393, 183, 067, 453 (with
+      the shared 385.s6), 187, 323 and 715.
+    - Not kept, put to the user as decisions 09 to 14: 028 and 459 trade
+      a gap for a bump; 142, 171 and 077 gained nothing or grew a step;
+      572 cleared its ring, but the scan flagged a tick beside it.
+  - *Decision 08 closed:* "now" kept for 180 (above).
+  - *What this taught:* the mismatch area round a ring misses the shape
+    of a fault. A jag or hook barely changes the area. Look at the
+    close-up before calling a round useless.
+  - *The Geekmini* runs at most 3 jobs at once from now on (the user,
+    2026-10-25: "Decrease parallel tasks to 3 at a time max";
+    `workers.json`).
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
