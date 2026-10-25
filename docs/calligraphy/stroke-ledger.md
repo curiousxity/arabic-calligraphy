@@ -2165,6 +2165,42 @@ item; the shorthand gained `&` (defect) and `%` (window).
   The user, 2026-10-25, chose "A": trim the tips. All three go to the hair
   search (cut back, turn or narrow the end's nib), aimed at the ring
   (`tjob.py hairat`).
+- **Judging the stroke-end touch-ups.** One page a shape: the whole letter
+  now, touched up and the studio's across the top, and under each a
+  close-up of the end drawn at three times the sheets' resolution
+  (`SCRATCH/me/endpages.py`). Smaller pages were "too small and
+  pixelated". The marking the user and I agreed:
+  - green on a column keeps that end ("now" keeps the old one);
+  - a red ring anywhere becomes a red mark, fixed on the GPU
+    (`gpumark.py`);
+  - a red dot on a tip means "lengthen a little bit" (the user,
+    2026-10-25);
+  - an unmarked or unreturned page keeps the touch-up.
+
+  Every keep still passes a before/after defect scan first.
+- **The first two rounds of end pages** (28 shapes, 2026-10-25). 21
+  touch-ups were kept, 2 old ends stayed (088.s1, 159.s0), and 2 tips were
+  lengthened. The user: "A lot of improvement but there are also some
+  other errors that i guess i didnt see before".
+  - *The scan:* one new fault, on 175. Its kept tip has a 0.055-nuqta spur
+    the scan doesn't like. The user had looked at that close-up and chosen
+    it, so it stays.
+  - *Lengthening:* the tip is stretched along its own direction over its
+    last 0.4 nuqta, the end moving 0.08 nuqta and nothing behind 0.4
+    moving (`SCRATCH/me/lengthen.py`). Moving only the end node folded
+    158, whose last nodes sit 0.02 nuqta apart. 158 also had a hook in its
+    second node, which drew a hair spike once stretched, so that node was
+    dropped. Both tips go back to the user before they are kept.
+  - *Red rings on the same pages:* 20 rings became GPU polishes. Most were
+    joints and tooth bottoms the end pages showed larger than the sheets
+    did. They were kept where the scan stayed clean.
+    - *085d:* the first round turned the tip the wrong way. A second
+      round (corner 4, window 0.5 nuqta) put it on the studio's edge.
+    - *170:* the whole top-right turn sat about a third of a nuqta left of
+      the studio's. The first round closed two thirds of that. A second
+      round, starting from the first round's result, is running.
+    - *191:* the first round grew the spur, so it is running again with
+      more nodes free.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
