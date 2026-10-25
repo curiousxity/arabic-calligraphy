@@ -200,8 +200,10 @@ def _ink_loop(ea, eb, x1, y1, r, H, W, soft):
     return torch.sigmoid(depth * r / soft)
 
 
-def window_worst(nodes, pieces, origin, ppn, pen_px, others=(), windows=()):
-    """The deepest miss either way (nuqta) inside the windows, on a hard raster of the strokes and the pieces."""
+def window_worst(nodes, pieces, origin, ppn, pen_px, others=(), windows=(), ignore=()):
+    """The deepest miss either way (nuqta) inside the windows, on a hard raster of the strokes and the pieces. Ink on
+    `ignore`'s ground (the neighbours' pieces) is no miss, as in _refine's corner term: without that, a stroke run on
+    through a joint was judged worse than its start and every schedule's result was thrown away (2026-10-25)."""
     if not windows:
         return 0.0
     rings = [ref_ring(p) for p in pieces]
@@ -216,12 +218,15 @@ def window_worst(nodes, pieces, origin, ppn, pen_px, others=(), windows=()):
         cv2.fillConvexPoly(A, cv2.convexHull(to_px(h)), 1, cv2.LINE_8, 4)
     for ring in rings:
         cv2.fillPoly(B, [to_px(ring)], 1, cv2.LINE_8, 4)
+    D = np.zeros((H, W), np.uint8)
+    for p in ignore:
+        cv2.fillPoly(D, [to_px(ref_ring(p))], 1, cv2.LINE_8, 4)
     yy, xx = np.mgrid[0:H, 0:W]
     win = np.zeros((H, W), bool)
     for x, y, rad in windows:
         cx, cy = (np.asarray(origin) + np.array([x, y]) * ppn - [x1, y1]) * r
         win |= np.hypot(xx - cx, yy - cy) < rad * WIN_PXN
-    o, u = win & (A == 1) & (B == 0), win & (B == 1) & (A == 0)
+    o, u = win & (A == 1) & (B == 0) & (D == 0), win & (B == 1) & (A == 0)
     wo = cv2.distanceTransform(1 - B, cv2.DIST_L2, 5)[o].max() / WIN_PXN if o.any() else 0.0
     wu = cv2.distanceTransform(1 - A, cv2.DIST_L2, 5)[u].max() / WIN_PXN if u.any() else 0.0
     return float(max(wo, wu))
@@ -239,7 +244,7 @@ def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fi
     def judged(ns):
         s = score([ns, *others], pieces, origin, ppn, pen_px, ignore)
         if windows:
-            s = {**s, "window_worst": round(window_worst(ns, pieces, origin, ppn, pen_px, others, windows), 4)}
+            s = {**s, "window_worst": round(window_worst(ns, pieces, origin, ppn, pen_px, others, windows, ignore), 4)}
         return s, s["iou"] - s["gap95"] - corner * s.get("window_worst", 0.0)
     s0, k0 = judged(nodes)
     best = (nodes, s0, k0)  # never hand back worse than it was given
