@@ -2098,6 +2098,14 @@ item; the shorthand gained `&` (defect) and `%` (window).
   and 119 from 0.964 to 0.976 (worst 0.119 to 0.046). Nine marks (045, 052,
   057, 067, 068, 069, 070b, 073, 075) found no candidate that helped and
   stay as they were.
+- **Fourth round, the rest** (Kaf pairs, Mim, Lam medial, Fa, Ha, Nun, Ta
+  Za: 47 marked shapes whose jobs came back last). 73 strokes were kept.
+  The scan found a new fault of 0.05 or more in nine shapes.
+  - *Swapped:* 450 took the GPU candidate instead, and passed.
+  - *Left as they were:* the other candidate still added a spur for 293,
+    373, 572 and 573. For 293 and 373 the spur was on a sharer, 295 and
+    the approved 374. For 397, 454, 459 and 461 there was no other
+    candidate that helped.
 - **Stroke starts: what the rings on a start are.** The user ringed the
   start of 047, 053, 055 and 066, where our cut's corner differs from the
   studio's.
