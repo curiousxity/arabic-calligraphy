@@ -343,6 +343,69 @@ results) and the queue's `done/` (`jd-c11-*` to `jd-c14-*`).
   `harf-research/laptop/c15/` on the NAS (`approved_ala_p67.json`), the
   queue runs in its `done/` (`jd-c15-*`, `jd-c15s-*`, `jd-c15f-*`).
 
+## The narrow nib, and the ain before انفسهم (2026-10-24)
+
+- **A second, narrower nib.** The fitter knows one pen. To fit with a
+  narrower one, the queue job's pen is set to that width, and the node
+  widths that come back are rescaled to the main nib, so a node width
+  under 1 means the narrower pen. Nothing in the fitter changed.
+- **The ain's head takes half the nib.** Fitted three ways to the
+  approved head cut (the body written under it counts neither way): a
+  third of the nib, the course's small pen (lesson 6), overlap 0.73,
+  worst miss 0.18 nuqta, too thin for his head in one pass; half the nib
+  0.91 / 0.07, filling the curl with almost no spill; the main nib
+  0.91 / 0.88, spilling into the curl again. His head is bolder than the
+  teacher's, and lesson 1 gets half width from one pen by letting part
+  of the nib touch. The user chose half ("Yes half nib"); whole letter
+  0.935 against 0.932.
+- **Smoothing a stroke is evening out the nib's turn.** Between two nodes
+  the nib turns at a steady rate; wherever that rate jumps, the edge gets
+  a small corner. Resampling the nodes closer and evening out the angle
+  along the stroke, without moving it, made the turning 2 to 4 times
+  smoother in the lam, the ya and the ain's body, and took out a hair at
+  the lam–ya joint and notches along the body. The head's curl really
+  turns that tightly and stayed about the same. The user asked for it:
+  "The jagged edges is the cause of some of the bleeding problems".
+- **Smoothing did not reduce the ink on paper.** It went up, 504 px to
+  553, because it also evens out places where the nib had narrowed to
+  stay inside his edge. The folds it removes were real spills, so it is
+  kept, but it is not a fix for bleeding on its own. Of two smoothed
+  versions the user took the one with the body as before (0.931) over a
+  refitted body that filled his tip with a fold (0.936).
+- **A full nib cannot make his rounded club.** The body's tip ends in a
+  round club. One full-nib pass reaches its top only by turning sharply
+  at the start, which leaves a point, and a step on the upper edge where
+  the turned nib's corner sticks out. Three refits and a tip-local polish
+  around the user's marks (magenta to cover, green bleed made
+  off-limits) all left the point and the step.
+- **A half-nib touch rounds it.** A second, short stroke (`ain.cap`),
+  with the user's agreement. The body ends three nodes earlier, its
+  straight nib edge below his top. The touch's cut is his ink in the tip
+  minus the body, the crossing strokes and the green mark, keeping every
+  piece of 20 px or more. A first cut kept only the largest piece and too
+  wide a margin round the green, and lost a wedge on the top left ("Just
+  missing a piece on top"). Where the touch lies over the body the overlap
+  is hidden in the ink.
+- **The user's second marks.** On the touch's first fit: a squarish
+  corner at the lower right, where his ink runs into the crossing letter
+  (green: cut, made off-limits), and a bend in the upper edge where the
+  touch meets the body (blue: smooth). The bend was measured as the
+  sharpest turn of the outline at 16x and the touch's tail pulled inward
+  until it fell from about 20 degrees to 5 while clear of both greens.
+- **Closing a pinhole between two strokes.** Each refine of the touch
+  reopened a pinhole of paper between it and the body's end, and nudging
+  the body's last node bared its end corner as a dent. What closed it:
+  the body runs on a little (0.15 nuqta) along its own direction under
+  the touch, its width narrowing to half the nib, checked at 16x.
+- **Result.** The whole letter: overlap 0.937, worst out 0.13, worst short
+  0.19 nuqta (0.18 before the touch: the body's upper edge lower down
+  sits about a pixel inside his ink); ink on paper 553 px to 520; no
+  pinholes; his ink inside the cut corner left bare, as asked. Still
+  there: an angled end with mild corners at the cut, and the bumps on
+  the lower right of the ya's bowl. Approved by the user ("yes"). Nodes in
+  `harf-research/laptop/c15/approved_ala_p67_anfusihim.json` on the NAS,
+  queue runs `jd-c15n-*`, `jd-c15j-*`, `jd-c15cap-*`, `jd-c15cap2-*`.
+
 ## Sabti's moves, letter by letter
 
 How Sabti writes each letter on his plate (Beirut Jali volume, p. 9): the
