@@ -5,8 +5,9 @@ judged on every shape that draws the strokes, as the comparison sheets draw it (
     search "window"  eyetune.py: positions (and with `angles`, nib angles; with `widths`, the nib's width, 2 x the
                      step, kept within 0.3-1.5) in steps STEPS; the score is the mean
                      overlap of every shape minus win_w/100 x each window's mismatch (plus perim_w x its edge length
-                     against the studio's, so a spike or notch counts though it adds little area); no shape may fall
-                     more than `floor` below where it began
+                     against the studio's, so a spike or notch counts though it adds little area; plus corner_w x its
+                     worst miss in nuqta, so a corner cut off by 0.03 nuqta counts though it adds almost no area or
+                     edge); no shape may fall more than `floor` below where it began
     search "hair"    SCRATCH/me/autocut.py, one hair at one stroke end: the end cut back along its path (CUTS), its
                      node's nib turned (TURNS) or narrowed (WIDTHS), or turned and narrowed; of those that bring our
                      ink within CLEAR of the studio's within R of the hair without any shape losing more than
@@ -26,9 +27,11 @@ Like a widen job it is self-contained: the reading side (SCRATCH/me/tjob.py) res
              (the shape's own frame), so they hold when the frame's corner moves with the ink; optional close:
              [[x0, y0, x1, y1, r]], boxes (screen px) where the studio's ink is closed with a disc of r nuqta before
              judging, for a notch the user said the studio should not have either (401's and 409's necks)
-    win_w, perim_w, angles, widths, floor    "window"'s weights (defaults 10, 0, true, false, 0.001); widths, the
-             user's red rings on stroke starts (2026-10-24): a cut whose width is off steps the edge beside it, and
-             positions and angles alone cannot close that
+    win_w, perim_w, corner_w, angles, widths, floor    "window"'s weights (defaults 10, 0, 0, true, false, 0.001);
+             widths, the user's red rings on stroke starts (2026-10-24): a cut whose width is off steps the edge beside
+             it, and positions and angles alone cannot close that; corner_w, the same rings (2026-10-25): what they
+             ring is mostly a corner of the studio's cut our ink misses by about 0.04 nuqta, too little area for the
+             overlap or the edge length to see
 The result: {name, kind "tune", job (the first stroke), jobs {job: nodes}, judge {shape: {before, after}}, score,
 seconds, host, cpus, gpu, settings}; before and after are [overlap, worst miss in nuqta]."""
 import copy, os, socket, time
@@ -78,15 +81,28 @@ class Shapes:
 
 iou = lambda A, B: float((A & B).sum() / max(1, (A | B).sum()))
 edge = lambda M: int((M ^ cv2.erode(M, np.ones((3, 3), np.uint8))).sum())
+MARGIN = 0.3  # nuqta round a window that the corner term's distances may reach into
+
+
+def worst_in(A, B, box, pxn):
+    """widenjob.worst() of the pixels inside box (x0, y0, x1, y1), with distances measured in a margin round it."""
+    x0, y0, x1, y1 = box; m = int(MARGIN * pxn)
+    X0, Y0 = max(0, x0 - m), max(0, y0 - m)
+    a, b = A[Y0:y1 + m, X0:x1 + m], B[Y0:y1 + m, X0:x1 + m]
+    inside = np.zeros(a.shape, bool); inside[max(0, y0) - Y0:y1 - Y0, max(0, x0) - X0:x1 - X0] = True
+    o, u = inside & (a == 1) & (b == 0), inside & (b == 1) & (a == 0)
+    wo = cv2.distanceTransform((1 - b).astype(np.uint8), cv2.DIST_L2, 5)[o].max() / pxn if o.any() else 0.0
+    wu = cv2.distanceTransform((1 - a).astype(np.uint8), cv2.DIST_L2, 5)[u].max() / pxn if u.any() else 0.0
+    return float(max(wo, wu))
 
 
 def window(job, sh):
-    win_w, perim_w = job.get("win_w", 10.0), job.get("perim_w", 0.0)
+    win_w, perim_w, corner_w = job.get("win_w", 10.0), job.get("perim_w", 0.0), job.get("corner_w", 0.0)
     angles, floor = job.get("angles", True), job.get("floor", 0.001)
     widths = job.get("widths", False)
 
     def judge(cur):
-        tot, loc, ious = 0.0, 0.0, {}
+        tot, loc, cor, ious = 0.0, 0.0, 0.0, {}
         for k in job["shapes"]:
             A, B, c0 = sh.draw(k, cur); ious[k] = iou(A, B); tot += ious[k]
             for w in job["shapes"][k].get("windows", []):
@@ -95,7 +111,9 @@ def window(job, sh):
                 loc += float((a != b).sum()) / max(1, (a | b).sum())
                 if perim_w:
                     loc += perim_w * abs(edge(a) - edge(b)) / max(1, edge(b))
-        return tot / len(ious) - win_w * loc * 0.01, ious
+                if corner_w:
+                    cor += corner_w * worst_in(A, B, (x0, y0, x1, y1), sh.pxn)
+        return tot / len(ious) - win_w * loc * 0.01 - cor, ious
 
     cur = {j: copy.deepcopy(s["start"]) for j, s in job["strokes"].items()}
     best, i0 = judge(cur)
@@ -288,7 +306,7 @@ def run(job):
     before = verdict(start)
     cur = {"joint": joint, "hair": hair}.get(job["search"], window)(job, sh)
     after = verdict(cur)
-    keys = ("search", "win_w", "perim_w", "angles", "widths", "floor")
+    keys = ("search", "win_w", "perim_w", "corner_w", "angles", "widths", "floor")
     return {"name": job["name"], "kind": "tune", "job": next(iter(job["strokes"])), "jobs": cur,
             "nodes": cur[next(iter(job["strokes"]))],
             "judge": {k: {"before": before[k], "after": after[k]} for k in job["shapes"]},
