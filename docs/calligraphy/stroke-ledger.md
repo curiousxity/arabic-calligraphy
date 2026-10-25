@@ -2441,6 +2441,37 @@ item; the shorthand gained `&` (defect) and `%` (window).
     - 722's head start came out squared like the studio's, but the scan
       flagged a bigger tick inside the head. It waits for the user's
       marks on those pages.
+- **Decisions answered by drawing on them** (2026-10-25). The user asked
+  for the decision pictures in the chat ("Give me the decisions in the
+  chat so i can draw and send them back") and drew on the close-ups. A
+  ring round a column picks it. A drawing marks what to change on the
+  column it is drawn on. `SCRATCH/me/decmarks.py` turns a drawing into
+  marks: the centroid of each drawn blob, offset from the decision's
+  ring by where it sits in the close-up.
+  - *Picked as drawn, done:*
+    - 15, 743: the touched-up tail (kept from `e743`).
+    - 42, 159: the second GPU round (red54).
+    - 44, 719: now. The shared 719.s0 stays as it is.
+    - 47, 164: now.
+  - *Drawn on, back on the GPU, each starting from the column drawn on:*
+    - 09, 028: the gap at the joint filled on now (g59, the neighbours
+      sent along).
+    - 10, 459: from the GPU's version, the step on the left smoothed
+      and the tick on the right cleared.
+    - 11, 142: now's left side filled out, blunt like the studio's.
+    - 12, 171: the inside of the downstroke filled out under the turn.
+    - 13, 077: the GPU's tip cut back where it swells.
+    - 14, 572: from the GPU's version, the left corner rounded and the
+      bottom tick cleared (all g58).
+    - 41, 154: from round 2, the left edge straight up to a corner
+      (g60).
+    - 46, 637: the studio's small notch at the joint, cut into now
+      (g60).
+  - *715's barb* (decision 45): the GPU never moved the tip, because it
+    has nothing to start a barb from. So the barb was begun by hand: two
+    nodes added before the tip, 0.5 nuqta down and to the left, thin.
+    The pen now starts at the barb's end, runs up to the tip, turns there
+    and comes down the stem. A GPU round from there (g61, smoothing 0.02) shapes it.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
