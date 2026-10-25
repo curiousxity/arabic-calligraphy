@@ -2300,6 +2300,44 @@ item; the shorthand gained `&` (defect) and `%` (window).
 
   Decisions 02, 05 and 06 were retired as fixed. Each has a
   before/after/studio picture in the fixes folder.
+- **The user's decisions, and what came after them** (2026-10-25):
+  - *04, 190:* "4 b". The tip trim B (red33t t20) was kept.
+  - *07, 201:* "7 a but there are problems elsewhere". A, the shared
+    178.s2 moved, was kept: the tooth spike is gone, and 196 eases from
+    0.972 to 0.968. On a clean page of 201 and the three letters
+    sharing that stroke (`SCRATCH/me/markme.py`), the user ringed eight
+    more misses:
+    - the spurs at the joins of 178 and 180 cleared in one round;
+    - 201's middle tooth and last corner, and 196's inner corner and
+      right edge, cleared in a second, stronger round (corner 4, window
+      0.5, spread 2);
+    - 180's right end did not clear (below).
+  - *03, 470:* "Same problem" as 432, more correct but with a new
+    fault. Starting from A, the bump under the tail turned out to be
+    470.s3's nib grown to 1.28 at one node. Removing that width and
+    polishing positions only (`GPU_WIDTHS=0`) cleared it with the joint
+    still filled. Kept.
+  - *01, 432:* "now i guess", after ten tries, none of which gave the
+    studio's round inner arch:
+    - B, which had freed the whole stroke, swung the nib's width from
+      0.3 to 1.29 along it. That swing is the step the user saw, and
+      taming the widths (plain or smoothed) lost the loop.
+    - A pen pivot (`SCRATCH/me/pivot.py`: the turn's two nodes merged
+      into one `corner` node, run on the worker's CPU) sharpened the
+      turn instead of rounding it.
+    - Polishing from the pivot shrank the step but kept a point.
+  - *08, 180's right end:* "None of them are correct". The corner is
+    where 180.s1 meets 175.s3, which 18 shapes share, and 180.s1 had
+    only four nodes from the first tooth's tip to that corner. Every
+    round could only pull the whole stroke, so one try raised the
+    tooth's tip. Next: midpoints added (four nodes to seven), the
+    tooth's nodes held, and the end polished (`SCRATCH/me/job45.py`).
+  - *What these taught:*
+    - When a width-free round gains, look at the widths it chose: a
+      width at a clamp, or a swing along the stroke, is the window
+      being gamed.
+    - A stroke with few nodes cannot change its end without moving its
+      other end.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
