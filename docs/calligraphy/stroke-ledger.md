@@ -2074,6 +2074,16 @@ item; the shorthand gained `&` (defect) and `%` (window).
   569). They go through the usual touch-up now. The real fix belongs with
   letter joins: a joint step that fills the corner as a calligrapher does
   with a fine pen, since the nib's stamps alone can't close it.
+- **Fourth round of red marks, first part** (sheets 8, 9, 11, 55, 60; the
+  user, 2026-10-24: "Send whatever you have"). The 42 marked shapes whose
+  jobs had all come back went through before the rest. 63 strokes were
+  kept. The scan caught four candidates with a new fault of 0.05 or more.
+  080 and 085c took the GPU candidate instead. 067 and 077 stay as they
+  were, since no candidate helped them without the fault, and neither
+  candidate helped 068. 020.s0 is shared by 020 and 045, and each shape's
+  mark gave it a different fix. 020's own fix was kept because 020 is on
+  its third attempt, so 045's mark there may still show. `SCRATCH/me/
+  redstat.py` lists which marked shapes have all their jobs back.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
