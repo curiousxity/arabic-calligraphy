@@ -2029,6 +2029,30 @@ item; the shorthand gained `&` (defect) and `%` (window).
   rebuild saw 19 sheets in review where there were 49. The record was
   rebuilt from the folder, and `splitsheet.py` now saves only its own
   sheets. The 30 missed sheets' 1137 strokes went to the GPU the same way.
+- **Judging moved to the Geekmini too** (2026-10-24). The judge
+  (`vjudge.py`), the defect scans and the trials of held strokes now run
+  there as scan jobs. Jobs named `fast-` go ahead of everything else; their
+  results are renamed back when done. The laptop builds bands, keeps
+  strokes and draws pages.
+  - The nine missed sheets under five shapes (14, 19, 35, 36, 47, 54, 62,
+    65, 66; the user, "Give me some <5 of the missed sheets") were moved
+    to the front. Kept: 26 of 54 strokes; 42 faults went. 630b.s0 stayed
+    out for a 0.07 notch.
+  - The next eight sheets to finish (8, 9, 33, 34, 39, 42, 45, 46): the
+    judge passed 301 of 485 strokes. Kept 218, the clean 156 and 62 that
+    passed alone. 364 faults went; the faults added are at 0.045 or less.
+    Mean overlap rose 0.007.
+- **Second round of red marks** (sheets 11, 18, 55, 60, 64). Kept 40
+  strokes on 21 shapes, with the GPU polish for 297 and 298.
+  - 261's and 270's sad tooth now rises to the studio's point. The window
+    search carried it up: +0.020 and +0.026 overlap.
+  - 019, 034 and 294 traded the marked fault for a new one of 0.05 or
+    more, and stay as they were.
+- **Studio flaws to fill:** 637 ("637 needs to be filled in. It is wrong
+  on the studio") and 377 have the same thin slit between the head's tail
+  and the stroke. Both are now window searches with the studio's slit
+  closed only inside a tight box (`CLOSE`, r 0.12). Last time a wide box
+  thickened 377's underside.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
