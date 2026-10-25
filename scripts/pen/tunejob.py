@@ -2,7 +2,8 @@
 (SCRATCH/me/eyetune.py and joint.py, 2026-10-23) run on a worker. Each is a coordinate search on chosen nodes,
 judged on every shape that draws the strokes, as the comparison sheets draw it (widenjob.py's masks()).
 
-    search "window"  eyetune.py: positions (and with `angles`, nib angles) in steps STEPS; the score is the mean
+    search "window"  eyetune.py: positions (and with `angles`, nib angles; with `widths`, the nib's width, 2 x the
+                     step, kept within 0.3-1.5) in steps STEPS; the score is the mean
                      overlap of every shape minus win_w/100 x each window's mismatch (plus perim_w x its edge length
                      against the studio's, so a spike or notch counts though it adds little area); no shape may fall
                      more than `floor` below where it began
@@ -25,7 +26,9 @@ Like a widen job it is self-contained: the reading side (SCRATCH/me/tjob.py) res
              (the shape's own frame), so they hold when the frame's corner moves with the ink; optional close:
              [[x0, y0, x1, y1, r]], boxes (screen px) where the studio's ink is closed with a disc of r nuqta before
              judging, for a notch the user said the studio should not have either (401's and 409's necks)
-    win_w, perim_w, angles, floor    "window"'s weights (defaults 10, 0, true, 0.001)
+    win_w, perim_w, angles, widths, floor    "window"'s weights (defaults 10, 0, true, false, 0.001); widths, the
+             user's red rings on stroke starts (2026-10-24): a cut whose width is off steps the edge beside it, and
+             positions and angles alone cannot close that
 The result: {name, kind "tune", job (the first stroke), jobs {job: nodes}, judge {shape: {before, after}}, score,
 seconds, host, cpus, gpu, settings}; before and after are [overlap, worst miss in nuqta]."""
 import copy, os, socket, time
@@ -80,6 +83,7 @@ edge = lambda M: int((M ^ cv2.erode(M, np.ones((3, 3), np.uint8))).sum())
 def window(job, sh):
     win_w, perim_w = job.get("win_w", 10.0), job.get("perim_w", 0.0)
     angles, floor = job.get("angles", True), job.get("floor", 0.001)
+    widths = job.get("widths", False)
 
     def judge(cur):
         tot, loc, ious = 0.0, 0.0, {}
@@ -104,11 +108,18 @@ def window(job, sh):
                     moves = [(step, 0, 0), (-step, 0, 0), (0, step, 0), (0, -step, 0)]
                     if angles:
                         moves += [(0, 0, step * 100), (0, 0, -step * 100)]
+                    if widths:
+                        moves += [(0, 0, 0, step * 2), (0, 0, 0, -step * 2)]
                     for d in moves:
                         c = copy.deepcopy(cur); q = c[j][i]; p = q["p"]
                         q["p"] = [round(p[0] + d[0], 4), round(p[1] + d[1], 4)]
                         if d[2]:
                             q["angle"] = round(q.get("angle", 145) + d[2], 2)
+                        if len(d) > 3:
+                            w = round(q.get("width", 1.0) + d[3], 3)
+                            if not 0.3 <= w <= 1.5:
+                                continue
+                            q["width"] = w
                         s_, ious = judge(c)
                         if s_ > best + 1e-5 and all(ious[k] >= i0[k] - floor for k in ious):
                             cur, best, improved = c, s_, True
@@ -277,7 +288,7 @@ def run(job):
     before = verdict(start)
     cur = {"joint": joint, "hair": hair}.get(job["search"], window)(job, sh)
     after = verdict(cur)
-    keys = ("search", "win_w", "perim_w", "angles", "floor")
+    keys = ("search", "win_w", "perim_w", "angles", "widths", "floor")
     return {"name": job["name"], "kind": "tune", "job": next(iter(job["strokes"])), "jobs": cur,
             "nodes": cur[next(iter(job["strokes"]))],
             "judge": {k: {"before": before[k], "after": after[k]} for k in job["shapes"]},
