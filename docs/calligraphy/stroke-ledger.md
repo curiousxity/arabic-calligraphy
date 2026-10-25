@@ -2493,6 +2493,21 @@ item; the shorthand gained `&` (defect) and `%` (window).
       not move.
     - The scan's flags on 077 (the cut tip) and 572 (the loop's counter,
       as before) were judged by close-up.
+    - **A shape the stroke cannot reach: change how the pen starts, then
+      polish.** Kept after clean scans:
+      - 142: a node added before the start with a flat nib (angle 0)
+        gives the studio's blunt head; s0's end pulled back off the
+        point. A GPU round from there (g63) rounded it, 0.967 → 0.975.
+      - 171: the nib turned 15° on nodes 68–71 smooths the inside of the
+        turn, as drawn. The GPU's polish of it put a corner back, so the
+        hand version was kept.
+      - 715: the barb rebuilt as a solid triangle on the stem. The pen
+        starts at the barb's end (thin), runs to a node on the stem at
+        the barb's foot (nib at 68°, the barb's height), through a node
+        midway up the stem, to the tip moved onto the studio's. The first
+        try, with the barb's node off the stem, left a white eye between
+        barb and stem. 0.976 → 0.977; the scan's tip flag is the new tip
+        matching the studio's.
   - *715's barb* (decision 45): the GPU never moved the tip, because it
     has nothing to start a barb from. So the barb was begun by hand: two
     nodes added before the tip, 0.5 nuqta down and to the left, thin.
