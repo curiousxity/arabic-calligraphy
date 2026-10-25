@@ -2053,6 +2053,27 @@ item; the shorthand gained `&` (defect) and `%` (window).
   and the stroke. Both are now window searches with the studio's slit
   closed only inside a tight box (`CLOSE`, r 0.12). Last time a wide box
   thickened 377's underside.
+  - That failed too: the slit narrowed but stayed open on both. A tune
+    only moves and turns the pen, and two strokes converging at a sharp
+    angle leave paper between them however they sit. Closing it needs a
+    fine-pen fill of the corner, the joint step below.
+- **Third round of red marks** (sheets 14, 18, 19, 47, 55, 60, 64, 11).
+  Kept 36 strokes on 21 shapes. The defect scan caught 019 (spur 0.089),
+  035 (notch 0.055) and 715 (spur 0.070). The first two kept the other
+  candidate. 715's other candidate made a 0.18 spur, so 715 stays as it
+  was.
+- **Rings read from the picture** (`SCRATCH/me/inkmarks.py`). Red and green
+  ink on a returned page are found by colour, and each ring's centre gives
+  its cell and point. Rings drawn round a label near a row's edge can land
+  in the wrong cell; check the green list against the page.
+- **Joints between a letter's own strokes (^)** (the user, 2026-10-24, on
+  the Ba, Kaf and Mim pages: "The ^ are going to need some work when we
+  start joining letters"). Most of that round's 61 red rings sit where two
+  strokes meet: the notch or slit between them (044, 047, 048, 051-053,
+  057, 060, 065, 068, 069, 444-446, 455, 457, 459, 461, 465, 554, 568,
+  569). They go through the usual touch-up now. The real fix belongs with
+  letter joins: a joint step that fills the corner as a calligrapher does
+  with a fine pen, since the nib's stamps alone can't close it.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
