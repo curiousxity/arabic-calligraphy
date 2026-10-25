@@ -2392,6 +2392,29 @@ item; the shorthand gained `&` (defect) and `%` (window).
     took it to 0.0035 and matched the studio. It scanned clean (0.968 →
     0.971) and was kept.
 
+- **End touch-ups stopped, approval pages started** (2026-10-25). The
+  user: "Stop the touch ups. Lets fix the other problems. Start
+  approving things."
+  - *The end roll-out stopped* with 152 touch-ups never shown. Half of
+    them changed less than a third as much as the ones reviewed. None
+    were kept.
+  - *Approval pages* (`SCRATCH/me/approvepages.py`): every shape not yet
+    approved (488) is drawn 4 to a page, ours beside the studio's, into
+    the NAS folder `review/to approve/`. Groups with the fewest shapes
+    left come first, so whole groups close sooner. Shapes waiting on a
+    decision (028, 459, 142, 171, 077, 572, 743) are held back.
+    `SCRATCH/me/pagering.py` turns a ring on a page into a mark.
+  - *My own check before sending* found hooked head tips on 718 and 720.
+    A GPU round (red53) fixed both; they scanned clean and were kept. The
+    user's rings landed on the same tips. The same round made 154 and
+    159 worse, left 162 and 485 as they were, and opened a white slit
+    in 719's shared stroke 719.s0. None of those were kept.
+  - *Pages A001–A008:* 373, H01, 161 and 482 approved. That completes
+    Fa, Hamza, Nun and Reset, which went into the catalogue. Red rings
+    on 715, 637, 154, 158, 159, 160, 162–165, 600, 481, 483–486, 454,
+    457, 461, 465, 719, 720 and 721 went to the GPU (red54). Page A006
+    (487–490) was not returned and stays unapproved.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
