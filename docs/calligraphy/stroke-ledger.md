@@ -2170,3 +2170,32 @@ other strokes as `ignore`, and strokes fitted before this get a join refit
   rise 0.
 - **A meem into a final nun:** the pen lifts. The meem's exit band ends in
   the nun's arm, and the nun's knot covers the seam.
+
+### Words the studio builds (references for the joining step, 2026-10-24)
+
+The studio composes any word typed into it (the user, 2026-10-24: "It will
+build the words that you give it ... the joined words do exist"). Thirteen
+words likely to be hard were built there and kept as references, so our own
+joins can be checked against the studio's join by join: محمد, نجم, حياتي,
+في, كل, كلا, السلام, بسم, معلم, تحت, ايمن, ام, الحب.
+- **How they are kept.** The studio draws a word as catalogue entries
+  placed letter by letter. Each letter's first strokes match one entry
+  exactly, so a word is stored as entry numbers plus their placements
+  (`words.json`, in Claude's scratch folder `studio/words/`, with
+  `addword.py` and `render.py`). The pictures and the json are on the NAS
+  in `HarfCanvas side-by-side/studio words/`. Dots are left out; the
+  joins are the point.
+- **What the studio does that the catalogue doesn't show:**
+  - **Stacking is placement only.** In محمد, نجم, معلم and تحت the letters
+    are the ordinary initial and medial entries, raised and moved so that
+    each one starts on the one before. No special stacked shapes.
+  - **Pairs are used when they exist.** في is the Fa and Ya pair (398), and
+    كلا is the Kaf and Lam-alif pair (465).
+  - **A lam is reshaped to fit the word.** In كل, السلام and الحب the lam's
+    stem is lengthened (or the lam-alif rebuilt) to stand level with the
+    word's other tall letters. These strokes are in no catalogue entry and
+    are kept as full outlines. Our joining step needs the same ability:
+    the stem stretches, and the nib stays the same.
+  - **A word breaks after a letter that doesn't join forward** (alif). The
+    next part is placed down and to the left, as in حياتي, السلام, ايمن
+    and ام.
