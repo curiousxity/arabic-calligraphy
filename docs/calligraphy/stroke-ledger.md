@@ -2414,6 +2414,26 @@ item; the shorthand gained `&` (defect) and `%` (window).
     on 715, 637, 154, 158, 159, 160, 162–165, 600, 481, 483–486, 454,
     457, 461, 465, 719, 720 and 721 went to the GPU (red54). Page A006
     (487–490) was not returned and stays unapproved.
+  - *Kept after a close-up check and a scan:*
+    - from red54: 158, 160, 454, 457, 461 (without 460.s2), 465, 481,
+      486, 600 and 721, and 485's start;
+    - from the second round (red56: spread 2, corner 4, neighbours sent
+      along): 163 and 165.
+    - The scan flagged a point on 160, 481, 485 and 721. Each close-up
+      showed it was better than the spike or notch it replaced.
+    - Strokes that an approved shape also draws (445.s0, 460.s2) were
+      left out, so nothing approved changed.
+  - *The Kaf medial corner* (481, 483–489) was a spike from one shared
+    stroke, 483.s3. Its first node's nib angle was 23° off the next one,
+    and three GPU rounds would not move it: the job kept its start each
+    time. Dropping that node (a hand edit) cleared the corner on all six
+    shapes, and their scans were clean. *Lesson:* when the GPU returns a
+    stroke unchanged at a spike, look for a twisted angle at an end node.
+  - *Decisions 41–48* (16–40 were already used by another job's cut
+    pages): 154 head top, 159 top tip, 162 head joint, 719 head (every
+    round opened a white slit in shared stroke 719.s0), 715 top tip (the
+    studio has a barb ours lacks), 637 joint, 164 head joint and 720's
+    right side. Each had three GPU rounds that didn't fix it.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
