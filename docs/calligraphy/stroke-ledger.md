@@ -2084,6 +2084,11 @@ item; the shorthand gained `&` (defect) and `%` (window).
   mark gave it a different fix. 020's own fix was kept because 020 is on
   its third attempt, so 045's mark there may still show. `SCRATCH/me/
   redstat.py` lists which marked shapes have all their jobs back.
+- **Sheets 26 and 29 (Jim Ha Kha starting and pairs) rebuilt from the
+  studio's bands.** 93 of 170 band strokes passed `vjudge.py` (24 of them
+  as built). The defect scan found new notches of 0.05 or more in 107,
+  110 and 119, so the 11 strokes drawn by those shapes stay as they were.
+  82 strokes were kept.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
