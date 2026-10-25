@@ -11,6 +11,15 @@ is pieces.refine's: 1 - overlap, plus `edge` times the outline gap (the area whe
 the reference's perimeter, in nuqta), plus `rough` times the changes of bend and of the nib's turning, plus the fold
 penalty. The result is scored by pieces.score, the CPU's own measure, so the two refiners are judged alike.
 
+`corner` and `windows` (the user's red rings on stroke starts and joints, 2026-10-25): a cut-off corner or a notch at
+a joint misses by 0.03 to 0.05 nuqta over almost no area, so neither the overlap nor the outline gap sees it
+(tunejob.py's corner_w is the CPU's answer). Here each window, a circle (x, y, radius) in the nodes' nuqta, adds
+`corner` times a power mean (P_CORNER) of how far each wrong pixel in it lies from the right ink: the studio's for
+ink we add, ours for ink we miss (our side measured on the hard ink every RELAYOUT steps and held between, so the
+gradient comes through the soft ink alone). The power mean leans on the deepest pixels, as the worst miss does. Of the
+schedules' results, the one kept then also counts `corner` times the worst miss in the windows on a hard raster.
+`widths_free`: the nib's width moves too (kept within 0.3 to 1.5), since a start whose width is off steps the edge.
+
 Nodes as smooth_path and refine make them: {"p", "angle"} and perhaps "width". A node with "dir", "corner",
 "keep", "tin" or "tout" is outside this model: refine() hands those paths back to pieces.refine."""
 import math, os, sys
@@ -40,6 +49,10 @@ BATCH_CELLS = 3e7  # most (quad edge, pixel) pairs in one batch, ~120 MB a tenso
 RELAYOUT = 25   # steps between recounts of the placements, and between checks that the cost is still falling
 SETTLED = 2e-5  # a fall in cost over RELAYOUT steps smaller than this, four times running, ends the stage
 UNSUPPORTED = ("dir", "corner", "keep", "tin", "tout")
+P_CORNER = 6    # the corner term's power mean: high enough to follow the deepest pixels, low enough to stay smooth
+WIN_PXN = 40    # raster px to the nuqta of the hard raster that judges the windows between schedules
+WSCALE = float(os.environ.get("GPUFIT_WSCALE", 3.0))  # nib width per unit of the optimiser's step: at 0.1 it never narrowed a
+                                                     # start far enough (032.s6 wants 1.0 to 0.6); at 3 it matched the CPU search
 
 
 # on: with both schedules it matches pieces.refine on the studio's alif strokes (0.927 / 0.923 / 0.84 against the
@@ -187,18 +200,55 @@ def _ink_loop(ea, eb, x1, y1, r, H, W, soft):
     return torch.sigmoid(depth * r / soft)
 
 
+def window_worst(nodes, pieces, origin, ppn, pen_px, others=(), windows=()):
+    """The deepest miss either way (nuqta) inside the windows, on a hard raster of the strokes and the pieces."""
+    if not windows:
+        return 0.0
+    rings = [ref_ring(p) for p in pieces]
+    hulls = [h for q in (nodes, *others) for h in path_hulls(q, origin, ppn, pen_px, step=1.0)]
+    pts = np.concatenate(rings + hulls)
+    x1, y1 = pts.min(0) - pen_px
+    r = WIN_PXN / ppn
+    W, H = int((pts[:, 0].max() - x1) * r) + 2, int((pts[:, 1].max() - y1) * r) + 2
+    to_px = lambda q: np.round((np.asarray(q) - [x1, y1]) * r * 16).astype(np.int32)
+    A, B = np.zeros((H, W), np.uint8), np.zeros((H, W), np.uint8)
+    for h in hulls:
+        cv2.fillConvexPoly(A, cv2.convexHull(to_px(h)), 1, cv2.LINE_8, 4)
+    for ring in rings:
+        cv2.fillPoly(B, [to_px(ring)], 1, cv2.LINE_8, 4)
+    yy, xx = np.mgrid[0:H, 0:W]
+    win = np.zeros((H, W), bool)
+    for x, y, rad in windows:
+        cx, cy = (np.asarray(origin) + np.array([x, y]) * ppn - [x1, y1]) * r
+        win |= np.hypot(xx - cx, yy - cy) < rad * WIN_PXN
+    o, u = win & (A == 1) & (B == 0), win & (B == 1) & (A == 0)
+    wo = cv2.distanceTransform(1 - B, cv2.DIST_L2, 5)[o].max() / WIN_PXN if o.any() else 0.0
+    wu = cv2.distanceTransform(1 - A, cv2.DIST_L2, 5)[u].max() / WIN_PXN if u.any() else 0.0
+    return float(max(wo, wu))
+
+
 def refine(nodes, pieces, origin, ppn, pen_px, rough=0.02, edge=1.0, iters=3, fixed=(), others=(), res=0.5, ignore=(),
-           bend="position", hold=()):
+           bend="position", hold=(), corner=0.0, windows=(), widths_free=False):
     """pieces.refine's signature and result (new nodes, their score); `iters` and `res` only matter on the CPU.
     `ignore`: pieces whose ground counts neither way (pieces.ignore_mask). `bend`: as pieces.shape_cost. `hold`:
-    as pieces.refine, which takes such a job (the GPU path does not hold angles)."""
+    as pieces.refine, which takes such a job (the GPU path does not hold angles). `corner`, `windows`,
+    `widths_free`: as the module's notes (GPU only; the score gains "window_worst" when there are windows)."""
     if torch is None or hold or any(k in q for q in nodes for k in UNSUPPORTED):
         return cpu_refine(nodes, pieces, origin, ppn, pen_px, rough, edge, iters, fixed, others, res, ignore, bend, hold)
-    best = (nodes, score([nodes, *others], pieces, origin, ppn, pen_px, ignore))  # never hand back worse than it was given
+
+    def judged(ns):
+        s = score([ns, *others], pieces, origin, ppn, pen_px, ignore)
+        if windows:
+            s = {**s, "window_worst": round(window_worst(ns, pieces, origin, ppn, pen_px, others, windows), 4)}
+        return s, s["iou"] - s["gap95"] - corner * s.get("window_worst", 0.0)
+    s0, k0 = judged(nodes)
+    best = (nodes, s0, k0)  # never hand back worse than it was given
     for stages in SCHEDULES:
-        out, s = _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore, bend)
-        if s["iou"] - s["gap95"] > best[1]["iou"] - best[1]["gap95"]:
-            best = (out, s)
+        out, _ = _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore, bend,
+                         corner, windows, widths_free)
+        s, k = judged(out)
+        if k > best[2]:
+            best = (out, s, k)
     return [dict(q) for q in best[0]], best[1]
 
 
@@ -222,7 +272,8 @@ def shape_cost(a, rough, bend="position"):
     return cost + torch.relu(-cos).sum() * 10
 
 
-def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore=(), bend="position"):
+def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore=(), bend="position",
+            corner=0.0, windows=(), widths_free=False):
     dev = _device()
     rings = [ref_ring(p) for p in pieces]
     ignored = [ref_ring(p) for p in ignore]
@@ -236,10 +287,14 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
     scale = torch.tensor([1.0, 1.0, 10.0], device=dev)
     org = torch.tensor(origin, dtype=torch.float32, device=dev)
     other_hulls = [h for p in others for h in path_hulls(p, origin, ppn, pen_px, step=1.0)]
-    v = torch.zeros((n, 3), device=dev, requires_grad=True)
+    v = torch.zeros((n, 4), device=dev, requires_grad=True)  # x, y, angle and (with widths_free) width
+    wfree = free[:, 0] * (1.0 if widths_free else 0.0)
 
     def unpack():
-        return base + v * scale * free
+        return base + v[:, :3] * scale * free
+
+    def widths_now():
+        return (widths + v[:, 3] * WSCALE * wfree).clamp(0.3, 1.5)
 
     for px_per_nuqta, soft, steps, rate in stages:
         r = px_per_nuqta / ppn
@@ -259,20 +314,37 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
         Bt = torch.tensor(Bm, dtype=torch.float32, device=dev)
         Ot = torch.tensor(Om, dtype=torch.float32, device=dev)
         Kt = torch.tensor(1 - Dm, dtype=torch.float32, device=dev)
+        if corner and windows:
+            yy, xx = np.mgrid[0:H, 0:W]
+            Wm = np.zeros((H, W), bool)
+            for x, y, rad in windows:
+                cx, cy = (np.asarray(origin) + np.array([x, y]) * ppn - [x1, y1]) * r
+                Wm |= np.hypot(xx - cx, yy - cy) < rad * px_per_nuqta
+            Wt = torch.tensor(Wm, dtype=torch.float32, device=dev)
+            DBt = torch.tensor(cv2.distanceTransform(1 - Bm, cv2.DIST_L2, 5) / px_per_nuqta, device=dev)
+            DAt = None
         opt = torch.optim.Adam([v], lr=rate)
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, steps, rate / 10)
         layout, last, still = None, None, 0
         for step in range(steps):
             opt.zero_grad()
             a = unpack()
+            wd = widths_now()
             if step % RELAYOUT == 0:  # how many placements per segment: recounted now and then, as the path moves
-                layout = _layout(a.detach(), widths, org, ppn, pen_px, r)
-            ea, eb = _placements(a, widths, org, ppn, pen_px, r, layout)
+                layout = _layout(a.detach(), wd.detach(), org, ppn, pen_px, r)
+            ea, eb = _placements(a, wd, org, ppn, pen_px, r, layout)
             A = (1 - (1 - _ink(ea, eb, x1, y1, r, H, W, soft)) * (1 - Ot)) * Kt
             inter = (A * Bt).sum()
             iou = inter / (A.sum() + Bt.sum() - inter)
             gap = (A.sum() + Bt.sum() - 2 * inter) / perim / px_per_nuqta
             cost = 1 - iou + edge * gap + shape_cost(a, rough, bend)
+            if corner and windows:
+                if step % RELAYOUT == 0:  # how far each pixel lies from our hard ink, held until the next recount
+                    Ah = (A.detach() > 0.5).to(torch.uint8).cpu().numpy()
+                    DAt = torch.tensor(cv2.distanceTransform(1 - Ah, cv2.DIST_L2, 5) / px_per_nuqta, device=dev)
+                extra, miss = A * (1 - Bt) * Kt * Wt, Bt * (1 - A) * Wt
+                mass = (extra + miss).sum() + 1e-6
+                cost = cost + corner * ((extra * DBt ** P_CORNER + miss * DAt ** P_CORNER).sum() / mass) ** (1 / P_CORNER)
             cost.backward()
             opt.step()
             sched.step()
@@ -284,5 +356,7 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
                 if still >= 4:
                     break
     a = unpack().detach().cpu().numpy()
-    out = [{**q, "p": [round(float(a[i, 0]), 3), round(float(a[i, 1]), 3)], "angle": round(float(a[i, 2]), 1)} for i, q in enumerate(nodes)]
+    wd = widths_now().detach().cpu().numpy()
+    out = [{**q, "p": [round(float(a[i, 0]), 3), round(float(a[i, 1]), 3)], "angle": round(float(a[i, 2]), 1),
+            **({"width": round(float(wd[i]), 3)} if widths_free and free[i, 0] else {})} for i, q in enumerate(nodes)]
     return out, score([out, *others], pieces, origin, ppn, pen_px, ignore)

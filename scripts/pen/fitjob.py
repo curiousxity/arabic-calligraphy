@@ -8,7 +8,8 @@ A job is self-contained, so it can run on a computer without the repository:
     origin   [x, y]: where the run's frame sits in screen px; ppn screen px to the nuqta; pen the nib in screen px
     mode     "fit" (default): try a band, a band off the skeleton, and a pull, and keep the best (method step 5 in
              docs/calligraphy/stroke-ledger.md); "refine": polish `start` (spec nodes) with pieces.refine, passing
-             the job's `refine` options through (rough, edge, iters, res, fixed, others) against `pieces`
+             the job's `refine` options through (rough, edge, iters, res, fixed, others; on a GPU also corner,
+             windows, widths_free) against `pieces`
              (default: [piece]); "widen": the stroke `start` written with a pen as wide as its band and judged on
              every shape that draws it (widenjob.py, which documents its own fields); "tune": chosen nodes of fitted
              strokes moved to clear a window or a joint, judged the same way (tunejob.py); "scan": a laptop
@@ -93,7 +94,10 @@ def run(job, log=print):
     pieces = job.get("pieces") or [piece]
     ignore = job.get("ignore") or []
     if job.get("mode", "fit") == "refine":
-        p, s = (gpufit.refine if GPU else refine)(job["start"], pieces, O, PPN, PEN, ignore=ignore, **job.get("refine", {}))
+        opts = job.get("refine", {})
+        if not GPU:  # the corner term and free widths are the GPU refiner's alone (gpufit.py)
+            opts = {k: v for k, v in opts.items() if k not in ("corner", "windows", "widths_free")}
+        p, s = (gpufit.refine if GPU else refine)(job["start"], pieces, O, PPN, PEN, ignore=ignore, **opts)
         kind, alls = "refine", {"refine": s}
     else:
         kind, p, alls = fit(piece, O, PPN, PEN, log, job.get("spacing", SPACING), job.get("edge", EDGE), ignore)
