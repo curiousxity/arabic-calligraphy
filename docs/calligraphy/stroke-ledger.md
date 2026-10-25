@@ -2467,6 +2467,32 @@ item; the shorthand gained `&` (defect) and `%` (window).
       (g60).
     - 46, 637: the studio's small notch at the joint, cut into now
       (g60).
+  - *What came back:* a ring round the drawing (the plain rounds above)
+    moved nothing again. The drawing had become one point, and a point
+    asks the same polish toward the studio that had already failed three
+    times. Two methods that keep what was drawn worked instead:
+    - **Ink to take away: hand edits at the stroke ends.** Each tick was a
+      stroke end poking past its neighbour, and each step or corner was a
+      node with its nib width at the 1.5 clamp. Kept after clean scans:
+      - 459 from the GPU's version: 459.s5 node 6's width 1.5 → 1.1 (the
+        step), 459.s4's end node dropped (the tick).
+      - 572 from the GPU's version: 572.s4 node 5's width 1.5 → 1.0 (the
+        corner), 572.s3's start trimmed 0.1 nuqta (the tick).
+      - 077 from the GPU's version: the tip's widths cut to 0.5 and 0.15
+        and the tip trimmed 0.12 nuqta.
+      - `SCRATCH/me/nodeview.py` draws every node, numbered, over a
+        close-up, with ours-only ink orange, so the node behind a fault can
+        be read off. A stray wedge on 572 had no node under it: it was the
+        outline folding at the clamped width.
+    - **Ink to add: the drawing as the target.** `SCRATCH/me/drawpatch.py`
+      turns a drawn blob into an extra target piece (as `fillpatch.py`
+      does with a hull), so a GPU round aims at the studio plus the
+      drawing. On 637 that filled the V at the joint, kept after a clean
+      scan (the user's green there is 81% on paper: a fill, not the
+      studio's notch). 028's gap filled but grew a lump; 142 and 171 did
+      not move.
+    - The scan's flags on 077 (the cut tip) and 572 (the loop's counter,
+      as before) were judged by close-up.
   - *715's barb* (decision 45): the GPU never moved the tip, because it
     has nothing to start a barb from. So the barb was begun by hand: two
     nodes added before the tip, 0.5 nuqta down and to the left, thin.
