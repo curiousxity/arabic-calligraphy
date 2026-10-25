@@ -2434,6 +2434,13 @@ item; the shorthand gained `&` (defect) and `%` (window).
     round opened a white slit in shared stroke 719.s0), 715 top tip (the
     studio has a barb ours lacks), 637 joint, 164 head joint and 720's
     right side. Each had three GPU rounds that didn't fix it.
+  - *My own check of pages A009–A010* sent the Ya heads 722, 723, 724,
+    726 and 727 to the GPU (red55). None were kept:
+    - 723 grew a step at its joint, 724 turned lumpy, 727 grew a tick,
+      and 726 was worse.
+    - 722's head start came out squared like the studio's, but the scan
+      flagged a bigger tick inside the head. It waits for the user's
+      marks on those pages.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
