@@ -2379,6 +2379,19 @@ item; the shorthand gained `&` (defect) and `%` (window).
     2026-10-25: "Decrease parallel tasks to 3 at a time max";
     `workers.json`).
 
+- **Round eleven of end pages** (2026-10-25). The user: "They are all
+  pretty much the same."
+  - *Green on the touch-up, kept after a clean scan:* 634.s0, 332.s1,
+    015.s1, 329.s0, 434.s0 and 319.s4 (`endkeep13`).
+  - *Green on "now":* 174.s5, whose touched-up tail dipped and ended in
+    a flat hook, and 253.s3.
+  - *The user's ring on 174's left side:* a notch where the upper stroke
+    (s4) runs into the bowl (s5). The first GPU round (g51) halved the
+    miss round the ring (0.023 → 0.011 nuqta²) but left a small nick. A
+    second round from that result, freeing two nodes either side (g52),
+    took it to 0.0035 and matched the studio. It scanned clean (0.968 →
+    0.971) and was kept.
+
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
 everything under 0.95. That was 343 shapes, most on pages already passed,
