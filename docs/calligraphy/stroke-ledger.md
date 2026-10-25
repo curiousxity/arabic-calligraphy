@@ -2140,6 +2140,31 @@ item; the shorthand gained `&` (defect) and `%` (window).
   353 shapes went. Shapes waiting on a band polish, and strokes waiting on
   a red-mark fix, wait for those first. `SCRATCH/me/unapproved.py` lists
   the unapproved shapes and which are ready.
+- **The corner term on the GPU** (the user, 2026-10-25, of the CPU
+  searches: "Why are these jobs running on the cpu?"). `gpufit.refine`
+  takes `corner`, `windows` (circles in the nodes' nuqta) and
+  `widths_free`.
+  - *The term:* each window adds a power mean (p 6) of how far its wrong
+    pixels lie from the right ink. Ours is measured on the hard ink every
+    25 steps, and the gradient comes through the soft ink.
+  - *The width step:* at 0.1 the width never moved far enough; it needs
+    3. On 032.s6's end the miss went from 0.29 to 0.025 nuqta, as the CPU
+    search found. On the user's ringed joints it won 6 of 9 against the
+    CPU joint search.
+  - *Where it is used now:* red marks (`gpumark.py`) and the stroke-end
+    roll-out (`SCRATCH/me/egpu.py`) go to the GPU first. The CPU search
+    comes back only where the GPU result fails `endpick.py`. Defect scans
+    stay on the CPU.
+- **Decision 11: three rings still red after three touch-ups** (373, 465,
+  553). Close up, none was a gap at the joint:
+  - 373 and 553 have a hair of a stroke end poking past the studio's
+    edge;
+  - in 465 the stroke from the left ends 0.02 nuqta too high, leaving a
+    0.034-nuqta step where it meets the next.
+
+  The user, 2026-10-25, chose "A": trim the tips. All three go to the hair
+  search (cut back, turn or narrow the end's nib), aimed at the ring
+  (`tjob.py hairat`).
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
