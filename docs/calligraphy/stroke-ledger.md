@@ -2089,6 +2089,49 @@ item; the shorthand gained `&` (defect) and `%` (window).
   as built). The defect scan found new notches of 0.05 or more in 107,
   110 and 119, so the 11 strokes drawn by those shapes stay as they were.
   82 strokes were kept.
+- **Fourth round of red marks, second part** (sheets 8, 9 and 26,
+  2026-10-25). The window search can now change the nib's width
+  (`widths`), since a cut whose width is off steps the edge beside it. 21
+  strokes were kept. 080's and 119's first picks deepened a spur at a tip
+  just outside the window. Both were rerun with the corner term below and
+  a 0.5-nuqta window: 080 went from 0.888 to 0.935 (worst 0.20 to 0.14),
+  and 119 from 0.964 to 0.976 (worst 0.119 to 0.046). Nine marks (045, 052,
+  057, 067, 068, 069, 070b, 073, 075) found no candidate that helped and
+  stay as they were.
+- **Stroke starts: what the rings on a start are.** The user ringed the
+  start of 047, 053, 055 and 066, where our cut's corner differs from the
+  studio's.
+  - *What they are:* close up, it is mostly missing ink at the corner,
+    0.036 to 0.040 nuqta deep. It shows before the smoothing, so the cause
+    is the pen, not the outline: the first node's nib angle and width
+    differ from the second's by 7 to 11 degrees and up to 0.2 of the pen,
+    and the sweep blends them over the first segment, cutting the corner
+    off (053, 066) or leaving a flat top (055).
+  - *Trimming ink behind the cut does nothing:* it moved the edge less
+    than half a pixel on a review page. A trim can only remove ink, and
+    the defect is ink missing. It was tried and dropped. So was a
+    pinned-corner smoother.
+  - *The fix:* the width search fixed 053 and 066. For the rest, the
+    window score has a corner term, `corner_w` x each window's worst miss
+    in nuqta (`tunejob.py`), so a 0.03-nuqta corner counts although it
+    adds almost no area.
+  - *The settings:* on 055, `corner_w` 0.5 with no shape allowed to lose
+    overlap left an odd bump. 0.5 allowing a 0.005 loss gave a soft peak.
+    2 allowing a 0.005 loss gave the studio's sharp corner (0.038 to 0.013
+    nuqta) with a slightly heavier start. The user, 2026-10-25: "55 strong
+    is best". 047 was already close; 0.5 strict took it from 0.014 to
+    0.006 nuqta at the ring.
+- **Stroke ends of every unapproved shape** (the user, 2026-10-25: "Start
+  on the unapproved strokes"). `SCRATCH/me/endq.py` sends one window job
+  per stroke over its two ends, with the strong settings (`corner_w` 2,
+  floor 0.005, widths free). Two kinds of end are left alone:
+  - a thin tip (nib under half the pen), which has no corner to square;
+  - an end with another stroke of the shape within 0.8 nuqta, where the
+    corner is under the other stroke's ink.
+
+  353 shapes went. Shapes waiting on a band polish, and strokes waiting on
+  a red-mark fix, wait for those first. `SCRATCH/me/unapproved.py` lists
+  the unapproved shapes and which are ready.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
