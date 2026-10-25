@@ -344,7 +344,8 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
                     DAt = torch.tensor(cv2.distanceTransform(1 - Ah, cv2.DIST_L2, 5) / px_per_nuqta, device=dev)
                 extra, miss = A * (1 - Bt) * Kt * Wt, Bt * (1 - A) * Wt
                 mass = (extra + miss).sum() + 1e-6
-                cost = cost + corner * ((extra * DBt ** P_CORNER + miss * DAt ** P_CORNER).sum() / mass) ** (1 / P_CORNER)
+                # + 1e-8 inside the root: a window with nothing wrong in it would otherwise give an infinite gradient
+                cost = cost + corner * ((extra * DBt ** P_CORNER + miss * DAt ** P_CORNER).sum() / mass + 1e-8) ** (1 / P_CORNER)
             cost.backward()
             opt.step()
             sched.step()
