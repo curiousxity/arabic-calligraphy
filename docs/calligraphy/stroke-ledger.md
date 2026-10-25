@@ -2201,6 +2201,38 @@ item; the shorthand gained `&` (defect) and `%` (window).
       round, starting from the first round's result, is running.
     - *191:* the first round grew the spur, so it is running again with
       more nodes free.
+- **Rounds three to five of end pages** (2026-10-25). The pages now go in
+  batches of about 8; 16 overflowed the user's attachment limit.
+  - *A strong GPU round often returns its start unchanged.* Corner 4 and
+    window 0.5 from a start already near the studio left 171, 176, 194
+    and 170's tip exactly as they were. What works: a default round
+    first (corner 2, window 0.35), then the strong one from its result
+    (`GPU_START` in `gpumark.py`).
+  - *Trimming a tip.* A tip running long past the studio's (170 and 171,
+    about half a nuqta, left by the hook polish as a 0.53-nuqta hair
+    spur) is cut back by `lengthen.py` with a negative stretch. 170 took
+    0.5 nuqta over the last 1.0 (`LEN_SPAN=1.0`); trims of 0.4 to 0.6
+    all cut the miss at the turn from 0.129 to 0.023, and the scan picks
+    the shortest that clears the spur. 194's tooth took 0.10.
+  - *Filling a flaw of the studio's.* The user, on 392: "needs fill in at
+    ^". The studio has the same V-notch at the head, so polishing toward
+    it keeps the notch. `fillpatch.py` adds an extra target piece, the
+    convex hull of the studio's ink within 0.3 nuqta of the ring
+    (0.024 nuqta² of fill), and the GPU polishes toward that
+    (`GPU_PATCH`). Both the mark comparison and the defect scan measure
+    against the studio, so they score the fill as worse (the scan calls
+    it a 0.087 spur). It is judged by eye, and was kept.
+  - *A touch-up must not undo a later fix.* 088.s0's end touch-up was
+    built before its red-ring fix was kept; showing it would have offered
+    to undo the fix. `endshow.py` now skips any stroke kept after the
+    roll-out was built.
+  - *The Mim pairs* (555, 558, 560): the CPU joint fix added faults of
+    up to 0.13 nuqta. One GPU round starting from the CPU fix cleaned
+    them up (555 0.015 → 0.003, 560 0.019 → 0.009; 558 took the strong
+    settings, 0.023 → 0.009). 626 kept its original stroke, since
+    neither attempt beat it.
+  - *Still open:* 317a's filled edge leaves a 0.056-nuqta bump in both
+    rounds, and goes to the user on a page.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
