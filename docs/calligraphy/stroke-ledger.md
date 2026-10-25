@@ -2233,6 +2233,35 @@ item; the shorthand gained `&` (defect) and `%` (window).
     neither attempt beat it.
   - *Still open:* 317a's filled edge leaves a 0.056-nuqta bump in both
     rounds, and goes to the user on a page.
+- **Rounds six to eight of end pages** (2026-10-25). Most rings clear in
+  one GPU round. What the rest taught:
+  - *Free the stroke that owns the edge.* `marks.py` looks for nodes
+    within 0.4 nuqta of the ring, and an edge can pass close while its
+    nodes are far. 470's ring was 0.47 from the joint stroke s3, which
+    no round had freed; freeing it cut the miss from 0.013 to 0.005.
+    Measure the distance to each stroke's line, not just its nodes.
+  - *More nodes free* (`GPU_SPREAD`, nodes either side of the ring's) helps
+    when a round returns its start, but freeing nearly a whole stroke
+    (432.s1) let it grow a step.
+  - *Leave a touched-up end out of a ring's round.* On 343, freeing the
+    touched-up s2 next to the ring grew a hairline from its tip in two
+    rounds; freeing only s0 cleared the ring.
+  - *A ring on a stroke kept as a touch-up the same day* starts from the
+    touch-up (`GPU_START` = the keep folder), so the round cannot undo
+    it.
+  - *Rings the user drew on the "now" column* belong to that column's
+    frame (`redfind.py LABEL@0`); a ring running off the panel pulls its
+    centre, so it is placed by eye.
+  - *Three failed tries go to the user* as one picture each in the
+    decisions folder (`SCRATCH/me/decide.py`: now, the attempts and the
+    studio, with a close-up at the ring). Six went on 2026-10-25: 432,
+    248, 470, 190, 189 and 250. Four are one fault: where two strokes
+    meet, the studio has one rounded peak or arch and ours has a sharp
+    corner or two points with a notch (432, 189, 250, 248). 190's is a
+    tip the studio ends broad and blunt and ours ends as a hair; trims
+    shorten it but cannot widen it.
+  - *Queue names:* a scan the worker takes before its rename to `fast-`
+    finishes as `scan-`, so a watch counts both.
 
 **Reruns of the shapes under 0.90 (`SCRATCH/me/vpass.py`, `vjudge.py`,
 2026-10-22).** The user agreed to rerun the 32 shapes under 0.90, but not
