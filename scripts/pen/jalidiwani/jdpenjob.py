@@ -62,8 +62,12 @@ def judge(s):
     return s["iou"] - s["gap95"] - CORNER * s.get("window_worst", 0.0)
 
 
-def end_windows(nodes):
-    return [(*nodes[0]["p"], END_R), (*nodes[-1]["p"], END_R)]
+def end_windows(nodes, pen=PEN):
+    """The two end windows, their radius in proportion to the nib: a small pen's tip is a third the size, and a window
+    sized for the main nib's covers a whole head curl, so the curl's spiral scored as a missed tip and an unwound fit won
+    (113.s2, trial three: 0.87 lost to 0.76)."""
+    r = END_R * pen / PEN
+    return [(*nodes[0]["p"], r), (*nodes[-1]["p"], r)]
 
 
 def length(nodes):
@@ -162,7 +166,7 @@ def fit(stroke, log):
     if stroke in FILL:
         for sname, nodes in starts:
             p, s = gpufit.refine(nodes, [piece], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ignore, widths_free=True,
-                                 corner=CORNER, windows=end_windows(nodes), judge="gpu")
+                                 corner=CORNER, windows=end_windows(nodes, P), judge="gpu")
             tried.append({"start": sname, "angle0": None, "anchor": None, "score": s, "nodes": p, "pen": None})
             log(stroke, "fill", sname, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
     for sname, nodes in ([] if stroke in FILL else starts):
@@ -177,7 +181,7 @@ def fit(stroke, log):
                  **({"turns": list(range(1, len(nodes)))} if ROTATE else {})}
                 for a in starts_a for anc in ((1, 1), (1, -1), (-1, 1), (-1, -1))]
         res = gpufit.refine_pens(nodes, [piece], O, PPN, P, pens, rough=ROUGH, edge=EDGE, ignore=ignore,
-                                 schedules=(sched,), corner=CORNER, windows=end_windows(nodes), judge="gpu")
+                                 schedules=(sched,), corner=CORNER, windows=end_windows(nodes, P), judge="gpu")
         for pen, (p, s) in zip(pens, res):
             a, anc = pen["angle"], pen["anchor"]
             tried.append({"start": sname, "angle0": a, "anchor": anc, "score": s, "nodes": p, "pen": pen})
@@ -187,7 +191,7 @@ def fit(stroke, log):
         nodes = dict(starts)[best["start"]]
         other = 1 - (0 if length(nodes) >= SHORT else 1)
         (p, s), = gpufit.refine_pens(nodes, [piece], O, PPN, P, [best["pen"]], rough=ROUGH, edge=EDGE, ignore=ignore,
-                                     schedules=(other,), corner=CORNER, windows=end_windows(nodes), judge="gpu")
+                                     schedules=(other,), corner=CORNER, windows=end_windows(nodes, P), judge="gpu")
         log(stroke, "other schedule", s["iou"], s["gap95"])
         if judge(s) > judge(best["score"]):
             best = {**best, "nodes": p, "score": s, "schedule": other}
