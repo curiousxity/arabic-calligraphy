@@ -2548,6 +2548,31 @@ item; the shorthand gained `&` (defect) and `%` (window).
     That completed Waw and Laam Alif. Sent back: 028 and 720 (the right
     border is irregular), 459 and 572 (a small defect along the
     underside of the connecting stroke). 719 and 142 got no mark either way.
+  - *Fourth pass* (2026-10-25), all scanned clean and kept:
+    - 459 and 572: the step under the connecting stroke came from the
+      incoming stroke thinning and turning its nib over its last three
+      nodes (widths 1.07→1.0, angles 87°→73°) just before the connecting
+      stroke took over. 459.s3 nodes 10–12 held at width 1.1, and 459.s0's
+      first nib turned from −98° to −92° to match the next node. 572.s2 eased
+      instead (1.09/1.08/1.06 at 87°/85°/82°).
+    - 720: the shared 719.s0's nib angle dipped at the junction (77.6°,
+      67.4°, 77.9°, 92.8°). Nodes 11–13 now run 76°/82°/88°, with widths
+      12–13 at 1.17 and 1.1. 719 scanned unchanged.
+    - 028: the downstroke's widths zig-zagged (0.84, 0.57, 1.1, 1.14, 0.8),
+      and it stood upright where the studio's leans into the joint. Nodes
+      6–9 were moved left by up to 0.14 and the widths evened. That exposed
+      028.s3's start as a foot, so it was pulled 0.12 left. A scan then
+      found the outer corner turning 0.15 nuqta too high, so the end node
+      was dropped 0.1.
+    - From here on every computation runs on the Geekmini (the user:
+      "move any computation over to the mini even if it is cpu"). The
+      decision pictures' renders are `SCRATCH/me/rendjob.py`, sent through
+      `remote.py` as a "scan" job. decide.py draws them with `REND=`, and
+      its overlaps matched the laptop's exactly.
+    - The user's view: the studio gives each stroke's outline but not the
+      pen's path, its lifts, or how one stroke enters the next, so joints
+      like 028's are guessed. More lesson videos (theirs or ones found and
+      approved) are to settle how the strokes fit together.
   - *715's barb* (decision 45): the GPU never moved the tip, because it
     has nothing to start a barb from. So the barb was begun by hand: two
     nodes added before the tip, 0.5 nuqta down and to the left, thin.
