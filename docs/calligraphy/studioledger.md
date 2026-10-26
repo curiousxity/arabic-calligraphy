@@ -48,7 +48,11 @@ Techniques (each gets a section once it is worked out from the videos):
   gradually while the hand keeps moving. By the end only the corner of the
   long side touches. The nib narrows onto **one corner**, not about its
   middle. One edge runs on unbroken and the other closes onto it. The ra's
-  tail and the mim's tail are flicks.
+  tail and the mim's tail are flicks. So is the hook that closes the sin's
+  long body: in 170.s0 the nib narrows onto its corner over the last 3.3
+  nuqta, at one angle (81°), and the hairline lies on the studio's. A
+  turning nib could not draw it (the user, 2026-10-26: "try it with a
+  flick").
 - **Angle changes.** When the pen does turn, the move is recorded as an
   exception with its reason, never as a free variable.
 - **Lifts.** A new stroke starts where the pen comes back down. The vector
