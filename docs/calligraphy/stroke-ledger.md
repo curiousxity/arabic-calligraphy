@@ -2508,6 +2508,25 @@ item; the shorthand gained `&` (defect) and `%` (window).
         try, with the barb's node off the stem, left a white eye between
         barb and stem. 0.976 → 0.977; the scan's tip flag is the new tip
         matching the studio's.
+  - *Second pass on the pictures* (2026-10-25). The user: "Still some
+    fixes but much better." Green on 715's barb (done). The rest, kept
+    after clean scans:
+    - 09, 028: the fill's lump was the second stroke's start flaring at
+      a −33° nib, plus a node at the 1.5 width clamp. The start was turned
+      to its neighbour's angle at width 0.4 and trimmed 0.05 nuqta; the
+      clamped node went to 1.1.
+    - 41, 154: round 2 picked. Its bump was another node at the 1.5
+      clamp, eased to 1.25.
+    - 48, 720: round 3 picked. The spike was the bowl stroke's end
+      (720.s2, shared with 724) poking past the head stroke; trimmed 0.05
+      nuqta. Trimming the head stroke's end (719.s0) only made the spike
+      longer, which showed whose end it was.
+    - 142: the head's angular right side and stepped bottom left. Node
+      1's nib turned to 45°, node 2 narrowed to 0.7 and both lower nodes
+      moved right a little.
+    - 171: a dent in the downstroke, from widths of 0.73 and 0.9 under a
+      node at the clamp: 1.3, 1.0, 1.05.
+    - Decision 43 (162) is the only one still open.
   - *715's barb* (decision 45): the GPU never moved the tip, because it
     has nothing to start a barb from. So the barb was begun by hand: two
     nodes added before the tip, 0.5 nuqta down and to the left, thin.
