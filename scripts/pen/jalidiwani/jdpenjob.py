@@ -25,6 +25,12 @@ Q = os.environ.get("HARF_Q", "")
 LIFT = float(os.environ.get("PEN_LIFT", 1.0))
 SIZE = os.environ.get("PEN_SIZE", "1") == "1"
 FILL = {x for x in os.environ.get("PEN_FILL", "").split(",") if x}
+# PEN_ROTATE ("1", the default): the nib turns as it goes. Diwani's teacher rotates the pen in the fingers to taper an
+# end and to follow a curve ("You must rotate the pen while moving", "a fixed angle gives the wrong shape": the course
+# notes), so the Thuluth rule of one angle a stroke drew the trial's alif at 0.75 against the free fit's 0.97. Every
+# node is then a turn (gpufit's pen "turns"): its own angle, kept smooth by the refine's roughness term, while the size
+# stays one and the width still falls only where the pen lifts, onto one corner.
+ROTATE = os.environ.get("PEN_ROTATE", "1") == "1"
 SHORT = 1.5
 END_R, CORNER = 0.6, 2.0
 ROUGH, EDGE, SPACING = 0.05, 3.0, 0.3
@@ -151,13 +157,18 @@ def fit(stroke, log):
             log(stroke, "fill", sname, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
     for sname, nodes in ([] if stroke in FILL else starts):
         sched = 0 if length(nodes) >= SHORT else 1
-        for a in angles(nodes, piece, O, ignore):
+        starts_a = angles(nodes, piece, O, ignore)
+        if ROTATE:  # the start path's own angles too, each node turning on its own
+            starts_a = [[q["angle"] for q in nodes]] + [[a] * len(nodes) for a in starts_a]
+        for a in starts_a:
             for anc in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
                 pen = {"angle": a, "lift_start": LIFT, "lift_end": LIFT, "anchor": list(anc), "size": SIZE}
+                if ROTATE:
+                    pen["turns"] = list(range(1, len(nodes)))
                 p, s = gpufit.refine(nodes, [piece], O, PPN, PEN, rough=ROUGH, edge=EDGE, ignore=ignore, pen=pen,
                                      schedules=(sched,), corner=CORNER, windows=end_windows(nodes), judge="gpu")
                 tried.append({"start": sname, "angle0": a, "anchor": list(anc), "score": s, "nodes": p, "pen": pen})
-                log(stroke, sname, a, anc, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
+                log(stroke, sname, a if np.isscalar(a) else "own" if len(set(a)) > 1 else a[0], anc, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
     best = max(tried, key=lambda c: judge(c["score"]))
     if best["pen"] is not None:  # the other schedule, from the same start (a restart: the lift does not carry over)
         nodes = dict(starts)[best["start"]]
@@ -174,7 +185,7 @@ def fit(stroke, log):
            "angles": [round(min(q["angle"] for q in n), 1), round(max(q["angle"] for q in n), 1)],
            "size": round(max(q.get("width", 1) for q in n), 3), "length": round(length(n), 2), "lifts": lifts(n),
            "free": {"score": r_old["score"]} if r_old else None,
-           "tried": [{k: v for k, v in c.items() if k != "nodes"} for c in tried], "seconds": round(time.time() - t0)}
+           "tried": [{k: (v if k != "pen" or not v else {**v, "angle": "own" if len(set(np.atleast_1d(v["angle"]))) > 1 else float(np.atleast_1d(v["angle"])[0])}) for k, v in c.items() if k != "nodes"} for c in tried], "seconds": round(time.time() - t0)}
     return out, picture(stroke, piece, ignore, O, r_old["nodes"] if r_old else None, n)
 
 
