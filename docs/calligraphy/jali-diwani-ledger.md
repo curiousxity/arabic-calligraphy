@@ -525,9 +525,10 @@ approximated (its extraction scored 0.85-0.93 against the sheet).
   of 0.981 (5th percentile 0.962), and each studio stroke the sheet stroke it
   was cut from (median 0.977). The split is the same: where the counts
   differ, the studio cut one sheet stroke in two (the ayn's tail, 403, 404,
-  484, 485; the second piece is absorbed into the first). Five shapes are a
-  sheet letter with an optional tail end or stem embellisher drawn on
-  (247, 646, H01 and others); those were matched stroke by stroke.
+  484, 485; the second piece is absorbed into the first). Four shapes
+  (247, 614, 646, H01) are spread over more than one sheet unit, a letter
+  with an optional tail end or stem embellisher drawn on; those were
+  matched stroke by stroke.
 - **No source found:** 362 (sad, initial/medial) and 580 (kaf, initial);
   the studio's outline serves for them until they are looked at.
 - **Marks:** the crowns (0.94-0.96), the kaf's stroke (0.98), the ط's stem
