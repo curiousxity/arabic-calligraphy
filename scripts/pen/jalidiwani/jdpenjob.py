@@ -31,6 +31,15 @@ FILL = {x for x in os.environ.get("PEN_FILL", "").split(",") if x}
 # node is then a turn (gpufit's pen "turns"): its own angle, kept smooth by the refine's roughness term, while the size
 # stays one and the width still falls only where the pen lifts, onto one corner.
 ROTATE = os.environ.get("PEN_ROTATE", "1") == "1"
+# The small pen (the user, 2026-10-26: the head curls and the crowns' heads; the course: "one third of that width ... used
+# for decorations and small heads"): those strokes are fitted with a nib a third as wide, and hand back node widths as
+# fractions of the main nib (a third, less where the pen lifts), so a renderer draws them with the one pen.
+SMALL_PEN = 1 / 3
+SMALL = {"T04.s0", "T05.s0", "T06.s0"} | {x for x in os.environ.get("PEN_SMALL", "").split(",") if x}
+# A long stroke's ends may thin over PEN_LIFT_LONG nuqta (the user, 2026-10-26: Diwani's long tails thin over more
+# than the 1 nuqta of a Thuluth flick); LONG: the start path's length, nuqta, from which a stroke counts as long.
+LIFT_LONG = float(os.environ.get("PEN_LIFT_LONG", 2.0))
+LONG = 4.0
 SHORT = 1.5
 END_R, CORNER = 0.6, 2.0
 ROUGH, EDGE, SPACING = 0.05, 3.0, 0.3
@@ -62,22 +71,22 @@ def length(nodes):
     return float(np.linalg.norm(np.diff(P, axis=0), axis=1).sum())
 
 
-def band_start(piece, O, ignore):
+def band_start(piece, O, ignore, pen=PEN):
     best = None
-    for samples in (bands([piece], PEN)[0], skeleton_samples(piece, PEN)):
+    for samples in (bands([piece], pen)[0], skeleton_samples(piece, pen)):
         if not samples:
             continue
         for h in (0, 45, 90, 135):
-            p = smooth_path(samples, PEN, O, PPN, SPACING, hint=h)
-            s = gpu_score([p], [piece], O, PPN, PEN, ignore)
+            p = smooth_path(samples, pen, O, PPN, SPACING, hint=h)
+            s = gpu_score([p], [piece], O, PPN, pen, ignore)
             if best is None or s["iou"] > best[1]["iou"]:
                 best = (p, s)
     return best[0]
 
 
-def angles(nodes, piece, O, ignore):
+def angles(nodes, piece, O, ignore, pen=PEN):
     """The two best single nib angles for this path, at least 30 degrees apart."""
-    sc = sorted(((gpu_score([[{**n, "angle": a, "width": 1} for n in nodes]], [piece], O, PPN, PEN, ignore)["iou"], a)
+    sc = sorted(((gpu_score([[{**n, "angle": a, "width": 1} for n in nodes]], [piece], O, PPN, pen, ignore)["iou"], a)
                  for a in range(0, 180, 10)), reverse=True)
     out = [sc[0][1]]
     for _, a in sc[1:]:
@@ -99,8 +108,8 @@ def lifts(nodes):
     return out
 
 
-def ink(nodes_list, rings, O, x1, y1, r, H, W):
-    A = (gpufit.ink_masks(nodes_list, O, PPN, PEN, (float(x1), float(y1), float(r), H, W)).cpu().numpy().astype(np.uint8)
+def ink(nodes_list, rings, O, x1, y1, r, H, W, pen=PEN):
+    A = (gpufit.ink_masks(nodes_list, O, PPN, pen, (float(x1), float(y1), float(r), H, W)).cpu().numpy().astype(np.uint8)
          if nodes_list else np.zeros((H, W), np.uint8))
     to_px = lambda q: np.round((np.asarray(q) - [x1, y1]) * r * 16).astype(np.int32)  # noqa: E731
     B = np.zeros((H, W), np.uint8)
@@ -109,11 +118,11 @@ def ink(nodes_list, rings, O, x1, y1, r, H, W):
     return A, B
 
 
-def picture(stroke, piece, ignore, O, old, new):
+def picture(stroke, piece, ignore, O, old, new, pen=PEN):
     """free fit | pen | sheet | pen over the sheet's outline, the shape's other strokes pale behind, 60 px to the nuqta."""
     PX = 60; r = PX / PPN
     ring = ref_ring(piece); others = [ref_ring(p) for p in ignore]
-    pts = np.concatenate([ring] + [gpufit._reach([n], O, PPN, PEN) for n in (old, new) if n])
+    pts = np.concatenate([ring] + [gpufit._reach([n], O, PPN, PEN) for n in (old, new) if n])  # widths: of the main nib
     x1, y1 = pts.min(0) - PPN * 0.4; x2, y2 = pts.max(0) + PPN * 0.4
     W, H = int((x2 - x1) * r) + 1, int((y2 - y1) * r) + 1
     _, G = ink([], others, O, x1, y1, r, H, W)
@@ -144,28 +153,30 @@ def picture(stroke, piece, ignore, O, old, new):
 def fit(stroke, log):
     t0 = time.time()
     piece, ignore, O = job_of(stroke)
+    P = PEN * SMALL_PEN if stroke in SMALL else PEN   # this stroke's nib, screen px
     r_old = old_fit(stroke)
-    starts = [("band", band_start(piece, O, ignore))]
+    starts = [("band", band_start(piece, O, ignore, P))]
     if r_old:
         starts.append(("free", [{"p": n["p"], "angle": n["angle"]} for n in r_old["nodes"]]))
     tried = []
     if stroke in FILL:
         for sname, nodes in starts:
-            p, s = gpufit.refine(nodes, [piece], O, PPN, PEN, rough=ROUGH, edge=EDGE, ignore=ignore, widths_free=True,
+            p, s = gpufit.refine(nodes, [piece], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ignore, widths_free=True,
                                  corner=CORNER, windows=end_windows(nodes), judge="gpu")
             tried.append({"start": sname, "angle0": None, "anchor": None, "score": s, "nodes": p, "pen": None})
             log(stroke, "fill", sname, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
     for sname, nodes in ([] if stroke in FILL else starts):
         sched = 0 if length(nodes) >= SHORT else 1
-        starts_a = angles(nodes, piece, O, ignore)
+        lift = LIFT_LONG if length(nodes) >= LONG else LIFT
+        starts_a = angles(nodes, piece, O, ignore, P)
         if ROTATE:  # the start path's own angles too, each node turning on its own
             starts_a = [[q["angle"] for q in nodes]] + [[a] * len(nodes) for a in starts_a]
         # every angle and anchor of this start side by side in one loop on the card (gpufit.refine_pens; the user,
         # 2026-10-26: "make that change for the diwani branch as well")
-        pens = [{"angle": a, "lift_start": LIFT, "lift_end": LIFT, "anchor": list(anc), "size": SIZE,
+        pens = [{"angle": a, "lift_start": lift, "lift_end": lift, "anchor": list(anc), "size": SIZE,
                  **({"turns": list(range(1, len(nodes)))} if ROTATE else {})}
                 for a in starts_a for anc in ((1, 1), (1, -1), (-1, 1), (-1, -1))]
-        res = gpufit.refine_pens(nodes, [piece], O, PPN, PEN, pens, rough=ROUGH, edge=EDGE, ignore=ignore,
+        res = gpufit.refine_pens(nodes, [piece], O, PPN, P, pens, rough=ROUGH, edge=EDGE, ignore=ignore,
                                  schedules=(sched,), corner=CORNER, windows=end_windows(nodes), judge="gpu")
         for pen, (p, s) in zip(pens, res):
             a, anc = pen["angle"], pen["anchor"]
@@ -175,20 +186,23 @@ def fit(stroke, log):
     if best["pen"] is not None:  # the other schedule, from the same start (a restart: the lift does not carry over)
         nodes = dict(starts)[best["start"]]
         other = 1 - (0 if length(nodes) >= SHORT else 1)
-        (p, s), = gpufit.refine_pens(nodes, [piece], O, PPN, PEN, [best["pen"]], rough=ROUGH, edge=EDGE, ignore=ignore,
+        (p, s), = gpufit.refine_pens(nodes, [piece], O, PPN, P, [best["pen"]], rough=ROUGH, edge=EDGE, ignore=ignore,
                                      schedules=(other,), corner=CORNER, windows=end_windows(nodes), judge="gpu")
         log(stroke, "other schedule", s["iou"], s["gap95"])
         if judge(s) > judge(best["score"]):
             best = {**best, "nodes": p, "score": s, "schedule": other}
     n = best["nodes"]
-    out = {"recipe": "pen" if best["pen"] else "fill", "nodes": n, "score": best["score"],
-           "cpu_score": score([n], [piece], O, PPN, PEN, ignore), "start": best["start"], "anchor": best["anchor"],
+    cpu = score([n], [piece], O, PPN, P, ignore)
+    if P != PEN:  # widths as fractions of the main nib, so the stroke draws with the one pen
+        n = [{**q, "width": round(q.get("width", 1) * SMALL_PEN, 4)} for q in n]
+    out = {"recipe": ("small pen" if P != PEN else "pen") if best["pen"] else "fill", "nodes": n, "score": best["score"],
+           "cpu_score": cpu, "pen_scale": round(P / PEN, 4), "start": best["start"], "anchor": best["anchor"],
            "angle": round(n[len(n) // 2]["angle"] % 180, 1),
            "angles": [round(min(q["angle"] for q in n), 1), round(max(q["angle"] for q in n), 1)],
            "size": round(max(q.get("width", 1) for q in n), 3), "length": round(length(n), 2), "lifts": lifts(n),
            "free": {"score": r_old["score"]} if r_old else None,
            "tried": [{k: (v if k != "pen" or not v else {**v, "angle": "own" if len(set(np.atleast_1d(v["angle"]))) > 1 else float(np.atleast_1d(v["angle"])[0])}) for k, v in c.items() if k != "nodes"} for c in tried], "seconds": round(time.time() - t0)}
-    return out, picture(stroke, piece, ignore, O, r_old["nodes"] if r_old else None, n)
+    return out, picture(stroke, piece, ignore, O, r_old["nodes"] if r_old else None, n)  # n in main-nib widths
 
 
 if __name__ == "__main__":
