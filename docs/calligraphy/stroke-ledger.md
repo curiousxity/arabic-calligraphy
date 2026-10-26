@@ -2527,6 +2527,19 @@ item; the shorthand gained `&` (defect) and `%` (window).
     - 171: a dent in the downstroke, from widths of 0.73 and 0.9 under a
       node at the clamp: 1.3, 1.0, 1.05.
     - Decision 43 (162) is the only one still open.
+  - *Third pass* (2026-10-25): green on 154 and 171 (done). Kept after
+    clean scans:
+    - 028: the joint stroke's end widened to 0.8 and turned to 40°, which
+      tucked the lower tick in. A GPU round (g64) smoothed the step under
+      the alif head, but only 028.s4's result was kept. Its 028.s5 result
+      lengthened the hook beside the alif head, and its 028.s2 result
+      reopened the gap at the joint.
+    - 142: the hairline's end trimmed 0.3 nuqta over a 0.7 span, so it
+      no longer touches the head (a 0.4 span left a tooth). The head moved
+      left 0.035. The hairline now ends in a finer point than the
+      studio's; turning the nib there made it worse.
+    - 720: the right side filled out by widening the shared 719.s0 at the
+      junction (nodes 13–14 to 1.05 and 1.0). 719 scanned unchanged.
   - *715's barb* (decision 45): the GPU never moved the tip, because it
     has nothing to start a barb from. So the barb was begun by hand: two
     nodes added before the tip, 0.5 nuqta down and to the left, thin.
