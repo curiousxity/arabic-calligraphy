@@ -2540,6 +2540,14 @@ item; the shorthand gained `&` (defect) and `%` (window).
       studio's; turning the nib there made it worse.
     - 720: the right side filled out by widening the shared 719.s0 at the
       junction (nodes 13–14 to 1.05 and 1.0). 719 scanned unchanged.
+  - *Closing the decisions* (2026-10-25): the twelve fixed shapes went on
+    approval pages F01–F03 (`SCRATCH/me/approvefixed.py`, the approval
+    page layout, appended to `approve_pages.json`), with decision 43
+    beside them. The user kept 637, 715, 154, 159, 077, 162 and 171, so
+    162 stays as it is and decision 43 is closed without a GPU round.
+    That completed Waw and Laam Alif. Sent back: 028 and 720 (the right
+    border is irregular), 459 and 572 (a small defect along the
+    underside of the connecting stroke). 719 and 142 got no mark either way.
   - *715's barb* (decision 45): the GPU never moved the tip, because it
     has nothing to start a barb from. So the barb was begun by hand: two
     nodes added before the tip, 0.5 nuqta down and to the left, thin.
