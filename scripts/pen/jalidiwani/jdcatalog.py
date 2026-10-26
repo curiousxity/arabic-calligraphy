@@ -23,12 +23,57 @@ _pf = os.path.join(WORK, "plates.json")
 plates = json.load(open(_pf, encoding="utf-8")) if os.path.exists(_pf) else {}
 for _k, _p in plates.items():
     db.setdefault(_k, {"group": "plate", "form": _k, "variant": "hashim"})
+# the letters as the studio composes them (2026-10-25, read one at a time from its Letter shapes picker with the Crowns
+# switch on): key "family-Form|stamp" -> the stamp's strokes plus its marks (crowns, the kaf's upper stroke, the ط's
+# stem, dots) as strokes of their own, named "<mark id>.<stroke id>", e.g. "T05.s0" (the user, 2026-10-25: "treat this
+# as a collection of strokes that mesh into each other")
+_cf = os.environ.get("JD_COMPOSED") or os.path.join(DATA, "..", "studio-composed", "composed.json")
+composed = json.load(open(_cf, encoding="utf-8")) if os.path.exists(_cf) else {"letters": {}, "marks": {}}
+mark_kinds = {}
+_mk = os.path.join(DATA, "marks-kinds.json")
+if os.path.exists(_mk):
+    mark_kinds = {k: v["kind"] for k, v in json.load(open(_mk, encoding="utf-8")).items()}
+
+
+def _affine_d(d, A):
+    """An M/C/L/Z outline with every point moved by the 2x3 affine A (exact for cubics)."""
+    out, nums = [], []
+    for tok in re.findall(r"[MCLZ]|-?\d*\.?\d+(?:e-?\d+)?", d):
+        if tok in "MCLZ":
+            out.append(tok); continue
+        nums.append(float(tok))
+        if len(nums) == 2:
+            x, y = A[0][0] * nums[0] + A[0][1] * nums[1] + A[0][2], A[1][0] * nums[0] + A[1][1] * nums[1] + A[1][2]
+            out.append("%.3f %.3f" % (x, y)); nums = []
+    return " ".join(out)
+
+
+def _mul(P, Q):
+    """Two SVG matrices (a b c d e f) composed, P after Q, as a 2x3."""
+    a, b, c, d, e, f = P; A = [[a, c, e], [b, d, f]]
+    a, b, c, d, e, f = Q; B = [[a, c, e], [b, d, f], [0, 0, 1]]
+    return [[sum(A[i][k] * B[k][j] for k in range(3)) for j in range(3)] for i in range(2)]
 
 
 def strokes(k):
     if k in plates:
         return [tuple(s) for s in plates[k]["strokes"]]
+    if "|" in k:
+        e = composed["letters"][k]
+        out = strokes(e["stamp"])
+        for kind, mid, outer, inner in e["marks"]:
+            A = _mul(outer, inner); A[0][2] += 2; A[1][2] += 2   # the stamp sits at translate(-2 -2) in the letter
+            out += [(f"{mid}.{sid}", _affine_d(d, A)) for sid, d in composed["marks"].get(mid, [])]
+        return out
     return re.findall(r'<g id="(s\d+)"><path d="([^"]+)"', stamps[k])
+
+
+def piece_kind(sid):
+    """'body' for a stamp's own stroke, else the mark's kind (crown, nuqta, ...) from the studio's marks-kinds."""
+    if "." not in sid:
+        return "body"
+    mid = sid.split(".")[0]
+    return mark_kinds.get(mid) or {"T16": "ta-stem", "T18": "kaf-stroke"}.get(mid, "mark")
 
 
 def transform(k):

@@ -406,6 +406,40 @@ results) and the queue's `done/` (`jd-c11-*` to `jd-c14-*`).
   `harf-research/laptop/c15/approved_ala_p67_anfusihim.json` on the NAS,
   queue runs `jd-c15n-*`, `jd-c15j-*`, `jd-c15cap-*`, `jd-c15cap2-*`.
 
+## Strokes that mesh: the basis (2026-10-25)
+
+The user, once the studio's composed letters were captured: "treat this as a
+collection of strokes that mesh into each other to form joined letters/words.
+This has to be the fundamental basis of this part of the project." Every plate
+is cut again on that basis.
+
+- **The studio's composed letters are the guide.** All 902 shapes its Letter
+  shapes picker offers were read one at a time with the Crowns switch on
+  (overlapping letters lose their crowns), each with its marks: the three
+  crown sizes (T04-T06, a head and a hairline each), the kaf's upper stroke
+  (T18), the ط's stem (T16) and the dot groups. Kept in the scratch
+  `studio-composed/composed.json` and on the NAS; `jdcatalog.strokes()`
+  serves a composed key (`family-Form|stamp`) as the body strokes plus each
+  mark's strokes, named `T05.s0` and so on.
+- **Placed whole, then stroke by stroke.** `jdguidepick.pick` places the
+  composed letter over his ink (dots left out). Then `refine` places each
+  body stroke again on its own (within 15% and 9 degrees) and each mark with
+  its strokes together (0.7-1.4x, 24 degrees, 1.5 pens of travel), each over
+  the ink the others leave, always searched from the whole letter's pose so
+  the ranges never compound.
+- **The crown is a structure of its own.** Its distance from the letter
+  varies (the user, 2026-10-25), so it is never held at the studio's
+  offset: `plates.json` records, for every piece, where it landed against
+  the studio's place (`placed`: moved in pens, size, turn). On p. 65 the
+  crowns sit up to 2 pens from the studio's place and up to 1.4x its size.
+- **Body before mark.** Where a mark's guide lies over a body stroke's, the
+  ink is the body's, so a crown's hairline beside the stem takes none of it.
+  A dot takes only the dot of his beside it (within 1.5 pens).
+- **Windows (%) stay open.** A piece's outline is its outer edge; a window
+  inside it is kept as a hole beside it (`pieces[sid].holes`), never filled.
+- Known weak spot: the crown's thin tail below where it crosses the stem
+  (lam, kaf) can go to the stem when the studio's tail is shorter than his.
+
 ## Sabti's moves, letter by letter
 
 How Sabti writes each letter on his plate (Beirut Jali volume, p. 9): the
