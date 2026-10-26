@@ -3,12 +3,16 @@
     python scripts/pen/fitqueue.py work QUEUE [--jobs N]   a worker: fits every job that lands in QUEUE/todo
     python scripts/pen/fitqueue.py status QUEUE            what is waiting, running, done and failed
     python scripts/pen/fitqueue.py retry QUEUE             failed jobs back in line
+    python scripts/pen/fitqueue.py jobs QUEUE HOST N       HOST's worker runs N jobs at once
 
     from fitqueue import submit, wait                      the reading side: hand jobs over, collect results
 
-QUEUE is any folder every computer can reach (a NAS share). QUEUE/workers.json, if there, sets how many jobs each
-computer runs at once ({"<host>": n}), read as the worker goes, so the reading side can tune a worker without
-anyone restarting it. A job is one fitjob.py input file. Each submit copies
+QUEUE is any folder every computer can reach (a NAS share). An empty file QUEUE/workers-<host>-<n> sets how many
+jobs that computer runs at once, read as the worker goes, so the reading side can tune a worker without anyone
+restarting it (`python scripts/pen/fitqueue.py jobs QUEUE HOST N`). The number is in the file's name, not in it: a
+Windows worker reading a file every two seconds kept its cached copy and never saw the file change, even deleted and
+made again (the Geekmini, 2026-10-26), while new names in a folder show at once. QUEUE/workers.json ({"<host>": n})
+is still read where no such file is. A job is one fitjob.py input file. Each submit copies
 the fitting code into QUEUE/code, and a worker runs every job from a local snapshot of that copy, in a process of its
 own, so a worker needs no repository, picks up a code change with its next job, and is never caught mid-update.
 A job is claimed by renaming it from todo/ to running/, which only one worker can do, so any number of workers on
@@ -105,6 +109,12 @@ def _requeue(q, stem):
 
 
 def _jobs_for(q, default):
+    try:
+        for f in os.listdir(q):
+            if f.startswith(f"workers-{HOST}-") and f[len(f"workers-{HOST}-"):].isdigit():
+                return max(1, int(f[len(f"workers-{HOST}-"):]))
+    except OSError:
+        pass
     try:
         return max(1, int(json.load(open(os.path.join(q, "workers.json"), encoding="utf-8"))[HOST]))
     except (OSError, ValueError, KeyError, TypeError):
@@ -208,6 +218,14 @@ def work(q, jobs):
         print("stopped; unfinished jobs are back in todo", flush=True)
 
 
+def set_jobs(q, host, n):
+    """The worker on `host` runs `n` jobs at once, from its next look at the queue (module notes)."""
+    for f in os.listdir(q):
+        if f.startswith(f"workers-{host}-"):
+            os.remove(os.path.join(q, f))
+    open(os.path.join(q, f"workers-{host}-{int(n)}"), "w").close()
+
+
 def retry(q):
     _dirs(q)
     for f in os.listdir(os.path.join(q, "failed")):
@@ -234,5 +252,7 @@ if __name__ == "__main__":
         status(q)
     elif cmd == "retry":
         retry(q)
+    elif cmd == "jobs":
+        set_jobs(q, sys.argv[3], sys.argv[4])
     else:
         sys.exit(__doc__)
