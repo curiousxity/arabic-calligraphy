@@ -19,6 +19,11 @@ order of the moves the two scripts share. Jawad Sabti's numbered Jali
 Diwani plate gives the order of what Jali Diwani adds (head curls, the
 kaf's flourish, the lam-alifs) and is a second opinion on the rest.
 
+**Since 2026-10-25 the studio is the convention, for the stroke split and
+the shapes both; Hashim's plates are kept as reference only** (section
+"The studio is the convention", below). The 2026-10-21 paragraph that
+follows is the earlier rule, kept as it was.
+
 **Since 2026-10-21 every letter is fitted to Hashim's page itself**, the
 studio's stroke split only guiding the cut (`jdplatecut.py`): the user
 chose his proportions for the whole alphabet ("hashim"), and the studio's
@@ -459,6 +464,48 @@ is cut again on that basis.
   gives the letters' shapes, their marks and which strokes join; each letter
   is then placed on his ink on its own, in reading order, and the join map
   says where one piece may run on into the next.
+
+## The studio is the convention (2026-10-25)
+
+Shown the p. 65 recut, the user found the ta, ra, zay and sad right "for the
+most part" but said this script "has a lot of variability in how it is
+written... pick one convention and stick to it." Offered the studio's split
+as that convention, they agreed and went further: "you can save hashim's
+version as a reference but i think the studio works better here. so lets
+start fresh with the studio." This reverses 2026-10-21 (every letter fitted
+to Hashim's page and proportions).
+
+- **What the convention is.** The studio's strokes, as its composed letters
+  and words use them, are what the pen is fitted to: their split, their
+  shapes and their proportions. One way per letter form, the studio's; his
+  variants are not cut.
+- **Why the studio.** It covers every letter in every position, with its
+  crowns, dots and the junctions that join one letter to the next, and it
+  splits a stroke the same way wherever it appears, so fitted strokes will
+  mesh into words. Its strokes have no windows: where a letter has a
+  counter (the ha's eyes) it is the space between separate strokes, so the
+  fitter, which fills an outline, needs no special handling.
+- **Each stroke is fitted once.** Strokes are keyed by outline
+  (`jdcatalog.key`), so a body stroke shared by ba, ta and tha, or by sin and
+  shin, is one job. A mark (crowns T04-T06, the kaf's stroke T18, the ط's
+  stem T16, the dot groups) is fitted once in its own frame, unturned; a
+  stroke of several dots is split into one dab per dot (T23 two, T27 three).
+  Where a mark sits on a letter is that letter's matrix in `composed.json`,
+  which is the crown's variable offset the user asked for.
+- **Batches.** First: every shape the Isolated and Final forms use, the
+  stamps of the 41 studio words of pp. 66-67, and the marks (160 shapes,
+  351 new strokes; the ورد strokes from 2026-10-20 are reused). Second: the
+  rest of the Initial and Medial shapes (209 shapes, 417 strokes). Then the
+  second passes, end trims and tip rule as in "Fitting the studio's shapes".
+  Working folder: scratch `jd-studio/` (`registry.json`, `batches.json`).
+- **Hashim's work is reference.** The p. 65 cuts (test 19, plates and
+  pictures) are on the NAS in `harf-research/laptop/c19/`, and their review
+  pictures, with the carried p. 66-67 waws and ains (old decisions 60-75),
+  in `HarfCanvas side-by-side/Hashim reference/`. The letters already
+  approved from his page (dal, waw, ra, على, the p. 67 ains and waws) stay
+  approved as reference fits; the library takes the studio's.
+- **Next, the mesh test:** assemble the fitted strokes into the studio's 41
+  words by their junctions and compare each with the studio's own word.
 
 ## Sabti's moves, letter by letter
 

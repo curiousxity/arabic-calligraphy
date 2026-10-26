@@ -33,6 +33,24 @@ mark_kinds = {}
 _mk = os.path.join(DATA, "marks-kinds.json")
 if os.path.exists(_mk):
     mark_kinds = {k: v["kind"] for k, v in json.load(open(_mk, encoding="utf-8")).items()}
+# a mark (crown, dots, the kaf's stroke, the ط's stem) is fitted once, in its own frame and unturned: where it sits on
+# each letter is that letter's matrix in composed.json, the variable the user asked for (2026-10-25)
+for _k in composed["marks"]:
+    db.setdefault(_k, {"group": "mark", "form": mark_kinds.get(_k, "mark"), "variant": _k})
+
+
+def _is_mark(k):
+    return k in composed["marks"] and k not in stamps
+
+
+def _mark_strokes(k):
+    """A mark's strokes, a stroke of several dots split into one per dot (T23's two, T27's three): each is its own dab
+    of the pen, s0a, s0b, ..."""
+    out = []
+    for sid, d in composed["marks"][k]:
+        parts = [p.strip() for p in re.split(r"(?=M)", d) if p.strip()]
+        out += [(sid, d)] if len(parts) == 1 else [(sid + "abcdefgh"[i], p) for i, p in enumerate(parts)]
+    return out
 
 
 def _affine_d(d, A):
@@ -65,6 +83,8 @@ def strokes(k):
             A = _mul(outer, inner); A[0][2] += 2; A[1][2] += 2   # the stamp sits at translate(-2 -2) in the letter
             out += [(f"{mid}.{sid}", _affine_d(d, A)) for sid, d in composed["marks"].get(mid, [])]
         return out
+    if _is_mark(k):
+        return _mark_strokes(k)
     return re.findall(r'<g id="(s\d+)"><path d="([^"]+)"', stamps[k])
 
 
@@ -104,6 +124,8 @@ def origin(k):
     the margin goes back on (Thuluth's catalogue leaves it off: 0.08 nuqta there, 0.43 here)."""
     if k in plates:
         return list(plates[k]["origin"])
+    if _is_mark(k):                   # a mark has no inkbox: its right-most ink in its own frame
+        return [max(float(x) for _, d in composed["marks"][k] for x in re.findall(r"-?\d*\.?\d+", d)[0::2]) * S, 0.0]
     return [(inkbox[k][2] + 2) * S, 0.0]
 
 
