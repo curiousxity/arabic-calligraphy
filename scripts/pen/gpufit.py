@@ -385,6 +385,9 @@ def shape_cost(a, rough, bend="position"):
 
 
 LIFT_MIN = 0.02  # the narrowest a lifted nib's mark gets: a corner's width (a zero-width quad inks nothing)
+PEN_PIXELS = float(os.environ.get("GPUFIT_PEN_PIXELS", 6e6))  # most grid pixels, over all tries, in one refine_pens
+                                                              # loop (refine_pens); ~0.6 GB a job, seven jobs well
+                                                              # inside the 4070's 12 GB
 
 
 def _pen_params(nodes, pen, dev):
@@ -709,11 +712,19 @@ def refine_pens(nodes, pieces, origin, ppn, pen_px, pens, rough=0.02, edge=1.0, 
             s = {**s, "window_worst": round(window_worst(ns, pieces, origin, ppn, pen_px, others, windows, ignore), 4)}
         return s, s["iou"] - s["gap95"] - corner * s.get("window_worst", 0.0)
     best = [(None, None, -1e9)] * len(pens)
+    pts = np.concatenate([ref_ring(p) for p in pieces])
+    span = pts.max(0) - pts.min(0) + 3 * pen_px
     for i, stages in enumerate(SCHEDULES):
         if schedules is not None and i not in schedules:
             continue
-        outs = _refine_pens(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore, bend,
-                            corner, windows, pens)
+        # as many tries at once as PEN_PIXELS allows on the finest grid: eight tries of a long stroke on seven
+        # workers overran the 4070's 12 GB, and Windows paged the card's memory to the CPU's (alif 003b, 2026-10-26:
+        # 3 hours a stroke instead of 5 minutes)
+        r = max(s[0] for s in stages) / ppn
+        per = max(1, int(PEN_PIXELS // ((span[0] * r + 1) * (span[1] * r + 1))))
+        outs = [o for j in range(0, len(pens), per)
+                for o in _refine_pens(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stages, ignore,
+                                      bend, corner, windows, pens[j:j + per])]
         for c, out in enumerate(outs):
             s, k = judged(out)
             if k > best[c][2]:
