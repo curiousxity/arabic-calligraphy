@@ -42,6 +42,7 @@ LIFT_LONG = float(os.environ.get("PEN_LIFT_LONG", 2.0))
 LONG = 4.0
 SHORT = 1.5
 END_R, CORNER = 0.6, 2.0
+ALT_GAP = 0.05
 ROUGH, EDGE, SPACING = 0.05, 3.0, 0.3
 
 
@@ -122,7 +123,7 @@ def ink(nodes_list, rings, O, x1, y1, r, H, W, pen=PEN):
     return A, B
 
 
-def picture(stroke, piece, ignore, O, old, new, pen=PEN):
+def picture(stroke, piece, ignore, O, old, new, pen=PEN, labels=("free fit", "pen", "sheet", "pen + sheet edge")):
     """free fit | pen | sheet | pen over the sheet's outline, the shape's other strokes pale behind, 60 px to the nuqta."""
     PX = 60; r = PX / PPN
     ring = ref_ring(piece); others = [ref_ring(p) for p in ignore]
@@ -148,7 +149,7 @@ def picture(stroke, piece, ignore, O, old, new, pen=PEN):
         row = cv2.resize(row, None, fx=200 / W, fy=200 / W, interpolation=cv2.INTER_NEAREST); W = 200
     head = np.full((52, row.shape[1], 3), 255, np.uint8)
     cv2.putText(head, stroke, (4, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 160), 1, cv2.LINE_AA)
-    for i, lab in enumerate(("free fit", "pen", "sheet", "pen + sheet edge")):
+    for i, lab in enumerate(labels):
         cv2.putText(head, lab, (i * (W + 8) + 4, 44), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
     ok, png = cv2.imencode(".png", np.vstack([head, row]))
     return base64.b64encode(png.tobytes()).decode()
@@ -196,17 +197,27 @@ def fit(stroke, log):
         if judge(s) > judge(best["score"]):
             best = {**best, "nodes": p, "score": s, "schedule": other}
     n = best["nodes"]
+    # the best by overlap alone, when it beats the judge's choice by ALT_GAP: drawn too, for the user to choose between
+    # (113.s2 in trial four: the spiral at 0.87 lost to a hook at 0.76 on its end's worst miss)
+    alt = max(tried, key=lambda c: c["score"]["iou"])
+    alt = alt if alt["score"]["iou"] > best["score"]["iou"] + ALT_GAP else None
     cpu = score([n], [piece], O, PPN, P, ignore)
     if P != PEN:  # widths as fractions of the main nib, so the stroke draws with the one pen
         n = [{**q, "width": round(q.get("width", 1) * SMALL_PEN, 4)} for q in n]
+    an = alt and [{**q, "width": round(q.get("width", 1) * P / PEN, 4)} for q in alt["nodes"]]
     out = {"recipe": ("small pen" if P != PEN else "pen") if best["pen"] else "fill", "nodes": n, "score": best["score"],
            "cpu_score": cpu, "pen_scale": round(P / PEN, 4), "start": best["start"], "anchor": best["anchor"],
            "angle": round(n[len(n) // 2]["angle"] % 180, 1),
            "angles": [round(min(q["angle"] for q in n), 1), round(max(q["angle"] for q in n), 1)],
            "size": round(max(q.get("width", 1) for q in n), 3), "length": round(length(n), 2), "lifts": lifts(n),
            "free": {"score": r_old["score"]} if r_old else None,
+           "alt": {"score": alt["score"], "anchor": alt["anchor"], "start": alt["start"], "nodes": an} if alt else None,
            "tried": [{k: (v if k != "pen" or not v else {**v, "angle": "own" if len(set(np.atleast_1d(v["angle"]))) > 1 else float(np.atleast_1d(v["angle"])[0])}) for k, v in c.items() if k != "nodes"} for c in tried], "seconds": round(time.time() - t0)}
-    return out, picture(stroke, piece, ignore, O, r_old["nodes"] if r_old else None, n)  # n in main-nib widths
+    pics = {stroke: picture(stroke, piece, ignore, O, r_old["nodes"] if r_old else None, n)}  # n in main-nib widths
+    if alt:
+        pics[stroke + ".alt"] = picture(stroke, piece, ignore, O, n, an,
+                                        labels=("judge's pick", "best overlap", "sheet", "best overlap + sheet edge"))
+    return out, pics
 
 
 if __name__ == "__main__":
@@ -215,6 +226,7 @@ if __name__ == "__main__":
     log = lambda *a: print(*a, flush=True)  # noqa: E731
     log("gpu", gpufit.available(), "pen px", round(PEN, 3), "ppn", PPN)
     for st in names:
-        res[st], pics[st] = fit(st, log)
+        res[st], p = fit(st, log)
+        pics.update(p)
         json.dump(res, open(os.path.join(od, "pen.json"), "w"))
         json.dump(pics, open(os.path.join(od, "pics.json"), "w"))
