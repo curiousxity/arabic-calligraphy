@@ -41,9 +41,9 @@ n, lab, st, cen = cv2.connectedComponentsWithStats(ink, 8)
 vx, vy = map(float, pt.split(",")); x, y = int((vx - VX) * K), int((vy - VY) * K)
 r = lab[y - 40:y + 40, x - 40:x + 40]; ids, c = np.unique(r[r > 0], return_counts=True); i = ids[np.argmax(c)]
 m = (lab == i).astype(np.uint8); ys, xs = np.nonzero(m)
-# the crop reaches 3 pens past his letter, so the dots beside it come in too (as other ink, `oth`), for a guide's
-# dots to claim (2026-10-25)
-PAD = int(3 * NIB)
+# the crop reaches 4 pens past his letter, so the dots beside it come in too (as other ink), for a guide's dots to
+# claim (2026-10-25)
+PAD = int(4 * NIB)
 y0, y1, x0, x1 = max(ys.min() - PAD, 0), ys.max() + PAD + 1, max(xs.min() - PAD, 0), xs.max() + PAD + 1
 m = m[y0:y1, x0:x1]; lab_c = lab[y0:y1, x0:x1] * (1 - m)
 m = (cv2.GaussianBlur(m.astype(np.float32), (0, 0), 1.2) > 0.5).astype(np.uint8)  # the scan's edge fuzz
@@ -100,8 +100,10 @@ if a.guide:
         Ms_ = Mof[sid]
         z = np.zeros_like(m); cv2.fillPoly(z, [np.round((ring @ Ms_[:, :2].T + Ms_[:, 2]) * 16).astype(np.int32)], 1, cv2.LINE_8, 4)
         regions.append((sid, cv2.dilate(z, np.ones((9, 9), np.uint8))))
-    # a dot is its own ink: it takes none of the letter's, only the dot beside it (the nearest of the other ink's
-    # small blobs, within 1.5 pens of where the guide puts it)
+    # a dot is its own ink: it takes none of the letter's, only a dot of his: of the small blobs within 3 pens of his
+    # letter, the one nearest where the guide puts its dot, up to 4.5 pens from it (his dots sit elsewhere than the
+    # studio's: the zay's above
+    # the head where the studio's is far to the left)
     dot = [piece_kind(sid) == "nuqta" for sid, _ in regions]
     own = [m & z * (not t) for (_, z), t in zip(regions, dot)]
     # where a mark's guide lies over a body stroke's, the ink is the body's: a crown's hairline running down beside
@@ -119,17 +121,18 @@ if a.guide:
                for (_, z), t in zip(regions, dot)]
         near = np.argmin(np.stack(dts), 0)
         for j in range(len(own)): own[j] |= left & (near == j)
+    near_letter = cv2.distanceTransform((1 - m).astype(np.uint8), cv2.DIST_L2, 5)
     taken = set()
     for j, ((sid, z), t) in enumerate(zip(regions, dot)):
         if not t:
             continue
         zy, zx = np.nonzero(z); c = np.array([zx.mean(), zy.mean()])
-        best_, bd = None, 1.5 * NIB
+        best_, bd = None, 4.5 * NIB
         for lb in np.unique(lab_c[lab_c > 0]):
             if lb in taken:
                 continue
             by, bx = np.nonzero(lab_c == lb)
-            if len(by) > 4 * NIB ** 2:      # a neighbour's letter, not a dot
+            if len(by) > 4 * NIB ** 2 or near_letter[by, bx].min() > 3 * NIB:   # a neighbour's letter, or too far
                 continue
             dd = np.linalg.norm([bx.mean() - c[0], by.mean() - c[1]])
             if dd < bd:

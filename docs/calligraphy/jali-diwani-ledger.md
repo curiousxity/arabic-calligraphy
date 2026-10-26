@@ -434,7 +434,12 @@ is cut again on that basis.
   crowns sit up to 2 pens from the studio's place and up to 1.4x its size.
 - **Body before mark.** Where a mark's guide lies over a body stroke's, the
   ink is the body's, so a crown's hairline beside the stem takes none of it.
-  A dot takes only the dot of his beside it (within 1.5 pens).
+  A dot takes only a dot of his: of the small blobs within 3 pens of his
+  letter, the one nearest the studio's dot, up to 4.5 pens from it (his dots
+  sit elsewhere than the studio's: the zay's above the head, the studio's far
+  to the left). Where his two dots touch (qaf, ta) one piece holds both. His
+  alphabet writes ba and ta on one body, so that letter is guided by the ba's
+  dot and the ta's together.
 - **Windows (%) stay open.** A piece's outline is its outer edge; a window
   inside it is kept as a hole beside it (`pieces[sid].holes`), never filled.
 - Known weak spot: the crown's thin tail below where it crosses the stem
