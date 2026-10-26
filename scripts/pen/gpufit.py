@@ -307,7 +307,14 @@ def window_worst(nodes, pieces, origin, ppn, pen_px, others=(), windows=(), igno
     if not windows:
         return 0.0
     rings = [ref_ring(p) for p in pieces]
-    hulls = [h for q in (nodes, *others) for h in path_hulls(q, origin, ppn, pen_px, step=1.0)]
+    own = path_hulls(nodes, origin, ppn, pen_px, step=1.0)
+    hulls = own + [h for q in others for h in path_hulls(q, origin, ppn, pen_px, step=1.0)]
+    # a fit run far off its piece is a runaway, as gpu_score's check: its miss is how far, with no raster drawn. The
+    # raster spans all the ink at WIN_PXN, so a runaway's took a Diwani job on a tiny closed mark (T21.s0) to 15 GB
+    ref_pts, ink_pts = np.concatenate(rings), np.concatenate(own)
+    far = float(max(0.0, *(ref_pts.min(0) - ink_pts.min(0)), *(ink_pts.max(0) - ref_pts.max(0)))) / ppn
+    if far > RUNAWAY:
+        return far
     pts = np.concatenate(rings + hulls)
     x1, y1 = pts.min(0) - pen_px
     r = WIN_PXN / ppn
