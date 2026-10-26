@@ -507,6 +507,45 @@ to Hashim's page and proportions).
 - **Next, the mesh test:** assemble the fitted strokes into the studio's 41
   words by their junctions and compare each with the studio's own word.
 
+## The studio's source: the vector sheet (2026-10-25)
+
+The user then gave Omar Uddin's *Jali Diwani Vector Sheet 2.0* (two SVGs,
+Detailed and Flat; reference only, kept off the repository). **The studio's
+Jali Diwani shapes were extracted from it**: the studio's `db.json` carries
+`sheet_form`, `n_red` (the sheet draws the letter studied in red) and an
+extraction `iou`, and its twelve isolated alifs match the sheet's in
+proportion to 0.01. The Detailed sheet draws every pen stroke as its own
+path, grouped per letter, so it holds the exact outlines the studio
+approximated (its extraction scored 0.85-0.93 against the sheet).
+
+- **Matched on the Geekmini** (research t20, FFT over every shift): one
+  scale, 2.866 studio units to the sheet's point; 546 of the 548 studio
+  shapes that are single letters (the 191 pair-table shapes are two letters
+  drawn together and are not used) match a sheet letter at a median overlap
+  of 0.981 (5th percentile 0.962), and each studio stroke the sheet stroke it
+  was cut from (median 0.977). The split is the same: where the counts
+  differ, the studio cut one sheet stroke in two (the ayn's tail, 403, 404,
+  484, 485; the second piece is absorbed into the first). Five shapes are a
+  sheet letter with an optional tail end or stem embellisher drawn on
+  (247, 646, H01 and others); those were matched stroke by stroke.
+- **No source found:** 362 (sad, initial/medial) and 580 (kaf, initial);
+  the studio's outline serves for them until they are looked at.
+- **Marks:** the crowns (0.94-0.96), the kaf's stroke (0.98), the ط's stem
+  (0.99) and the round dot groups (0.98) come from the sheet. The studio's
+  square dots T20 and T22 have no match; every dot on the sheet's Nuqta
+  layer is the same shape, so they take that dot, centred where the studio
+  put its own.
+- **The pen is 3.8 studio units**, not the extraction's 3.6: the sheet's dot
+  is the nib, 3.80 units on its long side, and its thickest strokes reach
+  3.7-3.8.
+- **The connection types A-M** printed on the sheet's pair tables are the
+  studio's `ports` (`port_source: brushset`).
+- `jdcatalog.py` serves the sheet's strokes in each stamp's own frame when
+  `JD_EXACT` names `stamps.exact.json`, so the composed letters, the words
+  and their junctions stand unchanged. Jobs are named `jdx-`; the 46 fits of
+  the extraction that ran first are kept for comparison. Batches as above:
+  322 strokes, then 337.
+
 ## Sabti's moves, letter by letter
 
 How Sabti writes each letter on his plate (Beirut Jali volume, p. 9): the

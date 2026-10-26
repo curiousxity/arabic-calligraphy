@@ -12,6 +12,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.environ.get("JD_STUDIO_DATA") or os.path.join(HERE, "..", "studio-data")
 WORK = os.environ.get("JD_WORK") or HERE
 UPD, PEN_U = 4.644, 3.6          # studio units to the dot; the studio's pen in units
+# the studio's shapes were extracted from Omar Uddin's Jali Diwani vector sheet (2026-10-25): JD_EXACT names a
+# stamps.exact.json holding the sheet's own strokes laid in each stamp's frame (research t20), served in place of the
+# extraction; its pen is the sheet's, 3.8 units (its dot's long side, and its thickest strokes)
+_ef = os.environ.get("JD_EXACT")
+exact = json.load(open(_ef, encoding="utf-8")) if _ef else {"stamps": {}, "marks": {}}
+if _ef:
+    PEN_U = exact["pen_u"]
+PREFIX = os.environ.get("JD_PREFIX") or "jd-"   # a job name's prefix: a new source gets its own, never reusing old fits
 PPN = 25.9                        # screen px to the nuqta, as Thuluth's
 S = PPN / UPD                     # studio unit -> screen px
 PEN = PEN_U * S
@@ -43,11 +51,15 @@ def _is_mark(k):
     return k in composed["marks"] and k not in stamps
 
 
+def _mark_src(k):
+    return exact["marks"].get(k) or composed["marks"].get(k, [])
+
+
 def _mark_strokes(k):
     """A mark's strokes, a stroke of several dots split into one per dot (T23's two, T27's three): each is its own dab
     of the pen, s0a, s0b, ..."""
     out = []
-    for sid, d in composed["marks"][k]:
+    for sid, d in _mark_src(k):
         parts = [p.strip() for p in re.split(r"(?=M)", d) if p.strip()]
         out += [(sid, d)] if len(parts) == 1 else [(sid + "abcdefgh"[i], p) for i, p in enumerate(parts)]
     return out
@@ -81,10 +93,12 @@ def strokes(k):
         out = strokes(e["stamp"])
         for kind, mid, outer, inner in e["marks"]:
             A = _mul(outer, inner); A[0][2] += 2; A[1][2] += 2   # the stamp sits at translate(-2 -2) in the letter
-            out += [(f"{mid}.{sid}", _affine_d(d, A)) for sid, d in composed["marks"].get(mid, [])]
+            out += [(f"{mid}.{sid}", _affine_d(d, A)) for sid, d in _mark_src(mid)]
         return out
     if _is_mark(k):
         return _mark_strokes(k)
+    if k in exact["stamps"]:
+        return [tuple(s) for s in exact["stamps"][k]]
     return re.findall(r'<g id="(s\d+)"><path d="([^"]+)"', stamps[k])
 
 
@@ -125,11 +139,11 @@ def origin(k):
     if k in plates:
         return list(plates[k]["origin"])
     if _is_mark(k):                   # a mark has no inkbox: its right-most ink in its own frame
-        return [max(float(x) for _, d in composed["marks"][k] for x in re.findall(r"-?\d*\.?\d+", d)[0::2]) * S, 0.0]
+        return [max(float(x) for _, d in _mark_src(k) for x in re.findall(r"-?\d*\.?\d+", d)[0::2]) * S, 0.0]
     return [(inkbox[k][2] + 2) * S, 0.0]
 
 
 def job(k, sid, d):
     Tk = transform(k)
-    return {"name": f"jd-{k}.{sid}", "piece": [Tk, d], "origin": origin(k), "ppn": PPN, "pen": PEN,
+    return {"name": f"{PREFIX}{k}.{sid}", "piece": [Tk, d], "origin": origin(k), "ppn": PPN, "pen": PEN,
             "ignore": [[Tk, od] for osid, od in strokes(k) if osid != sid]}
