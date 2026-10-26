@@ -698,6 +698,18 @@ def _shape_cost_b(a, rough, bend="position"):
     return cost + torch.relu(-cos).sum(1) * 10
 
 
+def _release(what):
+    """Each job's own record of its GPU memory (the most it held live, and what the allocator kept), then the cached
+    blocks handed back: six jobs share the 4070, a stage's grids change size at every relayout, and an allocator that
+    keeps every size it has seen grows past what the job needs (2026-10-26: the card's memory climbed all morning)."""
+    if torch is None or not torch.cuda.is_available():
+        return
+    print(f"gpu memory {what}: peak {torch.cuda.max_memory_allocated() / 2**30:.2f} GB, "
+          f"held {torch.cuda.memory_reserved() / 2**30:.2f} GB", flush=True)
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
+
+
 def refine_pens(nodes, pieces, origin, ppn, pen_px, pens, rough=0.02, edge=1.0, fixed=(), others=(), ignore=(),
                 bend="position", corner=0.0, windows=(), schedules=None, judge="gpu"):
     """refine(pen=p) for every p in `pens`, the tries side by side in one loop (module notes): a list of (nodes,
@@ -821,6 +833,7 @@ def _refine_pens(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others,
                 last = c
                 if (still >= 4).all():
                     break
+        _release(f"pens x{C} stage {px_per_nuqta}px")
     a, wd = unpack()
     a, wd = a.detach().cpu().numpy(), wd.detach().cpu().numpy()
     return [[{**q, "p": [round(float(a[c, i, 0]), 3), round(float(a[c, i, 1]), 3)], "angle": round(float(a[c, i, 2]), 1),
