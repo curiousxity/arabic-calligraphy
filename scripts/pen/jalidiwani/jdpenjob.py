@@ -6,7 +6,7 @@ For each stroke "shape.sN":
   starts   the outline's centre line (band or skeleton, the better one) and the stroke's free fit (jdx-), if any
   angles   for each start, the two nib angles (at least 30 degrees apart) whose straight sweep covers it best
   anchors  each end may lift onto either corner: the four pairs
-each combination refined by gpufit.refine(pen=...) with one schedule (fine first over SHORT nuqta, coarse first under),
+each start's combinations refined side by side by gpufit.refine_pens with one schedule (fine first over SHORT nuqta, coarse first under),
 the best by overlap less outline gap less the end windows' worst miss kept, then run again with the other schedule.
   python jdpenjob.py OUT stroke ...      writes OUT/pen.json {stroke: {...}} and OUT/pics.json {stroke: png base64}
 env PEN_LIFT (nuqta at each end that may lift, default 1.0), PEN_SIZE ("1": the nib's size may move, default "1"),
@@ -160,21 +160,23 @@ def fit(stroke, log):
         starts_a = angles(nodes, piece, O, ignore)
         if ROTATE:  # the start path's own angles too, each node turning on its own
             starts_a = [[q["angle"] for q in nodes]] + [[a] * len(nodes) for a in starts_a]
-        for a in starts_a:
-            for anc in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
-                pen = {"angle": a, "lift_start": LIFT, "lift_end": LIFT, "anchor": list(anc), "size": SIZE}
-                if ROTATE:
-                    pen["turns"] = list(range(1, len(nodes)))
-                p, s = gpufit.refine(nodes, [piece], O, PPN, PEN, rough=ROUGH, edge=EDGE, ignore=ignore, pen=pen,
-                                     schedules=(sched,), corner=CORNER, windows=end_windows(nodes), judge="gpu")
-                tried.append({"start": sname, "angle0": a, "anchor": list(anc), "score": s, "nodes": p, "pen": pen})
-                log(stroke, sname, a if np.isscalar(a) else "own" if len(set(a)) > 1 else a[0], anc, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
+        # every angle and anchor of this start side by side in one loop on the card (gpufit.refine_pens; the user,
+        # 2026-10-26: "make that change for the diwani branch as well")
+        pens = [{"angle": a, "lift_start": LIFT, "lift_end": LIFT, "anchor": list(anc), "size": SIZE,
+                 **({"turns": list(range(1, len(nodes)))} if ROTATE else {})}
+                for a in starts_a for anc in ((1, 1), (1, -1), (-1, 1), (-1, -1))]
+        res = gpufit.refine_pens(nodes, [piece], O, PPN, PEN, pens, rough=ROUGH, edge=EDGE, ignore=ignore,
+                                 schedules=(sched,), corner=CORNER, windows=end_windows(nodes), judge="gpu")
+        for pen, (p, s) in zip(pens, res):
+            a, anc = pen["angle"], pen["anchor"]
+            tried.append({"start": sname, "angle0": a, "anchor": anc, "score": s, "nodes": p, "pen": pen})
+            log(stroke, sname, a if np.isscalar(a) else "own" if len(set(a)) > 1 else a[0], anc, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
     best = max(tried, key=lambda c: judge(c["score"]))
     if best["pen"] is not None:  # the other schedule, from the same start (a restart: the lift does not carry over)
         nodes = dict(starts)[best["start"]]
         other = 1 - (0 if length(nodes) >= SHORT else 1)
-        p, s = gpufit.refine(nodes, [piece], O, PPN, PEN, rough=ROUGH, edge=EDGE, ignore=ignore, pen=best["pen"],
-                             schedules=(other,), corner=CORNER, windows=end_windows(nodes), judge="gpu")
+        (p, s), = gpufit.refine_pens(nodes, [piece], O, PPN, PEN, [best["pen"]], rough=ROUGH, edge=EDGE, ignore=ignore,
+                                     schedules=(other,), corner=CORNER, windows=end_windows(nodes), judge="gpu")
         log(stroke, "other schedule", s["iou"], s["gap95"])
         if judge(s) > judge(best["score"]):
             best = {**best, "nodes": p, "score": s, "schedule": other}
