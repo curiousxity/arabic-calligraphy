@@ -571,7 +571,8 @@ so that at the end only the tip of the long side touches. That is the
 model's lift onto one corner, and it is always the same corner. The fits
 agree: every real tail flick in the trials (237.s1, 113.s1, 001.s0, 553.s1)
 chose the end corner on the nib's upper end, the one the model calls +1
-while the angle stays within 0-180. The same video writes the ra in two
+while the angle stays within 0-180. The fitter still tries both corners at
+each end (the user, 2026-10-26: "just let the fitter choose"). The same video writes the ra in two
 moves, the head then the tail from the head's foot, as the sheet splits it.
 A Thuluth alif lesson showed the paper turned for the head and the tail:
 the nib's angle to the letter changes between its parts.
