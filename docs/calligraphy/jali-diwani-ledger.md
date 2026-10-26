@@ -439,6 +439,21 @@ is cut again on that basis.
   inside it is kept as a hole beside it (`pieces[sid].holes`), never filled.
 - Known weak spot: the crown's thin tail below where it crosses the stem
   (lam, kaf) can go to the stem when the studio's tail is shorter than his.
+- **Whole words from the studio.** Typing a word into the studio's word
+  keypad (Jali Diwani style) previews it on the sheet; each piece of the word
+  (a run of joined letters) carries `data-pen-item` with its stamp ids and
+  its **junctions**: for each letter, the stroke that leaves it and the
+  stroke of the next letter it runs into. That is the join map, stroke to
+  stroke. All words of p. 66 and of p. 67's second line were read this way
+  (2026-10-25, nothing downloaded): scratch `studio-words-jd/words.json`,
+  pictures in `HarfCanvas side-by-side/studio words Jali Diwani/` on the NAS.
+  الله is not built from letters there but is a ready module (T01). The
+  studio adds a long swash (T14) to a final ba.
+- **His words are not the studio's layout.** Hashim stacks and stretches;
+  carrying a whole word rigidly failed before (2026-10-22). The studio's word
+  gives the letters' shapes, their marks and which strokes join; each letter
+  is then placed on his ink on its own, in reading order, and the join map
+  says where one piece may run on into the next.
 
 ## Sabti's moves, letter by letter
 
