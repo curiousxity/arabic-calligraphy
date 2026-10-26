@@ -53,6 +53,19 @@ Techniques (each gets a section once it is worked out from the videos):
   exception with its reason, never as a free variable.
 - **Lifts.** A new stroke starts where the pen comes back down. The vector
   sheet shows how far it overlaps the last one.
+- **Under a neighbour.** A stroke's ink stops where the studio's stroke
+  stops, even where the next stroke would cover it. It may run at most half
+  a nib under a neighbour, for a clean joint. Hidden ink is not free: it
+  shows once the stroke is joined to something else (the user, 2026-10-26).
+  Before this, 32 of 204 fits ran on under a neighbour, a spur up to three
+  stroke widths into its stem.
+- **Turning pen.** Where one angle cannot follow a sweep, the nib turns
+  smoothly through it, even past 180° through an S or a curl. "The hand
+  actually turns that much" (the user, 2026-10-26).
+- **Filled heads.** The alif hat, the ra and dal heads and the sin teeth
+  are filled in with the nib tip or a smaller pen, not swept with the main
+  nib. A sweep of the teeth needs a nib narrower than the pen's narrowest
+  setting.
 
 What this means for the fitting code (`scripts/pen`): the angle is fixed
 per stroke, and changes only at a recorded technique point. A flick is a
