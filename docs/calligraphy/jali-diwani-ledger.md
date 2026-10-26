@@ -547,6 +547,35 @@ approximated (its extraction scored 0.85-0.93 against the sheet).
   the extraction that ran first are kept for comparison. Batches as above:
   322 strokes, then 337.
 
+## The pen held to the qalam (2026-10-26)
+
+`jdpenjob.py` fits the sheet's strokes with the Thuluth session's pen model
+(one size, width falling only at the ends onto one corner), changed for
+Diwani as the trials showed:
+
+- **The nib turns as it goes.** One angle a stroke drew the alif at 0.75;
+  turning at every node, 0.98 (the course notes: rotate the pen while
+  moving). Sizes stayed at the full nib.
+- **The small pen** (a third of the nib) for the head curls and crown heads,
+  the user's call. The thickness scan (t22: each stroke's thickest point, in
+  nibs) puts about 110 strokes at or under a third, with a gap at 0.28-0.34;
+  the crown's long looped stroke is one (0.27), the main nib cannot draw
+  it. Thin is not proof of the small pen: a candidate list goes to the user.
+- **End windows in proportion to the nib.** Sized for the main nib, they
+  covered the whole jim head curl and an unwound fit beat the spiral.
+- **Long tails** (4 nuqta or more) may thin over 2 nuqta, the user's call.
+
+**The flick, from a lesson video the user pointed to:** as the stroke
+finishes, lift the nib's short side gradually while the hand keeps moving,
+so that at the end only the tip of the long side touches. That is the
+model's lift onto one corner, and it is always the same corner. The fits
+agree: every real tail flick in the trials (237.s1, 113.s1, 001.s0, 553.s1)
+chose the end corner on the nib's upper end, the one the model calls +1
+while the angle stays within 0-180. The same video writes the ra in two
+moves, the head then the tail from the head's foot, as the sheet splits it.
+A Thuluth alif lesson showed the paper turned for the head and the tail:
+the nib's angle to the letter changes between its parts.
+
 ## Sabti's moves, letter by letter
 
 How Sabti writes each letter on his plate (Beirut Jali volume, p. 9): the
