@@ -142,6 +142,25 @@ Times are minutes:seconds into the individual-letters lesson.
 
 (Filled in letter by letter.)
 
+### Ba
+
+**Ba Medial 4: the wing rising to the tooth, and the tooth coming down (two strokes)**
+
+- **Strokes:** 068.s0. The studio gives it as one outline; the pen writes it as two.
+- **Pen:** the outline is cut through the tooth's peak, from the top of the hollow under it to its tip.
+  - The left part (the wing up to the peak): one angle, 85°.
+  - The right part (the peak down the stem and round to the right): one angle, 78°.
+  - The two may meet under each other by half a nib, as at any joint.
+- **Source:**
+  - The studio outline. As one stroke, four kinds of fit (one angle, a flick, a turning pen, and a turning pen with a
+    flick) matched 87–91%. The best brought the peak out low and blunt, and the left end slanted where the studio's is
+    square.
+  - The user, 2026-10-27, decision 48: "I think it is 2 separate strokes try that".
+  - Three cuts were tried, each at one angle and with a turning pen. The cut through the peak at one angle each matched
+    96.5%, the worst spot 0.075 nuqta. A turning pen on the same cut matched 97.9% but turned only 5–8°, so one angle
+    stands.
+- **Status:** recreated.
+
 ### Fa
 
 **The head of Fa Initial 3 (the small loop)**
