@@ -590,6 +590,21 @@ the hook the judge picked (0.77) for a smaller miss at the tip. The judge is
 left as it is; where a curl's best-overlap fit (the job's `.alt` picture)
 beats the judge's pick, the curl is taken.
 
+**Hairlines drawn with the pen's tip are fitted apart from the body.**
+T18.s0 is one outline on the sheet: a thick body with a hairline loop off
+the tail's end and another hanging under the head. The course draws such
+decorations as moves of their own, "using the tip of the pen", pulled
+"neatly from the main line". Held whole to one pen it fit at 0.62. Split
+(`PEN_SPLIT`), the body is everything wider than 0.2 nuqta, drawn with the
+main pen, and each hairline reaching half a nuqta or more is filled with the
+small pen.
+
+**Two genuine ways to draw a stroke are both kept, the fancier tagged
+decorative (the user, 2026-10-27).** The hook and the curl that ends in a
+circle (113.s2); a body alone and the body with its tip hairlines (T18.s0).
+When a fit's best-overlap alternative is a different style rather than a
+wrong one, it becomes the second version, not a discard.
+
 **A turning nib tries the other anchor pairs on its leading angle only**
 (`PEN_PRUNE`, from the Thuluth session's measurements): one angle's four
 pairs scored within 0.005 of each other while the angles differed by
