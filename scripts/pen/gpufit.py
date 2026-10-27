@@ -85,25 +85,29 @@ READY = True
 
 
 def _pick():
-    """The card the fits run on: an NVIDIA card (CUDA), else a Mac's own GPU (MPS), else the CPU. HARF_DEVICE=cpu
-    holds a worker to the CPU (fitqueue.py sets it on a Mac whose GPU fails devcheck.py)."""
-    if not READY or torch is None or os.environ.get("HARF_DEVICE", "").lower() == "cpu":
+    """Where the fits run: an NVIDIA card (CUDA), else a Mac's own GPU (MPS); None where there is no torch or no GPU,
+    and the fits go to pieces.refine and pieces.score. HARF_DEVICE=cpu runs this module's own fit on the processor
+    instead, the same steps and the same scoring as on a card: fitqueue.py sends some of a Mac's jobs there when its
+    GPU is saturated (the user, 2026-10-27), and all of them when its GPU fails devcheck.py."""
+    if not READY or torch is None:
+        return None
+    if os.environ.get("HARF_DEVICE", "").lower() == "cpu":
         return "cpu"
     if torch.cuda.is_available():
         return "cuda"
     mps = getattr(torch.backends, "mps", None)
-    return "mps" if mps is not None and mps.is_available() else "cpu"
+    return "mps" if mps is not None and mps.is_available() else None
 
 
 DEVICE = _pick()
 
 
 def available():
-    return DEVICE != "cpu"
+    return DEVICE is not None
 
 
 def _device():
-    return torch.device(DEVICE)
+    return torch.device(DEVICE or "cpu")
 
 
 def _controls(P):

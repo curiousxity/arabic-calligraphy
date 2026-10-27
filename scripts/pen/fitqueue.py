@@ -4,6 +4,7 @@
     python scripts/pen/fitqueue.py status QUEUE            what is waiting, running, done and failed
     python scripts/pen/fitqueue.py retry QUEUE             failed jobs back in line
     python scripts/pen/fitqueue.py jobs QUEUE HOST N       HOST's worker runs N jobs at once
+    python scripts/pen/fitqueue.py cpujobs QUEUE HOST N    N of them on its processor
 
     from fitqueue import submit, wait                      the reading side: hand jobs over, collect results
 
@@ -21,7 +22,11 @@ any number of computers can share a queue. Results land in done/ (or failed/, wi
 A worker is named by HARF_WORKER where that is set, else by its computer's name: a Mac's name changes with the network
 it is on ("...MacBook-Pro.local", "...MacBook-Pro.lan"), and its held jobs and its workers-<name>-<n> file must keep
 one name. A worker on a GPU other than an NVIDIA card (a Mac's, through MPS) runs devcheck.py as it starts, and fits
-on the CPU when that GPU does not fit as the CPU does (the user's MacBook Pro, 2026-10-27; start-worker-mac.command)."""
+on the CPU when that GPU does not fit as the CPU does (the user's MacBook Pro, 2026-10-27; start-worker-mac.command).
+An empty file QUEUE/cpujobs-<name>-<n> sends n of that worker's jobs at once to its processor (HARF_DEVICE=cpu: gpufit's
+own fit, the same steps and scoring, on torch's CPU side), each with the processor's threads shared between them, so a
+GPU that is saturated is not given more (`python scripts/pen/fitqueue.py cpujobs QUEUE HOST N`). They count toward
+the worker's n jobs: with workers-MacBookPro-2 and cpujobs-MacBookPro-1, one job runs on the GPU and one on the CPU."""
 import hashlib, json, os, shutil, signal, socket, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -113,13 +118,21 @@ def _requeue(q, stem):
         pass
 
 
-def _jobs_for(q, default):
+def _count_file(q, kind):
+    """The n of QUEUE/<kind>-<this worker>-<n>, or None."""
     try:
         for f in os.listdir(q):
-            if f.startswith(f"workers-{HOST}-") and f[len(f"workers-{HOST}-"):].isdigit():
-                return max(1, int(f[len(f"workers-{HOST}-"):]))
+            if f.startswith(f"{kind}-{HOST}-") and f[len(f"{kind}-{HOST}-"):].isdigit():
+                return int(f[len(f"{kind}-{HOST}-"):])
     except OSError:
         pass
+    return None
+
+
+def _jobs_for(q, default):
+    n = _count_file(q, "workers")
+    if n is not None:
+        return max(1, n)
     try:
         return max(1, int(json.load(open(os.path.join(q, "workers.json"), encoding="utf-8"))[HOST]))
     except (OSError, ValueError, KeyError, TypeError):
@@ -165,6 +178,7 @@ def work(q, jobs):
     tmp = os.path.join(tempfile.gettempdir(), "harf-fit-out")
     os.makedirs(tmp, exist_ok=True)
     active = {}  # stem -> (process, log file, out path, start)
+    on_cpu = set()  # the stems among them sent to the processor (cpujobs-<name>-<n>)
     me = os.path.join(q, "code", "fitqueue.py")
     started = open(me, "rb").read() if os.path.exists(me) else None
     try:
@@ -201,6 +215,7 @@ def work(q, jobs):
                     continue
                 logf.close()
                 del active[stem]
+                on_cpu.discard(stem)
                 held = os.path.join(q, "running", f"{stem}@{HOST}.json")
                 log = os.path.join(tmp, stem + ".log")
                 if p.returncode == 0 and os.path.exists(out):
@@ -213,6 +228,7 @@ def work(q, jobs):
                     os.replace(held, os.path.join(q, "failed", stem + ".json"))
                     print(f"FAILED {stem} (see failed/{stem}.log)", flush=True)
             jobs = _jobs_for(q, jobs)
+            cpu_n = min(jobs, _count_file(q, "cpujobs") or 0) if env.get("HARF_DEVICE", "").lower() != "cpu" else 0
             while len(active) < jobs and not updated:
                 # not "._" names: the sidecar files a Mac can leave on a network share
                 todo = sorted((f for f in os.listdir(os.path.join(q, "todo")) if f.endswith(".json") and f[0] != "."),
@@ -233,10 +249,16 @@ def work(q, jobs):
                 logf = open(os.path.join(tmp, stem + ".log"), "wb")
                 # not -I: that drops the user's site-packages, where pip puts packages when Python's own folder is
                 # read-only, and every job would fail to import numpy
+                # the GPU's share of the jobs first; the rest go to the processor, sharing its threads
+                cpu = len(active) - len(on_cpu) >= jobs - cpu_n
+                th = str(max(1, ((os.cpu_count() or 2) - 2) // max(1, cpu_n)))
+                job_env = dict(env, HARF_DEVICE="cpu", OMP_NUM_THREADS=th, OPENBLAS_NUM_THREADS=th, MKL_NUM_THREADS=th)                     if cpu else env
                 p = subprocess.Popen([sys.executable, "-B", os.path.join(code, "fitjob.py"), held, out],
-                                     stdout=logf, stderr=subprocess.STDOUT, env=env)
+                                     stdout=logf, stderr=subprocess.STDOUT, env=job_env)
                 active[stem] = (p, logf, out, time.time())
-                print(f"start  {stem}", flush=True)
+                if cpu:
+                    on_cpu.add(stem)
+                print(f"start  {stem}" + (f" (processor, {th} threads)" if cpu else ""), flush=True)
             time.sleep(2)
     except KeyboardInterrupt:
         for stem, (p, logf, _, _) in active.items():
@@ -247,12 +269,13 @@ def work(q, jobs):
         print("stopped; unfinished jobs are back in todo", flush=True)
 
 
-def set_jobs(q, host, n):
-    """The worker on `host` runs `n` jobs at once, from its next look at the queue (module notes)."""
+def set_jobs(q, host, n, kind="workers"):
+    """The worker on `host` runs `n` jobs at once ("workers"), or sends `n` of them to its processor ("cpujobs"), from
+    its next look at the queue (module notes)."""
     for f in os.listdir(q):
-        if f.startswith(f"workers-{host}-"):
+        if f.startswith(f"{kind}-{host}-"):
             os.remove(os.path.join(q, f))
-    open(os.path.join(q, f"workers-{host}-{int(n)}"), "w").close()
+    open(os.path.join(q, f"{kind}-{host}-{int(n)}"), "w").close()
 
 
 def retry(q):
@@ -283,5 +306,7 @@ if __name__ == "__main__":
         retry(q)
     elif cmd == "jobs":
         set_jobs(q, sys.argv[3], sys.argv[4])
+    elif cmd == "cpujobs":
+        set_jobs(q, sys.argv[3], sys.argv[4], "cpujobs")
     else:
         sys.exit(__doc__)

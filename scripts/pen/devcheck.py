@@ -49,7 +49,7 @@ def fit(device):
 
 
 def main():
-    if gpufit.torch is None or gpufit.DEVICE == "cpu":
+    if gpufit.DEVICE in (None, "cpu"):
         print("devcheck: no GPU here; the fits run on the CPU")
         return 0
     dev = gpufit.DEVICE
