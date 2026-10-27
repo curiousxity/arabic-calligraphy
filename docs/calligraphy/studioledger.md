@@ -141,3 +141,23 @@ Times are minutes:seconds into the individual-letters lesson.
 ## Letters
 
 (Filled in letter by letter.)
+
+### Ya
+
+**The long tail of Ya 4 (the flat tail running right)**
+
+- **Strokes:** 721.s1, 732i.s1.
+- **Pen:** one angle the whole way: 73.5° in 721.s1, 82.7° in 732i.s1. The nib is a little wider than the
+  nominal pen (1.20 times). The stroke goes down from the neck, round the bottom bend at full width, then
+  runs right along the line.
+  - In 732i.s1 the right tip is a flick: it narrows onto one corner over the last 3.3 nuqta.
+  - 721.s1 ends square.
+- **Order and joins:** written after the head and neck. It starts under the neck's foot.
+- **Source:**
+  - The letters video (13:22–13:31) writes the isolated ya's tail in one stroke. The hand stays still from
+    the neck's foot round the bottom bend, and the bend is round and at full width. That ya's tail curls back
+    up to the left, not right as Ya 4's does, so the video settles the pen but not the path.
+  - The studio outline matches 96% (721.s1) and 95% (732i.s1). A turning fit matched 732i.s1 1% better, but
+    only by turning the nib about 115°, which the video does not show.
+- **Status:** recreated. One miss remains: the studio's bottom bend is a little rounder and fuller than either
+  fit, by up to 0.2–0.3 nuqta.
