@@ -11,6 +11,9 @@ fi
 export HARF_WORKER=MacBookPro
 # three jobs at once to start with; the reading side changes it with a workers-MacBookPro-<n> file
 if [ $# -eq 0 ]; then set -- --jobs 3; fi
+echo "Starting the worker on the queue in $Q"
+echo "The first start takes a few minutes: it loads PyTorch, then fits a test stroke on the Mac's graphics and on its"
+echo "processor and compares them. A line starting \"worker MacBookPro\" means it is running."
 # caffeinate -i keeps the Mac awake while the worker runs (the screen may still turn off)
 caffeinate -i "$PY" "$Q/code/fitqueue.py" work "$Q" "$@"
 read -r -p "The worker stopped. Press Return to close. "
