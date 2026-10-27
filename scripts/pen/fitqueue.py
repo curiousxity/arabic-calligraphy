@@ -16,15 +16,20 @@ is still read where no such file is. A job is one fitjob.py input file. Each sub
 the fitting code into QUEUE/code, and a worker runs every job from a local snapshot of that copy, in a process of its
 own, so a worker needs no repository, picks up a code change with its next job, and is never caught mid-update.
 A job is claimed by renaming it from todo/ to running/, which only one worker can do, so any number of workers on
-any number of computers can share a queue. Results land in done/ (or failed/, with the log)."""
-import hashlib, json, os, shutil, socket, subprocess, sys, tempfile, time
+any number of computers can share a queue. Results land in done/ (or failed/, with the log).
+
+A worker is named by HARF_WORKER where that is set, else by its computer's name: a Mac's name changes with the network
+it is on ("...MacBook-Pro.local", "...MacBook-Pro.lan"), and its held jobs and its workers-<name>-<n> file must keep
+one name. A worker on a GPU other than an NVIDIA card (a Mac's, through MPS) runs devcheck.py as it starts, and fits
+on the CPU when that GPU does not fit as the CPU does (the user's MacBook Pro, 2026-10-27; start-worker-mac.command)."""
+import hashlib, json, os, shutil, signal, socket, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CODE = ["fitjob.py", "gpufit.py", "pieces.py", "ribbon.py", "build.py", "widenjob.py", "tunejob.py", "outline.py", "scanjob.py",
-        "scanrun.py", "fitqueue.py"]
-ROOT = ["start-worker.bat", "install-packages.bat", "README.txt"]  # fitqueue/, at the queue's top, for whoever sets a worker up
+        "scanrun.py", "fitqueue.py", "devcheck.py"]
+ROOT = ["start-worker.bat", "install-packages.bat", "start-worker-mac.command", "install-packages-mac.command", "README.txt"]  # fitqueue/, at the queue's top, for whoever sets a worker up
 DIRS = ["todo", "running", "done", "failed", "code"]
-HOST = socket.gethostname()
+HOST = os.environ.get("HARF_WORKER") or socket.gethostname()
 
 
 def _dirs(q):
@@ -134,6 +139,10 @@ def _rank(f):
     return (0 if tag == "f" else 1 if not f[:1].isdigit() else 3 if tag in ("r", "t", "u") else 2, f)
 
 
+def _hang_up(*_):
+    raise KeyboardInterrupt
+
+
 def work(q, jobs):
     # a worker without its packages would take every job and fail it: refuse to start instead
     missing = []
@@ -145,11 +154,14 @@ def work(q, jobs):
     if missing:
         sys.exit(f"this Python ({sys.executable}) is missing {', '.join(missing)}: run install-packages.bat, then start again")
     _dirs(q)
+    if hasattr(signal, "SIGHUP"):  # a Mac's Terminal window closed: stop as Ctrl+C does, with the jobs in hand back in line
+        signal.signal(signal.SIGHUP, _hang_up)
     # jobs this computer held when it last stopped go back in line
     for f in os.listdir(os.path.join(q, "running")):
-        if f.endswith(f"@{HOST}.json"):
+        if f.endswith(f"@{HOST}.json") and f[0] != ".":
             _requeue(q, f[: -len(f"@{HOST}.json")])
-    env = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
+    # PYTORCH_ENABLE_MPS_FALLBACK: an operation a Mac's GPU lacks runs on its CPU instead of failing the job
+    env = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1", PYTORCH_ENABLE_MPS_FALLBACK="1")
     tmp = os.path.join(tempfile.gettempdir(), "harf-fit-out")
     os.makedirs(tmp, exist_ok=True)
     active = {}  # stem -> (process, log file, out path, start)
@@ -157,10 +169,25 @@ def work(q, jobs):
     started = open(me, "rb").read() if os.path.exists(me) else None
     try:
         import torch
-        gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none: torch is here but sees no CUDA GPU"
+        mps = getattr(torch.backends, "mps", None)
+        if torch.cuda.is_available():
+            gpu = torch.cuda.get_device_name(0)
+        elif mps is not None and mps.is_available() and env.get("HARF_DEVICE", "").lower() != "cpu":
+            # checked once against the CPU before it fits anything (devcheck.py)
+            chk = subprocess.run([sys.executable, "-B", os.path.join(_snapshot(q), "devcheck.py")], env=env,
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace")
+            print((chk.stdout + chk.stderr).strip().splitlines()[-1] if (chk.stdout + chk.stderr).strip() else
+                  f"devcheck exited {chk.returncode}", flush=True)
+            if chk.returncode == 0:
+                gpu = "the Mac's own (MPS)"
+            else:
+                env["HARF_DEVICE"] = "cpu"
+                gpu = "none: the Mac's GPU failed devcheck.py, so this worker fits on the CPU"
+        else:
+            gpu = "none: torch is here but sees no GPU"
     except ImportError:
-        gpu = "none: torch is not installed (install-packages.bat)"
-    print(f"worker on {HOST}: {jobs} at a time, queue {q}; GPU {gpu}", flush=True)
+        gpu = "none: torch is not installed (install-packages.bat, or install-packages-mac.command on a Mac)"
+    print(f"worker {HOST}: {jobs} at a time, queue {q}; GPU {gpu}", flush=True)
     try:
         while True:
             # the worker's own code changed in the queue: take nothing new, and once the jobs in hand are done,
@@ -187,7 +214,9 @@ def work(q, jobs):
                     print(f"FAILED {stem} (see failed/{stem}.log)", flush=True)
             jobs = _jobs_for(q, jobs)
             while len(active) < jobs and not updated:
-                todo = sorted((f for f in os.listdir(os.path.join(q, "todo")) if f.endswith(".json")), key=_rank)
+                # not "._" names: the sidecar files a Mac can leave on a network share
+                todo = sorted((f for f in os.listdir(os.path.join(q, "todo")) if f.endswith(".json") and f[0] != "."),
+                              key=_rank)
                 if not todo:
                     break
                 stem = todo[0][:-5]

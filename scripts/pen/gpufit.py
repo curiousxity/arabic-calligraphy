@@ -1,6 +1,6 @@
 """pieces.refine on a GPU: the same cost, minimised by gradient descent over a soft raster of the swept nib.
 
-    from gpufit import available, refine     # available(): torch with CUDA is here
+    from gpufit import available, refine     # available(): torch with a GPU is here (CUDA, or a Mac's MPS)
 
 pieces.refine scores each try by rasterising the stroke and runs Powell's method, one try after another, which a
 CPU core does in minutes. Here the ink is made differentiable instead: the nib is placed every half pixel along
@@ -84,12 +84,26 @@ WSCALE = float(os.environ.get("GPUFIT_WSCALE", 3.0))  # nib width per unit of th
 READY = True
 
 
+def _pick():
+    """The card the fits run on: an NVIDIA card (CUDA), else a Mac's own GPU (MPS), else the CPU. HARF_DEVICE=cpu
+    holds a worker to the CPU (fitqueue.py sets it on a Mac whose GPU fails devcheck.py)."""
+    if not READY or torch is None or os.environ.get("HARF_DEVICE", "").lower() == "cpu":
+        return "cpu"
+    if torch.cuda.is_available():
+        return "cuda"
+    mps = getattr(torch.backends, "mps", None)
+    return "mps" if mps is not None and mps.is_available() else "cpu"
+
+
+DEVICE = _pick()
+
+
 def available():
-    return READY and torch is not None and torch.cuda.is_available()
+    return DEVICE != "cpu"
 
 
 def _device():
-    return torch.device("cuda" if available() else "cpu")
+    return torch.device(DEVICE)
 
 
 def _controls(P):
@@ -709,7 +723,10 @@ def _release(what):
     """Each job's own record of its GPU memory (the most it held live, and what the allocator kept), then the cached
     blocks handed back: six jobs share the 4070, a stage's grids change size at every relayout, and an allocator that
     keeps every size it has seen grows past what the job needs (2026-10-26: the card's memory climbed all morning)."""
-    if torch is None or not torch.cuda.is_available():
+    if DEVICE == "mps":  # a Mac's GPU shares the computer's memory; it keeps no peak
+        print(f"gpu memory {what}: held {torch.mps.driver_allocated_memory() / 2**30:.2f} GB", flush=True)
+        torch.mps.empty_cache()
+    if DEVICE != "cuda":
         return
     print(f"gpu memory {what}: peak {torch.cuda.max_memory_allocated() / 2**30:.2f} GB, "
           f"held {torch.cuda.memory_reserved() / 2**30:.2f} GB", flush=True)

@@ -20,5 +20,22 @@ Running it:
      a line as each job starts and finishes.
      Close it to stop; anything half done goes back in line for next time.
 
+On a Mac (it works alongside the Geekmini, taking jobs from the same list):
+
+  1. Connect to the NAS in Finder (Go > Connect to Server, smb://monas/homes) and open this folder.
+  2. Install Python 3.13 from https://www.python.org/downloads/ (on an older Intel Mac, Python 3.12).
+  3. Double-click install-packages-mac.command here. It makes a Python environment of its own in the
+     folder harf-worker in your home folder, with numpy, scipy, OpenCV and PyTorch (PyTorch on a Mac
+     uses the Mac's own graphics, no extra download).
+  4. Double-click start-worker-mac.command here. It runs three jobs at once and keeps the Mac awake
+     while it works. Its first lines check the Mac's graphics against the processor; if they disagree,
+     it fits on the processor instead, so a result is never wrong, only slower.
+  5. Leave the Terminal window open. Close it to stop; anything half done goes back in line.
+
+  If a double-click says the file cannot be opened or has no permission: open Terminal, type
+  bash and a space, drag the .command file into the window, and press Return.
+  Keep the Mac on its charger: it fits much faster plugged in, and the lid can stay open with the
+  screen off.
+
 The fitting code lives in code\ and is updated automatically by the reading side, so there is
 nothing to update here by hand.

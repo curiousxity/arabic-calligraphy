@@ -164,5 +164,6 @@ def run(job):
     return {"name": job["name"], "kind": "widen", "job": job["job"], "nodes": one["nodes"], "judge": one["judge"],
             **({"variants": out} if job.get("variants") else {}),
             "score": {"iou": max(min((x["after"][0] for x in o["judge"].values()), default=0.0) for o in out)},
-            "seconds": round(time.time() - t), "host": socket.gethostname(), "cpus": os.cpu_count(), "gpu": False,
+            "seconds": round(time.time() - t), "host": os.environ.get("HARF_WORKER") or socket.gethostname(),
+            "cpus": os.cpu_count(), "gpu": False,
             "settings": one["settings"]}

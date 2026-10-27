@@ -105,7 +105,8 @@ def run(job, log=print):
         p, _ = trim_ends(p, pieces + ignore, O, PPN, PEN)  # ink on a neighbour's ground is not overshoot
     s = score([p], pieces, O, PPN, PEN, ignore)
     return {"name": job["name"], "kind": kind, "nodes": p, "score": s, "all": alls,
-            "seconds": round(time.time() - t), "host": socket.gethostname(), "cpus": os.cpu_count(), "gpu": GPU,
+            "seconds": round(time.time() - t), "host": os.environ.get("HARF_WORKER") or socket.gethostname(),
+            "cpus": os.cpu_count(), "gpu": GPU,
             "settings": {"spacing": job.get("spacing", SPACING), "edge": job.get("edge", EDGE), "ignore": bool(ignore)}}
 
 

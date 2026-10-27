@@ -46,5 +46,6 @@ def run(job):
             files[f] = open(os.path.join(out, f), encoding="utf-8").read()
     shutil.rmtree(out, ignore_errors=True)
     return {"name": job["name"], "kind": "scan", "nodes": [], "files": files, "log": log, "score": {"iou": 0.0},
-            "seconds": round(time.time() - t), "host": socket.gethostname(), "cpus": os.cpu_count(), "gpu": False,
+            "seconds": round(time.time() - t), "host": os.environ.get("HARF_WORKER") or socket.gethostname(),
+            "cpus": os.cpu_count(), "gpu": False,
             "settings": {"bundle": job["bundle"], "argv": job["argv"]}}

@@ -311,5 +311,6 @@ def run(job):
             "nodes": cur[next(iter(job["strokes"]))],
             "judge": {k: {"before": before[k], "after": after[k]} for k in job["shapes"]},
             "score": {"iou": min((v[0] for v in after.values()), default=0.0)},
-            "seconds": round(time.time() - t), "host": socket.gethostname(), "cpus": os.cpu_count(), "gpu": False,
+            "seconds": round(time.time() - t), "host": os.environ.get("HARF_WORKER") or socket.gethostname(),
+            "cpus": os.cpu_count(), "gpu": False,
             "settings": {**{k: job.get(k) for k in keys}, "how": job.get("_how")}}
