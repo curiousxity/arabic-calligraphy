@@ -597,7 +597,14 @@ decorations as moves of their own, "using the tip of the pen", pulled
 "neatly from the main line". Held whole to one pen it fit at 0.62. Split
 (`PEN_SPLIT`), the body is everything wider than 0.2 nuqta, drawn with the
 main pen, and each hairline reaching half a nuqta or more is filled with the
-small pen.
+small pen. A hairline that circles back on itself starts from a walk round
+its skeleton that passes every loop once (`walk_samples`), not the longest
+path, which cut the loop off (0.57 and 0.42 before, 0.84 and 0.80 after).
+The body fits at 0.97; body and both loops against the sheet's whole outline
+at 0.93, the body alone at 0.82. Both are kept (decision 48, the user,
+2026-10-27): the body alone is T18's plain version, body and loops its
+decorative one. The loops come out a little fatter than the sheet's, and the
+stem under the head's loop a little short.
 
 **Two genuine ways to draw a stroke are both kept, the fancier tagged
 decorative (the user, 2026-10-27).** The hook and the curl that ends in a
