@@ -26,7 +26,14 @@ on the CPU when that GPU does not fit as the CPU does (the user's MacBook Pro, 2
 An empty file QUEUE/cpujobs-<name>-<n> sends n of that worker's jobs at once to its processor (HARF_DEVICE=cpu: gpufit's
 own fit, the same steps and scoring, on torch's CPU side), each with the processor's threads shared between them, so a
 GPU that is saturated is not given more (`python scripts/pen/fitqueue.py cpujobs QUEUE HOST N`). They count toward
-the worker's n jobs: with workers-MacBookPro-2 and cpujobs-MacBookPro-1, one job runs on the GPU and one on the CPU."""
+the worker's n jobs: with workers-MacBookPro-2 and cpujobs-MacBookPro-1, one job runs on the GPU and one on the CPU.
+Such a worker also chooses its jobs by size (the user, 2026-10-27: "if there are jobs better suited for gpu tasks and
+others that are better for cpu, maybe you should just assign them that way"). Measured on the MacBook Pro's first
+jobs: its GPU (MPS) takes about 100 s per million grid pixels at every size, its processor 75 s on small strokes and
+60 s on large ones, so the processor gains most over the GPU on the large ones. So of the next WINDOW jobs in line (the
+same rank and urgency as the first), its processor takes the biggest and its GPU the smallest (BIG_TO_CPU), by
+QUEUE/bundles/<tag>.weights.json ({stroke: pixels of its finest grid}, written as the jobs are queued). A worker with no processor share takes jobs in order: seven of the biggest strokes at
+once is what overran the Geekmini's 12 GB card (2026-10-26)."""
 import hashlib, json, os, shutil, signal, socket, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -152,6 +159,48 @@ def _rank(f):
     return (0 if tag == "f" else 1 if not f[:1].isdigit() else 3 if tag in ("r", "t", "u") else 2, f)
 
 
+WINDOW = 40  # jobs looked over for the biggest or smallest (module notes)
+BIG_TO_CPU = True  # the processor takes the biggest of them, the GPU the smallest (module notes, measured 2026-10-27)
+
+
+def _urgent(f):
+    return f.startswith("fast-a-")  # one-off jobs the reading side wants first (pensubmit's "a-" tags)
+
+
+def _weight(q, f, cache):
+    """A todo job's size, the pixels of its strokes' finest grids, or None where its bundle has no weights."""
+    if f not in cache:
+        w = None
+        try:
+            job = json.load(open(os.path.join(q, "todo", f), encoding="utf-8"))
+            tag = job["bundle"][:-4] if job.get("bundle", "").endswith(".zip") else None
+            if tag:
+                if tag not in cache:
+                    try:
+                        cache[tag] = json.load(open(os.path.join(q, "bundles", tag + ".weights.json"), encoding="utf-8"))
+                    except (OSError, ValueError):
+                        cache[tag] = {}
+                ws = [cache[tag][a] for a in job.get("argv", [])[2:] if a in cache[tag]]
+                w = sum(ws) if ws else None
+        except (OSError, ValueError, KeyError, TypeError):
+            pass  # taken meanwhile, or not a job this reads
+        cache[f] = w
+    return cache[f]
+
+
+def _choose(q, todo, cpu, cache):
+    """The job to take: the first in line, or for a worker with a processor share (module notes) the biggest or the
+    smallest of the next WINDOW, for its processor or its GPU as BIG_TO_CPU says."""
+    if cpu is None:
+        return todo[0]
+    first = todo[0]
+    win = [f for f in todo[:WINDOW] if _rank(f)[0] == _rank(first)[0] and _urgent(f) == _urgent(first)]
+    sized = [(w, f) for f in win if (w := _weight(q, f, cache)) is not None]
+    if not sized:
+        return first
+    return max(sized)[1] if cpu == BIG_TO_CPU else min(sized)[1]
+
+
 def _hang_up(*_):
     raise KeyboardInterrupt
 
@@ -179,6 +228,7 @@ def work(q, jobs):
     os.makedirs(tmp, exist_ok=True)
     active = {}  # stem -> (process, log file, out path, start)
     on_cpu = set()  # the stems among them sent to the processor (cpujobs-<name>-<n>)
+    sizes = {}  # job and bundle weights read so far (_weight)
     me = os.path.join(q, "code", "fitqueue.py")
     started = open(me, "rb").read() if os.path.exists(me) else None
     try:
@@ -235,10 +285,13 @@ def work(q, jobs):
                               key=_rank)
                 if not todo:
                     break
-                stem = todo[0][:-5]
+                # the GPU's share of the jobs first; the rest go to the processor, sharing its threads
+                cpu = len(active) - len(on_cpu) >= jobs - cpu_n
+                pick = _choose(q, todo, cpu if cpu_n else None, sizes)
+                stem = pick[:-5]
                 held = os.path.join(q, "running", f"{stem}@{HOST}.json")
                 try:
-                    os.rename(os.path.join(q, "todo", todo[0]), held)
+                    os.rename(os.path.join(q, "todo", pick), held)
                 except (FileNotFoundError, FileExistsError, PermissionError):
                     time.sleep(0.2)  # another worker took it
                     continue
@@ -249,10 +302,9 @@ def work(q, jobs):
                 logf = open(os.path.join(tmp, stem + ".log"), "wb")
                 # not -I: that drops the user's site-packages, where pip puts packages when Python's own folder is
                 # read-only, and every job would fail to import numpy
-                # the GPU's share of the jobs first; the rest go to the processor, sharing its threads
-                cpu = len(active) - len(on_cpu) >= jobs - cpu_n
                 th = str(max(1, ((os.cpu_count() or 2) - 2) // max(1, cpu_n)))
-                job_env = dict(env, HARF_DEVICE="cpu", OMP_NUM_THREADS=th, OPENBLAS_NUM_THREADS=th, MKL_NUM_THREADS=th)                     if cpu else env
+                job_env = env if not cpu else dict(env, HARF_DEVICE="cpu", OMP_NUM_THREADS=th, OPENBLAS_NUM_THREADS=th,
+                                                   MKL_NUM_THREADS=th)
                 p = subprocess.Popen([sys.executable, "-B", os.path.join(code, "fitjob.py"), held, out],
                                      stdout=logf, stderr=subprocess.STDOUT, env=job_env)
                 active[stem] = (p, logf, out, time.time())
