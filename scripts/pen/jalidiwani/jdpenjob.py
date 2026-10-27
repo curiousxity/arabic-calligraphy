@@ -85,7 +85,7 @@ def split_piece(piece):
         cs, hier = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
         out = []
         for i, c in enumerate(cs):
-            if hier[0][i][3] != -1:
+            if hier[0][i][3] != -1 or len(c) < 3:  # a pixel's contour is one point, a ring with no segments to parse
                 continue
             pts, j = c[:, 0].astype(float), hier[0][i][2]
             while j != -1:
