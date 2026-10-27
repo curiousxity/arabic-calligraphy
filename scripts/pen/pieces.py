@@ -356,9 +356,13 @@ def skeleton_samples(piece, pen_px, sub=4):
     # carry each end out to the outline along its own direction
     def extend(path, at_start):
         e, f = (path[0], path[min(6, len(path) - 1)]) if at_start else (path[-1], path[max(-7, -len(path))])
-        d = (e - f) / (np.linalg.norm(e - f) or 1)
+        if not np.linalg.norm(e - f):
+            # a skeleton thinned to one pixel (a round mark narrower than the nib, T21.s0) has no direction: with d
+            # zero, q stood on ink and the loop below appended forever (15 GB on the Geekmini, 2026-10-26)
+            return path
+        d = (e - f) / np.linalg.norm(e - f)
         ext, q = [], e.copy()
-        while True:
+        for _ in range(sum(m.shape)):  # no walk across the mask is longer
             q = q + d
             r, c = int(round(q[0])), int(round(q[1]))
             if not (0 <= r < m.shape[0] and 0 <= c < m.shape[1]) or not m[r, c]:
