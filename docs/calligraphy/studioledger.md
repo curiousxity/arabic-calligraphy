@@ -142,6 +142,24 @@ Times are minutes:seconds into the individual-letters lesson.
 
 (Filled in letter by letter.)
 
+### Kaf
+
+**The initial kaf's top bar (the long bar rising right, then a thin line back down)**
+
+- **Strokes:** 469.s0, 470.s0.
+- **Pen:** one angle the whole way: 83° in 469.s0, 87° in 470.s0. The bar rises to the right at full width,
+  turns over at the top, and comes back down and to the left as a thin line.
+  - In 470.s0 the thin line's end is a flick onto one corner.
+  - 469.s0 ends square.
+- **Source:**
+  - The letters video (8:24–9:18) writes only the isolated kaf. Its top is a plain diagonal with a separate small
+    head, so the video does not show this bar.
+  - The studio outline. Four fits were tried on each: one angle, turning pen, and a flick with each. The turning fits
+    scored up to 1.2% higher overall but stopped short of the studio's top of the bend by up to 0.16 nuqta. The
+    one-angle fits miss by 0.07 nuqta (469.s0) and 0.05 nuqta (470.s0) at their worst spot.
+  - The user, 2026-10-27, decision 46: close enough, keep the one-angle fit.
+- **Status:** recreated. The thin line coming down is a little thicker than the studio's where it leaves the bend.
+
 ### Ya
 
 **The long tail of Ya 4 (the flat tail running right)**
