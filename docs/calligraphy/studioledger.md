@@ -142,6 +142,19 @@ Times are minutes:seconds into the individual-letters lesson.
 
 (Filled in letter by letter.)
 
+### Fa
+
+**The head of Fa Initial 3 (the small loop)**
+
+- **Strokes:** 402.s0.
+- **Pen:** one angle the whole way, 80°, with a nib 1.26 times the nominal pen. The end narrows onto one corner
+  (a flick) over its last 3.2 nuqta.
+- **Source:**
+  - The letters video (6:24–7:12) writes the isolated fa's head with the holder pointing the same way throughout.
+  - The studio outline matches 98%, the worst spot 0.1 nuqta. A turning fit matched the same 98% only by turning
+    the nib 180°, which the video does not show.
+- **Status:** recreated.
+
 ### Kaf
 
 **The initial kaf's top bar (the long bar rising right, then a thin line back down)**
@@ -159,6 +172,35 @@ Times are minutes:seconds into the individual-letters lesson.
     one-angle fits miss by 0.07 nuqta (469.s0) and 0.05 nuqta (470.s0) at their worst spot.
   - The user, 2026-10-27, decision 46: close enough, keep the one-angle fit.
 - **Status:** recreated. The thin line coming down is a little thicker than the studio's where it leaves the bend.
+
+### Lam
+
+**The bowl of Lam Final 3 (the long sweep from the stem down to a point on the left)**
+
+- **Strokes:** 551.s2.
+- **Pen:** a turning pen, from 10° to 243°. One of the exceptions: the nib turns much more than the path bends.
+- **Source:**
+  - The letters video (9:18–9:48) writes the isolated lam's bowl in one stroke with the holder steady. That bowl
+    curls up at its left end; this one runs out flat to a sharp point, so the video does not settle it.
+  - The studio outline. One angle matched 93%, and one angle with a flick 95%: at one angle the nib narrows only to
+    about half its width, so the left point comes out blunt by 0.2 nuqta. The turning fit matches 99%, the worst
+    spot 0.05 nuqta.
+  - The user, 2026-10-27, decision 47: "Yes turning pen".
+- **Status:** recreated.
+
+### Nun
+
+**The bowl of Nun Final 3**
+
+- **Strokes:** 633.s2.
+- **Pen:** one angle the whole way, 89°, with a nib 1.09 times the nominal pen. Both ends narrow onto one corner,
+  one almost to a point and the other a little.
+- **Source:**
+  - The letters video (11:00–11:42) writes the isolated nun's bowl in one stroke. The holder stays steady and the
+    left end thins to a point.
+  - The studio outline matches 98%. The left tip stops 0.1 nuqta short of the studio's. A turning fit matched
+    98.4% only by turning the nib 253°.
+- **Status:** recreated.
 
 ### Ya
 
