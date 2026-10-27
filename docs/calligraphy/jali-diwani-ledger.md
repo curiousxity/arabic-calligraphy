@@ -577,6 +577,24 @@ moves, the head then the tail from the head's foot, as the sheet splits it.
 A Thuluth alif lesson showed the paper turned for the head and the tail:
 the nib's angle to the letter changes between its parts.
 
+**Thin decorations take the small pen; a head curl ends in a circle (the
+user, 2026-10-27, pointing to the course's jim lesson).** The jim's fourth
+move, its head, "is done with a different pen size", a third of the nib,
+and the alif lesson gives the same pen to "the decorations and the small
+heads". On 11 thin test strokes the small pen beat the main nib every time
+(116.s0 0.87 against 0.68, 053.s1 0.97 against 0.88), so every stroke at or
+under a third of the nib that the thickness scan held back is fitted with
+it. The same lesson draws the head's other shape as a sweep that "end[s] it
+with a circle": the jim's head curl 113.s2 is the spiral (overlap 0.88), not
+the hook the judge picked (0.77) for a smaller miss at the tip. The judge is
+left as it is; where a curl's best-overlap fit (the job's `.alt` picture)
+beats the judge's pick, the curl is taken.
+
+**A turning nib tries the other anchor pairs on its leading angle only**
+(`PEN_PRUNE`, from the Thuluth session's measurements): one angle's four
+pairs scored within 0.005 of each other while the angles differed by
+0.05-0.15, and the pruned search found the same fits in half the time.
+
 ## Sabti's moves, letter by letter
 
 How Sabti writes each letter on his plate (Beirut Jali volume, p. 9): the
