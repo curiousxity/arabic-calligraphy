@@ -49,6 +49,13 @@ ANCHORS = ((1, 1), (1, -1), (-1, 1), (-1, -1))
 # in 2,135 s against 4,524 s. A turning nib's 12-24 tries overflow GPUFIT_PEN_PIXELS into several loops on the card, so
 # fewer tries drop whole loops; a one-angle fit's 8 share one loop, and pruning made them 15% slower, so they keep the full search.
 PRUNE = os.environ.get("PEN_PRUNE", "1") == "1"
+# PEN_SPLIT ("T18.s0,..."): strokes whose sheet outline carries hairlines drawn with the pen's tip, a move of their own
+# pulled from the wet body (the course: "using the tip of the pen to add a nice decoration", "come back with the tip
+# of the pen ... extrude slightly, like neatly from the main line"). The main pen cannot sweep them, so such a stroke is
+# fitted as its body, all of it wider than HAIR_W nuqta, with the main pen, and each hairline "stroke~hN" filled with
+# the small pen, its widths free. T18.s0 held whole: 0.62, the head and both loops missed.
+SPLIT = {x for x in os.environ.get("PEN_SPLIT", "").split(",") if x}
+HAIR_W, HAIR_L = 0.2, 0.5  # nuqta: a hairline is thinner than HAIR_W and reaches HAIR_L; shorter bits are where the body thins
 END_R, CORNER = 0.6, 2.0
 ALT_GAP = 0.05
 ROUGH, EDGE, SPACING = 0.05, 3.0, 0.3
@@ -61,10 +68,50 @@ def old_fit(stroke):
     return max(rs, key=lambda r: r["score"]["iou"] - r["score"]["gap95"]) if rs else None
 
 
+def split_piece(piece):
+    """A PEN_SPLIT stroke's outline as its body (wider than HAIR_W) and its hairlines (reaching HAIR_L or more), longest first, each a piece in
+    the stroke's own frame, plus the slivers where the body thins out (in nobody's target). A hairline's loop is a hole;
+    a ring holds none, so the hole is joined to the outline by a slit of no width."""
+    (a, d, e, f), _ = piece
+    ring = ref_ring(piece); r = 8.0  # raster px a screen px
+    x1, y1 = ring.min(0) - 4
+    W, H = [int(v) + 1 for v in (ring.max(0) + 4 - [x1, y1]) * r]
+    M = np.zeros((H, W), np.uint8)
+    cv2.fillPoly(M, [np.round((ring - [x1, y1]) * r).astype(np.int32)], 1)
+    k = int(HAIR_W / 2 * PPN * r) * 2 + 1
+    body = cv2.morphologyEx(M, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+
+    def rings_of(mask):
+        cs, hier = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        out = []
+        for i, c in enumerate(cs):
+            if hier[0][i][3] != -1:
+                continue
+            pts, j = c[:, 0].astype(float), hier[0][i][2]
+            while j != -1:
+                h = cs[j][:, 0].astype(float)
+                ia, ib = np.unravel_index((((pts[:, None] - h[None]) ** 2).sum(-1)).argmin(), (len(pts), len(h)))
+                pts = np.vstack([pts[:ia + 1], np.roll(h, -ib, 0), h[ib:ib + 1], pts[ia:]])
+                j = hier[0][j][0]
+            P = pts / r + [x1, y1]
+            q = np.c_[(P[:, 0] - e) / a, (P[:, 1] - f) / d]
+            out.append((max(cv2.boundingRect(c)[2:]) / r / PPN, [(a, d, e, f), "M " + " L ".join("%.4f %.4f" % tuple(v) for v in q) + " Z"]))
+        return sorted(out, key=lambda t: -t[0])
+    bodies, hairs = rings_of(body), rings_of(M & (1 - body))
+    return (bodies[0][1], [p for s, p in hairs if s >= HAIR_L],
+            [p for s, p in bodies[1:]] + [p for s, p in hairs if s < HAIR_L])
+
+
 def job_of(stroke):
-    k, sid = stroke.split(".", 1)
+    base, _, h = stroke.partition("~")
+    k, sid = base.split(".", 1)
     d_of = dict(strokes(k)); T = transform(k)
-    return [T, d_of[sid]], [[T, od] for osid, od in d_of.items() if osid != sid], np.array(origin(k), float)
+    piece, ignore = [T, d_of[sid]], [[T, od] for osid, od in d_of.items() if osid != sid]
+    if base in SPLIT:  # the body ("~" none) or hairline "~hN", the stroke's other parts beside the shape's strokes
+        body, hairs, slivers = split_piece(piece)
+        parts = [body] + hairs; i = int(h[1:]) if h else 0
+        piece, ignore = parts[i], ignore + [p for j, p in enumerate(parts) if j != i] + slivers
+    return piece, ignore, np.array(origin(k), float)
 
 
 def judge(s):
@@ -166,13 +213,15 @@ def picture(stroke, piece, ignore, O, old, new, pen=PEN, labels=("free fit", "pe
 def fit(stroke, log):
     t0 = time.time()
     piece, ignore, O = job_of(stroke)
-    P = PEN * SMALL_PEN if stroke in SMALL else PEN   # this stroke's nib, screen px
-    r_old = old_fit(stroke)
+    hair = "~h" in stroke  # a tip-drawn hairline of a PEN_SPLIT stroke: the small pen, filled
+    fill = stroke in FILL or hair
+    P = PEN * SMALL_PEN if stroke in SMALL or hair else PEN   # this stroke's nib, screen px
+    r_old = None if hair or stroke in SPLIT else old_fit(stroke)  # a free fit of the whole outline fits no part
     starts = [("band", band_start(piece, O, ignore, P))]
     if r_old:
         starts.append(("free", [{"p": n["p"], "angle": n["angle"]} for n in r_old["nodes"]]))
     tried = []
-    if stroke in FILL:
+    if fill:
         for sname, nodes in starts:
             p, s = gpufit.refine(nodes, [piece], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ignore, widths_free=True,
                                  corner=CORNER, windows=end_windows(nodes, P), judge="gpu")
@@ -195,7 +244,7 @@ def fit(stroke, log):
             log(stroke, sname, a if np.isscalar(a) else "own" if len(set(a)) > 1 else a[0], anc, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
 
     prune = PRUNE and ROTATE
-    for sname, nodes in ([] if stroke in FILL else starts):
+    for sname, nodes in ([] if fill else starts):
         starts_a = angles(nodes, piece, O, ignore, P)
         if ROTATE:  # the start path's own angles too, each node turning on its own
             starts_a = [[q["angle"] for q in nodes]] + [[a] * len(nodes) for a in starts_a]
@@ -242,7 +291,7 @@ if __name__ == "__main__":
     res, pics = {}, {}
     log = lambda *a: print(*a, flush=True)  # noqa: E731
     log("gpu", gpufit.available(), "pen px", round(PEN, 3), "ppn", PPN)
-    for st in names:
+    for st in [p for s in names for p in ([s] + [f"{s}~h{i}" for i in range(1, len(split_piece(job_of(s.partition('~')[0])[0])[1]) + 1)] if s in SPLIT else [s])]:
         res[st], p = fit(st, log)
         pics.update(p)
         json.dump(res, open(os.path.join(od, "pen.json"), "w"))
