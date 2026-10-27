@@ -156,7 +156,9 @@ Times are minutes:seconds into the individual-letters lesson.
 - **Source:**
   - The letters video (13:22–13:31) writes the isolated ya's tail in one stroke. The hand stays still from
     the neck's foot round the bottom bend, and the bend is round and at full width. That ya's tail curls back
-    up to the left, not right as Ya 4's does, so the video settles the pen but not the path.
+    up to the left, not right as Ya 4's does, so the video settles the pen but not the path. A small roll of
+    the pen between the fingers would not show at the video's size, so this rests on the holder keeping its
+    direction and the bend keeping its full width.
   - The studio outline matches 96% (721.s1) and 95% (732i.s1). A turning fit matched 732i.s1 1% better, but
     only by turning the nib about 115°, which the video does not show.
 - **Status:** recreated. One miss remains: the studio's bottom bend is a little rounder and fuller than either
