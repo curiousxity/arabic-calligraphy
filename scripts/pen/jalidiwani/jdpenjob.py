@@ -291,7 +291,10 @@ if __name__ == "__main__":
     res, pics = {}, {}
     log = lambda *a: print(*a, flush=True)  # noqa: E731
     log("gpu", gpufit.available(), "pen px", round(PEN, 3), "ppn", PPN)
-    for st in [p for s in names for p in ([s] + [f"{s}~h{i}" for i in range(1, len(split_piece(job_of(s.partition('~')[0])[0])[1]) + 1)] if s in SPLIT else [s])]:
+    def hairs(s):  # counted on the whole outline: job_of hands back the body, already split
+        k, sid = s.split(".", 1)
+        return len(split_piece([transform(k), dict(strokes(k))[sid]])[1])
+    for st in [p for s in names for p in ([s] + [f"{s}~h{i}" for i in range(1, hairs(s) + 1)] if s in SPLIT else [s])]:
         res[st], p = fit(st, log)
         pics.update(p)
         json.dump(res, open(os.path.join(od, "pen.json"), "w"))
