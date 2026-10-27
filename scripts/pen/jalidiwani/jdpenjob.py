@@ -5,7 +5,8 @@ pieces.score runs once a stroke, as a check. Runs on the Geekmini through the qu
 For each stroke "shape.sN":
   starts   the outline's centre line (band or skeleton, the better one) and the stroke's free fit (jdx-), if any
   angles   for each start, the two nib angles (at least 30 degrees apart) whose straight sweep covers it best
-  anchors  each end may lift onto either corner: the four pairs
+  anchors  each end may lift onto either corner: the four pairs (a turning nib: the first pair for every angle, then
+           the other three for the leading start and angle only, PEN_PRUNE)
 each start's combinations refined side by side by gpufit.refine_pens with one schedule (fine first over SHORT nuqta, coarse first under),
 the best by overlap less outline gap less the end windows' worst miss kept, then run again with the other schedule.
   python jdpenjob.py OUT stroke ...      writes OUT/pen.json {stroke: {...}} and OUT/pics.json {stroke: png base64}
@@ -41,6 +42,13 @@ SMALL = {"T04.s0", "T05.s0", "T06.s0"} | {x for x in os.environ.get("PEN_SMALL",
 LIFT_LONG = float(os.environ.get("PEN_LIFT_LONG", 2.0))
 LONG = 4.0
 SHORT = 1.5
+ANCHORS = ((1, 1), (1, -1), (-1, 1), (-1, -1))
+# PEN_PRUNE ("1", the default; turning-nib fits only): every angle with the first anchor pair, then the other three
+# pairs for the leading start and angle alone. The Thuluth session's logs (2026-10-26) had one angle's four pairs within
+# 0.005 of each other and the angles 0.05-0.15 apart; on four turning-nib strokes the pruned search found the same fits
+# in 2,135 s against 4,524 s. A turning nib's 12-24 tries overflow GPUFIT_PEN_PIXELS into several loops on the card, so
+# fewer tries drop whole loops; a one-angle fit's 8 share one loop, and pruning made them 15% slower, so they keep the full search.
+PRUNE = os.environ.get("PEN_PRUNE", "1") == "1"
 END_R, CORNER = 0.6, 2.0
 ALT_GAP = 0.05
 ROUGH, EDGE, SPACING = 0.05, 3.0, 0.3
@@ -170,23 +178,32 @@ def fit(stroke, log):
                                  corner=CORNER, windows=end_windows(nodes, P), judge="gpu")
             tried.append({"start": sname, "angle0": None, "anchor": None, "score": s, "nodes": p, "pen": None})
             log(stroke, "fill", sname, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
-    for sname, nodes in ([] if stroke in FILL else starts):
-        sched = 0 if length(nodes) >= SHORT else 1
+    def pen_of(nodes, a, anc):
         lift = LIFT_LONG if length(nodes) >= LONG else LIFT
-        starts_a = angles(nodes, piece, O, ignore, P)
-        if ROTATE:  # the start path's own angles too, each node turning on its own
-            starts_a = [[q["angle"] for q in nodes]] + [[a] * len(nodes) for a in starts_a]
-        # every angle and anchor of this start side by side in one loop on the card (gpufit.refine_pens; the user,
-        # 2026-10-26: "make that change for the diwani branch as well")
-        pens = [{"angle": a, "lift_start": lift, "lift_end": lift, "anchor": list(anc), "size": SIZE,
-                 **({"turns": list(range(1, len(nodes)))} if ROTATE else {})}
-                for a in starts_a for anc in ((1, 1), (1, -1), (-1, 1), (-1, -1))]
+        return {"angle": a, "lift_start": lift, "lift_end": lift, "anchor": list(anc), "size": SIZE,
+                **({"turns": list(range(1, len(nodes)))} if ROTATE else {})}
+
+    def run_pens(sname, nodes, pens):
+        """Every pen side by side in one loop on the card (gpufit.refine_pens; the user, 2026-10-26: "make that change
+        for the diwani branch as well"), with this start's schedule; each try goes into tried."""
+        sched = 0 if length(nodes) >= SHORT else 1
         res = gpufit.refine_pens(nodes, [piece], O, PPN, P, pens, rough=ROUGH, edge=EDGE, ignore=ignore,
                                  schedules=(sched,), corner=CORNER, windows=end_windows(nodes, P), judge="gpu")
         for pen, (p, s) in zip(pens, res):
             a, anc = pen["angle"], pen["anchor"]
             tried.append({"start": sname, "angle0": a, "anchor": anc, "score": s, "nodes": p, "pen": pen})
             log(stroke, sname, a if np.isscalar(a) else "own" if len(set(a)) > 1 else a[0], anc, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
+
+    prune = PRUNE and ROTATE
+    for sname, nodes in ([] if stroke in FILL else starts):
+        starts_a = angles(nodes, piece, O, ignore, P)
+        if ROTATE:  # the start path's own angles too, each node turning on its own
+            starts_a = [[q["angle"] for q in nodes]] + [[a] * len(nodes) for a in starts_a]
+        run_pens(sname, nodes, [pen_of(nodes, a, anc) for a in starts_a for anc in (ANCHORS[:1] if prune else ANCHORS)])
+    if prune and tried:  # the other three anchor pairs, for the leading start and angle only
+        lead = max(tried, key=lambda c: judge(c["score"]))
+        nodes = dict(starts)[lead["start"]]
+        run_pens(lead["start"], nodes, [pen_of(nodes, lead["angle0"], anc) for anc in ANCHORS[1:]])
     best = max(tried, key=lambda c: judge(c["score"]))
     if best["pen"] is not None:  # the other schedule, from the same start (a restart: the lift does not carry over)
         nodes = dict(starts)[best["start"]]
@@ -206,7 +223,7 @@ def fit(stroke, log):
         n = [{**q, "width": round(q.get("width", 1) * SMALL_PEN, 4)} for q in n]
     an = alt and [{**q, "width": round(q.get("width", 1) * P / PEN, 4)} for q in alt["nodes"]]
     out = {"recipe": ("small pen" if P != PEN else "pen") if best["pen"] else "fill", "nodes": n, "score": best["score"],
-           "cpu_score": cpu, "pen_scale": round(P / PEN, 4), "start": best["start"], "anchor": best["anchor"],
+           "cpu_score": cpu, "pen_scale": round(P / PEN, 4), "start": best["start"], "anchor": best["anchor"], "prune": prune,
            "angle": round(n[len(n) // 2]["angle"] % 180, 1),
            "angles": [round(min(q["angle"] for q in n), 1), round(max(q["angle"] for q in n), 1)],
            "size": round(max(q.get("width", 1) for q in n), 3), "length": round(length(n), 2), "lifts": lifts(n),
