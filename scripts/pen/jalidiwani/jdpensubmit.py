@@ -22,8 +22,10 @@ if cmd == "submit":
         for f in ("jdcatalog.py", "jdpenjob.py"):
             zf.write(os.path.join(HERE, f), "jd/" + f)
         # this branch's gpufit over the queue's, until the queue's has window_worst's runaway check (2026-10-26: a
-        # runaway on the mark T21.s0 drew a 15 GB raster); a duplicate name in a zip, the later entry wins on extract
-        if "far > RUNAWAY:\n        return far" not in open(os.path.join(q, "code", "gpufit.py"), encoding="utf-8").read():
+        # runaway on the mark T21.s0 drew a 15 GB raster) and _ink_b's guard for a batch wholly out of frame (2026-10-27,
+        # T21.s0 again); a duplicate name in a zip, the later entry wins on extract
+        qg = open(os.path.join(q, "code", "gpufit.py"), encoding="utf-8").read()
+        if "far > RUNAWAY:\n        return far" not in qg or "max(1, int(pw.max()))" not in qg:
             zf.write(os.path.join(HERE, "..", "gpufit.py"), "jd/gpufit.py")
         data = os.environ["JD_STUDIO_DATA"]
         for f in ("db.json", "stamps.pack.json", "inkbox.json", "marks-kinds.json"):

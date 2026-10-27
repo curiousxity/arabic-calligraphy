@@ -624,11 +624,13 @@ def _ink_b(ea, eb, quads, blocks, C, x1, y1, r, H, W, soft):
         i0 = ((lo[:, 1] - y1) * r).floor().clamp(0, H - 1).long()
         # each block's window as _ink makes it for that path alone (the widest of the path's blocks): a pixel past an
         # acute corner of a thin quad reads shallower than its distance, so a wider window would ink more
-        bw = ((hi[:, 0] - x1) * r).ceil().clamp(max=W).sub(j0).long() + 1
-        bh = ((hi[:, 1] - y1) * r).ceil().clamp(max=H).sub(i0).long() + 1
+        bw = ((hi[:, 0] - x1) * r).ceil().clamp(0, W).sub(j0).long() + 1
+        bh = ((hi[:, 1] - y1) * r).ceil().clamp(0, H).sub(i0).long() + 1
         pw = torch.zeros(C, dtype=torch.long, device=V.device).scatter_reduce(0, blocks, bw, reduce="amax")
         ph = torch.zeros(C, dtype=torch.long, device=V.device).scatter_reduce(0, blocks, bh, reduce="amax")
-        ww, hh = int(pw.max()), int(ph.max())
+        # a batch whose every quad has left the frame (or gone non-finite) has no window: one pixel, masked off below,
+        # so the batch draws no ink instead of dividing by zero (the Diwani branch's T21.s0, 2026-10-27)
+        ww, hh = max(1, int(pw.max())), max(1, int(ph.max()))
         jj = j0[:, None] + torch.arange(ww, device=V.device)[None]           # (nc, ww)
         ii = i0[:, None] + torch.arange(hh, device=V.device)[None]           # (nc, hh)
         inside = ((ii < H) & (torch.arange(hh, device=V.device)[None] < ph[blocks][:, None]))[:, :, None] \

@@ -141,6 +141,14 @@ def band_start(piece, O, ignore, pen=PEN):
             s = gpu_score([p], [piece], O, PPN, pen, ignore)
             if best is None or s["iou"] > best[1]["iou"]:
                 best = (p, s)
+    if best is None or length(best[0]) < 0.05:
+        # a round mark thins to one skeleton point, and smooth_path makes two nodes on it: a path of no length, which
+        # the fit drove out of the raster (T21.s0, 2026-10-27). A chord along the ring's long axis instead, a nib short
+        ring = ref_ring(piece); c = ring.mean(0)
+        v = np.linalg.eigh(np.cov((ring - c).T))[1][:, -1]; t = (ring - c) @ v
+        half = max(np.ptp(t) - pen, 0.2 * np.ptp(t)) / 2
+        a = best[0][0]["angle"] if best else 45.0
+        best = ([{"p": [round(float(x), 3) for x in (c + k * half * v - O) / PPN], "angle": a} for k in (-1, 1)], None)
     return best[0]
 
 
@@ -215,7 +223,9 @@ def fit(stroke, log):
     piece, ignore, O = job_of(stroke)
     hair = "~h" in stroke  # a tip-drawn hairline of a PEN_SPLIT stroke: the small pen, filled
     fill = stroke in FILL or hair
-    P = PEN * SMALL_PEN if stroke in SMALL or hair else PEN   # this stroke's nib, screen px
+    # a mark narrower than the nib cannot be the main pen's: it is a small-pen mark (T21.s0, 0.56 nuqta to a 0.82 nib)
+    narrow = float(np.ptp(ref_ring(piece), 0).max()) < PEN
+    P = PEN * SMALL_PEN if stroke in SMALL or hair or narrow else PEN   # this stroke's nib, screen px
     r_old = None if hair or stroke in SPLIT else old_fit(stroke)  # a free fit of the whole outline fits no part
     starts = [("band", band_start(piece, O, ignore, P))]
     if r_old:
@@ -254,6 +264,8 @@ def fit(stroke, log):
         nodes = dict(starts)[lead["start"]]
         run_pens(lead["start"], nodes, [pen_of(nodes, lead["angle0"], anc) for anc in ANCHORS[1:]])
     best = max(tried, key=lambda c: judge(c["score"]))
+    if best["score"]["iou"] == 0:  # every try left the sheet's ink: no fit, and nothing sane to draw a picture from
+        raise RuntimeError(f"{stroke}: no try touched the sheet's ink")
     if best["pen"] is not None:  # the other schedule, from the same start (a restart: the lift does not carry over)
         nodes = dict(starts)[best["start"]]
         other = 1 - (0 if length(nodes) >= SHORT else 1)
