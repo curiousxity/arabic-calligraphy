@@ -259,7 +259,7 @@ def fit(stroke, log):
         if ROTATE:  # the start path's own angles too, each node turning on its own
             starts_a = [[q["angle"] for q in nodes]] + [[a] * len(nodes) for a in starts_a]
         run_pens(sname, nodes, [pen_of(nodes, a, anc) for a in starts_a for anc in (ANCHORS[:1] if prune else ANCHORS)])
-    if prune and tried:  # the other three anchor pairs, for the leading start and angle only
+    if prune and not fill and tried:  # the other three anchor pairs, for the leading start and angle only (a fill has none)
         lead = max(tried, key=lambda c: judge(c["score"]))
         nodes = dict(starts)[lead["start"]]
         run_pens(lead["start"], nodes, [pen_of(nodes, lead["angle0"], anc) for anc in ANCHORS[1:]])
