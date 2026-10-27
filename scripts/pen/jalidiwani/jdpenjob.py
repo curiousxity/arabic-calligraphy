@@ -12,13 +12,13 @@ the best by overlap less outline gap less the end windows' worst miss kept, then
   python jdpenjob.py OUT stroke ...      writes OUT/pen.json {stroke: {...}} and OUT/pics.json {stroke: png base64}
 env PEN_LIFT (nuqta at each end that may lift, default 1.0), PEN_SIZE ("1": the nib's size may move, default "1"),
 PEN_FILL ("a.s0,b.s1": strokes filled with a small pen or the nib's tip, fitted freely, not held to the pen)."""
-import base64, json, os, sys, time
+import base64, json, math, os, sys, time
 import numpy as np, cv2
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from jdcatalog import strokes, origin, transform, PPN, PEN  # noqa: E402
 from ribbon import bands, smooth_path  # noqa: E402
-from pieces import ref_ring, score, skeleton_samples  # noqa: E402
+from pieces import ref_ring, score, skeleton_samples, _thin  # noqa: E402
 import gpufit  # noqa: E402
 from gpufit import gpu_score  # noqa: E402
 
@@ -56,6 +56,7 @@ PRUNE = os.environ.get("PEN_PRUNE", "1") == "1"
 # the small pen, its widths free. T18.s0 held whole: 0.62, the head and both loops missed.
 SPLIT = {x for x in os.environ.get("PEN_SPLIT", "").split(",") if x}
 HAIR_W, HAIR_L = 0.2, 0.5  # nuqta: a hairline is thinner than HAIR_W and reaches HAIR_L; shorter bits are where the body thins
+HAIR_SPACING = 0.12  # nuqta between a hairline's start nodes: a loop half a nuqta across needs a dozen to go round
 END_R, CORNER = 0.6, 2.0
 ALT_GAP = 0.05
 ROUGH, EDGE, SPACING = 0.05, 3.0, 0.3
@@ -131,13 +132,120 @@ def length(nodes):
     return float(np.linalg.norm(np.diff(P, axis=0), axis=1).sum())
 
 
-def band_start(piece, O, ignore, pen=PEN):
+def walk_samples(piece, pen, sub=8):
+    """Centre samples [x, y, w, phi, off] of a tip-drawn hairline, walked through every branch of its skeleton once (an
+    Euler path between its free ends), so a loop is gone round where the longest path cuts straight past it (T18.s0's
+    hairlines, 2026-10-27: 0.57 and 0.42). Spurs shorter than a few line widths come off first. None when no such walk
+    exists (more than two free ends left, or no branch at all)."""
+    from collections import defaultdict
+    ring = ref_ring(piece)
+    x1, y1 = ring.min(0) - 4
+    W, H = [int(v) + 1 for v in (ring.max(0) + 4 - [x1, y1]) * sub]
+    m = np.zeros((H, W), np.uint8)
+    cv2.fillPoly(m, [np.round((ring - [x1, y1]) * sub * 16).astype(np.int32)], 1, cv2.LINE_8, 4)
+    dt = cv2.distanceTransform(m, cv2.DIST_L2, 5)
+    pts = {tuple(p) for p in np.argwhere(_thin(m))}
+    N8 = ((-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1))
+    nb = lambda p: [(p[0] + a, p[1] + b) for a, b in N8 if (p[0] + a, p[1] + b) in pts]  # noqa: E731
+
+    def crossings(p):  # 0-to-1 steps round the 8 neighbours: the branches a pixel joins, blind to staircase corners
+        r8 = [(p[0] + a, p[1] + b) in pts for a, b in N8]
+        return sum((not r8[i]) and r8[(i + 1) % 8] for i in range(8))
+    nodes = {p for p in pts if crossings(p) != 2}
+    cl = {}  # each end or junction pixel's cluster: a junction is a few pixels thick
+    for p in nodes:
+        if p in cl:
+            continue
+        cl[p], q = len(set(cl.values())), [p]
+        while q:
+            for n in nb(q.pop()):
+                if n in nodes and n not in cl:
+                    cl[n] = cl[p]; q.append(n)
+    segs, seen = [], set()
+    for u in nodes:
+        for v in nb(u):
+            if v in nodes or v in seen:
+                continue
+            path, prev, cur = [u, v], u, v
+            seen.add(v)
+            while True:
+                nx = [n for n in nb(cur) if n != prev and n not in path[-3:]]
+                end = [n for n in nx if n in nodes and (len(path) > 3 or cl[n] != cl[u])]
+                if end:
+                    path.append(end[0]); break
+                nx = sorted((n for n in nx if n not in seen and n not in nodes), key=lambda n: abs(n[0] - cur[0]) + abs(n[1] - cur[1]))
+                if not nx:
+                    path = None; break
+                prev, cur = cur, nx[0]; seen.add(cur); path.append(cur)
+            if path:
+                segs.append([cl[u], cl[path[-1]], path])
+    if not segs:
+        return None
+    width = 2 * float(np.median([dt[p] for p in pts])) / sub  # the line's own width, screen px
+    parent = {}
+
+    def root(c):
+        while parent.get(c, c) != c:
+            c = parent[c]
+        return c
+    short = lambda p: len(p) / sub < 3 * width  # noqa: E731
+    while True:
+        segs = [[root(a), root(b), p] for a, b, p in segs]
+        deg = defaultdict(int)
+        for a, b, _ in segs:
+            deg[a] += 1; deg[b] += 1
+        # a crossing thins to a few junctions a pixel or two apart, joined by short links: one junction
+        link = [i for i, (a, b, p) in enumerate(segs) if a != b and deg[a] > 1 and deg[b] > 1 and short(p)]
+        # a short branch to a free end is where thinning frays a blunt end
+        spur = [i for i, (a, b, p) in enumerate(segs) if (a == b or deg[a] == 1 or deg[b] == 1) and short(p) and len(segs) > 1]
+        if link:
+            a, b, _ = segs.pop(link[0]); parent[b] = a
+        elif spur:
+            segs.pop(spur[0])
+        else:
+            break
+    odd = [c for c, k in deg.items() if k % 2]
+    if len(odd) not in (0, 2):
+        return None
+    adj = defaultdict(list)
+    for i, (a, b, _) in enumerate(segs):
+        adj[a].append(i); adj[b].append(i)
+    used, stack, walk = set(), [(odd[0] if odd else segs[0][0], None)], []
+    while stack:  # Hierholzer
+        v, _ = stack[-1]
+        while adj[v] and adj[v][-1] in used:
+            adj[v].pop()
+        if adj[v]:
+            i = adj[v].pop(); used.add(i)
+            a, b, _ = segs[i]
+            stack.append((b if a == v else a, (i, v)))
+        else:
+            walk.append(stack.pop()[1])
+    path = []
+    for i, frm in [e for e in walk[::-1] if e]:
+        p = segs[i][2] if segs[i][0] == frm else segs[i][2][::-1]
+        path += p[1:] if path else p
+    path = np.array(path, float)
+    xy = np.c_[path[:, 1] / sub + x1, path[:, 0] / sub + y1]
+    w = np.array([2 * dt[int(r), int(c)] / sub for r, c in path])
+    step = max(1, len(xy) // 240)
+    xy, w = xy[::step], w[::step]
+    out = []
+    for k in range(len(xy)):
+        k0, k1 = max(0, k - 2), min(len(xy) - 1, k + 2)
+        phi = math.degrees(math.atan2(-(xy[k1, 1] - xy[k0, 1]), xy[k1, 0] - xy[k0, 0]))
+        out.append([float(xy[k, 0]), float(xy[k, 1]), float(w[k]), phi, math.degrees(math.asin(min(1.0, w[k] / pen)))])
+    return out
+
+
+def band_start(piece, O, ignore, pen=PEN, hair=False):
     best = None
-    for samples in (bands([piece], pen)[0], skeleton_samples(piece, pen)):
+    walk = hair and walk_samples(piece, pen)  # a hairline goes round its loops; without a walk, the band's usual starts
+    for samples in ((walk,) if walk else (bands([piece], pen)[0], skeleton_samples(piece, pen))):
         if not samples:
             continue
         for h in (0, 45, 90, 135):
-            p = smooth_path(samples, pen, O, PPN, SPACING, hint=h)
+            p = smooth_path(samples, pen, O, PPN, HAIR_SPACING if walk else SPACING, hint=h)
             s = gpu_score([p], [piece], O, PPN, pen, ignore)
             if best is None or s["iou"] > best[1]["iou"]:
                 best = (p, s)
@@ -227,7 +335,7 @@ def fit(stroke, log):
     narrow = float(np.ptp(ref_ring(piece), 0).max()) < PEN
     P = PEN * SMALL_PEN if stroke in SMALL or hair or narrow else PEN   # this stroke's nib, screen px
     r_old = None if hair or stroke in SPLIT else old_fit(stroke)  # a free fit of the whole outline fits no part
-    starts = [("band", band_start(piece, O, ignore, P))]
+    starts = [("walk" if hair else "band", band_start(piece, O, ignore, P, hair))]
     if r_old:
         starts.append(("free", [{"p": n["p"], "angle": n["angle"]} for n in r_old["nodes"]]))
     tried = []
