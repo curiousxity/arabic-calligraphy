@@ -190,8 +190,8 @@ Times are minutes:seconds into the individual-letters lesson.
     full edge and is dragged down, so the top's point comes from the nib's corner, and the rest of the ink is the
     tooth's own body. In the studio's cut the flag is the part of that landing that shows above the next stroke.
   - The user, 2026-10-28, on the proposal: "Yes" (decision 50 A).
-- **Status:** open. Being refitted with no ink allowed under the next stroke, as a nib-tip fill and with a
-  turning pen.
+- **Status:** done. Filled with the nib tip, with no ink allowed under the next stroke, it matches 94.5% and stays
+  inside the studio's shape (before: 95.5%, but with a blob under the next stroke). The turning pen matched 93%.
 
 ### Fa
 
@@ -283,8 +283,10 @@ Times are minutes:seconds into the individual-letters lesson.
     straight move that does not run back along the up-curve. A sin's second tooth curves up first, then down, a
     crest. So the pen stops at the peak and starts again, as at Ba Medial 4's peak.
   - The user, 2026-10-28, on the proposal: "Yes" (decision 49 A).
-- **Status:** open. Three cuts from the notch under the peak are being fitted: to the peak's tip, straight up, and
-  across the down-stroke. Each is tried at one angle and with a turning pen.
+- **Status:** open, decision 51. Three cuts from the notch under the peak were tried, each at one angle and with
+  a turning pen. With the turning pen, the cut straight up matched 94% and the cut across the down-stroke 92%,
+  against 91% as one stroke. The worst miss fell from 0.31 to 0.19 nuqta, and the peak comes out sharp. But both
+  show a step where the two parts meet. The cut to the tip and the one-angle fits did worse (86-91%).
 
 ### Ya
 
