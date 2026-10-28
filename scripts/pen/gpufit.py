@@ -160,6 +160,20 @@ def _placements(a, widths, origin, ppn, pen, r, layout=None):
     return _curve(a, widths, origin, ppn, pen, seg, t)
 
 
+def _hull4(V):
+    """Quads (q, 4, 2), corners in order round their centre, made convex: a corner inside the triangle of the other
+    three (the nib's far end swinging back on a fast turn) is moved onto the corner before it, leaving that triangle,
+    the four's hull. Depth inside a quad is the least over its edges, which is only right for a convex one: a dented
+    quad inked only its convex part, and left specks of paper in the ink of a fast turn (Ha 2's arch, 643.s1, twelve
+    dented quads at 60 px to the nuqta)."""
+    P, N = torch.roll(V, 1, 1), torch.roll(V, -1, 1)
+    with torch.no_grad():
+        area = (V[..., 0] * N[..., 1] - N[..., 0] * V[..., 1]).sum(1)
+        turn = (V - P)[..., 0] * (N - V)[..., 1] - (V - P)[..., 1] * (N - V)[..., 0]
+        dent = turn * torch.sign(area)[:, None] < 0
+    return torch.where(dent[..., None], P, V)
+
+
 def _ink(ea, eb, x1, y1, r, H, W, soft):
     """Soft ink on the grid: each pixel by its depth inside the quad (placement i to i + 2) it is deepest in. The quads
     go in blocks of CHUNK, each block over a window of the grid just round it, all blocks in one batch."""
@@ -169,7 +183,7 @@ def _ink(ea, eb, x1, y1, r, H, W, soft):
     with torch.no_grad():
         c = V.mean(1, keepdim=True)
         order = torch.atan2(V[..., 1] - c[..., 1], V[..., 0] - c[..., 0]).argsort(1)
-    V = torch.gather(V, 1, order[..., None].expand(-1, -1, 2))
+    V = _hull4(torch.gather(V, 1, order[..., None].expand(-1, -1, 2)))
     q = V.shape[0]
     pad = (-q) % CHUNK
     if pad:  # the last quad again: a repeat changes no pixel's deepest
@@ -214,7 +228,7 @@ def _ink_loop(ea, eb, x1, y1, r, H, W, soft):
     with torch.no_grad():
         c = V.mean(1, keepdim=True)
         order = torch.atan2(V[..., 1] - c[..., 1], V[..., 0] - c[..., 0]).argsort(1)
-    V = torch.gather(V, 1, order[..., None].expand(-1, -1, 2))
+    V = _hull4(torch.gather(V, 1, order[..., None].expand(-1, -1, 2)))
     E = torch.roll(V, -1, 1) - V                                             # edges
     area = (V[:, :, 0] * torch.roll(V, -1, 1)[:, :, 1] - torch.roll(V, -1, 1)[:, :, 0] * V[:, :, 1]).sum(1)
     L = E.norm(dim=-1, keepdim=True)
@@ -637,7 +651,7 @@ def _ink_b(ea, eb, quads, blocks, C, x1, y1, r, H, W, soft):
     with torch.no_grad():
         c = V.mean(1, keepdim=True)
         order = torch.atan2(V[..., 1] - c[..., 1], V[..., 0] - c[..., 0]).argsort(1)
-    V = torch.gather(V, 1, order[..., None].expand(-1, -1, 2))
+    V = _hull4(torch.gather(V, 1, order[..., None].expand(-1, -1, 2)))
     nc = V.shape[0] // CHUNK
     V = V.view(nc, CHUNK, 4, 2)
     E = torch.roll(V, -1, 2) - V
