@@ -410,10 +410,12 @@ def shape_cost(a, rough, bend="position"):
 
 
 LIFT_MIN = 0.02  # the narrowest a lifted nib's mark gets: a corner's width (a zero-width quad inks nothing)
-# how evenly a lifting nib narrows: the cost of the width's second difference along the path, times `rough`. 0 (the
-# default) lets the width fall node by node in steps. The user, 2026-10-28, of a kaf hook drawn that way: "the pen
-# version for the kaf looks like it is irregular"; in the lesson video the pen rolls onto its corner in one even motion.
-LIFT_SMOOTH = float(os.environ.get("GPUFIT_LIFT_SMOOTH", 0))
+# how evenly a lifting nib narrows: the cost of the width's second difference along the path, times `rough` (0 lets
+# the width fall node by node in steps). The user, 2026-10-28, of a kaf hook drawn that way: "the pen version for the
+# kaf looks like it is irregular"; in the lesson video the pen rolls onto its corner in one even motion. 0.03 held
+# both kaf hooks even and matched the studio better (474.s0 96% -> 97.6%); the user then made it the rule for every
+# fit ("1 yes try it").
+LIFT_SMOOTH = float(os.environ.get("GPUFIT_LIFT_SMOOTH", 0.03))
 
 
 def lift_cost(w, rough):
