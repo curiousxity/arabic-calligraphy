@@ -57,6 +57,8 @@ PRUNE = os.environ.get("PEN_PRUNE", "1") == "1"
 SPLIT = {x for x in os.environ.get("PEN_SPLIT", "").split(",") if x}
 HAIR_W, HAIR_L = 0.2, 0.5  # nuqta: a hairline is thinner than HAIR_W and reaches HAIR_L; shorter bits are where the body thins
 HAIR_SPACING = 0.12  # nuqta between a hairline's start nodes: a loop half a nuqta across needs a dozen to go round
+TIP_ANGLE = 110  # degrees: an outline point sharper than this is a tooth's tip
+TOOTH = 0.25  # nuqta the outline stands out of the stroke past its half width: a tooth the pen goes up into and back (tooth_start)
 END_R, CORNER = 0.6, 2.0
 ALT_GAP = 0.05
 ROUGH, EDGE, SPACING = 0.05, 3.0, 0.3
@@ -238,6 +240,56 @@ def walk_samples(piece, pen, sub=8):
     return out
 
 
+def tooth_start(piece, O, nodes, pen=PEN, sub=4):
+    """The band's start with a node added at each tooth's tip, so the pen goes up into the tooth and back down: the
+    centre line cuts under a tooth's peak, and the fit rounded over it (13 strokes, 2026-10-27: 290.s1 ... 366.s0,
+    0.74-0.85). A tooth is where the outline stands out from the start path TOOTH nuqta beyond the stroke's half width
+    there, away from the path's ends; the farthest such point in each stretch of PPN along the path is the tip.
+    None without a tooth."""
+    ring = ref_ring(piece)
+    x1, y1 = ring.min(0) - 4
+    W, H = [int(v) + 1 for v in (ring.max(0) + 4 - [x1, y1]) * sub]
+    m = np.zeros((H, W), np.uint8)
+    cv2.fillPoly(m, [np.round((ring - [x1, y1]) * sub * 16).astype(np.int32)], 1, cv2.LINE_8, 4)
+    dt = cv2.distanceTransform(m, cv2.DIST_L2, 5) / sub  # screen px to the outline
+    P = np.array([n["p"] for n in nodes]) * PPN + O
+    seg = np.linalg.norm(np.diff(P, axis=0), axis=1)
+    arc = np.r_[0, np.cumsum(seg)]
+    t = np.linspace(0, arc[-1], max(2, int(arc[-1] * 2)))  # half a screen px apart
+    dense = np.c_[np.interp(t, arc, P[:, 0]), np.interp(t, arc, P[:, 1])]
+    half = np.array([dt[min(max(int(round((y - y1) * sub)), 0), H - 1), min(max(int(round((x - x1) * sub)), 0), W - 1)]
+                     for x, y in dense])
+    d = np.linalg.norm(ring[:, None] - dense[None], axis=2)
+    j = d.argmin(1); out = d[np.arange(len(ring)), j] - half[j]
+    # a tip is a point of the outline, sharper than TIP_ANGLE and turned outward (the chord across it runs through the
+    # ink): where the centre line runs off the middle, the outline across a valley stands out too, but it is not a point
+    ra = np.r_[0, np.cumsum(np.linalg.norm(np.diff(ring, axis=0, append=ring[:1]), axis=1))][:-1]
+    L = ra[-1] + np.linalg.norm(ring[0] - ring[-1])
+    def sharp(k):
+        a_ = ring[np.argmin(np.abs((ra - ra[k] + 0.25 * PPN) % L - 0))]
+        b_ = ring[np.argmin(np.abs((ra - ra[k] - 0.25 * PPN) % L - 0))]
+        u, v = a_ - ring[k], b_ - ring[k]
+        cosang = u @ v / max(np.linalg.norm(u) * np.linalg.norm(v), 1e-9)
+        mx, my = (a_ + b_) / 2
+        inside = m[min(max(int(round((my - y1) * sub)), 0), H - 1), min(max(int(round((mx - x1) * sub)), 0), W - 1)]
+        return inside and cosang > math.cos(math.radians(TIP_ANGLE))
+    ok = (t[j] > 0.3 * PPN) & (t[j] < arc[-1] - 0.3 * PPN) & (out >= TOOTH * PPN)
+    ok = ok & np.array([bool(o) and sharp(k) for k, o in enumerate(ok)])
+    tips = []
+    for k in np.argsort(-out):
+        if ok[k] and all(abs(t[j[k]] - t[j[q]]) > PPN for q in tips):
+            tips.append(k)
+    if not tips:
+        return None
+    nodes = [dict(n) for n in nodes]
+    for k in sorted(tips, key=lambda q: -t[j[q]]):  # from the far end, so earlier indices hold
+        i = int(np.searchsorted(arc, t[j[k]]))  # the tip goes in before node i
+        i = min(max(i, 1), len(nodes) - 1)
+        tip = ring[k] + (dense[j[k]] - ring[k]) / max(np.linalg.norm(dense[j[k]] - ring[k]), 1e-6) * pen * 0.1
+        nodes.insert(i, {"p": [round(float(v), 3) for v in (tip - O) / PPN], "angle": nodes[i - 1]["angle"]})
+    return nodes
+
+
 def band_start(piece, O, ignore, pen=PEN, hair=False):
     best = None
     walk = hair and walk_samples(piece, pen)  # a hairline goes round its loops; without a walk, the band's usual starts
@@ -336,6 +388,9 @@ def fit(stroke, log):
     P = PEN * SMALL_PEN if stroke in SMALL or hair or narrow else PEN   # this stroke's nib, screen px
     r_old = None if hair or stroke in SPLIT else old_fit(stroke)  # a free fit of the whole outline fits no part
     starts = [("walk" if hair else "band", band_start(piece, O, ignore, P, hair))]
+    tooth = None if hair else tooth_start(piece, O, starts[0][1], P)
+    if tooth:
+        starts.append(("tooth", tooth))
     if r_old:
         starts.append(("free", [{"p": n["p"], "angle": n["angle"]} for n in r_old["nodes"]]))
     tried = []
