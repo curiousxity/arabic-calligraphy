@@ -299,9 +299,13 @@ Times are minutes:seconds into the individual-letters lesson.
     The first course's sin lessons say it too ("you can stop here and from here you're gonna add a similar move").
     One short lesson carries the pen through the peak in one move, turning it.
   - The user, 2026-10-28, on making the split the main way: "ok".
-- **Status:** two strokes, cut straight up from the notch under the peak, each with a turning pen (94%, worst
-  miss 0.19 nuqta). The one-stroke turning fit (91%) is kept as the other way to write it. Two refits try to
-  smooth the step where the parts meet: no ink outside the studio shape, and a nib that may lift over 2 nuqta.
+- **Status:** two strokes, cut straight up from the notch under the peak, each with a turning pen and no ink
+  outside the studio shape (97%; the left half 99%, the right 96%). Keeping the ink inside the studio shape
+  fixed what the first split got wrong: a nick off the peak's right shoulder, a spur on its right edge, and a
+  gap in the inner bend. A nib that may lift over 2 nuqta helped less (95%). What is left is the joint itself:
+  a hairline slit along the cut and a small wedge at the top of the peak, where the halves meet (worst miss
+  0.22 nuqta). That is joint work (^), for when strokes are joined. The one-stroke turning fit (91%) is kept as
+  the other way to write it.
 
 ### Ya
 
