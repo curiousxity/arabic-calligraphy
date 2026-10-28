@@ -55,6 +55,10 @@ PRUNE = os.environ.get("PEN_PRUNE", "1") == "1"
 # fitted as its body, all of it wider than HAIR_W nuqta, with the main pen, and each hairline "stroke~hN" filled with
 # the small pen, its widths free. T18.s0 held whole: 0.62, the head and both loops missed.
 SPLIT = {x for x in os.environ.get("PEN_SPLIT", "").split(",") if x}
+# PEN_WALK ("142.s1,..."): curls whose band path stops before the curl's tip (the r1 curl tails, 2026-10-28: the inner
+# hook missed). The course's jim head is one small-pen move that sweeps, turns down, curls under and back, and ends in a
+# short thick foot (lesson 2, 05:29-05:36), so these strokes also start from the walk round the skeleton, finely spaced.
+WALK = {x for x in os.environ.get("PEN_WALK", "").split(",") if x}
 HAIR_W, HAIR_L = 0.2, 0.5  # nuqta: a hairline is thinner than HAIR_W and reaches HAIR_L; shorter bits are where the body thins
 HAIR_SPACING = 0.12  # nuqta between a hairline's start nodes: a loop half a nuqta across needs a dozen to go round
 TIP_ANGLE = 110  # degrees: an outline point sharper than this is a tooth's tip
@@ -391,6 +395,8 @@ def fit(stroke, log):
     tooth = None if hair else tooth_start(piece, O, starts[0][1], P)
     if tooth:
         starts.append(("tooth", tooth))
+    if stroke in WALK and not hair:  # a curl the band's path stops short of: the walk goes on round it
+        starts.append(("walk", band_start(piece, O, ignore, P, hair=True)))
     if r_old:
         starts.append(("free", [{"p": n["p"], "angle": n["angle"]} for n in r_old["nodes"]]))
     tried = []
