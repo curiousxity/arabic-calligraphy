@@ -590,6 +590,19 @@ the hook the judge picked (0.77) for a smaller miss at the tip. The judge is
 left as it is; where a curl's best-overlap fit (the job's `.alt` picture)
 beats the judge's pick, the curl is taken.
 
+**A curl goes on round into its hook (accepted by the user, 2026-10-28).**
+The jim lesson's circle head (05:29-05:36) is one small-pen move. It
+starts as a hairline on the right, sweeps left thickening, turns down,
+curls under and back to the right, and stops in a short thick foot. The
+inner hook is that foot, not a stroke of its own. The band's centre line
+stopped at the bottom of the curl, so the fits left the hook empty
+(window_worst 0.18-0.20). `PEN_WALK` gives a curl a second start, the walk
+round its skeleton that the tip hairlines use, and that walk reaches the
+hook. On the 21 curl tails (tag c2: 114.s2-161.s2) every best fit came
+from the walk: overlap 0.86-0.88 rose to 0.946-0.955, the worst window to
+0.035 (0.05 on 145.s1 and 152.s2), and 113.s2 to 0.95. Each end narrows to
+about 0.7 of the small pen over its last 1.7 nuqta as the curl tightens.
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
