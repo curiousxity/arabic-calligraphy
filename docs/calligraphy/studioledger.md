@@ -178,6 +178,21 @@ Times are minutes:seconds into the individual-letters lesson.
   - The user, 2026-10-28, on the results: "Agree. These look better."
 - **Status:** recreated.
 
+**The small flag on the ba tooth in a ba pair (041.s3), open**
+
+- **Strokes:** 041.s3, a small pointed flag on a thin stem, sitting on top of the next stroke.
+- **Pen:** not settled. A turning pen (95%) and a nib-tip fill (96%) both leave a blob of ink under the next stroke
+  that the studio doesn't have.
+- **Source:**
+  - The studio outline.
+  - The user, 2026-10-28, decision 50: "C" (check the lesson video first).
+  - The second course's ba lessons: the tooth is one move from the top downward. The pen lands at the top with its
+    full edge and is dragged down, so the top's point comes from the nib's corner, and the rest of the ink is the
+    tooth's own body. In the studio's cut the flag is the part of that landing that shows above the next stroke.
+  - The user, 2026-10-28, on the proposal: "Yes" (decision 50 A).
+- **Status:** open. Being refitted with no ink allowed under the next stroke, as a nib-tip fill and with a
+  turning pen.
+
 ### Fa
 
 **The head of Fa Initial 3 (the small loop)**
@@ -252,6 +267,24 @@ Times are minutes:seconds into the individual-letters lesson.
   - The studio outline matches 98%. The left tip stops 0.1 nuqta short of the studio's. A turning fit matched
     98.4% only by turning the nib 253°.
 - **Status:** recreated.
+
+### Sin
+
+**The sin's middle tooth rising to a sharp peak and dropping into the hollow (195.s2), open**
+
+- **Strokes:** 195.s2, shared by 195, 206, 217 and 227.
+- **Pen:** not settled. Every fit rounds off the sharp peak. Best: turning pen 91%; one angle 76%; one angle with a
+  flick 90%; turning 77%.
+- **Source:**
+  - The studio outline.
+  - The user, 2026-10-28, decision 49: "C" (check the sin lessons first).
+  - The second course's ba and sin lessons. A medial tooth starts from the sharp stop at the top of the stroke
+    before it, then curves straight down. The tall tooth goes up, stops, then comes back down in a separate
+    straight move that does not run back along the up-curve. A sin's second tooth curves up first, then down, a
+    crest. So the pen stops at the peak and starts again, as at Ba Medial 4's peak.
+  - The user, 2026-10-28, on the proposal: "Yes" (decision 49 A).
+- **Status:** open. Three cuts from the notch under the peak are being fitted: to the peak's tip, straight up, and
+  across the down-stroke. Each is tried at one angle and with a turning pen.
 
 ### Ya
 
