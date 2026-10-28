@@ -302,10 +302,14 @@ Times are minutes:seconds into the individual-letters lesson.
 - **Status:** two strokes, cut straight up from the notch under the peak, each with a turning pen and no ink
   outside the studio shape (97%; the left half 99%, the right 96%). Keeping the ink inside the studio shape
   fixed what the first split got wrong: a nick off the peak's right shoulder, a spur on its right edge, and a
-  gap in the inner bend. A nib that may lift over 2 nuqta helped less (95%). What is left is the joint itself:
-  a hairline slit along the cut and a small wedge at the top of the peak, where the halves meet (worst miss
-  0.22 nuqta). That is joint work (^), for when strokes are joined. The one-stroke turning fit (91%) is kept as
-  the other way to write it.
+  gap in the inner bend. A nib that may lift over 2 nuqta helped less (95%). That left the joint itself: a
+  hairline slit along the cut and a small wedge at the top of the peak, where the halves meet. The user: "we are
+  going to have to fill in the gaps though". So the joint is filled with the nib tip, as the filled heads are:
+  after the two halves, whatever of the studio's ink is still bare within a nib of the cut gets its own free fill
+  (two fills here). With the joint filled: 98%, worst miss 0.17 nuqta (from 0.22). A needle a pixel wide still
+  pokes above the peak. The one-stroke turning fit (91%) is kept as the other way to write it.
+- **Joint fill, for every split stroke:** the halves are written, then the pen goes back over the meeting with its
+  tip. A sin lesson shows the same touch-up over the peak after the stroke is written.
 
 ### Ya
 
