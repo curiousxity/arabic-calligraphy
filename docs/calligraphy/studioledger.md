@@ -283,10 +283,17 @@ Times are minutes:seconds into the individual-letters lesson.
     straight move that does not run back along the up-curve. A sin's second tooth curves up first, then down, a
     crest. So the pen stops at the peak and starts again, as at Ba Medial 4's peak.
   - The user, 2026-10-28, on the proposal: "Yes" (decision 49 A).
-- **Status:** open, decision 51. Three cuts from the notch under the peak were tried, each at one angle and with
+- **Tried:** three cuts from the notch under the peak were tried, each at one angle and with
   a turning pen. With the turning pen, the cut straight up matched 94% and the cut across the down-stroke 92%,
   against 91% as one stroke. The worst miss fell from 0.31 to 0.19 nuqta, and the peak comes out sharp. But both
   show a step where the two parts meet. The cut to the tip and the one-angle fits did worse (86-91%).
+  - The user, 2026-10-28, decision 51: "keep one stroke and look at the videos to see if they make it".
+  - The second course's sin lesson, written at speed: the pen goes up to the peak and leaves the paper there to
+    take ink, then lands on the peak again and sweeps down-left into the bowl. So the lesson lifts at the peak,
+    but that lift is also an ink dip, and the move after it is the bowl itself rather than a sweep onto a bowl.
+    It does not show the wave written in one move.
+- **Status:** kept as one stroke (turning pen, 91%), by the user's choice. The two-stroke cut straight up (94%)
+  is kept on file if the lessons are judged to settle it.
 
 ### Ya
 
