@@ -410,6 +410,17 @@ def shape_cost(a, rough, bend="position"):
 
 
 LIFT_MIN = 0.02  # the narrowest a lifted nib's mark gets: a corner's width (a zero-width quad inks nothing)
+# how evenly a lifting nib narrows: the cost of the width's second difference along the path, times `rough`. 0 (the
+# default) lets the width fall node by node in steps. The user, 2026-10-28, of a kaf hook drawn that way: "the pen
+# version for the kaf looks like it is irregular"; in the lesson video the pen rolls onto its corner in one even motion.
+LIFT_SMOOTH = float(os.environ.get("GPUFIT_LIFT_SMOOTH", 0))
+
+
+def lift_cost(w, rough):
+    """The narrowing's unevenness (LIFT_SMOOTH): w (n,) or (C, n) widths; a scalar or (C,)."""
+    if not LIFT_SMOOTH or w.shape[-1] < 3:
+        return w.new_zeros(w.shape[:-1])
+    return LIFT_SMOOTH * rough * ((torch.diff(w, 2, dim=-1) / 0.05) ** 2).sum(-1)
 PEN_PIXELS = float(os.environ.get("GPUFIT_PEN_PIXELS", 6e6))  # most grid pixels, over all tries, in one refine_pens
                                                               # loop (refine_pens); ~0.6 GB a job, seven jobs well
                                                               # inside the 4070's 12 GB
@@ -528,7 +539,7 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
             inter = (A * Bt).sum()
             iou = inter / (A.sum() + Bt.sum() - inter)
             gap = (A.sum() + Bt.sum() - 2 * inter) / perim / px_per_nuqta
-            cost = 1 - iou + edge * gap + shape_cost(a, rough, bend)
+            cost = 1 - iou + edge * gap + shape_cost(a, rough, bend) + (lift_cost(wd, rough) if pen is not None else 0)
             if corner and windows:
                 if step % RELAYOUT == 0:  # how far each pixel lies from our hard ink, held until the next recount
                     Ah = (A.detach() > 0.5).to(torch.uint8).cpu().numpy()
@@ -843,7 +854,7 @@ def _refine_pens(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others,
             As = A.sum((1, 2))
             iou = inter / (As + Bs - inter)
             gap = (As + Bs - 2 * inter) / perim / px_per_nuqta
-            cost = 1 - iou + edge * gap + _shape_cost_b(a, rough, bend)
+            cost = 1 - iou + edge * gap + _shape_cost_b(a, rough, bend) + lift_cost(wd, rough)
             if corner and windows:
                 if step % RELAYOUT == 0:
                     Ah = (A.detach() > 0.5).to(torch.uint8).cpu().numpy()
