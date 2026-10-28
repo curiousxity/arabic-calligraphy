@@ -161,6 +161,23 @@ Times are minutes:seconds into the individual-letters lesson.
     stands.
 - **Status:** recreated.
 
+**The ba teeth of Ba Initial 6 and Ba Medial 10 (one stroke each)**
+
+- **Strokes:** 048.s0 (initial), 074.s0 (medial).
+- **Pen:**
+  - 048.s0: filled with the nib's tip, which gives the studio's rounded top. It matches 95%, with the worst spot
+    0.05 nuqta.
+  - 074.s0: a turning pen, 81–89°, which matches 96%. A nib-tip fill scored 97% but ran its top up into the next
+    stroke.
+- **Source:**
+  - The studio outline. 048.s0 was tried at one angle, with a flick, with a turning pen with and without a flick, and
+    with a turning pen at full nib. All matched 90–92%, and every one drew a sharp spike where the studio's top is
+    rounded.
+  - A second lesson course the user pointed to (2026-10-28): its first ba lesson draws the tooth in one touch.
+  - The user, 2026-10-28: "maybe you dont have to make 2 strokes", so neither tooth is split as Ba Medial 4's is.
+  - The user, 2026-10-28, on the results: "Agree. These look better."
+- **Status:** recreated.
+
 ### Fa
 
 **The head of Fa Initial 3 (the small loop)**
@@ -191,6 +208,21 @@ Times are minutes:seconds into the individual-letters lesson.
     one-angle fits miss by 0.07 nuqta (469.s0) and 0.05 nuqta (470.s0) at their worst spot.
   - The user, 2026-10-27, decision 46: close enough, keep the one-angle fit.
 - **Status:** recreated. The thin line coming down is a little thicker than the studio's where it leaves the bend.
+
+**The kaf's top bar with a hairline hook (474.s0, 481.s0)**
+
+- **Strokes:** 474.s0 (Kaf Initial 6), 481.s0.
+- **Pen:** one angle the whole way, 85–86°. The bar rises to the right, rounds over at the top, then the pen rolls
+  onto one corner and draws the hook down and to the left as a hairline. The nib narrows evenly over the last
+  4 nuqta (the fitter's even-narrowing setting, GPUFIT_LIFT_SMOOTH 0.03). The fits match 97.6% (474.s0) and 96.8%
+  (481.s0).
+- **Source:**
+  - The second lesson course's first kaf lesson, at 7:50–8:00: the bar and the hook are one stroke, and the hook is
+    drawn on the nib's corner.
+  - The studio outline. One angle, turning pen and flicks matched 95–96%, but the hairline narrowed in steps.
+  - The user, 2026-10-28: "the pen version for the kaf looks like it is irregular". With the narrowing held even:
+    "Agree. These look better."
+- **Status:** recreated.
 
 ### Lam
 
