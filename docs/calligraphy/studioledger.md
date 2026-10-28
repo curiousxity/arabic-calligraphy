@@ -292,8 +292,16 @@ Times are minutes:seconds into the individual-letters lesson.
     take ink, then lands on the peak again and sweeps down-left into the bowl. So the lesson lifts at the peak,
     but that lift is also an ink dip, and the move after it is the bowl itself rather than a sweep onto a bowl.
     It does not show the wave written in one move.
-- **Status:** kept as one stroke (turning pen, 91%), by the user's choice. The two-stroke cut straight up (94%)
-  is kept on file if the lessons are judged to settle it.
+  - Four more lessons the user sent, 2026-10-28. A double-pencil lesson draws each cup of the teeth as its own
+    stroke, ending in a point at the peak, and sets the pencils down on that point for the next stroke; the
+    finished peaks show the two strokes' lines crossing. A lesson with a numbered chart splits the sin the same way:
+    a cup rising to a point, then a wave at a lower pen angle that "starts from top, where the 2nd stroke ends".
+    The first course's sin lessons say it too ("you can stop here and from here you're gonna add a similar move").
+    One short lesson carries the pen through the peak in one move, turning it.
+  - The user, 2026-10-28, on making the split the main way: "ok".
+- **Status:** two strokes, cut straight up from the notch under the peak, each with a turning pen (94%, worst
+  miss 0.19 nuqta). The one-stroke turning fit (91%) is kept as the other way to write it. Two refits try to
+  smooth the step where the parts meet: no ink outside the studio shape, and a nib that may lift over 2 nuqta.
 
 ### Ya
 
