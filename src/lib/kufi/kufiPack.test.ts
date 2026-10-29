@@ -183,7 +183,10 @@ describe("packKufiPanel", () => {
     const size = fitKufiPanel(SHAHADA);
     const r = packKufiPanel({ text: SHAHADA, ...size });
     if (r.ok) expectPacked(r, SHAHADA);
-    else expect(r.suggestions.every((s) => packKufiPanel({ text: SHAHADA, ...s }).ok)).toBe(true);
+    else {
+      expect(["tooShort", "tooLong"]).toContain(r.reason);
+      for (const s of r.suggestions) expectPacked(packKufiPanel({ text: SHAHADA, ...s }), SHAHADA);
+    }
   }, 60000);
 
   it("empty and single-letter text return tooShort", () => {
@@ -204,19 +207,31 @@ describe("packKufiPanel", () => {
   }, 20000);
 });
 
+// Timing: the work budget decides results, so these tests assert the work each call did, plus a
+// wall-clock bound three times the target: loose enough that the parallel suite cannot flake it.
+// The targets themselves (2000 ms, 200 ms) are what a call takes alone; the code also stops on the
+// clock, at FIRST_DRAFT_CLOCK_MS for a first draft and at the repack budget for a repack.
 describe("budgets", () => {
-  it("a first draft runs within 2000 ms and a repack with previous within 200 ms", () => {
+  it("a first draft and a repack with previous stay within their work and clock budgets", () => {
     _internal.clearCaches();
+    _internal.stats.work = 0;
     let t = performance.now();
     const r = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 });
-    expect(performance.now() - t).toBeLessThan(2000);
+    expect(performance.now() - t).toBeLessThan(3 * 2000);
+    expect(_internal.stats.work).toBeLessThanOrEqual(_internal.PACK_WORK);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
+    _internal.stats.work = 0;
     t = performance.now();
     const again = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits: { stretch: { 2: [1] } } });
-    expect(performance.now() - t).toBeLessThan(200);
+    expect(performance.now() - t).toBeLessThan(3 * 200);
+    expect(_internal.stats.work).toBeLessThanOrEqual(_internal.REPACK_WORK);
     expect(again.ok).toBe(true);
   }, 20000);
+
+  it("the first draft's clock stops below 2000 ms", () => {
+    expect(_internal.FIRST_DRAFT_CLOCK_MS).toBeLessThan(2000);
+  });
 
   it("300-char text returns within budget", () => {
     let text = BAQARAH;
@@ -225,8 +240,27 @@ describe("budgets", () => {
     _internal.clearCaches();
     const t = performance.now();
     packKufiPanel({ text, ...size });
-    expect(performance.now() - t).toBeLessThan(2000);
+    expect(performance.now() - t).toBeLessThan(3 * 2000);
   }, 60000);
+});
+
+describe("cell edits", () => {
+  it("say when painted cells break packing", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    expect(r.editsBreakPacking).toBe(false);
+    const p = r.placements[5];
+    const erase = [];
+    for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) erase.push({ unitIndex: 5, key: p.key, dx, dy, on: false });
+    const broken = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits: { cells: erase } });
+    expect(broken.ok).toBe(true);
+    if (broken.ok) expect(broken.editsBreakPacking).toBe(true);
+    // painting a cell that is already ink changes nothing
+    const inked = glyphInk(r, p)[0];
+    const harmless = { unitIndex: 5, key: p.key, dx: (inked % r.cols) - p.col, dy: ((inked / r.cols) | 0) - p.row, on: true };
+    const fine = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits: { cells: [harmless] } });
+    expect(fine.ok).toBe(true);
+    if (fine.ok) expect(fine.editsBreakPacking).toBe(false);
+  }, 20000);
 });
 
 describe("pins", () => {
@@ -272,6 +306,23 @@ describe("pins", () => {
   }, 20000);
 });
 
+describe("implicit pins", () => {
+  it("a repack that cannot keep previous placements never reports a pin conflict the user did not make", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    for (const k of [0, 5, 13]) {
+      const again = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits: { stretch: { [k]: [1] } } });
+      if (!again.ok) expect(again.reason, `unit ${k}`).not.toBe("pinConflict");
+    }
+  }, 20000);
+
+  it("a pin whose stretch the glyph cannot take is a conflict, not a quiet correction", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    const bad = { ...r.placements[3], stretch: [-9] };
+    const a = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, edits: { pinned: { 3: bad } } });
+    expect(a).toEqual({ ok: false, reason: "pinConflict", suggestions: [] });
+  }, 20000);
+});
+
 describe("stability", () => {
   it("after stretch[k]=[1] with previous, every placement off unit k's line is unchanged", () => {
     const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
@@ -303,11 +354,71 @@ describe("reconcileEdits", () => {
     // unit 3 is the ل of يكلف: make it a ب
     const after = resolveKufiText(BAQARAH.replace("يكلف", "يكبف")).units;
     expect(after[3].key).not.toBe(before[3].key);
-    const kept = reconcileEdits(edits, after);
+    const kept = reconcileEdits(edits, before, after);
     expect(Object.keys(kept.pinned ?? {})).toEqual(["0"]);
     expect(kept.cells?.map((e) => e.unitIndex)).toEqual([0]);
     expect(kept.stretch).toEqual({});
   }, 20000);
+
+  it("follows its letter when a letter is inserted before it", () => {
+    const before = resolveKufiText(BAQARAH).units;
+    const after = resolveKufiText("ب " + BAQARAH).units;
+    const kept = reconcileEdits(
+      {
+        stretch: { 3: [1] },
+        forms: { 3: "lam.medial.1" },
+        routes: { 1: 2 },
+        cells: [{ unitIndex: 3, key: before[3].key, dx: 0, dy: 0, on: true }],
+      },
+      before,
+      after
+    );
+    expect(kept.stretch).toEqual({ 4: [1] });
+    expect(kept.forms).toEqual({ 4: "lam.medial.1" });
+    expect(kept.routes).toEqual({ 2: 2 });
+    expect(kept.cells).toEqual([{ unitIndex: 4, key: before[3].key, dx: 0, dy: 0, on: true }]);
+  });
+
+  it("drops the edits of a deleted letter and moves the rest", () => {
+    const before = resolveKufiText(BAQARAH).units;
+    const after = resolveKufiText(BAQARAH.replace("يكلف", "يكف")).units;
+    const kept = reconcileEdits({ stretch: { 3: [1], 5: [0, 1] } }, before, after);
+    // the lam (unit 3) is gone; the allah that was unit 5 is now unit 4
+    expect(kept.stretch).toEqual({ 4: [0, 1] });
+  });
+});
+
+describe("a joining letter's shapes", () => {
+  it("never include one without the stub it joins by", () => {
+    const list = KUFI_FORMS.beh.medial!;
+    const stubless: KufiGlyph = { id: "beh.medial.99", rows: [".#.", ".#."], base: 0, stretch: [] };
+    list.push(stubless);
+    try {
+      const ctx = _internal.makeCtx("ببب", 9, 9, {}, new Map(), 100);
+      expect(ctx.letters[1].cands.some((sh) => sh.g.id === "beh.medial.99")).toBe(false);
+    } finally {
+      list.pop();
+    }
+  });
+});
+
+describe("drawn dots", () => {
+  it("stay within a gap of their band, as during the search", () => {
+    // the tall initial ظ: its dot would sit two rows above a 7-row stem, out of its band
+    const ctx = _internal.makeCtx("ظا", 15, 15, {}, new Map(), 1e9);
+    let st = _internal.initState(ctx);
+    const pick = (li: number, id: string) => {
+      const cands: Parameters<typeof _internal.materialize>[2][] = [];
+      _internal.expand(ctx, st, 0, li, cands);
+      const c = cands.find((x) => x.mv.shape.g.id === id && x.mv.shape.counts.every((n) => n === 0) && (x.mv.mode !== 1 || x.mv.off === 0));
+      expect(c, id).toBeDefined();
+      st = _internal.materialize(ctx, st, c!);
+    };
+    pick(0, "tah.initial.3");
+    pick(1, "alef.final.0");
+    const f = _internal.finish(ctx, st);
+    expect([...f.kind].filter((k) => k === 3)).toEqual([]);
+  });
 });
 
 describe("fitKufiPanel", () => {

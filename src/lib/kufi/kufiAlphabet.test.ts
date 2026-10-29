@@ -449,9 +449,12 @@ describe("attachDotSets", () => {
   it("attaches a known id", () => {
     const glyph = KUFI_FORMS.beh.isolated![0];
     const before = glyph.dots;
-    attachDotSets({ "beh.isolated.0": { below1: [[4, 2]] } });
-    expect(glyph.dots?.below1).toEqual([{ row: 4, col: 2 }]);
-    glyph.dots = before;
+    try {
+      attachDotSets({ "beh.isolated.0": { below1: [[4, 2]] } });
+      expect(glyph.dots?.below1).toEqual([{ row: 4, col: 2 }]);
+    } finally {
+      glyph.dots = before;
+    }
   });
 });
 

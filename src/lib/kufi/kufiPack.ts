@@ -50,7 +50,7 @@ import {
   type KufiDotKey,
   type KufiGlyph,
 } from "./kufiAlphabet";
-import type { Turn } from "./kufiGrid";
+import { emptyBlocks2x2, inkBlocks2x2, type Turn } from "./kufiGrid";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
 
 // ---------------------------------------------------------------------------
@@ -75,6 +75,11 @@ export type KufiCellEdit = { unitIndex: number; key: string; dx: number; dy: num
  * The user's edits. Maps are keyed by unit index, except `routes`, keyed by
  * word index: an offset in cells along that word's line, further on in
  * reading order than where it would slide to.
+ *
+ * Only `pinned` fixes a unit's place. A `forms` or `stretch` edit keeps the
+ * edit, not the position: the unit takes that form or those counts wherever
+ * its line now puts it (a ruling on the plan's "any unit carrying an edit is
+ * pinned", which its own stability test contradicts).
  */
 export type KufiPanelEdits = {
   forms?: Record<number, string>;
@@ -85,7 +90,15 @@ export type KufiPanelEdits = {
 };
 
 export type KufiPackResult =
-  | { ok: true; cols: number; rows: number; cells: Uint8Array; placements: KufiPlacement[] }
+  | {
+      ok: true;
+      cols: number;
+      rows: number;
+      cells: Uint8Array;
+      placements: KufiPlacement[];
+      /** True when the painted or erased cells of `edits.cells` leave a hole, a solid 2×2 or a frame break: the packing itself was sound. */
+      editsBreakPacking: boolean;
+    }
   | { ok: false; reason: "tooShort" | "tooLong" | "pinConflict"; suggestions: Array<{ cols: number; rows: number }> };
 
 // ---------------------------------------------------------------------------
@@ -166,7 +179,16 @@ type Letter = {
 };
 
 /** A hard placement: glyph, counts and box, and optionally how its dots are drawn (see `DOT_SHIFT`). */
-type Pin = { glyphId: string; counts: number[]; col: number; row: number; turn: Turn; dots: number | null };
+type Pin = {
+  glyphId: string;
+  counts: number[];
+  col: number;
+  row: number;
+  turn: Turn;
+  dots: number | null;
+  /** The user's own pin. A repack's pins (units off the edited lines) are not, and never report a conflict. */
+  explicit: boolean;
+};
 
 /**
  * How a letter's dots are drawn: 0 not at all, 1 where authored, 2 and 3 the
@@ -290,6 +312,8 @@ function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins:
         if (fixed) return [shapeOf(g, normalCounts(g, fixed))];
         return countVectors(g).map((c) => shapeOf(g, c));
       });
+    // a shape without the stub it joins by would break the word silently
+    const joinsBy = (sh: Shape) => (!u.joinsNext || !!sh.lStub) && (!(i > 0 && units[i - 1].joinsNext) || !!sh.rStub);
     const ch = text[u.textOffset] ?? "";
     const d = u.skeleton === "allah" || u.skeleton === "lamAlef" ? null : dotsOf(ch, u.form);
     return {
@@ -297,8 +321,8 @@ function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins:
       unit: u,
       ch,
       weight: u.skeleton === "allah" ? 4 : u.skeleton === "lamAlef" ? 2 : 1,
-      cands: shapes(glyphs.filter((g) => g.joins?.right !== 0)),
-      entry: shapes(glyphs.filter((g) => g.joins?.right === 0)),
+      cands: shapes(glyphs.filter((g) => g.joins?.right !== 0)).filter(joinsBy),
+      entry: shapes(glyphs.filter((g) => g.joins?.right === 0)).filter(joinsBy),
       joinsNext: u.joinsNext,
       joinedPrev: i > 0 && units[i - 1].joinsNext,
       word: u.wordIndex,
@@ -479,6 +503,10 @@ type Ctx = {
   /** Moves tried so far, and the most this search may try: the budget that decides results. */
   work: number;
   workMax: number;
+  /** Set when the work or the clock runs out mid-step: no more moves are tried. */
+  out: boolean;
+  /** Set while the greedy first pass runs: it always finishes, so there is always an answer. */
+  noClock: boolean;
 };
 
 function initState(ctx: Ctx): St {
@@ -632,6 +660,14 @@ function dotCellsAt(ctx: Ctx, L: Line, sh: Shape, key: KufiDotKey, x0: number, y
   return n - from;
 }
 
+/** A letter's dots stay within one gap of its band (at `yb` above the line). */
+function dotsInBand(sh: Shape, key: KufiDotKey, yb: number): boolean {
+  const d = sh.dots[key];
+  if (!d) return false;
+  for (let k = 1; k < d.length; k += 2) if (yb + d[k] < -2 || yb + d[k] > BAND + 1) return false;
+  return true;
+}
+
 /**
  * A nudged set still reads as its letter's: no dot touches the letter even
  * diagonally, and none sits one gap straight beyond a free end of its strokes.
@@ -695,7 +731,8 @@ function makesInk2(ctx: Ctx, st: St, cells: number[]): boolean {
  * when the move does not fit.
  */
 function apply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
-  ctx.work++;
+  // a long letter step stops part-way when the budget runs out, not only between letters
+  if (++ctx.work >= ctx.workMax || ((ctx.work & 255) === 0 && performance.now() > ctx.deadline)) ctx.out = true;
   const letter = ctx.letters[li];
   const sh = mv.shape;
   let L: Line;
@@ -803,10 +840,7 @@ function apply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
   let nd = 0;
   if (mv.dots) {
     if (!letter.dotKey) return null;
-    const d = sh.dots[letter.dotKey];
-    if (!d) return null;
-    // a letter's dots stay within one gap of its band
-    for (let k = 1; k < d.length; k += 2) if (yb + d[k] < -2 || yb + d[k] > BAND + 1) return null;
+    if (!dotsInBand(sh, letter.dotKey, yb)) return null;
     nd = dotCellsAt(ctx, L, sh, letter.dotKey, x0 + DOT_SHIFT[mv.dots], yb, n);
     if (nd < 0) return null;
   }
@@ -929,7 +963,7 @@ function undo(ctx: Ctx, st: St, rec: Applied) {
 function failLetter(ctx: Ctx, st: St, li: number): St {
   const s = cloneState(st);
   s.failed += ctx.letters[li].weight;
-  if (ctx.letters[li].pin) s.failedPins++;
+  if (ctx.letters[li].pin?.explicit) s.failedPins++;
   s.seg = null;
   s.hash = (s.hash ^ Math.imul(li + 1, 0x27d4eb2f)) | 0;
   return s;
@@ -972,7 +1006,7 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
   let stop = false;
   /** Applies, visits and undoes one move; true when it fitted. */
   const tryMove = (mv: Move): boolean => {
-    if (stop) return false;
+    if (stop || (ctx.out && !ctx.noClock)) return false;
     const rec = apply(ctx, st, li, mv);
     if (!rec) return false;
     const ok = !pin || pinMatches(st.lines[st.cur], mv.shape, rec.x0, rec.yb, pin);
@@ -1405,7 +1439,7 @@ function drawDots(ctx: Ctx, s: St) {
       if (!key || p.dots) continue;
       const L = s.lines[p.line];
       const n = shapeCells(ctx, L, p.shape, p.x0, p.yb);
-      if (n < 0) continue;
+      if (n < 0 || !dotsInBand(p.shape, key, p.yb)) continue;
       for (let v = 1; v < DOT_SHIFT.length; v++) {
         const nd = dotCellsAt(ctx, L, p.shape, key, p.x0 + DOT_SHIFT[v], p.yb, n);
         if (nd <= 0 || !dotsFit(ctx, s, n, nd) || (v > 1 && !nudgeReads(ctx, s, p.letter, n, nd))) continue;
@@ -1648,7 +1682,6 @@ function lookahead(ctx: Ctx, st: St, li: number): number {
   return Number.isFinite(best) ? best : st.score + W.fail * ctx.letters[li].weight;
 }
 
-/** Widening beams until one packs or the budget is spent; the best panel found. */
 /**
  * Large-neighbourhood moves: from each run's first letter, latest first, a
  * small beam re-plans everything after it; a better panel is polished and
@@ -1681,9 +1714,18 @@ function replan(ctx: Ctx, start: Final, B: number): Final {
 const REPLAN_ROUNDS = 8;
 const REPLAN_BEAM = 8;
 
+/** Widening beams, each polished and replanned, until one packs or the budget is spent; the best panel found. */
 function search(ctx: Ctx): Final | null {
+  const f = searchInner(ctx);
+  stats.work += ctx.work;
+  return f;
+}
+
+function searchInner(ctx: Ctx): Final | null {
   // a greedy pass first, so there is always an answer within the budget
+  ctx.noClock = true;
   let best: Final | null = beamPass(ctx, 1, initState(ctx), 0, true);
+  ctx.noClock = false;
   if (best?.packed) return best;
   for (const B of BEAMS) {
     let f = beamPass(ctx, B);
@@ -1716,12 +1758,24 @@ function zobrist(n: number): Int32Array {
  */
 const WORK_PER_MS = 400;
 
-/** Panels up to this many cells may run past the clock budget, to this factor, before their work budget is spent. */
+/**
+ * Panels up to this many cells may run past the clock budget, to this factor,
+ * before their work budget is spent, so a busy machine still gives the same
+ * panel. Never past FIRST_DRAFT_CLOCK_MS: a call ends inside 2000 ms whatever
+ * the load, and only then can a loaded machine give a different panel.
+ */
 const LOOSE_CLOCK_CELLS = 32 * 32;
 const LOOSE_CLOCK = 2.5;
+/** No search runs longer than this on the clock (2000 ms less room for drawing dots, fills and the result). */
+const FIRST_DRAFT_CLOCK_MS = 1700;
+/** The most moves a first draft and a repack may try (see WORK_PER_MS). */
+const PACK_WORK = PACK_BUDGET_MS * WORK_PER_MS;
+const REPACK_WORK = REPACK_BUDGET_MS * WORK_PER_MS;
+/** Moves tried by searches since last reset, for the budget tests. */
+const stats = { work: 0 };
 
 function spent(ctx: Ctx): boolean {
-  return ctx.work > ctx.workMax || performance.now() > ctx.deadline;
+  return ctx.out || ctx.work >= ctx.workMax || performance.now() > ctx.deadline;
 }
 
 function makeCtx(
@@ -1749,9 +1803,12 @@ function makeCtx(
     // the work budget makes a search give the same panel on a busy machine as on a quiet
     // one; the clock is a safety net, loose for panels the size of a real one and tight
     // for big ones, where a move costs more and nothing packs anyway
-    deadline: performance.now() + budgetMs * (!strictClock && cols * rows <= LOOSE_CLOCK_CELLS ? LOOSE_CLOCK : 1),
+    deadline:
+      performance.now() + Math.min(FIRST_DRAFT_CLOCK_MS, budgetMs * (!strictClock && cols * rows <= LOOSE_CLOCK_CELLS ? LOOSE_CLOCK : 1)),
     work: 0,
     workMax: budgetMs * WORK_PER_MS,
+    out: false,
+    noClock: false,
   };
 }
 
@@ -1816,8 +1873,8 @@ function dotsDrawn(text: string, unit: KufiUnit, p: KufiPlacement, cells: Uint8A
   return 0;
 }
 
-function pinOf(p: KufiPlacement, dots: number | null): Pin {
-  return { glyphId: p.glyphId, counts: p.stretch.slice(), col: p.col, row: p.row, turn: p.turn, dots };
+function pinOf(p: KufiPlacement, dots: number | null, explicit: boolean): Pin {
+  return { glyphId: p.glyphId, counts: p.stretch.slice(), col: p.col, row: p.row, turn: p.turn, dots, explicit };
 }
 
 /** Explicit pins, or null when one cannot apply to its unit. */
@@ -1826,8 +1883,10 @@ function explicitPins(units: KufiUnit[], edits: KufiPanelEdits): Map<number, Pin
   for (const [k, p] of Object.entries(edits.pinned ?? {})) {
     const i = Number(k);
     const u = units[i];
-    if (!u || p.key !== u.key || !formsOf(u).some((g) => g.id === p.glyphId)) return null;
-    pins.set(i, pinOf(p, null));
+    const g = u && p.key === u.key ? formsOf(u).find((x) => x.id === p.glyphId) : undefined;
+    // a stretch the glyph cannot take would be quietly corrected: a moved pin
+    if (!g || !sameCounts(normalCounts(g, p.stretch), p.stretch)) return null;
+    pins.set(i, pinOf(p, null, true));
   }
   return pins;
 }
@@ -1842,12 +1901,29 @@ function applyCellEdits(cells: Uint8Array, cols: number, rows: number, placement
   }
 }
 
+/** No empty or solid 2×2 and no double break in the frame. */
+function packedCells(cells: Uint8Array, cols: number, rows: number): boolean {
+  const grid = { cols, rows, cells };
+  if (inkBlocks2x2(grid).length || emptyBlocks2x2(grid).length) return false;
+  for (let c = 0; c + 1 < cols; c++) {
+    if (!cells[c] && !cells[c + 1]) return false;
+    const b = (rows - 1) * cols + c;
+    if (!cells[b] && !cells[b + 1]) return false;
+  }
+  for (let r = 0; r + 1 < rows; r++) {
+    if (!cells[r * cols] && !cells[(r + 1) * cols]) return false;
+    if (!cells[r * cols + cols - 1] && !cells[(r + 1) * cols + cols - 1]) return false;
+  }
+  return true;
+}
+
 function okResult(units: KufiUnit[], f: Final, cols: number, rows: number, edits: KufiPanelEdits): KufiPackResult {
   const placements = placementsOf(f).map((p) => ({ ...p, key: units[p.unitIndex].key }));
   const cells = new Uint8Array(cols * rows);
   for (let i = 0; i < cells.length; i++) cells[i] = f.owner[i] !== 0 ? 1 : 0;
   applyCellEdits(cells, cols, rows, placements, edits);
-  return { ok: true, cols, rows, cells, placements };
+  const editsBreakPacking = (edits.cells?.length ?? 0) > 0 && !packedCells(cells, cols, rows);
+  return { ok: true, cols, rows, cells, placements, editsBreakPacking };
 }
 
 /**
@@ -1977,12 +2053,14 @@ function lineKeys(units: KufiUnit[], prev: KufiPlacement[]): string[] {
       keys.push(keys[k - 1] ?? "?");
       return;
     }
-    keys.push(`${p.turn}:${pinBase(shapeOf(g, normalCounts(g, p.stretch)), pinOf(p, null))}`);
+    keys.push(`${p.turn}:${pinBase(shapeOf(g, normalCounts(g, p.stretch)), pinOf(p, null, false))}`);
   });
   return keys;
 }
 
-const sameCounts = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+function sameCounts(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
 
 /** Cells (row-major indices) a placement's glyph box covers. */
 function boxIndices(p: KufiPlacement, units: KufiUnit[], cols: number, rows: number): number[] {
@@ -2039,17 +2117,22 @@ function repack(
       if (boxIndices(p, units, cols, rows).some((i) => zone[i])) near.add(keys[k]);
     });
   }
+  // the last round frees every line: the implicit pins are dropped, a fresh pack in what is left
   const rounds = [new Set([...dirty].map((k) => keys[k])), near, null];
   let best: Final | null = null;
+  let workLeft = REPACK_WORK;
   for (const free of rounds) {
     const left = REPACK_BUDGET_MS - (performance.now() - t0);
-    if (left <= 0) break;
+    if (left <= 0 || workLeft <= 0) break;
     const pins = new Map(explicit);
     units.forEach((u, k) => {
       if (pins.has(k) || !free || free.has(keys[k])) return;
-      pins.set(k, pinOf(prev[k], dotsDrawn(text, u, prev[k], cells, cols, rows)));
+      pins.set(k, pinOf(prev[k], dotsDrawn(text, u, prev[k], cells, cols, rows), false));
     });
-    const f = search(makeCtx(text, cols, rows, edits, pins, left));
+    const ctx = makeCtx(text, cols, rows, edits, pins, left, true);
+    ctx.workMax = Math.min(ctx.workMax, workLeft);
+    const f = search(ctx);
+    workLeft -= ctx.work;
     if (f && (!best || f.score < best.score)) best = f;
     if (best?.packed) break;
   }
@@ -2120,46 +2203,107 @@ export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}): { cols: 
 }
 
 /**
- * Keeps the edits that still match their units after the text changed: a
- * keyed edit (pin, cell) whose key differs is dropped, and so is every other
- * edit on a unit that lost one. Form ids must still be forms of their unit,
- * stretch counts must fit one of its glyphs, and routes must name a word.
+ * Old unit index → new unit index, for units the text change kept: the
+ * longest common subsequence of the two key lists. A unit that was deleted
+ * or became another letter or form has no entry.
  */
-export function reconcileEdits(edits: KufiPanelEdits, units: KufiUnit[]): KufiPanelEdits {
+function alignUnits(oldUnits: KufiUnit[], newUnits: KufiUnit[]): Map<number, number> {
+  const n = oldUnits.length;
+  const m = newUnits.length;
+  const len: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      len[i][j] = oldUnits[i].key === newUnits[j].key ? len[i + 1][j + 1] + 1 : Math.max(len[i + 1][j], len[i][j + 1]);
+  const map = new Map<number, number>();
+  for (let i = 0, j = 0; i < n && j < m; ) {
+    if (oldUnits[i].key === newUnits[j].key && len[i][j] === len[i + 1][j + 1] + 1) map.set(i++, j++);
+    else if (len[i + 1][j] >= len[i][j + 1]) i++;
+    else j++;
+  }
+  return map;
+}
+
+/**
+ * Carries the edits across a text change: every index-keyed entry follows
+ * its unit to its new index (aligned on unit keys), and routes follow their
+ * word. Entries on a unit that was deleted or changed are dropped, as is
+ * every other edit on a unit whose keyed edit (pin, cell) no longer matches;
+ * form ids must still be forms of their unit, and stretch counts must fit one
+ * of its glyphs.
+ */
+export function reconcileEdits(edits: KufiPanelEdits, oldUnits: KufiUnit[], newUnits: KufiUnit[]): KufiPanelEdits {
+  const to = alignUnits(oldUnits, newUnits);
   const stale = new Set<number>();
-  const fits = (k: number, glyphId: string) => !!units[k] && formsOf(units[k]).some((g) => g.id === glyphId);
-  for (const [k, p] of Object.entries(edits.pinned ?? {}))
-    if (!units[+k] || p.key !== units[+k].key || !fits(+k, p.glyphId)) stale.add(+k);
-  for (const e of edits.cells ?? []) if (!units[e.unitIndex] || e.key !== units[e.unitIndex].key) stale.add(e.unitIndex);
-  for (const [k, id] of Object.entries(edits.forms ?? {})) if (!fits(+k, id)) stale.add(+k);
-  const maxSlices = (k: number) => Math.max(0, ...formsOf(units[k]).map((g) => g.stretch.length));
-  const keep = <T,>(m: Record<number, T> | undefined, ok: (k: number, v: T) => boolean): Record<number, T> | undefined => {
+  const fits = (k: number, glyphId: string) => !!newUnits[k] && formsOf(newUnits[k]).some((g) => g.id === glyphId);
+  for (const [k, p] of Object.entries(edits.pinned ?? {})) {
+    const j = to.get(+k);
+    if (j === undefined || p.key !== newUnits[j].key || !fits(j, p.glyphId)) stale.add(+k);
+  }
+  for (const e of edits.cells ?? []) {
+    const j = to.get(e.unitIndex);
+    if (j === undefined || e.key !== newUnits[j].key) stale.add(e.unitIndex);
+  }
+  for (const [k, id] of Object.entries(edits.forms ?? {})) {
+    const j = to.get(+k);
+    if (j === undefined || !fits(j, id)) stale.add(+k);
+  }
+  const maxSlices = (j: number) => Math.max(0, ...formsOf(newUnits[j]).map((g) => g.stretch.length));
+  const carry = <T,>(m: Record<number, T> | undefined, ok: (j: number, v: T) => boolean): Record<number, T> | undefined => {
     if (!m) return undefined;
     const out: Record<number, T> = {};
-    for (const [k, v] of Object.entries(m)) if (!stale.has(+k) && ok(+k, v)) out[+k] = v;
+    for (const [k, v] of Object.entries(m)) {
+      const j = to.get(+k);
+      if (j !== undefined && !stale.has(+k) && ok(j, v)) out[j] = v;
+    }
     return out;
   };
   const out: KufiPanelEdits = {};
-  const forms = keep(edits.forms, () => true);
-  const stretch = keep(edits.stretch, (k, v) => !!units[k] && v.length <= maxSlices(k));
-  const pinned = keep(edits.pinned, () => true);
+  const forms = carry(edits.forms, () => true);
+  const stretch = carry(edits.stretch, (j, v) => v.length <= maxSlices(j));
+  const pinned = carry(edits.pinned, () => true);
   if (forms) out.forms = forms;
   if (stretch) out.stretch = stretch;
-  if (pinned) out.pinned = pinned;
+  if (pinned) out.pinned = Object.fromEntries(Object.entries(pinned).map(([j, p]) => [j, { ...p, unitIndex: +j }]));
   if (edits.routes) {
-    const words = new Set(units.map((u) => u.wordIndex));
+    // a word follows its units; one whose units all went, or split, loses its route
+    const wordTo = new Map<number, number | null>();
+    for (const [i, j] of to) {
+      const w = oldUnits[i].wordIndex;
+      const nw = newUnits[j].wordIndex;
+      const seen = wordTo.get(w);
+      wordTo.set(w, seen === undefined || seen === nw ? nw : null);
+    }
     const routes: Record<number, number> = {};
-    for (const [w, r] of Object.entries(edits.routes)) if (words.has(+w)) routes[+w] = r;
+    for (const [w, r] of Object.entries(edits.routes)) {
+      const nw = wordTo.get(+w);
+      if (nw !== undefined && nw !== null) routes[nw] = r;
+    }
     out.routes = routes;
   }
-  if (edits.cells) out.cells = edits.cells.filter((e) => !stale.has(e.unitIndex));
+  if (edits.cells)
+    out.cells = edits.cells.filter((e) => !stale.has(e.unitIndex)).map((e) => ({ ...e, unitIndex: to.get(e.unitIndex)! }));
   return out;
 }
 
-// exported for the tests and the local experiments
 /** Internals for the tests: the engine below the public API. */
-export const _internal = { makeCtx, initState, expand, materialize, finish, beamPass, search, clearCaches };
+export const _internal = {
+  makeCtx,
+  initState,
+  expand,
+  materialize,
+  finish,
+  beamPass,
+  search,
+  clearCaches,
+  stats,
+  PACK_WORK,
+  REPACK_WORK,
+  FIRST_DRAFT_CLOCK_MS,
+};
 
+/** Every cache, so a timing is cold. */
 function clearCaches() {
   finals.clear();
+  shapeCache.clear();
+  lineCache.clear();
 }
