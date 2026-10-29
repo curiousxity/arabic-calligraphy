@@ -23,8 +23,8 @@ Spike scripts run with `npx --yes tsx` (the precedent is
 - The block type is `"kufiPanel"`. Never `"squareKufi"`, which is in `REMOVED_BLOCK_TYPES`.
 - Never reuse `kufiColumns`, `kufiComposition`, `kufiLineGap`, `kufiWordGap`, `kufiCellEdits` or `kufiCellEditMode`: they are in `REMOVED_BLOCK_FIELDS` and are stripped on load. New fields use a `panel` prefix.
 - Lattice grammar: stroke = gap = one cell. No 2×2 of ink anywhere. A letter's ink is 4-connected. Joins and turns are single-cell runs.
-- Letters change only by stretching a marked row or column in whole cells, or by swapping to another authored form. Never by scaling.
-- No dots and no tashkeel. Harakat in the input are dropped silently.
+- Letters change only by stretching or shortening a marked row or column in whole cells (never below the minimum), or by swapping to another authored form. Never by scaling.
+- No tashkeel; harakat in the input are dropped silently. Dots and single squares may be placed as hole-filling (user "yes" 2026-10-28). Tall strokes may shorten at a marked row, never below the minimum.
 - Canvas: no modes and no coloured dots; hover outlines and direct drags only.
 - Never name the online studio, a teacher or a product in any committed file. The studio's material and the user's reference photos stay local or on the NAS.
 - Pure `src/lib/kufi/*` must not import `./harfbuzz` (or anything that does).

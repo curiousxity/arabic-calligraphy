@@ -82,8 +82,10 @@ Kufi. All are in the future plan below.
 - the output reads as rows of typed text in a box (the old block's failure);
 - the frame has holes or uneven gaps the user must hand-paint to close;
 - a hand edit is silently undone by the next re-pack;
-- a letter is distorted to fit: letters change only by stretching a stroke
-  in whole cells or by swapping to another authored form. (Consistent with
+- a letter is distorted to fit: letters change only by stretching or
+  shortening a marked stroke in whole cells, never below a minimum (the
+  user's "yes", 2026-10-28; see Constraints), or by swapping to another
+  authored form. (Consistent with
   the user's standing rule: "never scale a whole glyph to lengthen a
   stroke".)
 
@@ -98,10 +100,15 @@ Kufi. All are in the future plan below.
   tests): ink is 4-connected within a letter; no 2×2 block of ink anywhere;
   joins are single-cell-wide runs. A turned corner is the same primitive as a
   join.
-- **Square Kufi has no dots and no tashkeel** in this build. Claude's call:
-  none of the user's references carry them, the tradition omits them, and the
-  old write-up explains why a dot in a tight lattice reads as part of the
-  letter.
+- **No tashkeel. Dots and single squares are fill, not iʿjām.** This was
+  Claude's call at first ("no dots"). Rebuilding the user's Al-Baqarah panel
+  cell by cell (2026-10-28) showed that real panels shorten tall letters
+  (lams 7 → 5 squares, to the band depth) and use dots and lone squares to
+  plug holes. Take any one away and gaps open. Asked whether our letters may
+  do the same, the user said **"yes"** (2026-10-28). The packer may therefore
+  shorten a stroke at its marked row, never below the letter's minimum, and
+  may place a dot or single square where it closes a hole and reads as
+  belonging to a nearby letter. A dot still never makes a 2×2.
 - **The block type must not be named `squareKufi`**: that name is in
   `REMOVED_BLOCK_TYPES` (`src/lib/legacySaves.ts`) so pre-removal saves load
   with those blocks dropped. Use a new type name and new field names.
@@ -218,3 +225,26 @@ In the user's order of mention, after the single box ships:
    isolated, initial, medial and final forms plus ornaments; it stays local
    and nothing from it is committed. Closer to how the app already handles
    pen-drawn scripts than to the lattice.
+
+## What the first spike taught (2026-10-28)
+
+Three guessed arrangements (rows joined by turns, rows with a turned column,
+words facing different edges) all left gaps. The user's verdict was "none of
+them look right". Rebuilding the Al-Baqarah panel from our letters instead
+(412 of 441 squares matched) showed how a real panel is built:
+
+- The words run clockwise round the frame from the bottom right, with every
+  baseline on the outer edge. A word never bends round a corner: each edge
+  ends on a tall stroke that runs on along the next edge. What's left goes
+  into the core.
+- Bands are 5 squares deep, and tall letters are cut to that depth. Teeth
+  stay short, and the next band fills the space above them, so the bands
+  interlock.
+- Irregular pieces plug holes: a lifted ي that steps down to the line, a
+  kaf bar reaching over the letter before it, a hooked ن, dots, and a lone
+  square.
+
+The packer is built from these rules, and the pieces our table lacks are
+added to it: shortened tall letters, the lifted letter, a narrow middle ك, a
+full-height end ف, a middle ه joined at its top, a hooked ن, a join that
+turns back on itself, and dots and filler squares.
