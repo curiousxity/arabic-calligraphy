@@ -29,7 +29,16 @@ const isSpace = (ch: string) => /\s/.test(ch);
  * A lone leading و/ف/ب before الله is not treated as part of allah.
  */
 export function resolveKufiText(text: string): { units: KufiUnit[]; unsupported: string[] } {
-  const chars = classifyJoiningForms(text);
+  // classifyJoiningForms misaligns after non-BMP characters, so classify a copy
+  // where each is a single BMP placeholder and map back to the original here.
+  const original = Array.from(text);
+  const offsets: number[] = [];
+  let at = 0;
+  for (const ch of original) {
+    offsets.push(at);
+    at += ch.length;
+  }
+  const chars = classifyJoiningForms(original.map((ch) => (ch.length > 1 ? "�" : ch)).join(""));
   const units: KufiUnit[] = [];
   const unsupported: string[] = [];
   let word = 0;
@@ -50,7 +59,7 @@ export function resolveKufiText(text: string): { units: KufiUnit[]; unsupported:
   const push = (c: ClassifiedChar, skeleton: SkeletonName | LigatureName, form: JoiningForm) => {
     units.push({
       index: units.length,
-      textOffset: c.index,
+      textOffset: offsets[c.index],
       key: `${skeleton}:${form}`,
       skeleton,
       form,
@@ -78,13 +87,14 @@ export function resolveKufiText(text: string): { units: KufiUnit[]; unsupported:
     const c = chars[i];
     const cp = c.codepoint;
     if (isTransparent(cp) || cp === TATWEEL || cp === 0x200d) continue;
-    if (isSpace(c.char)) {
+    const ch = original[c.index];
+    if (isSpace(ch)) {
       endWord();
       continue;
     }
     const sk = skeletonOf(cp);
     if (sk === null) {
-      unsupported.push(c.char);
+      unsupported.push(ch);
       endWord();
       continue;
     }
