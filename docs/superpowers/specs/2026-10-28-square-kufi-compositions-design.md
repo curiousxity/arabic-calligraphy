@@ -100,15 +100,20 @@ Kufi. All are in the future plan below.
   tests): ink is 4-connected within a letter; no 2×2 block of ink anywhere;
   joins are single-cell-wide runs. A turned corner is the same primitive as a
   join.
-- **No tashkeel. Dots and single squares are fill, not iʿjām.** This was
+- **No tashkeel. Dots are iʿjām; single squares are fill.** This was
   Claude's call at first ("no dots"). Rebuilding the user's Al-Baqarah panel
   cell by cell (2026-10-28) showed that real panels shorten tall letters
   (lams 7 → 5 squares, to the band depth) and use dots and lone squares to
   plug holes. Take any one away and gaps open. Asked whether our letters may
   do the same, the user said **"yes"** (2026-10-28). The packer may therefore
   shorten a stroke at its marked row, never below the letter's minimum, and
-  may place a dot or single square where it closes a hole and reads as
-  belonging to a nearby letter. A dot still never makes a 2×2.
+  may place a single square where it closes a hole.
+  **Dots are read as letter dots** (the user, 2026-10-29: a dot above ي
+  "should be 2 dots not one"; two dots on the ن of نفسا "would make it a
+  ta"). A dotted letter gets its whole set of dots on its correct side (ي
+  two below, ت two above, ث three above, ن and ف one above, ب one below) or
+  none; a dot never goes in only to fill a hole. A dot still never makes a
+  2×2.
 - **The block type must not be named `squareKufi`**: that name is in
   `REMOVED_BLOCK_TYPES` (`src/lib/legacySaves.ts`) so pre-removal saves load
   with those blocks dropped. Use a new type name and new field names.
@@ -243,6 +248,15 @@ them look right". Rebuilding the Al-Baqarah panel from our letters instead
 - Irregular pieces plug holes: a lifted ي that steps down to the line, a
   kaf bar reaching over the letter before it, a hooked ن, dots, and a lone
   square.
+
+**Gate (2026-10-29).** A rule-based arranger given only the text and a
+21×21 box produced the same plan as the reference: words clockwise round the
+frame, the same corner turns, the same turn-back in the core. The user: "it
+looks well placed but the words are wrong" — the wrong words were all dots
+(see Constraints) — and "everything else is fine". The direction is
+accepted. Left open by the spike: it took about 3 minutes per panel, left 2
+gaps, and failed the Shahada at every size, so the real packer must be much
+faster and needs the letter-table additions below.
 
 The packer is built from these rules, and the pieces our table lacks are
 added to it: shortened tall letters, the lifted letter, a narrow middle ك, a
