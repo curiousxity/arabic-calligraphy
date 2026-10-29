@@ -376,6 +376,13 @@ Times are minutes:seconds into the individual-letters lesson.
   | 467r.s0 | 94.1% | 98.0% |
 
   (Scores are before the joint's trim and fill, which leave nothing past the edge or bare within the zone.)
+- **Every split stroke's joint to the studio edge (2026-10-29):** the peaks and hooks written as two pieces had the
+  same small nib corners past the edge at the cut (0.014-0.033 nuqta) and bare spots there (up to 0.052, 069.s0's
+  peak). The user, asked whether all 17 should get decision 54's trim and fill: "yes". Done for 068.s0, 195.s2,
+  069.s0, 224.s2, 189.s2, 253.s1 (peaks) and 116g.s0, 195.s3, 259g.s0, 462.s1, 468.s4, 468g.s0, 259.s2, 301.s5,
+  449.s2, 728.s0, 729.s0 (hooks); none left past the edge or bare at the joint. Adopted with it, as decision 53's
+  hook and the peaks' two strokes: 253.s1's peak (95.8% -> 98.7%) and the hooks of 259.s2 (96.2% -> 98.4%), 301.s5
+  (98.0% -> 98.7%), 449.s2 (96.5% -> 98.8%), 728.s0 (96.6% -> 98.7%), 729.s0 (95.9% -> 98.4%).
 - **Decision 52 (210.s1, a small head, 2026-10-28):** no pen got its top-right corner square: one angle 92%,
   turning, both flicks, and the nib-tip fill (91%, which notched the left side). The user: "go with A. The top right
   corner square is part of the other stroke." So the one-angle fit stays, and the corner is left to the neighbouring
