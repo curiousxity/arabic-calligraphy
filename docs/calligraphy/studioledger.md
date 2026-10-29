@@ -310,6 +310,14 @@ Times are minutes:seconds into the individual-letters lesson.
   pokes above the peak. The one-stroke turning fit (91%) is kept as the other way to write it.
 - **Joint fill, for every split stroke:** the halves are written, then the pen goes back over the meeting with its
   tip. A sin lesson shows the same touch-up over the peak after the stroke is written.
+- **Two more peaks written the same way (2026-10-28):** 069.s0 and 224.s2 have the same pointed peak, and every
+  one-stroke pen (one angle, turning, flick) rounded it off. Each is cut from the notch under the peak up through
+  its tip, the halves written with a turning nib and no overlap, then the joint filled with the nib tip.
+
+  | stroke | one stroke (best) | two strokes, joint filled | worst miss (nuqta) |
+  |---|---|---|---|
+  | 069.s0 | 90% | 98.5% | 0.12 |
+  | 224.s2 | 93% | 97% | 0.23 |
 
 ### Ya
 
