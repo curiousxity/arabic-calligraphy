@@ -351,6 +351,31 @@ Times are minutes:seconds into the individual-letters lesson.
   The user: "Should I fill the gaps that lie entirely inside a stroke's ink yes". So any gap wholly inside a
   stroke's own ink is filled, as wet ink flows across; each becomes a small patch (`fillgaps.py`), grown 0.005 nuqta
   into the ink around it, and the outer edge is untouched. 27 split strokes checked, none left with a gap.
+- **Decision 54 (the bend at the top of the r stroke, 2026-10-29):** ten strokes (444.s0, 452.s0, 457.s0, 461.s0,
+  465.s0, 457r.s0, 460r.s0, 461r.s0, 463r.s0, 467r.s0) whose bend every one-stroke pen left short of the studio edge,
+  outside the corner and along the inner curve: turning pen, flick (one angle and turning) and full nib all failed.
+  Written as two strokes meeting at the bend, cut from the inner notch out across the corner, both turning pens, the
+  joint filled (nib tip, three nibs' reach), the bend fills out. Drawn large, the pieces' square nib ends stood out as
+  two small corners at the top of the bend (0.02-0.05 nuqta thick). The user chose "1": two strokes, with the joint
+  trimmed to the studio edge. Within one and a half nibs of the cut (one nib left a small tooth on 461r.s0), ink past
+  the studio edge over open paper is trimmed and bare studio ink is filled (461r.s0's hairline piece started 0.018
+  nuqta short, a step inside the bend); ink under a neighbouring stroke stays (decision 41) and nothing away from the
+  joint is touched (`trimcut.py`). The user, of the result: "looks perfect".
+
+  | stroke | one stroke (best) | two strokes, joint to the studio edge |
+  |---|---|---|
+  | 444.s0 | 94.1% | 98.2% |
+  | 452.s0 | 96.0% | 97.9% |
+  | 457.s0 | 95.4% | 97.9% |
+  | 461.s0 | 95.6% | 97.5% |
+  | 465.s0 | 95.7% | 98.7% |
+  | 457r.s0 | 92.6% | 98.3% |
+  | 460r.s0 | 93.8% | 97.0% |
+  | 461r.s0 | 95.5% | 97.5% |
+  | 463r.s0 | 95.4% | 98.4% |
+  | 467r.s0 | 94.1% | 98.0% |
+
+  (Scores are before the joint's trim and fill, which leave nothing past the edge or bare within the zone.)
 - **Decision 52 (210.s1, a small head, 2026-10-28):** no pen got its top-right corner square: one angle 92%,
   turning, both flicks, and the nib-tip fill (91%, which notched the left side). The user: "go with A. The top right
   corner square is part of the other stroke." So the one-angle fit stays, and the corner is left to the neighbouring
