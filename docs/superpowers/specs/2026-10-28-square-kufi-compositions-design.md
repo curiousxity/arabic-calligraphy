@@ -197,6 +197,10 @@ What the packer must honour, whatever its method:
 - every word's letters stay in order and joined; words may turn corners;
 - strokes stretch only where a form says it may stretch (stems, baselines,
   join runs), in whole cells;
+- strokes change length only when they must: of the packed panels, prefer the
+  one closest to each letter's natural length (the user, 2026-10-29: "the la
+  was unnecessarily shorted and the last word was unnecessarily
+  enlgonated");
 - pinned edits are hard constraints;
 - the result fills the box: no unfilled region larger than a gap.
 
