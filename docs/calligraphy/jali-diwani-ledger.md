@@ -603,6 +603,40 @@ from the walk: overlap 0.86-0.88 rose to 0.946-0.955, the worst window to
 0.035 (0.05 on 145.s1 and 152.s2), and 113.s2 to 0.95. Each end narrows to
 about 0.7 of the small pen over its last 1.7 nuqta as the curl tightens.
 
+**The sin's tooth is two strokes that meet at the peak (decided by the
+user, 2026-10-28).** The pen narrows only where it lifts at an end, so a
+single stroke keeps its full width over the peak. The peak then rounds off,
+or the stroke cuts under it and leaves the tooth empty. The course teaches
+the tooth as "stop and come back", so each tooth is its own move (lesson 4).
+`PEN_CUT` cuts the outline at its sharpest outward point, across the stroke
+under the tooth. The right half (`~c0`) runs from the stroke's right end
+into the peak. The left half (`~c1`) runs out of the peak, and both may
+narrow onto a corner there. Against the sheet's whole outline (tag k1):
+
+| | one stroke: overlap | one stroke: typical edge miss | two strokes: overlap | two strokes: typical edge miss |
+|---|---|---|---|---|
+| 297.s1 | 0.924 | 0.043 | 0.949 | 0.028 |
+| 301.s1 | 0.851 | 0.116 | 0.934 | 0.032 |
+
+Both halves are one qalam. Fitted apart, 297.s1's halves took 1.49 and 0.94
+nib sizes, and the bigger one bulged past the sheet's end. So the bigger half
+is now fitted first, with its size free, and the other half is held to that
+size. The Thuluth side kept its sin as one stroke (decision 51). Diwani's
+tooth gains much more from the cut, so that choice does not carry over.
+
+The right half starts at a thin spike, and there the pen first stood out
+past the sheet's edge. The flick was tried for it (the user asked). The
+ledger's flick starts on the nib's corner at the hairline and opens at one
+angle. That lost on both strokes: 297.s1's right half scored 0.80 against
+0.90 for the turning nib. Through the dip the nib turns about 170 degrees,
+which one angle cannot follow. A turning nib allowed to narrow over the
+whole half lost too (0.90 and 0.88). So neither flick is tried by default
+(`PEN_FLICK=1` turns them on). With the shared size, the plain turning nib
+reaches the spike; only a sliver stands out on 297.s1. Against the sheet's
+whole outline (tag k5), 297.s1 scores 0.942 and 301.s1 0.948. A rerun of
+the same settings moved 297.s1's right half between 0.925 and 0.936, and
+its shared size between 0.95 and 0.94, so differences that small are noise.
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
