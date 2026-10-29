@@ -382,7 +382,9 @@ Times are minutes:seconds into the individual-letters lesson.
   069.s0, 224.s2, 189.s2, 253.s1 (peaks) and 116g.s0, 195.s3, 259g.s0, 462.s1, 468.s4, 468g.s0, 259.s2, 301.s5,
   449.s2, 728.s0, 729.s0 (hooks); none left past the edge or bare at the joint. Adopted with it, as decision 53's
   hook and the peaks' two strokes: 253.s1's peak (95.8% -> 98.7%) and the hooks of 259.s2 (96.2% -> 98.4%), 301.s5
-  (98.0% -> 98.7%), 449.s2 (96.5% -> 98.8%), 728.s0 (96.6% -> 98.7%), 729.s0 (95.9% -> 98.4%).
+  (98.0% -> 98.7%), 449.s2 (96.5% -> 98.8%), 728.s0 (96.6% -> 98.7%), 729.s0 (95.9% -> 98.4%). And 577.s3, turned
+  down under decision 53 for its slit along the cut: with the slit filled and the joint trimmed it passes (95.4% ->
+  98.0%; a bump on the body's top edge 0.03 nuqta). 301g.s0's sliver lies past the joint, so it stays one stroke.
 - **Decision 52 (210.s1, a small head, 2026-10-28):** no pen got its top-right corner square: one angle 92%,
   turning, both flicks, and the nib-tip fill (91%, which notched the left side). The user: "go with A. The top right
   corner square is part of the other stroke." So the one-angle fit stays, and the corner is left to the neighbouring
