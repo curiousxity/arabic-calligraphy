@@ -388,6 +388,14 @@ Times are minutes:seconds into the individual-letters lesson.
   516.s4's rounded hump, written as the peaks are (two strokes, cut from the notch up through the top), goes
   from 90.6% to 96.4% with its joint to the studio edge; extra ink inside its bottom bowl remains, as on 391g.s1 and
   573.s4. A fixed nib angle on the long body of 195.s3 and 729.s0 left their tails' ends square: dropped.
+- **The eraser past the joints (2026-10-29):** asked whether the joint's trim and fill should also reach misses away
+  from a joint (the extra ink inside the bottom bend of 391g.s1, 573.s4 and 516.s4; the tails of 195.s3 and 729.s0
+  ending square where the studio's are cut on a slant), the user: "yes". Each patch of ink past the studio edge over
+  open paper, or of studio ink left bare, at least 0.02 nuqta thick, is trimmed or filled to the edge; ink under a
+  neighbouring stroke stays (decision 41), and nothing smaller is touched (`edgefix.py`). The widest miss left on each
+  is 0.005-0.019 nuqta. The same was done for 571r.s1 (a bare strip down its hairline) and 193r.s0, two of the seven
+  pair-half strokes found never fitted while the library was built and fitted then. With these, no stroke is left to
+  check: 3,098 fitted, and the library holds all 4,173 shape strokes.
 - **Decision 52 (210.s1, a small head, 2026-10-28):** no pen got its top-right corner square: one angle 92%,
   turning, both flicks, and the nib-tip fill (91%, which notched the left side). The user: "go with A. The top right
   corner square is part of the other stroke." So the one-angle fit stays, and the corner is left to the neighbouring

@@ -7,7 +7,7 @@ the pair halves fitted after it was made come from the stamps, studio/catalog.py
 me/penreview.json (each fitted stroke's chosen fit and the batch it came from), me/twins.json (strokes that copy a
 twin's fit, moved by the difference of their corners), me/gaps.json (patches filling gaps that lie wholly inside a
 split stroke's ink: the user, 2026-10-29) and me/trims.json (a split stroke's joint trimmed and filled to the studio
-edge: decision 54 and the user's "yes" to every split joint). Each batch folder me/<tag>/pen.json holds the fits.
+edge: decision 54 and the user's "yes" to every split joint; and the user's "yes" to the eraser past the joints). Each batch folder me/<tag>/pen.json holds the fits.
 
 A fit's nodes are in nuqta from the shape's origin (x at its right-most ink, y = 0 at the stamp's top, y down); the
 library stores them in the stamp's own units (PPN to the nuqta) and the app rebuilds the fitter's cubic handles from
@@ -87,7 +87,7 @@ def main(sp, out):
         else:
             pens = [pen_path(e["nodes"], O, shift)]
         g = gaps.get(k, {}) if v["recipe"] == "split" else {}
-        t = trims.get(k, {}) if v["recipe"] == "split" else {}
+        t = trims.get(k, {})  # a split stroke's joint, and any stroke's visible misses away from a joint (edgefix.py)
         out = {"recipe": v["recipe"], "pens": pens}
         if g.get("patches") or t.get("fill"):
             out["patches"] = [ring(p, shift) for p in g.get("patches", []) + t.get("fill", [])]
