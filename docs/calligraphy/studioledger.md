@@ -339,6 +339,10 @@ Times are minutes:seconds into the individual-letters lesson.
   | 259g.s0 | 97% | 98.0%, slivers | 98.5%, clean | 3 nibs |
   | 116g.s0 | 96.7% | 99.3%, clean | | 1 nib |
   | 301g.s0 | | 98.0%, slivers | 98.6%, a sliver on top | one stroke |
+  | 462.s1 | 98.0% | | 98.9%, clean | 3 nibs |
+  | 468.s4 | 98.4% | | 99.3%, clean | 3 nibs |
+  | 468g.s0 | 96.8% | | 99.2%, clean | 3 nibs |
+  | 577.s3 | 95.4% | | 98.0%, a slit along the cut | one stroke |
 
   (116g.s0 and 301g.s0 needed the cut moved right, to x 17 and 18, before the hook piece was big enough to fit.)
 - **Decision 52 (210.s1, a small head, 2026-10-28):** no pen got its top-right corner square: one angle 92%,
