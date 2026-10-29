@@ -637,6 +637,47 @@ whole outline (tag k5), 297.s1 scores 0.942 and 301.s1 0.948. A rerun of
 the same settings moved 297.s1's right half between 0.925 and 0.936, and
 its shared size between 0.95 and 0.94, so differences that small are noise.
 
+The other eleven main-pen tooth strokes were cut the same way (k6, 2026-10-29).
+071.s0 has no peak to cut at and stays one stroke. The cut first landed in
+the wrong place on four of them: 356.s0 and 357.s0 down the shaft or near the
+hook's tip, 299.s1 in the dip, 366.s0 near the hook's tip. The peak is found
+by how sharp the outline turns a quarter nuqta either side of a point. On a
+long smooth stretch the outline's points lie far apart, and the nearest point
+a quarter nuqta back was sometimes the point itself. That reads as a right
+angle, and it beat any real peak blunter than that. `cut_piece` now measures
+along the outline between its points. The other strokes kept their cut.
+
+Separately, the fitter twice picked the worse fit for a right half. 290.s1:
+a try that followed the dip and the peak at 0.94 lost to one that missed the
+dip at 0.83; 366.s0: 0.947 lost to 0.902. The better try's only fault was its
+free end. Drawn with the nib edge-on, it ran on as a hair past the sheet's
+spike tip, and the end window counts that as a deep miss. The tip rule
+(the user, 2026-10-21: the tip stops where the reference's ink stops,
+`jdtip.py`) now runs on every try before the pick, not after (the user,
+2026-10-29). `trim_ends` pulls a hairline free end back 0.05 nuqta at a time
+while that lessens the ink outside near the end. It stops when the sheet's
+own ink near the end would come uncovered by more than 0.03 nuqta, and after
+1 nuqta at most. A broad end, a cap or a head, is left to the fit, and a cut
+half's cut end stays. The try is then scored again against its start path's
+end windows, so a trim that leaves the sheet's end uncovered shows as a
+miss. Each try keeps its untrimmed score beside the trimmed one (`raw`,
+`trim`). `PEN_TRIM=0` turns it off. Against the sheet's whole outline:
+
+| | one stroke: overlap | two strokes, first cut | two strokes, peak cut | with the trim (k8) |
+|---|---|---|---|---|
+| 290.s1 | 0.856 | 0.866 | (the same cut) | 0.934 |
+| 299.s1 | 0.835 | 0.944 | 0.950 | |
+| 356.s0 | 0.776 | 0.917 | 0.982 | |
+| 357.s0 | 0.854 | 0.946 | 0.980 | |
+| 366.s0 | 0.795 | 0.952 | 0.931 | 0.946 |
+| 297.s1 | 0.924 | | 0.942 (k5) | 0.943 |
+| 301.s1 | 0.851 | | 0.948 (k5) | 0.948 |
+
+309.s1 0.942, 311.s1 0.956, 312.s1 0.938, 313.s1 0.941 and 347.s0 0.953 were
+cut at the peak the first time (k6). 366.s0's first cut scored higher, but
+it was not cut at the peak and its half bridged the tooth. With the trim, its
+right half follows the dip, and its end stops at the sheet's tip.
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
