@@ -254,6 +254,21 @@ Times are minutes:seconds into the individual-letters lesson.
   - The user, 2026-10-27, decision 47: "Yes turning pen".
 - **Status:** recreated.
 
+**The lams the studio reshapes inside a word**
+
+- **What the studio does:** in the 13 words captured from it, 39 of the 43 letters are its catalogue shapes exactly,
+  neither stretched nor squeezed; where a word needs a different look it picks another catalogue variant. Only the
+  lam is redrawn for its word, four times:
+  - كل: the final lam's stem and its inner stroke are about one nuqta taller than Lam Final 457g's. Its bowl is the
+    catalogue's own.
+  - لا in السلام: the lam's stem is about one nuqta taller and the alif slightly shorter than in Laam Alif Final 040g.
+  - The ال of السلام and الحب: the stem keeps its height but is redrawn, and the lam's two small head strokes are
+    left off. Its joining stroke is the catalogue's own.
+- **Strokes:** the four lams are added to the catalogue as W01–W04 (scratch `me/wordlams.py`). The nine new strokes
+  are fitted the usual way. The three strokes the catalogue already has (W01.s1, W02.s1, W04.s1) reuse those fits.
+- **Source:** the studio's built words. The user, 2026-10-29: "3 fit it now".
+- **Status:** fitting.
+
 ### Nun
 
 **The bowl of Nun Final 3**
