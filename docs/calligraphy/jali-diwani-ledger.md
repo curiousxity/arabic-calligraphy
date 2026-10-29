@@ -628,8 +628,10 @@ The right half starts at a thin spike, and there the pen first stood out
 past the sheet's edge. The flick was tried for it (the user asked). The
 ledger's flick starts on the nib's corner at the hairline and opens at one
 angle. That lost on both strokes: 297.s1's right half scored 0.80 against
-0.90 for the turning nib. Through the dip the nib turns about 170 degrees,
-which one angle cannot follow. A turning nib allowed to narrow over the
+0.90 for the turning nib. Through the dip the nib turned about 170 degrees,
+which one angle cannot follow. (That turn was a fault of the fit, not the
+pen; see the end-window note below: held upright, the nib slides down and
+left through the dip.) A turning nib allowed to narrow over the
 whole half lost too (0.90 and 0.88). So neither flick is tried by default
 (`PEN_FLICK=1` turns them on). With the shared size, the plain turning nib
 reaches the spike; only a sliver stands out on 297.s1. Against the sheet's
@@ -677,6 +679,73 @@ miss. Each try keeps its untrimmed score beside the trimmed one (`raw`,
 cut at the peak the first time (k6). 366.s0's first cut scored higher, but
 it was not cut at the peak and its half bridged the tooth. With the trim, its
 right half follows the dip, and its end stops at the sheet's tip.
+
+**A cut half is judged at its free end only; the nib does not spin through
+the dip** (the user, 2026-10-29). 366.s0's right half wound its nib about 165
+degrees through the dip (87 down to -77). That drew a ledge in the dip, where
+the nib lay flat, and a spike over the peak, from the nib's corner. The user:
+there the pen goes down and slides left; it does not turn. The fitter tried a
+nib held upright down the dip, and it covered the outline better (0.944
+against 0.919). It lost on the window at the cut end, 0.27 nuqta to 0.13.
+That window asked the half to cover its own side of the cut alone, before the
+other half was drawn, and the spin was how it did. `PEN_CUTWIN=free` judges a
+cut half on its free end's window only. The joint is checked on the whole
+outline once both halves are in. A charge on how fast the nib turns
+(`PEN_TURN`, k9) only spread the spin out, and it made 297.s1 and 299.s1 worse.
+It is off.
+
+With no window at the cut end, nothing caught a cut end running past the
+peak. 347.s0's right half ran 0.4 nuqta over it, a spike the user marked.
+Under `PEN_CUTWIN=free`, `trim_ends` trims the cut end too.
+
+347.s0's left half still began a little high, inside the right half's ink,
+and left a step below the peak. The user drew its start (2026-10-29):
+- the second stroke starts where the first ended, its top level with the
+  first's;
+- the nib moves a short way left (the user first said right, then corrected
+  it; right left a square notch at the peak);
+- then the long move down.
+
+`PEN_LEAD` fits it that way:
+- The right half's points are pulled down until the nib's top is level with
+  the outline's peak, never up (`level_top`).
+- The left half starts there, at full nib width (left to narrow, its top sat
+  under the peak's shoulder).
+- It moves `PEN_LEAD_STEP` (-0.15 nuqta, to the left).
+- Its start and its tail's end are held. Left free, the tail's end drew up off
+  the tail.
+- The short move's end is not held (`PEN_LEAD_HOLDSTEP=0`). Held level at
+  full width, the move stood over the outline where the top edge falls away
+  left of the peak, and drew a bulge (k17).
+- Its nib starts at its own path's angle. At the right half's upright angle,
+  it stayed upright down the whole left half.
+- An overlap at the joint (`PEN_LEAD_OVERLAP`) was not needed (k20: 0.971).
+
+The studio's tail ends in a short flat cut, and the held tail matches it.
+
+Accepted (the user, 2026-10-29), each pair against the sheet's whole outline:
+
+| stroke | run | overlap |
+|---|---|---|
+| 366.s0 | k10 | 0.976 (was 0.946) |
+| 290.s1 | k10 | 0.942 |
+| 297.s1 | k10 | 0.952 |
+| 301.s1 | k10 | 0.956 |
+| 309.s1 | k10 | 0.959 |
+| 311.s1 | k10 | 0.963 |
+| 313.s1 | k10 | 0.946 |
+| 357.s0 | k10 | 0.984 |
+| 347.s0 | k19 (`PEN_LEAD`) | 0.974 |
+| 299.s1 | k7 | 0.950 |
+| 356.s0 | k7 | 0.982 |
+| 312.s1 | k6 | 0.938 |
+
+k10 is `PEN_CUTWIN=free`. 299.s1, 312.s1 and 356.s0 keep their earlier fits:
+- **312.s1 and 356.s0:** under k10, a half spun about 180 degrees at its
+  free end.
+- **299.s1:** under k10, its left half fit worse.
+
+The free-end spins are open.
 
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off

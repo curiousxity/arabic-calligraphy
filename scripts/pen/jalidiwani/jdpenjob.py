@@ -155,12 +155,39 @@ def judge(s):
     return s["iou"] - s["gap95"] - CORNER * s.get("window_worst", 0.0)
 
 
-def end_windows(nodes, pen=PEN):
+# PEN_CUTWIN ("free"): a PEN_CUT half is judged on its free end's window only. The cut end's window asked the half to
+# cover its own side of the cut alone, before the other half was drawn; 366.s0's right half held its nib down the dip
+# at 0.944 overlap and lost to the spin (0.919) on that window, 0.27 nuqta to 0.13 (k9). The spin's corner is the
+# spike the user marked over the peak. The joint is checked on the whole outline once both halves are in.
+CUTWIN = os.environ.get("PEN_CUTWIN", "both")
+# PEN_LEAD ("347.s0,..."): the left half "~c1" starts where the right half ended, its top level with the right half's
+# top; the nib moves LEAD_STEP nuqta left, then the long move down. The user (2026-10-29, 347.s0): "start the second
+# stroke so that the top is aligned with the top of the previous stroke and move the nib a very short distance to the
+# right before major move down", then "it probably should have been to the left" (right left a square notch at the
+# peak, k15). Left free, the left half's start rose into the right half's ink and its corner stood out as a step below
+# the peak. Accepted as k19 (0.974). How it got there:
+#   the right half's points come down until the nib's top is level with the peak (level_top; k13 held the left half
+#     to an end 0.11 nuqta over it and drew a square cap);
+#   the start is the full nib (left to narrow, its top sat 0.14 nuqta under the peak's shoulder, k16);
+#   the start and the tail's end are held (left free, the end drew 0.16 nuqta up off the tail, k16), the short move's
+#     end is not (held level at full width it stood over the top edge falling away left of the peak, a bulge, k17);
+#   the nib starts at the path's own angle (at the right half's upright one it stayed upright down the whole half and
+#     the tail lost its end, k13: 0.906 against 0.959);
+#   an overlap at the joint was not needed (k20: 0.971).
+LEAD = {x for x in os.environ.get("PEN_LEAD", "").split(",") if x}
+LEAD_STEP = float(os.environ.get("PEN_LEAD_STEP", -0.15))  # the short move, nuqta: - left, + right
+LEAD_SKIP, LEAD_NEAR = 0.3, 0.6
+
+
+def end_windows(nodes, pen=PEN, stroke=None):
     """The two end windows, their radius in proportion to the nib: a small pen's tip is a third the size, and a window
     sized for the main nib's covers a whole head curl, so the curl's spiral scored as a missed tip and an unwound fit won
     (113.s2, trial three: 0.87 lost to 0.76)."""
     r = END_R * pen / PEN
-    return [(*nodes[0]["p"], r), (*nodes[-1]["p"], r)]
+    w = [(*nodes[0]["p"], r), (*nodes[-1]["p"], r)]
+    if CUTWIN == "free" and stroke in CUT_AT:  # orient puts a "~c0" half's free end first, a "~c1" half's last
+        return w[:1] if stroke.endswith("~c0") else w[1:]
+    return w
 
 
 def length(nodes):
@@ -398,12 +425,31 @@ def tooth_tips(piece, O, nodes, sub=4):
 TIPS_ON = os.environ.get("PEN_TIPS", "0") == "1"
 _tips = set()  # the tip nodes of the path being refined, set by with_tips
 _shape_cost_b, _shape_cost = gpufit._shape_cost_b, gpufit.shape_cost
+# PEN_TURN ("0", off): a PEN_CUT half's nib pays for how fast it turns, not only for changes in that speed. gpufit's term is
+# the angle's second difference, so a steady spin is free: 366.s0's right half wound its nib about 165 degrees the long
+# way through the dip to the peak (87 ... 68, 38, 1, -38, -77), the same nib line as a 15 degree tilt onto the other
+# corner, and drew a ledge in the dip and a spike over the peak. The user (2026-10-29): there the pen goes down and
+# slides left, it does not turn. 20 degrees a node costs ROUGH; the 15-25 degrees a good tooth turns in all is noise.
+# Curls and S sweeps, which do turn (the user, 2026-10-25), are no cut half and keep the old cost.
+# k9 (2026-10-29): the spin only spread out (-71 ... 88) and 297.s1 and 299.s1 took one up (0.943 to 0.927, 0.950 to 0.912),
+# so the term is off: the spin was the cut end's window at work (PEN_CUTWIN).
+TURN_ON = os.environ.get("PEN_TURN", "0") == "1"
+TURN_DEG = 20.0
+_turn = [False]  # set by fit for a cut half's refines
+
+
+def _turn_cost_b(a, rough):
+    import torch
+    if not _turn[0] or a.shape[1] < 2:
+        return a.new_zeros(a.shape[0])
+    return rough * ((torch.diff(a[..., 2], 1, dim=1) / TURN_DEG) ** 2).sum(1)
 
 
 def _tip_cost_b(a, rough, bend="position"):
-    """gpufit._shape_cost_b, with the bend and fold at each node in _tips left out, as pieces.shape_cost's corners."""
+    """gpufit._shape_cost_b, with the bend and fold at each node in _tips left out, as pieces.shape_cost's corners; and
+    a cut half's turn rate (PEN_TURN)."""
     if not _tips:
-        return _shape_cost_b(a, rough, bend)
+        return _shape_cost_b(a, rough, bend) + _turn_cost_b(a, rough)
     import torch
     n = a.shape[1]
     cost = a.new_zeros(a.shape[0])
@@ -422,11 +468,11 @@ def _tip_cost_b(a, rough, bend="position"):
     ch = torch.diff(a[..., :2], dim=1)
     cos = (ch[:, 1:] * ch[:, :-1]).sum(-1) / (ch[:, 1:].norm(dim=-1) * ch[:, :-1].norm(dim=-1) + 1e-9)
     fold = torch.tensor([0.0 if j + 1 in _tips else 1.0 for j in range(n - 2)], device=a.device)
-    return cost + (torch.relu(-cos) * fold).sum(1) * 10
+    return cost + (torch.relu(-cos) * fold).sum(1) * 10 + _turn_cost_b(a, rough)
 
 
 def _tip_cost(a, rough, bend="position"):
-    return _tip_cost_b(a[None], rough, bend)[0] if _tips else _shape_cost(a, rough, bend)
+    return _tip_cost_b(a[None], rough, bend)[0] if _tips or _turn[0] else _shape_cost(a, rough, bend)
 
 
 gpufit._shape_cost_b, gpufit.shape_cost = _tip_cost_b, _tip_cost
@@ -573,7 +619,7 @@ def end_miss(nodes, piece, ignore, O, P, c, sub=4):
     return float(out), float(short)
 
 
-def trim_ends(stroke, nodes, piece, ignore, O, P):
+def trim_ends(stroke, nodes, piece, ignore, O, P, keep_start=False):
     """The stroke's free hairline ends pulled back to where the outline's ink stops (the user, 2026-10-21, jdtip.py's
     rule; before the pick, 2026-10-29). An end drawn with the nib edge-on runs a hair past the outline's tip: the
     fitter's soft ink barely feels it, the judge's end window does, and a try that followed the whole stroke lost to
@@ -582,6 +628,10 @@ def trim_ends(stroke, nodes, piece, ignore, O, P):
     outline's own ink would come uncovered by more than TRIM_SHORT, and after TRIM_MAX. A cut half's cut end stays.
     (nodes, nuqta pulled back at each end)."""
     ends = [0] if stroke.endswith("~c0") else [-1] if stroke.endswith("~c1") else [0, -1]
+    if CUTWIN == "free" and stroke in CUT_AT:  # no window at the cut end, so its hair is trimmed here (347.s0, k10: the
+        ends = [0, -1]                         # right half ran 0.4 nuqta on past the peak, the spike the user marked)
+    if keep_start:  # PEN_LEAD's held start
+        ends = [i for i in ends if i != 0]
     moved = {}
     for i in ends:
         j = 1 if i == 0 else -2
@@ -612,10 +662,43 @@ def trim_ends(stroke, nodes, piece, ignore, O, P):
     return nodes, moved
 
 
-def fit(stroke, log, size=None):
-    """size: a nib size, in main nibs, the stroke is held to (a PEN_CUT half after its other half); else it may move."""
+def level_top(node, piece, O, pen_scale=1.0):
+    """node moved straight down until its nib's top is level with the outline's highest point within LEAD_NEAR nuqta
+    (never up). k13: the right half's trimmed end still stood 0.11 nuqta over 347.s0's peak, and the left half's top,
+    held level with it, drew a square cap there. Widths in main nibs (pen_scale: the result's, to undo)."""
+    ring = (ref_ring(piece) - O) / PPN
+    p = np.array(node["p"], float)
+    near = ring[np.linalg.norm(ring - p, axis=1) < LEAD_NEAR]
+    if not len(near):
+        return node
+    half = node.get("width", 1) / pen_scale * PEN / 2 / PPN * abs(math.sin(math.radians(node["angle"])))
+    y = max(p[1], near[:, 1].min() + half)
+    return {**node, "p": [round(float(p[0]), 4), round(float(y), 4)]}
+
+
+def led(nodes, lead):
+    """A "~c1" start path for PEN_LEAD: the right half's last point (lead, its nodes, already levelled with the peak),
+    then LEAD_STEP nuqta across; the path's own nodes within LEAD_SKIP of either go, and the path then only moves away.
+    The nib starts at the path's own angle."""
+    e = lead["nodes"][-1]
+    a = np.array(e["p"], float); b = a + [LEAD_STEP, 0.0]
+    rest = [q for q in nodes if min(np.linalg.norm(np.array(q["p"]) - a), np.linalg.norm(np.array(q["p"]) - b)) > LEAD_SKIP]
+    ang = (rest or nodes)[0]["angle"]
+    head = [{"p": [round(float(v), 4) for v in a], "angle": ang}, {"p": [round(float(v), 4) for v in b], "angle": ang}]
+    d = lambda q: np.linalg.norm(np.array(q["p"]) - a)  # noqa: E731
+    while len(rest) > 2 and d(rest[0]) >= d(rest[1]):  # the band wanders at the cut (347.s0: down, up, down): from
+        rest = rest[1:]                                 # the held points the path only moves away
+    while LEAD_STEP < 0 and len(rest) > 2 and rest[0]["p"][0] > b[0]:  # a move left: no path point back to its right
+        rest = rest[1:]
+    return head + rest
+
+
+def fit(stroke, log, size=None, lead=None):
+    """size: a nib size, in main nibs, the stroke is held to (a PEN_CUT half after its other half); else it may move.
+    lead: the right half's result, when PEN_LEAD starts this left half from its end (led)."""
     t0 = time.time()
     piece, ignore, O = job_of(stroke)
+    _turn[0] = TURN_ON and stroke in CUT_AT  # every refine of this stroke, set again by the next fit
     hair = "~h" in stroke  # a tip-drawn hairline of a PEN_SPLIT stroke: the small pen, filled
     fill = stroke in FILL or hair
     # a mark narrower than the nib cannot be the main pen's: it is a small-pen mark (T21.s0, 0.56 nuqta to a 0.82 nib)
@@ -631,6 +714,11 @@ def fit(stroke, log, size=None):
         starts.append(("walk", orient(stroke, band_start(piece, O, ignore, P, hair=True), O, piece)))
     if r_old:
         starts.append(("free", [{"p": n["p"], "angle": n["angle"]} for n in r_old["nodes"]]))
+    held = ()
+    if lead:  # every start behind the held start; a free fit's path is the whole outline's, no half's
+        starts = [(n_, led(ns, lead)) for n_, ns in starts if n_ != "free"]
+        held = (0, -1)  # the start and the tail's end (PEN_LEAD)
+        log(stroke, "lead: held start", starts[0][1][0]["p"], "then", starts[0][1][1]["p"])
     tried = []
 
     def kept(p, s, nodes):
@@ -639,22 +727,23 @@ def fit(stroke, log, size=None):
         untrimmed, "trim": nuqta pulled back} when the trim moved anything."""
         if not TRIM:
             return p, s, {}
-        t, moved = trim_ends(stroke, p, piece, ignore, O, P)
+        t, moved = trim_ends(stroke, p, piece, ignore, O, P, keep_start=bool(held))
         if not moved:
             return p, s, {}
         ts = gpu_score([t], [piece], O, PPN, P, ignore)
-        ts["window_worst"] = round(gpufit.window_worst(t, [piece], O, PPN, P, (), end_windows(nodes, P), ignore), 4)
+        ts["window_worst"] = round(gpufit.window_worst(t, [piece], O, PPN, P, (), end_windows(nodes, P, stroke), ignore), 4)
         return t, ts, {"raw": s, "trim": moved}
     if fill:
         for sname, nodes in starts:
             p, s = gpufit.refine(with_tips(nodes), [piece], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ignore, widths_free=True,
-                                 corner=CORNER, windows=end_windows(nodes, P), judge="gpu")
+                                 corner=CORNER, windows=end_windows(nodes, P, stroke), judge="gpu")
             p, s, raw = kept(p, s, nodes)
             tried.append({"start": sname, "angle0": None, "anchor": None, "score": s, "nodes": p, "pen": None, **raw})
             log(stroke, "fill", sname, s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
     def pen_of(nodes, a, anc):
         lift = LIFT_LONG if length(nodes) >= LONG else LIFT
-        return {"angle": a, "lift_start": lift, "lift_end": lift, "anchor": list(anc), "size": SIZE and not size,
+        # a held start is the full nib: let narrow, 347.s0's left half began 0.14 nuqta under the peak's shoulder (k16)
+        return {"angle": a, "lift_start": 0.0 if held else lift, "lift_end": lift, "anchor": list(anc), "size": SIZE and not size,
                 **({"turns": list(range(1, len(nodes)))} if ROTATE else {})}
 
     def flick_of(nodes, a, anc):  # one angle, the start narrowing onto a corner over as much of the stroke as it needs
@@ -664,15 +753,17 @@ def fit(stroke, log, size=None):
         """Every pen side by side in one loop on the card (gpufit.refine_pens; the user, 2026-10-26: "make that change
         for the diwani branch as well"), with this start's schedule; each try goes into tried."""
         sched = 0 if length(nodes) >= SHORT else 1
-        res = gpufit.refine_pens(with_tips(nodes), [piece], O, PPN, P, pens, rough=ROUGH, edge=EDGE, ignore=ignore,
-                                 schedules=(sched,), corner=CORNER, windows=end_windows(nodes, P), judge="gpu")
+        res = gpufit.refine_pens(with_tips(nodes), [piece], O, PPN, P, pens, rough=ROUGH, edge=EDGE, ignore=ignore, fixed=held,
+                                 schedules=(sched,), corner=CORNER, windows=end_windows(nodes, P, stroke), judge="gpu")
         for pen, (p, s) in zip(pens, res):
             a, anc = pen["angle"], pen["anchor"]
             p, s, raw = kept(p, s, nodes)
             tried.append({"start": sname, "angle0": a, "anchor": anc, "score": s, "nodes": p, "pen": pen, "flick": flick, **raw})
             log(stroke, sname + (" flick" if flick else ""), a if np.isscalar(a) else "own" if len(set(a)) > 1 else a[0], anc, s["iou"], s["gap95"], raw.get("trim", ""), "%.0fs" % (time.time() - t0))
 
-    prune = PRUNE and ROTATE
+    # a cut half tries all four anchor pairs on every angle: the short way to the cut ends on the other corner, and a
+    # pruned search would only find it on the leading angle
+    prune = PRUNE and ROTATE and stroke not in CUT_AT
     for sname, nodes in ([] if fill else starts):
         starts_a = angles(nodes, piece, O, ignore, P)
         if ROTATE:  # the start path's own angles too, each node turning on its own
@@ -694,13 +785,20 @@ def fit(stroke, log, size=None):
     if best["pen"] is not None:  # the other schedule, from the same start (a restart: the lift does not carry over)
         nodes = dict(starts)[best["start"]]
         other = 1 - (0 if length(nodes) >= SHORT else 1)
-        (p, s), = gpufit.refine_pens(with_tips(nodes), [piece], O, PPN, P, [best["pen"]], rough=ROUGH, edge=EDGE, ignore=ignore,
-                                     schedules=(other,), corner=CORNER, windows=end_windows(nodes, P), judge="gpu")
+        (p, s), = gpufit.refine_pens(with_tips(nodes), [piece], O, PPN, P, [best["pen"]], rough=ROUGH, edge=EDGE, ignore=ignore, fixed=held,
+                                     schedules=(other,), corner=CORNER, windows=end_windows(nodes, P, stroke), judge="gpu")
         p, s, raw = kept(p, s, nodes)
         log(stroke, "other schedule", s["iou"], s["gap95"], raw.get("trim", ""))
         if judge(s) > judge(best["score"]):
             best = {k: v for k, v in best.items() if k not in ("raw", "trim")}
             best = {**best, "nodes": p, "score": s, "schedule": other, **raw}
+    if stroke.endswith("~c0") and stroke[:-3] in LEAD and best["pen"] is not None:  # its end level with the peak
+        lv = [level_top(q, piece, O, PEN / P) for q in best["nodes"]]  # k16: the next to last stood over the peak too
+        if lv != best["nodes"]:
+            s = gpu_score([lv], [piece], O, PPN, P, ignore)
+            s["window_worst"] = round(gpufit.window_worst(lv, [piece], O, PPN, P, (), end_windows(dict(starts)[best["start"]], P, stroke), ignore), 4)
+            log(stroke, "lead: end levelled", best["nodes"][-1]["p"], "to", lv[-1]["p"], s["iou"], s["gap95"])
+            best = {**best, "nodes": lv, "score": s}
     n = best["nodes"]
     # the best by overlap alone, when it beats the judge's choice by ALT_GAP: drawn too, for the user to choose between
     # (113.s2 in trial four: the spiral at 0.87 lost to a hook at 0.76 on its end's worst miss)
@@ -738,7 +836,8 @@ if __name__ == "__main__":
     for st in [p for s in names for p in ([s] + [f"{s}~h{i}" for i in range(1, hairs(s) + 1)] if s in SPLIT
                                           else bigger_first(s) if s in CUT else [s])]:
         other = st.endswith(("~c0", "~c1")) and res.get(st[:-1] + ("1" if st.endswith("0") else "0"))
-        res[st], p = fit(st, log, size=other and other["size"])
+        lead = st.endswith("~c1") and st[:-3] in LEAD and res.get(st[:-1] + "0")
+        res[st], p = fit(st, log, size=other and other["size"], lead=lead or None)
         pics.update(p)
         json.dump(res, open(os.path.join(od, "pen.json"), "w"))
         json.dump(pics, open(os.path.join(od, "pics.json"), "w"))
