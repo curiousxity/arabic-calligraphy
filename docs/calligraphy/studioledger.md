@@ -345,6 +345,12 @@ Times are minutes:seconds into the individual-letters lesson.
   | 577.s3 | 95.4% | | 98.0%, a slit along the cut | one stroke |
 
   (116g.s0 and 301g.s0 needed the cut moved right, to x 17 and 18, before the hook piece was big enough to fit.)
+- **Gaps inside a stroke written in pieces are filled (2026-10-29):** drawn at 0.0025 nuqta a pixel, nearly every
+  stroke written as two pieces had a hairline slit along the cut, where the pieces' square nib ends meet without
+  overlapping: 0.005-0.02 nuqta wide, up to 0.15 long, too fine for the review pictures. No one-stroke fit has one.
+  The user: "Should I fill the gaps that lie entirely inside a stroke's ink yes". So any gap wholly inside a
+  stroke's own ink is filled, as wet ink flows across; each becomes a small patch (`fillgaps.py`), grown 0.005 nuqta
+  into the ink around it, and the outer edge is untouched. 27 split strokes checked, none left with a gap.
 - **Decision 52 (210.s1, a small head, 2026-10-28):** no pen got its top-right corner square: one angle 92%,
   turning, both flicks, and the nib-tip fill (91%, which notched the left side). The user: "go with A. The top right
   corner square is part of the other stroke." So the one-angle fit stays, and the corner is left to the neighbouring
