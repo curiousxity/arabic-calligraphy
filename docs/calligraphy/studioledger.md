@@ -385,6 +385,9 @@ Times are minutes:seconds into the individual-letters lesson.
   (98.0% -> 98.7%), 449.s2 (96.5% -> 98.8%), 728.s0 (96.6% -> 98.7%), 729.s0 (95.9% -> 98.4%). And 577.s3, turned
   down under decision 53 for its slit along the cut: with the slit filled and the joint trimmed it passes (95.4% ->
   98.0%; a bump on the body's top edge 0.03 nuqta). 301g.s0's sliver lies past the joint, so it stays one stroke.
+  516.s4's rounded hump, written as the peaks are (two strokes, cut from the notch up through the top), goes
+  from 90.6% to 96.4% with its joint to the studio edge; extra ink inside its bottom bowl remains, as on 391g.s1 and
+  573.s4. A fixed nib angle on the long body of 195.s3 and 729.s0 left their tails' ends square: dropped.
 - **Decision 52 (210.s1, a small head, 2026-10-28):** no pen got its top-right corner square: one angle 92%,
   turning, both flicks, and the nib-tip fill (91%, which notched the left side). The user: "go with A. The top right
   corner square is part of the other stroke." So the one-angle fit stays, and the corner is left to the neighbouring
