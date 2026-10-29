@@ -326,16 +326,20 @@ Times are minutes:seconds into the individual-letters lesson.
 - **Decision 53 (the upturned hook at the start of a long tail, 2026-10-29):** every one-stroke pen clipped the
   hook's tip and left its round belly short of the studio edge. Cut off about half a nuqta from the tip (5% of the
   stroke) and filled with the nib tip, as the alif hat and the ra heads are, the hook comes back; the body is a
-  turning pen, and the joint fill closes the seam. The user: "Yes to both". A sliver about 0.03 nuqta thin stays
-  along the inside of 195.s3's curve, past the joint fill's reach.
+  turning pen, and the joint fill closes the seam. The user: "Yes to both", then, of the slivers left just past
+  the joint where the body starts short of the studio edge: "The notch is the bigger problem. If that notch is not
+  appropriately filled, I would rather go with the smoother first option." So the hook is its own piece only where
+  no notch shows; otherwise the one-stroke fit stands. Two more tries at the notch are running: the body
+  allowed to start half a nib under the hook, and the joint fill looking three nibs out from the cut.
 
-  | stroke | one stroke (best) | hook as its own piece |
-  |---|---|---|
-  | 195.s3 | 96% | 98.1% |
-  | 259g.s0 | 97% | 98.0% |
+  | stroke | one stroke (best) | hook as its own piece | notch |
+  |---|---|---|---|
+  | 195.s3 | 96% | 98.1% | slivers: one stroke stands |
+  | 259g.s0 | 97% | 98.0% | slivers: one stroke stands |
+  | 116g.s0 | 96.7% | 99.3% | none: adopted |
+  | 301g.s0 | | 98.0% | slivers: one stroke stands |
 
-  116g.s0 and 301g.s0 carry the same hook; the first cut left their hook pieces too small to fit, so they are
-  rerunning with the cut moved right to the same 5% share.
+  (116g.s0 and 301g.s0 needed the cut moved right, to x 17 and 18, before the hook piece was big enough to fit.)
 - **Decision 52 (210.s1, a small head, 2026-10-28):** no pen got its top-right corner square: one angle 92%,
   turning, both flicks, and the nib-tip fill (91%, which notched the left side). The user: "go with A. The top right
   corner square is part of the other stroke." So the one-angle fit stays, and the corner is left to the neighbouring
