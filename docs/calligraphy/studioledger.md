@@ -329,15 +329,16 @@ Times are minutes:seconds into the individual-letters lesson.
   turning pen, and the joint fill closes the seam. The user: "Yes to both", then, of the slivers left just past
   the joint where the body starts short of the studio edge: "The notch is the bigger problem. If that notch is not
   appropriately filled, I would rather go with the smoother first option." So the hook is its own piece only where
-  no notch shows; otherwise the one-stroke fit stands. Two more tries at the notch are running: the body
-  allowed to start half a nib under the hook, and the joint fill looking three nibs out from the cut.
+  no notch shows; otherwise the one-stroke fit stands. The joint fill looking three nibs out from the cut instead
+  of one (PEN_JOINT_REACH 3) closes the notch on 195.s3 and 259g.s0; letting the body start half a nib under the
+  hook instead made every one worse (96.6-97.8%).
 
-  | stroke | one stroke (best) | hook as its own piece | notch |
-  |---|---|---|---|
-  | 195.s3 | 96% | 98.1% | slivers: one stroke stands |
-  | 259g.s0 | 97% | 98.0% | slivers: one stroke stands |
-  | 116g.s0 | 96.7% | 99.3% | none: adopted |
-  | 301g.s0 | | 98.0% | slivers: one stroke stands |
+  | stroke | one stroke (best) | hook, joint fill 1 nib | hook, joint fill 3 nibs | adopted |
+  |---|---|---|---|---|
+  | 195.s3 | 96% | 98.1%, slivers | 98.5%, clean | 3 nibs |
+  | 259g.s0 | 97% | 98.0%, slivers | 98.5%, clean | 3 nibs |
+  | 116g.s0 | 96.7% | 99.3%, clean | | 1 nib |
+  | 301g.s0 | | 98.0%, slivers | 98.6%, a sliver on top | one stroke |
 
   (116g.s0 and 301g.s0 needed the cut moved right, to x 17 and 18, before the hook piece was big enough to fit.)
 - **Decision 52 (210.s1, a small head, 2026-10-28):** no pen got its top-right corner square: one angle 92%,
