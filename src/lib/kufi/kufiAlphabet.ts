@@ -28,21 +28,37 @@
  *
  * **Joins sit on the baseline, with deliberate exceptions.** The old table
  * (and its layout) normalised every join to the baseline row. The convention
- * followed here keeps that as the rule but not as a law, in two ways:
+ * followed here keeps that as the rule but not as a law, in three ways:
  *
  * - some medial alternates of the tooth letters join one stem *above* the
  *   line on one side, stepping the word up or down so it can climb round a
  *   corner of a panel;
  * - some final forms whose body sits on the line with a tail beneath it (و,
- *   ن, ه alternates) take their join *at the bottom stroke*, below the line.
+ *   ن, ه alternates) take their join *at the bottom stroke*, below the line;
+ * - the medial ه `heh.medial.2` is entered *at its top*, by a join that has
+ *   turned the line back on itself (`KUFI_JOINS`).
  *
  * Those glyphs name the row in `joins`; every other glyph joins on its
  * baseline row (`joinRow`). A layout that cannot place a stepped join should
- * simply not pick those alternates.
+ * simply not pick those alternates. The lifted tooth (`beh/noon/yeh.initial.1`)
+ * is the opposite case: its body stands two rows up, to fill the top of a
+ * band, and the glyph itself steps down to join on the line.
  *
- * **Dots are not drawn.** Traditional square Kufi omits the iʿjām and leaves
- * ب/ت/ث to context, so letters that differ only by dots share one skeleton.
- * A dot in a lattice this tight reads as part of the letter.
+ * **A join stub may be inset.** A few glyphs reach over their neighbour: the
+ * narrow medial ك runs its top bar past its own right join, above the join
+ * of the letter before it. Such a glyph names, in `inset`, how many columns
+ * of its box lie beyond the stub on that side; `joinCol` gives the stub's
+ * column. The neighbour's box overlaps those columns too.
+ *
+ * **Dots are not part of a letter.** Traditional square Kufi omits the iʿjām
+ * and leaves ب/ت/ث to context, so letters that differ only by dots share one
+ * skeleton. A dot or a lone square is a separate fill piece (`KUFI_FILLS`),
+ * placed only where it closes a hole and reads as belonging to the letter
+ * beside it, as a real panel does. Glyphs never carry dots.
+ *
+ * One glyph is drawn in more than one piece: the الله whose alef is a short
+ * stroke with one square above it. It says so in `parts`; every other glyph
+ * is a single 4-connected piece.
  *
  * ## Stretching
  *
@@ -61,12 +77,27 @@
  *
  * Letters without a stretch point (ه loops, ع, ق, م, و, ء) change size only
  * by swapping to an alternate.
+ *
+ * ## Shortening
+ *
+ * A slice may also be removed, up to `min` copies, by a negative count. The
+ * copies come out of the run of identical rows (or columns) the slice sits
+ * in, and at least one copy always stays, so a shortened glyph is exactly
+ * the glyph authored with a shorter stroke: every check that holds for it
+ * still holds. Tall strokes shorten to the band depth of a panel, 5 rows
+ * standing on the line: lams and 7-row alefs drop by 2, as the lams of a
+ * real panel do. Strokes already at 5 rows, teeth, bowls and counters do not
+ * shorten (`min` 0), so a tall letter always stays taller than a tooth.
  */
 
 import type { JoiningForm } from "../arabicJoining";
 
-/** Repeating this row or column of a glyph's `rows` lengthens its stroke(s) there by one cell. */
-export type KufiStretch = { axis: "row" | "col"; index: number };
+/**
+ * Repeating this row or column of a glyph's `rows` lengthens its stroke(s)
+ * there by one cell; removing it (a negative count, at most `min` copies)
+ * shortens them. `min` defaults to 0: the slice only grows.
+ */
+export type KufiStretch = { axis: "row" | "col"; index: number; min?: number };
 
 export type KufiGlyph = {
   /** `<skeleton>.<form>.<n>`, stable for saves and pins. */
@@ -79,6 +110,10 @@ export type KufiGlyph = {
   stretch: KufiStretch[];
   /** Join rows (top row = 0) for the few glyphs that do not join on their baseline row. */
   joins?: { right?: number; left?: number };
+  /** Columns of the box beyond the join stub on that side (a bar reaching over the neighbour); see `joinCol`. */
+  inset?: { right?: number; left?: number };
+  /** Separate 4-connected pieces the glyph is drawn in, when more than one. */
+  parts?: number;
 };
 
 export type SkeletonName =
@@ -111,8 +146,9 @@ const g = (
   base: number,
   rows: string[],
   stretch: KufiStretch[],
-  joins?: KufiGlyph["joins"]
-): KufiGlyph => (joins ? { id, rows, base, stretch, joins } : { id, rows, base, stretch });
+  joins?: KufiGlyph["joins"],
+  more?: Pick<KufiGlyph, "inset" | "parts">
+): KufiGlyph => ({ id, rows, base, stretch, ...(joins ? { joins } : {}), ...more });
 
 /**
  * Every glyph. The tooth letters (ب ن ي) share their initial and medial
@@ -127,15 +163,15 @@ const g = (
 export const KUFI_FORMS: KufiFormTable = {
   alef: {
     isolated: [
-      g("alef.isolated.0", 0, ["#", "#", "#", "#", "#", "#", "#"], [{ axis: "row", index: 3 }]),
+      g("alef.isolated.0", 0, ["#", "#", "#", "#", "#", "#", "#"], [{ axis: "row", index: 3, min: 2 }]),
       g("alef.isolated.1", 0, ["#", "#", "#", "#", "#"], [{ axis: "row", index: 2 }]),
       g("alef.isolated.2", 0, ["###", "..#", "..#", "..#", "..#"], [{ axis: "row", index: 2 }]),
-      g("alef.isolated.3", 0, ["###", "..#", "..#", "..#", "..#", "..#", "..#"], [{ axis: "row", index: 3 }]),
+      g("alef.isolated.3", 0, ["###", "..#", "..#", "..#", "..#", "..#", "..#"], [{ axis: "row", index: 3, min: 2 }]),
       g("alef.isolated.4", 0, ["###", "#..", "#..", "#..", "#.."], [{ axis: "row", index: 2 }]),
-      g("alef.isolated.5", 0, ["###", "#..", "#..", "#..", "#..", "#..", "#.."], [{ axis: "row", index: 3 }]),
+      g("alef.isolated.5", 0, ["###", "#..", "#..", "#..", "#..", "#..", "#.."], [{ axis: "row", index: 3, min: 2 }]),
     ],
     final: [
-      g("alef.final.0", 0, ["#.", "#.", "#.", "#.", "#.", "#.", "##"], [{ axis: "row", index: 3 }]),
+      g("alef.final.0", 0, ["#.", "#.", "#.", "#.", "#.", "#.", "##"], [{ axis: "row", index: 3, min: 2 }]),
       g("alef.final.1", 0, ["#.", "#.", "#.", "#.", "##"], [{ axis: "row", index: 2 }]),
       g("alef.final.2", 0, ["##", "#.", "#.", "#.", "##"], [{ axis: "row", index: 2 }]),
       g("alef.final.3", 0, ["##.", ".#.", ".#.", ".#.", ".##"], [{ axis: "row", index: 2 }]),
@@ -153,6 +189,7 @@ export const KUFI_FORMS: KufiFormTable = {
     ],
     initial: [
       g("beh.initial.0", 0, [".#", ".#", "##"], []),
+      g("beh.initial.1", 0, ["....#", "....#", "#####", "#....", "#...."], [{ axis: "col", index: 2 }, { axis: "row", index: 3, min: 1 }]),
     ],
     medial: [
       g("beh.medial.0", 0, [".#.", ".#.", "###"], []),
@@ -170,6 +207,8 @@ export const KUFI_FORMS: KufiFormTable = {
     ],
     initial: [
       g("noon.initial.0", 0, [".#", ".#", "##"], []),
+      g("noon.initial.1", 0, ["....#", "....#", "#####", "#....", "#...."], [{ axis: "col", index: 2 }, { axis: "row", index: 3, min: 1 }]),
+      g("noon.initial.2", 0, ["###", "..#", "..#", "..#", "###"], [{ axis: "col", index: 1 }, { axis: "row", index: 2 }]),
     ],
     medial: [
       g("noon.medial.0", 0, [".#.", ".#.", "###"], []),
@@ -193,6 +232,7 @@ export const KUFI_FORMS: KufiFormTable = {
     ],
     initial: [
       g("yeh.initial.0", 0, [".#", ".#", "##"], []),
+      g("yeh.initial.1", 0, ["....#", "....#", "#####", "#....", "#...."], [{ axis: "col", index: 2 }, { axis: "row", index: 3, min: 1 }]),
     ],
     medial: [
       g("yeh.medial.0", 0, [".#.", ".#.", "###"], []),
@@ -302,20 +342,20 @@ export const KUFI_FORMS: KufiFormTable = {
   },
   tah: {
     isolated: [
-      g("tah.isolated.0", 0, ["..#....", "..#....", "..#....", "..#....", "..#####", "..#...#", "#######"], [{ axis: "col", index: 4 }, { axis: "row", index: 3 }]),
+      g("tah.isolated.0", 0, ["..#....", "..#....", "..#....", "..#....", "..#####", "..#...#", "#######"], [{ axis: "col", index: 4 }, { axis: "row", index: 3, min: 2 }]),
     ],
     initial: [
-      g("tah.initial.0", 0, [".#....", ".#....", ".#....", ".#....", ".#####", ".#...#", "######"], [{ axis: "col", index: 3 }, { axis: "row", index: 3 }]),
-      g("tah.initial.1", 0, [".#..", ".#..", ".#..", ".#..", ".###", ".#.#", "####"], [{ axis: "col", index: 2 }, { axis: "row", index: 3 }]),
-      g("tah.initial.2", 0, [".#......", ".#......", ".#......", ".#......", ".#######", ".#.....#", "########"], [{ axis: "col", index: 4 }, { axis: "row", index: 3 }]),
-      g("tah.initial.3", 0, [".#########", ".#........", ".#........", ".#........", ".#########", ".#.......#", "##########"], [{ axis: "col", index: 5 }, { axis: "row", index: 3 }]),
+      g("tah.initial.0", 0, [".#....", ".#....", ".#....", ".#....", ".#####", ".#...#", "######"], [{ axis: "col", index: 3 }, { axis: "row", index: 3, min: 2 }]),
+      g("tah.initial.1", 0, [".#..", ".#..", ".#..", ".#..", ".###", ".#.#", "####"], [{ axis: "col", index: 2 }, { axis: "row", index: 3, min: 2 }]),
+      g("tah.initial.2", 0, [".#......", ".#......", ".#......", ".#......", ".#######", ".#.....#", "########"], [{ axis: "col", index: 4 }, { axis: "row", index: 3, min: 2 }]),
+      g("tah.initial.3", 0, [".#########", ".#........", ".#........", ".#........", ".#########", ".#.......#", "##########"], [{ axis: "col", index: 5 }, { axis: "row", index: 3, min: 2 }]),
       g("tah.initial.4", 0, [".#........", ".#........", ".#.....###", ".#.....#.#", ".#######.#", ".#.......#", "##########"], [{ axis: "col", index: 5 }, { axis: "row", index: 3 }]),
     ],
     medial: [
-      g("tah.medial.0", 0, [".#.....", ".#.....", ".#.....", ".#.....", ".#####.", ".#...#.", "#######"], [{ axis: "col", index: 3 }, { axis: "row", index: 3 }]),
+      g("tah.medial.0", 0, [".#.....", ".#.....", ".#.....", ".#.....", ".#####.", ".#...#.", "#######"], [{ axis: "col", index: 3 }, { axis: "row", index: 3, min: 2 }]),
     ],
     final: [
-      g("tah.final.0", 0, ["..#.....", "..#.....", "..#.....", "..#.....", "..#####.", "..#...#.", "########"], [{ axis: "col", index: 4 }, { axis: "row", index: 3 }]),
+      g("tah.final.0", 0, ["..#.....", "..#.....", "..#.....", "..#.....", "..#####.", "..#...#.", "########"], [{ axis: "col", index: 4 }, { axis: "row", index: 3, min: 2 }]),
     ],
   },
   ain: {
@@ -355,6 +395,7 @@ export const KUFI_FORMS: KufiFormTable = {
       g("feh.final.0", 0, ["....###.", "....#.#.", "#...###.", "#.....#.", "########"], [{ axis: "col", index: 3 }]),
       g("feh.final.1", 0, ["###.", "#.#.", "###.", "#...", "####"], [{ axis: "col", index: 1 }]),
       g("feh.final.2", 0, ["....###.", "....#.#.", "###.###.", "#.....#.", "########"], [{ axis: "col", index: 3 }]),
+      g("feh.final.3", 0, ["#.###.", "#.#.#.", "#.###.", "#...#.", "######"], [{ axis: "col", index: 1 }]),
     ],
   },
   qaf: {
@@ -386,6 +427,8 @@ export const KUFI_FORMS: KufiFormTable = {
     ],
     medial: [
       g("kaf.medial.0", 0, [".#####.", ".#.....", ".#####.", ".....#.", "#######"], [{ axis: "col", index: 3 }]),
+      g("kaf.medial.1", 0, [".###.", ".#...", ".###.", "...#.", "#####"], [{ axis: "col", index: 2 }]),
+      g("kaf.medial.2", 0, [".#######", ".#......", ".###....", "...#....", "######.."], [{ axis: "col", index: 2 }], undefined, { inset: { right: 2 } }),
     ],
     final: [
       g("kaf.final.0", 0, ["#####.", "#.....", "#####.", "....#.", "######"], [{ axis: "col", index: 2 }]),
@@ -393,20 +436,20 @@ export const KUFI_FORMS: KufiFormTable = {
   },
   lam: {
     isolated: [
-      g("lam.isolated.0", 2, ["..#", "..#", "..#", "..#", "#.#", "#.#", "#.#", "#.#", "###"], [{ axis: "col", index: 1 }, { axis: "row", index: 2 }]),
-      g("lam.isolated.1", 0, ["..#", "..#", "..#", "..#", "..#", "..#", "###"], [{ axis: "col", index: 1 }, { axis: "row", index: 3 }]),
-      g("lam.isolated.2", 3, ["....#", "....#", "....#", "....#", "....#", "....#", "###.#", "#...#", "#####"], [{ axis: "col", index: 3 }, { axis: "row", index: 4 }]),
+      g("lam.isolated.0", 2, ["..#", "..#", "..#", "..#", "#.#", "#.#", "#.#", "#.#", "###"], [{ axis: "col", index: 1 }, { axis: "row", index: 2, min: 2 }]),
+      g("lam.isolated.1", 0, ["..#", "..#", "..#", "..#", "..#", "..#", "###"], [{ axis: "col", index: 1 }, { axis: "row", index: 3, min: 2 }]),
+      g("lam.isolated.2", 3, ["....#", "....#", "....#", "....#", "....#", "....#", "###.#", "#...#", "#####"], [{ axis: "col", index: 3 }, { axis: "row", index: 4, min: 1 }]),
     ],
     initial: [
-      g("lam.initial.0", 0, [".#", ".#", ".#", ".#", ".#", ".#", "##"], [{ axis: "row", index: 3 }]),
+      g("lam.initial.0", 0, [".#", ".#", ".#", ".#", ".#", ".#", "##"], [{ axis: "row", index: 3, min: 2 }]),
     ],
     medial: [
-      g("lam.medial.0", 0, [".#.", ".#.", ".#.", ".#.", ".#.", ".#.", "###"], [{ axis: "row", index: 3 }]),
+      g("lam.medial.0", 0, [".#.", ".#.", ".#.", ".#.", ".#.", ".#.", "###"], [{ axis: "row", index: 3, min: 2 }]),
     ],
     final: [
-      g("lam.final.0", 2, ["..#.", "..#.", "..#.", "..#.", "#.#.", "#.#.", "#.##", "#.#.", "###."], [{ axis: "col", index: 1 }, { axis: "row", index: 3 }]),
-      g("lam.final.1", 2, ["..#.", "..#.", "..#.", "..#.", "..#.", "..#.", "..##", "..#.", "###."], [{ axis: "col", index: 1 }, { axis: "row", index: 4 }]),
-      g("lam.final.2", 0, ["....#.", "....#.", "....#.", "....#.", "....#.", "....#.", "######"], [{ axis: "col", index: 2 }, { axis: "row", index: 3 }]),
+      g("lam.final.0", 2, ["..#.", "..#.", "..#.", "..#.", "#.#.", "#.#.", "#.##", "#.#.", "###."], [{ axis: "col", index: 1 }, { axis: "row", index: 3, min: 2 }]),
+      g("lam.final.1", 2, ["..#.", "..#.", "..#.", "..#.", "..#.", "..#.", "..##", "..#.", "###."], [{ axis: "col", index: 1 }, { axis: "row", index: 4, min: 2 }]),
+      g("lam.final.2", 0, ["....#.", "....#.", "....#.", "....#.", "....#.", "....#.", "######"], [{ axis: "col", index: 2 }, { axis: "row", index: 3, min: 2 }]),
     ],
   },
   meem: {
@@ -438,6 +481,7 @@ export const KUFI_FORMS: KufiFormTable = {
     medial: [
       g("heh.medial.0", 2, [".###.", ".#.#.", "#####", ".#.#.", ".###."], []),
       g("heh.medial.1", 0, [".#####.", ".#.#.#.", "#######"], []),
+      g("heh.medial.2", 0, [".####", ".#.#.", ".###.", ".#.#.", "####."], [], { right: 0 }),
     ],
     final: [
       g("heh.final.0", 0, ["###.", "#.#.", "####"], [{ axis: "row", index: 1 }]),
@@ -456,20 +500,21 @@ export const KUFI_FORMS: KufiFormTable = {
   lamAlef: {
     isolated: [
       g("lamAlef.isolated.0", 0, ["#.#", "#.#", "###", ".#.", "###", "#.#", "###"], [{ axis: "row", index: 3 }]),
-      g("lamAlef.isolated.1", 0, ["#.#", "#.#", "#.#", "#.#", "###", ".#.", "###", "#.#", "###"], [{ axis: "row", index: 3 }]),
-      g("lamAlef.isolated.2", 0, ["#.#", "#.#", "#.#", "#.#", "###", "#.#", "###"], [{ axis: "row", index: 3 }]),
+      g("lamAlef.isolated.1", 0, ["#.#", "#.#", "#.#", "#.#", "###", ".#.", "###", "#.#", "###"], [{ axis: "row", index: 3, min: 2 }]),
+      g("lamAlef.isolated.2", 0, ["#.#", "#.#", "#.#", "#.#", "###", "#.#", "###"], [{ axis: "row", index: 3, min: 2 }]),
       g("lamAlef.isolated.3", 0, ["#.#", "#.#", "###", ".#.", "###"], [{ axis: "row", index: 3 }]),
     ],
     final: [
       g("lamAlef.final.0", 0, ["#.#.", "#.#.", "###.", ".#..", "###.", "#.#.", "####"], [{ axis: "row", index: 3 }]),
-      g("lamAlef.final.1", 0, ["#.#.", "#.#.", "#.#.", "#.#.", "###.", ".#..", "###.", "#.#.", "####"], [{ axis: "row", index: 3 }]),
+      g("lamAlef.final.1", 0, ["#.#.", "#.#.", "#.#.", "#.#.", "###.", ".#..", "###.", "#.#.", "####"], [{ axis: "row", index: 3, min: 2 }]),
       g("lamAlef.final.2", 0, ["#.#.", "#.#.", "###.", ".#..", "####"], [{ axis: "row", index: 3 }]),
     ],
   },
   allah: {
     isolated: [
-      g("allah.isolated.0", 0, ["###.#.#.#", "#.#.#.#.#", "#.#.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1 }]),
-      g("allah.isolated.1", 0, ["....#.#.#", "....#.#.#", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1 }]),
+      g("allah.isolated.0", 0, ["###.#.#.#", "#.#.#.#.#", "#.#.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }]),
+      g("allah.isolated.1", 0, ["....#.#.#", "....#.#.#", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }]),
+      g("allah.isolated.2", 0, ["###.#.#.#", "..#.#.#..", "###.#.#.#", "#.#.#.#.#", "#######.#"], [{ axis: "row", index: 3 }], undefined, { parts: 3 }),
     ],
   },
 };
@@ -539,10 +584,65 @@ export function joinRow(glyph: KufiGlyph, side: "right" | "left", rows: string[]
 }
 
 /**
+ * The column (left = 0) a glyph's join stub sits in at one side: the
+ * outermost column, or `inset` columns in from it. Stretch slices always lie
+ * between the stubs, so this holds for stretched rows too.
+ */
+export function joinCol(glyph: KufiGlyph, side: "right" | "left", rows: string[] = glyph.rows): number {
+  const w = rows[0]?.length ?? 0;
+  return side === "right" ? w - 1 - (glyph.inset?.right ?? 0) : glyph.inset?.left ?? 0;
+}
+
+/** Row `i` or column `i` of `rows`, as a string. */
+const sliceAt = (rows: string[], axis: KufiStretch["axis"], i: number): string =>
+  axis === "row" ? rows[i] : rows.map((r) => r[i]).join("");
+
+/**
+ * Where a removal may take copies of slice `s` from: the run of slices
+ * identical to it, kept to its own side of the baseline for a row slice.
+ * The baseline row may belong to the run (a lift standing on the line), but
+ * it is never removed itself, so a shortened stroke never eats the line and
+ * `stretchedBase` stays exact. Returns the removable slice indices and how
+ * many copies may go in all: one copy of the run always stays.
+ */
+function removable(glyph: KufiGlyph, s: KufiStretch): { from: number[]; most: number } {
+  const len = s.axis === "row" ? glyph.rows.length : (glyph.rows[0]?.length ?? 0);
+  const baselineRow = s.axis === "row" ? glyph.rows.length - 1 - glyph.base : -1;
+  if (s.index === baselineRow) return { from: [], most: 0 };
+  let lo = 0;
+  let hi = len - 1;
+  if (s.axis === "row") {
+    if (s.index < baselineRow) hi = baselineRow;
+    else lo = baselineRow;
+  }
+  const own = sliceAt(glyph.rows, s.axis, s.index);
+  let a = s.index;
+  let b = s.index;
+  while (a - 1 >= lo && sliceAt(glyph.rows, s.axis, a - 1) === own) a--;
+  while (b + 1 <= hi && sliceAt(glyph.rows, s.axis, b + 1) === own) b++;
+  const from: number[] = [];
+  for (let k = a; k <= b; k++) if (k !== baselineRow) from.push(k);
+  return { from, most: b - a };
+}
+
+/**
+ * The count actually applied for `glyph.stretch[i]`: whole cells, never
+ * below `-min`, and never removing the last copy of the slice.
+ */
+function appliedCount(glyph: KufiGlyph, i: number, counts: number[]): number {
+  const s = glyph.stretch[i];
+  const n = Math.floor(counts[i] ?? 0);
+  if (n >= 0) return n;
+  return Math.max(n, -(s.min ?? 0), -removable(glyph, s).most);
+}
+
+/**
  * The glyph's rows with `counts[i]` extra copies of the slice at
- * `glyph.stretch[i]`. Missing counts are zero; negative counts are treated as
- * zero (a glyph never shrinks below its authored size). Every slice index
- * refers to the unstretched glyph, so the order of `stretch` does not matter.
+ * `glyph.stretch[i]`, or, for a negative count, that many copies removed
+ * (see `KufiStretch.min`). Missing counts are zero, and a negative count on a
+ * slice without a `min` is zero: such a glyph never shrinks below its
+ * authored size. Every slice index refers to the unstretched glyph, so the
+ * order of `stretch` does not matter.
  */
 export function stretchGlyph(glyph: KufiGlyph, counts: number[]): string[] {
   const h = glyph.rows.length;
@@ -550,9 +650,19 @@ export function stretchGlyph(glyph: KufiGlyph, counts: number[]): string[] {
   const rowRepeat = new Array<number>(h).fill(1);
   const colRepeat = new Array<number>(w).fill(1);
   glyph.stretch.forEach((s, i) => {
-    const n = Math.max(0, Math.floor(counts[i] ?? 0));
-    if (s.axis === "row") rowRepeat[s.index] += n;
-    else colRepeat[s.index] += n;
+    const repeat = s.axis === "row" ? rowRepeat : colRepeat;
+    const n = appliedCount(glyph, i, counts);
+    if (n >= 0) {
+      repeat[s.index] += n;
+      return;
+    }
+    // The run's slices are identical, so which copies go does not change the result.
+    let left = -n;
+    for (const k of removable(glyph, s).from) {
+      const take = Math.min(left, repeat[k]);
+      repeat[k] -= take;
+      left -= take;
+    }
   });
   const out: string[] = [];
   for (let y = 0; y < h; y++) {
@@ -565,12 +675,73 @@ export function stretchGlyph(glyph: KufiGlyph, counts: number[]): string[] {
 
 /**
  * `base` after stretching: rows repeated below the baseline (a deepened bowl
- * or tail) hang the box further under the line; rows above it do not move it.
+ * or tail) hang the box further under the line, and rows removed there raise
+ * it; rows above the line do not move it.
  */
 export function stretchedBase(glyph: KufiGlyph, counts: number[]): number {
   const baselineRow = glyph.rows.length - 1 - glyph.base;
   return glyph.stretch.reduce(
-    (acc, s, i) => (s.axis === "row" && s.index > baselineRow ? acc + Math.max(0, Math.floor(counts[i] ?? 0)) : acc),
+    (acc, s, i) => (s.axis === "row" && s.index > baselineRow ? acc + appliedCount(glyph, i, counts) : acc),
     glyph.base
   );
 }
+
+/**
+ * A fill piece: not a letter, and never part of one. A panel places a fill
+ * only where it closes a hole (an empty 2×2) and reads as belonging to a
+ * letter beside it: a dot by its dotted letter, a lone square anywhere. Fills
+ * turn with the band they sit in.
+ */
+export type KufiFill = {
+  id: string;
+  /** Cells, top row first; 1-2 ink cells, never a 2×2. */
+  rows: string[];
+  /** The letters (as characters) it may sit beside, or `"any"`. */
+  beside: string | "any";
+};
+
+/** Letters carrying one dot (ب ج خ ذ ز ض ظ غ ف ن): a dot drawn beside one is its own. */
+const ONE_DOT = "بجخذزضظغفن";
+/** Letters carrying two dots (ت ق ي ة) — and three (ث ش پ چ ژ), whose dots may be drawn as a pair. */
+const TWO_DOTS = "تقيةثشپچژ";
+
+export const KUFI_FILLS: KufiFill[] = [
+  { id: "fill.square", rows: ["#"], beside: "any" },
+  { id: "fill.dot", rows: ["#"], beside: ONE_DOT + TWO_DOTS },
+  { id: "fill.dots2", rows: ["#.#"], beside: TWO_DOTS },
+];
+
+/**
+ * A join piece: a run between two letters that is not a straight stretch of
+ * a stub. `from` is the cell it shares with the previous letter's left stub
+ * (on the bottom row, on that letter's line), `to` the cell it shares with
+ * the next letter's right stub (on the top row). `turn` is the clockwise
+ * quarter turn of the next letter's line relative to the previous one.
+ *
+ * `join.uturn.0` turns the line back on itself: from the line it runs one
+ * cell on, climbs, and comes back one cell, so the word continues upside
+ * down on a line above, entering its next letter at that letter's top (the
+ * medial ه `heh.medial.2` joins there). It climbs 6 as authored, the height
+ * of a 5-row band and its gap, and stretches or shortens at its stem; at its
+ * shortest it climbs 2. It is a join, not a glyph, because it belongs to no
+ * letter: any two joining letters may meet through it.
+ */
+export type KufiJoin = {
+  id: string;
+  rows: string[];
+  stretch: KufiStretch[];
+  from: [row: number, col: number];
+  to: [row: number, col: number];
+  turn: 0 | 90 | 180 | 270;
+};
+
+export const KUFI_JOINS: KufiJoin[] = [
+  {
+    id: "join.uturn.0",
+    rows: ["##", "#.", "#.", "#.", "#.", "#.", "##"],
+    stretch: [{ axis: "row", index: 3, min: 4 }],
+    from: [6, 1],
+    to: [0, 1],
+    turn: 180,
+  },
+];
