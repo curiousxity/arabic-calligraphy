@@ -24,7 +24,8 @@ Spike scripts run with `npx --yes tsx` (the precedent is
 - Never reuse `kufiColumns`, `kufiComposition`, `kufiLineGap`, `kufiWordGap`, `kufiCellEdits` or `kufiCellEditMode`: they are in `REMOVED_BLOCK_FIELDS` and are stripped on load. New fields use a `panel` prefix.
 - Lattice grammar: stroke = gap = one cell. No 2×2 of ink anywhere. A letter's ink is 4-connected. Joins and turns are single-cell runs.
 - Letters change only by stretching or shortening a marked row or column in whole cells (never below the minimum), or by swapping to another authored form. Never by scaling.
-- No tashkeel; harakat in the input are dropped silently. Dots and single squares may be placed as hole-filling (user "yes" 2026-10-28). Tall strokes may shorten at a marked row, never below the minimum.
+- No tashkeel; harakat in the input are dropped silently. Single squares may be placed as hole-filling (user "yes" 2026-10-28). Tall strokes may shorten at a marked row, never below the minimum.
+- Dots are iʿjām, never filler (user 2026-10-29). A dotted letter gets its whole set on its correct side (ي two below, ت two above, ث three above, ن and ف one above, ب one below) or none.
 - Canvas: no modes and no coloured dots; hover outlines and direct drags only.
 - Never name the online studio, a teacher or a product in any committed file. The studio's material and the user's reference photos stay local or on the NAS.
 - Pure `src/lib/kufi/*` must not import `./harfbuzz` (or anything that does).
@@ -146,7 +147,37 @@ Spike scripts run with `npx --yes tsx` (the precedent is
 
 # Phase B: the block, built to the chosen structure
 
-### Task 5: The packer
+**Gate result (2026-10-29).** The user accepted the rule-based arranger's
+placement ("it looks well placed"; "everything else is fine"). Its only
+errors were dots. It is in `scripts/kufi/arrange.ts`, with its report in the
+SDD workspace (`task-4c-report.md`). What it left open: about 3 minutes per
+panel, 2 gaps on Al-Baqarah, and no packing for the Shahada at any size.
+Task 5 is therefore split:
+- **5a:** letter-table additions and real dot sets;
+- **5b:** the fast packer, ported from the spike's rules, not its search.
+
+### Task 5a: Letter table additions for the packer
+
+**Files:** Modify `src/lib/kufi/kufiAlphabet.ts` and `src/lib/kufi/kufiAlphabet.test.ts`.
+
+**Produces:**
+- `KufiGlyph.dots?: Array<{ col: number; row: number }>`: the letter's own iʿjām cells, relative to the glyph box, which may lie outside it. They are authored per form, for every dotted letter: ب ت ث ج خ ذ ز ش ض ظ غ ف ق ن ي ة.
+- `dotsOf(char: string): number`: how many dots, and on which side. Use it to check `dots` in tests.
+
+**Also add (the spike report's list):**
+- a sideways stretch on the «الله» forms;
+- a join that turns 90°;
+- top-joined medials for ل, ع and the teeth, so a U-turn can enter them;
+- lifted or raised forms for more short letters.
+
+**Tests:**
+- Every dotted form's `dots` has the count and side its letter needs.
+- No dot is 4-adjacent to the glyph's own ink.
+- New forms pass the existing structural tests.
+
+Commit: `feat(kufi): dot sets and packer alternates in the letter table`.
+
+### Task 5b: The packer
 
 **Files:**
 - Create: `src/lib/kufi/kufiPack.ts`
@@ -164,16 +195,18 @@ Spike scripts run with `npx --yes tsx` (the precedent is
   - `reconcileEdits(edits: KufiPanelEdits, units: KufiUnit[]): KufiPanelEdits` (drops entries whose `key` no longer matches)
 
 - [ ] **Step 1: Write the failing tests:**
-  - For each spike phrase at its spike sizes: `ok` is true; `inkBlocks2x2` and `emptyBlocks2x2` are empty; reading order matches `units` order. Walking placements by `unitIndex` must give strictly increasing reading positions under the chosen structure.
+  - Al-Baqarah at 21×21 and «الله» at 9×9: `ok` is true; `inkBlocks2x2` and `emptyBlocks2x2` are empty; reading order matches `units` order. The Shahada: `fitKufiPanel` gives a size that packs, or the packer returns `ok:false` honestly. A panel with holes is never reported as `ok`.
+  - Dots: every dot in the result belongs to one placed letter and matches that letter's `dots`. A letter's set is all or none.
+  - Budget: a first draft runs within 2000 ms; a repack with `previous` runs within 200 ms. (Ruling: the spike took about 3 min, so the first draft runs in a Web Worker in Task 6 and the UI never waits on it.) Walking placements by `unitIndex` must give strictly increasing reading positions under the chosen structure.
   - `empty and single-letter text return tooShort`: `""` and `"ب"` give `ok:false`, `reason:"tooShort"`.
   - A box too small gives `tooLong` with at least 1 suggestion, and each suggestion packs `ok:true`.
   - **Pins:** pinning a unit at its placement and repacking keeps that placement identical. A pin that can't be honoured gives `pinConflict`, never a moved pin.
   - **Stability:** after adding `stretch[k]=[1]` with `previous`, every placement outside unit k's line or column is unchanged.
-  - `300-char text returns within budget`: the Al-Baqarah phrase repeated to over 300 characters, in a box `fitKufiPanel` chose, returns in under 200 ms (measured with `performance.now()`).
+  - `300-char text returns within budget`: the Al-Baqarah phrase repeated to over 300 characters, in a box `fitKufiPanel` chose, returns in under 2000 ms (measured with `performance.now()`).
   - `text edit keeps matching edits and drops stale ones`: edits on units 0 and 3; after changing the letter at unit 3, `reconcileEdits` keeps 0 and drops 3.
   - `fitKufiPanel` returns a size that packs `ok:true`.
 - [ ] **Step 2:** Run it. Expected: FAIL.
-- [ ] **Step 3:** Implement the structure the user chose in Task 4, starting from the spike's code. Cap any search with a budget constant, as the old block's `COLUMN_SWEEP_BUDGET` did, and measure before trusting it.
+- [ ] **Step 3:** Implement the rules from `scripts/kufi/arrange.ts`. Its random search is too slow to port; replace it with a constructive or band-by-band search. The reference layout scores 441/441 when given to the spike, so the rules can describe a fully packed panel. Cap any search with a budget constant, as the old block's `COLUMN_SWEEP_BUDGET` did, and measure before trusting it.
 - [ ] **Step 4:** Run it. Expected: PASS.
 - [ ] **Step 5:** Commit: `feat(kufi): square Kufi packer with pins and stable repack`.
 
