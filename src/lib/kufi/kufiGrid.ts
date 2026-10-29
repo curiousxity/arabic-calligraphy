@@ -9,6 +9,16 @@ export type Turn = 0 | 1 | 2 | 3;
 /** `cells` is row-major, 1 = ink. */
 export type Grid = { cols: number; rows: number; cells: Uint8Array };
 
+/** ASCII rows (`#` = ink, top row first) as a `Grid`. */
+export function gridFromRows(rows: string[]): Grid {
+  const cols = rows[0]?.length ?? 0;
+  const cells = new Uint8Array(cols * rows.length);
+  rows.forEach((r, y) => {
+    for (let x = 0; x < cols; x++) if (r[x] === "#") cells[y * cols + x] = 1;
+  });
+  return { cols, rows: rows.length, cells };
+}
+
 /** Rotates ASCII rows (`#` = ink) by quarter turns clockwise. */
 export function rotateRows(rows: string[], turn: Turn): string[] {
   let out = rows;

@@ -5,6 +5,7 @@ import {
   emptyBlocks2x2,
   isConnected4,
   cellRings,
+  gridFromRows,
   type Grid,
   type Ring,
 } from "./kufiGrid";
@@ -124,5 +125,22 @@ describe("cellRings", () => {
         expect(x0 === x1 || y0 === y1).toBe(true);
       }
     }
+  });
+});
+
+describe("gridFromRows", () => {
+  it("packs ASCII rows into a row-major grid", () => {
+    const g = gridFromRows(["#.", ".#", "##"]);
+    expect(g.cols).toBe(2);
+    expect(g.rows).toBe(3);
+    expect(Array.from(g.cells)).toEqual([1, 0, 0, 1, 1, 1]);
+  });
+
+  it("agrees with inkBlocks2x2 on a solid block", () => {
+    expect(inkBlocks2x2(gridFromRows(["##", "##"]))).toEqual([[0, 0]]);
+  });
+
+  it("is empty for no rows", () => {
+    expect(gridFromRows([])).toEqual({ cols: 0, rows: 0, cells: new Uint8Array(0) });
   });
 });
