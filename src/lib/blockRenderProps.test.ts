@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { markProps, shapedTextProps, textPathProps } from "./blockRenderProps";
+import { kufiPanelProps, markProps, shapedTextProps, textPathProps } from "./blockRenderProps";
 import type { Block } from "../types";
 import { resolveGuidePath } from "./guides";
 
@@ -47,5 +47,16 @@ describe("markProps", () => {
     } as unknown as Extract<Block, { type: "mark" }>;
     expect(markProps(b)).toMatchObject({ markD: "M0 0L1 0L1 1Z", markFlipX: true, color: "#123456", rotation: 15 });
     expect(markProps({ ...b, markD: undefined as never, markFlipX: undefined })).toMatchObject({ markD: "", markFlipX: false });
+  });
+});
+
+describe("kufiPanelProps", () => {
+  it("maps the panel size and edits for a mirror", () => {
+    const panelEdits = { forms: { 1: "beh.medial.0" }, cells: [{ unitIndex: 0, key: "lam:initial", dx: 0, dy: 1, on: false }] };
+    const b = {
+      id: 4, type: "kufiPanel", text: "الله", x: 0, y: 0, fontSize: 48, color: "#222", fontFamily: "Amiri",
+      stroke: "#000", shadowColor: "#000", panelCols: 9, panelRows: 11, panelEdits,
+    } as unknown as Extract<Block, { type: "kufiPanel" }>;
+    expect(kufiPanelProps(b)).toMatchObject({ text: "الله", fontSize: 48, color: "#222", panelCols: 9, panelRows: 11, panelEdits });
   });
 });

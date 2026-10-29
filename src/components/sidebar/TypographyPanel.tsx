@@ -103,7 +103,9 @@ export const TypographyPanel: React.FC<TypographyPanelProps> = ({
           {/* Everything this section needs is derived from the block's
               own text, so it holds no state of its own beyond the
               selected slot (which lives in App.tsx). */}
-          {selectedBlock.type !== "stack" && (() => {
+          {/* No kashida on a stack (a bake) or a Kufi panel (no font: its
+              letters stretch by whole cells on the lattice instead). */}
+          {selectedBlock.type !== "stack" && selectedBlock.type !== "kufiPanel" && (() => {
             const slots = findKashidaSlots(selectedBlock.text);
             if (slots.length === 0) {
               return (

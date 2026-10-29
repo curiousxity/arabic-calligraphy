@@ -5,7 +5,8 @@ export type BlockType =
   | "mirror"
   | "guide"
   | "stack"
-  | "mark";
+  | "mark"
+  | "kufiPanel";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 
@@ -50,6 +51,7 @@ import type { DetachedMarkOverride } from "./lib/detachedMarks";
 import type { BlockFill } from "./lib/blockFill";
 import type { SvgCmd } from "./lib/svgPath";
 import type { Pt } from "./lib/strokeCuts";
+import type { KufiPanelEdits } from "./lib/kufi/kufiPack";
 // ---- /STREAM-F ----
 
 type BlockCommon = {
@@ -359,6 +361,21 @@ export type MirrorBlock = BlockCommon & {
   radialRadius?: number;
 };
 
+/**
+ * The block's text packed into one square-Kufi lattice panel of
+ * `panelCols` x `panelRows` cells (`lib/kufi/kufiPack.ts`). Draws no font:
+ * `fontFamily` is inert, and `fontSize / 8` is the cell size in px, so the
+ * size slider scales the panel. Fields carry a `panel` prefix because the
+ * removed `squareKufi` block's `kufi*` fields are stripped on load.
+ */
+export type KufiPanelBlock = BlockCommon & {
+  type: "kufiPanel";
+  panelCols: number;
+  panelRows: number;
+  /** The user's form, stretch, route, pin and cell edits. Absent means none. */
+  panelEdits?: KufiPanelEdits;
+};
+
 export type Block =
   | TextBlock
   | ShapeFillBlock
@@ -366,4 +383,5 @@ export type Block =
   | MirrorBlock
   | GuideBlock
   | StackBlock
-  | MarkBlock;
+  | MarkBlock
+  | KufiPanelBlock;

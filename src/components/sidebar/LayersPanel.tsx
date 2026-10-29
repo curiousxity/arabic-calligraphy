@@ -26,6 +26,8 @@ const blockTypeIcon = (b: Block) =>
     "◯"
   ) : b.type === "mark" ? (
     "✒"
+  ) : b.type === "kufiPanel" ? (
+    "▦"
   ) : (
     "T"
   );
@@ -35,6 +37,7 @@ const defaultLabel = (b: Block) =>
   b.type === "guide" ? `Guide · ${GUIDE_SHAPE_LABELS[b.guideShape]}`
   : b.type === "stack" ? `Stack · ${b.source.text}`
   : b.type === "mark" ? `Mark · ${findMark(b.markId)?.name ?? "custom"}`
+  : b.type === "kufiPanel" ? `Kufi panel · ${b.text}`
   : `Block ${b.id}`;
 
 export type LayersPanelProps = {

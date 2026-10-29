@@ -7,6 +7,7 @@ import { TextOnPathText } from "./TextOnPathText";
 import { GuideView } from "./GuideView";
 import { StackView } from "./StackView";
 import { MarkView } from "./MarkView";
+import { KufiPanelView } from "./KufiPanelView";
 import { resolveGuidePath, type WritingSession } from "../lib/guides";
 import { isClosedPath } from "../lib/guideShapes";
 import { guideCaret, projectToGuide, type GuideCaret } from "../lib/guidePlacement";
@@ -95,6 +96,7 @@ import {
   shapeFillProps,
   shapedTextProps,
   markProps,
+  kufiPanelProps,
   stackProps,
   textPathProps,
 } from "../lib/blockRenderProps";
@@ -1228,6 +1230,21 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     key={block.id}
                     {...commonProps}
                     {...markProps(block)}
+                    x={block.x}
+                    y={block.y}
+                    opacity={block.opacity ?? 1}
+                    locked={block.locked}
+                    isSelected={block.id === selectedId}
+                  />
+                );
+              }
+
+              if (block.type === "kufiPanel") {
+                return (
+                  <KufiPanelView
+                    key={block.id}
+                    {...commonProps}
+                    {...kufiPanelProps(block)}
                     x={block.x}
                     y={block.y}
                     opacity={block.opacity ?? 1}

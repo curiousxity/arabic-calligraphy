@@ -32,7 +32,7 @@ import { attachedTo, guidesIn } from "../lib/guides";
 import { LayersPanel } from "./sidebar/LayersPanel";
 import type { HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
-import { hasOwnFont, supportsDiacriticOverrides } from "../lib/blockCapabilities";
+import { hasOwnFont, hasOwnText, supportsDiacriticOverrides } from "../lib/blockCapabilities";
 import {
   SelectRow,
   ColorRow,
@@ -1205,8 +1205,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* A mirror has no content or typography of its own — both come from
-            its source — so it hides these two panels. */}
-        {selectedBlock && hasOwnFont(selectedBlock) && (
+            its source — so it hides these two panels. A Kufi panel has
+            text but no font, so it keeps Content and hides Font. */}
+        {selectedBlock && hasOwnText(selectedBlock) && (
           <div className="sidebarPanel">
             <CollapsibleSection
               title="Content"

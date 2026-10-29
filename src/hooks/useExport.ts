@@ -16,6 +16,8 @@ import {
 } from "../lib/artboard";
 import { triggerDownload } from "../lib/download";
 import type { ExportFormat } from "../lib/exportPresets";
+import { ensureKufiLayouts } from "../lib/kufi/kufiLayoutClient";
+import { kufiPanelInputs } from "../lib/kufi/kufiPanelBlock";
 
 /** Per-call export overrides. Every field defaults to the app's long-standing behaviour. */
 export type ExportOptions = {
@@ -63,6 +65,7 @@ const dataURLToBlob = (dataURL: string): Blob => {
 /** Browsers throttle downloads fired in the same tick, so `handleExportAll` spaces them out. */
 const DOWNLOAD_GAP_MS = 250;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
 /**
  * How the page (if any) shapes an export. Both fields default to the
@@ -124,6 +127,15 @@ export function useExport(
     opts: { transparent?: boolean },
     fn: (stage: Konva.Stage) => T | Promise<T>
   ): Promise<T> => {
+    // A Kufi panel's layout comes from a worker, so the canvas may still be
+    // showing the previous draft. Export is not interactive: pack whatever
+    // the cache lacks right here, then let React and Konva redraw (two
+    // frames) so the stage holds the panel for the current inputs.
+    const kufi = blocks.flatMap((b) => (b.type === "kufiPanel" ? [kufiPanelInputs(b)] : []));
+    if (ensureKufiLayouts(kufi)) {
+      await nextFrame();
+      await nextFrame();
+    }
     const bgNode = opts.transparent ? stage.findOne("#artboard-background") : null;
     // Everything the editor draws over the artwork — the alignment grid, the
     // page outline and margin guide, the pen-tool and cell-paint overlays —

@@ -163,6 +163,7 @@ import { convertRunToStack, fillerShapes, teardropShape, type UnjoinedPair } fro
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
+import { kufiPanelTextPatch } from "./lib/kufi/kufiPanelBlock";
 import {
   buildComposition,
   describeComposition,
@@ -295,6 +296,17 @@ const isBrowser = typeof window !== "undefined";
  * because summing them needs the nuqta table that module deliberately keeps
  * out; `runStyleForBlock` takes the result as a required argument.
  */
+/**
+ * The generic update paths' `{ ...b, ...patch }`, plus one rule: a Kufi
+ * panel's text change carries its edits to their letters' new indices
+ * (`kufiPanelTextPatch`), so a painted cell or a stretch follows its letter.
+ */
+const applyBlockPatch = (b: Block, patch: Partial<Block>): Block => {
+  if (b.type === "kufiPanel" && typeof patch.text === "string" && patch.text !== b.text && !("panelEdits" in patch))
+    return { ...b, ...patch, ...kufiPanelTextPatch(b, patch.text) } as Block;
+  return { ...b, ...patch } as Block;
+};
+
 const cutWidthForBlock = (block: Block): number =>
   cutAdvanceTotal(block.strokeCuts ?? [], nuqtaUnits(block.fontFamily, block.fontSize));
 
@@ -1217,7 +1229,7 @@ const App: React.FC = () => {
       if (!selectedBlock) return;
       pushHistory();
       setBlocks((prev) =>
-        prev.map((b) => (b.id === selectedBlock.id ? ({ ...b, ...patch } as Block) : b))
+        prev.map((b) => (b.id === selectedBlock.id ? applyBlockPatch(b, patch) : b))
       );
     },
     [selectedBlock, pushHistory]
@@ -1226,7 +1238,7 @@ const App: React.FC = () => {
   const updateBlock = useCallback(
     (id: number, patch: Partial<Block>) => {
       pushHistory();
-      setBlocks((prev) => prev.map((b) => (b.id === id ? ({ ...b, ...patch } as Block) : b)));
+      setBlocks((prev) => prev.map((b) => (b.id === id ? applyBlockPatch(b, patch) : b)));
     },
     [pushHistory]
   );

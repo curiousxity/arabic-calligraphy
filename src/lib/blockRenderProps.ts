@@ -112,3 +112,11 @@ export const markProps = (b: Extract<Block, { type: "mark" }>) => ({
   markD: b.markD ?? "",
   markFlipX: b.markFlipX ?? false,
 });
+
+/** A square-Kufi panel, for `KufiPanelView`. */
+export const kufiPanelProps = (b: Extract<Block, { type: "kufiPanel" }>) => ({
+  ...typographicProps(b),
+  panelCols: b.panelCols,
+  panelRows: b.panelRows,
+  panelEdits: b.panelEdits,
+});

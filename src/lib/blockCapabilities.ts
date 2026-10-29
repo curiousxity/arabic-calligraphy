@@ -20,14 +20,33 @@ import type { Block } from "../types";
  * The block types that shape text in a font of their own: text, Shape Fill
  * and Curve. A mirror draws its source, a guide is a path, and a stacked
  * composition is a bake nothing re-shapes — all three carry `fontFamily`
- * through `BlockCommon` without reading it. Gates the Font and Content
- * panels and the missing-font notices, so a removed or added block type is
+ * through `BlockCommon` without reading it, as does a Kufi panel, which draws
+ * lattice cells rather than a font's glyphs. Gates the Font panel and the
+ * missing-font notices (Content goes by `hasOwnText`), so a removed or added block type is
  * one edit here rather than one per site.
  */
 export const hasOwnFont = (
   b: Block
 ): b is Extract<Block, { type: "text" | "shapeFill" | "textPath" }> =>
   b.type === "text" || b.type === "shapeFill" || b.type === "textPath";
+
+/**
+ * The block types whose own `text` is drawn and can be edited in Content:
+ * the three font renderers plus the Kufi panel, which packs its text into
+ * lattice cells without a font.
+ */
+export const hasOwnText = (
+  b: Block
+): b is Extract<Block, { type: "text" | "shapeFill" | "textPath" | "kufiPanel" }> =>
+  hasOwnFont(b) || b.type === "kufiPanel";
+
+/**
+ * A square-Kufi panel. Every per-glyph tool below (diacritics, stroke cuts,
+ * Next Shape, style sets, detached marks) keys off shaped font glyphs, which
+ * this block has none of, so each guard leaves it out.
+ */
+export const isKufiPanel = (b: Block): b is Extract<Block, { type: "kufiPanel" }> =>
+  b.type === "kufiPanel";
 
 /**
  * The block types whose renderers mount `DiacriticHoverHandles`: text, Shape
