@@ -10,6 +10,10 @@ import {
   stretchedBase,
   joinRow,
   joinCol,
+  dotsOf,
+  dotKey,
+  dotCells,
+  type KufiCell,
   type KufiGlyph,
   type KufiStretch,
 } from "./kufiAlphabet";
@@ -522,5 +526,245 @@ describe("skeletonOf", () => {
       const s = skeletonOf(cp);
       if (s) expect(KUFI_FORMS[s], s).toBeDefined();
     }
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Dots (iʿjām) and the packer's alternates                            */
+/* ------------------------------------------------------------------ */
+
+/** Every dotted letter, with the count and side it needs. */
+const DOTTED: Array<[char: string, count: 1 | 2 | 3, side: "above" | "below"]> = [
+  ["ب", 1, "below"],
+  ["ت", 2, "above"],
+  ["ث", 3, "above"],
+  ["ج", 1, "below"],
+  ["خ", 1, "above"],
+  ["ذ", 1, "above"],
+  ["ز", 1, "above"],
+  ["ش", 3, "above"],
+  ["ض", 1, "above"],
+  ["ظ", 1, "above"],
+  ["غ", 1, "above"],
+  ["ف", 1, "above"],
+  ["ق", 2, "above"],
+  ["ن", 1, "above"],
+  ["ي", 2, "below"],
+  ["ة", 2, "above"],
+  ["پ", 3, "below"],
+  ["چ", 3, "below"],
+  ["ژ", 3, "above"],
+];
+
+/** Letters that only ever take their isolated and final forms. */
+const RIGHT_JOINING_DOTTED = new Set(["ذ", "ز", "ة", "ژ"]);
+
+const FORMS_ALL: JoiningForm[] = ["isolated", "initial", "medial", "final"];
+
+/** Every (letter, form, glyph) a dotted letter can be drawn with. */
+const DOTTED_CASES = DOTTED.flatMap(([ch, count, side]) => {
+  const sk = skeletonOf(ch.codePointAt(0)!)!;
+  const forms = RIGHT_JOINING_DOTTED.has(ch) ? (["isolated", "final"] as JoiningForm[]) : FORMS_ALL;
+  return forms.flatMap((form) =>
+    (KUFI_FORMS[sk][form] ?? []).map((g) => ({ ch, form, g, count, side, name: `${ch} ${g.id}` }))
+  );
+});
+
+const inkSet = (rows: string[]) => {
+  const s = new Set<string>();
+  rows.forEach((r, y) => [...r].forEach((c, x) => c === "#" && s.add(`${y},${x}`)));
+  return s;
+};
+
+/** Problems with a dot set against its glyph's rows (`baseRow` = the baseline row, top = 0). */
+function dotProblems(rows: string[], baseRow: number, dots: KufiCell[], count: number, side: "above" | "below"): string[] {
+  const out: string[] = [];
+  const ink = inkSet(rows);
+  if (dots.length !== count) out.push(`count ${dots.length}, wants ${count}`);
+  if (dots.length === 0) return out;
+  for (const d of dots) {
+    if (!Number.isInteger(d.row) || !Number.isInteger(d.col)) out.push(`non-integer dot ${d.row},${d.col}`);
+    if (ink.has(`${d.row},${d.col}`)) out.push(`dot on ink ${d.row},${d.col}`);
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
+      if (ink.has(`${d.row + dr},${d.col + dc}`)) out.push(`dot 4-adjacent to ink ${d.row},${d.col}`);
+    // One gap clear all round, as a real panel draws them: no ink even diagonally.
+    for (let dr = -1; dr <= 1; dr++)
+      for (let dc = -1; dc <= 1; dc++)
+        if ((dr || dc) && ink.has(`${d.row + dr},${d.col + dc}`)) out.push(`dot touches ink diagonally ${d.row},${d.col}`);
+  }
+  // Dots of a set are one empty cell apart: no two touch, even diagonally.
+  for (let i = 0; i < dots.length; i++)
+    for (let j = i + 1; j < dots.length; j++)
+      if (Math.max(Math.abs(dots[i].row - dots[j].row), Math.abs(dots[i].col - dots[j].col)) < 2)
+        out.push(`dots touch ${i},${j}`);
+  // The shape of the set: a pair side by side; three as a pair with a third centred beyond it.
+  const nearRow = side === "above" ? Math.max(...dots.map((d) => d.row)) : Math.min(...dots.map((d) => d.row));
+  const near = dots.filter((d) => d.row === nearRow).sort((a, b) => a.col - b.col);
+  if (count === 2 && !(near.length === 2 && near[1].col - near[0].col === 2)) out.push("pair is not side by side, one gap apart");
+  if (count === 3) {
+    const far = dots.find((d) => d.row !== nearRow);
+    const farRow = side === "above" ? nearRow - 2 : nearRow + 2;
+    if (!(near.length === 2 && near[1].col - near[0].col === 2 && far && far.row === farRow && far.col === near[0].col + 1))
+      out.push("three dots are not a pair with a centred third beyond it");
+  }
+  // The side: every dot on its side of the baseline, with the letter's ink on the far side of it.
+  const minC = Math.min(...dots.map((d) => d.col)) - 1;
+  const maxC = Math.max(...dots.map((d) => d.col)) + 1;
+  const inSpan = [...ink].map((k) => k.split(",").map(Number)).filter(([, c]) => c >= minC && c <= maxC);
+  if (side === "above") {
+    if (dots.some((d) => d.row >= baseRow)) out.push("an above dot sits on or below the baseline");
+    if (!inSpan.some(([r]) => r > nearRow)) out.push("no letter ink under the above dots");
+  } else {
+    if (dots.some((d) => d.row < baseRow)) out.push("a below dot sits above the baseline");
+    if (!inSpan.some(([r]) => r < nearRow)) out.push("no letter ink over the below dots");
+  }
+  // Glyph and dots together: still no solid 2x2 anywhere.
+  const all = new Set([...ink, ...dots.map((d) => `${d.row},${d.col}`)]);
+  for (const k of all) {
+    const [r, c] = k.split(",").map(Number);
+    if (all.has(`${r},${c + 1}`) && all.has(`${r + 1},${c}`) && all.has(`${r + 1},${c + 1}`)) out.push(`2x2 with dots at ${r},${c}`);
+  }
+  return out;
+}
+
+describe("dotsOf", () => {
+  it.each(DOTTED)("%s has %i dot(s) %s", (ch, count, side) => {
+    expect(dotsOf(ch, "medial")).toEqual({ count, side });
+    expect(dotsOf(ch, "isolated")).toEqual({ count, side });
+  });
+
+  it("gives undotted letters no dots", () => {
+    for (const ch of "ءآأإاحدرسصطعكلمهوىئؤٹڈڑکگ") expect(dotsOf(ch), ch).toBeNull();
+  });
+
+  it("dots the Persian yeh only where it joins forward", () => {
+    expect(dotsOf("ی", "initial")).toEqual({ count: 2, side: "below" });
+    expect(dotsOf("ی", "medial")).toEqual({ count: 2, side: "below" });
+    expect(dotsOf("ی", "final")).toBeNull();
+    expect(dotsOf("ی", "isolated")).toBeNull();
+    expect(dotsOf("ی")).toBeNull();
+  });
+
+  it("returns null for non-letters", () => {
+    expect(dotsOf("A")).toBeNull();
+    expect(dotsOf(" ")).toBeNull();
+    expect(dotsOf("")).toBeNull();
+  });
+
+  it("names a set by side and count", () => {
+    expect(dotKey({ count: 2, side: "above" })).toBe("above2");
+    expect(dotKey({ count: 1, side: "below" })).toBe("below1");
+  });
+});
+
+describe("KufiGlyph.dots", () => {
+  it("covers every form of every dotted letter", () => {
+    expect(DOTTED_CASES.length).toBeGreaterThan(100);
+  });
+
+  it.each(DOTTED_CASES.map((c) => [c.name, c] as const))(
+    "%s: its dots have the count and side the letter needs, one gap clear of the letter",
+    (_n, c) => {
+      const dots = dotCells(c.g, c.ch, c.form);
+      expect(dotProblems(c.g.rows, c.g.rows.length - 1 - c.g.base, dots, c.count, c.side)).toEqual([]);
+    }
+  );
+
+  it.each(DOTTED_CASES.map((c) => [c.name, c] as const))(
+    "%s: its dots stay valid with the glyph stretched by 1 and 3 and shortened to its minimum",
+    (_n, c) => {
+      const cases = [c.g.stretch.map(() => 1), c.g.stretch.map(() => 3), c.g.stretch.map((s) => -(s.min ?? 0))];
+      for (const counts of cases) {
+        const rows = stretchGlyph(c.g, counts);
+        const dots = dotCells(c.g, c.ch, c.form, counts);
+        const baseRow = rows.length - 1 - stretchedBase(c.g, counts);
+        expect(dotProblems(rows, baseRow, dots, c.count, c.side), counts.join()).toEqual([]);
+      }
+    }
+  );
+
+  it("a glyph carries exactly the dot sets its letters need, and no others", () => {
+    const need = new Map<string, Set<string>>();
+    for (const c of DOTTED_CASES) {
+      if (!need.has(c.g.id)) need.set(c.g.id, new Set());
+      need.get(c.g.id)!.add(dotKey({ count: c.count, side: c.side }));
+    }
+    for (const e of ENTRIES) {
+      expect(Object.keys(e.g.dots ?? {}).sort(), e.g.id).toEqual([...(need.get(e.g.id) ?? [])].sort());
+    }
+  });
+
+  it("gives an undotted letter no cells", () => {
+    expect(dotCells(glyphById("beh.medial.0"), "ٹ", "medial")).toEqual([]);
+    expect(dotCells(glyphById("jeem.medial.0"), "ح", "medial")).toEqual([]);
+    expect(dotCells(glyphById("yeh.final.0"), "ى", "final")).toEqual([]);
+    expect(dotCells(glyphById("yeh.final.0"), "ی", "final")).toEqual([]);
+  });
+
+  it("dots the Persian yeh's joining forms like ي", () => {
+    const g = glyphById("yeh.medial.0");
+    expect(dotCells(g, "ی", "medial")).toEqual(dotCells(g, "ي", "medial"));
+  });
+
+  it("sits the lifted yeh's pair under its raised bar, as the reference panel does", () => {
+    expect(dotCells(glyphById("yeh.initial.1"), "ي", "initial")).toEqual([
+      { row: 4, col: 2 },
+      { row: 4, col: 4 },
+    ]);
+  });
+
+  it("sits the hooked noon's dot inside its hook, as the reference panel does", () => {
+    expect(dotCells(glyphById("noon.initial.2"), "ن", "initial")).toEqual([{ row: 2, col: 0 }]);
+  });
+
+  it("keeps a pair rigid when the glyph stretches between its dots", () => {
+    const g = glyphById("beh.isolated.0");
+    const a = dotCells(g, "ت", "isolated");
+    const b = dotCells(g, "ت", "isolated", [4]);
+    expect(b[1].col - b[0].col).toBe(a[1].col - a[0].col);
+  });
+});
+
+describe("the packer's alternates", () => {
+  it("every الله form widens sideways at a column slice", () => {
+    for (const g of KUFI_FORMS.allah.isolated ?? []) {
+      expect(g.stretch.some((s) => s.axis === "col"), g.id).toBe(true);
+      const i = g.stretch.findIndex((s) => s.axis === "col");
+      const counts = g.stretch.map((_, j) => (j === i ? 3 : 0));
+      expect(stretchGlyph(g, counts)[0].length, g.id).toBe(g.rows[0].length + 3);
+    }
+  });
+
+  it("has a join that turns the line a quarter turn", () => {
+    const j = KUFI_JOINS.find((x) => x.turn === 90);
+    expect(j).toBeDefined();
+    expect(j!.id).toBe("join.turn90.0");
+  });
+
+  it.each(["beh", "noon", "yeh", "lam", "ain"] as const)("%s has a medial entered at its top, for the U-turn", (sk) => {
+    const top = (KUFI_FORMS[sk].medial ?? []).filter((g) => joinRow(g, "right") === 0);
+    expect(top.length).toBeGreaterThan(0);
+    for (const g of top) {
+      // The left join stays on the line, and nothing but the top stub reaches the right column.
+      expect(joinRow(g, "left")).toBe(g.rows.length - 1 - g.base);
+      const right = g.rows.map((r) => r[r.length - 1]).join("");
+      expect(right, g.id).toBe("#" + ".".repeat(g.rows.length - 1));
+    }
+  });
+
+  /** The body stands two rows up and one stroke steps down to the line at the joining side. */
+  const lifted = (g: KufiGlyph, side: "right" | "left") => {
+    const b = g.rows.length - 1 - g.base;
+    const c = joinCol(g, side);
+    const only = (r: string) => [...r].every((ch, x) => (x === c ? ch === "#" : ch === "."));
+    return joinRow(g, side) === b && only(g.rows[b]) && only(g.rows[b - 1]) && g.rows[b - 2].replace(/\./g, "").length > 1;
+  };
+
+  it.each(["seen", "sad", "jeem", "ain", "meem", "beh"] as const)("%s has a lifted initial", (sk) => {
+    expect((KUFI_FORMS[sk].initial ?? []).some((g) => lifted(g, "left"))).toBe(true);
+  });
+
+  it.each(["beh", "dal", "reh"] as const)("%s has a lifted final", (sk) => {
+    expect((KUFI_FORMS[sk].final ?? []).some((g) => lifted(g, "right"))).toBe(true);
   });
 });
