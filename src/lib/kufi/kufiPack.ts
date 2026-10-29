@@ -176,7 +176,34 @@ type Letter = {
   /** The letter's own dot pattern, or null. */
   dotKey: KufiDotKey | null;
   pin: Pin | null;
+  /** For a tall letter (ا ل لا), the tallest stem its form's alternates are authored with, in rows; else -1. */
+  natural: number;
+  /** Pinned, or stretched by the user: its length is the user's, not counted as deviation. */
+  exempt: boolean;
 };
+
+const TALL = new Set(["alef", "lam", "lamAlef"]);
+/** Cutting a tall stroke weighs this much more than lengthening one, cell for cell. */
+const SHORTEN_WEIGHT = 1.5;
+
+/**
+ * How far a placed shape is from its letter's natural length: |count| over
+ * every slice, shortening and stretching alike. A tall letter's stem is
+ * measured against the tallest stem its alternates are authored with, so a
+ * short alternate counts as a cut stem; cutting it weighs SHORTEN_WEIGHT.
+ */
+function devOf(letter: Letter, sh: Shape): number {
+  if (letter.exempt) return 0;
+  let dev = 0;
+  sh.g.stretch.forEach((sl, i) => {
+    if (letter.natural < 0 || sl.axis === "col") dev += Math.abs(sh.counts[i] ?? 0);
+  });
+  if (letter.natural >= 0) {
+    const stem = sh.baseRow + 1;
+    dev += stem < letter.natural ? SHORTEN_WEIGHT * (letter.natural - stem) : stem - letter.natural;
+  }
+  return dev;
+}
 
 /** A hard placement: glyph, counts and box, and optionally how its dots are drawn (see `DOT_SHIFT`). */
 type Pin = {
@@ -328,6 +355,8 @@ function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins:
       word: u.wordIndex,
       dotKey: d ? dotKey(d) : null,
       pin,
+      natural: TALL.has(u.skeleton) ? Math.max(...all.map((g) => g.rows.length - g.base)) : -1,
+      exempt: !!pin || !!fixed,
     };
   });
 }
@@ -483,6 +512,8 @@ type St = {
   splits: number;
   uturns: number;
   stretch: number;
+  /** Total `devOf` over placed letters. */
+  dev: number;
   dotsOff: number;
   lastWord: number;
   hash: number;
@@ -530,6 +561,7 @@ function initState(ctx: Ctx): St {
     splits: 0,
     uturns: 0,
     stretch: 0,
+    dev: 0,
     dotsOff: 0,
     lastWord: -1,
     hash: 0,
@@ -588,7 +620,7 @@ type Applied = {
   oldTpl: number;
   oldSeg: St["seg"];
   oldIds: number;
-  oldScalars: [number, number, number, number, number, number];
+  oldScalars: [number, number, number, number, number, number, number];
   oldHash: number;
   oldStubs: number[];
   pushedDots: boolean;
@@ -857,7 +889,7 @@ function apply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
     oldTpl: st.tpl,
     oldSeg: st.seg,
     oldIds: st.ids,
-    oldScalars: [st.failed, st.splits, st.uturns, st.stretch, st.dotsOff, st.lastWord],
+    oldScalars: [st.failed, st.splits, st.uturns, st.stretch, st.dotsOff, st.lastWord, st.dev],
     oldHash: st.hash,
     oldStubs: [],
     pushedDots: false,
@@ -916,6 +948,7 @@ function apply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
   if ((mv.mode === 0 || mv.mode === 1) && st.lastWord === letter.word && mv.mode === 1) st.splits++;
   if (mv.mode === 3) st.uturns++;
   st.stretch += sh.cost + (mv.mode === 2 ? mv.jext : 0) + (mv.mode === 3 ? Math.abs(mv.climb) : 0);
+  st.dev += devOf(letter, sh);
   if (letter.dotKey && !mv.dots) {
     // dots are drawn at the end, where they fit; until then they count as ink
     const m = dotCellsAt(ctx, L, sh, letter.dotKey, x0, yb, 0);
@@ -954,7 +987,7 @@ function undo(ctx: Ctx, st: St, rec: Applied) {
   st.tpl = rec.oldTpl;
   st.seg = rec.oldSeg;
   st.ids = rec.oldIds;
-  [st.failed, st.splits, st.uturns, st.stretch, st.dotsOff, st.lastWord] = rec.oldScalars;
+  [st.failed, st.splits, st.uturns, st.stretch, st.dotsOff, st.lastWord, st.dev] = rec.oldScalars;
   st.hash = rec.oldHash;
   if (rec.pushedDots) st.vdots.pop();
 }
@@ -1295,7 +1328,21 @@ type Final = {
   squares: number;
   score: number;
   packed: boolean;
+  /** Distance from natural stroke lengths (`devOf`), compared only between packed panels. */
+  dev: number;
 };
+
+/**
+ * Whether `a` is the better panel. Packing comes first: a packed panel beats
+ * any that is not, and is never traded for less deviation. Between packed
+ * panels the one nearer natural stroke lengths wins, then the lower score.
+ */
+function better(a: Final, b: Final | null): boolean {
+  if (!b) return true;
+  if (a.packed !== b.packed) return a.packed;
+  if (a.packed && Math.abs(a.dev - b.dev) > 1e-9) return a.dev < b.dev;
+  return a.score < b.score - 1e-9;
+}
 
 function count2x2(ctx: Ctx, own: Int32Array, ink: boolean): number {
   const { cols, rows } = ctx;
@@ -1483,7 +1530,7 @@ function finish(ctx: Ctx, st0: St): Final {
     W.uturn * st.uturns +
     W.stretch * st.stretch +
     W.dotsOff * st.dotsOff;
-  return { st, owner, kind, holes, edge, ink2, squares, score, packed: !holes && !edge && !ink2 && !st.failed };
+  return { st, owner, kind, holes, edge, ink2, squares, score, packed: !holes && !edge && !ink2 && !st.failed, dev: st.dev };
 }
 
 // ---------------------------------------------------------------------------
@@ -1551,6 +1598,8 @@ function reapply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
 function replayFrom(ctx: Ctx, prefix: St, plan: Plan, from: number): St | null {
   let s = cloneState(prefix);
   for (let li = from; li < plan.length; li++) {
+    // a spent budget stops replays too, so the work cap holds
+    if (ctx.out && !ctx.noClock) return null;
     const mv = plan[li];
     if (!mv) {
       s = failLetter(ctx, s, li);
@@ -1580,19 +1629,21 @@ function prefixesOf(ctx: Ctx, plan: Plan): St[] | null {
 }
 
 /**
- * Coordinate descent on the finished score: for each letter in turn, every
+ * Coordinate descent on the finished panel: for each letter in turn, every
  * other move it could make, with the letters after it replayed on their own
- * choices; the first improvement is kept. Sweeps until none improves or the
- * deadline passes.
+ * choices; the best that is `better` is kept. Sweeps until none improves or
+ * the budget is spent. Toward packing it stops once packed; `natural` goes on
+ * from a packed panel toward natural stroke lengths.
  */
-function polish(ctx: Ctx, start: Final): Final {
+function polish(ctx: Ctx, start: Final, natural = false): Final {
   let best = start;
   let plan = planOf(ctx, start.st);
   let pre = prefixesOf(ctx, plan);
   if (!pre) return best;
-  for (let sweep = 0; sweep < POLISH_SWEEPS && !best.packed; sweep++) {
+  const going = () => (natural ? best.packed : !best.packed);
+  for (let sweep = 0; sweep < POLISH_SWEEPS && going(); sweep++) {
     let improved = false;
-    for (let li = 0; li < plan.length && !best.packed; li++) {
+    for (let li = 0; li < plan.length && going(); li++) {
       if (spent(ctx)) return best;
       const base = pre[li];
       const alts: Move[] = [];
@@ -1607,7 +1658,7 @@ function polish(ctx: Ctx, start: Final): Final {
         const s = replayFrom(ctx, base, p2, li);
         if (!s) continue;
         const f = finish(ctx, s);
-        if (f.score < (found?.f.score ?? best.score) - 1e-9) found = { f, plan: p2 };
+        if (better(f, found?.f ?? best)) found = { f, plan: p2 };
       }
       if (found) {
         best = found.f;
@@ -1624,6 +1675,76 @@ function polish(ctx: Ctx, start: Final): Final {
 }
 
 const POLISH_SWEEPS = 4;
+
+/** Every move letter li can make from `st`, with the place each landed. */
+function movesAt(ctx: Ctx, st: St, li: number): Move[] {
+  const out: Move[] = [];
+  forMoves(ctx, st, li, (mv, rec) => {
+    out.push({ ...mv, x0: mv.mode <= 1 ? rec.x0 : mv.x0 });
+    return false;
+  });
+  return out;
+}
+
+/**
+ * Pair moves toward natural lengths, from a packed panel. A stroke often
+ * cannot return to its natural length alone: the corner لا grows up the
+ * right edge only if a letter further on makes room. So for each letter
+ * whose length deviates (most first), each of its moves nearer its natural
+ * length (nearest first) is tried together with every move of every later
+ * letter, the rest
+ * replayed; the best packed panel that is `better` is kept. Repeats while it
+ * finds one and the budget lasts.
+ */
+function pairPolish(ctx: Ctx, start: Final): Final {
+  let best = start;
+  for (let round = 0; round < PAIR_ROUNDS && best.packed; round++) {
+    const plan = planOf(ctx, best.st);
+    const pre = prefixesOf(ctx, plan);
+    if (!pre) return best;
+    const devs = plan
+      .map((mv, li) => ({ li, d: mv ? devOf(ctx.letters[li], mv.shape) : 0 }))
+      .filter((x) => x.d > 0)
+      .sort((a, b) => b.d - a.d || a.li - b.li);
+    let found: Final | null = null;
+    for (const { li, d } of devs) {
+      const alts = movesAt(ctx, pre[li], li)
+        .map((mv) => ({ mv, d: devOf(ctx.letters[li], mv.shape) }))
+        .filter((x) => x.d < d)
+        .sort((a, b) => a.d - b.d);
+      for (const { mv: alt } of alts) {
+        const p2 = plan.slice();
+        p2[li] = alt;
+        // the panel before each later letter, with this letter's new move
+        let s: St | null = replayFrom(ctx, pre[li], [...new Array(li).fill(null), alt], li);
+        if (!s) continue;
+        for (let lj = li + 1; s && lj < plan.length; lj++) {
+          if (spent(ctx)) return found && better(found, best) ? found : best;
+          // any later letter may make the room: later runs re-slide, so a narrower ع in the
+          // core lets the corner لا grow up the right edge
+          for (const alt2 of movesAt(ctx, s, lj)) {
+            const p3 = p2.slice();
+            p3[lj] = alt2;
+            const t = replayFrom(ctx, s, p3, lj);
+            if (!t) continue;
+            const f = finish(ctx, t);
+            if (f.packed && better(f, found ?? best)) found = f;
+          }
+          // on to the next letter, keeping this one's move
+          s = replayFrom(ctx, s, [...new Array(lj).fill(null), p2[lj]], lj);
+        }
+      }
+      if (found) break;
+    }
+    if (!found) break;
+    best = polish(ctx, found, true);
+  }
+  return best;
+}
+
+const PAIR_ROUNDS = 3;
+
+
 
 /** One beam pass of width B. Null when the deadline passed first. */
 function beamPass(ctx: Ctx, B: number, start: St = initState(ctx), from = 0, cheap = false): Final | null {
@@ -1663,7 +1784,7 @@ function beamPass(ctx: Ctx, B: number, start: St = initState(ctx), from = 0, che
   let best: Final | null = null;
   for (const st of beam) {
     const f = finish(ctx, st);
-    if (!best || f.score < best.score) best = f;
+    if (better(f, best)) best = f;
   }
   return best;
 }
@@ -1687,20 +1808,21 @@ function lookahead(ctx: Ctx, st: St, li: number): number {
  * small beam re-plans everything after it; a better panel is polished and
  * kept. Repeats until a round finds nothing or the deadline passes.
  */
-function replan(ctx: Ctx, start: Final, B: number): Final {
+function replan(ctx: Ctx, start: Final, B: number, natural = false): Final {
   let best = start;
-  for (let round = 0; round < REPLAN_ROUNDS && !best.packed; round++) {
+  const going = () => (natural ? best.packed : !best.packed);
+  for (let round = 0; round < REPLAN_ROUNDS && going(); round++) {
     const plan = planOf(ctx, best.st);
     const pre = prefixesOf(ctx, plan);
     if (!pre) return best;
     let improved = false;
-    for (let li = plan.length - 1; li >= 0 && !best.packed; li--) {
+    for (let li = plan.length - 1; li >= 0 && going(); li--) {
       if (ctx.letters[li].joinedPrev) continue;
       if (spent(ctx)) return best;
       let f = beamPass(ctx, B, pre[li], li);
       if (!f) return best;
       if (!f.packed) f = polish(ctx, f);
-      if (f.score < best.score - 1e-9) {
+      if (better(f, best)) {
         best = f;
         improved = true;
         break;
@@ -1732,8 +1854,15 @@ function searchInner(ctx: Ctx): Final | null {
     if (!f) break;
     if (!f.packed) f = polish(ctx, f);
     if (!f.packed) f = replan(ctx, f, Math.max(REPLAN_BEAM, B >> 1));
-    if (!best || f.score < best.score) best = f;
-    if (best.packed) break;
+    if (better(f, best)) best = f;
+    if (best?.packed) break;
+  }
+  // strokes change length only when they must: of the packed panels the budget
+  // still reaches, keep the one nearest natural lengths
+  if (best?.packed) {
+    best = polish(ctx, best, true);
+    best = pairPolish(ctx, best);
+    best = replan(ctx, best, REPLAN_BEAM, true);
   }
   return best;
 }
@@ -1771,6 +1900,12 @@ const FIRST_DRAFT_CLOCK_MS = 1700;
 /** The most moves a first draft and a repack may try (see WORK_PER_MS). */
 const PACK_WORK = PACK_BUDGET_MS * WORK_PER_MS;
 const REPACK_WORK = REPACK_BUDGET_MS * WORK_PER_MS;
+/**
+ * A search stops trying moves this far short of its cap: moves already chosen
+ * (a beam's survivors, a replay's last letter) are still applied after it
+ * stops, and must not take it past PACK_WORK or REPACK_WORK.
+ */
+const WORK_SLACK = 1000;
 /** Moves tried by searches since last reset, for the budget tests. */
 const stats = { work: 0 };
 
@@ -1806,7 +1941,7 @@ function makeCtx(
     deadline:
       performance.now() + Math.min(FIRST_DRAFT_CLOCK_MS, budgetMs * (!strictClock && cols * rows <= LOOSE_CLOCK_CELLS ? LOOSE_CLOCK : 1)),
     work: 0,
-    workMax: budgetMs * WORK_PER_MS,
+    workMax: budgetMs * WORK_PER_MS - WORK_SLACK,
     out: false,
     noClock: false,
   };

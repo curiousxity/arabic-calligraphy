@@ -430,6 +430,48 @@ describe("fitKufiPanel", () => {
   }, 30000);
 });
 
+// The reference 21x21 panel's choices, as the packer writes them (see "the scorer" below): its
+// strokes change length in two places only, the lam of يكلف cut by 2 and the alef of نفسا grown by 4.
+const REF_DEVIATION = 6;
+/** Rows of the reference's bottom-right لا (lamAlef.isolated.1, unstretched). */
+const REF_LA_ROWS = 9;
+
+/** Total change from authored stroke lengths: |count| summed over every slice of every letter. */
+const deviation = (r: Ok) => r.placements.reduce((a, p) => a + p.stretch.reduce((b, n) => b + Math.abs(n), 0), 0);
+
+describe("natural stroke lengths", () => {
+  it("Al-Baqarah packs no further from authored lengths than the reference does", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    expect(deviation(r)).toBeLessThanOrEqual(REF_DEVIATION);
+  }, 20000);
+
+  it("the bottom-right لا is not cut below the reference's height", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    const la = r.placements[0];
+    expect(la.glyphId.startsWith("lamAlef.")).toBe(true);
+    expect(stretchGlyph(glyphOf(la.glyphId), la.stretch).length).toBeGreaterThanOrEqual(REF_LA_ROWS);
+  }, 20000);
+
+  it("no letter of وسعها is stretched more than in the reference (where none is)", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    const { units } = resolveKufiText(BAQARAH);
+    const last = units.filter((u) => u.wordIndex === units[units.length - 1].wordIndex);
+    expect(last).toHaveLength(5);
+    for (const u of last) {
+      const grown = r.placements[u.index].stretch.reduce((a, n) => a + Math.max(0, n), 0);
+      expect(grown, `${r.placements[u.index].glyphId}`).toBe(0);
+    }
+  }, 20000);
+
+  it("a user's stretch edit is not counted against the panel", () => {
+    // the edit is the user's: the packer keeps it, and still packs where it can
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    const again = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits: { stretch: { 2: [1] } } });
+    expect(again.ok).toBe(true);
+    if (again.ok) expect(again.placements[2].stretch).toEqual([1]);
+  }, 20000);
+});
+
 describe("the scorer", () => {
   it("accepts the reference panel's own arrangement as packed", () => {
     // The reference 21x21 panel, written as this packer's choices, in reading order:
