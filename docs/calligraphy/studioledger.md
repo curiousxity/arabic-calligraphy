@@ -318,6 +318,10 @@ Times are minutes:seconds into the individual-letters lesson.
   |---|---|---|---|
   | 069.s0 | 90% | 98.5% | 0.12 |
   | 224.s2 | 93% | 97% | 0.23 |
+- **Decision 52 (210.s1, a small head, 2026-10-28):** no pen got its top-right corner square: one angle 92%,
+  turning, both flicks, and the nib-tip fill (91%, which notched the left side). The user: "go with A. The top right
+  corner square is part of the other stroke." So the one-angle fit stays, and the corner is left to the neighbouring
+  stroke.
 
 ### Ya
 
