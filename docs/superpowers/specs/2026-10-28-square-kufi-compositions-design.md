@@ -113,7 +113,9 @@ Kufi. All are in the future plan below.
   ta"). A dotted letter gets its whole set of dots on its correct side (ي
   two below, ت two above, ث three above, ن and ف one above, ب one below) or
   none; a dot never goes in only to fill a hole. A dot still never makes a
-  2×2.
+  2×2. A letter's whole set may move one cell along its line when its
+  usual spot is blocked, keeping its count and side (as the ف of نفسا does
+  in the reference); the user: "yes it is acceptable" (2026-10-29).
 - **The block type must not be named `squareKufi`**: that name is in
   `REMOVED_BLOCK_TYPES` (`src/lib/legacySaves.ts`) so pre-removal saves load
   with those blocks dropped. Use a new type name and new field names.
