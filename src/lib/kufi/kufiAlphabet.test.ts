@@ -13,6 +13,7 @@ import {
   dotsOf,
   dotKey,
   dotCells,
+  attachDotSets,
   type KufiCell,
   type KufiGlyph,
   type KufiStretch,
@@ -433,34 +434,24 @@ describe("KUFI_FORMS: pieces read off the reference panel", () => {
 });
 
 describe("KUFI_FILLS", () => {
-  it("has the lone square, the single dot and the dot pair", () => {
-    expect(KUFI_FILLS.map((f) => f.id).sort()).toEqual(["fill.dot", "fill.dots2", "fill.square"]);
+  it("has only the lone square: dots are iʿjām, never filler", () => {
+    expect(KUFI_FILLS.map((f) => f.id)).toEqual(["fill.square"]);
+    expect(KUFI_FILLS[0].rows).toEqual(["#"]);
+    expect(KUFI_FILLS[0].beside).toBe("any");
+  });
+});
+
+describe("attachDotSets", () => {
+  it("throws on a dot-set id that matches no glyph", () => {
+    expect(() => attachDotSets({ "beh.isolated.99": { below1: [[4, 2]] } })).toThrow(/beh\.isolated\.99/);
   });
 
-  it.each(KUFI_FILLS.map((f) => [f.id, f] as const))("%s is 1-2 cells, rectangular and free of 2x2 ink", (_id, f) => {
-    const ink = f.rows.join("").split("").filter((c) => c === "#").length;
-    expect(ink).toBeGreaterThanOrEqual(1);
-    expect(ink).toBeLessThanOrEqual(2);
-    expect(f.rows.every((r) => r.length === f.rows[0].length && /^[#.]+$/.test(r))).toBe(true);
-    expect(inkBlocks2x2(gridFromRows(f.rows))).toEqual([]);
-    // The box is tight: ink in its first and last column.
-    expect(f.rows.some((r) => r.startsWith("#"))).toBe(true);
-    expect(f.rows.some((r) => r.endsWith("#"))).toBe(true);
-  });
-
-  it.each(KUFI_FILLS.map((f) => [f.id, f] as const))("%s names the letters it may sit beside", (_id, f) => {
-    if (f.beside === "any") return;
-    expect(f.beside.length).toBeGreaterThan(0);
-    for (const ch of f.beside) expect(skeletonOf(ch.codePointAt(0)!), ch).not.toBeNull();
-  });
-
-  it("a dot sits only beside dotted letters; the square beside any", () => {
-    const dot = KUFI_FILLS.find((f) => f.id === "fill.dot")!;
-    const pair = KUFI_FILLS.find((f) => f.id === "fill.dots2")!;
-    expect(dot.beside).toContain("ن"); // noon
-    expect(dot.beside).not.toContain("ا"); // alef
-    expect(pair.beside).toContain("ي"); // yeh
-    expect(KUFI_FILLS.find((f) => f.id === "fill.square")!.beside).toBe("any");
+  it("attaches a known id", () => {
+    const glyph = KUFI_FORMS.beh.isolated![0];
+    const before = glyph.dots;
+    attachDotSets({ "beh.isolated.0": { below1: [[4, 2]] } });
+    expect(glyph.dots?.below1).toEqual([{ row: 4, col: 2 }]);
+    glyph.dots = before;
   });
 });
 

@@ -848,9 +848,8 @@ export function dotCells(glyph: KufiGlyph, char: string, form: JoiningForm, coun
 
 /**
  * A fill piece: not a letter, and never part of one. A panel places a fill
- * only where it closes a hole (an empty 2×2) and reads as belonging to a
- * letter beside it: a dot by its dotted letter, a lone square anywhere. Fills
- * turn with the band they sit in.
+ * only where it closes a hole (an empty 2×2), never where it could read as a
+ * letter's dot.
  */
 export type KufiFill = {
   id: string;
@@ -860,22 +859,12 @@ export type KufiFill = {
   beside: string | "any";
 };
 
-/** Letters carrying one dot (ب ج خ ذ ز ض ظ غ ف ن): a dot drawn beside one is its own. */
-const ONE_DOT = "بجخذزضظغفن";
-/** Letters carrying two dots (ت ق ي ة) — and three (ث ش پ چ ژ), whose dots may be drawn as a pair. */
-const TWO_DOTS = "تقيةثشپچژ";
-
 /**
- * `fill.dot` and `fill.dots2` predate the glyphs' own dot sets and remain
- * only so the reference panel's cell-by-cell rebuild keeps working. A packer
- * draws a letter's dots from `dotCells`, never from these: dots are iʿjām,
- * not filler. Only `fill.square` is a filler.
+ * The only filler is the lone square. Dots are iʿjām, drawn from a letter's
+ * own sets by `dotCells`; there is deliberately no dot fill, so no consumer
+ * can scatter dots to plug holes.
  */
-export const KUFI_FILLS: KufiFill[] = [
-  { id: "fill.square", rows: ["#"], beside: "any" },
-  { id: "fill.dot", rows: ["#"], beside: ONE_DOT + TWO_DOTS },
-  { id: "fill.dots2", rows: ["#.#"], beside: TWO_DOTS },
-];
+export const KUFI_FILLS: KufiFill[] = [{ id: "fill.square", rows: ["#"], beside: "any" }];
 
 /**
  * A join piece: a run between two letters that is not a straight stretch of
@@ -941,7 +930,7 @@ export const KUFI_JOINS: KufiJoin[] = [
  * and nudged one column off a free stroke end. The tests hold each set to
  * the rules in the module header, stretched and shortened too.
  */
-type DotTable = Record<string, Partial<Record<KufiDotKey, Array<[row: number, col: number]>>>>;
+export type DotTable = Record<string, Partial<Record<KufiDotKey, Array<[row: number, col: number]>>>>;
 
 const DOT_CELLS: DotTable = {
   "beh.isolated.0": { above2: [[-2, 1], [-2, 3]], above3: [[-2, 1], [-2, 3], [-4, 2]], below1: [[4, 2]], below3: [[4, 1], [4, 3], [6, 2]] },
@@ -1075,12 +1064,22 @@ const DOT_CELLS: DotTable = {
   "heh.final.4": { above2: [[-2, 0], [-2, 2]] },
 };
 
-for (const forms of Object.values(KUFI_FORMS))
-  for (const glyphs of Object.values(forms))
-    for (const glyph of glyphs ?? []) {
-      const sets = DOT_CELLS[glyph.id];
-      if (!sets) continue;
-      glyph.dots = {};
-      for (const [k, cells] of Object.entries(sets) as Array<[KufiDotKey, Array<[number, number]>]>)
-        glyph.dots[k] = cells.map(([row, col]) => ({ row, col }));
-    }
+/**
+ * Attaches dot sets to their glyphs by id, replacing any sets a glyph had.
+ * Throws on an id that matches no glyph, so a typo cannot silently leave a
+ * letter undotted.
+ */
+export function attachDotSets(table: DotTable): void {
+  const byId = new Map<string, KufiGlyph>();
+  for (const forms of Object.values(KUFI_FORMS))
+    for (const glyphs of Object.values(forms)) for (const glyph of glyphs ?? []) byId.set(glyph.id, glyph);
+  for (const [id, sets] of Object.entries(table)) {
+    const glyph = byId.get(id);
+    if (!glyph) throw new Error(`dot sets for unknown glyph ${id}`);
+    glyph.dots = {};
+    for (const [k, cells] of Object.entries(sets) as Array<[KufiDotKey, Array<[number, number]>]>)
+      glyph.dots[k] = cells.map(([row, col]) => ({ row, col }));
+  }
+}
+
+attachDotSets(DOT_CELLS);
