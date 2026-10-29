@@ -15,6 +15,8 @@ export const SIDEBAR_HINTS: Record<string, string> = {
   "Artboard & Grid":
     "The page: its size, colour and paper texture, plus gridlines, snapping and rulers to help you line things up.",
   "Save & Export": "Save your project to come back to it, or download the artwork as PNG, JPEG, SVG or PDF.",
+  "Studio letters":
+    "Every letter of the studio's Thuluth, written with the pen stroke by stroke. Click one to see how each stroke was written.",
   Layers: "Every block on the canvas, top to bottom. Reorder, hide, lock, rename or group them here.",
   "Align & Arrange": "Line up the selected blocks with each other, or space three or more evenly.",
   Font: "Choose the typeface for the selected block. Each card shows your own text in that font.",

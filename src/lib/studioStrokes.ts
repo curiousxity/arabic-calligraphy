@@ -42,13 +42,14 @@ export type StudioLibrary = { version: number; ppn: number; pen: number; shapes:
 /** Where the built library is served from (public/). */
 export const STUDIO_LIBRARY_URL = "/pen/studio-strokes.json";
 
-/** The library, fetched once. */
+/** The library, fetched once; `loadedStudioLibrary` holds it once it has arrived. */
 let pending: Promise<StudioLibrary> | null = null;
+export let loadedStudioLibrary: StudioLibrary | null = null;
 export function loadStudioLibrary(url = STUDIO_LIBRARY_URL): Promise<StudioLibrary> {
   pending ??= fetch(url).then((r) => {
     if (!r.ok) throw new Error(`studio library: ${r.status} ${url}`);
     return r.json() as Promise<StudioLibrary>;
-  });
+  }).then((lib) => (loadedStudioLibrary = lib));
   return pending;
 }
 
@@ -117,4 +118,41 @@ export function validateStudioLibrary(lib: StudioLibrary): string[] {
     }
   }
   return out;
+}
+
+/** Each stroke's ink for a whole shape, in the shape's stroke order. */
+export function shapeInk(lib: StudioLibrary, shapeId: string): { id: string; recipe: string; iou?: number; ink: Polygon[] }[] {
+  return lib.shapes[shapeId].strokes.map((st) => ({ id: st.id, recipe: st.recipe, iou: st.iou, ink: strokeInk(st, lib.pen, lib.ppn) }));
+}
+
+/** Polygons as an SVG path (draw with fill-rule evenodd), to a hundredth of a unit. */
+export function polygonsPath(polys: Polygon[]): string {
+  const n = (v: number) => String(Math.round(v * 100) / 100);
+  return polys.map((poly) => poly.map((r) => "M" + r.map((p) => `${n(p[0])} ${n(p[1])}`).join("L") + "Z").join("")).join("");
+}
+
+const FORMS = ["Isolated", "Isolated & Final", "Initial", "Initial & Medial", "Medial", "Final", "Pairs"];
+
+/** The library's shapes by letter, in the studio's order of letters (each by its first shape that is not a pair),
+ *  each letter's shapes by form, then variant, the halves of the studio's pairs last. */
+export function studioGroups(lib: StudioLibrary): { group: string; shapes: string[] }[] {
+  const by = new Map<string, string[]>();
+  for (const id of Object.keys(lib.shapes).sort()) {
+    const g = lib.shapes[id].group;
+    if (!by.has(g)) by.set(g, []);
+    by.get(g)!.push(id);
+  }
+  const first = (ids: string[]) => ids.find((id) => lib.shapes[id].form !== "Pairs" && !lib.shapes[id].pairOf) ?? ids[0];
+  const rank = (id: string) => {
+    const s = lib.shapes[id], f = FORMS.indexOf(s.form);
+    return [s.pairOf ? 1 : 0, f < 0 ? FORMS.length : f, s.variant ?? 0];
+  };
+  const cmp = (a: string, b: string) => {
+    const ra = rank(a), rb = rank(b);
+    for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] - rb[i];
+    return a < b ? -1 : a > b ? 1 : 0;
+  };
+  return [...by.entries()]
+    .sort((a, b) => (first(a[1]) < first(b[1]) ? -1 : 1))
+    .map(([group, ids]) => ({ group, shapes: [...ids].sort(cmp) }));
 }

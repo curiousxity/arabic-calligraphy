@@ -18,6 +18,8 @@ their own files under `src/components/sidebar/`:
   `GuideAttachmentPanel`, `VersePanel`, `StackPanel` — the type panels.
 - `TypographyPanel`, `EffectsPanel` — the shared styling panels.
 - `LayersPanel` — the layer list.
+- `StudioLettersPanel` — the studio's letters from the pen stroke library, to browse (see
+  [studio-strokes.md](studio-strokes.md)); mounted only while its section is open, which is what loads the library.
 
 The split was file boundaries only: no prop was renamed and no behaviour
 changed, so the e2e suite is its regression check. Shared low-level form
@@ -35,7 +37,7 @@ panel title so it groups without competing):
 | Tier | Panels |
 |---|---|
 | `document` | Start from a Template · Artboard & Grid |
-| `canvas` | Block Controls (Add · Selected · History) · Marks · Layers · Align & Arrange |
+| `canvas` | Block Controls (Add · Selected · History) · Marks · Studio letters · Layers · Align & Arrange |
 | `selected` | **Font** · Content · *type panel* (Verse / Mirror / Shape Fill / Guide / Stacked composition / Mark / Curve) · Typography · Effects |
 
 Then Shortcuts and **Save & Export**, outside any tier. Save & Export

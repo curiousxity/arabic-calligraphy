@@ -1,6 +1,8 @@
 ---
 paths:
   - "src/lib/studioStrokes*"
+  - "src/components/sidebar/StudioLettersPanel.tsx"
+  - "src/hooks/useStudioLibrary.ts"
   - "scripts/pen/studiolib.py"
   - "public/pen/**"
 ---
@@ -47,3 +49,12 @@ still without a fit.
 `python -I -X utf8 scripts/pen/studiolib.py SCRATCH` with SCRATCH the fitting folder (studio/registry.json,
 studio/catalog.py, me/penreview.json, me/twins.json, me/gaps.json, me/trims.json and the batch folders). Run
 `twins.py` first if fits came in since it last ran: a twin's source must be in the review.
+
+## The Studio letters panel
+
+`src/components/sidebar/StudioLettersPanel.tsx`, in the sidebar's canvas tier after Marks: one fold per letter
+(`studioGroups`: the studio's order of letters by each one's first shape that is not a pair; a letter's shapes by
+form, then variant, pair halves last), each shape a thumbnail; clicking one shows it large with its strokes in two
+alternating inks and each stroke's recipe and match. View only for now. The library loads when the section first
+opens (`useStudioLibrary`), and a shape is swept only when its fold opens, once (a module-level cache): sweeping
+takes a few milliseconds a stroke, about 20 s for the whole library.

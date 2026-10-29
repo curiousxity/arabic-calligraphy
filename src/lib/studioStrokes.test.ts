@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fixture from "./studioStrokes.fixture.json";
-import { CRUMB, penPathOf, strokeInk, validateStudioLibrary, type StudioLibrary, type StudioStroke } from "./studioStrokes";
+import { CRUMB, penPathOf, polygonsPath, shapeInk, strokeInk, studioGroups, validateStudioLibrary, type StudioLibrary, type StudioShape, type StudioStroke } from "./studioStrokes";
 import { polygonArea, sweepPath, unionPolygons } from "./penSweep";
 import * as clipping from "polygon-clipping";
 
@@ -79,5 +79,43 @@ describe("validateStudioLibrary", () => {
   it("names a stroke with no pen", () => {
     const bad = { ...lib, shapes: { x: { ...lib.shapes["001"], strokes: [{ id: "s0", recipe: "pen", pens: [] }] } } } as unknown as StudioLibrary;
     expect(validateStudioLibrary(bad)).toEqual(["x.s0: no pen path"]);
+  });
+});
+
+describe("polygonsPath", () => {
+  it("writes each ring as a closed subpath, holes included", () => {
+    const d = polygonsPath([[[[0, 0], [10, 0], [10, 10]], [[2, 2], [3, 2], [3, 3]]]]);
+    expect(d).toBe("M0 0L10 0L10 10ZM2 2L3 2L3 3Z");
+  });
+
+  it("rounds to a hundredth", () => {
+    expect(polygonsPath([[[[0.123, 1.006], [2, 2], [3, 0]]]])).toBe("M0.12 1.01L2 2L3 0Z");
+  });
+});
+
+describe("shapeInk", () => {
+  it("gives each stroke's ink, in the shape's order", () => {
+    const inks = shapeInk(lib, "001");
+    expect(inks.map((s) => s.id)).toEqual(["s0", "s1", "s2"]);
+    for (const s of inks) expect(polygonArea(s.ink)).toBeGreaterThan(0);
+  });
+});
+
+describe("studioGroups", () => {
+  const shape = (group: string, form: string, variant: number, pairOf?: string): StudioShape =>
+    ({ group, form, variant, ...(pairOf ? { pairOf } : {}), origin: [0, 0], strokes: [] });
+  const many: StudioLibrary = {
+    version: 1, ppn: 25.9, pen: 15.7, shapes: {
+      "015": shape("Ba Ta Tha", "Isolated", 1), "001": shape("Alif", "Isolated", 1), "020": shape("Ba Ta Tha", "Final", 1),
+      "016": shape("Ba Ta Tha", "Initial", 2), "017": shape("Ba Ta Tha", "Initial", 1), "020g": shape("Ba Ta Tha", "Final", 3, "020"),
+    },
+  };
+
+  it("keeps the studio's order of letters, by their first shape", () => {
+    expect(studioGroups(many).map((g) => g.group)).toEqual(["Alif", "Ba Ta Tha"]);
+  });
+
+  it("orders a letter's shapes by form, then variant, pair halves last", () => {
+    expect(studioGroups(many)[1].shapes).toEqual(["015", "017", "016", "020", "020g"]);
   });
 });

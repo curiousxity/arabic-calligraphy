@@ -25,6 +25,7 @@ import { BlockControlsPanel } from "./sidebar/BlockControlsPanel";
 import { MarkPanel } from "./sidebar/MarkPanel";
 import { TarkibPanel } from "./sidebar/TarkibPanel";
 import { MarkPicker } from "./sidebar/MarkPicker";
+import { StudioLettersPanel } from "./sidebar/StudioLettersPanel";
 import type { MarkItem } from "../lib/markLibrary";
 import { TypographyPanel } from "./sidebar/TypographyPanel";
 import { EffectsPanel } from "./sidebar/EffectsPanel";
@@ -477,6 +478,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showMark, setShowMark] = useState(true);
   // Closed by default: four groups of preview buttons are most of a screen.
   const [showMarks, setShowMarks] = useState(false);
+  const [showStudioLetters, setShowStudioLetters] = useState(false);
 
   const [showFileActions, setShowFileActions] = useState(false);
   const [showLayers, setShowLayers] = useState(!isMobile);
@@ -1042,6 +1044,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </CollapsibleSection>
           </div>
         )}
+
+        <div className="sidebarPanel">
+          <CollapsibleSection title="Studio letters" isOpen={showStudioLetters} onToggle={() => setShowStudioLetters((v) => !v)}>
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div className="sidebarTashkeelNote">
+                The studio&apos;s letters as written with the pen, stroke by stroke. Click one to see its strokes.
+              </div>
+              {showStudioLetters && <StudioLettersPanel />}
+            </div>
+          </CollapsibleSection>
+        </div>
 
         <div className="sidebarPanel">
           <CollapsibleSection title="Layers" isOpen={showLayers} onToggle={() => setShowLayers((v) => !v)}>
