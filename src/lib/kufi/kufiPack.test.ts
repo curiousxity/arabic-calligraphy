@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { KUFI_FORMS, dotCells, dotsOf, stretchGlyph, stretchedBase, type KufiGlyph } from "./kufiAlphabet";
 import { emptyBlocks2x2, inkBlocks2x2, rotateRows, type Turn } from "./kufiGrid";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
@@ -252,6 +252,23 @@ describe("budgets", () => {
     expect(_internal.stats.work).toBeLessThanOrEqual(_internal.REPACK_WORK);
     expect(again.ok).toBe(true);
   }, 20000);
+
+  it("a fresh pack with a genuinely conflicting pin ends within its bound (2 x CALL_BUDGET_MS, 3x for load)", () => {
+    const r = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const a = r.placements[1];
+    const b = { ...r.placements[2], col: a.col, row: a.row, turn: a.turn };
+    _internal.clearCaches();
+    const t = performance.now();
+    const out = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, edits: { pinned: { 1: a, 2: b } } });
+    expect(performance.now() - t).toBeLessThan(3 * 2 * _internal.CALL_BUDGET_MS);
+    expect(out.ok).toBe(false);
+  }, 60000);
+
+  it("a fresh pack with pins is bounded by twice a call's budget", () => {
+    expect(_internal.PINNED_CALL_MS).toBe(2 * _internal.CALL_BUDGET_MS);
+  });
 
   it("the first draft's clock stops below 2000 ms", () => {
     expect(_internal.FIRST_DRAFT_CLOCK_MS).toBeLessThan(2000);
@@ -613,6 +630,42 @@ describe("pins taken from a packed panel, packed fresh (a saved panel reloaded)"
     expect(reloaded.ok).toBe(true);
     if (reloaded.ok) expect(reloaded.placements[k]).toEqual(preview.placements[k]);
   }, 30000);
+});
+
+describe("pins taken from a packed panel: determinism and conflicts", () => {
+  it("with the clock override a repack never reads the wall clock", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    const edits = { stretch: { 2: [1] } };
+    const quiet = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits });
+    expect(quiet.ok).toBe(true);
+    // a clock that races ahead a second on every reading: a heavily loaded machine
+    const real = performance.now.bind(performance);
+    let skew = 0;
+    const spy = vi.spyOn(performance, "now").mockImplementation(() => real() + (skew += 1000));
+    try {
+      const loaded = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits });
+      expect(loaded).toEqual(quiet);
+    } finally {
+      spy.mockRestore();
+    }
+  }, 30000);
+
+  it("two pins on the same cells still give pinConflict after the fallbacks", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    const a = r.placements[1];
+    // unit 2 pinned on top of unit 1
+    const b = { ...r.placements[2], col: a.col, row: a.row, turn: a.turn };
+    const out = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, edits: { pinned: { 1: a, 2: b } } });
+    expect(out).toEqual({ ok: false, reason: "pinConflict", suggestions: [] });
+  }, 60000);
+
+  it("fitKufiPanel takes the same pinned path, so a reloaded edit keeps its size", () => {
+    const draft = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    const preview = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: draft, edits: { stretch: { 2: [2] } } }), BAQARAH);
+    const committed = { stretch: { 2: [2] }, pinned: { 2: preview.placements[2] } };
+    _internal.clearCaches();
+    expect(fitKufiPanel(BAQARAH, committed)).toEqual({ cols: 21, rows: 21 });
+  }, 60000);
 });
 
 describe("the form rule", () => {

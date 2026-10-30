@@ -332,8 +332,6 @@ export function kufiFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">): KufiGlyp
   return table[unit.skeleton]?.[unit.form] ?? table[unit.skeleton]?.isolated ?? [];
 }
 
-const formsOf = kufiFormsOf;
-
 /** The applied counts, padded to the glyph's slices; values outside the table's limits are clamped. */
 function normalCounts(g: KufiGlyph, counts: number[]): number[] {
   return g.stretch.map((s, i) => {
@@ -344,7 +342,7 @@ function normalCounts(g: KufiGlyph, counts: number[]): number[] {
 
 function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins: Map<number, Pin>): Letter[] {
   return units.map((u, i) => {
-    const all = formsOf(u);
+    const all = kufiFormsOf(u);
     const pin = pins.get(i) ?? null;
     const form = edits.forms?.[i];
     const fixed = edits.stretch?.[i];
@@ -2037,8 +2035,10 @@ const WORK_PER_MS = 400;
 /**
  * Panels up to this many cells may run past the clock budget, to this factor,
  * before their work budget is spent, so a busy machine still gives the same
- * panel. Never past FIRST_DRAFT_CLOCK_MS: a call ends inside 2000 ms whatever
- * the load, and only then can a loaded machine give a different panel.
+ * panel. Never past FIRST_DRAFT_CLOCK_MS: a search ends inside 2000 ms
+ * whatever the load, and only then can a loaded machine give a different
+ * panel. (A call is one search, except a fresh pack with pins: see
+ * PINNED_CALL_MS.)
  */
 const LOOSE_CLOCK_CELLS = 32 * 32;
 const LOOSE_CLOCK = 2.5;
@@ -2147,7 +2147,7 @@ function boxCell(turn: Turn, h: number, w: number, row: number, col: number, i: 
 
 /** Which of the `DOT_SHIFT` ways the placed letter's dots are inked in `cells`, or 0. */
 function dotsDrawn(text: string, unit: KufiUnit, p: KufiPlacement, cells: Uint8Array, cols: number, rows: number): number {
-  const g = formsOf(unit).find((x) => x.id === p.glyphId);
+  const g = kufiFormsOf(unit).find((x) => x.id === p.glyphId);
   if (!g) return 0;
   const d = unit.skeleton === "allah" || unit.skeleton === "lamAlef" ? null : dotsOf(text[unit.textOffset] ?? "", unit.form);
   if (!d) return 0;
@@ -2177,7 +2177,7 @@ function explicitPins(units: KufiUnit[], edits: KufiPanelEdits): Map<number, Pin
   for (const [k, p] of Object.entries(edits.pinned ?? {})) {
     const i = Number(k);
     const u = units[i];
-    const g = u && p.key === u.key ? formsOf(u).find((x) => x.id === p.glyphId) : undefined;
+    const g = u && p.key === u.key ? kufiFormsOf(u).find((x) => x.id === p.glyphId) : undefined;
     // a stretch the glyph cannot take would be quietly corrected: a moved pin
     if (!g || !sameCounts(normalCounts(g, p.stretch), p.stretch)) return null;
     pins.set(i, pinOf(p, null, true));
@@ -2257,7 +2257,7 @@ function outOfRoom(text: string, cols: number, rows: number): boolean {
   let need = 0;
   units.forEach((u, k) => {
     let w = Infinity;
-    for (const g of formsOf(u)) w = Math.min(w, (g.rows[0]?.length ?? 1) - (g.inset?.right ?? 0) - (g.inset?.left ?? 0));
+    for (const g of kufiFormsOf(u)) w = Math.min(w, (g.rows[0]?.length ?? 1) - (g.inset?.right ?? 0) - (g.inset?.left ?? 0));
     need += (Number.isFinite(w) ? w : 1) + (k > 0 && units[k - 1].joinsNext ? -1 : 1);
   });
   const rings = Math.max(1, Math.floor((Math.min(cols, rows) - 1) / (2 * (BAND + 1))) + 1);
@@ -2270,7 +2270,7 @@ function outOfRoom(text: string, cols: number, rows: number): boolean {
 function estimateSide(units: KufiUnit[]): number {
   let area = 0;
   for (const u of units) {
-    const g = formsOf(u)[0];
+    const g = kufiFormsOf(u)[0];
     if (g) area += g.rows.length * g.rows[0].length;
   }
   return Math.max(3, Math.round(Math.sqrt(area * AREA_FACTOR)));
@@ -2341,7 +2341,7 @@ function lineKeys(units: KufiUnit[], prev: KufiPlacement[]): string[] {
   const keys: string[] = [];
   prev.forEach((p, k) => {
     const u = units[k];
-    const g = formsOf(u).find((x) => x.id === p.glyphId);
+    const g = kufiFormsOf(u).find((x) => x.id === p.glyphId);
     const startsLine = k === 0 || !units[k - 1].joinsNext || prev[k - 1].turn !== p.turn;
     if (!g || !startsLine) {
       keys.push(keys[k - 1] ?? "?");
@@ -2358,7 +2358,7 @@ function sameCounts(a: number[], b: number[]): boolean {
 
 /** Cells (row-major indices) a placement's glyph box covers. */
 function boxIndices(p: KufiPlacement, units: KufiUnit[], cols: number, rows: number): number[] {
-  const g = formsOf(units[p.unitIndex]).find((x) => x.id === p.glyphId);
+  const g = kufiFormsOf(units[p.unitIndex]).find((x) => x.id === p.glyphId);
   if (!g) return [];
   const sh = shapeOf(g, normalCounts(g, p.stretch));
   const tall = p.turn === 0 || p.turn === 2;
@@ -2389,7 +2389,7 @@ function repack(
   const dirty = new Set<number>();
   units.forEach((u, k) => {
     const p = prev[k];
-    const g = formsOf(u).find((x) => x.id === p.glyphId);
+    const g = kufiFormsOf(u).find((x) => x.id === p.glyphId);
     if (edits.forms?.[k] !== undefined && edits.forms[k] !== p.glyphId) dirty.add(k);
     if (edits.stretch?.[k] && g && !sameCounts(normalCounts(g, edits.stretch[k]), p.stretch)) dirty.add(k);
     const pin = edits.pinned?.[k];
@@ -2416,7 +2416,8 @@ function repack(
   let best: Final | null = null;
   let workLeft = REPACK_WORK;
   for (const free of rounds) {
-    const left = REPACK_BUDGET_MS - (performance.now() - t0);
+    // under the tests' clock override every round gets the whole budget: no wall clock at all
+    const left = clockOverride !== null ? REPACK_BUDGET_MS : REPACK_BUDGET_MS - (performance.now() - t0);
     if (left <= 0 || workLeft <= 0) break;
     const pins = new Map(explicit);
     units.forEach((u, k) => {
@@ -2441,6 +2442,11 @@ function repack(
  * onto a fresh pack of the edits without their pins. Only when neither holds
  * the pins does a fresh search with them decide, and only it may report a
  * conflict.
+ *
+ * The whole path ends by PINNED_CALL_MS (2 × CALL_BUDGET_MS): each search
+ * gets at most what is left of it, and a step that cannot start in time is
+ * skipped. The first draft always has its full budget (it must be the same
+ * draft the session had).
  */
 function packPinned(
   text: string,
@@ -2450,21 +2456,32 @@ function packPinned(
   edits: KufiPanelEdits,
   explicit: Map<number, Pin>
 ): Final | null {
+  const deadline = clockOverride !== null ? Infinity : performance.now() + PINNED_CALL_MS;
+  const left = () => Math.min(PACK_BUDGET_MS, deadline - performance.now());
   const bases: KufiPanelEdits[] = [{}, { ...edits, pinned: undefined }];
   const tried = new Set<string>();
   for (const baseEdits of bases) {
     const key = JSON.stringify(baseEdits);
     if (tried.has(key)) continue;
     tried.add(key);
-    const base = freshFinal(text, cols, rows, baseEdits, new Map(), PACK_BUDGET_MS);
+    if (left() < MIN_SEARCH_MS) return null;
+    const base = freshFinal(text, cols, rows, baseEdits, new Map(), left());
     if (!base?.packed) continue;
     const prev = okResult(units, base, cols, rows, baseEdits);
     if (!prev.ok) continue;
     const f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit);
     if (f?.packed) return f;
   }
-  return freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS);
+  if (left() < MIN_SEARCH_MS) return null;
+  return freshFinal(text, cols, rows, edits, explicit, left());
 }
+
+/**
+ * A fresh pack with pins (`packPinned`) ends within this. It is longer than a
+ * plain call's CALL_BUDGET_MS, since rebuilding a saved panel may take a
+ * draft, a repack and a fresh search; it runs in the worker.
+ */
+const PINNED_CALL_MS = 2 * 1750; // 2 × CALL_BUDGET_MS
 
 /**
  * Packs `text` into a box of `cols` x `rows` cells. With `previous` (a packed
@@ -2480,7 +2497,7 @@ export function packKufiPanel(input: {
   edits?: KufiPanelEdits;
   previous?: KufiPackResult;
 }): KufiPackResult {
-  const t0 = performance.now();
+  let t0 = performance.now();
   const { text, cols, rows } = input;
   const edits = input.edits ?? {};
   const { units } = resolveKufiText(text);
@@ -2499,8 +2516,11 @@ export function packKufiPanel(input: {
   ) {
     f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit);
     repacked = true;
-  } else if (explicit.size > 0) f = packPinned(text, units, cols, rows, edits, explicit);
-  else f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS);
+  } else if (explicit.size > 0) {
+    f = packPinned(text, units, cols, rows, edits, explicit);
+    // the pinned path spends its own bound; suggestions get a call's budget of their own
+    t0 = performance.now();
+  } else f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS);
   if (f?.packed) return okResult(units, f, cols, rows, edits);
   // after an edit the box is the user's: say why, but do not spend a first draft's time on other sizes
   return failure(text, units, f, cols, rows, edits, repacked ? 0 : t0 + CALL_BUDGET_MS);
@@ -2509,7 +2529,11 @@ export function packKufiPanel(input: {
 /** Suggestions skip a size when less than this is left. */
 const MIN_SEARCH_MS = 250;
 
-/** A whole call, suggestions included, ends within this (a search step may overrun its deadline a little). */
+/**
+ * A whole call, suggestions included, ends within this (a search step may
+ * overrun its deadline a little). A fresh pack with pins is the exception: it
+ * may take PINNED_CALL_MS, then this again for its suggestions.
+ */
 export const CALL_BUDGET_MS = 1750;
 
 /** A square size that packs `text`, trying sizes round an estimate; the closest attempt when none does. */
@@ -2522,7 +2546,8 @@ export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}): { cols: 
   const t0 = performance.now();
   for (const n of sizesFrom(est, 0)) {
     if (performance.now() - t0 > FIT_BUDGET_MS) break;
-    const f = freshFinal(text, n, n, edits, pins, PACK_BUDGET_MS);
+    // the same path a pack takes, so a size fit calls packable is one a pack packs
+    const f = pins.size > 0 ? packPinned(text, units, n, n, edits, pins) : freshFinal(text, n, n, edits, pins, PACK_BUDGET_MS);
     if (f?.packed) return { cols: n, rows: n };
     if (f && (!best || f.score < best.score)) best = { n, score: f.score };
   }
@@ -2562,7 +2587,7 @@ function alignUnits(oldUnits: KufiUnit[], newUnits: KufiUnit[]): Map<number, num
 export function reconcileEdits(edits: KufiPanelEdits, oldUnits: KufiUnit[], newUnits: KufiUnit[]): KufiPanelEdits {
   const to = alignUnits(oldUnits, newUnits);
   const stale = new Set<number>();
-  const fits = (k: number, glyphId: string) => !!newUnits[k] && formsOf(newUnits[k]).some((g) => g.id === glyphId);
+  const fits = (k: number, glyphId: string) => !!newUnits[k] && kufiFormsOf(newUnits[k]).some((g) => g.id === glyphId);
   for (const [k, p] of Object.entries(edits.pinned ?? {})) {
     const j = to.get(+k);
     if (j === undefined || p.key !== newUnits[j].key || !fits(j, p.glyphId)) stale.add(+k);
@@ -2575,7 +2600,7 @@ export function reconcileEdits(edits: KufiPanelEdits, oldUnits: KufiUnit[], newU
     const j = to.get(+k);
     if (j === undefined || !fits(j, id)) stale.add(+k);
   }
-  const maxSlices = (j: number) => Math.max(0, ...formsOf(newUnits[j]).map((g) => g.stretch.length));
+  const maxSlices = (j: number) => Math.max(0, ...kufiFormsOf(newUnits[j]).map((g) => g.stretch.length));
   const carry = <T,>(m: Record<number, T> | undefined, ok: (j: number, v: T) => boolean): Record<number, T> | undefined => {
     if (!m) return undefined;
     const out: Record<number, T> = {};
@@ -2623,6 +2648,8 @@ export const _internal = {
   beamPass,
   search,
   setClockOverride,
+  CALL_BUDGET_MS,
+  PINNED_CALL_MS,
   better,
   devOf,
   placedList,
