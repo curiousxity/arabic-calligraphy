@@ -85,7 +85,7 @@ Because handlers reference each other via closures declared later in the same fu
 
 ### The `Block` discriminated union (`src/types.ts`)
 
-Everything drawn on the canvas is a `Block`: `TextBlock | ShapeFillBlock | TextPathBlock` (plus `MirrorBlock`, `GuideBlock` — a guide is an export-hidden construction path, see guides.md — `StackBlock`, a baked stacked composition, see stacked-compositions.md, and `MarkBlock`, a loose pen piece from the mark library, see marks.md), discriminated by `type`. All of them share a large `BlockCommon` (position, font fields, stroke/shadow, `groupId`, lock state, etc.) even where a variant doesn't conceptually need them (e.g. `GuideBlock` still carries unused `text`/`fontSize`/`color`/`fontFamily` because `BlockCommon` requires them) — this is an intentional simplification, not an oversight.
+Everything drawn on the canvas is a `Block`: `TextBlock | ShapeFillBlock | TextPathBlock` (plus `MirrorBlock`, `GuideBlock` — a guide is an export-hidden construction path, see guides.md — `StackBlock`, a baked stacked composition, see stacked-compositions.md, `MarkBlock`, a loose pen piece from the mark library, see marks.md, and `KufiPanelBlock`, text packed into one square-Kufi box, see kufi-panel.md), discriminated by `type`. All of them share a large `BlockCommon` (position, font fields, stroke/shadow, `groupId`, lock state, etc.) even where a variant doesn't conceptually need them (e.g. `GuideBlock` still carries unused `text`/`fontSize`/`color`/`fontFamily` because `BlockCommon` requires them) — this is an intentional simplification, not an oversight.
 
 Because `Partial<Block>` patches spread onto a `Block` union member don't type-check cleanly across six variants, the two generic update paths (`updateBlock`, `updateSelectedBlock` in `App.tsx`) cast the result `as Block`. This is a deliberate, narrow trust-the-caller escape hatch — don't propagate `as Block` elsewhere; fix the type properly if a new case needs it.
 
@@ -95,7 +95,7 @@ Because `Partial<Block>` patches spread onto a `Block` union member don't type-c
 
 ### Rendering: one Konva component per block type
 
-`CanvasStage.tsx` maps `blocks` to one of `ShapedText` (text), `ShapeFillText` (shapeFill), `TextOnPathText` (textPath), `MirrorBlockView` (mirror, which draws its source's own renderer), `StackView` (stack), `MarkView` (mark), or `GuideView` (guide, drawn above all other blocks), each a `react-konva` `Group`. Common per-block wiring (id, draggable, click/drag handlers) is built once as `commonProps` and spread into whichever component renders.
+`CanvasStage.tsx` maps `blocks` to one of `ShapedText` (text), `ShapeFillText` (shapeFill), `TextOnPathText` (textPath), `MirrorBlockView` (mirror, which draws its source's own renderer), `StackView` (stack), `MarkView` (mark), `KufiPanelView` (kufiPanel, one traced outline from the packer's lattice), or `GuideView` (guide, drawn above all other blocks), each a `react-konva` `Group`. Common per-block wiring (id, draggable, click/drag handlers) is built once as `commonProps` and spread into whichever component renders.
 
 - **`ShapedText.tsx`** — a normal text block; single shaped run.
 - **`ShapeFillText.tsx`** — *tiles* the shaped text in repeating rows to fill an uploaded SVG shape's silhouette (scanline + ray-casting against a sampled polygon), auto-scaling each row to span the shape width exactly.

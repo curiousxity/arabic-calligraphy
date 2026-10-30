@@ -28,19 +28,26 @@ them would see a new block deleted from its own save. New fields are
 
 Stroke = gap = one cell. No 2x2 of ink anywhere, and no empty 2x2 either
 (see below). A letter's ink is 4-connected; joins and turns are single-cell
-runs. Letters change only by stretching a marked row or column in whole
-cells, or by swapping to another authored form, never by scaling. No
+runs. Letters change only by stretching or shortening a marked row or column
+in whole cells (shortening down to the form's `min`), or by swapping to
+another authored form, never by scaling. No
 tashkeel: harakat in the input are dropped silently. `kufiGrid.ts` holds the
 shared cell arithmetic (`cellRings`, `packedCells`, `applyCellEdits`);
 `kufiAlphabet.ts` the authored forms (`KUFI_FORMS`, stretch points, joins,
 `dotCells`); `kufiWords.ts` turns text into `KufiUnit`s (one per letter or
 ligature, with a `key`, a `wordIndex` and a UTF-16 `textOffset`).
+**Presentation forms** (U+FB50–U+FDFF, U+FE70–U+FEFF: ﷲ, the lam-alef forms
+ﻻ ﻼ ﻷ ﻸ ﻹ ﻺ ﻵ ﻶ, shaped single letters) are normalised NFKC to their letters
+before resolving; every unit made from one carries the form's own
+`textOffset`, so edits keyed on it still find their place.
 
 ## The packer (`kufiPack.ts`, pure)
 
-`packKufiPanel(text, cols, rows, edits, previous?)` returns `ok:true` with
-`cells`, `placements` and `editsBreakPacking`, or `ok:false` with a reason
-(`tooShort`, `tooLong`, `pinConflict`) and size suggestions.
+`packKufiPanel({ text, cols, rows, edits?, previous? })` returns `ok:true`
+with `cells`, `placements` and `editsBreakPacking`, or `ok:false` with a
+reason (`tooShort`, `tooLong`, `pinConflict`) and size suggestions
+(`pinConflict` never has any: the pins hold absolute cells, so other sizes
+are no better).
 
 - **Structure.** Words run clockwise round the frame from the bottom right,
   every baseline on the outer edge: bottom line upright, left line turned and
@@ -103,16 +110,26 @@ unit `key` so a stale save is detected, not misapplied: `forms`, `stretch`,
 - **Text changes.** `reconcileEdits(edits, oldUnits, newUnits)` (the signature
   the plan gave could not detect shifts) aligns old and new units by diff and
   moves each edit with its letter; edits on removed letters are dropped.
-  `kufiPanelTextPatch` is the one place a text change goes through it. Limit:
-  alignment is by key, so with **repeated identical letters** (the two lams of
-  الله) an edit can land on a neighbouring copy when a copy is inserted or
-  deleted next to it.
+  `kufiPanelTextPatch` is the one place a text change goes through it.
+  `alignUnits` first matches the untouched runs at both ends (same key and
+  `textOffset` for the prefix; same key and the text's length shift for the
+  suffix) and runs the LCS on the keys of the middle only, so a single insert
+  or delete beside **repeated identical letters** (a ي typed before يكلف)
+  leaves the edit on the letter it was made on. Only an edit inside a run of
+  identical keys that itself changed is still ambiguous, and then the
+  earliest copy takes it.
 - **Pins.** Only `pinned` fixes a place; a `forms` or `stretch` edit keeps the
   edit, not the position. The **UI** pins the edited unit at its resulting
   placement when a gesture commits (the packer never pins by itself), so later
   repacks hold it. Only **explicit** pins (from `edits.pinned`) can cause
   `pinConflict`; pins the packer adds during a repack are implicit and are
-  dropped in its last round.
+  dropped in its last round. Pins hold **absolute cells**, so they survive a
+  size change, a Fit (which packs every candidate size with them) and a text
+  change, and a pinned panel set to a size its pins do not fit is empty with
+  `pinConflict`. **Release hand edits** (`kufiReleasePins`, the button in the
+  Kufi panel section whenever `pinned` is non-empty, on the `pinConflict` line
+  when there is one) drops `pinned` and `routes` (a route is the record of a
+  pin's drag) and keeps `forms`, `stretch` and `cells`, as one undo step.
 - **Routes are a record only.** The packer does not read `routes`. A word
   moves by a pin on its first letter, with the word's other pins released so
   its letters follow; the route number is what the next drag starts from.
@@ -182,17 +199,37 @@ arithmetic), like Next Shape; outline, handle and the e2e marker are
 is a stage listener, not a node drag.
 
 Priority on mouse down: **Alt first** (paints, claims the press whatever is
-under it) -> a **stretch handle** (`hitStretchEnd`; hover shows only the end
-nearest the pointer, or a **slice grip** on a stretchable slice with no free
-end) -> a **word's first letter** (`hitWordStart`, drags the word) -> any other
-letter, not claimed: a press that drifts drags the whole panel, a **still
-press (within `CLICK_SLOP`) is a click that cycles the letter's form** among
-alternates that pack (skipping those that do not; a click that finds none says
-so). Alt-click toggles a cell, Alt-drag paints every cell crossed the way the
-first went; a cell that would make a solid 2x2 is refused and its outline
-flashes red for `FLASH_MS` = 300. Painting never repacks (`kufiPaint.ts`
-arithmetic), one undo step per click or drag; Alt's default (the Windows menu
-bar) is suppressed while the pointer is over the panel.
+under it) -> a **handle** -> any other cell of a letter, not claimed: a press
+that drifts drags the whole panel, a **still press (within `CLICK_SLOP`) is a
+click that cycles the letter's form** among alternates that pack (skipping
+those that do not; a click that finds none says so).
+
+A letter's handles are its **stretch ends** (`stretchEnds`; an `end` is the
+last cell of a stroke a stretch point lengthens, or a **slice grip** on a
+stretchable slice with no free end) and, for a **word's first letter, its
+route handle** (`routeHandleOf`: the leading cell of the letter's box, on the
+baseline side; dragging it moves the word along its line). Hover shows **one
+square**, the handle whose drawn square (`handleCentre`) is nearest the
+pointer. A handle's hit cells are its own and the paper cell its square
+straddles onto (`hitStretchEnd`, `hitRouteHandle`); where a stretch end and a
+route handle share a cell (a first letter's leading corner is often a
+stroke's end) the pointer's place in the cell decides, so what hover shows is
+what a press takes. A press anywhere else on a first letter is the letter's
+own (panel drag or click), never the word's. `KufiEditTargets.words` (e2e)
+publishes a point on each route handle's square.
+
+Alt-click toggles a cell, Alt-drag paints every cell crossed the way the
+first went: the cells between two pointer samples are filled in
+(`cellsBetween`, a 4-connected Bresenham walk), each painted on its own, so a
+fast hand paints the same line as a slow one and each cell gets the 2x2
+check. A cell that would make a solid 2x2 is refused and its outline flashes
+red for `FLASH_MS` = 300. Painting never repacks (`kufiPaint.ts` arithmetic),
+one undo step per click or drag; Alt's default (the Windows menu bar) is
+suppressed while the pointer is over the panel. A window blur mid-gesture
+aborts it (nothing commits) and clears the drawn chrome.
+
+A new panel has `fontSize` 112 (14 px cells): `CLICK_SLOP` (10 px) and the
+handle (0.7 cell) must stay under a cell for the tools to be usable at 100%.
 
 Stretch and word drags ask the worker for a repack per cell crossed
 (`previewKufiLayout`, newest wins) and keep showing the last preview that
@@ -219,6 +256,11 @@ check a layout use the clock override; do not add wall-clock assertions.
   there are few corner / turn options. Making them pack is first on the future
   plan.
 - **Moving a word mostly refuses on tight panels** (the Baqarah finding above).
+- **A Fit with pins can run about 12.5 s** (`FIT_BUDGET_MS` is checked between
+  sizes, plus one `PINNED_CALL_MS`), under the 30 s watchdog but ahead of every
+  other job in `pump`, so drag previews wait for it. Export packs on the main
+  thread what the cache lacks (up to about 5 s for a pinned panel plus
+  suggestions).
 - **A dot or filler square under a removed paint edit** reads as paper to the
   paint tool (the result carries no dot list), so it can be painted over wrongly.
 - **Touch has no Alt-paint**, and a touch press on a handle does not set

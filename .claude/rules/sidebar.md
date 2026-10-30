@@ -48,7 +48,10 @@ contiguous run, instead of interleaving with the permanent ones.
 
 Not every panel shows for every type. **Font and Content** hide for a
 mirror, a guide and a stacked composition: a mirror draws its source, a
-guide is a path, and a stack is a bake that nothing re-shapes.
+guide is a path, and a stack is a bake that nothing re-shapes. A **Kufi
+panel** keeps Content (its text is typed there) but hides the Font panel
+and, inside Content, the Tashkeel library, Clear diacritics and the Presets:
+it has no font and draws no harakat (see [kufi-panel.md](kufi-panel.md)).
 **Typography** hides for a mirror, a guide and a mark (a stacked
 composition keeps it); the Mark type panel carries its own size, colour and
 Rotation rows (see [marks.md](marks.md)). **Effects** hides only for a guide, which is never
