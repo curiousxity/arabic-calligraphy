@@ -50,6 +50,9 @@ the deferred-features lines, and `.claude/rules/square-kufi.md`.
 `kufiComposition`, `kufiLineGap`, `kufiWordGap`, `kufiCellEdits` and
 `kufiCellEditMode` are in `REMOVED_BLOCK_FIELDS`.
 
+**Returned 2026-10-30 as `kufiPanel`** (new names, deliberately: the old ones
+are stripped on load) — see [kufi-panel.md](kufi-panel.md).
+
 ### Horizontal and vertical warp
 
 **What went:** `lib/warp.ts` and its test, `warpX`/`warpY` on `BlockCommon`,

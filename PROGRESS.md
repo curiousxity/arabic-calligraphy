@@ -101,6 +101,19 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-30 — Kufi panel (square Kufi, single box) — on `claude/kufi-square`, not merged
+
+- **Kufi panel** block: text packed into one box of cells and drawn as one
+  traced outline. Add Kufi panel button, Kufi panel sidebar section (size,
+  Fit, status line), canvas edits (stretch, swap, move a word, Alt-paint),
+  user-guide page. How it works: [kufi-panel.md](.claude/rules/kufi-panel.md).
+  Awaiting the user's trial in the app.
+- Known limits, details in the note: most texts do not pack (Shahada does not
+  at any size; Al-Baqarah-like texts do); moving a word is refused on tight
+  panels; a dot or filler square under a removed paint edit reads as paper;
+  touch has no Alt-paint; `e2e/kufi-panel.spec.ts` is load-sensitive in
+  parallel runs. `e2e/marks.spec.ts` fails independently of this work.
+
 ### 2026-10-16 — Mark library
 
 - **Marks panel**: 67 loose pen pieces (strokes & tails, heads & loops,

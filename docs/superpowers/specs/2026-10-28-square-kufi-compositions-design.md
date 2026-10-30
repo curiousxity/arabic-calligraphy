@@ -223,7 +223,20 @@ modules and e2e.
 
 ## Future build plan (not this build)
 
-In the user's order of mention, after the single box ships:
+**Single box: built on the branch `claude/kufi-square` (2026-10-30), awaiting
+the user's trial in the app; not merged.** How it works:
+`.claude/rules/kufi-panel.md`.
+
+Next, before the shapes below:
+
+- **Make most texts pack.** Today only texts like Al-Baqarah fill a box. More
+  words per band and more corner and turn options are needed, with the Shahada
+  as the test (it does not pack at any size).
+- **A decision for the user:** should moving a word be allowed to re-arrange
+  the rest of the panel? Today it only frees the letters before it, so on tight
+  panels nothing moves.
+
+The user's original order of mention follows, after the single box:
 
 1. **Single shape** — triangle, diamond, trapezoid, octagon frames (the
    mosaic panels). Needs a lattice clipped to a polygon, and likely 45°

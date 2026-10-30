@@ -36,7 +36,7 @@ panel title so it groups without competing):
 |---|---|
 | `document` | Start from a Template · Artboard & Grid |
 | `canvas` | Block Controls (Add · Selected · History) · Marks · Layers · Align & Arrange |
-| `selected` | **Font** · Content · *type panel* (Verse / Mirror / Shape Fill / Guide / Stacked composition / Mark / Curve) · Typography · Effects |
+| `selected` | **Font** · Content · *type panel* (Verse / Mirror / Shape Fill / Guide / Stacked composition / Mark / Kufi panel / Curve) · Typography · Effects |
 
 Then Shortcuts and **Save & Export**, outside any tier. Save & Export
 (formerly Project & Export) moved to the very bottom on 2026-10-16: it is
@@ -135,8 +135,8 @@ deliberate action and a second confirmation on top was redundant
 friction.
 
 **Block Controls is three labelled groups on fixed grids**, not one
-wrapping row. `Add` holds six buttons — text, shape fill, curved text;
-guide, mirror (muthanna), medallion — on a 3-column grid, two rows.
+wrapping row. `Add` holds seven buttons — text, shape fill, curved text, Kufi panel;
+guide, mirror (muthanna), medallion — on a 4-column grid, two rows.
 `Selected` (duplicate, delete) and `History` (undo, redo, history) share a
 line below it. Add medallion (2026-10-16) replaced Content's Compositions
 wizard; see [compositions.md](compositions.md).
@@ -148,11 +148,12 @@ rather than a layout. Columns are fixed so the shape is chosen rather than
 emergent. The split also moves the destructive `Delete` out of the leading
 position, where it sat immediately beside `Duplicate`.
 
-**The Add grid is three columns** (`.blockControlGrid--add` in `index.css`).
+**The Add grid is four columns** (`.blockControlGrid--add` in `index.css`).
 At the sidebar's 220px minimum the row is 171px wide: five 34px buttons fit
-in one row only with no gap at all, and six never do, so the sixth button
-made it two rows of three, which keeps the shared 8px gap. A seventh button
-means redoing that arithmetic.
+in one row only with no gap at all, so a row of four keeps the shared 8px gap
+and seven buttons make two rows (four, then three). It was three columns
+while there were six buttons; Add Kufi panel was the seventh. An eighth is
+fine; a ninth means redoing the arithmetic.
 
 Icon-button labels follow **sentence case and name the outcome**, not the
 mechanism: `Add shape fill`, not "Upload SVG for Shape Fill". The `title`
@@ -204,8 +205,8 @@ is disabled most of the time. It is used in two places:
 - **Checkbox rows.** `CheckboxRow`'s optional `demo` adds a `DemoHint` play
   icon beside the label, never inside it, because a button inside a
   `<label>` toggles the checkbox. It is used by the Diacritic tool row.
-- **Four of the six Add buttons** (text, shape fill, curved text, mirror;
-  Add guide and Add medallion have no recording, so they keep a plain
+- **Four of the seven Add buttons** (text, shape fill, curved text, mirror;
+  Add guide, Add medallion and Add Kufi panel have no recording, so they keep a plain
   `title`). Each button is its own anchor (the grid has no room for icons) with a 400 ms hover-intent delay, so sweeping
   across the row doesn't flash a popover per button. Their `title`s were removed and the
   same text now shows as the popover caption, since a native tooltip would
