@@ -434,6 +434,60 @@ test.describe("editing on the canvas", () => {
     await dragMouse(page, letter, { x: letter.x + 120, y: letter.y + 60 });
     await expect.poll(async () => (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x).toBeGreaterThan(x0 + 10);
     expect(await panelEdits(page)).toBeUndefined();
+
+    // A jittery click (a few px of drift) nudges the panel and is not also a
+    // form change: one step, not two.
+    // (past the history's 300 ms coalescing window, so the nudge is a step of its own)
+    await page.waitForTimeout(400);
+    const x1 = (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x;
+    const again = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
+    await page.mouse.move(again.x, again.y);
+    await page.mouse.down();
+    await page.mouse.move(again.x + 4, again.y + 2, { steps: 3 });
+    await page.mouse.up();
+    await expect.poll(async () => (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x).not.toBe(x1);
+    await page.waitForTimeout(600);
+    expect(await panelEdits(page)).toBeUndefined();
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x).toBe(x1);
+  });
+
+  test("hovering a letter shows one handle, the stretch end nearest the pointer", async ({ page }) => {
+    await openBaqarahPanel(page);
+    const targets = await kufiEditTargets(page);
+    const letter = targets.letters.find((l) => l.unit === 2)!;
+    expect(targets.ends.filter((e) => e.unit === 2).length).toBeGreaterThan(1);
+    await page.mouse.move(letter.x, letter.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-hover-outline")).toBeGreaterThan(0);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(1);
+  });
+
+  test("a baseline joined on both sides still has a grip on its stretch slice", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const before = await inkSignature(page, box);
+    const cellPx = 6 * (await getStageScale(page));
+    // unit 8, seen:medial on the top line: no free end, so its column slice carries the grip
+    const grips = (await kufiEditTargets(page)).ends.filter((e) => e.unit === 8);
+    expect(grips.length).toBeGreaterThan(0);
+    expect(grips.every((g) => g.kind === "slice" && g.dr === 0)).toBe(true);
+    const grip = grips[0];
+
+    await page.mouse.move(grip.x, grip.y);
+    await settleFrames(page);
+    expect(await hitTargetAt(page, grip)).toBe("Rect.kufi-edit-hit");
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(1);
+
+    // The top line is full, so no stretch of it packs: the pull snaps back and says so.
+    await page.mouse.down();
+    await page.mouse.move(grip.x + grip.dc * 2 * cellPx, grip.y, { steps: 12 });
+    await page.waitForTimeout(1200);
+    await page.mouse.up();
+    await expect(kufiPanel(page)).toContainText("No room to stretch that here");
+    expect(await panelEdits(page)).toBeUndefined();
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).toEqual(before);
   });
 
   test("dragging a stretch end two cells previews live, commits one step on release, and undoes", async ({ page }) => {

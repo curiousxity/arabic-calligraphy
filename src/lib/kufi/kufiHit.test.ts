@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { hitKufiUnit, hitStretchEnd, kufiFormsOf, kufiGlyphById, placementInk, stretchEnds, unitRings } from "./kufiHit";
+import {
+  hitKufiUnit,
+  hitStretchEnd,
+  kufiFormsOf,
+  kufiGlyphById,
+  nearestStretchEnd,
+  placementInk,
+  placementOf,
+  stretchEnds,
+  unitRings,
+} from "./kufiHit";
 import type { KufiPackResult, KufiPlacement } from "./kufiPack";
 import { resolveKufiText } from "./kufiWords";
 
@@ -166,5 +176,79 @@ describe("unitRings", () => {
     expect(rings).toHaveLength(1);
     expect(rings[0]).toEqual(expect.arrayContaining([[1, 1], [2, 1], [2, 8], [1, 8]]));
     expect(unitRings(r, 7)).toEqual([]);
+  });
+});
+
+describe("a slice with no free end", () => {
+  /**
+   * `beh.isolated.0` ("#...#" / "#...#" / "#####") at col 3, row 2, with ink
+   * just beyond both ends of its baseline, as a joined neighbour would be: no
+   * stroke end is free, so the slice's run (columns 1–3, the "..#" columns
+   * the column stretch repeats) carries the handle instead.
+   */
+  function joined(): Ok {
+    const cols = 12;
+    const rows = 8;
+    const placements: KufiPlacement[] = [
+      { unitIndex: 0, key: "beh:isolated", glyphId: "beh.isolated.0", col: 3, row: 2, turn: 0, stretch: [0] },
+    ];
+    const r: Ok = { ok: true, cols, rows, cells: new Uint8Array(cols * rows), placements, editsBreakPacking: false };
+    for (const i of placementInk(r, placements[0])) r.cells[i] = 1;
+    r.cells[4 * cols + 2] = 1;
+    r.cells[4 * cols + 8] = 1;
+    return r;
+  }
+
+  it("gets a grip on each cell of the slice's run, pointing away from the letter's middle", () => {
+    const r = joined();
+    const grips = stretchEnds(r, 0);
+    expect(grips.every((g) => g.kind === "slice" && g.stretchIndex === 0 && g.dr === 0)).toBe(true);
+    expect(grips.map((g) => [g.col, g.row, g.dc])).toEqual(
+      expect.arrayContaining([
+        [4, 4, -1],
+        [5, 4, 1],
+        [6, 4, 1],
+      ])
+    );
+    expect(grips).toHaveLength(3);
+  });
+
+  it("is hit on the run's cells only, never on the gap beside them", () => {
+    const r = joined();
+    expect(hitStretchEnd(r, 5, 4)).toMatchObject({ kind: "slice", unitIndex: 0, col: 5, row: 4 });
+    expect(hitStretchEnd(r, 4, 4)).toMatchObject({ kind: "slice", dc: -1 });
+    expect(hitStretchEnd(r, 5, 3)).toBeNull();
+    expect(hitStretchEnd(r, 3, 4)).toBeNull();
+    expect(hitStretchEnd(r, 2, 4)).toBeNull();
+  });
+
+  it("an end, when there is one, is a stroke end and not a grip", () => {
+    const r = panel();
+    expect(stretchEnds(r, 0).every((e) => e.kind === "end")).toBe(true);
+  });
+});
+
+describe("placementOf", () => {
+  it("looks a unit up by its index even when the placements are sparse", () => {
+    const r = panel();
+    const sparse: Ok = { ...r, placements: [r.placements[0], r.placements[2]] };
+    expect(placementOf(sparse, 2)).toBe(r.placements[2]);
+    expect(placementOf(sparse, 1)).toBeNull();
+    expect(placementOf(r, 1)).toBe(r.placements[1]);
+    // ends and outlines carry the right unit
+    expect(stretchEnds(sparse, 2).every((e) => e.unitIndex === 2)).toBe(true);
+    expect(stretchEnds(sparse, 2).length).toBeGreaterThan(0);
+    expect(unitRings(sparse, 2)).toHaveLength(1);
+    expect(hitKufiUnit(sparse, 8, 1)).toBe(2);
+  });
+});
+
+describe("nearestStretchEnd", () => {
+  it("picks the handle closest to a cell, and none from an empty list", () => {
+    const r = panel();
+    const ends = stretchEnds(r, 0);
+    expect(nearestStretchEnd(ends, 1, 2)).toMatchObject({ row: 1 });
+    expect(nearestStretchEnd(ends, 3, 6)).toMatchObject({ row: 7 });
+    expect(nearestStretchEnd([], 0, 0)).toBeNull();
   });
 });

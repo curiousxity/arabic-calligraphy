@@ -75,6 +75,16 @@ describe("kufiPanelBlock", () => {
       expect(out.stretch).toEqual({ 2: [1], 3: [1] });
     });
 
+    it("pins by unit index, not by position in the placements list", () => {
+      const placed: KufiPlacement = { ...pinC, row: 15, stretch: [1] };
+      const result: KufiPackResult = {
+        ok: true, cols: 21, rows: 21, cells: new Uint8Array(441), editsBreakPacking: false,
+        placements: [pinA, placed],
+      };
+      expect(kufiPinEdits({}, result, 3).pinned).toEqual({ 3: placed });
+      expect(kufiPinEdits({}, result, 1)).toEqual({});
+    });
+
     it("the form cycle runs through the other alternates from the current one, wrapping", () => {
       const text = "لا يكلف الله نفسا إلا وسعها";
       const cycle = kufiFormCycle(text, 3, "lam.medial.0");

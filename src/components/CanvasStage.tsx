@@ -183,7 +183,7 @@ export type CanvasStageProps = {
   /** A Kufi panel edited on the canvas (a form swap, a stretch): one undo step. See `KufiPanelEditOverlay`. */
   onEditKufiPanel?: (blockId: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => void;
   /** Why a Kufi panel canvas edit changed nothing, for its status line. */
-  onKufiPanelNotice?: (blockId: number, text: string) => void;
+  onKufiPanelNotice?: (blockId: number, fromKey: string, text: string) => void;
   onSetStrokeCut: (blockId: number, cut: StrokeCut) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   showRulers: boolean;
@@ -1258,7 +1258,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     locked={block.locked}
                     isSelected={block.id === selectedId}
                     onEditPanel={(fromKey, edits, result) => onEditKufiPanel?.(block.id, fromKey, edits, result)}
-                    onPanelNotice={(text) => onKufiPanelNotice?.(block.id, text)}
+                    onPanelNotice={(fromKey, text) => onKufiPanelNotice?.(block.id, fromKey, text)}
                   />
                 );
               }

@@ -2132,11 +2132,15 @@ const App: React.FC = () => {
     setKufiNotice(null);
   }, []);
 
-  /** Why a canvas edit changed nothing: shown in the Kufi panel's status line until the next edit or input change. */
-  const noticeKufiPanel = useCallback((id: number, text: string) => {
+  /**
+   * Why a canvas edit changed nothing: shown in the Kufi panel's status line
+   * until the next edit or input change. Dropped, like a commit, if the
+   * panel's inputs are no longer the ones the gesture was made against.
+   */
+  const noticeKufiPanel = useCallback((id: number, fromKey: string, text: string) => {
     const now = blocksRef.current.find((b) => b.id === id);
-    if (!now || !isKufiPanel(now)) return;
-    setKufiNotice({ blockId: id, key: kufiLayoutKey(kufiPanelInputs(now)), text });
+    if (!now || !isKufiPanel(now) || kufiLayoutKey(kufiPanelInputs(now)) !== fromKey) return;
+    setKufiNotice({ blockId: id, key: fromKey, text });
   }, []);
 
   // Guides: dashed construction paths that Curve text can attach to.

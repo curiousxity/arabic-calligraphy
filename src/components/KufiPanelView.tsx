@@ -31,8 +31,8 @@ export type KufiPanelViewProps = ReturnType<typeof kufiPanelProps> & {
    * none and gets no overlay.
    */
   onEditPanel?: (fromKey: string, edits: KufiPanelEdits, result: Ok) => void;
-  /** Why a canvas edit changed nothing, for the Kufi panel's status line. */
-  onPanelNotice?: (text: string) => void;
+  /** Why a canvas edit changed nothing, for the Kufi panel's status line; dropped if the inputs have moved on from `fromKey`. */
+  onPanelNotice?: (fromKey: string, text: string) => void;
 };
 
 const noNotice = () => {};

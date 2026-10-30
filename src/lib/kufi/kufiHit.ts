@@ -11,8 +11,15 @@ import type { KufiPackResult, KufiPlacement } from "./kufiPack";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
-/** One end of a stroke a stretch point lengthens: the end cell, and the outward step in panel cells. */
+/**
+ * A handle for a stretch point: an `end` is the last cell of a stroke the
+ * point lengthens, with the outward step in panel cells; a `slice` grip is
+ * one cell of the slice's run itself, for a stroke with no free end (a
+ * baseline joined on both sides), its step pointing along the slice's axis
+ * away from the letter's middle. Dragging along the step grows the stroke.
+ */
 export type KufiStretchEnd = {
+  kind: "end" | "slice";
   unitIndex: number;
   stretchIndex: number;
   col: number;
@@ -50,6 +57,17 @@ export function placementInk(result: Ok, p: KufiPlacement): number[] {
     }
   });
   return out;
+}
+
+/**
+ * The placement of a unit. The packer lists placements sorted by unit index
+ * and every unit placed, so the index is the fast path; a sparse list (a
+ * hand-built result, a future packer that leaves a unit out) is searched.
+ */
+export function placementOf(result: Ok, unitIndex: number): KufiPlacement | null {
+  const fast = result.placements[unitIndex];
+  if (fast && fast.unitIndex === unitIndex) return fast;
+  return result.placements.find((p) => p.unitIndex === unitIndex) ?? null;
 }
 
 /** Per result: which unit owns each cell (unit index + 1, 0 for none), built once. */
@@ -99,7 +117,9 @@ function sliceRun(g: KufiGlyph, si: number): number[] {
 const endsCache = new WeakMap<Ok, Map<number, KufiStretchEnd[]>>();
 
 /**
- * Where the strokes that `stretch[i]` lengthens end, for one unit.
+ * The handles of one unit's stretch points: where the strokes `stretch[i]`
+ * lengthens end, or, for a point whose strokes have no free end, the cells
+ * of its slice.
  *
  * The slice's whole run is marked (`@` for its ink) before stretching, so
  * the marks ride along to the drawn glyph whatever the counts, then the
@@ -108,19 +128,23 @@ const endsCache = new WeakMap<Ok, Map<number, KufiStretchEnd[]>>();
  * panel): an end that runs straight into ink is a join stub or touches a
  * dot, and dragging it would read as dragging the neighbour. A stroke end
  * that meets a bar (the top of a hooked alef) still counts: pulling it moves
- * the bar with it, which is what the user means.
+ * the bar with it, which is what the user means. A point with no end at all
+ * (a baseline joined on both sides) gets a grip on each marked cell instead,
+ * stepping along the slice's axis away from the glyph's middle, so pulling
+ * outward grows the stroke as it does at an end.
  */
 export function stretchEnds(result: Ok, unitIndex: number): KufiStretchEnd[] {
   let perUnit = endsCache.get(result);
   if (!perUnit) endsCache.set(result, (perUnit = new Map()));
   const hit = perUnit.get(unitIndex);
   if (hit) return hit;
-  const p = result.placements[unitIndex];
+  const p = placementOf(result, unitIndex);
   const g = p ? kufiGlyphById(p.glyphId) : null;
   const out: KufiStretchEnd[] = [];
   if (p && g) {
     const { cols, rows, cells } = result;
     const ink = (r: number, c: number, grid: string[]) => grid[r]?.[c] === "#" || grid[r]?.[c] === "@";
+    const inside = (r: number, c: number) => r >= 0 && c >= 0 && r < rows && c < cols;
     g.stretch.forEach((s, si) => {
       const run = new Set(sliceRun(g, si));
       const marked = g.rows.map((line, y) =>
@@ -135,9 +159,12 @@ export function stretchEnds(result: Ok, unitIndex: number): KufiStretchEnd[] {
       const vertical = (s.axis === "row") === (p.turn % 2 === 0);
       const dirs: Array<[number, number]> = vertical ? [[-1, 0], [1, 0]] : [[0, -1], [0, 1]];
       const seen = new Set<string>();
+      const ends: KufiStretchEnd[] = [];
+      const marks: Array<[number, number]> = [];
       grid.forEach((line, i) => {
         for (let j = 0; j < line.length; j++) {
           if (line[j] !== "@") continue;
+          marks.push([p.row + i, p.col + j]);
           for (const [di, dj] of dirs) {
             let ei = i;
             let ej = j;
@@ -148,16 +175,35 @@ export function stretchEnds(result: Ok, unitIndex: number): KufiStretchEnd[] {
             const row = p.row + ei;
             const col = p.col + ej;
             const key = `${row},${col}`;
-            if (seen.has(key) || row < 0 || col < 0 || row >= rows || col >= cols) continue;
+            if (seen.has(key) || !inside(row, col)) continue;
             seen.add(key);
-            const br = row + di;
-            const bc = col + dj;
-            const beyondInk = br >= 0 && bc >= 0 && br < rows && bc < cols && cells[br * cols + bc] !== 0;
-            if (beyondInk) continue;
-            out.push({ unitIndex, stretchIndex: si, col, row, dc: dj as -1 | 0 | 1, dr: di as -1 | 0 | 1 });
+            if (inside(row + di, col + dj) && cells[(row + di) * cols + col + dj] !== 0) continue;
+            ends.push({ kind: "end", unitIndex, stretchIndex: si, col, row, dc: dj as -1 | 0 | 1, dr: di as -1 | 0 | 1 });
           }
         }
       });
+      if (ends.length > 0) {
+        out.push(...ends);
+        return;
+      }
+      // no free end: the slice's own cells, stepping away from the glyph's middle
+      const h = grid.length;
+      const w = grid[0]?.length ?? 0;
+      const midRow = p.row + (h - 1) / 2;
+      const midCol = p.col + (w - 1) / 2;
+      for (const [row, col] of marks) {
+        if (!inside(row, col)) continue;
+        const away = vertical ? Math.sign(row - midRow) || 1 : Math.sign(col - midCol) || 1;
+        out.push({
+          kind: "slice",
+          unitIndex,
+          stretchIndex: si,
+          col,
+          row,
+          dc: (vertical ? 0 : away) as -1 | 0 | 1,
+          dr: (vertical ? away : 0) as -1 | 0 | 1,
+        });
+      }
     });
   }
   perUnit.set(unitIndex, out);
@@ -165,23 +211,37 @@ export function stretchEnds(result: Ok, unitIndex: number): KufiStretchEnd[] {
 }
 
 /**
- * The stretch end whose handle covers the cell: the end cell itself or the
- * paper cell just beyond it. Checked before `hitKufiUnit`, so a press on an
- * end is a stretch and never a click on the letter.
+ * The handle covering the cell: an end cell or the paper cell just beyond
+ * it, or a slice grip's own cell. Checked before `hitKufiUnit`, so a press
+ * on a handle is a stretch and never a click on the letter.
  */
 export function hitStretchEnd(result: Ok, col: number, row: number): KufiStretchEnd | null {
-  for (let k = 0; k < result.placements.length; k++) {
-    for (const e of stretchEnds(result, k)) {
+  for (const p of result.placements) {
+    for (const e of stretchEnds(result, p.unitIndex)) {
       if (e.col === col && e.row === row) return e;
-      if (e.col + e.dc === col && e.row + e.dr === row) return e;
+      if (e.kind === "end" && e.col + e.dc === col && e.row + e.dr === row) return e;
     }
   }
   return null;
 }
 
+/** The handle nearest a cell, or null from none. */
+export function nearestStretchEnd(ends: KufiStretchEnd[], col: number, row: number): KufiStretchEnd | null {
+  let best: KufiStretchEnd | null = null;
+  let bestD = Infinity;
+  for (const e of ends) {
+    const d = Math.hypot(e.col - col, e.row - row);
+    if (d < bestD) {
+      best = e;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
 /** The outline of one unit's ink, as closed rings in cell coordinates (`cellRings`). */
 export function unitRings(result: Ok, unitIndex: number): Ring[] {
-  const p = result.placements[unitIndex];
+  const p = placementOf(result, unitIndex);
   if (!p) return [];
   const mask = new Array<boolean>(result.cols * result.rows).fill(false);
   for (const i of placementInk(result, p)) mask[i] = true;

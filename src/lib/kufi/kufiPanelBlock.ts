@@ -3,7 +3,7 @@
  * inputs, carrying the user's edits across a text change, and planning the
  * edits a canvas gesture makes. Pure: no React, no Konva, no `./harfbuzz`.
  */
-import { kufiFormsOf } from "./kufiHit";
+import { kufiFormsOf, placementOf } from "./kufiHit";
 import { reconcileEdits, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
 import { resolveKufiText } from "./kufiWords";
 import type { KufiLayoutInputs } from "./kufiWorkerProtocol";
@@ -92,7 +92,7 @@ export function kufiFormEdits(edits: KufiPanelEdits | undefined, unitIndex: numb
  * pins by itself; the UI does, on commit).
  */
 export function kufiPinEdits(edits: KufiPanelEdits, result: Ok, unitIndex: number): KufiPanelEdits {
-  const p = result.placements[unitIndex];
+  const p = placementOf(result, unitIndex);
   if (!p) return edits;
   return { ...edits, pinned: { ...edits.pinned, [unitIndex]: { ...p, stretch: p.stretch.slice() } } };
 }

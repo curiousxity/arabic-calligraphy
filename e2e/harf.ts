@@ -642,7 +642,7 @@ export async function dragMouse(page: Page, from: Point, to: Point): Promise<voi
 /** What the Kufi panel's edit overlay publishes: a cell of each letter and every stretch end, in page space. */
 export type KufiEditTargets = {
   letters: { unit: number; glyphId: string; forms: number; x: number; y: number }[];
-  ends: { unit: number; si: number; dc: number; dr: number; x: number; y: number }[];
+  ends: { unit: number; si: number; kind: "end" | "slice"; dc: number; dr: number; x: number; y: number }[];
 };
 
 /**

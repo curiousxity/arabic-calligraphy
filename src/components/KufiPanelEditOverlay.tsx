@@ -4,9 +4,21 @@ import { Group, Line, Rect } from "react-konva";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 import { complementOf } from "../lib/complementColor";
 import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
-import { hitKufiUnit, hitStretchEnd, kufiFormsOf, kufiGlyphById, placementInk, stretchEnds, unitRings, type KufiStretchEnd } from "../lib/kufi/kufiHit";
+import {
+  hitKufiUnit,
+  hitStretchEnd,
+  kufiFormsOf,
+  kufiGlyphById,
+  nearestStretchEnd,
+  placementInk,
+  placementOf,
+  stretchEnds,
+  unitRings,
+  type KufiStretchEnd,
+} from "../lib/kufi/kufiHit";
 import { kufiFormCycle, kufiFormEdits, kufiPinEdits, kufiStretchEdits } from "../lib/kufi/kufiPanelBlock";
 import { kufiLayoutKey, previewKufiLayout, type KufiLayoutInputs } from "../lib/kufi/kufiLayoutClient";
+import { PULL_REST_MS, pullAnswer, pullMove, pullRelease, pullRest, pullStart, type KufiPull } from "../lib/kufi/kufiPull";
 import { resolveKufiText } from "../lib/kufi/kufiWords";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
@@ -24,7 +36,8 @@ type Props = {
   onPreview: (result: Ok | null) => void;
   /** A committed edit: the edits to save (already pinned), the result they draw, and the inputs they were made against. */
   onCommit: (fromKey: string, edits: KufiPanelEdits, result: Ok) => void;
-  onNotice: (text: string) => void;
+  /** Why a gesture changed nothing, against the inputs it was made on. */
+  onNotice: (fromKey: string, text: string) => void;
 };
 
 /** How far a press may drift, in screen px, and still count as a click. */
@@ -41,37 +54,42 @@ export const NO_ROOM_TO_STRETCH = "No room to stretch that here";
 export const NO_OTHER_FORM_FITS = "No other form of that letter fits here";
 export const SINGLE_FORM = "That letter has one form";
 
-type Hover = { kind: "unit"; unitIndex: number } | { kind: "end"; end: KufiStretchEnd };
+/** What is under the pointer: the letter, the handle it is on (if any), and the handle nearest to it. */
+type Hover = { unitIndex: number; on: KufiStretchEnd | null; nearest: KufiStretchEnd | null };
+
+const sameHover = (a: Hover | null, b: Hover | null) =>
+  a === b || (!!a && !!b && a.unitIndex === b.unitIndex && a.on === b.on && a.nearest === b.nearest);
 
 type Drag = {
   end: KufiStretchEnd;
-  /** The unit's counts when the drag began, and the one being pulled. */
+  /** The unit's counts when the drag began. */
   base: number[];
-  min: number;
   /** The pointer's cell at the press. */
   startCol: number;
   startRow: number;
-  /** The count last asked for. */
-  count: number;
-  /** The last preview that packed, with the edits that made it; the press's own panel at first. */
-  shown: { count: number; edits: KufiPanelEdits | undefined; result: Ok } | null;
-  /** True once some count other than the base was asked for. */
-  pulled: boolean;
+  pull: KufiPull;
+  /** The preview on show, by count: the edits that made it and its panel. */
+  shown: { count: number; edits: KufiPanelEdits; result: Ok } | null;
+  restTimer: ReturnType<typeof setTimeout> | null;
   ended: boolean;
-  release: () => void;
+  /** Ends the drag; `abort` (the overlay unmounting) commits nothing and says nothing. */
+  release: (abort?: boolean) => void;
 };
 
 /**
  * Editing a Kufi panel on the canvas, with no mode to enter: hover a letter
- * and it outlines in the block's editing colour; click it to cycle its
- * square-Kufi alternates (the ones that pack; a click that finds none says
- * so in the Kufi panel's status line); a small square sits at each end of a
- * stroke the letter may stretch, and dragging one lengthens or shortens that
+ * and it outlines in the block's editing colour, with one small square on
+ * the stretch handle nearest the pointer; click it to cycle its square-Kufi
+ * alternates (the ones that pack; a click that finds none says so in the
+ * Kufi panel's status line); drag the square to lengthen or shorten that
  * stroke in whole cells while the rest of the panel repacks around it live.
+ * A handle sits at the end of a stroke a stretch point lengthens, or, for a
+ * stroke with no free end (a baseline joined on both sides), on the slice
+ * itself; either way the drag runs along the stroke.
  *
  * **Pointer-resolved**, like Next Shape: one listening `Rect` spans the
  * panel and the cell under the pointer is resolved in arithmetic
- * (`kufiHit.ts`); the outline, handles and the e2e marker are
+ * (`kufiHit.ts`); the outline, the handle and the e2e marker are
  * `listening={false}`, so there is no node Konva can retarget hover to and
  * no leave race. A press on a letter is not claimed (the panel still drags
  * from its ink); a press on a handle is, and its drag is a stage listener
@@ -80,16 +98,19 @@ type Drag = {
  * **Previews run in the worker.** Each cell the pointer crosses asks
  * `previewKufiLayout` for a repack from the committed panel; the newest
  * request always wins and the panel keeps showing the last preview that
- * packed. Release commits that preview, pinned where the packer put the
- * letter, as one undo step; if nothing the pointer reached packs, nothing is
- * committed and the stroke snaps back.
+ * packed (`kufiPull.ts` holds the policy: a refused count is asked for once
+ * more when the pointer rests, since the repack budget is a clock). Release
+ * commits that preview, pinned where the packer put the letter, as one undo
+ * step; if nothing the pointer reached packs, nothing is committed and the
+ * stroke snaps back.
  */
 export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, inputs, cell, color, onPreview, onCommit, onNotice }) => {
   const [hover, setHover] = useState<Hover | null>(null);
   const [dragging, setDragging] = useState<Drag | null>(null);
   const groupRef = useRef<Konva.Group>(null);
   const drag = useRef<Drag | null>(null);
-  const press = useRef<{ unitIndex: number; x: number; y: number } | null>(null);
+  /** A press on a letter: where, and where the panel was, so a press that moved it is not a click. */
+  const press = useRef<{ unitIndex: number; x: number; y: number; panelX: number; panelY: number } | null>(null);
   const lastLetterPress = useRef(-Infinity);
   const cycling = useRef(false);
   const accent = useMemo(() => complementOf(color), [color]);
@@ -99,60 +120,68 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
   const height = result.rows * cell;
 
   // The cursor says what a press here does; cleared with the hover.
+  const cursor = hover ? (hover.on ? (hover.on.dc !== 0 ? "ew-resize" : "ns-resize") : "pointer") : null;
   useEffect(() => {
     const stage = groupRef.current?.getStage();
-    if (!stage || !hover) return;
+    if (!stage || !cursor) return;
     const style = stage.container().style;
     const prev = style.cursor;
-    style.cursor = hover.kind === "unit" ? "pointer" : hover.end.dc !== 0 ? "ew-resize" : "ns-resize";
+    style.cursor = cursor;
     return () => {
       style.cursor = prev;
     };
-  }, [hover]);
+  }, [cursor]);
 
   // A drag outliving the overlay (the panel deselected mid-gesture) commits nothing.
   useEffect(
     () => () => {
-      drag.current?.release();
+      drag.current?.release(true);
     },
     []
   );
 
-  const cellAt = (pos: { x: number; y: number }) => ({ col: Math.floor(pos.x / cell), row: Math.floor(pos.y / cell) });
+  const panelNode = () => groupRef.current?.getParent() ?? null;
   const pointerCell = () => {
     const pos = groupRef.current?.getRelativePointerPosition();
-    return pos ? cellAt(pos) : null;
+    return pos ? { col: Math.floor(pos.x / cell), row: Math.floor(pos.y / cell) } : null;
   };
   const hoverAt = (c: { col: number; row: number } | null): Hover | null => {
     if (!c) return null;
-    const end = hitStretchEnd(result, c.col, c.row);
-    if (end) return { kind: "end", end };
-    const unitIndex = hitKufiUnit(result, c.col, c.row);
-    return unitIndex === null ? null : { kind: "unit", unitIndex };
+    const on = hitStretchEnd(result, c.col, c.row);
+    const unitIndex = on ? on.unitIndex : hitKufiUnit(result, c.col, c.row);
+    if (unitIndex === null) return null;
+    return { unitIndex, on, nearest: on ?? nearestStretchEnd(stretchEnds(result, unitIndex), c.col, c.row) };
+  };
+  const updateHover = () => {
+    const next = hoverAt(pointerCell());
+    setHover((cur) => (sameHover(cur, next) ? cur : next));
   };
 
   /** Click: the next alternate of this letter that packs, tried in table order; one undo step. */
   const cycleForm = useCallback(
     async (unitIndex: number) => {
-      if (cycling.current) return;
-      const p = committed.placements[unitIndex];
+      if (cycling.current || drag.current) return;
+      const p = placementOf(committed, unitIndex);
       if (!p) return;
       const ids = kufiFormCycle(inputs.text, unitIndex, p.glyphId);
       if (ids.length === 0) {
-        onNotice(SINGLE_FORM);
+        onNotice(fromKey, SINGLE_FORM);
         return;
       }
       cycling.current = true;
       try {
         for (const id of ids) {
           const edits = kufiFormEdits(inputs.edits, unitIndex, id);
-          const r = await previewKufiLayout({ ...inputs, edits }, committed);
+          // null is "superseded", not "does not pack": nothing else previews
+          // while a cycle runs, but ask once more rather than skip the form
+          let r = await previewKufiLayout({ ...inputs, edits }, committed);
+          if (r === null) r = await previewKufiLayout({ ...inputs, edits }, committed);
           if (r?.ok) {
             onCommit(fromKey, kufiPinEdits(edits, r, unitIndex), r);
             return;
           }
         }
-        onNotice(NO_OTHER_FORM_FITS);
+        onNotice(fromKey, NO_OTHER_FORM_FITS);
       } finally {
         cycling.current = false;
       }
@@ -161,41 +190,50 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
   );
 
   const beginStretch = (end: KufiStretchEnd, start: { col: number; row: number }, stage: Konva.Stage | null) => {
-    if (!stage || drag.current) return;
-    const p = committed.placements[end.unitIndex];
-    const g = kufiGlyphById(p.glyphId);
-    if (!g) return;
+    if (!stage || drag.current || cycling.current) return;
+    const p = placementOf(committed, end.unitIndex);
+    const g = p ? kufiGlyphById(p.glyphId) : null;
+    if (!p || !g) return;
     const base = g.stretch.map((_, i) => p.stretch[i] ?? 0);
+    const at = base[end.stretchIndex];
     const state: Drag = {
       end,
       base,
-      min: -(g.stretch[end.stretchIndex].min ?? 0),
       startCol: start.col,
       startRow: start.row,
-      count: base[end.stretchIndex],
+      pull: pullStart(at, -(g.stretch[end.stretchIndex].min ?? 0), at + MAX_PULL),
       shown: null,
-      pulled: false,
+      restTimer: null,
       ended: false,
       release: () => {},
     };
+    const clearRest = () => {
+      if (state.restTimer !== null) clearTimeout(state.restTimer);
+      state.restTimer = null;
+    };
     const request = (count: number) => {
-      state.count = count;
-      if (count === base[end.stretchIndex]) {
-        state.shown = null;
-        onPreview(null);
-        return;
-      }
-      state.pulled = true;
       const counts = base.slice();
       counts[end.stretchIndex] = count;
       const edits = kufiStretchEdits(inputs.edits, end.unitIndex, counts);
       previewKufiLayout({ ...inputs, edits }, committed).then(
         (r) => {
-          // superseded, stale (an older count answered after a newer one), or over
-          if (!r || state.ended || state.count !== count) return;
-          if (r.ok) {
+          // superseded, or over
+          if (r === null || state.ended) return;
+          const a = pullAnswer(state.pull, count, r.ok);
+          state.pull = a.pull;
+          if (a.show && r.ok) {
             state.shown = { count, edits, result: r };
             onPreview(r);
+          } else if (!r.ok && state.pull.refused === count) {
+            // a refusal may be the clock, not the panel: once the pointer rests, ask again
+            clearRest();
+            state.restTimer = setTimeout(() => {
+              state.restTimer = null;
+              if (state.ended) return;
+              const rest = pullRest(state.pull);
+              state.pull = rest.pull;
+              if (rest.request !== null) request(rest.request);
+            }, PULL_REST_MS);
           }
         },
         (err: unknown) => console.warn(err)
@@ -205,49 +243,66 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       const c = pointerCell();
       if (!c) return;
       const delta = (c.col - state.startCol) * end.dc + (c.row - state.startRow) * end.dr;
-      const count = Math.max(state.min, Math.min(base[end.stretchIndex] + MAX_PULL, base[end.stretchIndex] + delta));
-      if (count !== state.count) request(count);
+      const m = pullMove(state.pull, delta);
+      if (m.pull === state.pull) return;
+      state.pull = m.pull;
+      clearRest();
+      if (m.clear) {
+        state.shown = null;
+        onPreview(null);
+      }
+      if (m.request !== null) request(m.request);
     };
-    const release = () => {
+    const release = (abort = false) => {
       if (state.ended) return;
       state.ended = true;
+      clearRest();
       stage.off(".kufistretch");
-      window.removeEventListener("mouseup", release);
-      window.removeEventListener("touchend", release);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchend", onUp);
       drag.current = null;
-      setDragging(null);
-      if (state.shown) onCommit(fromKey, kufiPinEdits(state.shown.edits ?? {}, state.shown.result, end.unitIndex), state.shown.result);
-      else if (state.pulled) onNotice(NO_ROOM_TO_STRETCH);
-      onPreview(null);
+      if (!abort) {
+        const r = pullRelease(state.pull);
+        if (r.kind === "commit" && state.shown?.count === r.count)
+          onCommit(fromKey, kufiPinEdits(state.shown.edits, state.shown.result, end.unitIndex), state.shown.result);
+        else if (r.kind === "refused") onNotice(fromKey, NO_ROOM_TO_STRETCH);
+        setDragging(null);
+        onPreview(null);
+      }
     };
+    const onUp = () => release();
     state.release = release;
     drag.current = state;
     setDragging(state);
     setHover(null);
     stage.on("mousemove.kufistretch touchmove.kufistretch", move);
-    stage.on("mouseup.kufistretch touchend.kufistretch", release);
-    window.addEventListener("mouseup", release);
-    window.addEventListener("touchend", release);
+    stage.on("mouseup.kufistretch touchend.kufistretch", onUp);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchend", onUp);
   };
 
   // What the chrome draws: while dragging, the pulled letter's outline and
-  // its handle on the previewed panel; otherwise the hovered letter's.
-  const shownUnit = dragging ? dragging.end.unitIndex : hover?.kind === "unit" ? hover.unitIndex : hover?.kind === "end" ? hover.end.unitIndex : null;
-  const rings = useMemo(() => (shownUnit === null ? [] : unitRings(result, shownUnit)), [result, shownUnit]);
-  const handles = useMemo(() => {
-    if (shownUnit === null) return [];
-    const ends = stretchEnds(result, shownUnit);
-    if (!dragging) return ends;
+  // its handle on the previewed panel; otherwise the hovered letter's and
+  // the handle nearest the pointer.
+  const shownUnit = dragging ? dragging.end.unitIndex : hover?.unitIndex ?? null;
+  const outlines = useMemo(
+    () => (shownUnit === null ? [] : unitRings(result, shownUnit).map((ring) => ring.flatMap(([x, y]) => [x * cell, y * cell]))),
+    [result, shownUnit, cell]
+  );
+  const handle = useMemo(() => {
+    if (shownUnit === null) return null;
+    if (!dragging) return hover?.nearest ?? null;
     const d = dragging.end;
-    const same = ends.filter((e) => e.stretchIndex === d.stretchIndex && e.dc === d.dc && e.dr === d.dr);
-    if (same.length === 0) return [];
-    return [same.reduce((best, e) => (Math.hypot(e.col - d.col, e.row - d.row) < Math.hypot(best.col - d.col, best.row - d.row) ? e : best))];
-  }, [result, shownUnit, dragging]);
+    const same = stretchEnds(result, shownUnit).filter((e) => e.kind === d.kind && e.stretchIndex === d.stretchIndex && e.dc === d.dc && e.dr === d.dr);
+    return nearestStretchEnd(same, d.col, d.row);
+  }, [result, shownUnit, dragging, hover]);
 
-  // Read-only scene data for the e2e harness: with one hit node there is no
-  // per-letter node a test could find. Group-space px of a cell of each
-  // letter (the ink cell nearest its centroid) and of every stretch end.
+  // Read-only scene data for the e2e harness, in dev builds only (like the
+  // `__HARF__` bridge): with one hit node there is no per-letter node a test
+  // could find. Group-space px of a cell of each letter (the ink cell nearest
+  // its centroid) and of every handle.
   const targets = useMemo(() => {
+    if (!import.meta.env.DEV) return null;
     const units = resolveKufiText(inputs.text).units;
     const letters = result.placements.map((p) => {
       const ink = placementInk(result, p);
@@ -260,10 +315,13 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       }
       cx /= ink.length;
       cy /= ink.length;
-      const at = ink.reduce((best, i) => {
-        const d = Math.hypot((i % result.cols) - cx, Math.floor(i / result.cols) - cy);
-        return d < best.d ? { i, d } : best;
-      }, { i: ink[0], d: Infinity }).i;
+      const at = ink.reduce(
+        (best, i) => {
+          const d = Math.hypot((i % result.cols) - cx, Math.floor(i / result.cols) - cy);
+          return d < best.d ? { i, d } : best;
+        },
+        { i: ink[0], d: Infinity }
+      ).i;
       const unit = units[p.unitIndex];
       return {
         unit: p.unitIndex,
@@ -273,8 +331,16 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
         y: (Math.floor(at / result.cols) + 0.5) * cell,
       };
     });
-    const ends = result.placements.flatMap((_, k) =>
-      stretchEnds(result, k).map((e) => ({ unit: k, si: e.stretchIndex, dc: e.dc, dr: e.dr, x: (e.col + 0.5) * cell, y: (e.row + 0.5) * cell }))
+    const ends = result.placements.flatMap((p) =>
+      stretchEnds(result, p.unitIndex).map((e) => ({
+        unit: p.unitIndex,
+        si: e.stretchIndex,
+        kind: e.kind,
+        dc: e.dc,
+        dr: e.dr,
+        x: (e.col + 0.5) * cell,
+        y: (e.row + 0.5) * cell,
+      }))
     );
     return { letters: letters.filter((l) => l !== null), ends };
   }, [result, inputs.text, cell]);
@@ -287,8 +353,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
         height={height}
         fill="transparent"
         onMouseMove={() => {
-          if (drag.current) return;
-          setHover(hoverAt(pointerCell()));
+          if (!drag.current) updateHover();
         }}
         onMouseLeave={() => {
           if (!drag.current) setHover(null);
@@ -298,35 +363,40 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           const c = pointerCell();
           const h = hoverAt(c);
           press.current = null;
-          if (h?.kind === "end" && c) {
+          if (h?.on && c) {
             // the handle's drag is this tool's, never the block's
             e.cancelBubble = true;
-            beginStretch(h.end, c, e.target.getStage());
-          } else if (h?.kind === "unit") {
+            beginStretch(h.on, c, e.target.getStage());
+          } else if (h) {
             // not claimed: a press that drifts drags the whole panel
-            press.current = { unitIndex: h.unitIndex, x: e.evt.clientX, y: e.evt.clientY };
+            const panel = panelNode();
+            press.current = { unitIndex: h.unitIndex, x: e.evt.clientX, y: e.evt.clientY, panelX: panel?.x() ?? 0, panelY: panel?.y() ?? 0 };
             lastLetterPress.current = performance.now();
           }
         }}
         onTouchStart={(e) => {
           const c = pointerCell();
           const h = hoverAt(c);
-          if (h?.kind === "end" && c) {
+          if (h?.on && c) {
             e.cancelBubble = true;
-            beginStretch(h.end, c, e.target.getStage());
-          } else if (h?.kind === "unit") lastLetterPress.current = performance.now();
+            beginStretch(h.on, c, e.target.getStage());
+          } else if (h) lastLetterPress.current = performance.now();
         }}
         // A click is read on release within a small slop, for the pressed
         // letter: Konva's `click` does not fire once the pointer has moved.
+        // A press that moved the panel (Konva drags from the first pixel)
+        // already took its own undo step and is not also a click.
         onMouseUp={(e) => {
           const p = press.current;
           press.current = null;
           if (!p || Math.hypot(e.evt.clientX - p.x, e.evt.clientY - p.y) > CLICK_SLOP) return;
+          const panel = panelNode();
+          if (panel && (panel.x() !== p.panelX || panel.y() !== p.panelY)) return;
           void cycleForm(p.unitIndex);
         }}
         onTap={() => {
           const h = hoverAt(pointerCell());
-          if (h?.kind === "unit") void cycleForm(h.unitIndex);
+          if (h && !h.on) void cycleForm(h.unitIndex);
         }}
         // The first click changes the letter; a quick second one must not
         // reach the block's edit handler and focus the textarea.
@@ -337,11 +407,11 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           if (performance.now() - lastLetterPress.current < DOUBLE_CLICK_WINDOW_MS) e.cancelBubble = true;
         }}
       />
-      {rings.map((ring, i) => (
+      {outlines.map((points, i) => (
         <Line
           key={i}
           name="kufi-hover-outline"
-          points={ring.flatMap(([x, y]) => [x * cell, y * cell])}
+          points={points}
           closed
           stroke={accent}
           strokeWidth={OUTLINE_PX}
@@ -349,20 +419,19 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           listening={false}
         />
       ))}
-      {handles.map((e) => (
+      {handle && (
         <Rect
-          key={`${e.stretchIndex}:${e.col},${e.row}`}
           name="kufi-stretch-handle"
-          // centred on the edge the stroke would grow across
-          x={(e.col + 0.5 + e.dc * 0.5) * cell - (HANDLE * cell) / 2}
-          y={(e.row + 0.5 + e.dr * 0.5) * cell - (HANDLE * cell) / 2}
+          // an end's square sits on the edge the stroke grows across; a slice grip on its cell
+          x={(handle.col + 0.5 + (handle.kind === "end" ? handle.dc * 0.5 : 0)) * cell - (HANDLE * cell) / 2}
+          y={(handle.row + 0.5 + (handle.kind === "end" ? handle.dr * 0.5 : 0)) * cell - (HANDLE * cell) / 2}
           width={HANDLE * cell}
           height={HANDLE * cell}
           fill={accent}
           listening={false}
         />
-      ))}
-      <Group name="kufi-edit-targets" listening={false} letters={targets.letters} ends={targets.ends} />
+      )}
+      {targets && <Group name="kufi-edit-targets" listening={false} letters={targets.letters} ends={targets.ends} />}
     </Group>
   );
 };
