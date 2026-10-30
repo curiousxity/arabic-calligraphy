@@ -201,6 +201,12 @@ What the packer must honour, whatever its method:
   one closest to each letter's natural length (the user, 2026-10-29: "the la
   was unnecessarily shorted and the last word was unnecessarily
   enlgonated");
+- space is filled by lengthening strokes before any filler square: the
+  reference packs with none, lengthening an alef by 4 instead. Filler squares
+  read as dots (the user, 2026-10-29: two side by side "read as dots. dot
+  usage as a filler is tricky… the original used lengthend strokes to
+  achieve this"). Order of preference: packed; then fewest filler squares,
+  never two near each other; then least shortening; then least lengthening;
 - pinned edits are hard constraints;
 - the result fills the box: no unfilled region larger than a gap.
 
