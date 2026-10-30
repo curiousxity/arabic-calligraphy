@@ -164,7 +164,7 @@ import { convertRunToStack, fillerShapes, teardropShape, type UnjoinedPair } fro
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
-import { kufiCellSize, kufiPanelInputs, kufiPanelTextPatch } from "./lib/kufi/kufiPanelBlock";
+import { kufiCellSize, kufiPanelInputs, kufiPanelTextPatch, kufiReleasePins } from "./lib/kufi/kufiPanelBlock";
 import { kufiLayoutKey, requestKufiFit, seedKufiLayout } from "./lib/kufi/kufiLayoutClient";
 import type { KufiPackResult, KufiPanelEdits } from "./lib/kufi/kufiPack";
 import {
@@ -2018,7 +2018,9 @@ const App: React.FC = () => {
   const addKufiPanel = () => {
     const id = createNextId();
     const text = "الله";
-    const fontSize = 48;
+    // 14 px cells: the stretch handle and the click slop stay smaller than a
+    // cell, so the canvas tools are usable before the panel is zoomed.
+    const fontSize = 112;
     const cols = 21;
     const rows = 21;
     const cell = kufiCellSize(fontSize);
@@ -2085,6 +2087,17 @@ const App: React.FC = () => {
     if (!selectedBlock || !isKufiPanel(selectedBlock)) return;
     if (selectedBlock.panelCols === size.cols && selectedBlock.panelRows === size.rows) return;
     updateSelectedBlock({ panelCols: size.cols, panelRows: size.rows });
+  };
+
+  /**
+   * Release the selected Kufi panel's pins ("Release hand edits"): one undo
+   * step. The letters may find new places; forms, stretch counts and painted
+   * cells stay. It is the way out of a `pinConflict` after a size change
+   * that keeps the work done since the pin (undo would discard that too).
+   */
+  const releaseKufiPanelPins = () => {
+    if (!selectedBlock || !isKufiPanel(selectedBlock) || !selectedBlock.panelEdits?.pinned) return;
+    updateSelectedBlock({ panelEdits: kufiReleasePins(selectedBlock.panelEdits) });
   };
 
   /**
@@ -3453,6 +3466,7 @@ const App: React.FC = () => {
         onAddKufiPanel={addKufiPanel}
         onSetKufiPanelSize={setKufiPanelSize}
         onFitKufiPanel={fitKufiPanelSize}
+        onReleaseKufiPanelPins={releaseKufiPanelPins}
         kufiNotice={kufiNotice}
         onAddGuide={addGuideBlock}
         onAddSvgGuide={addSvgGuideBlock}

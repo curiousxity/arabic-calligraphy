@@ -344,6 +344,8 @@ test("a size typed while Fit runs is not overwritten by the Fit", async ({ page 
  *   (dc = 1) pack at +1 and +2.
  * - unit 3, `lam:medial`, is drawn shortened (`[-2]`); pulling its stem up
  *   by one or two cells does not pack.
+ * - unit 2 pinned at its 21×21 place (by the +2 stretch) cannot stay in a
+ *   20×20 box: `pinConflict`; released, 20×20 is "Too long".
  */
 const savedBaqarah = {
   ...savedProject,
@@ -600,7 +602,7 @@ test.describe("editing on the canvas", () => {
     expect(errors).toEqual([]);
   });
 
-  test("dragging a word's first letter along its path asks the packer to move the word; where nothing packs it snaps back and says why", async ({ page }) => {
+  test("dragging a word's route handle along its path asks the packer to move the word; where nothing packs it snaps back and says why", async ({ page }) => {
     const box = await openBaqarahPanel(page);
     await pointerAway(page, box);
     const before = await inkSignature(page, box);
@@ -611,14 +613,17 @@ test.describe("editing on the canvas", () => {
     const word = targets.words.find((w) => w.word === 2)!;
     expect(word).toMatchObject({ unit: 5, dc: 0, dr: -1 });
     const letter = targets.letters.find((l) => l.unit === 5)!;
-    // the press is on the letter's body, not on one of its stretch handles
-    for (const e of targets.ends.filter((e) => e.unit === 5)) expect(Math.hypot(e.x - letter.x, e.y - letter.y)).toBeGreaterThan(targets.cellPx);
+    // the handle is on the letter's leading cell, away from the cell the letter is pressed on below
+    expect(Math.hypot(word.x - letter.x, word.y - letter.y)).toBeGreaterThan(targets.cellPx);
 
-    await page.mouse.move(letter.x, letter.y);
+    // Hovering the handle shows it (and no stretch handle in its place).
+    await page.mouse.move(word.x, word.y);
     await settleFrames(page);
-    expect(await hitTargetAt(page, letter)).toBe("Rect.kufi-edit-hit");
+    expect(await hitTargetAt(page, word)).toBe("Rect.kufi-edit-hit");
+    expect(await namedNodeCount(page, "kufi-route-handle")).toBe(1);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(0);
     await page.mouse.down();
-    await page.mouse.move(letter.x + word.dc * 2 * targets.cellPx, letter.y + word.dr * 2 * targets.cellPx, { steps: 12 });
+    await page.mouse.move(word.x + word.dc * 2 * targets.cellPx, word.y + word.dr * 2 * targets.cellPx, { steps: 12 });
     // give the previews time to be asked for, refused, and asked for once more
     await page.waitForTimeout(1200);
     await page.mouse.up();
@@ -631,12 +636,20 @@ test.describe("editing on the canvas", () => {
     expect(await inkSignature(page, box)).toEqual(before);
     await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
 
-    // A still press on a first letter is still a click on the letter: الله has
-    // three forms, so the click either lands one or says none fits.
+    // A still press elsewhere on a first letter is a click on the letter: الله
+    // has three forms, so the click either lands one or says none fits.
     await page.mouse.click(letter.x, letter.y);
     await expect
       .poll(async () => (await panelEdits(page))?.forms?.[5] !== undefined || (await kufiPanel(page).innerText()).includes("No other form"))
       .toBe(true);
+    await page.waitForTimeout(400);
+
+    // A press elsewhere on a first letter that drifts drags the whole panel, not the word.
+    const x1 = (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x;
+    const again = (await kufiEditTargets(page)).letters.find((l) => l.unit === 5)!;
+    await dragMouse(page, again, { x: again.x + 120, y: again.y + 60 });
+    await expect.poll(async () => (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x).toBeGreaterThan(x1 + 10);
+    expect((await panelEdits(page))?.routes).toBeUndefined();
   });
 
   /**
@@ -667,14 +680,15 @@ test.describe("editing on the canvas", () => {
     const word = targets.words.find((w) => w.word === 1)!;
     expect(word).toMatchObject({ unit: 3, dc: 0, dr: -1 });
     const letter = targets.letters.find((l) => l.unit === 3)!;
-    for (const e of targets.ends.filter((e) => e.unit === 3)) expect(Math.hypot(e.x - letter.x, e.y - letter.y)).toBeGreaterThan(targets.cellPx);
     const rowOf = (y: number) => Math.floor((y - targets.origin.y) / targets.cellPx);
     const meemRow = rowOf(letter.y);
 
-    await page.mouse.move(letter.x, letter.y);
+    // the word is dragged by its route handle, on the م's leading cell
+    await page.mouse.move(word.x, word.y);
     await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-route-handle")).toBe(1);
     await page.mouse.down();
-    await page.mouse.move(letter.x, letter.y - 2 * targets.cellPx, { steps: 12 });
+    await page.mouse.move(word.x, word.y - 2 * targets.cellPx, { steps: 12 });
     // live: the م has moved two cells up its line in the drawn panel while nothing is committed
     await expect
       .poll(async () => rowOf((await kufiEditTargets(page)).letters.find((l) => l.unit === 3)!.y), { timeout: 5_000 })
@@ -844,6 +858,32 @@ test.describe("editing on the canvas", () => {
     await expect.poll(async () => panelEdits(page)).toBeUndefined();
   });
 
+  test("a fast Alt-drag paints the cells it jumped over too, as one step", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const t = await kufiEditTargets(page);
+    const run = paintableRun(t.grid)!;
+    expect(run).not.toBeNull();
+    const from = kufiCellCenter(t, run[0].col, run[0].row);
+    const to = kufiCellCenter(t, run[2].col, run[2].row);
+
+    await page.mouse.move(from.x, from.y);
+    await page.keyboard.down("Alt");
+    await page.mouse.down();
+    // one pointer sample two cells on: the cell between gets no mousemove of its own
+    await page.mouse.move(to.x, to.y, { steps: 1 });
+    await settleFrames(page);
+    expect(await inkPixels(page, kufiCellBox(t, run[1].col, run[1].row))).toBeGreaterThan(0);
+    await page.mouse.up();
+    await page.keyboard.up("Alt");
+
+    await expect.poll(async () => (await panelEdits(page))?.cells?.length).toBe(3);
+    expect((await panelEdits(page))!.cells!.every((c) => c.on)).toBe(true);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+  });
+
   test("a cell that would make a 2×2 of ink is refused and the outline flashes red; erasing is allowed and a gap is reported", async ({ page }) => {
     const box = await openBaqarahPanel(page);
     await pointerAway(page, box);
@@ -935,5 +975,67 @@ test.describe("editing on the canvas", () => {
     await pointerAway(page, box);
     expect(await inkSignature(page, box)).toEqual(before);
     await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+  });
+
+  test("Release hand edits frees pinned letters after a size change they cannot survive, in one undo step", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await expect(kufiPanel(page)).not.toContainText("Release hand edits");
+
+    // A hand edit: the kaf's right end pulled two cells, as in the stretch test
+    // (a pull re-asks while the pointer rests, so it holds up under the full
+    // suite's load where a form click's two tries can be refused by the clock).
+    const cellPx = 6 * (await getStageScale(page));
+    const targets = await kufiEditTargets(page);
+    const end = targets.ends.find((e) => e.unit === 2 && e.si === 0 && e.dc === 1 && e.dr === 0)!;
+    const leftEndBefore = targets.ends.find((e) => e.unit === 2 && e.dc === -1)!;
+    await page.mouse.move(end.x, end.y);
+    await settleFrames(page);
+    await page.mouse.down();
+    await page.mouse.move(end.x + 2 * cellPx, end.y, { steps: 12 });
+    await expect
+      .poll(async () => (await kufiEditTargets(page)).ends.find((e) => e.unit === 2 && e.dc === -1)?.x, { timeout: 10_000 })
+      .toBeLessThan(leftEndBefore.x - 1.5 * cellPx);
+    await page.mouse.up();
+    await expect.poll(async () => (await panelEdits(page))?.pinned?.[2]).toBeDefined();
+    await pointerAway(page, box);
+    // offered whenever the panel has pins
+    await expect(kufiPanel(page).getByRole("button", { name: "Release hand edits" })).toBeVisible();
+
+    // 20×20: the pin holds the kaf at a cell the smaller box does not have.
+    await page.waitForTimeout(400);
+    await sizeField(page, "Width").fill("20");
+    await sizeField(page, "Width").press("Enter");
+    await sizeField(page, "Height").fill("20");
+    await sizeField(page, "Height").press("Enter");
+    await expect.poll(async () => [(await panelOf(page, PANEL_ID))?.panelCols, (await panelOf(page, PANEL_ID))?.panelRows]).toEqual([20, 20]);
+    await expect(kufiPanel(page)).toContainText("A pinned edit can't stay where it is at this size", { timeout: 15_000 });
+    const release = kufiPanel(page).getByRole("button", { name: "Release hand edits" });
+    await expect(release).toBeVisible();
+
+    // Released: the pin goes, the stretch stays, and the packer answers for 20×20
+    // (a packed panel, or "Too long", with sizes to try when its budget finds some).
+    await page.waitForTimeout(400);
+    await release.click();
+    await expect.poll(async () => (await panelEdits(page))?.pinned).toBeUndefined();
+    expect((await panelEdits(page))?.stretch?.[2]).toEqual([2]);
+    await expect(kufiPanel(page)).not.toContainText("pinned edit");
+    await expect(release).toHaveCount(0);
+    await expect
+      .poll(
+        async () => {
+          const text = await kufiPanel(page).innerText();
+          if (text.includes("Arranging")) return "waiting";
+          if (/Too long for 20×20/.test(text)) return "too long";
+          const b = await blockClientBox(page, PANEL_ID);
+          return (await inkPixels(page, b)) > b.width * b.height * 0.15 ? "packed" : text;
+        },
+        { timeout: 20_000 }
+      )
+      .toMatch(/^(too long|packed)$/);
+
+    // One undo brings the pins back, and with them the conflict.
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => (await panelEdits(page))?.pinned?.[2]).toBeDefined();
+    await expect(kufiPanel(page)).toContainText("A pinned edit can't stay where it is at this size", { timeout: 15_000 });
   });
 });

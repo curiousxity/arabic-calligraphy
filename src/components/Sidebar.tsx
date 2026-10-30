@@ -203,6 +203,8 @@ export type SidebarProps = {
   onSetKufiPanelSize?: (size: { cols: number; rows: number }) => void;
   /** Fits the selected Kufi panel's box to its text; rejects "Fit failed …" if the packer's worker dies. */
   onFitKufiPanel?: () => Promise<void>;
+  /** Releases the selected Kufi panel's pins (its letters may move again); one undo step. */
+  onReleaseKufiPanelPins?: () => void;
   /** Why the last canvas edit of a Kufi panel changed nothing, keyed to the panel and its inputs. */
   kufiNotice?: { blockId: number; key: string; text: string } | null;
   /** Guides — see .claude/rules/guides.md. */
@@ -406,6 +408,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddKufiPanel,
   onSetKufiPanelSize,
   onFitKufiPanel,
+  onReleaseKufiPanelPins,
   kufiNotice,
   onAddGuide,
   onAddSvgGuide,
@@ -1433,6 +1436,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 block={selectedBlock}
                 onSetSize={onSetKufiPanelSize}
                 onFit={onFitKufiPanel}
+                onReleasePins={onReleaseKufiPanelPins}
                 notice={kufiNotice ?? null}
               />
             </CollapsibleSection>

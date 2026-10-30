@@ -226,9 +226,57 @@ export function hitStretchEnd(result: Ok, col: number, row: number): KufiStretch
   return null;
 }
 
+/**
+ * The handle for moving a word along its path: one cell of the word's first
+ * letter, the leading cell (on the edge met first in reading order, on the
+ * baseline side), with the line's reading step. Shown on hover like a stretch
+ * end; a press on it drags the word, a press anywhere else on the letter is
+ * the letter's own (a click, or a drag of the whole panel).
+ */
+export type KufiRouteHandle = {
+  kind: "route";
+  unitIndex: number;
+  wordIndex: number;
+  col: number;
+  row: number;
+  dc: -1 | 0 | 1;
+  dr: -1 | 0 | 1;
+};
+
+/** Anything the overlay draws a small square for and starts a drag from. */
+export type KufiHandle = KufiStretchEnd | KufiRouteHandle;
+
+/**
+ * Where a handle's square is drawn, in cell units: an end's on the edge its
+ * stroke grows across, a slice grip's on its cell, a route handle's on the
+ * word's leading edge (the side the word reads away from). Two handles may
+ * share a cell (a first letter's leading corner is often a stroke's end);
+ * they never share a square, so the pointer's place in the cell tells them
+ * apart.
+ */
+export function handleCentre(h: KufiHandle): { x: number; y: number } {
+  const shift = h.kind === "end" ? 0.5 : h.kind === "route" ? -0.5 : 0;
+  return { x: h.col + 0.5 + h.dc * shift, y: h.row + 0.5 + h.dr * shift };
+}
+
+/** The handle whose square is nearest a point in cell units (the earlier of two at one distance), or null from none. */
+export function nearestHandleAt<T extends KufiHandle>(handles: T[], x: number, y: number): T | null {
+  let best: T | null = null;
+  let bestD = Infinity;
+  for (const h of handles) {
+    const c = handleCentre(h);
+    const d = Math.hypot(c.x - x, c.y - y);
+    if (d < bestD) {
+      best = h;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
 /** The handle nearest a cell, or null from none. */
-export function nearestStretchEnd(ends: KufiStretchEnd[], col: number, row: number): KufiStretchEnd | null {
-  let best: KufiStretchEnd | null = null;
+export function nearestHandle<T extends { col: number; row: number }>(ends: T[], col: number, row: number): T | null {
+  let best: T | null = null;
   let bestD = Infinity;
   for (const e of ends) {
     const d = Math.hypot(e.col - col, e.row - row);
@@ -266,9 +314,8 @@ export function firstUnitOfWord(units: KufiUnit[], wordIndex: number): number | 
 
 /**
  * The word whose first letter covers the cell, or null on any other letter,
- * on paper, a dot or a filler. Checked after `hitStretchEnd` by the overlay:
- * a handle on a first letter still stretches, every other cell of it drags
- * the word along its path.
+ * on paper, a dot or a filler. The overlay offers that word's route handle
+ * (`routeHandleOf`) among the letter's handles while it is hovered.
  */
 export function hitWordStart(result: Ok, units: KufiUnit[], col: number, row: number): number | null {
   const unitIndex = hitKufiUnit(result, col, row);
@@ -276,6 +323,58 @@ export function hitWordStart(result: Ok, units: KufiUnit[], col: number, row: nu
   const u = units[unitIndex];
   if (!u) return null;
   return firstUnitOfWord(units, u.wordIndex) === unitIndex ? u.wordIndex : null;
+}
+
+/**
+ * The route handle of a word: on its first letter's leading cell. Of the
+ * letter's ink on the leading edge of its box (the edge met first in reading
+ * order, as `routeOffsetFor` measures from), the cell nearest the line's
+ * outer edge, where the baseline runs: the bottom row for the bottom line,
+ * the left column for the left side, and so on by the turn. Null for a word
+ * the text does not have or whose first letter is not placed.
+ */
+export function routeHandleOf(result: Ok, units: KufiUnit[], wordIndex: number): KufiRouteHandle | null {
+  const unitIndex = firstUnitOfWord(units, wordIndex);
+  const p = unitIndex === null ? null : placementOf(result, unitIndex);
+  if (unitIndex === null || !p) return null;
+  const [dc, dr] = kufiReadingStep(p.turn);
+  const { h, w } = placedBox(p);
+  const leadCol = dc < 0 ? p.col + w - 1 : p.col;
+  const leadRow = dr < 0 ? p.row + h - 1 : p.row;
+  // the outer edge of the line: toward which the baseline lies, by turn
+  const outer = (col: number, row: number) => (p.turn === 0 ? row : p.turn === 1 ? -col : p.turn === 2 ? -row : col);
+  let best: { col: number; row: number } | null = null;
+  for (const i of placementInk(result, p)) {
+    const col = i % result.cols;
+    const row = Math.floor(i / result.cols);
+    if (dc !== 0 ? col !== leadCol : row !== leadRow) continue;
+    if (!best || outer(col, row) > outer(best.col, best.row)) best = { col, row };
+  }
+  if (!best) return null;
+  return { kind: "route", unitIndex, wordIndex, col: best.col, row: best.row, dc, dr };
+}
+
+/**
+ * The route handle covering the cell: the handle's own cell, or the cell
+ * just beyond it against the reading direction (where the square is drawn,
+ * half over the edge) when no letter owns that cell. Null elsewhere, so the
+ * rest of a first letter stays the letter's own.
+ */
+export function hitRouteHandle(result: Ok, units: KufiUnit[], col: number, row: number): KufiRouteHandle | null {
+  const own = hitWordStart(result, units, col, row);
+  if (own !== null) {
+    const h = routeHandleOf(result, units, own);
+    return h && h.col === col && h.row === row ? h : null;
+  }
+  if (hitKufiUnit(result, col, row) !== null) return null;
+  // paper: the cell beyond a handle is reached by stepping along the reading direction
+  for (const [dc, dr] of [[-1, 0], [0, -1], [1, 0], [0, 1]] as const) {
+    const w = hitWordStart(result, units, col + dc, row + dr);
+    if (w === null) continue;
+    const h = routeHandleOf(result, units, w);
+    if (h && h.col === col + dc && h.row === row + dr && h.dc === dc && h.dr === dr) return h;
+  }
+  return null;
 }
 
 /** The placed box's extent: the rows and columns it covers on the panel, after stretching and turning. */

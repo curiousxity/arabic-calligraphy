@@ -68,8 +68,11 @@ export const section: GuideSection = {
         </li>
         <li>
           <strong>A pinned edit can't stay where it is at this size.</strong>{" "}
-          Something you moved by hand does not fit the new size. Undo, or pick
-          another size.
+          A letter you stretched, swapped or moved is held at a place the new
+          size does not have. Press <strong>Release hand edits</strong> beside
+          it: the letters are free to find new places, and your stroke lengths
+          and letter shapes are kept. (Undo works too, but takes back everything
+          since.) The button is there whenever a panel has hand-placed letters.
         </li>
         <li>
           <strong>Painted cells leave a gap.</strong> Squares you painted by
@@ -108,24 +111,33 @@ export const section: GuideSection = {
           not fit are skipped. A letter with a single form says so.
         </li>
         <li>
-          <strong>Move a word.</strong> Drag a word's first letter along its
-          line to slide the word. On a tight panel there is often no room, so
-          the word snaps back; nothing else moves to make space.
+          <strong>Move a word.</strong> A word's first letter has a second
+          small square, on the corner where the word begins. Drag it along the
+          word's line to slide the word. On a tight panel there is often no
+          room, so the word snaps back; nothing else moves to make space.
+          Pressing the letter anywhere else moves the whole panel, or clicks
+          it.
         </li>
         <li>
           <strong>Paint a square.</strong> Hold <strong>Alt</strong> and click a
-          square to fill it or clear it, or drag to paint several. A square
-          that would make a solid 2×2 block flashes red and is refused. Use
-          this last, because hand-painted squares are not rearranged when you
-          change anything else. It needs a mouse or a trackpad with a keyboard;
-          touch screens cannot paint.
+          square to fill it or clear it, or drag to paint several: every square
+          along the way is painted, however fast you move. A square that would
+          make a solid 2×2 block flashes red and is refused. Use this last,
+          because hand-painted squares are not rearranged when you change
+          anything else. It needs a mouse or a trackpad with a keyboard; touch
+          screens cannot paint.
         </li>
       </ul>
       <p>
         Letters you have stretched, swapped or moved stay where you put them
-        when you change other things. If you change the text, your edits follow
-        their letters; in a word with the same letter twice (the two lams of
-        «الله»), an edit can end up on the other copy.
+        when you change other things; <strong>Release hand edits</strong> in
+        the Kufi panel section lets them move again. If you change the text,
+        your edits follow their letters.
+      </p>
+      <p>
+        You can type or paste the ligature characters «ﷲ» and «ﻻ» (and the
+        other joined lam-alef characters): they are read as the letters they
+        stand for.
       </p>
 
       <h4>Dots belong to their letters</h4>

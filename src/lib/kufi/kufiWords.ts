@@ -23,19 +23,39 @@ const ALEF_FORMS = new Set([0x0627, 0x0623, 0x0625, 0x0622]);
 const isSpace = (ch: string) => /\s/.test(ch);
 
 /**
+ * True for the Arabic Presentation Forms (A: U+FB50–U+FDFF, B: U+FE70–U+FEFF):
+ * the shaped glyph code points a keyboard or a pasted PDF can produce, such as
+ * ﷲ (U+FDF2) and the lam-alef forms ﻻ ﻼ ﻷ ﻸ ﻹ ﻺ ﻵ ﻶ (U+FEF5–U+FEFC). They are
+ * the letters they look like, so they are normalised (NFKC) to those letters
+ * before resolving, each expanded letter keeping the form's own text offset.
+ */
+const isPresentationForm = (ch: string) => {
+  const cp = ch.codePointAt(0) ?? 0;
+  return (cp >= 0xfb50 && cp <= 0xfdff) || (cp >= 0xfe70 && cp <= 0xfeff);
+};
+
+/**
  * Turns text into square Kufi letter units. Harakat and tatweel are dropped,
  * spaces split words, and anything without a skeleton (Latin, digits,
  * punctuation) is reported in `unsupported` and also ends the current word.
  * A lone leading و/ف/ب before الله is not treated as part of allah.
+ * Presentation forms (ﷲ, ﻻ and the rest) are read as the letters they stand
+ * for; a unit made from one has the form's offset as its `textOffset`.
  */
 export function resolveKufiText(text: string): { units: KufiUnit[]; unsupported: string[] } {
   // classifyJoiningForms misaligns after non-BMP characters, so classify a copy
   // where each is a single BMP placeholder and map back to the original here.
-  const original = Array.from(text);
+  // A presentation form becomes the letters it stands for, every one of them
+  // carrying the form's offset, so an edit keyed on the unit finds its place.
+  const original: string[] = [];
   const offsets: number[] = [];
   let at = 0;
-  for (const ch of original) {
-    offsets.push(at);
+  for (const ch of Array.from(text)) {
+    const expanded = isPresentationForm(ch) ? Array.from(ch.normalize("NFKC")) : [ch];
+    for (const e of expanded) {
+      original.push(e);
+      offsets.push(at);
+    }
     at += ch.length;
   }
   const chars = classifyJoiningForms(original.map((ch) => (ch.length > 1 ? "�" : ch)).join(""));

@@ -16,6 +16,45 @@ type Ok = Extract<KufiPackResult, { ok: true }>;
 
 export type KufiPaint = { kind: "ok"; edits: KufiPanelEdits; result: Ok } | { kind: "same" } | { kind: "refused" };
 
+type Cell = { col: number; row: number };
+
+/**
+ * The cells a drag crossed between two pointer samples, from `from`
+ * (excluded) to `to` (included), as a 4-connected line: a Bresenham walk
+ * whose diagonal steps are taken as two edge steps, so every cell the line
+ * passes through is listed in order, and painting them one by one gives each
+ * the 2×2 check it would have had under a slower hand. Empty when the two
+ * are the same cell.
+ */
+export function cellsBetween(from: Cell, to: Cell): Cell[] {
+  const out: Cell[] = [];
+  const dx = Math.abs(to.col - from.col);
+  const dy = Math.abs(to.row - from.row);
+  const sx = to.col > from.col ? 1 : -1;
+  const sy = to.row > from.row ? 1 : -1;
+  let col = from.col;
+  let row = from.row;
+  let err = dx - dy;
+  while (col !== to.col || row !== to.row) {
+    const e2 = 2 * err;
+    // Bresenham's two tests on the same error term; when both pass (a
+    // diagonal step) the two edge steps are taken one after the other
+    const stepCol = col !== to.col && (e2 > -dy || row === to.row);
+    const stepRow = row !== to.row && (e2 < dx || col === to.col);
+    if (stepCol) {
+      err -= dy;
+      col += sx;
+      out.push({ col, row });
+    }
+    if (stepRow) {
+      err += dx;
+      row += sy;
+      out.push({ col, row });
+    }
+  }
+  return out;
+}
+
 /**
  * The unit whose placed box is nearest the cell (Chebyshev distance to the
  * box, 0 on it); ties go to the lower unit index. Null with no letters.

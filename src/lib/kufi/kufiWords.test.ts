@@ -80,4 +80,41 @@ describe("resolveKufiText", () => {
       expect(units.map((u) => u.skeleton)).toEqual(["lamAlef"]);
     }
   });
+
+  describe("presentation forms", () => {
+    it("draws ﷲ as الله, at the ligature's own offset, and keeps the offsets after it", () => {
+      const { units, unsupported } = resolveKufiText("بسم ﷲ ب");
+      expect(unsupported).toEqual([]);
+      expect(units.map((u) => [u.skeleton, u.textOffset])).toEqual([
+        ["beh", 0],
+        ["seen", 1],
+        ["meem", 2],
+        ["allah", 4],
+        ["beh", 6],
+      ]);
+    });
+
+    it("draws every lam-alef presentation form as lam-alef, in the form its place gives it", () => {
+      for (const ch of ["ﻵ", "ﻶ", "ﻷ", "ﻸ", "ﻹ", "ﻺ", "ﻻ", "ﻼ"]) {
+        const { units, unsupported } = resolveKufiText(ch);
+        expect(unsupported, ch).toEqual([]);
+        expect(units.map((u) => u.key), ch).toEqual(["lamAlef:isolated"]);
+      }
+      const { units } = resolveKufiText("بﻼ");
+      expect(units.map((u) => [u.key, u.textOffset])).toEqual([
+        ["beh:initial", 0],
+        ["lamAlef:final", 1],
+      ]);
+    });
+
+    it("draws single-letter presentation forms as their letters", () => {
+      const { units, unsupported } = resolveKufiText("ﺑﺴﻢ");
+      expect(unsupported).toEqual([]);
+      expect(units.map((u) => [u.key, u.textOffset])).toEqual([
+        ["beh:initial", 0],
+        ["seen:medial", 1],
+        ["meem:final", 2],
+      ]);
+    });
+  });
 });

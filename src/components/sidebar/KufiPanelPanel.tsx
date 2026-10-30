@@ -83,13 +83,21 @@ const CellsField: React.FC<{ id: string; label: string; value: number; onCommit:
  * `notice` is why the last canvas edit (a click on a letter, a stretch)
  * changed nothing; it is shown only while the block and its layout inputs
  * are the ones it was made on.
+ *
+ * **Release hand edits** shows whenever the panel has pins (every committed
+ * canvas gesture pins its letter at an absolute cell), on the same line as
+ * the `pinConflict` status when there is one: pins are what a size change
+ * cannot honour, and undo would also take back whatever was done since.
+ * `onReleasePins` drops the pins and the routes they held, keeping forms,
+ * stretch counts and painted cells, as one undo step.
  */
 export const KufiPanelPanel: React.FC<{
   block: KufiPanelBlock;
   onSetSize: (size: Size) => void;
   onFit: () => Promise<void>;
+  onReleasePins?: () => void;
   notice?: { blockId: number; key: string; text: string } | null;
-}> = ({ block, onSetSize, onFit, notice = null }) => {
+}> = ({ block, onSetSize, onFit, onReleasePins, notice = null }) => {
   // Registers this panel as a reader, so the layout is packed even if the
   // canvas has not asked yet; the status reads the exact inputs below.
   useKufiPanelLayout(block);
@@ -118,6 +126,18 @@ export const KufiPanelPanel: React.FC<{
   const size = { cols: block.panelCols, rows: block.panelRows };
   const status = kufiPanelStatus(result, failed, size);
   const idBase = `kufi-panel-${block.id}`;
+  const hasPins = !!block.panelEdits?.pinned && Object.keys(block.panelEdits.pinned).length > 0;
+  const pinConflict = !!result && !result.ok && result.reason === "pinConflict";
+  const release = hasPins && onReleasePins && (
+    <button
+      type="button"
+      className="kufiPanelSuggestion"
+      onClick={onReleasePins}
+      title="Let the letters you stretched, swapped or moved find new places; their shapes and stroke lengths are kept"
+    >
+      Release hand edits
+    </button>
+  );
 
   const runFit = () => {
     const press = ++pressRef.current;
@@ -174,8 +194,10 @@ export const KufiPanelPanel: React.FC<{
                 </button>
               </span>
             ))}
+            {pinConflict && release && <> — {release}</>}
           </div>
         ) : null}
+        {!pinConflict && release && <div>{release}</div>}
         {notice && notice.blockId === block.id && notice.key === key && <div>{notice.text}</div>}
         {unsupported.length > 0 && <div>Not drawn: {unsupported.join(" ")}</div>}
         {(block.strokeWidth ?? 0) > 0 && <div>The outline exports as a separate path.</div>}

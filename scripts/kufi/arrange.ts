@@ -24,7 +24,8 @@
  * on, alternates, stretch counts, line offsets, U-turns), with restarts in a
  * time budget, scored on holes (empty 2x2), edge gaps, fills and penalties.
  *
- * Run: npx --yes tsx scripts/kufi/arrange.ts [baqarah|allah|shahada|all] [seconds-per-size]
+ * Run: KUFI_LOCAL=<folder with refs/ and spike2/ref21.txt> [KUFI_BROWSER=<chromium exe>]
+ *      npx --yes tsx scripts/kufi/arrange.ts [baqarah|allah|shahada|all] [seconds-per-size]
  */
 import fs from "node:fs";
 import { execFileSync, fork } from "node:child_process";
@@ -38,10 +39,18 @@ import {
 } from "../../src/lib/kufi/kufiAlphabet";
 import { resolveKufiText } from "../../src/lib/kufi/kufiWords";
 
-const ROOT = "C:/Users/Mo/OneDrive/Desktop/arabic-calligraphy";
-const OUT = `${ROOT}/kufi-local/spike3`;
-const REFS = `${ROOT}/kufi-local/refs`;
-const EDGE = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+// The local material (reference panels, output sheets) lives outside the
+// repo: KUFI_LOCAL names its folder (with `refs/` and `spike2/ref21.txt` in
+// it; `spike3/` is written). KUFI_BROWSER is a headless-capable Chromium
+// browser executable, used only to render the sheets to PNG.
+const LOCAL = process.env.KUFI_LOCAL;
+if (!LOCAL) {
+  console.error("arrange.ts: set KUFI_LOCAL to the folder holding the local Kufi material (refs/, spike2/ref21.txt).");
+  process.exit(2);
+}
+const OUT = `${LOCAL}/spike3`;
+const REFS = `${LOCAL}/refs`;
+const BROWSER = process.env.KUFI_BROWSER;
 fs.mkdirSync(OUT, { recursive: true });
 
 const D = 5; // band depth
@@ -1171,7 +1180,7 @@ function refGenome(ctx: Ctx): Genome {
 // ---------------------------------------------------------------------------
 
 const REF21 = fs
-  .readFileSync(`${ROOT}/kufi-local/spike2/ref21.txt`, "utf8")
+  .readFileSync(`${LOCAL}/spike2/ref21.txt`, "utf8")
   .split(/\r?\n/)
   .map((l) => l.trim())
   .filter((l) => l.length);
@@ -1257,7 +1266,11 @@ function svgOf(res: Result, px: number, colour: boolean): string {
 function shoot(html: string, png: string, w: number, h: number) {
   const file = png.replace(/\.png$/, ".html");
   fs.writeFileSync(file, html);
-  execFileSync(EDGE, [
+  if (!BROWSER) {
+    console.error(`arrange.ts: set KUFI_BROWSER to a Chromium-based browser executable to render ${png}; the HTML is at ${file}.`);
+    return;
+  }
+  execFileSync(BROWSER, [
     "--headless=new", "--disable-gpu", "--hide-scrollbars", "--allow-file-access-from-files",
     `--window-size=${w},${h}`, `--screenshot=${png}`, "file:///" + file,
   ], { stdio: "ignore" });

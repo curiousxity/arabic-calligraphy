@@ -1,7 +1,40 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { placementInk } from "./kufiHit";
-import { cellEditAt, nearestKufiUnit, paintKufiCell } from "./kufiPaint";
+import { cellEditAt, cellsBetween, nearestKufiUnit, paintKufiCell } from "./kufiPaint";
 import { packKufiPanel, _internal, type KufiPackResult, type KufiPanelEdits, type KufiPlacement } from "./kufiPack";
+
+describe("cellsBetween", () => {
+  it("walks from the last painted cell to the pointer's, 4-connected, without the start and ending on the pointer's cell", () => {
+    expect(cellsBetween({ col: 1, row: 1 }, { col: 4, row: 1 })).toEqual([
+      { col: 2, row: 1 },
+      { col: 3, row: 1 },
+      { col: 4, row: 1 },
+    ]);
+    expect(cellsBetween({ col: 2, row: 5 }, { col: 2, row: 3 })).toEqual([
+      { col: 2, row: 4 },
+      { col: 2, row: 3 },
+    ]);
+    expect(cellsBetween({ col: 1, row: 1 }, { col: 1, row: 1 })).toEqual([]);
+  });
+
+  it("a slanted jump passes through every cell on the way, one edge at a time", () => {
+    for (const to of [
+      { col: 3, row: 2 },
+      { col: -3, row: 2 },
+      { col: 1, row: -4 },
+      { col: 7, row: 7 },
+    ]) {
+      const path = cellsBetween({ col: 0, row: 0 }, to);
+      expect(path[path.length - 1]).toEqual(to);
+      expect(path).toHaveLength(Math.abs(to.col) + Math.abs(to.row));
+      let prev = { col: 0, row: 0 };
+      for (const c of path) {
+        expect(Math.abs(c.col - prev.col) + Math.abs(c.row - prev.row)).toBe(1);
+        prev = c;
+      }
+    }
+  });
+});
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 

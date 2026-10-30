@@ -7,6 +7,7 @@ import {
   kufiPanelTextPatch,
   kufiPinEdits,
   kufiPinWordEdits,
+  kufiReleasePins,
   kufiRouteEdits,
   kufiStretchEdits,
 } from "./kufiPanelBlock";
@@ -16,8 +17,27 @@ import { resolveKufiText } from "./kufiWords";
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
 describe("kufiPanelBlock", () => {
-  it("a cell is an eighth of the font size", () => {
+  it("a cell is an eighth of the font size: 14 px at a new panel's 112", () => {
     expect(kufiCellSize(48)).toBe(6);
+    expect(kufiCellSize(112)).toBe(14);
+  });
+
+  describe("releasing pins", () => {
+    const pin: KufiPlacement = { unitIndex: 2, key: "kaf:medial", glyphId: "kaf.medial.0", col: 3, row: 4, turn: 0, stretch: [1] };
+
+    it("drops every pin and the routes that stood on them, keeping forms, stretch and painted cells", () => {
+      const cells = [{ unitIndex: 2, key: "kaf:medial", dx: 1, dy: 1, on: true }];
+      const out = kufiReleasePins({ pinned: { 2: pin }, routes: { 1: 2 }, forms: { 4: "feh.final.1" }, stretch: { 2: [1] }, cells });
+      expect(out).toEqual({ forms: { 4: "feh.final.1" }, stretch: { 2: [1] }, cells });
+    });
+
+    it("is undefined when nothing but pins was there, and leaves edits with no pins as they are", () => {
+      expect(kufiReleasePins({ pinned: { 2: pin } })).toBeUndefined();
+      expect(kufiReleasePins({ pinned: { 2: pin }, routes: { 0: 1 } })).toBeUndefined();
+      const edits = { forms: { 4: "feh.final.1" } };
+      expect(kufiReleasePins(edits)).toBe(edits);
+      expect(kufiReleasePins(undefined)).toBeUndefined();
+    });
   });
 
   it("maps a block to the packer's inputs", () => {

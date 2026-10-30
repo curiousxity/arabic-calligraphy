@@ -2548,21 +2548,47 @@ export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}): { cols: 
 }
 
 /**
- * Old unit index → new unit index, for units the text change kept: the
- * longest common subsequence of the two key lists. A unit that was deleted
- * or became another letter or form has no entry.
+ * Old unit index → new unit index, for units the text change kept. The
+ * untouched run at each end is matched first: a unit whose key and text
+ * offset are the same (the prefix), or whose key is the same and whose
+ * offset moved by the text's change in length (the suffix), is the same
+ * letter. Only the middle, where the edit was, goes through a longest common
+ * subsequence of the key lists. Without the trim, a letter typed next to an
+ * identical one (a ي before يكلف) could take the edit of its neighbour: the
+ * LCS alone cannot tell two copies of a key apart and took the earliest.
+ * A unit that was deleted or became another letter or form has no entry.
  */
 function alignUnits(oldUnits: KufiUnit[], newUnits: KufiUnit[]): Map<number, number> {
   const n = oldUnits.length;
   const m = newUnits.length;
-  const len: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
-  for (let i = n - 1; i >= 0; i--)
-    for (let j = m - 1; j >= 0; j--)
-      len[i][j] = oldUnits[i].key === newUnits[j].key ? len[i + 1][j + 1] + 1 : Math.max(len[i + 1][j], len[i][j + 1]);
   const map = new Map<number, number>();
-  for (let i = 0, j = 0; i < n && j < m; ) {
-    if (oldUnits[i].key === newUnits[j].key && len[i][j] === len[i + 1][j + 1] + 1) map.set(i++, j++);
-    else if (len[i + 1][j] >= len[i][j + 1]) i++;
+  let lo = 0;
+  while (lo < n && lo < m && oldUnits[lo].key === newUnits[lo].key && oldUnits[lo].textOffset === newUnits[lo].textOffset) {
+    map.set(lo, lo);
+    lo++;
+  }
+  // the suffix moved as one by the text's change in length, read off its last units
+  const shift = n > 0 && m > 0 ? newUnits[m - 1].textOffset - oldUnits[n - 1].textOffset : 0;
+  let hi = 0;
+  while (
+    lo + hi < n &&
+    lo + hi < m &&
+    oldUnits[n - 1 - hi].key === newUnits[m - 1 - hi].key &&
+    newUnits[m - 1 - hi].textOffset - oldUnits[n - 1 - hi].textOffset === shift
+  ) {
+    map.set(n - 1 - hi, m - 1 - hi);
+    hi++;
+  }
+  const oldEnd = n - hi;
+  const newEnd = m - hi;
+  const len: number[][] = Array.from({ length: oldEnd - lo + 1 }, () => new Array<number>(newEnd - lo + 1).fill(0));
+  for (let i = oldEnd - 1; i >= lo; i--)
+    for (let j = newEnd - 1; j >= lo; j--)
+      len[i - lo][j - lo] =
+        oldUnits[i].key === newUnits[j].key ? len[i - lo + 1][j - lo + 1] + 1 : Math.max(len[i - lo + 1][j - lo], len[i - lo][j - lo + 1]);
+  for (let i = lo, j = lo; i < oldEnd && j < newEnd; ) {
+    if (oldUnits[i].key === newUnits[j].key && len[i - lo][j - lo] === len[i - lo + 1][j - lo + 1] + 1) map.set(i++, j++);
+    else if (len[i - lo + 1][j - lo] >= len[i - lo][j - lo + 1]) i++;
     else j++;
   }
   return map;

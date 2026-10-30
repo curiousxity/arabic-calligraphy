@@ -473,6 +473,25 @@ describe("reconcileEdits", () => {
     // the lam (unit 3) is gone; the allah that was unit 5 is now unit 4
     expect(kept.stretch).toEqual({ 4: [0, 1] });
   });
+
+  it("a letter typed next to an identical one leaves the edit on the letter it was made on", () => {
+    // A ي joined before the لا: the new unit 0 and the ي of يكلف (unit 1, now 2) share a key,
+    // and an alignment that takes the earliest match would move the edit onto the typed letter.
+    const before = resolveKufiText(BAQARAH).units;
+    const after = resolveKufiText("ي" + BAQARAH).units;
+    expect(after[0].key).toBe(before[1].key);
+    expect(after[2].key).toBe(before[1].key);
+    const kept = reconcileEdits({ stretch: { 1: [1] }, forms: { 1: before[1].key.replace(":", ".") + ".0" } }, before, after);
+    expect(kept.stretch).toEqual({ 2: [1] });
+    expect(Object.keys(kept.forms ?? {})).toEqual(["2"]);
+  });
+
+  it("deleting one of two identical neighbours drops that letter's edits and keeps the other's", () => {
+    const before = resolveKufiText("ي" + BAQARAH).units;
+    const after = resolveKufiText(BAQARAH).units;
+    const kept = reconcileEdits({ stretch: { 0: [2], 2: [1] } }, before, after);
+    expect(kept.stretch).toEqual({ 1: [1] });
+  });
 });
 
 describe("a joining letter's shapes", () => {

@@ -648,7 +648,8 @@ export async function dragMouse(page: Page, from: Point, to: Point): Promise<voi
 export type KufiEditTargets = {
   letters: { unit: number; glyphId: string; forms: number; x: number; y: number }[];
   ends: { unit: number; si: number; kind: "end" | "slice"; dc: number; dr: number; x: number; y: number }[];
-  words: { word: number; unit: number; dc: number; dr: number }[];
+  /** Each word's route handle: on its first letter, with the line's reading step; `x`/`y` is on the handle's square. */
+  words: { word: number; unit: number; dc: number; dr: number; x: number; y: number }[];
   grid: string[];
   cellPx: number;
   origin: Point;
@@ -696,7 +697,7 @@ export async function kufiEditTargets(page: Page): Promise<KufiEditTargets> {
     return {
       letters: map((node.getAttr("letters") as KufiEditTargets["letters"] | undefined) ?? []),
       ends: map((node.getAttr("ends") as KufiEditTargets["ends"] | undefined) ?? []),
-      words: (node.getAttr("words") as KufiEditTargets["words"] | undefined) ?? [],
+      words: map((node.getAttr("words") as KufiEditTargets["words"] | undefined) ?? []),
       grid: (node.getAttr("grid") as string[] | undefined) ?? [],
       cellPx: t.point({ x: cell, y: 0 }).x - o.x,
       origin: { x: c.left + o.x, y: c.top + o.y },

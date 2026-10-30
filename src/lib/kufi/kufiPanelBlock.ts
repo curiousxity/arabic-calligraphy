@@ -98,6 +98,22 @@ export function kufiPinEdits(edits: KufiPanelEdits, result: Ok, unitIndex: numbe
 }
 
 /**
+ * The edits with every pin released (the "Release hand edits" button): the
+ * letters may move again, and the packer finds them places at the current
+ * size. Pins hold absolute cells, so they are what blocks a panel after a
+ * size change (`pinConflict`); forms, stretch counts and painted cells are
+ * kept, since they describe the letter, not its place. `routes` go with the
+ * pins: a route is the record of where a word's pin took it, and without
+ * the pin it is stale. Undefined when nothing is left (no edits at all);
+ * the same object when there was nothing to release.
+ */
+export function kufiReleasePins(edits: KufiPanelEdits | undefined): KufiPanelEdits | undefined {
+  if (!edits?.pinned) return edits;
+  const out = tidy({ ...edits, pinned: undefined, routes: undefined });
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
  * The edits to preview a word dragged to `route` cells along its path. The
  * route counts from where the word stood before it was ever dragged, through
  * the chain of its drags: the committed `edits.routes` entry is where it

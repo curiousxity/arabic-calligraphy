@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  handleCentre,
   hitKufiUnit,
+  hitRouteHandle,
   hitStretchEnd,
   hitWordStart,
   kufiFormsOf,
   kufiGlyphById,
   kufiReadingStep,
-  nearestStretchEnd,
+  nearestHandle,
+  nearestHandleAt,
   placementInk,
   placementOf,
+  routeHandleOf,
   routeOffsetFor,
   stretchEnds,
   unitRings,
@@ -304,12 +308,81 @@ describe("kufiReadingStep / routeOffsetFor", () => {
   });
 });
 
-describe("nearestStretchEnd", () => {
+describe("nearestHandle", () => {
   it("picks the handle closest to a cell, and none from an empty list", () => {
     const r = panel();
     const ends = stretchEnds(r, 0);
-    expect(nearestStretchEnd(ends, 1, 2)).toMatchObject({ row: 1 });
-    expect(nearestStretchEnd(ends, 3, 6)).toMatchObject({ row: 7 });
-    expect(nearestStretchEnd([], 0, 0)).toBeNull();
+    expect(nearestHandle(ends, 1, 2)).toMatchObject({ row: 1 });
+    expect(nearestHandle(ends, 3, 6)).toMatchObject({ row: 7 });
+    expect(nearestHandle([], 0, 0)).toBeNull();
+  });
+
+  it("ranks a word's route handle with the stretch ends; listed first, it takes a tie", () => {
+    const r = panel();
+    const units = twoWords();
+    // the bar's free foot is both its lower stretch end and the word's leading cell
+    const handles = [routeHandleOf(r, units, 0)!, ...stretchEnds(r, 0)];
+    expect(nearestHandle(handles, 1, 7)).toMatchObject({ kind: "route" });
+    expect(nearestHandle(handles, 1, 6)).toMatchObject({ kind: "route" });
+    expect(nearestHandle(handles, 1, 1)).toMatchObject({ kind: "end", row: 1 });
+  });
+});
+
+describe("handleCentre / nearestHandleAt", () => {
+  it("draws an end on the edge its stroke grows across, a grip on its cell, a route handle on the word's leading edge", () => {
+    expect(handleCentre({ kind: "end", unitIndex: 0, stretchIndex: 0, col: 1, row: 7, dc: 0, dr: 1 })).toEqual({ x: 1.5, y: 8 });
+    expect(handleCentre({ kind: "slice", unitIndex: 0, stretchIndex: 0, col: 3, row: 4, dc: 1, dr: 0 })).toEqual({ x: 3.5, y: 4.5 });
+    // reading right to left, the word begins on the right: its square sits on the cell's right edge
+    expect(handleCentre({ kind: "route", unitIndex: 0, wordIndex: 0, col: 1, row: 7, dc: -1, dr: 0 })).toEqual({ x: 2, y: 7.5 });
+  });
+
+  it("two handles on one cell are told apart by where in the cell the pointer is", () => {
+    const r = panel();
+    const units = twoWords();
+    const handles = [routeHandleOf(r, units, 0)!, ...stretchEnds(r, 0)];
+    expect(stretchEnds(r, 0).some((e) => e.col === 1 && e.row === 7 && e.dr === 1)).toBe(true);
+    expect(nearestHandleAt(handles, 1.9, 7.5)).toMatchObject({ kind: "route" });
+    expect(nearestHandleAt(handles, 1.5, 7.95)).toMatchObject({ kind: "end", row: 7, dr: 1 });
+    expect(nearestHandleAt(handles, 1.5, 1.2)).toMatchObject({ kind: "end", row: 1 });
+    expect(nearestHandleAt([], 0, 0)).toBeNull();
+  });
+});
+
+describe("routeHandleOf / hitRouteHandle", () => {
+  it("sits on the first letter's leading cell, on the baseline side, with the word's reading step", () => {
+    const r = panel();
+    const units = twoWords();
+    // word 0: the upright bar at col 1 reads right to left; its leading edge is col 1, its baseline the bottom
+    expect(routeHandleOf(r, units, 0)).toEqual({ kind: "route", unitIndex: 0, wordIndex: 0, col: 1, row: 7, dc: -1, dr: 0 });
+    // word 1 opens with the beh (box cols 4–6): its leading column is 6, inked only on the baseline row
+    expect(routeHandleOf(r, units, 1)).toMatchObject({ unitIndex: 1, wordIndex: 1, col: 6, row: 7 });
+    expect(routeHandleOf(r, units, 7)).toBeNull();
+  });
+
+  it("a turned first letter's handle is on its leading row", () => {
+    const r = panel();
+    // the quarter-turned alef (unit 2) alone as a word: reading upward, leading edge row 2, where only its foot is inked
+    const units = [0, 1, 2].map((wordIndex, index) => ({ ...twoWords()[0], index, wordIndex }));
+    expect(routeHandleOf(r, units, 2)).toMatchObject({ unitIndex: 2, col: 6, row: 2, dc: 0, dr: -1 });
+  });
+
+  it("is hit on its own cell or the paper cell just beyond it, and nowhere else on the letter", () => {
+    const r = panel();
+    const units = twoWords();
+    expect(hitRouteHandle(r, units, 1, 7)).toMatchObject({ wordIndex: 0 });
+    expect(hitRouteHandle(r, units, 2, 7)).toMatchObject({ wordIndex: 0 });
+    expect(hitRouteHandle(r, units, 1, 3)).toBeNull();
+    expect(hitRouteHandle(r, units, 6, 7)).toMatchObject({ wordIndex: 1 });
+    expect(hitRouteHandle(r, units, 5, 7)).toBeNull();
+    expect(hitRouteHandle(r, units, 0, 0)).toBeNull();
+    // the cell beyond is another letter's ink: that letter keeps its press
+    const touching: Ok = { ...r, cells: r.cells.slice() };
+    touching.cells[7 * r.cols + 2] = 1;
+    expect(hitRouteHandle(touching, units, 2, 7)).toMatchObject({ wordIndex: 0 });
+    const withLetter: Ok = {
+      ...r,
+      placements: [...r.placements, { unitIndex: 3, key: "beh:medial", glyphId: "beh.medial.0", col: 2, row: 5, turn: 0, stretch: [] }],
+    };
+    expect(hitRouteHandle(withLetter, [...units, { ...units[2], index: 3, wordIndex: 2 }], 2, 7)).toBeNull();
   });
 });
