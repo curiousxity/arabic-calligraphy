@@ -11,8 +11,10 @@ import {
   ensureKufiLayouts,
   kufiLayoutFailed,
   kufiLayoutSnapshot,
+  previewKufiLayout,
   releaseKufiLayout,
   requestKufiFit,
+  seedKufiLayout,
   subscribeKufiLayouts,
   wantKufiLayout,
   type KufiLayoutInputs,
@@ -68,6 +70,89 @@ beforeEach(() => {
 afterEach(() => {
   unsubscribe();
   _resetKufiLayouts();
+});
+
+const okFor = (i: KufiLayoutInputs): KufiPackResult => ({
+  ok: true, cols: i.cols, rows: i.rows, cells: new Uint8Array(i.cols * i.rows), placements: [], editsBreakPacking: false,
+});
+
+describe("kufi layout previews", () => {
+  const prev = okFor(A);
+  const E1: KufiLayoutInputs = { ...A, edits: { stretch: { 0: [1] } } };
+  const E2: KufiLayoutInputs = { ...A, edits: { stretch: { 0: [2] } } };
+
+  it("packs a preview from the given previous panel and caches an ok answer", async () => {
+    const p = previewKufiLayout(E1, prev);
+    const job = worker.last();
+    expect(job).toMatchObject({ kind: "pack", input: { text: A.text, cols: 9, rows: 9, edits: E1.edits } });
+    expect(job.input?.previous).toBe(prev);
+    const r = okFor(E1);
+    worker.reply({ id: job.id, kind: "pack", result: r });
+    expect(await p).toBe(r);
+    expect(cachedKufiLayout(E1)).toBe(r);
+    // a slot asking for the same inputs later is served without a job
+    const posted = worker.posted.length;
+    wantKufiLayout("s1", E1);
+    expect(kufiLayoutSnapshot("s1", E1)).toBe(r);
+    expect(worker.posted.length).toBe(posted);
+  });
+
+  it("a cached answer resolves without a job", async () => {
+    seedKufiLayout(E1, okFor(E1));
+    const before = worker.posted.length;
+    expect(await previewKufiLayout(E1, prev)).toBe(cachedKufiLayout(E1));
+    expect(worker.posted.length).toBe(before);
+  });
+
+  it("does not cache a preview that did not pack: a fresh pack may still manage it", async () => {
+    const p = previewKufiLayout(E1, prev);
+    worker.reply({ id: worker.last().id, kind: "pack", result: fail(9) });
+    expect((await p)?.ok).toBe(false);
+    expect(cachedKufiLayout(E1)).toBeUndefined();
+  });
+
+  it("a newer preview supersedes one still waiting: the old one resolves null and is never posted", async () => {
+    const first = previewKufiLayout(E1, prev);
+    const job1 = worker.last();
+    const second = previewKufiLayout(E2, prev);
+    const third = previewKufiLayout({ ...A, edits: { stretch: { 0: [3] } } }, prev);
+    expect(worker.posted.length).toBe(1);
+    expect(await second).toBeNull();
+    worker.reply({ id: job1.id, kind: "pack", result: okFor(E1) });
+    expect((await first)?.ok).toBe(true);
+    expect(worker.posted.length).toBe(2);
+    expect(worker.last().input?.edits).toEqual({ stretch: { 0: [3] } });
+    const r3 = okFor(A);
+    worker.reply({ id: worker.last().id, kind: "pack", result: r3 });
+    expect(await third).toBe(r3);
+  });
+
+  it("goes ahead of a slot's pending layout: a preview is interactive", () => {
+    wantKufiLayout("s1", A);
+    const draft = worker.last();
+    wantKufiLayout("s2", B);
+    void previewKufiLayout(E1, prev);
+    expect(worker.posted.length).toBe(1);
+    worker.reply({ id: draft.id, kind: "pack", result: okFor(A) });
+    expect(worker.last().input?.edits).toEqual(E1.edits);
+  });
+
+  it("a worker that dies mid-preview is replaced and the preview is answered on this thread", async () => {
+    const p = previewKufiLayout(E1, prev);
+    worker.onerror?.(new Error("boom"));
+    const r = await p;
+    expect(r).not.toBeNull();
+    expect(workers[0].terminated).toBe(true);
+  });
+
+  it("seeding serves the snapshot and the cache", () => {
+    const r = okFor(E1);
+    seedKufiLayout(E1, r);
+    expect(cachedKufiLayout(E1)).toBe(r);
+    wantKufiLayout("s1", E1);
+    expect(kufiLayoutSnapshot("s1", E1)).toBe(r);
+    expect(worker.posted.length).toBe(0);
+  });
 });
 
 describe("kufi layout client", () => {

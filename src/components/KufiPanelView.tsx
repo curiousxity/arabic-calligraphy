@@ -1,11 +1,15 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Group, Shape } from "react-konva";
 import type Konva from "konva";
 import type { kufiPanelProps } from "../lib/blockRenderProps";
 import { cellRings } from "../lib/kufi/kufiGrid";
+import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
 import { createBlockFillPainter } from "../lib/blockFill";
 import { useKufiPanelLayout } from "../hooks/useKufiPanelLayout";
-import { kufiCellSize } from "../lib/kufi/kufiPanelBlock";
+import { kufiCellSize, kufiPanelInputs } from "../lib/kufi/kufiPanelBlock";
+import { KufiPanelEditOverlay } from "./KufiPanelEditOverlay";
+
+type Ok = Extract<KufiPackResult, { ok: true }>;
 
 export type KufiPanelViewProps = ReturnType<typeof kufiPanelProps> & {
   id?: string;
@@ -20,7 +24,18 @@ export type KufiPanelViewProps = ReturnType<typeof kufiPanelProps> & {
   onDblClick?: () => void;
   onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  /**
+   * A canvas edit (a form swap, a stretch) to commit: the edits to save,
+   * the packed panel they draw, and the key of the inputs they were made
+   * against. Mounts the edit overlay on the selected panel; a mirror passes
+   * none and gets no overlay.
+   */
+  onEditPanel?: (fromKey: string, edits: KufiPanelEdits, result: Ok) => void;
+  /** Why a canvas edit changed nothing, for the Kufi panel's status line. */
+  onPanelNotice?: (text: string) => void;
 };
+
+const noNotice = () => {};
 
 /**
  * Draws a square-Kufi panel: the packed lattice as **one** outline.
@@ -37,18 +52,30 @@ export type KufiPanelViewProps = ReturnType<typeof kufiPanelProps> & {
  * A panel that does not pack (`ok: false`), or whose first draft has not
  * arrived from the worker yet, draws no ink; its hit area keeps the block
  * grabbable at its box size.
+ *
+ * While a stroke is being dragged the selected panel draws the overlay's
+ * live preview instead of its committed layout (`KufiPanelEditOverlay`);
+ * the preview is cleared on release, when the commit is already in the
+ * layout cache, so the drawn panel never falls back to the old one between.
  */
 export const KufiPanelView: React.FC<KufiPanelViewProps> = (p) => {
   const result = useKufiPanelLayout(p);
   const cell = kufiCellSize(p.fontSize);
+  const [preview, setPreview] = useState<Ok | null>(null);
+  const shown = preview ?? result;
+  const inputs = useMemo(
+    () => kufiPanelInputs(p),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the four layout fields, not the props object
+    [p.text, p.panelCols, p.panelRows, p.panelEdits]
+  );
 
   const rings = useMemo(() => {
-    if (!result?.ok) return [];
-    return cellRings(Array.from(result.cells, (v) => v !== 0), result.cols, result.rows);
-  }, [result]);
+    if (!shown?.ok) return [];
+    return cellRings(Array.from(shown.cells, (v) => v !== 0), shown.cols, shown.rows);
+  }, [shown]);
 
-  const cols = result?.ok ? result.cols : p.panelCols;
-  const rows = result?.ok ? result.rows : p.panelRows;
+  const cols = shown?.ok ? shown.cols : p.panelCols;
+  const rows = shown?.ok ? shown.rows : p.panelRows;
   const width = Math.max(cols, 1) * cell;
   const height = Math.max(rows, 1) * cell;
 
@@ -112,6 +139,18 @@ export const KufiPanelView: React.FC<KufiPanelViewProps> = (p) => {
           ctx.restore();
         }}
       />
+      {p.isSelected && p.onEditPanel && result?.ok && (
+        <KufiPanelEditOverlay
+          result={shown?.ok ? shown : result}
+          committed={result}
+          inputs={inputs}
+          cell={cell}
+          color={p.color}
+          onPreview={setPreview}
+          onCommit={p.onEditPanel}
+          onNotice={p.onPanelNotice ?? noNotice}
+        />
+      )}
     </Group>
   );
 };

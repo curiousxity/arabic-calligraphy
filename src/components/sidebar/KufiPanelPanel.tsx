@@ -79,12 +79,17 @@ const CellsField: React.FC<{ id: string; label: string; value: number; onCommit:
  * `onFit` resolves when the new size is applied and rejects with an Error
  * whose message starts "Fit failed" if the packer's worker dies; the panel
  * catches it and says so.
+ *
+ * `notice` is why the last canvas edit (a click on a letter, a stretch)
+ * changed nothing; it is shown only while the block and its layout inputs
+ * are the ones it was made on.
  */
 export const KufiPanelPanel: React.FC<{
   block: KufiPanelBlock;
   onSetSize: (size: Size) => void;
   onFit: () => Promise<void>;
-}> = ({ block, onSetSize, onFit }) => {
+  notice?: { blockId: number; key: string; text: string } | null;
+}> = ({ block, onSetSize, onFit, notice = null }) => {
   // Registers this panel as a reader, so the layout is packed even if the
   // canvas has not asked yet; the status reads the exact inputs below.
   useKufiPanelLayout(block);
@@ -171,6 +176,7 @@ export const KufiPanelPanel: React.FC<{
             ))}
           </div>
         ) : null}
+        {notice && notice.blockId === block.id && notice.key === key && <div>{notice.text}</div>}
         {unsupported.length > 0 && <div>Not drawn: {unsupported.join(" ")}</div>}
         {(block.strokeWidth ?? 0) > 0 && <div>The outline exports as a separate path.</div>}
       </div>

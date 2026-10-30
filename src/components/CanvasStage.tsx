@@ -8,6 +8,7 @@ import { GuideView } from "./GuideView";
 import { StackView } from "./StackView";
 import { MarkView } from "./MarkView";
 import { KufiPanelView } from "./KufiPanelView";
+import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
 import { resolveGuidePath, type WritingSession } from "../lib/guides";
 import { isClosedPath } from "../lib/guideShapes";
 import { guideCaret, projectToGuide, type GuideCaret } from "../lib/guidePlacement";
@@ -179,6 +180,10 @@ export type CanvasStageProps = {
   /** Next Shape: the selected text block's letters that have alternates. */
   alternateLetters: LetterAlternates[];
   onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
+  /** A Kufi panel edited on the canvas (a form swap, a stretch): one undo step. See `KufiPanelEditOverlay`. */
+  onEditKufiPanel?: (blockId: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => void;
+  /** Why a Kufi panel canvas edit changed nothing, for its status line. */
+  onKufiPanelNotice?: (blockId: number, text: string) => void;
   onSetStrokeCut: (blockId: number, cut: StrokeCut) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   showRulers: boolean;
@@ -305,6 +310,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSetStrokeCut,
   alternateLetters,
   onPickGlyphAlternate,
+  onEditKufiPanel,
+  onKufiPanelNotice,
   onResizeShapeFillBlock,
   showRulers,
   guides,
@@ -1250,6 +1257,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     opacity={block.opacity ?? 1}
                     locked={block.locked}
                     isSelected={block.id === selectedId}
+                    onEditPanel={(fromKey, edits, result) => onEditKufiPanel?.(block.id, fromKey, edits, result)}
+                    onPanelNotice={(text) => onKufiPanelNotice?.(block.id, text)}
                   />
                 );
               }

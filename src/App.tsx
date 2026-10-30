@@ -164,8 +164,9 @@ import { convertRunToStack, fillerShapes, teardropShape, type UnjoinedPair } fro
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
-import { kufiCellSize, kufiPanelTextPatch } from "./lib/kufi/kufiPanelBlock";
-import { requestKufiFit } from "./lib/kufi/kufiLayoutClient";
+import { kufiCellSize, kufiPanelInputs, kufiPanelTextPatch } from "./lib/kufi/kufiPanelBlock";
+import { kufiLayoutKey, requestKufiFit, seedKufiLayout } from "./lib/kufi/kufiLayoutClient";
+import type { KufiPackResult, KufiPanelEdits } from "./lib/kufi/kufiPack";
 import {
   buildComposition,
   describeComposition,
@@ -319,6 +320,8 @@ const App: React.FC = () => {
   const [confirmRequest, setConfirmRequest] = useState<ConfirmDialogRequest | null>(null);
   /** The stack block open in the editor window, or null. */
   const [stackEditorId, setStackEditorId] = useState<number | null>(null);
+  /** Why the last canvas edit of a Kufi panel changed nothing, for its status line; keyed to the inputs it was made on. */
+  const [kufiNotice, setKufiNotice] = useState<{ blockId: number; key: string; text: string } | null>(null);
   const [pendingPlacement, setPendingPlacement] = useState<PendingPlacement | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -2111,6 +2114,31 @@ const App: React.FC = () => {
     );
   };
 
+  /**
+   * A canvas edit of a Kufi panel (a form swap, a stretch), from
+   * `KufiPanelEditOverlay`: one undo step. It is committed only if the
+   * panel's inputs are still the ones the gesture was made against
+   * (`fromKey`), so an answer landing after a text change is dropped. The
+   * result goes into the layout cache first: it is a packing of exactly
+   * these edits (the overlay pins the letter where that result put it), so
+   * the canvas draws the commit at once rather than repacking it.
+   */
+  const editKufiPanel = useCallback((id: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => {
+    const now = blocksRef.current.find((b) => b.id === id);
+    if (!now || !isKufiPanel(now) || kufiLayoutKey(kufiPanelInputs(now)) !== fromKey) return;
+    seedKufiLayout({ ...kufiPanelInputs(now), edits }, result);
+    pushHistoryRef.current();
+    setBlocks((prev) => prev.map((b) => (b.id === id && isKufiPanel(b) ? { ...b, panelEdits: edits } : b)));
+    setKufiNotice(null);
+  }, []);
+
+  /** Why a canvas edit changed nothing: shown in the Kufi panel's status line until the next edit or input change. */
+  const noticeKufiPanel = useCallback((id: number, text: string) => {
+    const now = blocksRef.current.find((b) => b.id === id);
+    if (!now || !isKufiPanel(now)) return;
+    setKufiNotice({ blockId: id, key: kufiLayoutKey(kufiPanelInputs(now)), text });
+  }, []);
+
   // Guides: dashed construction paths that Curve text can attach to.
   // See .claude/rules/guides.md.
   const addGuideBlock = (shape: GuideShape) => {
@@ -3421,6 +3449,7 @@ const App: React.FC = () => {
         onAddKufiPanel={addKufiPanel}
         onSetKufiPanelSize={setKufiPanelSize}
         onFitKufiPanel={fitKufiPanelSize}
+        kufiNotice={kufiNotice}
         onAddGuide={addGuideBlock}
         onAddSvgGuide={addSvgGuideBlock}
         onAddMark={addMarkBlock}
@@ -3556,6 +3585,8 @@ const App: React.FC = () => {
           onEditStack={openStackEditor}
           alternateLetters={glyphAlternatesState.letters}
           onPickGlyphAlternate={pickGlyphAlternate}
+          onEditKufiPanel={editKufiPanel}
+          onKufiPanelNotice={noticeKufiPanel}
           onSetStrokeCut={setStrokeCut}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           ghostBlock={

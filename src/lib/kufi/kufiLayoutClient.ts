@@ -19,6 +19,12 @@
  * - **Export reads synchronously.** `cachedKufiLayout` and
  *   `ensureKufiLayouts` (which packs on the calling thread what the cache
  *   lacks) let the export paths draw the current inputs, never a stale draft.
+ * - **Previews are one deep.** A canvas gesture (`previewKufiLayout`) packs
+ *   from an explicit `previous` ahead of any slot's layout; while one is in
+ *   flight only the newest asked-for preview waits, and the ones it displaced
+ *   resolve `null`. A preview that packs is cached by its inputs, so
+ *   committing it costs no second pack; one that does not is not, since a
+ *   fresh draft has ten times the budget of a repack and may still manage.
  *
  * The worker is injectable (`_setKufiWorkerFactory`) so Vitest, which runs in
  * Node with no `Worker`, can drive the protocol by hand. Without a `Worker`
@@ -82,7 +88,14 @@ const failed = new Set<string>();
 type FitWaiter = { resolve: (s: { cols: number; rows: number }) => void; reject: (e: Error) => void };
 const fits: Array<{ req: KufiWorkerRequest } & FitWaiter> = [];
 const fitWaiters = new Map<number, FitWaiter>();
-let inFlight: { id: number; key?: string } | null = null;
+type PreviewJob = { input: KufiLayoutInputs & { previous: KufiPackResult } } & {
+  resolve: (r: KufiPackResult | null) => void;
+  reject: (e: Error) => void;
+};
+/** The newest preview not yet posted; an older one waiting here resolves null when replaced. */
+let pendingPreview: PreviewJob | null = null;
+const previewWaiters = new Map<number, PreviewJob>();
+let inFlight: { id: number; key?: string; preview?: boolean } | null = null;
 /** The in-flight job's watchdog timer. */
 let watchdog: ReturnType<typeof setTimeout> | null = null;
 let nextId = 1;
@@ -197,6 +210,15 @@ function pump() {
     post(fit.req, KUFI_FIT_WATCHDOG_MS);
     return;
   }
+  const preview = pendingPreview;
+  if (preview) {
+    pendingPreview = null;
+    const id = nextId++;
+    inFlight = { id, key: kufiLayoutKey(preview.input), preview: true };
+    previewWaiters.set(id, preview);
+    post({ id, kind: "pack", input: preview.input }, KUFI_PACK_WATCHDOG_MS);
+    return;
+  }
   // Only what some slot wants *now* is packed, newest first: inputs a slot
   // has moved on from are never sent at all.
   let pick: { key: string; seq: number } | null = null;
@@ -225,6 +247,11 @@ function onReply(data: KufiWorkerResponse) {
   if (data.kind === "fit") {
     fitWaiters.get(data.id)?.resolve(data.size);
     fitWaiters.delete(data.id);
+  } else if (job.preview) {
+    const w = previewWaiters.get(data.id);
+    previewWaiters.delete(data.id);
+    if (job.key && data.result.ok) deliver(job.key, data.result);
+    w?.resolve(data.result);
   } else if (job.key) deliver(job.key, data.result);
   pump();
 }
@@ -259,7 +286,19 @@ function onWorkerError(err: unknown) {
   const job = inFlight;
   inFlight = null;
   try {
-    if (job?.key) {
+    if (job?.preview) {
+      const w = previewWaiters.get(job.id);
+      previewWaiters.delete(job.id);
+      if (w) {
+        try {
+          const r = packKufiPanel({ ...w.input });
+          if (job.key && r.ok) deliver(job.key, r);
+          w.resolve(r);
+        } catch (e) {
+          w.reject(e instanceof Error ? e : new Error(String(e)));
+        }
+      }
+    } else if (job?.key) {
       const input = inputsByKey.get(job.key);
       if (input) packHere(job.key, input);
     } else if (job) {
@@ -352,6 +391,36 @@ export function requestKufiFit(text: string, edits?: KufiPanelEdits): Promise<{ 
   });
 }
 
+/**
+ * A live preview for a canvas gesture: `inputs` packed from `previous` (the
+ * panel the gesture started on, so only the edited lines move), in the
+ * worker, ahead of any slot's layout. Resolves with the packer's answer, or
+ * with `null` when a newer preview was asked for before this one was sent.
+ * A result already cached for these inputs resolves at once. Rejects only if
+ * the packer throws on the main thread after the worker died.
+ */
+export function previewKufiLayout(inputs: KufiLayoutInputs, previous: KufiPackResult): Promise<KufiPackResult | null> {
+  const hit = results.get(kufiLayoutKey(inputs));
+  if (hit) return Promise.resolve(hit);
+  return new Promise((resolve, reject) => {
+    pendingPreview?.resolve(null);
+    pendingPreview = { input: { ...inputs, previous }, resolve, reject };
+    pump();
+  });
+}
+
+/**
+ * Stores a result the caller knows satisfies `inputs`: a committed preview,
+ * whose edits are the preview's plus a pin at the place that very result
+ * gave the unit. The renderer then draws the commit from the cache, with no
+ * second pack and no frame of the old panel in between.
+ */
+export function seedKufiLayout(inputs: KufiLayoutInputs, result: KufiPackResult): void {
+  const key = kufiLayoutKey(inputs);
+  if (!inputsByKey.has(key)) inputsByKey.set(key, { ...inputs });
+  deliver(key, result);
+}
+
 /** Tests only: swap the worker. */
 export function _setKufiWorkerFactory(f: () => KufiWorkerLike): void {
   worker?.terminate?.();
@@ -368,6 +437,8 @@ export function _resetKufiLayouts(): void {
   failed.clear();
   fits.length = 0;
   fitWaiters.clear();
+  pendingPreview = null;
+  previewWaiters.clear();
   inFlight = null;
   clearWatchdog();
   worker?.terminate?.();

@@ -638,3 +638,39 @@ export async function dragMouse(page: Page, from: Point, to: Point): Promise<voi
   await page.mouse.move(to.x, to.y, { steps: 16 });
   await page.mouse.up();
 }
+
+/** What the Kufi panel's edit overlay publishes: a cell of each letter and every stretch end, in page space. */
+export type KufiEditTargets = {
+  letters: { unit: number; glyphId: string; forms: number; x: number; y: number }[];
+  ends: { unit: number; si: number; dc: number; dr: number; x: number; y: number }[];
+};
+
+/**
+ * The Kufi panel edit overlay's targets, in page space.
+ *
+ * Like Next Shape's, the overlay is pointer-resolved (one hit rect, the
+ * letter under the pointer found in arithmetic), so there is no per-letter
+ * node to find. It publishes the centre of a cell of each letter and of each
+ * stretch end on a non-listening marker (`.kufi-edit-targets`, group-space
+ * px), mapped here through the marker's absolute transform. While a stretch
+ * is dragged the marker follows the live preview, which is how a test tells
+ * the preview is live without reading pixels under the pointer.
+ */
+export async function kufiEditTargets(page: Page): Promise<KufiEditTargets> {
+  return page.evaluate(() => {
+    const stage = window.__HARF__!.getStage();
+    const node = stage?.findOne(".kufi-edit-targets");
+    if (!stage || !node) return { letters: [], ends: [] };
+    const c = stage.container().getBoundingClientRect();
+    const t = node.getAbsoluteTransform();
+    const map = <T extends { x: number; y: number }>(list: T[]) =>
+      list.map((p) => {
+        const q = t.point({ x: p.x, y: p.y });
+        return { ...p, x: c.left + q.x, y: c.top + q.y };
+      });
+    return {
+      letters: map((node.getAttr("letters") as KufiEditTargets["letters"] | undefined) ?? []),
+      ends: map((node.getAttr("ends") as KufiEditTargets["ends"] | undefined) ?? []),
+    };
+  });
+}

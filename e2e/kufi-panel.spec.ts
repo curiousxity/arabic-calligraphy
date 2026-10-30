@@ -4,14 +4,22 @@ import {
   blockClientBox,
   centerOf,
   collectConsoleErrors,
+  draggableDotCenters,
   dragMouse,
   getBlocks,
+  getStageScale,
   gotoApp,
+  hitTargetAt,
   inkPixels,
+  kufiEditTargets,
+  namedNodeCount,
   openPanel,
   placeAtCanvas,
   setBlockText,
+  settleFrames,
+  type Box,
 } from "./harf";
+import type { KufiPanelEdits } from "../src/lib/kufi/kufiPack";
 
 /**
  * The Kufi panel block: rendering, saving and export, the Add button and the
@@ -51,7 +59,7 @@ const savedProject = {
   ],
 };
 
-async function openSavedPanel(page: Page) {
+async function openSavedPanel(page: Page, project: object = savedProject) {
   await page.addInitScript(
     ([key, value]) => {
       // Only on the first load, so a reload inside a test keeps what it saved.
@@ -60,7 +68,7 @@ async function openSavedPanel(page: Page) {
         sessionStorage.setItem("kufi-e2e-seeded", "1");
       }
     },
-    [STORAGE_KEY, JSON.stringify(savedProject)] as const
+    [STORAGE_KEY, JSON.stringify(project)] as const
   );
   await page.goto("/");
   await page.locator(STAGE_CANVAS).first().waitFor();
@@ -317,4 +325,196 @@ test("a size typed while Fit runs is not overwritten by the Fit", async ({ page 
   await page.waitForTimeout(500);
   expect((await panelOf(page, id))!.panelCols).toBe(15);
   expect((await panelOf(page, id))!.panelRows).toBe(9);
+});
+
+// ---------------------------------------------------------------------------
+// Editing on the canvas: hover, click to cycle a form, drag a stroke end
+// ---------------------------------------------------------------------------
+
+/**
+ * Baqarah at 21×21, the packer's own first draft (deterministic for a given
+ * text and box). The units the tests touch were read off that draft:
+ *
+ * - unit 4, `feh:final`, drawn `feh.final.3`, has four forms; from it the
+ *   next in table order (`.0`) does not pack and `.1` does, and from `.1`
+ *   `.2` does not and `.3` does — so two clicks skip two forms and come back.
+ * - unit 2, `kaf:medial`, has a column stretch whose ends on the right
+ *   (dc = 1) pack at +1 and +2.
+ * - unit 3, `lam:medial`, is drawn shortened (`[-2]`); pulling its stem up
+ *   by one or two cells does not pack.
+ */
+const savedBaqarah = {
+  ...savedProject,
+  // Centred on the view (the block draws from its top-left; a 21-cell box is
+  // 126 px), so every letter is on screen and clear of the canvas controls
+  // in the corners, which would take the pointer before the stage does.
+  blocks: [{ ...savedProject.blocks[0], text: BAQARAH, x: -63, y: -63 }],
+};
+
+async function openBaqarahPanel(page: Page): Promise<Box> {
+  await openSavedPanel(page, savedBaqarah);
+  const box = await blockClientBox(page, PANEL_ID);
+  await expect
+    .poll(async () => inkPixels(page, await blockClientBox(page, PANEL_ID)), { timeout: 15_000 })
+    .toBeGreaterThan(box.width * box.height * 0.15);
+  // the overlay is up once the draft is drawn
+  await expect.poll(async () => (await kufiEditTargets(page)).letters.length).toBeGreaterThan(0);
+  return box;
+}
+
+const panelEdits = async (page: Page) =>
+  ((await getBlocks(page)).find((b) => b.id === PANEL_ID) as { panelEdits?: KufiPanelEdits } | undefined)?.panelEdits;
+
+/** Ink per quadrant of a box: coarse, but a letter that moved or grew changes it. */
+async function inkSignature(page: Page, box: Box): Promise<number[]> {
+  const w = box.width / 2;
+  const h = box.height / 2;
+  const out: number[] = [];
+  for (const [fx, fy] of [[0, 0], [1, 0], [0, 1], [1, 1]])
+    out.push(await inkPixels(page, { x: box.x + fx * w, y: box.y + fy * h, width: w, height: h }));
+  return out;
+}
+
+/** Parks the pointer off the panel, so no hover chrome is in the pixels read next. */
+async function pointerAway(page: Page, box: Box) {
+  await page.mouse.move(box.x - 40, box.y - 40);
+  await settleFrames(page);
+}
+
+// One worker, in order: each of these packs the 21×21 draft in the packer's
+// worker inside its time budget, and four drafts racing on one machine can
+// run that budget out and leave a different (or no) panel to edit.
+test.describe("editing on the canvas", () => {
+  test.describe.configure({ mode: "default" });
+
+  test("hovering a letter outlines it, and a click cycles its form to the next one that packs, one step per click", async ({ page }) => {
+    const errors = collectConsoleErrors(page);
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const before = await inkSignature(page, box);
+
+    const letter = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
+    expect(letter).toMatchObject({ glyphId: "feh.final.3", forms: 4 });
+
+    // Hover: an outline in one listening node, and no coloured dots anywhere.
+    await page.mouse.move(letter.x, letter.y);
+    await settleFrames(page);
+    expect(await hitTargetAt(page, letter)).toBe("Rect.kufi-edit-hit");
+    expect(await namedNodeCount(page, "kufi-hover-outline")).toBeGreaterThan(0);
+    expect(await namedNodeCount(page, "kufi-edit-hit")).toBe(1);
+    expect(await draggableDotCenters(page)).toEqual([]);
+
+    // Click: the next form in table order that packs (`.0` cannot), pinned where it landed.
+    await page.mouse.click(letter.x, letter.y);
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
+    expect((await panelEdits(page))?.pinned?.[4]).toMatchObject({ unitIndex: 4, glyphId: "feh.final.1" });
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).not.toEqual(before);
+
+    // The outline follows the letter; a second click skips `.2` and comes back to the drawn form.
+    const again = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
+    expect(again.glyphId).toBe("feh.final.1");
+    await page.mouse.click(again.x, again.y);
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.3");
+
+    // Two clicks, two steps.
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).toEqual(before);
+    expect(errors).toEqual([]);
+  });
+
+  test("a press on a letter that drifts drags the whole panel, and changes no letter", async ({ page }) => {
+    await openBaqarahPanel(page);
+    const x0 = (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x;
+    const letter = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
+    await dragMouse(page, letter, { x: letter.x + 120, y: letter.y + 60 });
+    await expect.poll(async () => (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x).toBeGreaterThan(x0 + 10);
+    expect(await panelEdits(page)).toBeUndefined();
+  });
+
+  test("dragging a stretch end two cells previews live, commits one step on release, and undoes", async ({ page }) => {
+    const errors = collectConsoleErrors(page);
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const before = await inkSignature(page, box);
+    const cellPx = 6 * (await getStageScale(page));
+
+    const targets = await kufiEditTargets(page);
+    const end = targets.ends.find((e) => e.unit === 2 && e.si === 0 && e.dc === 1 && e.dr === 0)!;
+    expect(end).toBeDefined();
+    const leftEndBefore = targets.ends.find((e) => e.unit === 2 && e.dc === -1)!;
+
+    // Hover the end: the one handle, a small square, mounts; still one listening node.
+    await page.mouse.move(end.x, end.y);
+    await settleFrames(page);
+    expect(await hitTargetAt(page, end)).toBe("Rect.kufi-edit-hit");
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBeGreaterThan(0);
+    expect(await draggableDotCenters(page)).toEqual([]);
+
+    // Watch the main thread through the drag: the longest gap between frames.
+    await page.evaluate(() => {
+      const w = window as unknown as { __kufiMaxGap: number };
+      w.__kufiMaxGap = 0;
+      let last = performance.now();
+      const tick = (t: number) => {
+        w.__kufiMaxGap = Math.max(w.__kufiMaxGap, t - last);
+        last = t;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+
+    await page.mouse.down();
+    await page.mouse.move(end.x + 2 * cellPx, end.y, { steps: 12 });
+    // Live: the letter has grown in the drawn panel (its far end moved two
+    // cells) while nothing is committed yet.
+    await expect
+      .poll(async () => (await kufiEditTargets(page)).ends.find((e) => e.unit === 2 && e.dc === -1)?.x, { timeout: 5_000 })
+      .toBeLessThan(leftEndBefore.x - 1.5 * cellPx);
+    expect(await panelEdits(page)).toBeUndefined();
+    await page.mouse.up();
+
+    await expect.poll(async () => (await panelEdits(page))?.stretch?.[2]).toEqual([2]);
+    expect((await panelEdits(page))?.pinned?.[2]).toMatchObject({ unitIndex: 2, stretch: [2] });
+    const maxGap = await page.evaluate(() => (window as unknown as { __kufiMaxGap: number }).__kufiMaxGap);
+    // The previews pack in the worker (median 60 ms, at most ~150 ms each on
+    // this machine); on the main thread each would hold a frame for that long.
+    expect(maxGap).toBeLessThan(300);
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).not.toEqual(before);
+
+    // One step: undo restores the draft exactly.
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).toEqual(before);
+    expect(errors).toEqual([]);
+  });
+
+  test("a stretch nothing can pack snaps back, commits nothing, and says why", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const before = await inkSignature(page, box);
+    const cellPx = 6 * (await getStageScale(page));
+    const end = (await kufiEditTargets(page)).ends.find((e) => e.unit === 3 && e.dc === 0 && e.dr === -1)!;
+    expect(end).toBeDefined();
+
+    await page.mouse.move(end.x, end.y);
+    await settleFrames(page);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y - 2 * cellPx, { steps: 12 });
+    // give the previews time to be refused
+    await page.waitForTimeout(800);
+    await page.mouse.up();
+
+    await expect(kufiPanel(page)).toContainText("No room to stretch that here");
+    expect(await panelEdits(page)).toBeUndefined();
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).toEqual(before);
+    await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+  });
 });
