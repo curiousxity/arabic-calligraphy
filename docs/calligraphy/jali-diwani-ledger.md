@@ -747,6 +747,16 @@ stroke of the letter). Still marked at the peak: 309.s1 and 301.s1 a small notch
 slope, 299.s1 two tips. They go to `PEN_JOINT`: each half refitted against the whole stroke's outline with the other
 half's ink on the page.
 
+That refit made every half worse on the whole outline (299.s1's first half 0.949 to 0.874), so none stood. Filling
+and trimming against the studio's outline near the peak copied its facets and V back. What worked, approved 2026-10-30
+(shown the three peaks, studio | before | smoothed, the user: "Ok"): **smoothing our own ink at the joint**
+(`jdfinish.py`). Within 0.8 nib of the joint, notches between the two strokes close (a closing of 0.10 nuqta); within
+0.35 nib of the peak's top, thin tips come off (an opening of 0.07 nuqta, kept to the tip: over the whole zone it cut
+through the tooth's thin rising stroke). 299.s1 has one smooth peak; 309.s1's notch is filled; 301.s1's is mostly
+filled, and the slight kink on its slope stays (a bend outward, which a closing cannot change). Under 0.01 square
+nuqta changes a tooth. **309.s1, 301.s1 and 299.s1 are approved** with the right half levelled to the peak and the
+joint finished. The finish is the joining step's finish too.
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |
