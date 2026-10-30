@@ -7,7 +7,11 @@ the pair halves fitted after it was made come from the stamps, studio/catalog.py
 me/penreview.json (each fitted stroke's chosen fit and the batch it came from), me/twins.json (strokes that copy a
 twin's fit, moved by the difference of their corners), me/gaps.json (patches filling gaps that lie wholly inside a
 split stroke's ink: the user, 2026-10-29) and me/trims.json (a split stroke's joint trimmed and filled to the studio
-edge: decision 54 and the user's "yes" to every split joint; and the user's "yes" to the eraser past the joints). Each batch folder me/<tag>/pen.json holds the fits.
+edge: decision 54 and the user's "yes" to every split joint; and the user's "yes" to the eraser past the joints),
+me/jointtrims.json (every joint of every shape trimmed and filled to the studio edge, and the nib-tip fills taken to
+the studio's outline: the user, 2026-10-29, of the hamza and a spur at a ba joint, "These need to be fixed"; keyed by
+the shape's own stroke, since a twin's neighbours differ from its source's; me/jointtrim.py makes it from a library
+built without it, STUDIOLIB_JOINTTRIMS=0). Each batch folder me/<tag>/pen.json holds the fits.
 
 A fit's nodes are in nuqta from the shape's origin (x at its right-most ink, y = 0 at the stamp's top, y down); the
 library stores them in the stamp's own units (PPN to the nuqta) and the app rebuilds the fitter's cubic handles from
@@ -69,6 +73,8 @@ def main(sp, out):
     twins = json.load(open(os.path.join(me, "twins.json")))
     gaps = json.load(open(os.path.join(me, "gaps.json"))) if os.path.exists(os.path.join(me, "gaps.json")) else {}
     trims = json.load(open(os.path.join(me, "trims.json"))) if os.path.exists(os.path.join(me, "trims.json")) else {}
+    jt = os.path.join(me, "jointtrims.json")
+    jtrims = json.load(open(jt)) if os.path.exists(jt) and os.environ.get("STUDIOLIB_JOINTTRIMS", "1") == "1" else {}
     sys.path.insert(0, os.path.join(sp, "studio"))
     from catalog import origin, strokes as stamp_strokes, db, key, corner  # noqa: E402  origin: x at the shape's right-most ink
     batches = {}
@@ -100,6 +106,9 @@ def main(sp, out):
     ids = {s: [sid for sid, _h, _c in lst] for s, lst in reg["shapes"].items()}
     for k in rev:
         s = k.split(".")[0]
+        # a letter the studio reshapes inside a word (db status "word", me/wordlams.py) waits for the user's approval
+        if db.get(s, {}).get("status") == "word" and os.environ.get("STUDIOLIB_WORDS") != "1":
+            continue
         if "~" not in k and s not in ids:
             ids[s] = [sid for sid, _d in stamp_strokes(s)]
     shapes, missing = {}, []
@@ -126,6 +135,11 @@ def main(sp, out):
                 st = stroke(src, sh); st["twin"] = src
             else:
                 missing.append(k); continue
+            j = jtrims.get(k)
+            if j and j["erase"]:
+                st["erase"] = st.get("erase", []) + [ring(p, (0.0, 0.0)) for p in j["erase"]]
+            if j and j["fill"]:
+                st["patches"] = st.get("patches", []) + [ring(p, (0.0, 0.0)) for p in j["fill"]]
             strokes.append({"id": sid, **st})
         e = db[s]
         shapes[s] = {"group": e.get("group"), "form": e.get("form"), "variant": e.get("variant"),

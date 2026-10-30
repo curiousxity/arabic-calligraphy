@@ -63,6 +63,15 @@ describe("strokeInk", () => {
     expect(Math.abs(polygonArea(ink) - polygonArea(raw)) / polygonArea(raw)).toBeLessThan(0.02);
   });
 
+  it("draws a stroke whose trim meets its ink edge on nearly the same line (449r.s2)", () => {
+    // polygon-clipping's difference threw "Unable to find segment ... in SweepLine tree" on this joint's erase rings
+    // (the fixture keeps the rings that threw: a first build of every joint's trims, 2026-10-29)
+    const st = strokeOf("449r", "s2");
+    const ink = strokeInk(st, lib.pen, lib.ppn);
+    const raw = unionPolygons(st.pens.map((p) => sweepPath(penPathOf(p), lib.pen)));
+    expect(Math.abs(polygonArea(ink) - polygonArea(raw)) / polygonArea(raw)).toBeLessThan(0.02);
+  });
+
   it("keeps a stroke smaller than a crumb", () => {
     const tiny = { id: "s0", recipe: "pen", pens: [[[0, 0, 45, 0.05], [0.3, 0, 45, 0.05]]] } as StudioStroke;
     const ink = strokeInk(tiny, lib.pen, lib.ppn);

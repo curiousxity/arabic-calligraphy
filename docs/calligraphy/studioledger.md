@@ -254,6 +254,20 @@ Times are minutes:seconds into the individual-letters lesson.
   - The user, 2026-10-27, decision 47: "Yes turning pen".
 - **Status:** recreated.
 
+**Every joint trimmed to the studio edge**
+
+- **What was wrong:** at a joint the nib's square corner could stand a little past the studio's edge. The user,
+  2026-10-29, of the Studio letters panel: "there is a small spur at the ba joint (bottom right). These need to be
+  fixed." Ba Isolated 1 (015) had a 0.056-nuqta spike there. The same check found 1,565 such points in 746 of
+  the 1,053 shapes.
+- **Rule:** the eraser past the split joints (decision 54 and the user's "yes"), taken to every joint. Within 1.5
+  nibs of where two of a shape's strokes meet, ink past the studio's outline over open paper is erased. Studio ink
+  there that none of the strokes covers is filled. Ink under a neighbouring stroke stays (decision 41).
+- **Result:** 49 points remain, in 47 shapes. They are misses at a stroke's tip away from any joint, such as the left
+  upturn of some qaf tails, and go to the user's inspection pages.
+- **Source:** scratch `me/jointtrim.py` makes `me/jointtrims.json`, which `scripts/pen/studiolib.py` applies to
+  each shape's own strokes.
+
 **The lams the studio reshapes inside a word**
 
 - **What the studio does:** in the 13 words captured from it, 39 of the 43 letters are its catalogue shapes exactly,

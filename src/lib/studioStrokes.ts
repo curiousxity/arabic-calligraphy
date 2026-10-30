@@ -11,7 +11,7 @@
  * pieces' union less the erase rings, then the patches added. Pure; never imports ./harfbuzz.
  */
 import * as clipping from "polygon-clipping";
-import { sweepPath, unionPolygons, type NibNode, type PenPath, type Polygon, type Pt, type Ring } from "./penSweep";
+import { snap, sweepPath, unionPolygons, type NibNode, type PenPath, type Polygon, type Pt, type Ring } from "./penSweep";
 
 const pc = clipping as unknown as { difference?: typeof clipping.difference; default?: { difference: typeof clipping.difference } };
 const difference = pc.difference ?? pc.default!.difference;
@@ -91,11 +91,27 @@ const ringArea = (r: Ring): number => {
   return Math.abs(a) / 2;
 };
 
+/** ink less the erase rings. polygon-clipping can lose a segment where a ring runs along the ink's edge on nearly the
+ *  same line ("Unable to find segment ... in SweepLine tree": 449r.s2, whose joint trim follows the studio edge its
+ *  ink also nearly follows); snapping every point to a coarser grid, as penSweep's union does, moves those edges
+ *  apart or onto each other. The coarsest grid is a quarter of a stamp unit, a hundredth of a nuqta. */
+function erased(ink: Polygon[], rings: Polygon[][]): Polygon[] {
+  for (const grid of [0, 1 / 256, 1 / 32, 1 / 4]) {
+    try {
+      const [a, ...rest] = grid ? snap([ink, ...rings], grid) : [ink, ...rings];
+      return difference(a as never, ...(rest as never[])) as unknown as Polygon[];
+    } catch {
+      // try the next grid
+    }
+  }
+  throw new Error("studioStrokes: a stroke's erase rings could not be taken from its ink");
+}
+
 /** A stroke's ink: its pens swept and unioned, the erase rings taken away, the patches added, crumbs dropped. */
 export function strokeInk(stroke: StudioStroke, pen: number, ppn: number): Polygon[] {
   let ink = unionPolygons(stroke.pens.filter((p) => p.length > 1).map((p) => sweepPath(penPathOf(p), pen)));
   if (stroke.erase?.length && ink.length) {
-    ink = difference(ink as never, ...stroke.erase.map((r) => [r] as never)) as unknown as Polygon[];
+    ink = erased(ink, stroke.erase.map((r): Polygon[] => [[r]]));
   }
   if (stroke.patches?.length) {
     ink = unionPolygons([ink, ...stroke.patches.map((r): Polygon[] => [[r]])]);

@@ -157,7 +157,7 @@ export function unionPolygons(polys: Polygon[][]): Polygon[] {
 }
 
 /** Every point rounded to a multiple of `grid` units. */
-function snap(ms: Polygon[][], grid: number): Polygon[][] {
+export function snap(ms: Polygon[][], grid: number): Polygon[][] {
   return ms.map((polys) => polys.map((poly) => poly.map((ring) => ring.map(([x, y]) => [Math.round(x / grid) * grid, Math.round(y / grid) * grid] as Pt))));
 }
 
