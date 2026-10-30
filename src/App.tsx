@@ -630,6 +630,13 @@ const App: React.FC = () => {
   const { pushHistory, handleUndo, handleRedo, jumpBy, canUndo, canRedo, historyEntries } =
     useUndoRedo(getSnapshot, applySnapshot, captureHistoryThumbnail);
 
+  // The latest pushHistory, for async handlers (a Kufi Fit) whose step must
+  // snapshot the state when their answer lands, not when they started.
+  const pushHistoryRef = useRef(pushHistory);
+  useEffect(() => {
+    pushHistoryRef.current = pushHistory;
+  }, [pushHistory]);
+
   const scheduleMoveHistoryPush = useDebouncedHistoryPush(pushHistory);
 
   const dragDiacriticOverride = useCallback(
@@ -2032,17 +2039,12 @@ const App: React.FC = () => {
     requestKufiFit(text).then(
       (size) => {
         if (size.cols === cols && size.rows === rows) return;
-        const resize = (b: Block): Block => {
-          if (!isKufiPanel(b) || b.id !== id || b.text !== text || b.panelCols !== cols || b.panelRows !== rows) return b;
-          // Keep the centre where it was dropped.
-          return {
-            ...b,
-            panelCols: size.cols,
-            panelRows: size.rows,
-            x: b.x + ((cols - size.cols) * cell) / 2,
-            y: b.y + ((rows - size.rows) * cell) / 2,
-          };
-        };
+        const unchanged = (b: Block) =>
+          isKufiPanel(b) && b.id === id && b.text === text && b.panelCols === cols && b.panelRows === rows;
+        const resize = (b: Block): Block =>
+          unchanged(b) ? ({ ...b, panelCols: size.cols, panelRows: size.rows } as Block) : b;
+        // Still following the cursor: its x/y are the raw pointer, and the
+        // commit offsets below put the click at the new box's centre.
         setPendingPlacement((prev) =>
           prev && prev.block.id === id
             ? {
@@ -2055,7 +2057,20 @@ const App: React.FC = () => {
               }
             : prev
         );
-        setBlocks((prev) => prev.map(resize));
+        // Dropped: keep the centre where it was dropped.
+        setBlocks((prev) =>
+          prev.map((b) =>
+            unchanged(b)
+              ? ({
+                  ...b,
+                  panelCols: size.cols,
+                  panelRows: size.rows,
+                  x: b.x + ((cols - size.cols) * cell) / 2,
+                  y: b.y + ((rows - size.rows) * cell) / 2,
+                } as Block)
+              : b
+          )
+        );
       },
       // The panel keeps its default box; its status line says what to try.
       (err: unknown) => console.warn(err)
@@ -2073,16 +2088,24 @@ const App: React.FC = () => {
    * Fit: the selected panel's text in the smallest square box it fills. The
    * history step is pushed when the answer is applied, not when Fit is
    * pressed, so a fit that fails or is overtaken by an edit costs no step.
+   * The push goes through `pushHistoryRef`, the latest render's pushHistory:
+   * the one captured at the press would snapshot the blocks as they were
+   * then, folding any edit made during the wait (a colour, a drag) into the
+   * Fit's step. The answer is dropped if the panel's text, box or edits
+   * changed during the wait, so a size typed meanwhile is never overwritten.
    * Rejects (message "Fit failed …") if the packer's worker dies.
    */
   const fitKufiPanelSize = async () => {
     if (!selectedBlock || !isKufiPanel(selectedBlock)) return;
-    const { id, text, panelEdits } = selectedBlock;
+    const { id, text, panelEdits, panelCols, panelRows } = selectedBlock;
+    const editsKey = JSON.stringify(panelEdits ?? null);
     const size = await requestKufiFit(text, panelEdits);
     const now = blocksRef.current.find((b) => b.id === id);
     if (!now || !isKufiPanel(now) || now.text !== text) return;
+    if (now.panelCols !== panelCols || now.panelRows !== panelRows) return;
+    if (JSON.stringify(now.panelEdits ?? null) !== editsKey) return;
     if (now.panelCols === size.cols && now.panelRows === size.rows) return;
-    pushHistory();
+    pushHistoryRef.current();
     setBlocks((prev) =>
       prev.map((b) => (b.id === id && isKufiPanel(b) ? { ...b, panelCols: size.cols, panelRows: size.rows } : b))
     );

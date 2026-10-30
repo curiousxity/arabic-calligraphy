@@ -214,7 +214,9 @@ test("a box too small for the text offers sizes that fit", async ({ page }) => {
   const id = await addKufiPanel(page);
   await setBlockText(page, BAQARAH, id);
   await sizeField(page, "Width").fill("3");
+  await sizeField(page, "Width").press("Enter");
   await sizeField(page, "Height").fill("3");
+  await sizeField(page, "Height").press("Enter");
   await expect.poll(async () => [(await panelOf(page, id))?.panelCols, (await panelOf(page, id))?.panelRows]).toEqual([3, 3]);
 
   await expect(kufiPanel(page)).toContainText("Too long for 3×3 — try", { timeout: 15_000 });
@@ -245,4 +247,74 @@ test("a panel with an outline says the outline exports as its own path", async (
   await width.press("ArrowRight");
   await expect.poll(async () => (await panelOf(page, id))!.strokeWidth).toBeGreaterThan(0);
   await expect(kufiPanel(page)).toContainText("separate path");
+});
+
+test("a typed size is applied whole, in one undo step, with no upper cap", async ({ page }) => {
+  await gotoApp(page);
+  const id = await addKufiPanel(page);
+  await expect(sizeField(page, "Width")).toHaveValue("9");
+
+  const width = sizeField(page, "Width");
+  await width.click();
+  await width.press("ControlOrMeta+a");
+  // "7" alone is a valid width: it must not be applied on the way to "75".
+  await width.pressSequentially("75");
+  await page.waitForTimeout(400);
+  expect((await panelOf(page, id))!.panelCols).toBe(9);
+  await width.press("Enter");
+  await expect.poll(async () => (await panelOf(page, id))?.panelCols).toBe(75);
+  await expect(width).toHaveValue("75");
+
+  // An arrow key is a whole size of its own and applies at once. (Wait out
+  // the history's 300 ms coalescing window so it is a step of its own.)
+  await page.waitForTimeout(400);
+  await width.focus();
+  await width.press("ArrowUp");
+  await expect.poll(async () => (await panelOf(page, id))?.panelCols).toBe(76);
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(async () => (await panelOf(page, id))?.panelCols).toBe(75);
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(async () => (await panelOf(page, id))?.panelCols).toBe(9);
+});
+
+test("a Fit that lands after another edit keeps that edit out of its undo step", async ({ page }) => {
+  await gotoApp(page);
+  const id = await addKufiPanel(page);
+  await expect(sizeField(page, "Width")).toHaveValue("9");
+  await openPanel(page, /^Typography/);
+  await setBlockText(page, BAQARAH, id);
+
+  await kufiPanel(page).getByRole("button", { name: "Fit" }).click();
+  const swatch = page.getByRole("button", { name: "Set text color to #c9a227" });
+  await swatch.click();
+  // The colour changed while the Fit was still running (the worker is still
+  // packing 9×9 Baqarah ahead of it), or this test proves nothing.
+  await expect(kufiPanel(page)).toContainText("Finding a size");
+  await expect.poll(async () => (await panelOf(page, id) as unknown as { color: string }).color).toBe("#c9a227");
+
+  await expect(kufiPanel(page)).not.toContainText("Finding a size", { timeout: 20_000 });
+  expect((await panelOf(page, id))!.panelCols).toBeGreaterThan(9);
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(async () => (await panelOf(page, id))?.panelCols).toBe(9);
+  expect((await panelOf(page, id) as unknown as { color: string }).color).toBe("#c9a227");
+});
+
+test("a size typed while Fit runs is not overwritten by the Fit", async ({ page }) => {
+  await gotoApp(page);
+  const id = await addKufiPanel(page);
+  await expect(sizeField(page, "Width")).toHaveValue("9");
+  await setBlockText(page, BAQARAH, id);
+
+  await kufiPanel(page).getByRole("button", { name: "Fit" }).click();
+  await sizeField(page, "Width").fill("15");
+  await sizeField(page, "Width").press("Enter");
+  await expect.poll(async () => (await panelOf(page, id))?.panelCols).toBe(15);
+
+  // Let any Fit answer arrive (the worker is idle again once 15×9 is packed).
+  await expect(kufiPanel(page)).not.toContainText(/Finding a size|Arranging/, { timeout: 20_000 });
+  await page.waitForTimeout(500);
+  expect((await panelOf(page, id))!.panelCols).toBe(15);
+  expect((await panelOf(page, id))!.panelRows).toBe(9);
 });
