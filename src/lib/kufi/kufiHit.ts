@@ -8,7 +8,6 @@
 import { KUFI_FORMS, stretchGlyph, type KufiGlyph } from "./kufiAlphabet";
 import { cellRings, rotateRows, type Ring } from "./kufiGrid";
 import type { KufiPackResult, KufiPlacement } from "./kufiPack";
-import type { KufiUnit } from "./kufiWords";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
@@ -29,11 +28,8 @@ for (const forms of Object.values(KUFI_FORMS))
 /** The glyph a placement names (`<skeleton>.<form>.<n>`), or null for an id the table does not have. */
 export const kufiGlyphById = (id: string): KufiGlyph | null => glyphIndex.get(id) ?? null;
 
-/** The alternates a unit may take: its joining form's list, else the isolated one (the packer's rule). */
-export function kufiFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">): KufiGlyph[] {
-  const table = KUFI_FORMS as Record<string, Partial<Record<string, KufiGlyph[]>>>;
-  return table[unit.skeleton]?.[unit.form] ?? table[unit.skeleton]?.isolated ?? [];
-}
+/** The alternates a unit may take: the packer's own rule, re-exported for the canvas. */
+export { kufiFormsOf } from "./kufiPack";
 
 /** The placement's glyph as drawn: stretched by its counts, then turned. `#` is ink. */
 function placedRows(p: KufiPlacement, rows: string[] = kufiGlyphById(p.glyphId)?.rows ?? []): string[] {

@@ -1,15 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { KUFI_FORMS, dotCells, dotsOf, stretchGlyph, stretchedBase, type KufiGlyph } from "./kufiAlphabet";
 import { emptyBlocks2x2, inkBlocks2x2, rotateRows, type Turn } from "./kufiGrid";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
 import {
   fitKufiPanel,
+  kufiFormsOf,
   packKufiPanel,
   reconcileEdits,
   _internal,
   type KufiPackResult,
   type KufiPlacement,
 } from "./kufiPack";
+
+// Layouts are asserted on the work budget alone, so machine load cannot change them; the
+// budget tests put the product's clock back for their own run.
+beforeAll(() => _internal.setClockOverride(Infinity));
+afterAll(() => _internal.setClockOverride(null));
 
 const BAQARAH = "لا يكلف الله نفسا إلا وسعها";
 const ALLAH = "الله";
@@ -227,6 +233,9 @@ describe("packKufiPanel", () => {
 // The targets themselves (2000 ms, 200 ms) are what a call takes alone; the code also stops on the
 // clock, at FIRST_DRAFT_CLOCK_MS for a first draft and at the repack budget for a repack.
 describe("budgets", () => {
+  beforeEach(() => _internal.setClockOverride(null));
+  afterEach(() => _internal.setClockOverride(Infinity));
+
   it("a first draft and a repack with previous stay within their work and clock budgets", () => {
     _internal.clearCaches();
     _internal.stats.work = 0;
@@ -568,6 +577,66 @@ describe("the natural-length phase", () => {
     expect(ids[0]).toBe("lamAlef.isolated.1[0]");
     expect(ids[9]).toBe("alef.final.0[4]");
   }, 20000);
+});
+
+describe("pins taken from a packed panel, packed fresh (a saved panel reloaded)", () => {
+  it("each unit pinned at its packed placement packs, with that placement", () => {
+    _internal.clearCaches();
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    for (let k = 0; k < r.placements.length; k++) {
+      const pin = r.placements[k];
+      const again = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, edits: { pinned: { [k]: pin } } });
+      expect(again.ok, `unit ${k} ${pin.glyphId}`).toBe(true);
+      if (again.ok) expect(again.placements[k]).toEqual(pin);
+    }
+  }, 120000);
+
+  it("every unit pinned reproduces the panel exactly", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    const pinned = Object.fromEntries(r.placements.map((p, k) => [k, p]));
+    _internal.clearCaches();
+    const again = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, edits: { pinned } });
+    expect(again.ok).toBe(true);
+    if (!again.ok) return;
+    expect(again.placements).toEqual(r.placements);
+    expect([...again.cells]).toEqual([...r.cells]);
+  }, 30000);
+
+  it("a committed stretch (+2, pinned where the repack put it) packs again after a reload", () => {
+    // the canvas flow: a draft, a stretch previewed as a repack from it, then committed with a pin
+    const draft = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    const k = 2;
+    const preview = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: draft, edits: { stretch: { [k]: [2] } } }), BAQARAH);
+    const committed = { stretch: { [k]: [2] }, pinned: { [k]: preview.placements[k] } };
+    _internal.clearCaches();
+    const reloaded = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, edits: committed });
+    expect(reloaded.ok).toBe(true);
+    if (reloaded.ok) expect(reloaded.placements[k]).toEqual(preview.placements[k]);
+  }, 30000);
+});
+
+describe("the form rule", () => {
+  it("is the packer's own, shared under a public name", () => {
+    const { units } = resolveKufiText(BAQARAH);
+    for (const u of units) expect(kufiFormsOf(u).length).toBeGreaterThan(0);
+    expect(kufiFormsOf({ skeleton: "lam", form: "medial" }).map((g) => g.id)).toContain("lam.medial.0");
+    // a form a skeleton lacks falls back to its isolated list
+    expect(kufiFormsOf({ skeleton: "alef", form: "medial" }).every((g) => g.id.startsWith("alef.isolated."))).toBe(true);
+  });
+});
+
+describe("the clock override (tests only)", () => {
+  it("lets a layout test run on its work budget alone, and leaves the product's clock alone", () => {
+    _internal.setClockOverride(null);
+    expect(Number.isFinite(_internal.makeCtx(BAQARAH, 21, 21, {}, new Map(), 100).deadline)).toBe(true);
+    _internal.setClockOverride(Infinity);
+    try {
+      expect(_internal.makeCtx(BAQARAH, 21, 21, {}, new Map(), 100).deadline).toBe(Infinity);
+    } finally {
+      // the rest of this file runs work-bounded
+      _internal.setClockOverride(Infinity);
+    }
+  });
 });
 
 describe("the scorer", () => {

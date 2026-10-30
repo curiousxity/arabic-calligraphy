@@ -326,10 +326,13 @@ function countVectors(g: KufiGlyph): number[][] {
   return out;
 }
 
-function formsOf(unit: KufiUnit): KufiGlyph[] {
+/** The alternates a unit may take: its joining form's list, else the isolated one. The packer's rule, shared with the canvas. */
+export function kufiFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">): KufiGlyph[] {
   const table = KUFI_FORMS as Record<string, Partial<Record<JoiningForm, KufiGlyph[]>>>;
   return table[unit.skeleton]?.[unit.form] ?? table[unit.skeleton]?.isolated ?? [];
 }
+
+const formsOf = kufiFormsOf;
 
 /** The applied counts, padded to the glyph's slices; values outside the table's limits are clamped. */
 function normalCounts(g: KufiGlyph, counts: number[]): number[] {
@@ -2053,6 +2056,16 @@ const WORK_SLACK = 1000;
 /** Moves tried by searches since last reset, for the budget tests. */
 const stats = { work: 0, naturalRuns: 0 };
 
+/**
+ * Tests only: a deadline every search uses instead of its clock (Infinity:
+ * work-bounded alone), so a test that asserts a layout cannot depend on
+ * machine load. Null, the default, is the product's clock.
+ */
+let clockOverride: number | null = null;
+function setClockOverride(deadline: number | null) {
+  clockOverride = deadline;
+}
+
 function spent(ctx: Ctx): boolean {
   return ctx.out || ctx.work >= ctx.workMax || performance.now() > ctx.deadline;
 }
@@ -2083,6 +2096,7 @@ function makeCtx(
     // one; the clock is a safety net, loose for panels the size of a real one and tight
     // for big ones, where a move costs more and nothing packs anyway
     deadline:
+      clockOverride ??
       performance.now() + Math.min(FIRST_DRAFT_CLOCK_MS, budgetMs * (!strictClock && cols * rows <= LOOSE_CLOCK_CELLS ? LOOSE_CLOCK : 1)),
     work: 0,
     workMax: budgetMs * WORK_PER_MS - WORK_SLACK,
@@ -2420,6 +2434,39 @@ function repack(
 }
 
 /**
+ * A fresh pack with pins, as when a saved panel is opened again. Pins are
+ * taken from packed panels, and the editor makes those by repacking from a
+ * draft, so the panel is rebuilt the same way: the edits repacked onto the
+ * fresh draft without edits (which the work budget reproduces exactly), then
+ * onto a fresh pack of the edits without their pins. Only when neither holds
+ * the pins does a fresh search with them decide, and only it may report a
+ * conflict.
+ */
+function packPinned(
+  text: string,
+  units: KufiUnit[],
+  cols: number,
+  rows: number,
+  edits: KufiPanelEdits,
+  explicit: Map<number, Pin>
+): Final | null {
+  const bases: KufiPanelEdits[] = [{}, { ...edits, pinned: undefined }];
+  const tried = new Set<string>();
+  for (const baseEdits of bases) {
+    const key = JSON.stringify(baseEdits);
+    if (tried.has(key)) continue;
+    tried.add(key);
+    const base = freshFinal(text, cols, rows, baseEdits, new Map(), PACK_BUDGET_MS);
+    if (!base?.packed) continue;
+    const prev = okResult(units, base, cols, rows, baseEdits);
+    if (!prev.ok) continue;
+    const f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit);
+    if (f?.packed) return f;
+  }
+  return freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS);
+}
+
+/**
  * Packs `text` into a box of `cols` x `rows` cells. With `previous` (a packed
  * result for the same text and box) only the lines of edited units move.
  * A panel with holes is never reported as ok: the reason says whether the
@@ -2452,7 +2499,8 @@ export function packKufiPanel(input: {
   ) {
     f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit);
     repacked = true;
-  } else f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS);
+  } else if (explicit.size > 0) f = packPinned(text, units, cols, rows, edits, explicit);
+  else f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS);
   if (f?.packed) return okResult(units, f, cols, rows, edits);
   // after an edit the box is the user's: say why, but do not spend a first draft's time on other sizes
   return failure(text, units, f, cols, rows, edits, repacked ? 0 : t0 + CALL_BUDGET_MS);
@@ -2574,6 +2622,7 @@ export const _internal = {
   finish,
   beamPass,
   search,
+  setClockOverride,
   better,
   devOf,
   placedList,
