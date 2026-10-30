@@ -183,26 +183,35 @@ type Letter = {
 };
 
 const TALL = new Set(["alef", "lam", "lamAlef"]);
-/** Cutting a tall stroke weighs this much more than lengthening one, cell for cell. */
-const SHORTEN_WEIGHT = 1.5;
+/**
+ * A cell of shortening outweighs this many cells of lengthening: the order
+ * is least shortening, then least lengthening (a panel's space is filled by
+ * lengthening strokes, so growth is cheap; a cut is not).
+ */
+const CUT_WEIGHT = 100;
 
 /**
- * How far a placed shape is from its letter's natural length: |count| over
- * every slice, shortening and stretching alike. A tall letter's stem is
- * measured against the tallest stem its alternates are authored with, so a
- * short alternate counts as a cut stem; cutting it weighs SHORTEN_WEIGHT.
+ * How far a placed shape is from its letter's natural length, cuts weighed
+ * CUT_WEIGHT to growth's 1: every slice's count, and for a tall letter its
+ * stem against the tallest stem its alternates are authored with, so a short
+ * alternate counts as a cut stem.
  */
 function devOf(letter: Letter, sh: Shape): number {
   if (letter.exempt) return 0;
-  let dev = 0;
+  let cut = 0;
+  let grow = 0;
   sh.g.stretch.forEach((sl, i) => {
-    if (letter.natural < 0 || sl.axis === "col") dev += Math.abs(sh.counts[i] ?? 0);
+    if (letter.natural >= 0 && sl.axis === "row") return;
+    const n = sh.counts[i] ?? 0;
+    if (n < 0) cut -= n;
+    else grow += n;
   });
   if (letter.natural >= 0) {
     const stem = sh.baseRow + 1;
-    dev += stem < letter.natural ? SHORTEN_WEIGHT * (letter.natural - stem) : stem - letter.natural;
+    if (stem < letter.natural) cut += letter.natural - stem;
+    else grow += stem - letter.natural;
   }
-  return dev;
+  return CUT_WEIGHT * cut + grow;
 }
 
 /** A hard placement: glyph, counts and box, and optionally how its dots are drawn (see `DOT_SHIFT`). */
@@ -538,6 +547,8 @@ type Ctx = {
   out: boolean;
   /** Set while the greedy first pass runs: it always finishes, so there is always an answer. */
   noClock: boolean;
+  /** Set during repair moves: a replayed move that no longer fits gives way to the letter's best one that does. */
+  mend: boolean;
 };
 
 function initState(ctx: Ctx): St {
@@ -1333,13 +1344,16 @@ type Final = {
 };
 
 /**
- * Whether `a` is the better panel. Packing comes first: a packed panel beats
- * any that is not, and is never traded for less deviation. Between packed
- * panels the one nearer natural stroke lengths wins, then the lower score.
+ * Whether `a` is the better panel, in the order a calligrapher fills one:
+ * packed first (never traded away); then the fewest filler squares, since
+ * space is filled by lengthening strokes before any square; then the least
+ * shortening, then the least lengthening (`devOf`); then the lower score.
+ * Two squares near each other are never drawn at all (`fillPass`).
  */
 function better(a: Final, b: Final | null): boolean {
   if (!b) return true;
   if (a.packed !== b.packed) return a.packed;
+  if (a.packed && a.squares !== b.squares) return a.squares < b.squares;
   if (a.packed && Math.abs(a.dev - b.dev) > 1e-9) return a.dev < b.dev;
   return a.score < b.score - 1e-9;
 }
@@ -1407,7 +1421,7 @@ function dotZone(ctx: Ctx, st: St): Uint8Array {
   return z;
 }
 
-/** Lone squares, each closing at least FILL_MIN windows, beside a letter, never in a dot zone, at most a pair together. */
+/** Lone squares, each closing at least FILL_MIN windows, beside a letter, never in a dot zone, and never within two cells of another. */
 function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array, nextId: number): number {
   const { cols, rows } = ctx;
   const emptyAt = (r: number, c: number) => r < 0 || c < 0 || r >= rows || c >= cols || own[r * cols + c] === 0;
@@ -1458,11 +1472,8 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
     const c = i - r * cols;
     if (!iso(r, c) || closes(r, c) < FILL_MIN) continue;
     const f = fillsNear(r, c);
-    if (!f.letterNear || f.n > 1) continue;
-    if (f.mate >= 0) {
-      const m = fillsNear((f.mate / cols) | 0, f.mate % cols);
-      if (m.n > 0) continue;
-    }
+    // two squares near each other read as a letter's pair of dots: a square stands alone
+    if (!f.letterNear || f.n > 0) continue;
     own[i] = nextId++;
     kind[i] = K_FILL;
     squares++;
@@ -1607,7 +1618,22 @@ function replayFrom(ctx: Ctx, prefix: St, plan: Plan, from: number): St | null {
     }
     const prev = s.trail;
     const rec = reapply(ctx, s, li, mv);
-    if (!rec) return null;
+    if (!rec) {
+      if (!ctx.mend) return null;
+      // mending: the letter takes the first move that still fits; descent refines it
+      let first: Move | null = null;
+      forMoves(ctx, s, li, (m, r) => {
+        first = { ...m, x0: m.mode <= 1 ? r.x0 : m.x0 };
+        return true;
+      });
+      const got = first as Move | null;
+      if (!got) return null;
+      const rec2 = reapply(ctx, s, li, got);
+      if (!rec2) return null;
+      record(s, prev, li, got, rec2);
+      settleLines(ctx, s);
+      continue;
+    }
     record(s, prev, li, mv, rec);
     settleLines(ctx, s);
   }
@@ -1635,7 +1661,7 @@ function prefixesOf(ctx: Ctx, plan: Plan): St[] | null {
  * the budget is spent. Toward packing it stops once packed; `natural` goes on
  * from a packed panel toward natural stroke lengths.
  */
-function polish(ctx: Ctx, start: Final, natural = false): Final {
+function polish(ctx: Ctx, start: Final, natural = false, shapesOnly = false, nearHoles = false): Final {
   let best = start;
   let plan = planOf(ctx, start.st);
   let pre = prefixesOf(ctx, plan);
@@ -1643,11 +1669,28 @@ function polish(ctx: Ctx, start: Final, natural = false): Final {
   const going = () => (natural ? best.packed : !best.packed);
   for (let sweep = 0; sweep < POLISH_SWEEPS && going(); sweep++) {
     let improved = false;
+    // targeted: toward packing, the letters that could reach a hole; toward natural lengths,
+    // the letters that deviate and those that could reach a filler square
+    let tryLetter: Set<number> | null = null;
+    let anyShape: Set<number> | null = null;
+    if (nearHoles) {
+      tryLetter = lettersNearHoles(ctx, best, !natural);
+      anyShape = new Set(tryLetter);
+      if (natural) plan.forEach((mv, li) => mv && devOf(ctx.letters[li], mv.shape) > 0 && tryLetter!.add(li));
+    }
     for (let li = 0; li < plan.length && going(); li++) {
       if (spent(ctx)) return best;
+      if (tryLetter && !tryLetter.has(li)) continue;
       const base = pre[li];
+      const cur = plan[li];
       const alts: Move[] = [];
       forMoves(ctx, base, li, (mv, rec) => {
+        // shapes only: the letter keeps its line, join and U-turn, and changes glyph or counts
+        if (shapesOnly && cur && (mv.mode !== cur.mode || mv.t !== cur.t || mv.off !== cur.off || mv.jext !== cur.jext || mv.climb !== cur.climb))
+          return false;
+        // a deviating letter, targeted toward natural lengths, tries only shapes nearer its natural length
+        if (natural && anyShape && cur && !anyShape.has(li) && devOf(ctx.letters[li], mv.shape) >= devOf(ctx.letters[li], cur.shape))
+          return false;
         alts.push({ ...mv, x0: mv.mode <= 1 ? rec.x0 : mv.x0 });
         return false;
       });
@@ -1743,6 +1786,96 @@ function pairPolish(ctx: Ctx, start: Final): Final {
 }
 
 const PAIR_ROUNDS = 3;
+
+/**
+ * Repair moves toward natural lengths, for changes that take more than two
+ * letters. A letter is put back nearer its natural length even though the
+ * panel then stops packing; descent toward packing (`polish`) mends it one
+ * letter at a time, then descent toward natural lengths tidies it, and the
+ * result is kept only if it packs and is `better`. Replays mend (`Ctx.mend`):
+ * a later letter whose move no longer fits takes the first one that does, so
+ * the panels between here and there exist at all. The reference panel's
+ * own layout is four letters from the one the beam first packs (the corner
+ * لا, the alef of نفسا grown into the core, the ع and the ها's alef), and
+ * this is the move that reaches it.
+ */
+function repairPolish(ctx: Ctx, start: Final): Final {
+  ctx.mend = true;
+  try {
+    return repairRounds(ctx, start);
+  } finally {
+    ctx.mend = false;
+  }
+}
+
+function repairRounds(ctx: Ctx, start: Final): Final {
+  let best = start;
+  for (let round = 0; round < REPAIR_ROUNDS && best.packed; round++) {
+    const plan = planOf(ctx, best.st);
+    const pre = prefixesOf(ctx, plan);
+    if (!pre) return best;
+    const devs = plan
+      .map((mv, li) => ({ li, d: mv ? devOf(ctx.letters[li], mv.shape) : 0 }))
+      .filter((x) => x.d > 0)
+      .sort((a, b) => b.d - a.d || a.li - b.li);
+    let found: Final | null = null;
+    for (const { li, d } of devs) {
+      const alts = movesAt(ctx, pre[li], li)
+        .map((mv) => ({ mv, d: devOf(ctx.letters[li], mv.shape) }))
+        .filter((x) => x.d < d)
+        .sort((a, b) => a.d - b.d)
+        .slice(0, REPAIR_ALTS);
+      for (const { mv } of alts) {
+        if (spent(ctx)) return found ?? best;
+        const p2 = plan.slice();
+        p2[li] = mv;
+        const s = replayFrom(ctx, pre[li], p2, li);
+        if (!s) continue;
+        let f = polish(ctx, finish(ctx, s), false, true, true);
+        if (f.packed) f = polish(ctx, f, true, true, true);
+        // the first repair that helps is kept: the budget rarely runs to a second
+        if (f.packed && better(f, best)) {
+          found = f;
+          break;
+        }
+      }
+      if (found) break;
+    }
+    if (!found) break;
+    best = found;
+  }
+  return best;
+}
+
+const REPAIR_ROUNDS = 3;
+
+/**
+ * The letters that could close a hole of `f` by changing shape (or, with
+ * `holes` false, take a filler square's place): those whose box, widened by
+ * the longest stretch a slice may take, covers an empty 2×2 (or a square).
+ */
+function lettersNearHoles(ctx: Ctx, f: Final, holes_ = true): Set<number> {
+  const { cols, rows } = ctx;
+  const own = f.owner;
+  const holes: Array<[number, number]> = [];
+  for (let r = 0; r + 1 < rows; r++)
+    for (let c = 0; c + 1 < cols; c++) {
+      const i = r * cols + c;
+      if (holes_ ? !own[i] && !own[i + 1] && !own[i + cols] && !own[i + cols + 1] : f.kind[i] === K_FILL) holes.push([r, c]);
+    }
+  const out = new Set<number>();
+  const reach = Math.max(ROW_MAX, COL_MAX);
+  for (const p of placedList(f.st)) {
+    const b = boxOf(f.st.lines[p.line], p.shape, p.x0, p.yb);
+    const tall = b.turn === 0 || b.turn === 2;
+    const r1 = b.row + (tall ? p.shape.h : p.shape.w) - 1;
+    const c1 = b.col + (tall ? p.shape.w : p.shape.h) - 1;
+    if (holes.some(([r, c]) => r >= b.row - reach && r <= r1 + reach && c >= b.col - reach && c <= c1 + reach)) out.add(p.letter);
+  }
+  return out;
+}
+/** Alternatives per deviating letter a repair round tries, nearest natural length first. */
+const REPAIR_ALTS = 3;
 
 
 
@@ -1860,7 +1993,8 @@ function searchInner(ctx: Ctx): Final | null {
   // strokes change length only when they must: of the packed panels the budget
   // still reaches, keep the one nearest natural lengths
   if (best?.packed) {
-    best = polish(ctx, best, true);
+    best = repairPolish(ctx, best);
+    best = polish(ctx, best, true, true, true);
     best = pairPolish(ctx, best);
     best = replan(ctx, best, REPLAN_BEAM, true);
   }
@@ -1944,6 +2078,7 @@ function makeCtx(
     workMax: budgetMs * WORK_PER_MS - WORK_SLACK,
     out: false,
     noClock: false,
+    mend: false,
   };
 }
 

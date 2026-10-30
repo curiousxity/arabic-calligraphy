@@ -93,7 +93,7 @@ function expectReadingOrder(r: Ok, units: KufiUnit[]) {
  * own dots, in a whole set on its side (where authored, or the set moved one
  * cell along its line), or a lone square that could not be read as a dot.
  */
-function expectDotsAreLetters(r: Ok, text: string, units: KufiUnit[]) {
+function expectDotsAreLetters(r: Ok, text: string, units: KufiUnit[]): number[] {
   const { cols, rows, cells } = r;
   const ink = (rr: number, cc: number) => rr >= 0 && cc >= 0 && rr < rows && cc < cols && cells[rr * cols + cc] === 1;
   const glyph = new Uint8Array(cols * rows);
@@ -131,10 +131,25 @@ function expectDotsAreLetters(r: Ok, text: string, units: KufiUnit[]) {
     expect(drawn.length, `${ch} (unit ${p.unitIndex}) has at most one whole set`).toBeLessThanOrEqual(1);
     if (drawn.length) for (const c of own) dotOf.add(at(c, drawn[0]));
   }
+  const fillers: number[] = [];
   for (const i of lone) {
     if (dotOf.has(i)) continue;
     expect(zone.has(i), `the lone square at r${(i / cols) | 0}c${i % cols} would read as a dot`).toBe(false);
+    fillers.push(i);
   }
+  // two filler squares near each other read as a pair of dots
+  for (const a of fillers)
+    for (const b of fillers) {
+      if (a === b) continue;
+      const d = Math.max(Math.abs(((a / cols) | 0) - ((b / cols) | 0)), Math.abs((a % cols) - (b % cols)));
+      expect(d, `filler squares r${(a / cols) | 0}c${a % cols} and r${(b / cols) | 0}c${b % cols}`).toBeGreaterThan(2);
+    }
+  return fillers;
+}
+
+/** The filler squares of a packed panel: lone ink that is no glyph and no letter's dot. */
+function fillersOf(r: Ok, text: string): number[] {
+  return expectDotsAreLetters(r, text, resolveKufiText(text).units);
 }
 
 function expectPacked(r: KufiPackResult, text: string): Ok {
@@ -440,6 +455,11 @@ const REF_LA_ROWS = 9;
 const deviation = (r: Ok) => r.placements.reduce((a, p) => a + p.stretch.reduce((b, n) => b + Math.abs(n), 0), 0);
 
 describe("natural stroke lengths", () => {
+  it("Al-Baqarah fills its space with strokes, not filler squares", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    expect(fillersOf(r, BAQARAH)).toEqual([]);
+  }, 20000);
+
   it("Al-Baqarah packs no further from authored lengths than the reference does", () => {
     const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
     expect(deviation(r)).toBeLessThanOrEqual(REF_DEVIATION);
