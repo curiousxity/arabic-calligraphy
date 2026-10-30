@@ -1,7 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { KufiPackResult } from "./kufiPack";
 import {
   KUFI_CACHE_LIMIT,
+  KUFI_FIT_WATCHDOG_MS,
+  KUFI_PACK_WATCHDOG_MS,
   _kufiLayoutInternals,
   _resetKufiLayouts,
   _setKufiWorkerFactory,
@@ -234,5 +236,89 @@ describe("kufi layout client", () => {
     expect(_kufiLayoutInternals().inputKeys).toBe(2);
     worker.reply({ id: worker.last().id, kind: "pack", result: fail(11) });
     expect(_kufiLayoutInternals().inputKeys).toBe(2);
+  });
+
+  describe("a worker that cannot take a job", () => {
+    /** A worker whose postMessage throws, as a worker that failed to start does. */
+    const throwingFactory = () => {
+      const w = new FakeWorker();
+      w.postMessage = () => {
+        throw new Error("cannot post");
+      };
+      workers.push(w);
+      worker = w;
+      return w;
+    };
+
+    it("rejects a Fit with Fit failed and keeps the queue moving", async () => {
+      _setKufiWorkerFactory(throwingFactory);
+      const fit = requestKufiFit("الله");
+      await expect(fit).rejects.toThrow(/^Fit failed/);
+      // nothing is stuck in flight: the next request reaches a working worker
+      _setKufiWorkerFactory(() => {
+        worker = new FakeWorker();
+        workers.push(worker);
+        return worker;
+      });
+      const next = requestKufiFit("الله");
+      expect(worker.last()).toMatchObject({ kind: "fit" });
+      worker.reply({ id: worker.last().id, kind: "fit", size: { cols: 9, rows: 9 } });
+      await expect(next).resolves.toEqual({ cols: 9, rows: 9 });
+    });
+
+    it("packs on the main thread instead, and marks failed a layout that throws there too", () => {
+      _setKufiWorkerFactory(throwingFactory);
+      wantKufiLayout("s1", A);
+      expect(cachedKufiLayout(A)?.ok).toBe(true);
+      const bad = { text: null as unknown as string, cols: 9, rows: 9 };
+      expect(() => wantKufiLayout("s2", bad)).not.toThrow();
+      expect(kufiLayoutFailed(bad)).toBe(true);
+      expect(workers.every((w) => w.terminated)).toBe(true);
+    });
+  });
+
+  describe("a worker that goes silent", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("a pack with no answer is packed on the main thread after the watchdog", () => {
+      wantKufiLayout("s1", A);
+      const first = worker;
+      vi.advanceTimersByTime(KUFI_PACK_WATCHDOG_MS - 1);
+      expect(cachedKufiLayout(A)).toBeUndefined();
+      vi.advanceTimersByTime(1);
+      expect(first.terminated).toBe(true);
+      expect(cachedKufiLayout(A)?.ok).toBe(true);
+    });
+
+    it("a Fit with no answer rejects with Fit failed after the watchdog, and the queue moves on", async () => {
+      const fit = requestKufiFit("الله");
+      const caught = fit.catch((e: Error) => e);
+      wantKufiLayout("s1", B);
+      const first = worker;
+      vi.advanceTimersByTime(KUFI_FIT_WATCHDOG_MS);
+      expect(first.terminated).toBe(true);
+      expect(((await caught) as Error).message).toMatch(/^Fit failed/);
+      // the queued pack went to a fresh worker
+      expect(workers).toHaveLength(2);
+      expect(worker.last()).toMatchObject({ kind: "pack" });
+    });
+
+    it("an answer in time clears the watchdog", () => {
+      wantKufiLayout("s1", A);
+      const first = worker;
+      first.reply({ id: first.last().id, kind: "pack", result: fail(9) });
+      vi.advanceTimersByTime(KUFI_FIT_WATCHDOG_MS * 2);
+      expect(first.terminated).toBe(false);
+      expect(cachedKufiLayout(A)).toEqual(fail(9));
+    });
+
+    it("gives a Fit longer than a pack", () => {
+      expect(KUFI_FIT_WATCHDOG_MS).toBeGreaterThan(KUFI_PACK_WATCHDOG_MS);
+    });
   });
 });

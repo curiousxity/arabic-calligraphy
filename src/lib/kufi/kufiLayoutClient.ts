@@ -83,6 +83,8 @@ type FitWaiter = { resolve: (s: { cols: number; rows: number }) => void; reject:
 const fits: Array<{ req: KufiWorkerRequest } & FitWaiter> = [];
 const fitWaiters = new Map<number, FitWaiter>();
 let inFlight: { id: number; key?: string } | null = null;
+/** The in-flight job's watchdog timer. */
+let watchdog: ReturnType<typeof setTimeout> | null = null;
 let nextId = 1;
 let nextSeq = 1;
 const listeners = new Set<() => void>();
@@ -128,6 +130,38 @@ function forgetIfUnused(key: string) {
   failed.delete(key);
 }
 
+/**
+ * How long a job may stay in flight with no answer before the worker is
+ * taken for dead (a worker can die without firing any error): it is then
+ * terminated and the job handled as on a worker error. Generous: a first
+ * draft is capped near 1.75 s and a Fit has measured up to ~9 s.
+ */
+export const KUFI_PACK_WATCHDOG_MS = 10_000;
+export const KUFI_FIT_WATCHDOG_MS = 30_000;
+
+function clearWatchdog() {
+  if (watchdog !== null) clearTimeout(watchdog);
+  watchdog = null;
+}
+
+/**
+ * Sends the in-flight job. A worker that throws while starting or posting
+ * (so it never got the job) is handled as a worker error: the job is still
+ * answered, and the queue never stalls behind `inFlight`.
+ */
+function post(req: KufiWorkerRequest, ms: number) {
+  try {
+    getWorker().postMessage(req);
+  } catch (err) {
+    onWorkerError(err);
+    return;
+  }
+  watchdog = setTimeout(() => {
+    watchdog = null;
+    if (inFlight?.id === req.id) onWorkerError(new Error(`kufi worker gave no answer in ${ms} ms`));
+  }, ms);
+}
+
 function getWorker(): KufiWorkerLike {
   if (worker) return worker;
   const w = factory();
@@ -160,7 +194,7 @@ function pump() {
   if (fit) {
     inFlight = { id: fit.req.id };
     fitWaiters.set(fit.req.id, { resolve: fit.resolve, reject: fit.reject });
-    getWorker().postMessage(fit.req);
+    post(fit.req, KUFI_FIT_WATCHDOG_MS);
     return;
   }
   // Only what some slot wants *now* is packed, newest first: inputs a slot
@@ -173,7 +207,7 @@ function pump() {
   const id = nextId++;
   inFlight = { id, key: pick.key };
   const previous = previousFor(pick.key, input);
-  getWorker().postMessage({ id, kind: "pack", input: previous ? { ...input, previous } : { ...input } });
+  post({ id, kind: "pack", input: previous ? { ...input, previous } : { ...input } }, KUFI_PACK_WATCHDOG_MS);
 }
 
 function deliver(key: string, r: KufiPackResult) {
@@ -187,6 +221,7 @@ function onReply(data: KufiWorkerResponse) {
   if (!inFlight || data.id !== inFlight.id) return;
   const job = inFlight;
   inFlight = null;
+  clearWatchdog();
   if (data.kind === "fit") {
     fitWaiters.get(data.id)?.resolve(data.size);
     fitWaiters.delete(data.id);
@@ -211,12 +246,14 @@ function packHere(key: string, input: KufiLayoutInputs): boolean {
 }
 
 /**
- * A worker that fails is replaced. A pack it held is answered on this thread
+ * A worker that fails (an error event, a reply that cannot be read, a throw
+ * while posting, or no answer before the watchdog) is replaced. A pack it held is answered on this thread
  * (or marked failed if the packer throws there too); a Fit it held rejects.
  * The queue always moves on.
  */
 function onWorkerError(err: unknown) {
   console.error("kufi worker failed", err);
+  clearWatchdog();
   worker?.terminate?.();
   worker = null;
   const job = inFlight;
@@ -332,6 +369,7 @@ export function _resetKufiLayouts(): void {
   fits.length = 0;
   fitWaiters.clear();
   inFlight = null;
+  clearWatchdog();
   worker?.terminate?.();
   worker = null;
   factory = defaultFactory;
