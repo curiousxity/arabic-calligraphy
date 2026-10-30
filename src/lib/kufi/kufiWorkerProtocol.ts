@@ -19,6 +19,7 @@ export type KufiWorkerLike = {
   postMessage(msg: KufiWorkerRequest): void;
   onmessage: ((e: { data: KufiWorkerResponse }) => void) | null;
   onerror: ((e: unknown) => void) | null;
+  onmessageerror?: ((e: unknown) => void) | null;
   terminate?(): void;
 };
 

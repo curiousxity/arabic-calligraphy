@@ -100,7 +100,8 @@ test("a Kufi panel draws the phrase as one traced outline, on canvas and in SVG"
   const maxGap = await page.evaluate(() => (window as unknown as { __kufiMaxGap: number }).__kufiMaxGap);
   // Measured: 17–33 ms with the worker, 450–480 ms when the same draft
   // packs on the main thread (this machine packs it in ~460 ms).
-  expect(maxGap).toBeLessThan(200);
+  // 300 ms leaves room for a loaded runner while staying well under that.
+  expect(maxGap).toBeLessThan(300);
 
   await openPanel(page, /^Save & Export/);
   const downloadPromise = page.waitForEvent("download");

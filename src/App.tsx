@@ -38,6 +38,7 @@ import {
   isStackBlock,
   supportsDetachedMarks,
   hasOwnFont,
+  isKufiPanel,
 } from "./lib/blockCapabilities";
 import { useGlyphAlternates, useStyleSets } from "./hooks/useGlyphAlternates";
 import {
@@ -287,6 +288,17 @@ const DEFAULT_BLOCK: Block = {
 const isBrowser = typeof window !== "undefined";
 
 /**
+ * The generic update paths' `{ ...b, ...patch }`, plus one rule: a Kufi
+ * panel's text change carries its edits to their letters' new indices
+ * (`kufiPanelTextPatch`), so a painted cell or a stretch follows its letter.
+ */
+const applyBlockPatch = (b: Block, patch: Partial<Block>): Block => {
+  if (isKufiPanel(b) && typeof patch.text === "string" && patch.text !== b.text && !("panelEdits" in patch))
+    return { ...b, ...patch, ...kufiPanelTextPatch(b, patch.text) } as Block;
+  return { ...b, ...patch } as Block;
+};
+
+/**
  * Width a block's straight-stroke cuts add to its drawn run.
  *
  * Shaping cannot see cuts — they are geometry, not characters — so every
@@ -296,17 +308,6 @@ const isBrowser = typeof window !== "undefined";
  * because summing them needs the nuqta table that module deliberately keeps
  * out; `runStyleForBlock` takes the result as a required argument.
  */
-/**
- * The generic update paths' `{ ...b, ...patch }`, plus one rule: a Kufi
- * panel's text change carries its edits to their letters' new indices
- * (`kufiPanelTextPatch`), so a painted cell or a stretch follows its letter.
- */
-const applyBlockPatch = (b: Block, patch: Partial<Block>): Block => {
-  if (b.type === "kufiPanel" && typeof patch.text === "string" && patch.text !== b.text && !("panelEdits" in patch))
-    return { ...b, ...patch, ...kufiPanelTextPatch(b, patch.text) } as Block;
-  return { ...b, ...patch } as Block;
-};
-
 const cutWidthForBlock = (block: Block): number =>
   cutAdvanceTotal(block.strokeCuts ?? [], nuqtaUnits(block.fontFamily, block.fontSize));
 

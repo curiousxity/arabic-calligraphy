@@ -65,8 +65,11 @@ function defaultFactory(): KufiWorkerLike {
 let factory: () => KufiWorkerLike = defaultFactory;
 let worker: KufiWorkerLike | null = null;
 
-/** Most results kept; an evicted one is simply packed again when wanted. */
-const CACHE_LIMIT = 64;
+/**
+ * Most results kept beyond those a mounted slot is drawing, which are never
+ * evicted (evicting one would only send it straight back to the worker).
+ */
+export const KUFI_CACHE_LIMIT = 64;
 
 const results = new Map<string, KufiPackResult>();
 const inputsByKey = new Map<string, KufiLayoutInputs>();
@@ -74,8 +77,11 @@ const inputsByKey = new Map<string, KufiLayoutInputs>();
 const wanted = new Map<string, { key: string; seq: number }>();
 /** The last result each slot was shown, with the inputs it was packed for. */
 const latest = new Map<string, { result: KufiPackResult; inputs: KufiLayoutInputs }>();
-const fits: Array<{ req: KufiWorkerRequest; resolve: (s: { cols: number; rows: number }) => void }> = [];
-const fitWaiters = new Map<number, (s: { cols: number; rows: number }) => void>();
+/** Inputs the packer threw on, even on the main thread: never retried. */
+const failed = new Set<string>();
+type FitWaiter = { resolve: (s: { cols: number; rows: number }) => void; reject: (e: Error) => void };
+const fits: Array<{ req: KufiWorkerRequest } & FitWaiter> = [];
+const fitWaiters = new Map<number, FitWaiter>();
 let inFlight: { id: number; key?: string } | null = null;
 let nextId = 1;
 let nextSeq = 1;
@@ -92,14 +98,34 @@ function notify() {
   for (const l of listeners) l();
 }
 
+const isWanted = (key: string) => [...wanted.values()].some((w) => w.key === key);
+
+/** Marks a cached result as just used: eviction takes the least recently used first. */
+function touch(key: string) {
+  const r = results.get(key);
+  if (!r) return;
+  results.delete(key);
+  results.set(key, r);
+}
+
 function remember(key: string, r: KufiPackResult) {
   results.delete(key);
   results.set(key, r);
-  while (results.size > CACHE_LIMIT) {
-    const oldest = results.keys().next().value as string;
-    results.delete(oldest);
-    if (![...wanted.values()].some((w) => w.key === oldest)) inputsByKey.delete(oldest);
+  if (results.size <= KUFI_CACHE_LIMIT) return;
+  const keep = new Set([...wanted.values()].map((w) => w.key));
+  for (const k of [...results.keys()]) {
+    if (results.size <= KUFI_CACHE_LIMIT) break;
+    if (keep.has(k)) continue;
+    results.delete(k);
+    inputsByKey.delete(k);
   }
+}
+
+/** Drops the inputs of a key nobody wants that has no result and is not being packed. */
+function forgetIfUnused(key: string) {
+  if (results.has(key) || inFlight?.key === key || isWanted(key)) return;
+  inputsByKey.delete(key);
+  failed.delete(key);
 }
 
 function getWorker(): KufiWorkerLike {
@@ -107,6 +133,8 @@ function getWorker(): KufiWorkerLike {
   const w = factory();
   w.onmessage = (e) => onReply(e.data);
   w.onerror = (err) => onWorkerError(err);
+  // A reply that could not be deserialised: the job it answered is lost the same way.
+  w.onmessageerror = (err) => onWorkerError(err);
   worker = w;
   return w;
 }
@@ -131,14 +159,15 @@ function pump() {
   const fit = fits.shift();
   if (fit) {
     inFlight = { id: fit.req.id };
-    fitWaiters.set(fit.req.id, fit.resolve);
+    fitWaiters.set(fit.req.id, { resolve: fit.resolve, reject: fit.reject });
     getWorker().postMessage(fit.req);
     return;
   }
   // Only what some slot wants *now* is packed, newest first: inputs a slot
   // has moved on from are never sent at all.
   let pick: { key: string; seq: number } | null = null;
-  for (const w of wanted.values()) if (!results.has(w.key) && (!pick || w.seq > pick.seq)) pick = w;
+  for (const w of wanted.values())
+    if (!results.has(w.key) && !failed.has(w.key) && inputsByKey.has(w.key) && (!pick || w.seq > pick.seq)) pick = w;
   if (!pick) return;
   const input = inputsByKey.get(pick.key)!;
   const id = nextId++;
@@ -159,28 +188,51 @@ function onReply(data: KufiWorkerResponse) {
   const job = inFlight;
   inFlight = null;
   if (data.kind === "fit") {
-    fitWaiters.get(data.id)?.(data.size);
+    fitWaiters.get(data.id)?.resolve(data.size);
     fitWaiters.delete(data.id);
   } else if (job.key) deliver(job.key, data.result);
   pump();
 }
 
-/** A worker that fails is replaced; the job it held is answered on this thread so nothing waits forever. */
+/**
+ * Packs on the calling thread. A throw marks the inputs failed (so nothing
+ * retries them in a loop) and leaves the slots on what they last showed.
+ */
+function packHere(key: string, input: KufiLayoutInputs): boolean {
+  try {
+    deliver(key, packKufiPanel({ ...input }));
+    return true;
+  } catch (err) {
+    console.error("kufi packer failed", err);
+    failed.add(key);
+    notify();
+    return false;
+  }
+}
+
+/**
+ * A worker that fails is replaced. A pack it held is answered on this thread
+ * (or marked failed if the packer throws there too); a Fit it held rejects.
+ * The queue always moves on.
+ */
 function onWorkerError(err: unknown) {
   console.error("kufi worker failed", err);
   worker?.terminate?.();
   worker = null;
   const job = inFlight;
   inFlight = null;
-  if (job?.key) {
-    const input = inputsByKey.get(job.key);
-    if (input) deliver(job.key, packKufiPanel(input));
-  } else if (job) {
-    const fit = fitWaiters.get(job.id);
-    fitWaiters.delete(job.id);
-    fit?.({ cols: 0, rows: 0 });
+  try {
+    if (job?.key) {
+      const input = inputsByKey.get(job.key);
+      if (input) packHere(job.key, input);
+    } else if (job) {
+      const fit = fitWaiters.get(job.id);
+      fitWaiters.delete(job.id);
+      fit?.reject(new Error("Fit failed: the packer's worker stopped"));
+    }
+  } finally {
+    pump();
   }
-  pump();
 }
 
 /** Subscribes to every result arriving (the shape `useSyncExternalStore` wants). */
@@ -191,7 +243,18 @@ export function subscribeKufiLayouts(listener: () => void): () => void {
 
 /** What a slot should draw for these inputs now: their result, else the slot's last one, else null. */
 export function kufiLayoutSnapshot(slot: string, inputs: KufiLayoutInputs): KufiPackResult | null {
-  return results.get(kufiLayoutKey(inputs)) ?? latest.get(slot)?.result ?? null;
+  const key = kufiLayoutKey(inputs);
+  const hit = results.get(key);
+  if (hit) {
+    touch(key);
+    return hit;
+  }
+  return latest.get(slot)?.result ?? null;
+}
+
+/** True when the packer threw on these inputs (in the worker and again on the main thread). */
+export function kufiLayoutFailed(inputs: KufiLayoutInputs): boolean {
+  return failed.has(kufiLayoutKey(inputs));
 }
 
 /** The cached result for these inputs, if any. */
@@ -202,11 +265,14 @@ export function cachedKufiLayout(inputs: KufiLayoutInputs): KufiPackResult | und
 /** A slot now wants these inputs drawn: served from the cache, or queued for the worker. */
 export function wantKufiLayout(slot: string, inputs: KufiLayoutInputs): void {
   const key = kufiLayoutKey(inputs);
-  if (wanted.get(slot)?.key === key) return;
+  const before = wanted.get(slot)?.key;
+  if (before === key) return;
   wanted.set(slot, { key, seq: nextSeq++ });
+  if (before !== undefined) forgetIfUnused(before);
   if (!inputsByKey.has(key)) inputsByKey.set(key, { ...inputs });
   const hit = results.get(key);
   if (hit) {
+    touch(key);
     latest.set(slot, { result: hit, inputs: inputsByKey.get(key)! });
     return;
   }
@@ -215,8 +281,10 @@ export function wantKufiLayout(slot: string, inputs: KufiLayoutInputs): void {
 
 /** A slot unmounted. */
 export function releaseKufiLayout(slot: string): void {
+  const key = wanted.get(slot)?.key;
   wanted.delete(slot);
   latest.delete(slot);
+  if (key !== undefined) forgetIfUnused(key);
 }
 
 /**
@@ -228,18 +296,21 @@ export function ensureKufiLayouts(all: KufiLayoutInputs[]): boolean {
   let changed = false;
   for (const inputs of all) {
     const key = kufiLayoutKey(inputs);
-    if (results.has(key)) continue;
+    if (results.has(key) || failed.has(key)) continue;
     if (!inputsByKey.has(key)) inputsByKey.set(key, { ...inputs });
-    deliver(key, packKufiPanel({ ...inputs }));
-    changed = true;
+    if (packHere(key, inputs)) changed = true;
   }
   return changed;
 }
 
-/** A square size that packs `text` (`fitKufiPanel`), computed in the worker. */
+/**
+ * A square size that packs `text` (`fitKufiPanel`), computed in the worker.
+ * Rejects with an Error whose message starts "Fit failed" if the worker dies
+ * while fitting; it never resolves a made-up size.
+ */
 export function requestKufiFit(text: string, edits?: KufiPanelEdits): Promise<{ cols: number; rows: number }> {
-  return new Promise((resolve) => {
-    fits.push({ req: { id: nextId++, kind: "fit", text, edits }, resolve });
+  return new Promise((resolve, reject) => {
+    fits.push({ req: { id: nextId++, kind: "fit", text, edits }, resolve, reject });
     pump();
   });
 }
@@ -257,10 +328,16 @@ export function _resetKufiLayouts(): void {
   inputsByKey.clear();
   wanted.clear();
   latest.clear();
+  failed.clear();
   fits.length = 0;
   fitWaiters.clear();
   inFlight = null;
   worker?.terminate?.();
   worker = null;
   factory = defaultFactory;
+}
+
+/** Tests only: sizes of the internal maps. */
+export function _kufiLayoutInternals(): { results: number; inputKeys: number; failed: number } {
+  return { results: results.size, inputKeys: inputsByKey.size, failed: failed.size };
 }
