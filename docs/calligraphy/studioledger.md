@@ -254,6 +254,21 @@ Times are minutes:seconds into the individual-letters lesson.
   - The user, 2026-10-27, decision 47: "Yes turning pen".
 - **Status:** recreated.
 
+**A stroke is one smooth movement of the pen**
+
+- **The rule:** the user, 2026-10-29, after finding lumpy, faceted and self-crossing strokes in the app: "you have to
+  remember that this is a stroke and it should be smooth without facets or jagged edges or anything of the sort.
+  It's one movement of a pen. You may occasionally get a V shape or a angle, but that is usually when there are two
+  adjoining strokes. However, for the most part, these are smooth lines." Area match alone had passed them.
+- **Folds:** where the path runs parallel to the nib, the swept ribbon has no width, and past that point its edges
+  have swapped sides, so the outline pinches to a V ("the hook crosses over itself": 002, 020, 024, 063). 445 strokes
+  fold where it shows, from 361 fits. The GPU fitter now has a fold term (`GPUFIT_TWIST` in `scripts/pen/gpufit.py`),
+  counted again in choosing among tries. A fold within 0.1 nuqta of a stroke's end, a hairline tip, is allowed.
+- **Nib-tip fills:** traced through a few nodes they come out faceted. Each is refitted as a turning pen with a
+  smaller nib. The hamza (H01): the user chose that refit, "A is the way to go".
+- **Inspection:** "I'm going to need to see all of the strokes." Every shape is drawn as the app draws it, beside the
+  studio's, for the user.
+
 **Every joint trimmed to the studio edge**
 
 - **What was wrong:** at a joint the nib's square corner could stand a little past the studio's edge. The user,

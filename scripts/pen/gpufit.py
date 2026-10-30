@@ -432,6 +432,75 @@ LIFT_MIN = 0.02  # the narrowest a lifted nib's mark gets: a corner's width (a z
 LIFT_SMOOTH = float(os.environ.get("GPUFIT_LIFT_SMOOTH", 0.03))
 
 
+# the ribbon folding over itself (the user, 2026-10-29, of hooks "where the pen is crossing itself": "it should be
+# smooth without facets or jagged edges ... It's one movement of a pen"). Where the path runs parallel to the nib the
+# swept ribbon has no width, and past that point its two edges have swapped sides: the outline pinches to a V on both
+# sides. Measured along the path as the length (nuqta) of the stretches whose cross(direction, nib) has the minority
+# sign, weighted by how far across they are; TWIST_END nuqta at each end is left out (a hairline tip runs along the
+# nib). GPUFIT_TWIST weights it in the cost; 0 (the default) leaves every fit as before.
+TWIST = float(os.environ.get("GPUFIT_TWIST", 0.0))
+TWIST_END, TWIST_K = 0.1, 16
+
+
+def _twist_terms(P, ang, xp):
+    """P (..., n, 2) nuqta, ang (..., n) degrees; xp numpy or torch: (cross, ds) per sample, (..., m)."""
+    if xp is torch:
+        c1, c2 = _controls_b(P if P.dim() == 3 else P[None])
+        if P.dim() == 2: c1, c2 = c1[0], c2[0]
+        t = torch.linspace(0, 1, TWIST_K + 1, device=P.device)[:-1]
+    else:
+        c1, c2 = _np_controls(P)
+        t = np.linspace(0, 1, TWIST_K + 1)[:-1]
+    p0, p3 = P[..., :-1, :], P[..., 1:, :]
+    tt = t[:, None]
+    # derivative of each segment's cubic at every t: (..., segs, K, 2)
+    d = (3 * (1 - tt) ** 2 * (c1 - p0)[..., None, :] + 6 * (1 - tt) * tt * (c2 - c1)[..., None, :]
+         + 3 * tt ** 2 * (p3 - c2)[..., None, :])
+    th = (ang[..., :-1, None] + (ang[..., 1:] - ang[..., :-1])[..., None] * t)
+    th = th * (math.pi / 180)
+    ux, uy = xp.cos(th), -xp.sin(th)
+    L = (d[..., 0] ** 2 + d[..., 1] ** 2) ** 0.5 + 1e-9
+    cr = (d[..., 0] * uy - d[..., 1] * ux) / L
+    ds = L / TWIST_K
+    shp = cr.shape[:-2] + (-1,)
+    return cr.reshape(shp), ds.reshape(shp)
+
+
+def _twist_mask(ds, xp):
+    s = xp.cumsum(ds, -1) if xp is np else torch.cumsum(ds, -1)
+    tot = s[..., -1:]
+    return ((s > TWIST_END) & (s < tot - TWIST_END))
+
+
+def twist_cost_b(a):
+    """The fold term for a batch, a (C, n, 3) [x, y, angle]: (C,), 0 where TWIST is 0."""
+    if not TWIST or a.shape[1] < 2:
+        return a.new_zeros(a.shape[0])
+    cr, ds = _twist_terms(a[..., :2], a[..., 2], torch)
+    m = _twist_mask(ds.detach(), torch).float()
+    sgn = torch.sign((cr * ds * m).sum(-1, keepdim=True)).detach()
+    return TWIST * (torch.relu(-sgn * cr) * ds * m).sum(-1)
+
+
+def _np_controls(P):
+    d = np.empty_like(P); d[0] = P[1] - P[0]; d[-1] = P[-1] - P[-2]
+    if len(P) > 2: d[1:-1] = P[2:] - P[:-2]
+    t = d / np.maximum(np.linalg.norm(d, axis=-1, keepdims=True), 1e-9)
+    ch = np.linalg.norm(P[1:] - P[:-1], axis=-1, keepdims=True)
+    return P[:-1] + t[:-1] * ch / 3, P[1:] - t[1:] * ch / 3
+
+
+def twist_length(nodes):
+    """How much of a fit's path (nuqta) runs folded over (see TWIST), from its nodes [{p, angle}], for judging."""
+    if len(nodes) < 2:
+        return 0.0
+    P = np.array([q["p"] for q in nodes], float); ang = np.array([q["angle"] for q in nodes], float)
+    cr, ds = _twist_terms(P, ang, np)
+    m = _twist_mask(ds, np)
+    sgn = np.sign((cr * ds * m).sum())
+    return float(((sgn * cr < 0) * ds * m).sum())
+
+
 def lift_cost(w, rough):
     """The narrowing's unevenness (LIFT_SMOOTH): w (n,) or (C, n) widths; a scalar or (C,)."""
     if not LIFT_SMOOTH or w.shape[-1] < 3:
@@ -555,7 +624,7 @@ def _refine(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others, stag
             inter = (A * Bt).sum()
             iou = inter / (A.sum() + Bt.sum() - inter)
             gap = (A.sum() + Bt.sum() - 2 * inter) / perim / px_per_nuqta
-            cost = 1 - iou + edge * gap + shape_cost(a, rough, bend) + (lift_cost(wd, rough) if pen is not None else 0)
+            cost = 1 - iou + edge * gap + shape_cost(a, rough, bend) + (lift_cost(wd, rough) if pen is not None else 0) + twist_cost_b(a[None])[0]
             if corner and windows:
                 if step % RELAYOUT == 0:  # how far each pixel lies from our hard ink, held until the next recount
                     Ah = (A.detach() > 0.5).to(torch.uint8).cpu().numpy()
@@ -870,7 +939,7 @@ def _refine_pens(nodes, pieces, origin, ppn, pen_px, rough, edge, fixed, others,
             As = A.sum((1, 2))
             iou = inter / (As + Bs - inter)
             gap = (As + Bs - 2 * inter) / perim / px_per_nuqta
-            cost = 1 - iou + edge * gap + _shape_cost_b(a, rough, bend) + lift_cost(wd, rough)
+            cost = 1 - iou + edge * gap + _shape_cost_b(a, rough, bend) + lift_cost(wd, rough) + twist_cost_b(a)
             if corner and windows:
                 if step % RELAYOUT == 0:
                     Ah = (A.detach() > 0.5).to(torch.uint8).cpu().numpy()
