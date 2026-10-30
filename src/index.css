@@ -527,11 +527,12 @@ html, body, #root { height: 100%; margin: 0; }
   justify-content: start;
 }
 .blockControlGrid--inline { grid-template-columns: repeat(3, 34px); }
-/* The Add grid: six buttons as two rows of three. At the sidebar's 220px
-   minimum the row is 171px, which fits only five 34px buttons with no gap at
-   all; three columns of ~52px leave room for the shared 8px gap. Wider, the
+/* The Add grid: seven buttons as rows of four and three. At the sidebar's
+   220px minimum the row is 171px: four 34px buttons and three 8px gaps take
+   160px, so four columns fit with the shared gap (five would not). Three
+   columns would strand the seventh button alone on a third row. Wider, the
    1fr columns space them out. */
-.blockControlGrid--add { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.blockControlGrid--add { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 /* Selected and History sit side by side: two short groups stacked would
    cost a third of a screen in a sidebar that is already four screens tall. */
 .blockControlSplit { display: flex; gap: 20px; flex-wrap: wrap; }
@@ -589,3 +590,12 @@ details:not([open]) > .sidebarPresetKeyboardSummary { margin-bottom: 0; padding-
 .sidebarMarkKey { min-width: 0; aspect-ratio: 1; padding: 4px; border-radius: 8px; border: 1px solid var(--border-soft); background: var(--key-bg); color: var(--key-text); cursor: pointer; box-shadow: 0 2px 0 var(--key-shadow); }
 .sidebarMarkKey:hover { background: var(--key-hover); border-color: var(--accent); }
 .sidebarMarkKey svg { display: block; width: 100%; height: 100%; }
+
+/* Kufi panel type panel: Width, Height and Fit on one row, then the status. */
+.kufiPanelSizeRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+.kufiPanelSizeRow > * { min-width: 0; }
+.kufiPanelSizeField { margin-bottom: 0; }
+.kufiPanelFit { height: 36px; flex: none; }
+.kufiPanelStatus { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text-secondary); display: flex; flex-direction: column; gap: 2px; }
+.kufiPanelStatus:empty { display: none; }
+.kufiPanelSuggestion { border: none; background: none; padding: 0; color: var(--accent); font: inherit; font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }

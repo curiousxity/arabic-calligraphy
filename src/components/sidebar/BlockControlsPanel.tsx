@@ -14,6 +14,7 @@ import {
   RedoIcon,
   MirrorIcon,
   MedallionIcon,
+  KufiPanelIcon,
 } from "../Icons";
 
 /** How long the pointer must rest on an Add button before its demo opens. */
@@ -43,6 +44,8 @@ export type BlockControlsPanelProps = {
   onAddMedallion?: () => void;
   /** A plain text block with some text is selected. */
   canAddMedallion?: boolean;
+  /** A square-Kufi panel of its own text, sized to fit it. */
+  onAddKufiPanel?: () => void;
   onDuplicateBlock: () => void;
   onDeleteBlock: () => void;
   onUndo: () => void;
@@ -71,6 +74,7 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
   canAddMirrorBlock,
   onAddMedallion,
   canAddMedallion,
+  onAddKufiPanel,
   onDuplicateBlock,
   onDeleteBlock,
   onUndo,
@@ -120,8 +124,9 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
           chips. The old row let flex-wrap choose the shape, and at the
           sidebar's width it broke 8 / 1 / 3 — leaving one button
           stranded alone on a line of its own, which reads as a bug rather
-          than a layout. A fixed 3 × 2 grid — text, shape fill, curved text;
-          guide, mirror (muthanna), medallion — cannot orphan anything.
+          than a layout. A fixed four-column grid — text, shape fill, curved
+          text, Kufi panel; guide, mirror (muthanna), medallion — cannot
+          orphan anything.
           Splitting Add from the destructive pair also moves Delete out of
           the leading position, where it sat immediately beside Duplicate. */}
       <div className="blockControlGroup">
@@ -175,6 +180,19 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
               </button>
             </DemoHover>
           )}
+          {onAddKufiPanel && (
+            <span className="blockControlDemo" title="Add a square Kufi panel">
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                aria-label="Add Kufi panel"
+                onClick={onAddKufiPanel}
+              >
+                <KufiPanelIcon size={15} />
+              </button>
+            </span>
+          )}
+
           {onAddGuide && <AddGuideButton onAdd={onAddGuide} onAddSvg={onAddSvgGuide} />}
 
           {onAddMirrorBlock && (

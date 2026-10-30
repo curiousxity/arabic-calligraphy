@@ -65,7 +65,7 @@ import {
   type WritingSession,
 } from "./lib/guides";
 import { DEFAULT_ATTACHMENT } from "./lib/guidePlacement";
-import type { GuideAttachment, GuideBlock, GuideParams, GuideShape, MarkBlock } from "./types";
+import type { GuideAttachment, GuideBlock, GuideParams, GuideShape, KufiPanelBlock, MarkBlock } from "./types";
 import { markScale, type MarkItem } from "./lib/markLibrary";
 import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
@@ -164,7 +164,8 @@ import { convertRunToStack, fillerShapes, teardropShape, type UnjoinedPair } fro
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
-import { kufiPanelTextPatch } from "./lib/kufi/kufiPanelBlock";
+import { kufiCellSize, kufiPanelTextPatch } from "./lib/kufi/kufiPanelBlock";
+import { requestKufiFit } from "./lib/kufi/kufiLayoutClient";
 import {
   buildComposition,
   describeComposition,
@@ -1544,6 +1545,13 @@ const App: React.FC = () => {
   // functions are called twice under StrictMode (it double-invokes them to
   // catch impure ones), so the commit's side effects (pushHistory, setBlocks,
   // ...) must not live inside one, or they'd double-fire.
+  // The latest blocks, for async handlers (a Kufi Fit) that must check what
+  // changed while they waited.
+  const blocksRef = useRef(blocks);
+  useEffect(() => {
+    blocksRef.current = blocks;
+  }, [blocks]);
+
   const pendingPlacementRef = useRef<PendingPlacement | null>(null);
   useEffect(() => {
     pendingPlacementRef.current = pendingPlacement;
@@ -1986,6 +1994,97 @@ const App: React.FC = () => {
       -width / 2,
       -height / 2,
       "New Text on Path"
+    );
+  };
+
+  // Square-Kufi panels. A new panel is placed at a default box and then sized
+  // to its text by Fit, which runs in the packer's worker (up to seconds), so
+  // the add cannot wait for it. The fit's answer lands on the panel as part of
+  // the add's own undo step: while the panel is still following the cursor it
+  // rewrites the pending block, and after the drop it patches the block
+  // without a pushHistory (the add's entry already holds the state before the
+  // panel existed). It is dropped if the panel has since changed text or size,
+  // or gone. See lib/kufi/kufiPack.ts.
+  const addKufiPanel = () => {
+    const id = createNextId();
+    const text = "الله";
+    const fontSize = 48;
+    const cols = 21;
+    const rows = 21;
+    const cell = kufiCellSize(fontSize);
+    const panel: KufiPanelBlock = {
+      ...DEFAULT_BLOCK,
+      id,
+      text,
+      type: "kufiPanel",
+      fontSize,
+      color: "#1a1a1a",
+      // An outline would export as a second path around the panel, which a
+      // laser cutter reads as a second cut, so a new panel has none.
+      strokeWidth: 0,
+      panelCols: cols,
+      panelRows: rows,
+      x: 0,
+      y: 0,
+    };
+    // The panel draws from its top-left corner, so the click is its centre.
+    beginPlacement(panel, cols * cell, rows * cell, (-cols * cell) / 2, (-rows * cell) / 2, "New Kufi panel");
+    requestKufiFit(text).then(
+      (size) => {
+        if (size.cols === cols && size.rows === rows) return;
+        const resize = (b: Block): Block => {
+          if (!isKufiPanel(b) || b.id !== id || b.text !== text || b.panelCols !== cols || b.panelRows !== rows) return b;
+          // Keep the centre where it was dropped.
+          return {
+            ...b,
+            panelCols: size.cols,
+            panelRows: size.rows,
+            x: b.x + ((cols - size.cols) * cell) / 2,
+            y: b.y + ((rows - size.rows) * cell) / 2,
+          };
+        };
+        setPendingPlacement((prev) =>
+          prev && prev.block.id === id
+            ? {
+                ...prev,
+                block: resize(prev.block),
+                width: size.cols * cell,
+                height: size.rows * cell,
+                commitOffsetX: (-size.cols * cell) / 2,
+                commitOffsetY: (-size.rows * cell) / 2,
+              }
+            : prev
+        );
+        setBlocks((prev) => prev.map(resize));
+      },
+      // The panel keeps its default box; its status line says what to try.
+      (err: unknown) => console.warn(err)
+    );
+  };
+
+  /** Width and height of the selected Kufi panel, in cells: one undo step. */
+  const setKufiPanelSize = (size: { cols: number; rows: number }) => {
+    if (!selectedBlock || !isKufiPanel(selectedBlock)) return;
+    if (selectedBlock.panelCols === size.cols && selectedBlock.panelRows === size.rows) return;
+    updateSelectedBlock({ panelCols: size.cols, panelRows: size.rows });
+  };
+
+  /**
+   * Fit: the selected panel's text in the smallest square box it fills. The
+   * history step is pushed when the answer is applied, not when Fit is
+   * pressed, so a fit that fails or is overtaken by an edit costs no step.
+   * Rejects (message "Fit failed …") if the packer's worker dies.
+   */
+  const fitKufiPanelSize = async () => {
+    if (!selectedBlock || !isKufiPanel(selectedBlock)) return;
+    const { id, text, panelEdits } = selectedBlock;
+    const size = await requestKufiFit(text, panelEdits);
+    const now = blocksRef.current.find((b) => b.id === id);
+    if (!now || !isKufiPanel(now) || now.text !== text) return;
+    if (now.panelCols === size.cols && now.panelRows === size.rows) return;
+    pushHistory();
+    setBlocks((prev) =>
+      prev.map((b) => (b.id === id && isKufiPanel(b) ? { ...b, panelCols: size.cols, panelRows: size.rows } : b))
     );
   };
 
@@ -3296,6 +3395,9 @@ const App: React.FC = () => {
         onDeleteNamedProject={requestDeleteNamedProject}
         onAddShapeFillBlock={addShapeFillBlock}
         onAddTextPathBlock={addTextPathBlock}
+        onAddKufiPanel={addKufiPanel}
+        onSetKufiPanelSize={setKufiPanelSize}
+        onFitKufiPanel={fitKufiPanelSize}
         onAddGuide={addGuideBlock}
         onAddSvgGuide={addSvgGuideBlock}
         onAddMark={addMarkBlock}

@@ -33,6 +33,7 @@ import { LayersPanel } from "./sidebar/LayersPanel";
 import type { HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
 import { hasOwnFont, hasOwnText, supportsDiacriticOverrides } from "../lib/blockCapabilities";
+import { KufiPanelPanel } from "./sidebar/KufiPanelPanel";
 import {
   SelectRow,
   ColorRow,
@@ -196,6 +197,12 @@ export type SidebarProps = {
 
   onAddShapeFillBlock?: (svgPathData: string, w: number, h: number) => void;
   onAddTextPathBlock?: () => void;
+  /** Adds a square-Kufi panel, sized to its text once Fit answers. */
+  onAddKufiPanel?: () => void;
+  /** The selected Kufi panel's box in cells. */
+  onSetKufiPanelSize?: (size: { cols: number; rows: number }) => void;
+  /** Fits the selected Kufi panel's box to its text; rejects "Fit failed …" if the packer's worker dies. */
+  onFitKufiPanel?: () => Promise<void>;
   /** Guides — see .claude/rules/guides.md. */
   onAddGuide?: (shape: GuideShape) => void;
   onAddSvgGuide?: (pathData: string) => void;
@@ -394,6 +401,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onChangeSaveDestination,
   onAddShapeFillBlock,
   onAddTextPathBlock,
+  onAddKufiPanel,
+  onSetKufiPanelSize,
+  onFitKufiPanel,
   onAddGuide,
   onAddSvgGuide,
   onAddMark,
@@ -471,6 +481,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showGuide, setShowGuide] = useState(true);
   const [showStack, setShowStack] = useState(true);
   const [showMark, setShowMark] = useState(true);
+  const [showKufiPanel, setShowKufiPanel] = useState(true);
   // Closed by default: four groups of preview buttons are most of a screen.
   const [showMarks, setShowMarks] = useState(false);
 
@@ -1004,6 +1015,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onAddBlock={onAddBlock}
           onAddShapeFillBlock={onAddShapeFillBlock}
           onAddTextPathBlock={onAddTextPathBlock}
+          onAddKufiPanel={onAddKufiPanel}
           onAddGuide={onAddGuide}
           onAddSvgGuide={onAddSvgGuide}
           onAddMirrorBlock={onAddMirrorBlock}
@@ -1280,7 +1292,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
 
 
-                {selectedBlock && (
+                {/* A Kufi panel draws no harakat and has no font to look
+                    marks up in, so the mark tools and the font's own
+                    honorifics (Presets) are left out for it. */}
+                {hasOwnFont(selectedBlock) && (
                   <TashkeelLibrary
                     fontKey={selectedBlock.fontFamily}
                     cssFamily={
@@ -1291,6 +1306,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 )}
 
+                {hasOwnFont(selectedBlock) && (
                 <button
                   type="button"
                   onClick={onClearDiacritics}
@@ -1300,6 +1316,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   Clear diacritics
                 </button>
+                )}
 
                 {selectedBlock &&
                   supportsDiacriticOverrides(selectedBlock) &&
@@ -1315,13 +1332,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                   )}
 
-                <PresetKeyboard
-                  title="Presets"
-                  rows={[PRESETS]}
-                  onPick={handleKeyboardKey}
-                  fontFamily={selectedBlock?.fontFamily ?? "FatemiMaqala"}
-                  collapsible
-                />
+                {hasOwnFont(selectedBlock) && (
+                  <PresetKeyboard
+                    title="Presets"
+                    rows={[PRESETS]}
+                    onPick={handleKeyboardKey}
+                    fontFamily={selectedBlock.fontFamily}
+                    collapsible
+                  />
+                )}
 
                 <PresetKeyboard
                   title="Specials"
@@ -1399,6 +1418,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="sidebarPanel">
             <CollapsibleSection title="Stacked composition" isOpen={showStack} onToggle={() => setShowStack((v) => !v)}>
               <StackPanel block={selectedBlock} onEdit={onEditStack} />
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock?.type === "kufiPanel" && onSetKufiPanelSize && onFitKufiPanel && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Kufi panel" isOpen={showKufiPanel} onToggle={() => setShowKufiPanel((v) => !v)}>
+              <KufiPanelPanel key={selectedBlock.id} block={selectedBlock} onSetSize={onSetKufiPanelSize} onFit={onFitKufiPanel} />
             </CollapsibleSection>
           </div>
         )}

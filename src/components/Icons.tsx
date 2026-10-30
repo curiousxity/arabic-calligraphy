@@ -375,3 +375,11 @@ export const MedallionIcon: React.FC<IconProps> = (props) => (
     <circle cx="17.3" cy="17.3" r="1.5" />
   </IconBase>
 );
+
+/** A square-Kufi panel: a frame with a squared spiral inside, all straight runs on a lattice. */
+export const KufiPanelIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="3" y="3" width="18" height="18" />
+    <path d="M7 17V7h10v10h-6v-6h2" />
+  </IconBase>
+);
