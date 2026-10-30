@@ -483,12 +483,90 @@ describe("natural stroke lengths", () => {
     }
   }, 20000);
 
-  it("a user's stretch edit is not counted against the panel", () => {
+  it("a user's stretch edit is kept and still packs", () => {
     // the edit is the user's: the packer keeps it, and still packs where it can
     const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
     const again = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits: { stretch: { 2: [1] } } });
     expect(again.ok).toBe(true);
     if (again.ok) expect(again.placements[2].stretch).toEqual([1]);
+  }, 20000);
+});
+
+describe("the ranking of packed panels", () => {
+  type F = Parameters<typeof _internal.better>[0];
+  const panel = (o: Partial<{ packed: boolean; squares: number; cut: number; grow: number; score: number }>) =>
+    ({ packed: true, squares: 0, cut: 0, grow: 0, score: 0, ...o }) as unknown as F;
+
+  it("is packed, then fewest squares, then least cut, then least growth, then score, strictly in that order", () => {
+    const b = _internal.better;
+    expect(b(panel({ packed: true, squares: 3, cut: 9, grow: 99 }), panel({ packed: false }))).toBe(true);
+    expect(b(panel({ squares: 0, cut: 9 }), panel({ squares: 1, cut: 0 }))).toBe(true);
+    // one cell of cut outranks any amount of growth
+    expect(b(panel({ cut: 0, grow: 500 }), panel({ cut: 1, grow: 0 }))).toBe(true);
+    expect(b(panel({ cut: 1, grow: 0 }), panel({ cut: 0, grow: 500 }))).toBe(false);
+    expect(b(panel({ grow: 1, score: 99 }), panel({ grow: 2, score: 0 }))).toBe(true);
+    expect(b(panel({ score: 1 }), panel({ score: 2 }))).toBe(true);
+  });
+
+  it("the user's stretch edits, pins and form choices are not counted as deviation", () => {
+    const short = KUFI_FORMS.lamAlef.isolated!.find((g) => g.id === "lamAlef.isolated.3")!;
+    // a form edit: its natural length is its own, so the short لا the user chose is not a cut
+    const byForm = _internal.makeCtx(BAQARAH, 21, 21, { forms: { 0: short.id } }, new Map(), 100);
+    const own = byForm.letters[0].cands.find((sh) => sh.counts.every((n) => n === 0))!;
+    expect(_internal.devOf(byForm.letters[0], own)).toBe(0);
+    const unchosen = _internal.makeCtx(BAQARAH, 21, 21, {}, new Map(), 100);
+    const sameShape = unchosen.letters[0].cands.find((sh) => sh.g.id === short.id && sh.counts.every((n) => n === 0))!;
+    expect(_internal.devOf(unchosen.letters[0], sameShape)).toBeGreaterThan(0);
+    // a stretch edit and a pin: the length is the user's
+    const byStretch = _internal.makeCtx(BAQARAH, 21, 21, { stretch: { 3: [-2] } }, new Map(), 100);
+    for (const sh of byStretch.letters[3].cands) expect(_internal.devOf(byStretch.letters[3], sh)).toBe(0);
+    const free = _internal.makeCtx(BAQARAH, 21, 21, {}, new Map(), 100);
+    const cutLam = free.letters[3].cands.find((sh) => sh.g.id === "lam.medial.0" && sh.counts[0] === -2)!;
+    expect(_internal.devOf(free.letters[3], cutLam)).toBeGreaterThan(0);
+  });
+});
+
+describe("the natural-length phase", () => {
+  it("runs on a panel the greedy pass already packs", () => {
+    _internal.clearCaches();
+    const before = _internal.stats.naturalRuns;
+    expectPacked(packKufiPanel({ text: ALLAH, cols: 9, rows: 9 }), ALLAH);
+    expect(_internal.stats.naturalRuns).toBeGreaterThan(before);
+  });
+
+  it("leaves no single-letter move that gives a better packed panel", () => {
+    for (const [text, n] of [
+      [ALLAH, 9],
+      [BAQARAH, 21],
+    ] as const) {
+      const ctx = _internal.makeCtx(text, n, n, {}, new Map(), _internal.PACK_BUDGET_MS);
+      const f = _internal.search(ctx)!;
+      expect(f.packed).toBe(true);
+      ctx.workMax = Infinity;
+      ctx.deadline = Infinity;
+      ctx.out = false;
+      const plan = _internal.planOf(ctx, f.st);
+      const pre = _internal.prefixesOf(ctx, plan)!;
+      for (let li = 0; li < plan.length; li++)
+        for (const mv of _internal.movesAt(ctx, pre[li], li)) {
+          const p2 = plan.slice();
+          p2[li] = mv;
+          const s = _internal.replayFrom(ctx, pre[li], p2, li);
+          if (!s) continue;
+          const g = _internal.finish(ctx, s);
+          expect(g.packed && _internal.better(g, f), `${text}: letter ${li} as ${mv.shape.g.id}[${mv.shape.counts}]`).toBe(false);
+        }
+    }
+  }, 120000);
+
+  it("reaches the reference's layout for Al-Baqarah with room to spare: under 85% of the work cap", () => {
+    const ctx = _internal.makeCtx(BAQARAH, 21, 21, {}, new Map(), _internal.PACK_BUDGET_MS * 0.85);
+    ctx.deadline = Infinity;
+    const f = _internal.search(ctx)!;
+    expect({ packed: f.packed, squares: f.squares }).toEqual({ packed: true, squares: 0 });
+    const ids = _internal.placedList(f.st).map((p) => `${p.shape.g.id}[${p.shape.counts}]`);
+    expect(ids[0]).toBe("lamAlef.isolated.1[0]");
+    expect(ids[9]).toBe("alef.final.0[4]");
   }, 20000);
 });
 

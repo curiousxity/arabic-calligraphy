@@ -184,20 +184,20 @@ type Letter = {
 
 const TALL = new Set(["alef", "lam", "lamAlef"]);
 /**
- * A cell of shortening outweighs this many cells of lengthening: the order
- * is least shortening, then least lengthening (a panel's space is filled by
- * lengthening strokes, so growth is cheap; a cut is not).
+ * Orders a letter's alternatives nearest natural length first, for the moves
+ * that look for one: a cell of cut outweighs this many cells of growth. The
+ * ranking of whole panels (`better`) compares cut and growth strictly in turn.
  */
 const CUT_WEIGHT = 100;
 
 /**
- * How far a placed shape is from its letter's natural length, cuts weighed
- * CUT_WEIGHT to growth's 1: every slice's count, and for a tall letter its
- * stem against the tallest stem its alternates are authored with, so a short
- * alternate counts as a cut stem.
+ * How far a placed shape is from its letter's natural length, as cells cut
+ * and cells grown: every slice's count, and for a tall letter its stem against
+ * the tallest stem its allowed glyphs are authored with, so a short alternate
+ * counts as a cut stem. A letter the user pinned or stretched has none.
  */
-function devOf(letter: Letter, sh: Shape): number {
-  if (letter.exempt) return 0;
+function devParts(letter: Letter, sh: Shape): { cut: number; grow: number } {
+  if (letter.exempt) return { cut: 0, grow: 0 };
   let cut = 0;
   let grow = 0;
   sh.g.stretch.forEach((sl, i) => {
@@ -211,7 +211,13 @@ function devOf(letter: Letter, sh: Shape): number {
     if (stem < letter.natural) cut += letter.natural - stem;
     else grow += stem - letter.natural;
   }
-  return CUT_WEIGHT * cut + grow;
+  return { cut, grow };
+}
+
+/** `devParts` as one number, for ordering a letter's alternatives (see CUT_WEIGHT). */
+function devOf(letter: Letter, sh: Shape): number {
+  const d = devParts(letter, sh);
+  return CUT_WEIGHT * d.cut + d.grow;
 }
 
 /** A hard placement: glyph, counts and box, and optionally how its dots are drawn (see `DOT_SHIFT`). */
@@ -364,7 +370,8 @@ function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins:
       word: u.wordIndex,
       dotKey: d ? dotKey(d) : null,
       pin,
-      natural: TALL.has(u.skeleton) ? Math.max(...all.map((g) => g.rows.length - g.base)) : -1,
+      // over the glyphs allowed: a form the user chose sets its own natural length
+      natural: TALL.has(u.skeleton) && glyphs.length ? Math.max(...glyphs.map((g) => g.rows.length - g.base)) : -1,
       exempt: !!pin || !!fixed,
     };
   });
@@ -521,8 +528,10 @@ type St = {
   splits: number;
   uturns: number;
   stretch: number;
-  /** Total `devOf` over placed letters. */
+  /** Total `devOf` over placed letters, and its cells cut and grown. */
   dev: number;
+  cut: number;
+  grow: number;
   dotsOff: number;
   lastWord: number;
   hash: number;
@@ -573,6 +582,8 @@ function initState(ctx: Ctx): St {
     uturns: 0,
     stretch: 0,
     dev: 0,
+    cut: 0,
+    grow: 0,
     dotsOff: 0,
     lastWord: -1,
     hash: 0,
@@ -631,7 +642,7 @@ type Applied = {
   oldTpl: number;
   oldSeg: St["seg"];
   oldIds: number;
-  oldScalars: [number, number, number, number, number, number, number];
+  oldScalars: [number, number, number, number, number, number, number, number, number];
   oldHash: number;
   oldStubs: number[];
   pushedDots: boolean;
@@ -900,7 +911,7 @@ function apply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
     oldTpl: st.tpl,
     oldSeg: st.seg,
     oldIds: st.ids,
-    oldScalars: [st.failed, st.splits, st.uturns, st.stretch, st.dotsOff, st.lastWord, st.dev],
+    oldScalars: [st.failed, st.splits, st.uturns, st.stretch, st.dotsOff, st.lastWord, st.dev, st.cut, st.grow],
     oldHash: st.hash,
     oldStubs: [],
     pushedDots: false,
@@ -959,7 +970,10 @@ function apply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
   if ((mv.mode === 0 || mv.mode === 1) && st.lastWord === letter.word && mv.mode === 1) st.splits++;
   if (mv.mode === 3) st.uturns++;
   st.stretch += sh.cost + (mv.mode === 2 ? mv.jext : 0) + (mv.mode === 3 ? Math.abs(mv.climb) : 0);
-  st.dev += devOf(letter, sh);
+  const parts = devParts(letter, sh);
+  st.dev += CUT_WEIGHT * parts.cut + parts.grow;
+  st.cut += parts.cut;
+  st.grow += parts.grow;
   if (letter.dotKey && !mv.dots) {
     // dots are drawn at the end, where they fit; until then they count as ink
     const m = dotCellsAt(ctx, L, sh, letter.dotKey, x0, yb, 0);
@@ -998,7 +1012,7 @@ function undo(ctx: Ctx, st: St, rec: Applied) {
   st.tpl = rec.oldTpl;
   st.seg = rec.oldSeg;
   st.ids = rec.oldIds;
-  [st.failed, st.splits, st.uturns, st.stretch, st.dotsOff, st.lastWord, st.dev] = rec.oldScalars;
+  [st.failed, st.splits, st.uturns, st.stretch, st.dotsOff, st.lastWord, st.dev, st.cut, st.grow] = rec.oldScalars;
   st.hash = rec.oldHash;
   if (rec.pushedDots) st.vdots.pop();
 }
@@ -1038,7 +1052,6 @@ function pinMatches(L: Line, sh: Shape, x0: number, yb: number, pin: Pin): boole
 }
 
 type Cand = { parent: number; li: number; mv: Move; score: number; hash: number };
-
 
 /**
  * Calls `visit` with each move for letter li applied to `st` in place (and
@@ -1236,7 +1249,6 @@ const stamp = { mask: new Uint8Array(0), virt: new Int32Array(0), g: 0 };
 /** The frontier hash of the panel `partialScore` last scored. */
 let lastFrontier = 0;
 
-
 /**
  * A partial panel's score. Holes nothing later can close (empty 2×2 whose
  * cells all touch ink: a lower bound, since no piece may touch another) count
@@ -1339,8 +1351,10 @@ type Final = {
   squares: number;
   score: number;
   packed: boolean;
-  /** Distance from natural stroke lengths (`devOf`), compared only between packed panels. */
+  /** Distance from natural stroke lengths (`devOf`), and its cells cut and grown, compared only between packed panels. */
   dev: number;
+  cut: number;
+  grow: number;
 };
 
 /**
@@ -1354,7 +1368,8 @@ function better(a: Final, b: Final | null): boolean {
   if (!b) return true;
   if (a.packed !== b.packed) return a.packed;
   if (a.packed && a.squares !== b.squares) return a.squares < b.squares;
-  if (a.packed && Math.abs(a.dev - b.dev) > 1e-9) return a.dev < b.dev;
+  if (a.packed && a.cut !== b.cut) return a.cut < b.cut;
+  if (a.packed && a.grow !== b.grow) return a.grow < b.grow;
   return a.score < b.score - 1e-9;
 }
 
@@ -1451,7 +1466,6 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
   let squares = 0;
   const fillsNear = (r: number, c: number) => {
     let n = 0;
-    let mate = -1;
     let letterNear = false;
     for (let dr = -2; dr <= 2; dr++)
       for (let dc = -2; dc <= 2; dc++) {
@@ -1460,12 +1474,9 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
         if (rr < 0 || cc < 0 || rr >= rows || cc >= cols || (!dr && !dc)) continue;
         const k = kind[rr * cols + cc];
         if (k === K_GLYPH) letterNear = true;
-        else if (k === K_FILL) {
-          n++;
-          mate = rr * cols + cc;
-        }
+        else if (k === K_FILL) n++;
       }
-    return { n, mate, letterNear };
+    return { n, letterNear };
   };
   for (const [i] of cand) {
     const r = (i / cols) | 0;
@@ -1541,7 +1552,7 @@ function finish(ctx: Ctx, st0: St): Final {
     W.uturn * st.uturns +
     W.stretch * st.stretch +
     W.dotsOff * st.dotsOff;
-  return { st, owner, kind, holes, edge, ink2, squares, score, packed: !holes && !edge && !ink2 && !st.failed, dev: st.dev };
+  return { st, owner, kind, holes, edge, ink2, squares, score, packed: !holes && !edge && !ink2 && !st.failed, dev: st.dev, cut: st.cut, grow: st.grow };
 }
 
 // ---------------------------------------------------------------------------
@@ -1661,7 +1672,7 @@ function prefixesOf(ctx: Ctx, plan: Plan): St[] | null {
  * the budget is spent. Toward packing it stops once packed; `natural` goes on
  * from a packed panel toward natural stroke lengths.
  */
-function polish(ctx: Ctx, start: Final, natural = false, shapesOnly = false, nearHoles = false): Final {
+function polish(ctx: Ctx, start: Final, natural = false, shapesOnly = false, target: "holes" | "squares" | null = null): Final {
   let best = start;
   let plan = planOf(ctx, start.st);
   let pre = prefixesOf(ctx, plan);
@@ -1673,8 +1684,8 @@ function polish(ctx: Ctx, start: Final, natural = false, shapesOnly = false, nea
     // the letters that deviate and those that could reach a filler square
     let tryLetter: Set<number> | null = null;
     let anyShape: Set<number> | null = null;
-    if (nearHoles) {
-      tryLetter = lettersNearHoles(ctx, best, !natural);
+    if (target) {
+      tryLetter = lettersNear(ctx, best, target);
       anyShape = new Set(tryLetter);
       if (natural) plan.forEach((mv, li) => mv && devOf(ctx.letters[li], mv.shape) > 0 && tryLetter!.add(li));
     }
@@ -1735,9 +1746,8 @@ function movesAt(ctx: Ctx, st: St, li: number): Move[] {
  * right edge only if a letter further on makes room. So for each letter
  * whose length deviates (most first), each of its moves nearer its natural
  * length (nearest first) is tried together with every move of every later
- * letter, the rest
- * replayed; the best packed panel that is `better` is kept. Repeats while it
- * finds one and the budget lasts.
+ * letter, the rest replayed; the best packed panel that is `better` is kept.
+ * Repeats while it finds one and the budget lasts.
  */
 function pairPolish(ctx: Ctx, start: Final): Final {
   let best = start;
@@ -1790,9 +1800,10 @@ const PAIR_ROUNDS = 3;
 /**
  * Repair moves toward natural lengths, for changes that take more than two
  * letters. A letter is put back nearer its natural length even though the
- * panel then stops packing; descent toward packing (`polish`) mends it one
- * letter at a time, then descent toward natural lengths tidies it, and the
- * result is kept only if it packs and is `better`. Replays mend (`Ctx.mend`):
+ * panel then stops packing; descent toward packing (`polish`, changing only
+ * letters' shapes, on the letters that could reach a hole) mends it one
+ * letter at a time, and the result is kept only if it packs and is `better`;
+ * the next round goes on from there. Replays mend (`Ctx.mend`):
  * a later letter whose move no longer fits takes the first one that does, so
  * the panels between here and there exist at all. The reference panel's
  * own layout is four letters from the one the beam first packs (the corner
@@ -1831,8 +1842,7 @@ function repairRounds(ctx: Ctx, start: Final): Final {
         p2[li] = mv;
         const s = replayFrom(ctx, pre[li], p2, li);
         if (!s) continue;
-        let f = polish(ctx, finish(ctx, s), false, true, true);
-        if (f.packed) f = polish(ctx, f, true, true, true);
+        const f = polish(ctx, finish(ctx, s), false, true, "holes");
         // the first repair that helps is kept: the budget rarely runs to a second
         if (f.packed && better(f, best)) {
           found = f;
@@ -1850,18 +1860,19 @@ function repairRounds(ctx: Ctx, start: Final): Final {
 const REPAIR_ROUNDS = 3;
 
 /**
- * The letters that could close a hole of `f` by changing shape (or, with
- * `holes` false, take a filler square's place): those whose box, widened by
+ * The letters that could close a hole of `f` by changing shape (`"holes"`),
+ * or take a filler square's place (`"squares"`): those whose box, widened by
  * the longest stretch a slice may take, covers an empty 2×2 (or a square).
  */
-function lettersNearHoles(ctx: Ctx, f: Final, holes_ = true): Set<number> {
+function lettersNear(ctx: Ctx, f: Final, target: "holes" | "squares"): Set<number> {
   const { cols, rows } = ctx;
   const own = f.owner;
   const holes: Array<[number, number]> = [];
   for (let r = 0; r + 1 < rows; r++)
     for (let c = 0; c + 1 < cols; c++) {
       const i = r * cols + c;
-      if (holes_ ? !own[i] && !own[i + 1] && !own[i + cols] && !own[i + cols + 1] : f.kind[i] === K_FILL) holes.push([r, c]);
+      const hole = !own[i] && !own[i + 1] && !own[i + cols] && !own[i + cols + 1];
+      if (target === "holes" ? hole : f.kind[i] === K_FILL) holes.push([r, c]);
     }
   const out = new Set<number>();
   const reach = Math.max(ROW_MAX, COL_MAX);
@@ -1876,8 +1887,6 @@ function lettersNearHoles(ctx: Ctx, f: Final, holes_ = true): Set<number> {
 }
 /** Alternatives per deviating letter a repair round tries, nearest natural length first. */
 const REPAIR_ALTS = 3;
-
-
 
 /** One beam pass of width B. Null when the deadline passed first. */
 function beamPass(ctx: Ctx, B: number, start: St = initState(ctx), from = 0, cheap = false): Final | null {
@@ -1981,20 +1990,21 @@ function searchInner(ctx: Ctx): Final | null {
   ctx.noClock = true;
   let best: Final | null = beamPass(ctx, 1, initState(ctx), 0, true);
   ctx.noClock = false;
-  if (best?.packed) return best;
+  // the beams only until something packs: a greedy packing goes straight on to the natural phase
   for (const B of BEAMS) {
+    if (best?.packed) break;
     let f = beamPass(ctx, B);
     if (!f) break;
     if (!f.packed) f = polish(ctx, f);
     if (!f.packed) f = replan(ctx, f, Math.max(REPLAN_BEAM, B >> 1));
     if (better(f, best)) best = f;
-    if (best?.packed) break;
   }
   // strokes change length only when they must: of the packed panels the budget
-  // still reaches, keep the one nearest natural lengths
+  // still reaches, keep the one with fewest squares, then least cut, then least grown
   if (best?.packed) {
+    stats.naturalRuns++;
     best = repairPolish(ctx, best);
-    best = polish(ctx, best, true, true, true);
+    best = polish(ctx, best, true, true, "squares");
     best = pairPolish(ctx, best);
     best = replan(ctx, best, REPLAN_BEAM, true);
   }
@@ -2041,7 +2051,7 @@ const REPACK_WORK = REPACK_BUDGET_MS * WORK_PER_MS;
  */
 const WORK_SLACK = 1000;
 /** Moves tried by searches since last reset, for the budget tests. */
-const stats = { work: 0 };
+const stats = { work: 0, naturalRuns: 0 };
 
 function spent(ctx: Ctx): boolean {
   return ctx.out || ctx.work >= ctx.workMax || performance.now() > ctx.deadline;
@@ -2564,6 +2574,14 @@ export const _internal = {
   finish,
   beamPass,
   search,
+  better,
+  devOf,
+  placedList,
+  planOf,
+  prefixesOf,
+  replayFrom,
+  movesAt,
+  PACK_BUDGET_MS,
   clearCaches,
   stats,
   PACK_WORK,
