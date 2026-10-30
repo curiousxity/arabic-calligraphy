@@ -184,6 +184,13 @@ LEAD_FULL = os.environ.get("PEN_LEAD_FULL", "1") == "1"
 # the next letter (the user, 2026-10-29: "where the stroke connects to the next letter"); 105.s0's narrowed to 0.9 and
 # left the face's top corner bare.
 FULLSTART = {x for x in os.environ.get("PEN_FULLSTART", "").split(",") if x}
+# PEN_JOINT ("301.s1,..."): a PEN_CUT stroke's two halves finished together at the peak where they meet, from the fits
+# in PEN_JOINT_FROM (a JSON {"stroke~cN": {"nodes", "pen_scale"}}): each half is refitted against the whole stroke's
+# outline with the other half's ink counted as on the page (gpufit's `others`), the first half then the second, each
+# judged at its free end only; a refit stands only if the whole stroke scores no worse. The user marked notches just
+# under the peak (301.s1, 309.s1), a kink on the slope (301.s1) and a two-tipped peak (299.s1) where the halves,
+# fitted apart, met (2026-10-29), and moving their points by hand traded one fault for another.
+JOINT = {x for x in os.environ.get("PEN_JOINT", "").split(",") if x}
 
 # PEN_FREEHOLD ("312.s1~c0,..."): a PEN_CUT half's nib held at one angle over its first PEN_FREEHOLD_L nuqta from its free
 # end. Judged at its free end only (PEN_CUTWIN), 312.s1's and 356.s0's right halves spun the nib about 180 degrees
@@ -710,6 +717,32 @@ def led(nodes, lead):
     return head + rest
 
 
+def joint_refit(base, res, log):
+    """PEN_JOINT: res[base~c0], res[base~c1] refitted in turn against base's whole outline, each with the other's ink."""
+    piece, ignore, O = job_of(base)
+    whole = lambda a, b, P_: gpu_score([a, [{**q, "width": q.get("width", 1) * PEN / P_} for q in b]], [piece], O, PPN, P_, ignore)  # noqa: E731
+    for h, o in (("~c0", "~c1"), ("~c1", "~c0")):
+        me, other = res[base + h], res[base + o]
+        P = PEN * me["pen_scale"]
+        mine = [{**q, "width": q.get("width", 1) / me["pen_scale"]} for q in me["nodes"]]   # widths in this half's nib
+        oth = [{**q, "width": q.get("width", 1) * PEN / P} for q in other["nodes"]]
+        free = 0 if h == "~c0" else -1
+        win = [(*mine[free]["p"], END_R * P / PEN)]
+        lift = LIFT_LONG if length(mine) >= LONG else LIFT
+        pens = [{"angle": [q["angle"] for q in mine], "lift_start": lift, "lift_end": lift, "anchor": list(anc), "size": False,
+                 "turns": list(range(1, len(mine)))} for anc in ([me["anchor"]] if me.get("anchor") else ANCHORS)]
+        before = gpu_score([mine, oth], [piece], O, PPN, P, ignore)
+        res_ = gpufit.refine_pens(with_tips(mine), [piece], O, PPN, P, pens, rough=ROUGH, edge=EDGE, ignore=ignore,
+                                  others=[oth], corner=CORNER, windows=win, judge="gpu",
+                                  schedules=(0 if length(mine) >= SHORT else 1,))
+        p, s = max(res_, key=lambda t: judge(t[1]))
+        log(base + h, "joint: whole", before["iou"], before["gap95"], "->", s["iou"], s["gap95"])
+        if s["iou"] >= before["iou"] - 1e-4:
+            res[base + h] = {**me, "nodes": [{**q, "width": round(q.get("width", 1) * me["pen_scale"], 4)} for q in p],
+                             "joint": {"before": before, "after": s}}
+    return res
+
+
 def fit(stroke, log, size=None, lead=None):
     """size: a nib size, in main nibs, the stroke is held to (a PEN_CUT half after its other half); else it may move.
     lead: the right half's result, when PEN_LEAD starts this left half from its end (led)."""
@@ -863,6 +896,14 @@ if __name__ == "__main__":
         # the bigger (301.s1, 309.s1, 312.s1), it is fitted first only to set the shared size, then again behind the
         # right half at that size (the smaller half setting the size bulged 297.s1, k1)
         return h + [h[0]] if s in LEAD and h[0].endswith("~c1") else h
+    if JOINT:  # the halves come fitted (PEN_JOINT_FROM); only the joint is finished here
+        src = json.loads(os.environ["PEN_JOINT_FROM"])
+        for s in [s for s in names if s in JOINT]:
+            res.update({k: v for k, v in src.items() if k.split("~")[0] == s})
+            joint_refit(s, res, log)
+        names = [s for s in names if s not in JOINT]
+        json.dump(res, open(os.path.join(od, "pen.json"), "w"))
+        json.dump(pics, open(os.path.join(od, "pics.json"), "w"))
     sized = {}  # a PEN_CUT stroke's shared nib size, from its first fit
     for st in [p for s in names for p in ([s] + [f"{s}~h{i}" for i in range(1, hairs(s) + 1)] if s in SPLIT
                                           else bigger_first(s) if s in CUT else [s])]:

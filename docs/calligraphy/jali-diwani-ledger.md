@@ -738,6 +738,15 @@ the peak where the halves meet, "very subtle": 301.s1 and 309.s1 a nub on the pe
 a two-tipped peak, 312.s1 a jagged peak and a small notch on the dip's right side. "The others I approve": **290.s1,
 297.s1, 311.s1, 313.s1 (k10) and 356.s0 (k7)** are approved. The four marked are refitted with `PEN_LEAD`.
 
+`PEN_LEAD` drew a second horn on these flat-topped peaks, full width or narrowing (k23, k24). Bringing the right
+half's points down to the peak (`level_top` alone, on the k10/k7/k21 fits) cleared 312.s1 and 309.s1's nub. Shown the
+fixes with each stroke's letter beside it in colour (the user: "showing marks in different colors may also help"),
+the user approved, 2026-10-29 ("much better. The first page is good"): **312.s1 (levelled), 685.s1 (`PEN_TURNS`, no
+ledge in the bowl), T02.s1 (the small pen), 105.s0, 249.s0 and 685.s0** (the last two's tails run under the next
+stroke of the letter). Still marked at the peak: 309.s1 and 301.s1 a small notch just under it, 301.s1 a kink on the
+slope, 299.s1 two tips. They go to `PEN_JOINT`: each half refitted against the whole stroke's outline with the other
+half's ink on the page.
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |
