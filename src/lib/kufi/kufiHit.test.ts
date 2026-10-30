@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   hitKufiUnit,
   hitStretchEnd,
+  hitWordStart,
   kufiFormsOf,
   kufiGlyphById,
+  kufiReadingStep,
   nearestStretchEnd,
   placementInk,
   placementOf,
+  routeOffsetFor,
   stretchEnds,
   unitRings,
 } from "./kufiHit";
 import type { KufiPackResult, KufiPlacement } from "./kufiPack";
-import { resolveKufiText } from "./kufiWords";
+import { resolveKufiText, type KufiUnit } from "./kufiWords";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
@@ -240,6 +243,64 @@ describe("placementOf", () => {
     expect(stretchEnds(sparse, 2).length).toBeGreaterThan(0);
     expect(unitRings(sparse, 2)).toHaveLength(1);
     expect(hitKufiUnit(sparse, 8, 1)).toBe(2);
+  });
+});
+
+/** The hand-laid panel's letters as two words: the lone alef, then the beh joined to the alef. */
+const twoWords = (): KufiUnit[] =>
+  [0, 1, 1].map((wordIndex, index) => ({ index, textOffset: index, key: "", skeleton: "alef", form: "isolated", joinsNext: false, wordIndex }));
+
+describe("hitWordStart", () => {
+  it("names the word whose first letter covers the cell, and nothing for a later letter, paper or a filler", () => {
+    const r = panel();
+    const units = twoWords();
+    expect(hitWordStart(r, units, 1, 3)).toBe(0);
+    // the beh opens the second word; the turned alef closes it
+    expect(hitWordStart(r, units, 5, 6)).toBe(1);
+    expect(hitWordStart(r, units, 8, 1)).toBeNull();
+    expect(hitWordStart(r, units, 0, 0)).toBeNull();
+    r.cells[9 * r.cols + 9] = 1;
+    expect(hitWordStart(r, units, 9, 9)).toBeNull();
+  });
+
+  it("a unit the text does not have is no word start", () => {
+    expect(hitWordStart(panel(), [], 1, 3)).toBeNull();
+  });
+});
+
+describe("kufiReadingStep / routeOffsetFor", () => {
+  it("reads right to left along the bottom, up the left, left to right along the top, down the right", () => {
+    expect(kufiReadingStep(0)).toEqual([-1, 0]);
+    expect(kufiReadingStep(1)).toEqual([0, -1]);
+    expect(kufiReadingStep(2)).toEqual([1, 0]);
+    expect(kufiReadingStep(3)).toEqual([0, 1]);
+  });
+
+  it("measures the pointer along the word's path from its first letter's leading edge, further on positive", () => {
+    const r = panel();
+    const units = twoWords();
+    // word 0: the upright bar at col 1 reads right to left; its leading (right) edge is col 1
+    expect(routeOffsetFor(r, units, 0, 1, 3)).toBe(0);
+    expect(routeOffsetFor(r, units, 0, 0, 5)).toBe(1);
+    expect(routeOffsetFor(r, units, 0, 3, 3)).toBe(-2);
+    // the row does not count: the pointer is projected onto the path
+    expect(routeOffsetFor(r, units, 0, 1, 11)).toBe(0);
+    // word 1 opens with the beh (box cols 4–6, right to left): its leading edge is col 6
+    expect(routeOffsetFor(r, units, 1, 6, 6)).toBe(0);
+    expect(routeOffsetFor(r, units, 1, 4, 6)).toBe(2);
+  });
+
+  it("follows a turned first letter up its line", () => {
+    const r = panel();
+    // the quarter-turned alef (unit 2) alone as a word: box rows 1–2, reading upward, leading edge row 2
+    const units = [0, 1, 2].map((wordIndex, index) => ({ ...twoWords()[0], index, wordIndex }));
+    expect(routeOffsetFor(r, units, 2, 8, 2)).toBe(0);
+    expect(routeOffsetFor(r, units, 2, 8, 0)).toBe(2);
+    expect(routeOffsetFor(r, units, 2, 8, 5)).toBe(-3);
+  });
+
+  it("is 0 for a word the text does not have", () => {
+    expect(routeOffsetFor(panel(), twoWords(), 7, 0, 0)).toBe(0);
   });
 });
 

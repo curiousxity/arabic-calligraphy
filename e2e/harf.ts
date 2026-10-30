@@ -639,11 +639,34 @@ export async function dragMouse(page: Page, from: Point, to: Point): Promise<voi
   await page.mouse.up();
 }
 
-/** What the Kufi panel's edit overlay publishes: a cell of each letter and every stretch end, in page space. */
+/**
+ * What the Kufi panel's edit overlay publishes, in page space: a cell of each
+ * letter, every stretch end, each word's first letter with its reading step,
+ * the drawn lattice as rows of `#` and `.`, the page px of a cell and the
+ * page position of the panel's top-left corner.
+ */
 export type KufiEditTargets = {
   letters: { unit: number; glyphId: string; forms: number; x: number; y: number }[];
   ends: { unit: number; si: number; kind: "end" | "slice"; dc: number; dr: number; x: number; y: number }[];
+  words: { word: number; unit: number; dc: number; dr: number }[];
+  grid: string[];
+  cellPx: number;
+  origin: Point;
 };
+
+/** The page centre of lattice cell (col, row). */
+export const kufiCellCenter = (t: KufiEditTargets, col: number, row: number): Point => ({
+  x: t.origin.x + (col + 0.5) * t.cellPx,
+  y: t.origin.y + (row + 0.5) * t.cellPx,
+});
+
+/** The page rect of lattice cell (col, row), shrunk a little so an outline on its edge is not counted. */
+export const kufiCellBox = (t: KufiEditTargets, col: number, row: number): Box => ({
+  x: t.origin.x + col * t.cellPx + t.cellPx * 0.25,
+  y: t.origin.y + row * t.cellPx + t.cellPx * 0.25,
+  width: t.cellPx * 0.5,
+  height: t.cellPx * 0.5,
+});
 
 /**
  * The Kufi panel edit overlay's targets, in page space.
@@ -660,7 +683,7 @@ export async function kufiEditTargets(page: Page): Promise<KufiEditTargets> {
   return page.evaluate(() => {
     const stage = window.__HARF__!.getStage();
     const node = stage?.findOne(".kufi-edit-targets");
-    if (!stage || !node) return { letters: [], ends: [] };
+    if (!stage || !node) return { letters: [], ends: [], words: [], grid: [], cellPx: 0, origin: { x: 0, y: 0 } };
     const c = stage.container().getBoundingClientRect();
     const t = node.getAbsoluteTransform();
     const map = <T extends { x: number; y: number }>(list: T[]) =>
@@ -668,9 +691,15 @@ export async function kufiEditTargets(page: Page): Promise<KufiEditTargets> {
         const q = t.point({ x: p.x, y: p.y });
         return { ...p, x: c.left + q.x, y: c.top + q.y };
       });
+    const o = t.point({ x: 0, y: 0 });
+    const cell = (node.getAttr("cellPx") as number | undefined) ?? 0;
     return {
       letters: map((node.getAttr("letters") as KufiEditTargets["letters"] | undefined) ?? []),
       ends: map((node.getAttr("ends") as KufiEditTargets["ends"] | undefined) ?? []),
+      words: (node.getAttr("words") as KufiEditTargets["words"] | undefined) ?? [],
+      grid: (node.getAttr("grid") as string[] | undefined) ?? [],
+      cellPx: t.point({ x: cell, y: 0 }).x - o.x,
+      origin: { x: c.left + o.x, y: c.top + o.y },
     };
   });
 }

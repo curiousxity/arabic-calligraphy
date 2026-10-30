@@ -6,10 +6,14 @@ import {
   kufiPanelInputs,
   kufiPanelTextPatch,
   kufiPinEdits,
+  kufiPinWordEdits,
+  kufiRouteEdits,
   kufiStretchEdits,
 } from "./kufiPanelBlock";
 import type { KufiPackResult, KufiPlacement } from "./kufiPack";
 import { resolveKufiText } from "./kufiWords";
+
+type Ok = Extract<KufiPackResult, { ok: true }>;
 
 describe("kufiPanelBlock", () => {
   it("a cell is an eighth of the font size", () => {
@@ -103,6 +107,61 @@ describe("kufiPanelBlock", () => {
       // feh:medial has one glyph
       expect(kufiFormCycle(text, 7, "feh.medial.0")).toEqual([]);
       expect(kufiFormCycle(text, 99, "x")).toEqual([]);
+    });
+  });
+
+  describe("re-routing a word", () => {
+    // لا يكلف: word 1 is units 1–4 on the bottom line (reading right to left)
+    const text = "لا يكلف";
+    const units = resolveKufiText(text).units;
+    const place = (unitIndex: number, col: number, row: number, turn: 0 | 1 | 2 | 3 = 0): KufiPlacement => ({
+      unitIndex, key: units[unitIndex].key, glyphId: `${units[unitIndex].skeleton}.${units[unitIndex].form}.0`, col, row, turn, stretch: [0],
+    });
+    const placements = [place(0, 18, 12), place(1, 12, 16), place(2, 7, 16), place(3, 5, 16), place(4, 0, 16)];
+    const committed: Ok = { ok: true, cols: 21, rows: 21, cells: new Uint8Array(441), placements, editsBreakPacking: false };
+
+    it("records the route and pins the word's first letter that far along its path, releasing the word's other pins", () => {
+      const edits = { pinned: { 0: placements[0], 2: placements[2], 3: placements[3] }, stretch: { 2: [1] } };
+      const out = kufiRouteEdits(edits, committed, units, 1, 2);
+      expect(out).not.toBeNull();
+      expect(out!.routes).toEqual({ 1: 2 });
+      // two cells further on (right to left) from where it stands
+      expect(out!.pinned).toEqual({ 0: placements[0], 1: { ...placements[1], col: 10 } });
+      // other edits stay
+      expect(out!.stretch).toEqual({ 2: [1] });
+    });
+
+    it("moves from the committed route, not from zero, and a route back at zero drops its entry", () => {
+      // the word already stands two cells on, pinned there by the last drag
+      const edits = { routes: { 1: 2, 3: 1 }, pinned: { 1: { ...placements[1], col: 10 } } };
+      const routed: Ok = { ...committed, placements: placements.map((p, i) => (i === 1 ? { ...p, col: 10 } : p)) };
+      const out = kufiRouteEdits(edits, routed, units, 1, 3);
+      expect(out!.routes).toEqual({ 1: 3, 3: 1 });
+      expect(out!.pinned?.[1]).toEqual({ ...placements[1], col: 9 });
+      const back = kufiRouteEdits(edits, routed, units, 1, 0);
+      expect(back!.routes).toEqual({ 3: 1 });
+      expect(back!.pinned?.[1]).toEqual({ ...placements[1], col: 12 });
+      // a route map emptied is dropped altogether
+      expect(kufiRouteEdits({ routes: { 1: 2 } }, routed, units, 1, 0)!.routes).toBeUndefined();
+    });
+
+    it("follows the first letter's own line: a turned letter moves along rows", () => {
+      const turned: Ok = { ...committed, placements: placements.map((p, i) => (i === 1 ? { ...p, turn: 1, col: 0, row: 8 } : p)) };
+      const out = kufiRouteEdits(undefined, turned, units, 1, 2);
+      expect(out!.pinned?.[1]).toEqual({ ...turned.placements[1], row: 6 });
+    });
+
+    it("refuses a route that would take the letter's box off the panel, or a word the text does not have", () => {
+      expect(kufiRouteEdits(undefined, committed, units, 1, 13)).toBeNull();
+      expect(kufiRouteEdits(undefined, committed, units, 1, -9)).toBeNull();
+      expect(kufiRouteEdits(undefined, committed, units, 7, 1)).toBeNull();
+    });
+
+    it("a committed re-route pins every letter of the word where the packer put it", () => {
+      const result: Ok = { ...committed, placements: placements.map((p, i) => (i >= 1 && i <= 4 ? { ...p, col: p.col - 2 } : p)) };
+      const out = kufiPinWordEdits({ routes: { 1: 2 }, pinned: { 0: placements[0] } }, result, units, 1);
+      expect(out.pinned).toEqual({ 0: placements[0], 1: result.placements[1], 2: result.placements[2], 3: result.placements[3], 4: result.placements[4] });
+      expect(out.routes).toEqual({ 1: 2 });
     });
   });
 });

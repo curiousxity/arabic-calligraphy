@@ -347,6 +347,31 @@ describe("pins", () => {
   }, 20000);
 });
 
+describe("routes", () => {
+  it("a route is the user's record of a drag, not a placement: a pack with one is the pack without it, fresh or from a previous panel", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    _internal.clearCaches();
+    const fresh = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, edits: { routes: { 1: 3 } } });
+    expect(fresh).toEqual(r);
+    const again = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits: { routes: { 1: 3 } } });
+    expect(again).toEqual(r);
+  }, 30000);
+
+  it("a word moves along its path by its first letter's pin; where nothing can make room the packer says no rather than moving the pin", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    // the ي of يكلف, one cell on (right to left) along the bottom line: the لا before it has no stretch along the line
+    const yeh = r.placements[1];
+    expect(yeh.turn).toBe(0);
+    const on = { ...yeh, col: yeh.col - 1 };
+    const moved = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits: { routes: { 1: 1 }, pinned: { 1: on } } });
+    if (moved.ok) {
+      expect(moved.placements[1]).toEqual(on);
+      // words 0 and 1 keep their lines
+      expect(moved.placements[0]).toEqual(r.placements[0]);
+    } else expect(["tooShort", "tooLong", "pinConflict"]).toContain(moved.reason);
+  }, 30000);
+});
+
 describe("implicit pins", () => {
   it("a repack that cannot keep previous placements never reports a pin conflict the user did not make", () => {
     const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);

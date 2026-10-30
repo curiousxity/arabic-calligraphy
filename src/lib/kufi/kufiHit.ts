@@ -6,8 +6,9 @@
  * no `./harfbuzz`.
  */
 import { KUFI_FORMS, stretchGlyph, type KufiGlyph } from "./kufiAlphabet";
-import { cellRings, rotateRows, type Ring } from "./kufiGrid";
+import { cellRings, rotateRows, type Ring, type Turn } from "./kufiGrid";
 import type { KufiPackResult, KufiPlacement } from "./kufiPack";
+import type { KufiUnit } from "./kufiWords";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
@@ -237,6 +238,70 @@ export function nearestStretchEnd(ends: KufiStretchEnd[], col: number, row: numb
     }
   }
   return best;
+}
+
+/**
+ * The step a line is read along, by the turn of the letters on it: right to
+ * left along the bottom (turn 0), up the left side, left to right along the
+ * top, down the right side (the packer's `Line` for each `SIDE_ROT`).
+ */
+export function kufiReadingStep(turn: Turn): [dc: -1 | 0 | 1, dr: -1 | 0 | 1] {
+  switch (turn) {
+    case 0:
+      return [-1, 0];
+    case 1:
+      return [0, -1];
+    case 2:
+      return [1, 0];
+    default:
+      return [0, 1];
+  }
+}
+
+/** The index of the unit that opens word `wordIndex`, or null for a word the text does not have. */
+export function firstUnitOfWord(units: KufiUnit[], wordIndex: number): number | null {
+  const i = units.findIndex((u) => u.wordIndex === wordIndex);
+  return i < 0 ? null : i;
+}
+
+/**
+ * The word whose first letter covers the cell, or null on any other letter,
+ * on paper, a dot or a filler. Checked after `hitStretchEnd` by the overlay:
+ * a handle on a first letter still stretches, every other cell of it drags
+ * the word along its path.
+ */
+export function hitWordStart(result: Ok, units: KufiUnit[], col: number, row: number): number | null {
+  const unitIndex = hitKufiUnit(result, col, row);
+  if (unitIndex === null) return null;
+  const u = units[unitIndex];
+  if (!u) return null;
+  return firstUnitOfWord(units, u.wordIndex) === unitIndex ? u.wordIndex : null;
+}
+
+/** The placed box's extent: rows and columns it covers. */
+function placedBox(p: KufiPlacement): { h: number; w: number } {
+  const rows = placedRows(p);
+  return { h: rows.length, w: rows[0]?.length ?? 0 };
+}
+
+/**
+ * How far along the word's path the cell is, in cells, from the leading edge
+ * of its first letter's box (the edge met first in reading order); further
+ * on in reading order is positive. The pointer is projected onto the path,
+ * so its distance across the line does not count. A drag's route is the
+ * difference between this at the pointer and at the press. 0 for a word the
+ * text does not have.
+ */
+export function routeOffsetFor(result: Ok, units: KufiUnit[], wordIndex: number, col: number, row: number): number {
+  const first = firstUnitOfWord(units, wordIndex);
+  const p = first === null ? null : placementOf(result, first);
+  if (!p) return 0;
+  const [dc, dr] = kufiReadingStep(p.turn);
+  const { h, w } = placedBox(p);
+  // the leading edge: the box's far side when reading runs toward smaller indices
+  const leadCol = dc < 0 ? p.col + w - 1 : p.col;
+  const leadRow = dr < 0 ? p.row + h - 1 : p.row;
+  return (col - leadCol) * dc + (row - leadRow) * dr;
 }
 
 /** The outline of one unit's ink, as closed rings in cell coordinates (`cellRings`). */

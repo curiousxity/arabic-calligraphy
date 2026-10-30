@@ -73,8 +73,13 @@ export type KufiCellEdit = { unitIndex: number; key: string; dx: number; dy: num
 
 /**
  * The user's edits. Maps are keyed by unit index, except `routes`, keyed by
- * word index: an offset in cells along that word's line, further on in
- * reading order than where it would slide to.
+ * word index: how far along its path, in cells, the user has dragged that
+ * word's first letter (further on in reading order positive). A route is the
+ * drag's record, kept so the next drag continues from it; the word's place
+ * is held by the pins the drag leaves on its letters, and the packer does
+ * not read the number. (It used to slide the first letter that far past
+ * where its line left off, which opens a gap behind the word that nothing
+ * can close, so no such panel ever packed.)
  *
  * Only `pinned` fixes a unit's place. A `forms` or `stretch` edit keeps the
  * edit, not the position: the unit takes that form or those counts wherever
@@ -548,7 +553,6 @@ type Ctx = {
   letters: Letter[];
   nTpl: number;
   zob: Int32Array;
-  routes: Map<number, number>;
   deadline: number;
   /** Moves tried so far, and the most this search may try: the budget that decides results. */
   work: number;
@@ -1104,8 +1108,6 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
     }
     for (const off of t < 4 ? RING0_OFF : RINGK_OFF) lineOpts.push({ mode: 1, t, off, base: null });
   }
-  const route = ctx.routes.get(letter.word) ?? 0;
-  const firstOfWord = li === 0 || ctx.letters[li - 1].word !== letter.word;
   const shapes = letter.cands.length ? letter.cands : letter.entry;
   for (const lo of lineOpts) {
     for (const sh of shapes) {
@@ -1125,7 +1127,7 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
         continue;
       }
       // slide to the first place the letter fits
-      for (let X = start - (firstOfWord ? route : 0); X - (sh.maxJ - sh.minJ) >= 0; X--) {
+      for (let X = start; X - (sh.maxJ - sh.minJ) >= 0; X--) {
         if (tryDots({ mode: lo.mode, shape: sh, t: lo.t, off: lo.off, base, x0: X - sh.maxJ, jext: 0, climb: 0 })) break;
       }
     }
@@ -1608,9 +1610,8 @@ function reapply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
     len = (mv.t & 1) === 0 ? ctx.cols : ctx.rows;
     start = len - 1;
   }
-  const firstOfWord = li === 0 || ctx.letters[li - 1].word !== letter.word;
   const sh = mv.shape;
-  for (let X = start - (firstOfWord ? (ctx.routes.get(letter.word) ?? 0) : 0); X - (sh.maxJ - sh.minJ) >= 0; X--) {
+  for (let X = start; X - (sh.maxJ - sh.minJ) >= 0; X--) {
     const rec = apply(ctx, st, li, { ...mv, x0: X - sh.maxJ });
     if (rec) return rec;
   }
@@ -2081,8 +2082,6 @@ function makeCtx(
 ): Ctx {
   const { units } = resolveKufiText(text);
   const rings = Math.max(1, Math.floor((Math.min(cols, rows) - 1) / (2 * (BAND + 1))) + 1);
-  const routes = new Map<number, number>();
-  for (const [w, r] of Object.entries(edits.routes ?? {})) routes.set(Number(w), Math.max(0, Math.floor(r)));
   const letters = lettersOf(text, units, edits, pins);
   return {
     cols,
@@ -2091,7 +2090,6 @@ function makeCtx(
     letters,
     nTpl: rings * 4,
     zob: zobrist(cols * rows),
-    routes,
     // the work budget makes a search give the same panel on a busy machine as on a quiet
     // one; the clock is a safety net, loose for panels the size of a real one and tight
     // for big ones, where a move costs more and nothing packs anyway
@@ -2236,7 +2234,7 @@ function freshFinal(
   budgetMs: number,
   strictClock = false
 ): Final | null {
-  const key = JSON.stringify([text, cols, rows, edits.forms ?? {}, edits.stretch ?? {}, edits.routes ?? {}, edits.pinned ?? {}]);
+  const key = JSON.stringify([text, cols, rows, edits.forms ?? {}, edits.stretch ?? {}, edits.pinned ?? {}]);
   const hit = finals.get(key);
   if (hit && (hit.f?.packed || hit.budget >= budgetMs)) return hit.f;
   if (outOfRoom(text, cols, rows)) return null;

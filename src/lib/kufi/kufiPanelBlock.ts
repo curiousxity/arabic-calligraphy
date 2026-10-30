@@ -3,9 +3,9 @@
  * inputs, carrying the user's edits across a text change, and planning the
  * edits a canvas gesture makes. Pure: no React, no Konva, no `./harfbuzz`.
  */
-import { kufiFormsOf, placementOf } from "./kufiHit";
+import { firstUnitOfWord, kufiFormsOf, kufiReadingStep, placementOf } from "./kufiHit";
 import { reconcileEdits, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
-import { resolveKufiText } from "./kufiWords";
+import { resolveKufiText, type KufiUnit } from "./kufiWords";
 import type { KufiLayoutInputs } from "./kufiWorkerProtocol";
 
 /** Cells to the em (the removed block's figure): a cell is `fontSize / 8` px, so the size slider scales the panel. */
@@ -95,6 +95,42 @@ export function kufiPinEdits(edits: KufiPanelEdits, result: Ok, unitIndex: numbe
   const p = placementOf(result, unitIndex);
   if (!p) return edits;
   return { ...edits, pinned: { ...edits.pinned, [unitIndex]: { ...p, stretch: p.stretch.slice() } } };
+}
+
+/**
+ * The edits to preview a word dragged `route` cells along its path (from
+ * where the packer would slide it; the committed `edits.routes` entry is
+ * where it stands now). The word's first letter is pinned at its committed
+ * place moved by the difference along its line's reading step; the word's
+ * other pins are released so its letters follow; every other edit stays.
+ * The packer does not read the route (see `KufiPanelEdits`): the pin is
+ * what moves the word, the route what the next drag starts from. Null when
+ * the moved box would leave the panel, or for a word the text does not have.
+ */
+export function kufiRouteEdits(edits: KufiPanelEdits | undefined, committed: Ok, units: KufiUnit[], wordIndex: number, route: number): KufiPanelEdits | null {
+  const first = firstUnitOfWord(units, wordIndex);
+  const p = first === null ? null : placementOf(committed, first);
+  if (first === null || !p) return null;
+  const delta = route - (edits?.routes?.[wordIndex] ?? 0);
+  const [dc, dr] = kufiReadingStep(p.turn);
+  const pin = { ...p, col: p.col + dc * delta, row: p.row + dr * delta, stretch: p.stretch.slice() };
+  if (pin.col < 0 || pin.row < 0 || pin.col >= committed.cols || pin.row >= committed.rows) return null;
+  let pinned = edits?.pinned;
+  for (let k = first; k < units.length && units[k].wordIndex === wordIndex; k++) pinned = without(pinned, k);
+  return tidy({
+    ...edits,
+    routes: route === 0 ? without(edits?.routes, wordIndex) : { ...edits?.routes, [wordIndex]: route },
+    pinned: { ...pinned, [first]: pin },
+  });
+}
+
+/** What a committed re-route saves: every letter of the word pinned where the packer put it. */
+export function kufiPinWordEdits(edits: KufiPanelEdits, result: Ok, units: KufiUnit[], wordIndex: number): KufiPanelEdits {
+  let out = edits;
+  units.forEach((u, k) => {
+    if (u.wordIndex === wordIndex) out = kufiPinEdits(out, result, k);
+  });
+  return out;
 }
 
 /**

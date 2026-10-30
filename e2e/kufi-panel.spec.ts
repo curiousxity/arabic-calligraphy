@@ -11,6 +11,8 @@ import {
   gotoApp,
   hitTargetAt,
   inkPixels,
+  kufiCellBox,
+  kufiCellCenter,
   kufiEditTargets,
   namedNodeCount,
   openPanel,
@@ -596,6 +598,262 @@ test.describe("editing on the canvas", () => {
     await pointerAway(page, box);
     expect(await inkSignature(page, box)).toEqual(before);
     expect(errors).toEqual([]);
+  });
+
+  test("dragging a word's first letter along its path asks the packer to move the word; where nothing packs it snaps back and says why", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const before = await inkSignature(page, box);
+    const x0 = (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x;
+    const targets = await kufiEditTargets(page);
+    // الله (unit 5) opens word 2 on the left side, reading upward; it is wedged
+    // between the bottom and top bands, so no offset along its path packs.
+    const word = targets.words.find((w) => w.word === 2)!;
+    expect(word).toMatchObject({ unit: 5, dc: 0, dr: -1 });
+    const letter = targets.letters.find((l) => l.unit === 5)!;
+    // the press is on the letter's body, not on one of its stretch handles
+    for (const e of targets.ends.filter((e) => e.unit === 5)) expect(Math.hypot(e.x - letter.x, e.y - letter.y)).toBeGreaterThan(targets.cellPx);
+
+    await page.mouse.move(letter.x, letter.y);
+    await settleFrames(page);
+    expect(await hitTargetAt(page, letter)).toBe("Rect.kufi-edit-hit");
+    await page.mouse.down();
+    await page.mouse.move(letter.x + word.dc * 2 * targets.cellPx, letter.y + word.dr * 2 * targets.cellPx, { steps: 12 });
+    // give the previews time to be asked for, refused, and asked for once more
+    await page.waitForTimeout(1200);
+    await page.mouse.up();
+
+    await expect(kufiPanel(page)).toContainText("No room to move that word here");
+    expect(await panelEdits(page)).toBeUndefined();
+    // the press was the word's, not the panel's: nothing moved
+    expect((await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x).toBe(x0);
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).toEqual(before);
+    await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+
+    // A still press on a first letter is still a click on the letter: الله has
+    // three forms, so the click either lands one or says none fits.
+    await page.mouse.click(letter.x, letter.y);
+    await expect
+      .poll(async () => (await panelEdits(page))?.forms?.[5] !== undefined || (await kufiPanel(page).innerText()).includes("No other form"))
+      .toBe(true);
+  });
+
+  /** A paper cell whose painting completes no 2×2 of ink (preferring the panel's inside), or null. */
+  function paintableCell(grid: string[], skip: Set<string> = new Set()): { col: number; row: number } | null {
+    const ink = (c: number, r: number) => grid[r]?.[c] === "#";
+    for (let r = 1; r + 1 < grid.length; r++)
+      for (let c = 1; c + 1 < grid[r].length; c++) {
+        if (grid[r][c] !== "." || skip.has(`${c},${r}`)) continue;
+        let closes = false;
+        for (const dc of [-1, 1]) for (const dr of [-1, 1]) if (ink(c + dc, r) && ink(c, r + dr) && ink(c + dc, r + dr)) closes = true;
+        if (!closes) return { col: c, row: r };
+      }
+    return null;
+  }
+
+  /** A paper cell whose painting would complete a 2×2 of ink, or null. */
+  function blockedCell(grid: string[]): { col: number; row: number } | null {
+    const ink = (c: number, r: number) => grid[r]?.[c] === "#";
+    for (let r = 0; r < grid.length; r++)
+      for (let c = 0; c < grid[r].length; c++) {
+        if (grid[r][c] !== ".") continue;
+        for (const dc of [-1, 1]) for (const dr of [-1, 1]) if (ink(c + dc, r) && ink(c, r + dr) && ink(c + dc, r + dr)) return { col: c, row: r };
+      }
+    return null;
+  }
+
+  /** An ink cell whose erasing opens a 2×2 of paper (a lone square, a dot), or null. */
+  function gapCell(grid: string[]): { col: number; row: number } | null {
+    const paper = (c: number, r: number) => grid[r]?.[c] === ".";
+    for (let r = 1; r + 1 < grid.length; r++)
+      for (let c = 1; c + 1 < grid[r].length; c++) {
+        if (grid[r][c] !== "#") continue;
+        for (const dc of [-1, 1]) for (const dr of [-1, 1]) if (paper(c + dc, r) && paper(c, r + dr) && paper(c + dc, r + dr)) return { col: c, row: r };
+      }
+    return null;
+  }
+
+  /** Three paper cells in a row that can be painted one after the other without making a 2×2 of ink. */
+  function paintableRun(grid: string[]): Array<{ col: number; row: number }> | null {
+    for (let r = 1; r + 1 < grid.length; r++)
+      for (let c = 1; c + 3 < grid[r].length; c++) {
+        const g = grid.slice();
+        const run: Array<{ col: number; row: number }> = [];
+        for (let k = 0; k < 3; k++) {
+          const ink = (cc: number, rr: number) => g[rr]?.[cc] === "#";
+          const cc = c + k;
+          if (g[r][cc] !== ".") break;
+          let closes = false;
+          for (const dc of [-1, 1]) for (const dr of [-1, 1]) if (ink(cc + dc, r) && ink(cc, r + dr) && ink(cc + dc, r + dr)) closes = true;
+          if (closes) break;
+          g[r] = g[r].slice(0, cc) + "#" + g[r].slice(cc + 1);
+          run.push({ col: cc, row: r });
+        }
+        if (run.length === 3) return run;
+      }
+    return null;
+  }
+
+  const cellOutlineStroke = (page: Page) =>
+    page.evaluate(() => {
+      const node = window.__HARF__!.getStage()?.findOne(".kufi-cell-outline") as { stroke(): string } | undefined;
+      return node ? node.stroke() : null;
+    });
+
+  test("Alt shows a cell outline, Alt-click paints a cell and Alt-click again clears it, one step each; a tap of Alt leaves nothing stuck", async ({ page }) => {
+    const errors = collectConsoleErrors(page);
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const t = await kufiEditTargets(page);
+    const cell = paintableCell(t.grid)!;
+    expect(cell).not.toBeNull();
+    const at = kufiCellCenter(t, cell.col, cell.row);
+    expect(await inkPixels(page, kufiCellBox(t, cell.col, cell.row))).toBe(0);
+
+    // Holding Alt over paper: a thin outline round the cell, no letter chrome, no dots.
+    await page.mouse.move(at.x, at.y);
+    await page.keyboard.down("Alt");
+    await page.mouse.move(at.x + 1, at.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-cell-outline")).toBe(1);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(0);
+    expect(await draggableDotCenters(page)).toEqual([]);
+
+    // Alt-click: the cell is ink, saved as an offset from the nearest letter.
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.keyboard.up("Alt");
+    await expect.poll(async () => (await panelEdits(page))?.cells?.length).toBe(1);
+    expect((await panelEdits(page))!.cells![0]).toMatchObject({ on: true });
+    await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
+    await pointerAway(page, box);
+    expect(await inkPixels(page, kufiCellBox(t, cell.col, cell.row))).toBeGreaterThan(0);
+    // a lone painted square breaks nothing
+    await expect(kufiPanel(page)).not.toContainText("leave a gap");
+
+    // Alt released: the outline is gone and the letters' hover chrome is back; the page's focus is where it was.
+    expect(await namedNodeCount(page, "kufi-cell-outline")).toBe(0);
+    const letter = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
+    await page.mouse.move(letter.x, letter.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-hover-outline")).toBeGreaterThan(0);
+    expect(await page.evaluate(() => document.activeElement === document.body || document.activeElement?.tagName === "CANVAS")).toBe(true);
+
+    // Alt-click the same cell: the edit is removed, not stacked.
+    // (past the history's 300 ms coalescing window, so the second click is a step of its own)
+    await page.waitForTimeout(400);
+    await page.mouse.move(at.x, at.y);
+    await page.keyboard.down("Alt");
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.keyboard.up("Alt");
+    await expect.poll(async () => (await panelEdits(page))?.cells).toBeUndefined();
+    await pointerAway(page, box);
+    expect(await inkPixels(page, kufiCellBox(t, cell.col, cell.row))).toBe(0);
+
+    // Two clicks, two steps.
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => (await panelEdits(page))?.cells?.length).toBe(1);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    expect(errors).toEqual([]);
+  });
+
+  test("Alt-drag paints every cell it crosses the way its first cell went, as one step", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const t = await kufiEditTargets(page);
+    const run = paintableRun(t.grid)!;
+    expect(run).not.toBeNull();
+    const from = kufiCellCenter(t, run[0].col, run[0].row);
+    const to = kufiCellCenter(t, run[2].col, run[2].row);
+
+    await page.mouse.move(from.x, from.y);
+    await page.keyboard.down("Alt");
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 12 });
+    // live: the cells are ink while nothing is committed yet
+    await settleFrames(page);
+    expect(await inkPixels(page, kufiCellBox(t, run[1].col, run[1].row))).toBeGreaterThan(0);
+    expect(await panelEdits(page)).toBeUndefined();
+    await page.mouse.up();
+    await page.keyboard.up("Alt");
+
+    await expect.poll(async () => (await panelEdits(page))?.cells?.length).toBe(3);
+    expect((await panelEdits(page))!.cells!.every((c) => c.on)).toBe(true);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+  });
+
+  test("a cell that would make a 2×2 of ink is refused and the outline flashes red; erasing is allowed and a gap is reported", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const t = await kufiEditTargets(page);
+    const blocked = blockedCell(t.grid)!;
+    expect(blocked).not.toBeNull();
+    const at = kufiCellCenter(t, blocked.col, blocked.row);
+
+    await page.mouse.move(at.x, at.y);
+    await page.keyboard.down("Alt");
+    await page.mouse.move(at.x + 1, at.y);
+    await settleFrames(page);
+    const accent = await cellOutlineStroke(page);
+    expect(accent).not.toBeNull();
+    await page.mouse.down();
+    await page.mouse.up();
+    // refused: red for a moment, then the outline's own colour again, and nothing saved
+    await expect.poll(() => cellOutlineStroke(page)).toBe("#e03131");
+    await expect.poll(() => cellOutlineStroke(page), { timeout: 2000 }).toBe(accent);
+    await page.keyboard.up("Alt");
+    await page.waitForTimeout(300);
+    expect(await panelEdits(page)).toBeUndefined();
+    await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+
+    // Erasing a lone square (a dot) opens a 2×2 of paper: allowed, and the status says so.
+    const gap = gapCell(t.grid)!;
+    expect(gap).not.toBeNull();
+    const g = kufiCellCenter(t, gap.col, gap.row);
+    await page.mouse.move(g.x, g.y);
+    await page.keyboard.down("Alt");
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.keyboard.up("Alt");
+    await expect.poll(async () => (await panelEdits(page))?.cells?.length).toBe(1);
+    expect((await panelEdits(page))!.cells![0]).toMatchObject({ on: false });
+    await expect(kufiPanel(page)).toContainText("Painted cells leave a gap");
+    await pointerAway(page, box);
+    expect(await inkPixels(page, kufiCellBox(t, gap.col, gap.row))).toBe(0);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    await expect(kufiPanel(page)).not.toContainText("leave a gap");
+  });
+
+  test("a painted cell survives Fit and a text change that keeps the same letters", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const t = await kufiEditTargets(page);
+    const cell = paintableCell(t.grid)!;
+    const at = kufiCellCenter(t, cell.col, cell.row);
+    await page.mouse.move(at.x, at.y);
+    await page.keyboard.down("Alt");
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.keyboard.up("Alt");
+    await expect.poll(async () => (await panelEdits(page))?.cells?.length).toBe(1);
+    const painted = (await panelEdits(page))!.cells![0];
+
+    // Fit: the same letters in whatever box it picks; the edit rides along.
+    await kufiPanel(page).getByRole("button", { name: "Fit" }).click();
+    await expect(kufiPanel(page)).not.toContainText("Finding a size", { timeout: 20_000 });
+    expect((await panelEdits(page))?.cells).toEqual([painted]);
+
+    // A fatha on the first letter is dropped by the panel: the same units, so the edit follows them.
+    await setBlockText(page, "لَا يكلف الله نفسا إلا وسعها", PANEL_ID);
+    await expect.poll(async () => ((await getBlocks(page)).find((b) => b.id === PANEL_ID) as { text: string }).text).toContain("لَا");
+    expect((await panelEdits(page))?.cells).toEqual([painted]);
+    await pointerAway(page, box);
+    await expect.poll(async () => inkPixels(page, kufiCellBox(await kufiEditTargets(page), cell.col, cell.row))).toBeGreaterThan(0);
   });
 
   test("a stretch nothing can pack snaps back, commits nothing, and says why", async ({ page }) => {
