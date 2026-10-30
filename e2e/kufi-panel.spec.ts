@@ -452,6 +452,55 @@ test.describe("editing on the canvas", () => {
     await expect.poll(async () => (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x).toBe(x1);
   });
 
+  test("a click on a handle, with no pull, is a click on the letter", async ({ page }) => {
+    await openBaqarahPanel(page);
+    const targets = await kufiEditTargets(page);
+    // an end handle of the feh (four forms): pressing and releasing on it cycles the form
+    const end = targets.ends.find((e) => e.unit === 4)!;
+    expect(end).toBeDefined();
+    await page.mouse.move(end.x, end.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(1);
+    await page.mouse.click(end.x, end.y);
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
+    // a slice grip of the seen (one form): the click reaches the letter and says so
+    const grip = (await kufiEditTargets(page)).ends.find((e) => e.unit === 8 && e.kind === "slice")!;
+    expect(grip).toBeDefined();
+    await page.mouse.click(grip.x, grip.y);
+    await expect(kufiPanel(page)).toContainText("That letter has one form");
+  });
+
+  test("a drag cut short by losing the selection commits nothing and leaves no preview drawn", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const before = await inkSignature(page, box);
+    const cellPx = 6 * (await getStageScale(page));
+    const targets = await kufiEditTargets(page);
+    const end = targets.ends.find((e) => e.unit === 2 && e.si === 0 && e.dc === 1 && e.dr === 0)!;
+    const leftEndBefore = targets.ends.find((e) => e.unit === 2 && e.dc === -1)!;
+
+    // Copy the panel first; pasting mid-drag selects the copy and so unmounts
+    // the overlay while the stretch is still held.
+    await page.keyboard.press("ControlOrMeta+c");
+    await page.mouse.move(end.x, end.y);
+    await settleFrames(page);
+    await page.mouse.down();
+    await page.mouse.move(end.x + 2 * cellPx, end.y, { steps: 12 });
+    await expect
+      .poll(async () => (await kufiEditTargets(page)).ends.find((e) => e.unit === 2 && e.dc === -1)?.x, { timeout: 5_000 })
+      .toBeLessThan(leftEndBefore.x - 1.5 * cellPx);
+    await page.keyboard.press("ControlOrMeta+v");
+    await expect.poll(async () => (await getBlocks(page)).length).toBe(2);
+    await page.mouse.up();
+
+    // The copy is gone again; the panel is unselected and draws its own layout.
+    await page.keyboard.press("Delete");
+    await expect.poll(async () => (await getBlocks(page)).length).toBe(1);
+    await pointerAway(page, box);
+    await expect.poll(async () => inkSignature(page, box)).toEqual(before);
+    expect(await panelEdits(page)).toBeUndefined();
+  });
+
   test("hovering a letter shows one handle, the stretch end nearest the pointer", async ({ page }) => {
     await openBaqarahPanel(page);
     const targets = await kufiEditTargets(page);

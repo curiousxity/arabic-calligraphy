@@ -67,6 +67,10 @@ type Drag = {
   /** The pointer's cell at the press. */
   startCol: number;
   startRow: number;
+  /** The pointer at the press in stage px, and whether it has since left `CLICK_SLOP`: a still press is a click on the letter. */
+  pressX: number;
+  pressY: number;
+  moved: boolean;
   pull: KufiPull;
   /** The preview on show, by count: the edits that made it and its panel. */
   shown: { count: number; edits: KufiPanelEdits; result: Ok } | null;
@@ -196,11 +200,15 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
     if (!p || !g) return;
     const base = g.stretch.map((_, i) => p.stretch[i] ?? 0);
     const at = base[end.stretchIndex];
+    const pressed = stage.getPointerPosition() ?? { x: 0, y: 0 };
     const state: Drag = {
       end,
       base,
       startCol: start.col,
       startRow: start.row,
+      pressX: pressed.x,
+      pressY: pressed.y,
+      moved: false,
       pull: pullStart(at, -(g.stretch[end.stretchIndex].min ?? 0), at + MAX_PULL),
       shown: null,
       restTimer: null,
@@ -240,6 +248,8 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       );
     };
     const move = () => {
+      const at = stage.getPointerPosition();
+      if (at && Math.hypot(at.x - state.pressX, at.y - state.pressY) > CLICK_SLOP) state.moved = true;
       const c = pointerCell();
       if (!c) return;
       const delta = (c.col - state.startCol) * end.dc + (c.row - state.startRow) * end.dr;
@@ -261,14 +271,19 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       window.removeEventListener("mouseup", onUp);
       window.removeEventListener("touchend", onUp);
       drag.current = null;
-      if (!abort) {
-        const r = pullRelease(state.pull);
-        if (r.kind === "commit" && state.shown?.count === r.count)
-          onCommit(fromKey, kufiPinEdits(state.shown.edits, state.shown.result, end.unitIndex), state.shown.result);
-        else if (r.kind === "refused") onNotice(fromKey, NO_ROOM_TO_STRETCH);
-        setDragging(null);
-        onPreview(null);
-      }
+      // Whatever ends the drag, the panel goes back to drawing its own
+      // layout: an uncommitted preview must never stay on a deselected
+      // panel (it would draw, and export, a layout that was never saved).
+      onPreview(null);
+      if (abort) return;
+      setDragging(null);
+      const r = pullRelease(state.pull);
+      if (r.kind === "commit" && state.shown?.count === r.count)
+        onCommit(fromKey, kufiPinEdits(state.shown.edits, state.shown.result, end.unitIndex), state.shown.result);
+      else if (r.kind === "refused") onNotice(fromKey, NO_ROOM_TO_STRETCH);
+      // A press and release that never moved is a click on the letter, as it
+      // is anywhere else on the letter: a handle is not a dead spot.
+      else if (r.kind === "cancel" && !state.moved) void cycleForm(end.unitIndex);
     };
     const onUp = () => release();
     state.release = release;
@@ -366,6 +381,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           if (h?.on && c) {
             // the handle's drag is this tool's, never the block's
             e.cancelBubble = true;
+            lastLetterPress.current = performance.now();
             beginStretch(h.on, c, e.target.getStage());
           } else if (h) {
             // not claimed: a press that drifts drags the whole panel
