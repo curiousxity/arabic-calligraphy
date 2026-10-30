@@ -177,6 +177,14 @@ CUTWIN = os.environ.get("PEN_CUTWIN", "both")
 LEAD = {x for x in os.environ.get("PEN_LEAD", "").split(",") if x}
 LEAD_STEP = float(os.environ.get("PEN_LEAD_STEP", -0.15))  # the short move, nuqta: - left, + right
 LEAD_SKIP, LEAD_NEAR = 0.3, 0.6
+# PEN_LEAD_FULL ("1"): the held start is the full nib. "0" lets it narrow as it starts: on teeth with a broad flat
+# peak (301.s1, 309.s1, 312.s1, k23) the full nib tilted to cover the flat top and its corner stood up as a second horn.
+LEAD_FULL = os.environ.get("PEN_LEAD_FULL", "1") == "1"
+# PEN_FULLSTART ("105.s0,..."): these strokes start at the full nib, unnarrowed: the squared face where a stroke joins
+# the next letter (the user, 2026-10-29: "where the stroke connects to the next letter"); 105.s0's narrowed to 0.9 and
+# left the face's top corner bare.
+FULLSTART = {x for x in os.environ.get("PEN_FULLSTART", "").split(",") if x}
+
 # PEN_FREEHOLD ("312.s1~c0,..."): a PEN_CUT half's nib held at one angle over its first PEN_FREEHOLD_L nuqta from its free
 # end. Judged at its free end only (PEN_CUTWIN), 312.s1's and 356.s0's right halves spun the nib about 180 degrees
 # there (k10: 275 down to 86 over 0.9 nuqta, 266 down to 88 over 2.3), where the earlier fits held it at 80-92. Named
@@ -440,6 +448,9 @@ _shape_cost_b, _shape_cost = gpufit._shape_cost_b, gpufit.shape_cost
 # k9 (2026-10-29): the spin only spread out (-71 ... 88) and 297.s1 and 299.s1 took one up (0.943 to 0.927, 0.950 to 0.912),
 # so the term is off: the spin was the cut end's window at work (PEN_CUTWIN).
 TURN_ON = os.environ.get("PEN_TURN", "0") == "1"
+# PEN_TURNS ("685.s1,..."): the turn-rate cost on these whole strokes too: 685.s1's nib turned 25-33 degrees a node
+# through the bowl's climb and drew a ledge inside it; T02.s1's turned broadside to a thin straight stroke.
+TURNS = {x for x in os.environ.get("PEN_TURNS", "").split(",") if x}
 TURN_DEG = 20.0
 _turn = [False]  # set by fit for a cut half's refines
 
@@ -704,7 +715,7 @@ def fit(stroke, log, size=None, lead=None):
     lead: the right half's result, when PEN_LEAD starts this left half from its end (led)."""
     t0 = time.time()
     piece, ignore, O = job_of(stroke)
-    _turn[0] = TURN_ON and stroke in CUT_AT  # every refine of this stroke, set again by the next fit
+    _turn[0] = (TURN_ON and stroke in CUT_AT) or stroke in TURNS  # every refine of this stroke, set again by the next fit
     hair = "~h" in stroke  # a tip-drawn hairline of a PEN_SPLIT stroke: the small pen, filled
     fill = stroke in FILL or hair
     # a mark narrower than the nib cannot be the main pen's: it is a small-pen mark (T21.s0, 0.56 nuqta to a 0.82 nib)
@@ -749,7 +760,7 @@ def fit(stroke, log, size=None, lead=None):
     def pen_of(nodes, a, anc):
         lift = LIFT_LONG if length(nodes) >= LONG else LIFT
         # a held start is the full nib: let narrow, 347.s0's left half began 0.14 nuqta under the peak's shoulder (k16)
-        return {"angle": a, "lift_start": 0.0 if held else lift, "lift_end": lift, "anchor": list(anc), "size": SIZE and not size,
+        return {"angle": a, "lift_start": 0.0 if (held and LEAD_FULL) or stroke in FULLSTART else lift, "lift_end": lift, "anchor": list(anc), "size": SIZE and not size,
                 **({"turns": turns_of(nodes)} if ROTATE else {})}
 
     def turns_of(nodes):  # each node turns on its own, but none within FREEHOLD_L of a PEN_FREEHOLD half's free end
