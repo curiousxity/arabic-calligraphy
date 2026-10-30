@@ -730,6 +730,14 @@ reject the rest". Approved: **366.s0 (k10), 357.s0 (k10), 347.s0 (k19)**. Reject
 311.s1, 313.s1 (k10), 299.s1 (k7), 312.s1 (k21 and k6), 356.s0 (k21 and k7). The table below is the pick as it
 stood before that review; only the three approved rows stand.
 
+Asked what was wrong, the user ruled first on what is not wrong: "The squared left end is very advantageous. I would
+not get rid of that because that is where the stroke connects to the next letter. The small kinks that you mentioned
+are actually not that bad. The small tick at the peak is also fine." A stroke is "one movement of a pen" and smooth;
+a V or an angle belongs where two strokes adjoin. Shown the nine side by side (studio | ours), they marked four, all at
+the peak where the halves meet, "very subtle": 301.s1 and 309.s1 a nub on the peak and a notch just under it, 299.s1
+a two-tipped peak, 312.s1 a jagged peak and a small notch on the dip's right side. "The others I approve": **290.s1,
+297.s1, 311.s1, 313.s1 (k10) and 356.s0 (k7)** are approved. The four marked are refitted with `PEN_LEAD`.
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |
