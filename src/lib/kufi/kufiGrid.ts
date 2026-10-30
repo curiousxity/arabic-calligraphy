@@ -66,6 +66,52 @@ export function emptyBlocks2x2(grid: Grid): Array<[col: number, row: number]> {
   return blocks2x2(grid, 0);
 }
 
+/**
+ * The packer's measure of a finished lattice, applied after the user's cell
+ * edits: no 2×2 of paper or of ink, and no two paper cells side by side on
+ * the frame (a double break). Shared by the packer and the canvas paint tool
+ * so the panel drawn in a session is the panel a reload draws.
+ */
+export function packedCells(cells: Uint8Array, cols: number, rows: number): boolean {
+  const grid = { cols, rows, cells };
+  if (inkBlocks2x2(grid).length || emptyBlocks2x2(grid).length) return false;
+  for (let c = 0; c + 1 < cols; c++) {
+    if (!cells[c] && !cells[c + 1]) return false;
+    const b = (rows - 1) * cols + c;
+    if (!cells[b] && !cells[b + 1]) return false;
+  }
+  for (let r = 0; r + 1 < rows; r++) {
+    if (!cells[r * cols] && !cells[(r + 1) * cols]) return false;
+    if (!cells[r * cols + cols - 1] && !cells[(r + 1) * cols + cols - 1]) return false;
+  }
+  return true;
+}
+
+/** A painted (`on`) or erased cell, as an offset from a unit's placed box (`KufiCellEdit` in the packer). */
+export type CellEditLike = { unitIndex: number; key: string; dx: number; dy: number; on: boolean };
+
+/**
+ * Paints the user's cell edits over a lattice, in order (the last on a cell
+ * wins), each through its unit's placed box: an edit whose unit is gone or is
+ * another letter now (the key differs), or whose cell is off the grid, is
+ * skipped. `placementOf` gives a unit's box, or null.
+ */
+export function applyCellEdits(
+  cells: Uint8Array,
+  cols: number,
+  rows: number,
+  placementOf: (unitIndex: number) => { key: string; col: number; row: number } | null,
+  edits: { cells?: CellEditLike[] }
+): void {
+  for (const e of edits.cells ?? []) {
+    const p = placementOf(e.unitIndex);
+    if (!p || p.key !== e.key) continue;
+    const r = p.row + e.dy;
+    const c = p.col + e.dx;
+    if (r >= 0 && c >= 0 && r < rows && c < cols) cells[r * cols + c] = e.on ? 1 : 0;
+  }
+}
+
 /** True when all ink (`#`) is one 4-connected component; diagonal contact does not join. */
 export function isConnected4(rows: string[]): boolean {
   const h = rows.length;

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { placementInk } from "./kufiHit";
 import { cellEditAt, nearestKufiUnit, paintKufiCell } from "./kufiPaint";
-import type { KufiPackResult, KufiPanelEdits, KufiPlacement } from "./kufiPack";
+import { packKufiPanel, _internal, type KufiPackResult, type KufiPanelEdits, type KufiPlacement } from "./kufiPack";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
@@ -114,8 +114,8 @@ describe("paintKufiCell", () => {
       expect(corner.kind).toBe("ok");
       if (corner.kind === "ok") expect(corner.result.editsBreakPacking).toBe(true);
       const r = packed();
-      r.cells[1 * 5 + 1] = 0; // (1, 1) off: the window at (1..2, 1..2) now has one ink cell, (2, 2)
-      const hole = paintKufiCell(r, undefined, 2, 2);
+      r.cells[1 * 5 + 1] = 0; // (1, 1) off: the window at (0..1, 1..2) now has one ink cell, the letter's (0, 2)
+      const hole = paintKufiCell(r, undefined, 0, 2);
       expect(hole.kind).toBe("ok");
       if (hole.kind === "ok") expect(hole.result.editsBreakPacking).toBe(true);
     });
@@ -148,17 +148,128 @@ describe("paintKufiCell", () => {
     expect(at(next.result, 2, 11)).toBe(1);
   });
 
-  it("an edit already at the cell is replaced, never doubled", () => {
+  it("an edit already at the cell is never doubled: a set back to the letter's own ink drops it, a set over paper replaces it", () => {
     const edits: KufiPanelEdits = { cells: [{ unitIndex: 0, key: "alef:isolated", dx: 0, dy: 3, on: false }] };
     const r = panel(undefined, edits);
     const out = paintKufiCell(r, edits, 1, 4, true);
     expect(out.kind).toBe("ok");
     if (out.kind !== "ok") return;
-    expect(out.edits.cells).toEqual([{ unitIndex: 0, key: "alef:isolated", dx: 0, dy: 3, on: true }]);
+    expect(out.edits.cells).toBeUndefined();
+    expect(at(out.result, 1, 4)).toBe(1);
+    // an erase over paper (a letter that moved away from a painted cell) set on again: one edit, on
+    const over: KufiPanelEdits = { cells: [{ unitIndex: 0, key: "alef:isolated", dx: 1, dy: 9, on: false }] };
+    const q = panel(undefined, over);
+    const set = paintKufiCell(q, over, 2, 10, true);
+    expect(set.kind).toBe("ok");
+    if (set.kind !== "ok") return;
+    expect(set.edits.cells).toEqual([{ unitIndex: 0, key: "alef:isolated", dx: 1, dy: 9, on: true }]);
   });
 
   it("a cell off the panel is nothing", () => {
     expect(paintKufiCell(panel(), undefined, -1, 0)).toEqual({ kind: "same" });
     expect(paintKufiCell(panel(), undefined, 0, 12)).toEqual({ kind: "same" });
   });
+
+  it("a panel with no letters has nothing to hang an edit on: same, not a refusal", () => {
+    const r: Ok = { ...panel(), placements: [] };
+    expect(paintKufiCell(r, undefined, 2, 10)).toEqual({ kind: "same" });
+  });
+
+  it("removing an edit sets the cell from the packed state, not from the opposite of what it showed", () => {
+    // an on:true edit lying over the bar's own ink (a letter moved onto a painted cell): removing it leaves ink,
+    // so a toggle to paper must say so with an erase
+    const edits: KufiPanelEdits = { cells: [{ unitIndex: 0, key: "alef:isolated", dx: 0, dy: 3, on: true }] };
+    const r = panel(undefined, edits);
+    expect(at(r, 1, 4)).toBe(1);
+    const out = paintKufiCell(r, edits, 1, 4);
+    expect(out.kind).toBe("ok");
+    if (out.kind !== "ok") return;
+    expect(at(out.result, 1, 4)).toBe(0);
+    expect(out.edits.cells).toEqual([{ unitIndex: 0, key: "alef:isolated", dx: 0, dy: 3, on: false }]);
+    // and the reverse: an on:false edit over paper, toggled to ink
+    const over: KufiPanelEdits = { cells: [{ unitIndex: 0, key: "alef:isolated", dx: 1, dy: 9, on: false }] };
+    const q = panel(undefined, over);
+    const back = paintKufiCell(q, over, 2, 10);
+    expect(back.kind).toBe("ok");
+    if (back.kind !== "ok") return;
+    expect(at(back.result, 2, 10)).toBe(1);
+    expect(back.edits.cells).toEqual([{ unitIndex: 0, key: "alef:isolated", dx: 1, dy: 9, on: true }]);
+  });
+
+  it("two edits on one cell: removing the last leaves the other's state", () => {
+    const edits: KufiPanelEdits = {
+      cells: [
+        { unitIndex: 1, key: "beh:medial", dx: -2, dy: 5, on: true },
+        { unitIndex: 0, key: "alef:isolated", dx: 1, dy: 9, on: false },
+      ],
+    };
+    const r = panel(undefined, edits);
+    expect(at(r, 2, 10)).toBe(0);
+    const out = paintKufiCell(r, edits, 2, 10);
+    expect(out.kind).toBe("ok");
+    if (out.kind !== "ok") return;
+    expect(at(out.result, 2, 10)).toBe(1);
+    // the earlier edit already paints it: nothing is added
+    expect(out.edits.cells).toEqual([edits.cells![0]]);
+  });
+});
+
+describe("paintKufiCell against the packer", () => {
+  beforeAll(() => _internal.setClockOverride(Infinity));
+  afterAll(() => _internal.setClockOverride(null));
+  const BAQARAH = "لا يكلف الله نفسا إلا وسعها";
+
+  /** The cell a paint gives must be the cell the packer gives for the same edits. */
+  function expectSameAsPacker(draft: Ok, out: ReturnType<typeof paintKufiCell>) {
+    expect(out.kind).toBe("ok");
+    if (out.kind !== "ok") return out;
+    const packed = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: draft, edits: out.edits });
+    expect(packed.ok).toBe(true);
+    if (!packed.ok) return out;
+    expect(Array.from(out.result.cells)).toEqual(Array.from(packed.cells));
+    expect(out.result.editsBreakPacking).toBe(packed.editsBreakPacking);
+    return out;
+  }
+
+  it("paints, erases, toggles back and erases a dot exactly as a repack with the same edits does", () => {
+    const draft = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 });
+    expect(draft.ok).toBe(true);
+    if (!draft.ok) return;
+    const ink = (c: number, r: number) => draft.cells[r * 21 + c] === 1;
+    const glyph = new Set<number>();
+    for (const p of draft.placements) for (const i of placementInk(draft, p)) glyph.add(i);
+    // a paper cell that closes no 2×2
+    let paper: [number, number] | null = null;
+    let dot: [number, number] | null = null;
+    for (let r = 1; r < 20 && (!paper || !dot); r++)
+      for (let c = 1; c < 20; c++) {
+        if (!paper && !ink(c, r)) {
+          let closes = false;
+          for (const dc of [-1, 1]) for (const dr of [-1, 1]) if (ink(c + dc, r) && ink(c, r + dr) && ink(c + dc, r + dr)) closes = true;
+          if (!closes) paper = [c, r];
+        }
+        if (!dot && ink(c, r) && !glyph.has(r * 21 + c)) dot = [c, r];
+      }
+    expect(paper).not.toBeNull();
+    expect(dot).not.toBeNull();
+    const [pc, pr] = paper!;
+    const painted = expectSameAsPacker(draft, paintKufiCell(draft, undefined, pc, pr));
+    if (painted.kind !== "ok") return;
+    // a glyph cell erased on top of that
+    const g = draft.placements[3];
+    const gi = placementInk(draft, g)[0];
+    const erased = expectSameAsPacker(draft, paintKufiCell(painted.result, painted.edits, gi % 21, (gi / 21) | 0));
+    if (erased.kind !== "ok") return;
+    // the painted cell toggled back: its edit goes and the cell is paper again
+    const back = expectSameAsPacker(draft, paintKufiCell(erased.result, erased.edits, pc, pr));
+    if (back.kind !== "ok") return;
+    expect(back.edits.cells).toHaveLength(1);
+    // a dot (ink the glyphs do not own) erased, then toggled back on: the toggle must land on ink again
+    const [dc, dr] = dot!;
+    const noDot = expectSameAsPacker(draft, paintKufiCell(back.result, back.edits, dc, dr));
+    if (noDot.kind !== "ok") return;
+    const dotAgain = expectSameAsPacker(draft, paintKufiCell(noDot.result, noDot.edits, dc, dr));
+    if (dotAgain.kind !== "ok") return;
+    expect(dotAgain.result.cells[dr * 21 + dc]).toBe(1);
+  }, 30000);
 });

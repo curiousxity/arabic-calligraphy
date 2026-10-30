@@ -50,7 +50,7 @@ import {
   type KufiDotKey,
   type KufiGlyph,
 } from "./kufiAlphabet";
-import { emptyBlocks2x2, inkBlocks2x2, type Turn } from "./kufiGrid";
+import { applyCellEdits, packedCells, type Turn } from "./kufiGrid";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
 
 // ---------------------------------------------------------------------------
@@ -2183,37 +2183,12 @@ function explicitPins(units: KufiUnit[], edits: KufiPanelEdits): Map<number, Pin
   return pins;
 }
 
-function applyCellEdits(cells: Uint8Array, cols: number, rows: number, placements: KufiPlacement[], edits: KufiPanelEdits) {
-  for (const e of edits.cells ?? []) {
-    const p = placements[e.unitIndex];
-    if (!p || p.key !== e.key) continue;
-    const r = p.row + e.dy;
-    const c = p.col + e.dx;
-    if (r >= 0 && c >= 0 && r < rows && c < cols) cells[r * cols + c] = e.on ? 1 : 0;
-  }
-}
-
-/** No empty or solid 2×2 and no double break in the frame. */
-function packedCells(cells: Uint8Array, cols: number, rows: number): boolean {
-  const grid = { cols, rows, cells };
-  if (inkBlocks2x2(grid).length || emptyBlocks2x2(grid).length) return false;
-  for (let c = 0; c + 1 < cols; c++) {
-    if (!cells[c] && !cells[c + 1]) return false;
-    const b = (rows - 1) * cols + c;
-    if (!cells[b] && !cells[b + 1]) return false;
-  }
-  for (let r = 0; r + 1 < rows; r++) {
-    if (!cells[r * cols] && !cells[(r + 1) * cols]) return false;
-    if (!cells[r * cols + cols - 1] && !cells[(r + 1) * cols + cols - 1]) return false;
-  }
-  return true;
-}
-
 function okResult(units: KufiUnit[], f: Final, cols: number, rows: number, edits: KufiPanelEdits): KufiPackResult {
   const placements = placementsOf(f).map((p) => ({ ...p, key: units[p.unitIndex].key }));
   const cells = new Uint8Array(cols * rows);
   for (let i = 0; i < cells.length; i++) cells[i] = f.owner[i] !== 0 ? 1 : 0;
-  applyCellEdits(cells, cols, rows, placements, edits);
+  // the user's painted cells go over the packed lattice (`kufiGrid`, shared with the canvas paint tool)
+  applyCellEdits(cells, cols, rows, (k) => placements[k] ?? null, edits);
   const editsBreakPacking = (edits.cells?.length ?? 0) > 0 && !packedCells(cells, cols, rows);
   return { ok: true, cols, rows, cells, placements, editsBreakPacking };
 }
@@ -2372,6 +2347,15 @@ function boxIndices(p: KufiPlacement, units: KufiUnit[], cols: number, rows: num
  * their places, dots and all; when that cannot pack, the lines of units whose
  * boxes come within two cells of an edited unit's are freed too, and then
  * every line. Each round searches within what is left of the repack budget.
+ *
+ * A word dragged along its path (its first letter's pin moved along its
+ * line, the glyph and counts as they were) is absorbed by the letters before
+ * it and by its own letters: their lines are freed in the first round too,
+ * so the letter before the word (on its line, or on the line before the
+ * corner the word opens) may lengthen or shorten along the line by the
+ * shift, and the word's own joins and letters may give or take the rest.
+ * The search still ranks by natural length, so nothing stretches that need
+ * not, and explicit pins stay hard.
  */
 function repack(
   text: string,
@@ -2395,6 +2379,16 @@ function repack(
       dirty.add(k);
   });
   const keys = lineKeys(units, prev);
+  // a moved word: its own letters and the letter before it absorb the shift
+  const first = new Set<string>();
+  for (const k of dirty) {
+    const pin = edits.pinned?.[k];
+    const p = prev[k];
+    const moved = pin && pin.glyphId === p.glyphId && pin.turn === p.turn && sameCounts(pin.stretch, p.stretch) && (pin.col !== p.col || pin.row !== p.row);
+    if (!moved || (k > 0 && units[k - 1].wordIndex === units[k].wordIndex)) continue;
+    if (k > 0) first.add(keys[k - 1]);
+    for (let j = k; j < units.length && units[j].wordIndex === units[k].wordIndex; j++) first.add(keys[j]);
+  }
   const near = new Set<string>();
   {
     const zone = new Uint8Array(cols * rows);
@@ -2410,7 +2404,7 @@ function repack(
     });
   }
   // the last round frees every line: the implicit pins are dropped, a fresh pack in what is left
-  const rounds = [new Set([...dirty].map((k) => keys[k])), near, null];
+  const rounds = [new Set([...[...dirty].map((k) => keys[k]), ...first]), near, null];
   let best: Final | null = null;
   let workLeft = REPACK_WORK;
   for (const free of rounds) {

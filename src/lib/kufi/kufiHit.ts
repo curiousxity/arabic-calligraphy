@@ -278,8 +278,8 @@ export function hitWordStart(result: Ok, units: KufiUnit[], col: number, row: nu
   return firstUnitOfWord(units, u.wordIndex) === unitIndex ? u.wordIndex : null;
 }
 
-/** The placed box's extent: rows and columns it covers. */
-function placedBox(p: KufiPlacement): { h: number; w: number } {
+/** The placed box's extent: the rows and columns it covers on the panel, after stretching and turning. */
+export function placedBox(p: KufiPlacement): { h: number; w: number } {
   const rows = placedRows(p);
   return { h: rows.length, w: rows[0]?.length ?? 0 };
 }

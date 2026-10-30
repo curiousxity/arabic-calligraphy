@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
+  applyCellEdits,
   rotateRows,
   inkBlocks2x2,
   emptyBlocks2x2,
   isConnected4,
   cellRings,
   gridFromRows,
+  packedCells,
   type Grid,
   type Ring,
 } from "./kufiGrid";
@@ -125,6 +127,41 @@ describe("cellRings", () => {
         expect(x0 === x1 || y0 === y1).toBe(true);
       }
     }
+  });
+});
+
+describe("packedCells", () => {
+  it("is the packer's measure: no 2×2 of paper or ink, no two paper cells side by side on the frame", () => {
+    const g = toGrid(["#.#.#", ".#.#.", "#.#.#", ".#.#.", "#.#.#"]);
+    expect(packedCells(g.cells, g.cols, g.rows)).toBe(true);
+    const solid = toGrid(["##.#.", "##.#.", "#.#.#", ".#.#.", "#.#.#"]);
+    expect(packedCells(solid.cells, solid.cols, solid.rows)).toBe(false);
+    const hole = toGrid(["#.#.#", ".#.#.", "#...#", ".#..#", "#.#.#"]);
+    expect(packedCells(hole.cells, hole.cols, hole.rows)).toBe(false);
+    const frame = toGrid(["..#.#", ".#.#.", "#.#.#", ".#.#.", "#.#.#"]);
+    expect(packedCells(frame.cells, frame.cols, frame.rows)).toBe(false);
+    const side = toGrid(["#.#.#", ".#.#.", "..#.#", ".#.#.", "#.#.#"]);
+    expect(packedCells(side.cells, side.cols, side.rows)).toBe(false);
+  });
+});
+
+describe("applyCellEdits", () => {
+  it("paints each edit through its unit's placed box, in order, skipping units whose key no longer matches or cells off the grid", () => {
+    const g = toGrid(["...", "...", "..."]);
+    const boxes = [{ key: "beh:initial", col: 1, row: 1 }, { key: "alef:final", col: 0, row: 0 }];
+    applyCellEdits(g.cells, g.cols, g.rows, (u) => boxes[u] ?? null, {
+      cells: [
+        { unitIndex: 0, key: "beh:initial", dx: 0, dy: 0, on: true },
+        { unitIndex: 0, key: "beh:initial", dx: 1, dy: -1, on: true },
+        { unitIndex: 1, key: "alef:final", dx: 2, dy: 0, on: false },
+        { unitIndex: 1, key: "seen:final", dx: 0, dy: 1, on: true },
+        { unitIndex: 1, key: "alef:final", dx: 5, dy: 0, on: true },
+        { unitIndex: 7, key: "x", dx: 0, dy: 0, on: true },
+      ],
+    });
+    expect(Array.from(g.cells)).toEqual([0, 0, 0, 0, 1, 0, 0, 0, 0]);
+    applyCellEdits(g.cells, g.cols, g.rows, (u) => boxes[u] ?? null, {});
+    expect(Array.from(g.cells)).toEqual([0, 0, 0, 0, 1, 0, 0, 0, 0]);
   });
 });
 

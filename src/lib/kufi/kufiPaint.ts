@@ -1,32 +1,20 @@
 /**
  * Painting single cells of a packed Kufi panel, the last-resort tool: a cell
  * is turned on or off as a `KufiCellEdit`, an offset from the nearest
- * letter's placed box (`applyCellEdits` in the packer reads it back the same
- * way), and the drawn panel is updated here, in arithmetic, so a click or a
- * drag never waits on the worker. The result a paint gives is what the
- * packer gives for the same inputs: the cells with the edits applied over
- * the packed lattice, and `editsBreakPacking` by the packer's rule (a 2×2 of
- * paper or of ink, or a double break in the frame). Pure: no React, no
- * Konva, no `./harfbuzz`.
+ * letter's placed box, and the drawn panel is updated here, in arithmetic,
+ * so a click or a drag never waits on the worker. The result a paint gives
+ * is what the packer gives for the same inputs: the packed lattice with the
+ * edits painted over it (`applyCellEdits`) and `editsBreakPacking` by the
+ * packer's own measure (`packedCells`), both shared through `kufiGrid`.
+ * Pure: no React, no Konva, no `./harfbuzz`.
  */
-import { emptyBlocks2x2, inkBlocks2x2 } from "./kufiGrid";
-import { kufiGlyphById, placementOf } from "./kufiHit";
-import { stretchGlyph } from "./kufiAlphabet";
-import type { KufiCellEdit, KufiPackResult, KufiPanelEdits, KufiPlacement } from "./kufiPack";
+import { applyCellEdits, packedCells } from "./kufiGrid";
+import { placedBox, placementInk, placementOf } from "./kufiHit";
+import type { KufiCellEdit, KufiPackResult, KufiPanelEdits } from "./kufiPack";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
 export type KufiPaint = { kind: "ok"; edits: KufiPanelEdits; result: Ok } | { kind: "same" } | { kind: "refused" };
-
-/** The placed box's rows and columns (the glyph stretched, then turned). */
-function boxSize(p: KufiPlacement): { h: number; w: number } {
-  const g = kufiGlyphById(p.glyphId);
-  if (!g) return { h: 0, w: 0 };
-  const rows = stretchGlyph(g, p.stretch);
-  const h = rows.length;
-  const w = rows[0]?.length ?? 0;
-  return p.turn % 2 === 0 ? { h, w } : { h: w, w: h };
-}
 
 /**
  * The unit whose placed box is nearest the cell (Chebyshev distance to the
@@ -36,7 +24,7 @@ export function nearestKufiUnit(result: Ok, col: number, row: number): number | 
   let best: number | null = null;
   let bestD = Infinity;
   for (const p of result.placements) {
-    const { h, w } = boxSize(p);
+    const { h, w } = placedBox(p);
     const dc = col < p.col ? p.col - col : col >= p.col + w ? col - (p.col + w - 1) : 0;
     const dr = row < p.row ? p.row - row : row >= p.row + h ? row - (p.row + h - 1) : 0;
     const d = Math.max(dc, dr);
@@ -55,7 +43,7 @@ function cellOf(result: Ok, e: KufiCellEdit): { col: number; row: number } | nul
   return { col: p.col + e.dx, row: p.row + e.dy };
 }
 
-/** The index in `edits.cells` of the edit on this cell, or -1. */
+/** The index in `edits.cells` of the last edit on this cell, or -1. */
 export function cellEditAt(result: Ok, edits: KufiPanelEdits | undefined, col: number, row: number): number {
   const list = edits?.cells ?? [];
   for (let i = list.length - 1; i >= 0; i--) {
@@ -65,20 +53,18 @@ export function cellEditAt(result: Ok, edits: KufiPanelEdits | undefined, col: n
   return -1;
 }
 
-/** The packer's rule for `editsBreakPacking`: no 2×2 of paper or of ink, and no double break in the frame. */
-function packedCells(cells: Uint8Array, cols: number, rows: number): boolean {
-  const grid = { cols, rows, cells };
-  if (inkBlocks2x2(grid).length || emptyBlocks2x2(grid).length) return false;
-  for (let c = 0; c + 1 < cols; c++) {
-    if (!cells[c] && !cells[c + 1]) return false;
-    const b = (rows - 1) * cols + c;
-    if (!cells[b] && !cells[b + 1]) return false;
-  }
-  for (let r = 0; r + 1 < rows; r++) {
-    if (!cells[r * cols] && !cells[(r + 1) * cols]) return false;
-    if (!cells[r * cols + cols - 1] && !cells[(r + 1) * cols + cols - 1]) return false;
-  }
-  return true;
+/**
+ * The cell's state under `list`: the letters' own ink (what the packer owns
+ * there, short of a dot or a filler square, which no placement names), with
+ * the last edit on the cell painted over it. Letting `applyCellEdits` do the
+ * painting keeps this the packer's order.
+ */
+function stateUnder(result: Ok, list: KufiCellEdit[], col: number, row: number): boolean {
+  const i = row * result.cols + col;
+  const cells = new Uint8Array(result.cols * result.rows);
+  for (const p of result.placements) for (const k of placementInk(result, p)) cells[k] = 1;
+  applyCellEdits(cells, result.cols, result.rows, (k) => placementOf(result, k), { cells: list });
+  return cells[i] === 1;
 }
 
 /** True when inking the cell would complete a 2×2 of ink. */
@@ -93,10 +79,13 @@ function makesInk2x2(result: Ok, col: number, row: number): boolean {
  * is set, and a cell already in that state is `same` (a drag paints every
  * cell it crosses the way its first cell went). Turning a cell on that would
  * make a 2×2 of ink is `refused`; erasing never is. An edit already on the
- * cell is removed first: a toggle back to the packed state leaves no edit
- * behind, and a set replaces it. The returned result is `result` with the
- * one cell changed and `editsBreakPacking` recomputed; its placements are
- * the same objects.
+ * cell is removed first, and a new one added only if the cell would not then
+ * show the wanted state by itself: a toggle back to the packed state leaves
+ * no edit behind, a toggle over a letter that has since moved onto a painted
+ * cell leaves an erase, and a set replaces. The returned result is `result`
+ * with the one cell changed and `editsBreakPacking` recomputed; its
+ * placements are the same objects. A panel with no letters is `same`: there
+ * is nothing to hang an edit on.
  */
 export function paintKufiCell(result: Ok, edits: KufiPanelEdits | undefined, col: number, row: number, on?: boolean): KufiPaint {
   if (col < 0 || row < 0 || col >= result.cols || row >= result.rows) return { kind: "same" };
@@ -107,11 +96,15 @@ export function paintKufiCell(result: Ok, edits: KufiPanelEdits | undefined, col
   if (want && makesInk2x2(result, col, row)) return { kind: "refused" };
   const at = cellEditAt(result, edits, col, row);
   const list = (edits?.cells ?? []).filter((_, k) => k !== at);
-  // no edit left on the cell: the packed state is what the toggle asked for
-  if (at < 0 || on !== undefined) {
+  // A cell with no edit shows the packed state, so the change needs one. A
+  // cell whose edit was just removed needs one only if what it shows without
+  // it is not the wanted state. (A dot or a filler square is ink no placement
+  // names, so under a removed edit it reads as paper: a toggle to paper over
+  // a dot that moved under a painted cell is the one case this draws wrong.)
+  if (at < 0 || stateUnder(result, list, col, row) !== want) {
     const unitIndex = nearestKufiUnit(result, col, row);
     const p = unitIndex === null ? null : placementOf(result, unitIndex);
-    if (unitIndex === null || !p) return { kind: "refused" };
+    if (unitIndex === null || !p) return { kind: "same" };
     list.push({ unitIndex, key: p.key, dx: col - p.col, dy: row - p.row, on: want });
   }
   const cells = result.cells.slice();

@@ -239,7 +239,13 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       if (over.current) e.preventDefault();
       setAlt(false);
     };
-    const blur = () => setAlt(false);
+    // losing the window ends a held gesture too, committing nothing: a
+    // mouseup the page never sees must not commit on the next click anywhere
+    const blur = () => {
+      setAlt(false);
+      drag.current?.release(true);
+      paint.current?.release(true);
+    };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     window.addEventListener("blur", blur);
@@ -500,6 +506,8 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       const c = pointerCell();
       if (!c || sameCell(c, state.last)) return;
       state.last = c;
+      // the outline follows the cell being painted
+      setCellHover(inside(c) ? c : null);
       at(c);
     };
     const release = (abort = false) => {
@@ -508,7 +516,11 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       stage.off(".kufipaint");
       window.removeEventListener("mouseup", onUp);
       onPreview(null);
-      if (abort || !state.changed || !state.edits) return;
+      if (abort) {
+        setAlt(false);
+        return;
+      }
+      if (!state.changed || !state.edits) return;
       onCommit(fromKey, state.edits, state.result);
     };
     const onUp = () => release();

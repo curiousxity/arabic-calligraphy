@@ -20,6 +20,7 @@ afterAll(() => _internal.setClockOverride(null));
 const BAQARAH = "لا يكلف الله نفسا إلا وسعها";
 const ALLAH = "الله";
 const SHAHADA = "لا إله إلا الله محمد رسول الله";
+const NASR = "نصر من الله";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
@@ -357,18 +358,38 @@ describe("routes", () => {
     expect(again).toEqual(r);
   }, 30000);
 
-  it("a word moves along its path by its first letter's pin; where nothing can make room the packer says no rather than moving the pin", () => {
+  it("a word moves along its path by its first letter's pin, the letters before it lengthening along the line to absorb the shift", () => {
+    // نصر من الله at 15×9: نصر along the bottom, من up the left side, الله along the top
+    const r = expectPacked(packKufiPanel({ text: NASR, cols: 15, rows: 9 }), NASR);
+    const { units } = resolveKufiText(NASR);
+    const meem = units.findIndex((u) => u.wordIndex === 1);
+    const p = r.placements[meem];
+    expect(p.turn).toBe(1);
+    const k = 2;
+    const on = { ...p, row: p.row - k };
+    const moved = packKufiPanel({ text: NASR, cols: 15, rows: 9, previous: r, edits: { routes: { 1: k }, pinned: { [meem]: on } } });
+    expect(moved.ok).toBe(true);
+    if (!moved.ok) return;
+    expectPacked(moved, NASR);
+    expect(moved.placements[meem]).toEqual(on);
+    // the ص before the corner grew along the bottom line by the shift; الله after the corner is untouched
+    const sad = units.findIndex((u) => u.key === "sad:medial");
+    expect(moved.placements[sad].stretch[0]).toBe(r.placements[sad].stretch[0] + k);
+    expect(moved.placements[5]).toEqual(r.placements[5]);
+    // one cell up leaves the ر no room under the م: refused, not moved
+    const one = packKufiPanel({ text: NASR, cols: 15, rows: 9, previous: r, edits: { routes: { 1: 1 }, pinned: { [meem]: { ...p, row: p.row - 1 } } } });
+    expect(one.ok).toBe(false);
+  }, 30000);
+
+  it("where nothing can make room the packer says no rather than moving the pin", () => {
     const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
     // the ي of يكلف, one cell on (right to left) along the bottom line: the لا before it has no stretch along the line
     const yeh = r.placements[1];
     expect(yeh.turn).toBe(0);
     const on = { ...yeh, col: yeh.col - 1 };
     const moved = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits: { routes: { 1: 1 }, pinned: { 1: on } } });
-    if (moved.ok) {
-      expect(moved.placements[1]).toEqual(on);
-      // words 0 and 1 keep their lines
-      expect(moved.placements[0]).toEqual(r.placements[0]);
-    } else expect(["tooShort", "tooLong", "pinConflict"]).toContain(moved.reason);
+    expect(moved.ok).toBe(false);
+    if (!moved.ok) expect(["tooShort", "tooLong", "pinConflict"]).toContain(moved.reason);
   }, 30000);
 });
 

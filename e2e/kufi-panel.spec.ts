@@ -639,6 +639,64 @@ test.describe("editing on the canvas", () => {
       .toBe(true);
   });
 
+  /**
+   * نصر من الله at 15×9: نصر along the bottom, من up the left side (unit 3,
+   * the م, opens word 1 at the bottom-left corner), الله along the top. The
+   * ص before the corner has a stretch along the bottom line, so من can be
+   * dragged two cells up its path: the ص lengthens by two and the ر moves
+   * into the corner under the م. One cell up does not pack (the ر has no
+   * room under a م moved only one), so the drag passes a refusal on its way.
+   */
+  const NASR = "نصر من الله";
+  const savedNasr = {
+    ...savedProject,
+    blocks: [{ ...savedProject.blocks[0], text: NASR, x: -45, y: -27, panelCols: 15, panelRows: 9 }],
+  };
+
+  test("dragging a word's first letter along its path moves the word: live preview, one step on release, undo restores", async ({ page }) => {
+    const errors = collectConsoleErrors(page);
+    await openSavedPanel(page, savedNasr);
+    const box = await blockClientBox(page, PANEL_ID);
+    await expect
+      .poll(async () => inkPixels(page, await blockClientBox(page, PANEL_ID)), { timeout: 15_000 })
+      .toBeGreaterThan(box.width * box.height * 0.15);
+    await expect.poll(async () => (await kufiEditTargets(page)).letters.length).toBe(6);
+    await pointerAway(page, box);
+    const before = await inkSignature(page, box);
+    const targets = await kufiEditTargets(page);
+    const word = targets.words.find((w) => w.word === 1)!;
+    expect(word).toMatchObject({ unit: 3, dc: 0, dr: -1 });
+    const letter = targets.letters.find((l) => l.unit === 3)!;
+    for (const e of targets.ends.filter((e) => e.unit === 3)) expect(Math.hypot(e.x - letter.x, e.y - letter.y)).toBeGreaterThan(targets.cellPx);
+    const rowOf = (y: number) => Math.floor((y - targets.origin.y) / targets.cellPx);
+    const meemRow = rowOf(letter.y);
+
+    await page.mouse.move(letter.x, letter.y);
+    await settleFrames(page);
+    await page.mouse.down();
+    await page.mouse.move(letter.x, letter.y - 2 * targets.cellPx, { steps: 12 });
+    // live: the م has moved two cells up its line in the drawn panel while nothing is committed
+    await expect
+      .poll(async () => rowOf((await kufiEditTargets(page)).letters.find((l) => l.unit === 3)!.y), { timeout: 5_000 })
+      .toBe(meemRow - 2);
+    expect(await panelEdits(page)).toBeUndefined();
+    await page.mouse.up();
+
+    // committed: the route recorded, every letter of the word pinned where it landed, one step
+    await expect.poll(async () => (await panelEdits(page))?.routes?.[1]).toBe(2);
+    const edits = (await panelEdits(page))!;
+    expect(edits.pinned?.[3]).toMatchObject({ unitIndex: 3, key: "meem:initial" });
+    expect(edits.pinned?.[4]).toMatchObject({ unitIndex: 4, key: "noon:final" });
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).not.toEqual(before);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).toEqual(before);
+    await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+    expect(errors).toEqual([]);
+  });
+
   /** A paper cell whose painting completes no 2×2 of ink (preferring the panel's inside), or null. */
   function paintableCell(grid: string[], skip: Set<string> = new Set()): { col: number; row: number } | null {
     const ink = (c: number, r: number) => grid[r]?.[c] === "#";

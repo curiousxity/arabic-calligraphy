@@ -151,10 +151,16 @@ describe("kufiPanelBlock", () => {
       expect(out!.pinned?.[1]).toEqual({ ...turned.placements[1], row: 6 });
     });
 
-    it("refuses a route that would take the letter's box off the panel, or a word the text does not have", () => {
+    it("refuses a route that would take any of the letter's box off the panel, or a word the text does not have", () => {
       expect(kufiRouteEdits(undefined, committed, units, 1, 13)).toBeNull();
-      expect(kufiRouteEdits(undefined, committed, units, 1, -9)).toBeNull();
+      // yeh.initial.0 is 2 wide at col 12: 7 cells back puts its right edge on col 20, 8 puts it past
+      expect(kufiRouteEdits(undefined, committed, units, 1, -7)).not.toBeNull();
+      expect(kufiRouteEdits(undefined, committed, units, 1, -8)).toBeNull();
       expect(kufiRouteEdits(undefined, committed, units, 7, 1)).toBeNull();
+      // a turned letter past the bottom edge: yeh.initial.0 turned once is 2 tall at row 8, going down 11 is off
+      const turned: Ok = { ...committed, placements: placements.map((p, i) => (i === 1 ? { ...p, turn: 3, col: 0, row: 8 } : p)) };
+      expect(kufiRouteEdits(undefined, turned, units, 1, 11)).not.toBeNull();
+      expect(kufiRouteEdits(undefined, turned, units, 1, 12)).toBeNull();
     });
 
     it("a committed re-route pins every letter of the word where the packer put it", () => {
