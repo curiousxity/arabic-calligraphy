@@ -723,7 +723,14 @@ and left a step below the peak. The user drew its start (2026-10-29):
 
 The studio's tail ends in a short flat cut, and the held tail matches it.
 
-Accepted (the user, 2026-10-29), each pair against the sheet's whole outline:
+**Superseded the same day.** The user then asked to approve every item by hand ("Before we move on, let me
+manually approve every item we have so far"). Shown each stroke alone, as studio | ours over the studio's edge | ours
+alone, they approved only three: "approve numbers 1 and 8 from the first sheet. only approve 9 from the second sheet.
+reject the rest". Approved: **366.s0 (k10), 357.s0 (k10), 347.s0 (k19)**. Rejected: 290.s1, 297.s1, 301.s1, 309.s1,
+311.s1, 313.s1 (k10), 299.s1 (k7), 312.s1 (k21 and k6), 356.s0 (k21 and k7). The table below is the pick as it
+stood before that review; only the three approved rows stand.
+
+The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |
 |---|---|---|
