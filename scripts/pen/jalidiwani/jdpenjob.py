@@ -177,6 +177,12 @@ CUTWIN = os.environ.get("PEN_CUTWIN", "both")
 LEAD = {x for x in os.environ.get("PEN_LEAD", "").split(",") if x}
 LEAD_STEP = float(os.environ.get("PEN_LEAD_STEP", -0.15))  # the short move, nuqta: - left, + right
 LEAD_SKIP, LEAD_NEAR = 0.3, 0.6
+# PEN_FREEHOLD ("312.s1~c0,..."): a PEN_CUT half's nib held at one angle over its first PEN_FREEHOLD_L nuqta from its free
+# end. Judged at its free end only (PEN_CUTWIN), 312.s1's and 356.s0's right halves spun the nib about 180 degrees
+# there (k10: 275 down to 86 over 0.9 nuqta, 266 down to 88 over 2.3), where the earlier fits held it at 80-92. Named
+# by half: 356.s0's left half turns about 90 degrees into its hook at its free end, as it should.
+FREEHOLD = {x for x in os.environ.get("PEN_FREEHOLD", "").split(",") if x}
+FREEHOLD_L = float(os.environ.get("PEN_FREEHOLD_L", 1.0))
 
 
 def end_windows(nodes, pen=PEN, stroke=None):
@@ -744,7 +750,16 @@ def fit(stroke, log, size=None, lead=None):
         lift = LIFT_LONG if length(nodes) >= LONG else LIFT
         # a held start is the full nib: let narrow, 347.s0's left half began 0.14 nuqta under the peak's shoulder (k16)
         return {"angle": a, "lift_start": 0.0 if held else lift, "lift_end": lift, "anchor": list(anc), "size": SIZE and not size,
-                **({"turns": list(range(1, len(nodes)))} if ROTATE else {})}
+                **({"turns": turns_of(nodes)} if ROTATE else {})}
+
+    def turns_of(nodes):  # each node turns on its own, but none within FREEHOLD_L of a PEN_FREEHOLD half's free end
+        ts = list(range(1, len(nodes)))
+        if stroke not in FREEHOLD or stroke not in CUT_AT:
+            return ts
+        P_ = np.array([q["p"] for q in nodes]); arc = np.r_[0, np.cumsum(np.linalg.norm(np.diff(P_, axis=0), axis=1))]
+        if stroke.endswith("~c0"):  # free end first: one angle up to the first node past FREEHOLD_L
+            return [i for i in ts if arc[i] > FREEHOLD_L]
+        return [i for i in ts if arc[i - 1] < arc[-1] - FREEHOLD_L]
 
     def flick_of(nodes, a, anc):  # one angle, the start narrowing onto a corner over as much of the stroke as it needs
         return {"angle": a, "lift_start": length(nodes), "lift_end": LIFT, "anchor": list(anc), "size": SIZE and not size}
@@ -832,12 +847,22 @@ if __name__ == "__main__":
         k, sid = s.split(".", 1)
         return len(split_piece([transform(k), dict(strokes(k))[sid]])[1])
     def bigger_first(s):  # a PEN_CUT stroke's halves, the bigger first: its size then holds the other
-        return sorted([f"{s}~c0", f"{s}~c1"], key=lambda h: -cv2.contourArea(ref_ring(job_of(h)[0]).astype(np.float32)))
+        h = sorted([f"{s}~c0", f"{s}~c1"], key=lambda h: -cv2.contourArea(ref_ring(job_of(h)[0]).astype(np.float32)))
+        # PEN_LEAD starts the left half from the right half's end, so the right half must come first; where the left is
+        # the bigger (301.s1, 309.s1, 312.s1), it is fitted first only to set the shared size, then again behind the
+        # right half at that size (the smaller half setting the size bulged 297.s1, k1)
+        return h + [h[0]] if s in LEAD and h[0].endswith("~c1") else h
+    sized = {}  # a PEN_CUT stroke's shared nib size, from its first fit
     for st in [p for s in names for p in ([s] + [f"{s}~h{i}" for i in range(1, hairs(s) + 1)] if s in SPLIT
                                           else bigger_first(s) if s in CUT else [s])]:
-        other = st.endswith(("~c0", "~c1")) and res.get(st[:-1] + ("1" if st.endswith("0") else "0"))
+        base = st.split("~")[0]
+        size = sized.get(base) if st.endswith(("~c0", "~c1")) else None
         lead = st.endswith("~c1") and st[:-3] in LEAD and res.get(st[:-1] + "0")
-        res[st], p = fit(st, log, size=other and other["size"], lead=lead or None)
+        if lead and size is None:  # the bigger left half's first pass: no right half yet to start from
+            lead = None
+        res[st], p = fit(st, log, size=size, lead=lead or None)
+        if st.endswith(("~c0", "~c1")) and base not in sized:
+            sized[base] = res[st]["size"]
         pics.update(p)
         json.dump(res, open(os.path.join(od, "pen.json"), "w"))
         json.dump(pics, open(os.path.join(od, "pics.json"), "w"))
