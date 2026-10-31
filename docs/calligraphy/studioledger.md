@@ -288,6 +288,12 @@ Times are minutes:seconds into the individual-letters lesson.
   pen". Every upstroke node nearer than D degrees to the path's direction is turned to D the other way round (eased
   in over two nodes), and the last two nodes narrow to a quarter of the nib. Turning the nib the other way bent the
   stroke out of shape. Taken: 742 at 12 degrees, 744 at 10 (it already sits 13-15 off, so only the lift changes it).
+- **Where a letter meets the next one (2026-10-31):** in الرحيم the ya's tail tip (077) ran a little past the
+  studio's edge where the meem's head (618b) starts, and the meem's tip stood a little above it. The user: "Slightly
+  irregular edge between the ya and meem in the second word". The joint trim only knew joints between a letter's own
+  strokes, so it never looked there. Each letter now also takes the point where it meets its neighbour in a word (in
+  its own units, from the studio's word) as a joint, under the same rule: ink past the studio's edge, wholly within
+  1.5 nibs of it, is erased. Only 077 and 618b have such a point so far.
 
 **Every joint trimmed to the studio edge**
 
