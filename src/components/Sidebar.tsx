@@ -35,6 +35,7 @@ import { makeId } from "./sidebar/utils";
 import { hasOwnFont, hasOwnText, supportsDiacriticOverrides } from "../lib/blockCapabilities";
 import { KufiPanelPanel } from "./sidebar/KufiPanelPanel";
 import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
+import type { KufiTool } from "../lib/kufi/kufiPanelBlock";
 import {
   SelectRow,
   ColorRow,
@@ -209,7 +210,9 @@ export type SidebarProps = {
   /** Applies one of the Kufi panel's other arrangements to block `id`; one undo step, dropped if its inputs moved on from `fromKey`. */
   onApplyKufiEdits?: (id: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => void;
   /** Why the last canvas edit of a Kufi panel changed nothing, keyed to the panel and its inputs. */
-  kufiNotice?: { blockId: number; key: string; text: string } | null;
+  /** The Kufi panel canvas tool (App state, never saved) and picking another. */
+  kufiTool?: KufiTool;
+  onSetKufiTool?: (tool: KufiTool) => void;
   /** The Kufi panel letter clicked on the canvas, whose forms the Kufi panel section lists. */
   kufiLetter?: { blockId: number; unitIndex: number } | null;
   /** Guides — see .claude/rules/guides.md. */
@@ -415,7 +418,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onFitKufiPanel,
   onReleaseKufiPanelPins,
   onApplyKufiEdits,
-  kufiNotice,
+  kufiTool,
+  onSetKufiTool,
   kufiLetter,
   onAddGuide,
   onAddSvgGuide,
@@ -1445,7 +1449,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onFit={onFitKufiPanel}
                 onReleasePins={onReleaseKufiPanelPins}
                 onApplyEdits={onApplyKufiEdits && ((fromKey, edits, result) => onApplyKufiEdits(selectedBlock.id, fromKey, edits, result))}
-                notice={kufiNotice ?? null}
+                tool={kufiTool}
+                onSetTool={onSetKufiTool}
                 letter={kufiLetter && kufiLetter.blockId === selectedBlock.id ? kufiLetter.unitIndex : null}
               />
             </CollapsibleSection>

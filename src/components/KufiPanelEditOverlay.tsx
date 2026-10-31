@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
-import { Group, Line, Rect } from "react-konva";
+import { Group, Label, Line, Rect, Tag, Text } from "react-konva";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
 import { complementOf } from "../lib/complementColor";
 import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
@@ -14,6 +14,7 @@ import {
   kufiGlyphById,
   nearestHandle,
   nearestHandleAt,
+  placedBox,
   placementInk,
   placementOf,
   routeHandleOf,
@@ -31,7 +32,9 @@ import {
   kufiPinWordEdits,
   kufiRouteEdits,
   kufiStretchEdits,
+  type KufiTool,
 } from "../lib/kufi/kufiPanelBlock";
+import { kufiNoticeAt } from "../lib/kufi/kufiPanelStatus";
 import { kufiLayoutKey, previewKufiLayout, type KufiLayoutInputs } from "../lib/kufi/kufiLayoutClient";
 import { PULL_REST_MS, pullAnswer, pullMove, pullRelease, pullRest, pullStart, snapPull, type KufiPull } from "../lib/kufi/kufiPull";
 import { resolveKufiText } from "../lib/kufi/kufiWords";
@@ -54,11 +57,23 @@ type Props = {
   onPreview: (result: Ok | null) => void;
   /** A committed edit: the edits to save (already pinned), the result they draw, and the inputs they were made against. */
   onCommit: (fromKey: string, edits: KufiPanelEdits, result: Ok) => void;
-  /** Why a gesture changed nothing, against the inputs it was made on. */
-  onNotice: (fromKey: string, text: string) => void;
+  /** Why a gesture changed nothing, against the inputs it was made on, and the letter it was on; null when a gesture starts (clears the one on show). */
+  onNotice: (fromKey: string, notice: KufiNotice | null) => void;
+  /** The notice on show (App clears it after `KUFI_NOTICE_MS`): drawn beside its letter while `key` is these inputs' key. */
+  notice?: ({ key: string } & KufiNotice) | null;
+  /** The tool picked in the sidebar's tool row: which handles show and what a press does. */
+  tool?: KufiTool;
   /** A still click on a letter selects it (its options show in the sidebar); a still click on paper clears it. */
   onSelectLetter?: (unitIndex: number | null) => void;
 };
+
+/** A refusal or confirmation, drawn as a short label beside the letter it is about. */
+export type KufiNotice = { text: string; unitIndex: number };
+/** How long a notice stays beside its letter. */
+export const KUFI_NOTICE_MS = 2000;
+/** The notice label's type size and padding, in screen px (the label is drawn at the stage's inverse scale). */
+const NOTICE_FONT_PX = 12;
+const NOTICE_PAD_PX = 4;
 
 /** How far a press may drift, in screen px, and still count as a click. */
 const CLICK_SLOP = 10;
@@ -67,8 +82,12 @@ const DOUBLE_CLICK_WINDOW_MS = 600;
 /** The furthest a stroke may be pulled past its current length, or a word along its path, in one drag, in cells. */
 const MAX_PULL = 12;
 const OUTLINE_PX = 1.5;
-/** The stretch handle's side, as a fraction of a cell. */
+/** The route handle's side, as a fraction of a cell. */
 const HANDLE = 0.7;
+/** A stretch end's square in the Stretch tool: a whole cell, every end of the hovered letter at once. */
+const STRETCH_HANDLE = 1;
+/** The ends not under the pointer draw this faint, so the letter's ink still reads beneath them. */
+const IDLE_HANDLE_OPACITY = 0.55;
 /** How long the cell outline shows red after a refused paint: the one transient coloured cue. */
 export const FLASH_MS = 300;
 export const FLASH_COLOR = "#e03131";
@@ -78,11 +97,10 @@ export const NO_ROOM_TO_ROUTE = "No room to move that word here";
 export const NO_OTHER_FORM_FITS = "No other form of that letter fits here";
 export const SINGLE_FORM = "That letter has one form";
 
-/** What is under the pointer: the letter, the handle it is on (if any) and the handle nearest to it (a stretch end, or a first letter's route handle). */
-type Hover = { unitIndex: number; on: KufiHandle | null; nearest: KufiHandle | null };
+/** What is under the pointer: the letter, and the current tool's handle it is on (if any). */
+type Hover = { unitIndex: number; on: KufiHandle | null };
 
-const sameHover = (a: Hover | null, b: Hover | null) =>
-  a === b || (!!a && !!b && a.unitIndex === b.unitIndex && a.on === b.on && a.nearest === b.nearest);
+const sameHover = (a: Hover | null, b: Hover | null) => a === b || (!!a && !!b && a.unitIndex === b.unitIndex && a.on === b.on);
 const sameCell = (a: Cell | null, b: Cell | null) => a === b || (!!a && !!b && a.col === b.col && a.row === b.row);
 
 /**
@@ -134,7 +152,7 @@ type Drag = {
   release: (abort?: boolean) => void;
 };
 
-/** An Alt-drag painting cells: its running edits and panel, and whether cells go on or off (the first cell decides). */
+/** A paint drag (the Paint tool, or Alt): its running edits and panel, and whether cells go on or off (the first cell decides). */
 type Paint = {
   edits: KufiPanelEdits | undefined;
   result: Ok;
@@ -145,32 +163,48 @@ type Paint = {
 };
 
 /**
- * Editing a Kufi panel on the canvas, with no mode to enter: hover a letter
- * and it outlines in the block's editing colour, with one small square on
- * the stretch handle nearest the pointer; click it to cycle its square-Kufi
- * alternates (the ones that pack; a click that finds none says so in the
- * Kufi panel's status line); drag the square to lengthen or shorten that
- * stroke in whole cells while the rest of the panel repacks around it live.
- * A handle sits at the end of a stroke a stretch point lengthens, or, for a
- * stroke with no free end (a baseline joined on both sides), on the slice
- * itself; either way the drag runs along the stroke.
+ * Editing a Kufi panel on the canvas, with the **tool** picked in the
+ * sidebar's tool row (`KufiToolRow`; App state, Select by default, back to
+ * Select when the selection changes):
+ *
+ * - **Select**: hover outlines a letter; a still click selects it and swaps
+ *   it to its next square-Kufi alternate that packs (a click that finds none
+ *   says so beside the letter). No handles.
+ * - **Stretch**: hover outlines a letter and shows **every** stretch end of
+ *   it that can fit, each a whole-cell square; drag one to lengthen or
+ *   shorten that stroke in whole cells while the rest of the panel repacks
+ *   around it live. A still click on a letter (or a handle) only selects it.
+ * - **Move word**: every word's route handle shows; drag one to slide the
+ *   word along its line. A still click on a letter only selects it.
+ * - **Paint**: the cell under the pointer outlines; click or drag paints, as
+ *   Alt does from any tool.
+ *
+ * In every tool but Paint a press on a letter away from a handle is not
+ * claimed: a drift drags the whole panel.
+ *
+ * A stretch handle sits at the end of a stroke a stretch point lengthens,
+ * or, for a stroke with no free end (a baseline joined on both sides), on
+ * the slice itself; either way the drag runs along the stroke.
+ *
+ * **Refusals and confirmations draw beside the letter** (`notice`, a Konva
+ * label named `kufi-notice`, export-hidden with the rest of the overlay):
+ * the overlay reports one through `onNotice`, App holds it for
+ * `KUFI_NOTICE_MS` and clears it when the next gesture starts.
  *
  * **A word's first letter carries a route handle** (`routeHandleOf`: its
- * leading cell, on the baseline side), ranked with the letter's stretch ends
- * so hover shows whichever handle is nearest the pointer. Dragging it along
+ * leading cell, on the baseline side), shown in the Move word tool. Dragging it along
  * the word's line asks the packer to hold the word that many cells further
  * on (or back), live, as a stretch does; release commits the preview with
  * every letter of the word pinned where it landed, and the offset recorded
  * in `edits.routes`. A press anywhere else on a first letter is the letter's
  * own, as on any letter: a drift drags the whole panel, a still press is a
- * click. Where a route handle and a stretch end share a cell, the pointer's
- * place in the cell decides: the handle whose drawn square is nearer wins
- * (`nearestHandleAt`; an exact tie goes to the route), on hover and press
- * alike. Where nothing packs the word snaps back and the status line says so.
+ * click. Each tool hit-tests only its own handles, so a route handle and a
+ * stretch end sharing a cell never compete. Where nothing packs the word
+ * snaps back and says so beside the letter.
  *
- * **Alt paints single cells.** Holding Alt shows a thin outline round the
- * cell under the pointer (any cell, paper or ink); Alt-click toggles it and
- * Alt-drag paints every cell crossed the way the first cell went, one undo
+ * **Paint (or Alt from any tool) paints single cells.** A thin outline
+ * shows round the cell under the pointer (any cell, paper or ink); a click
+ * toggles it and a drag paints every cell crossed the way the first cell went, one undo
  * step per click or drag. The cells between two pointer samples are filled
  * in (`cellsBetween`, a 4-connected line), so a fast hand paints the same
  * line as a slow one; each cell gets its own 2×2 check. A cell that would
@@ -199,7 +233,19 @@ type Paint = {
  * step; if nothing the pointer reached packs, nothing is committed and the
  * stroke (or word) snaps back.
  */
-export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, inputs, cell, color, onPreview, onCommit, onNotice, onSelectLetter }) => {
+export const KufiPanelEditOverlay: React.FC<Props> = ({
+  result,
+  committed,
+  inputs,
+  cell,
+  color,
+  onPreview,
+  onCommit,
+  onNotice,
+  notice = null,
+  tool = "select",
+  onSelectLetter,
+}) => {
   const [hover, setHover] = useState<Hover | null>(null);
   const [cellHover, setCellHover] = useState<Cell | null>(null);
   const [alt, setAlt] = useState(false);
@@ -241,9 +287,11 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
 
   const width = result.cols * cell;
   const height = result.rows * cell;
+  /** Whether a press paints: the Paint tool, or Alt held in any tool. */
+  const painting = alt || tool === "paint";
 
   // The cursor says what a press here does; cleared with the hover.
-  const cursor = alt
+  const cursor = painting
     ? cellHover
       ? "crosshair"
       : null
@@ -318,28 +366,33 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
   };
   const pointerCell = (): Cell | null => pointer()?.cell ?? null;
   const inside = (c: Cell | null): c is Cell => !!c && c.col >= 0 && c.row >= 0 && c.col < result.cols && c.row < result.rows;
-  /** The letter's handles: its route handle first (it takes a tie), then its stretch ends. */
-  const handlesOf = (r: Ok, unitIndex: number): KufiHandle[] => {
-    const u = units[unitIndex];
-    const route = u && firstUnitOfWord(units, u.wordIndex) === unitIndex ? routeHandleOf(r, units, u.wordIndex) : null;
-    const ends = stretchEnds(r, unitIndex).filter(endShown);
-    return route ? [route, ...ends] : ends;
-  };
   /**
-   * What the pointer is on. Of the handles whose hit cells include the
-   * pointer's cell (a route handle and a stretch end often share a first
-   * letter's leading corner), the one whose drawn square is nearest the
-   * pointer: so what hover shows is what a press takes.
+   * What the pointer is on: the letter, and the handle of the current tool
+   * whose hit cells include the pointer's cell (Stretch: a stretch end that
+   * can fit; Move word: a route handle; Select and Paint have none). A
+   * handle's paper cell counts as its letter's, so hover shows what a press
+   * takes.
    */
   const hoverAt = (p: { at: { x: number; y: number }; cell: Cell } | null): Hover | null => {
     if (!p) return null;
     const { at, cell: c } = p;
-    const end = hitStretchEnd(result, c.col, c.row);
-    const hits = [hitRouteHandle(result, units, c.col, c.row), end && endShown(end) ? end : null].filter((h): h is KufiHandle => h !== null);
+    const hits: KufiHandle[] = [];
+    if (tool === "stretch") {
+      const end = hitStretchEnd(result, c.col, c.row);
+      if (end && endShown(end)) hits.push(end);
+    } else if (tool === "move") {
+      const route = hitRouteHandle(result, units, c.col, c.row);
+      if (route) hits.push(route);
+    }
     const on = nearestHandleAt(hits, at.x, at.y);
     const unitIndex = on ? on.unitIndex : hitKufiUnit(result, c.col, c.row);
     if (unitIndex === null) return null;
-    return { unitIndex, on, nearest: on ?? nearestHandleAt(handlesOf(result, unitIndex), at.x, at.y) };
+    return { unitIndex, on };
+  };
+  /** A still click on a letter: in Select it also swaps the form; in the other tools it only selects. */
+  const clickLetter = (unitIndex: number) => {
+    if (tool === "select") void cycleForm(unitIndex);
+    else onSelectLetter?.(unitIndex);
   };
   const updateHover = (altKey: boolean) => {
     const p = pointer();
@@ -375,7 +428,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       if (!p) return;
       const ids = kufiFormCycle(inputs.text, unitIndex, p.glyphId);
       if (ids.length === 0) {
-        onNotice(fromKey, SINGLE_FORM);
+        onNotice(fromKey, { text: SINGLE_FORM, unitIndex });
         return;
       }
       const known = optionsOf(unitIndex).forms;
@@ -398,7 +451,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
             return;
           }
         }
-        onNotice(fromKey, NO_OTHER_FORM_FITS);
+        onNotice(fromKey, { text: NO_OTHER_FORM_FITS, unitIndex });
       } finally {
         cycling.current = false;
       }
@@ -506,10 +559,11 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       const r = pullRelease(state.pull);
       if (r.kind === "commit" && state.shown?.count === r.count)
         onCommit(fromKey, spec.pinFor(state.shown.edits, state.shown.result), state.shown.result);
-      else if (r.kind === "refused") onNotice(fromKey, spec.notice);
+      else if (r.kind === "refused") onNotice(fromKey, { text: spec.notice, unitIndex: spec.unitIndex });
       // A press and release that never moved is a click on the letter, as it
-      // is anywhere else on the letter: a handle is not a dead spot.
-      else if (r.kind === "cancel" && !state.moved) void cycleForm(spec.unitIndex);
+      // is anywhere else on the letter: a handle is not a dead spot. Pulls
+      // happen only in Stretch and Move word, where a click only selects.
+      else if (r.kind === "cancel" && !state.moved) onSelectLetter?.(spec.unitIndex);
     };
     const onUp = () => release();
     state.release = release;
@@ -589,7 +643,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
     );
   };
 
-  /** Alt-press: toggle the cell, then paint every cell the pointer crosses the same way; one undo step on release. */
+  /** A paint press (the Paint tool, or Alt): toggle the cell, then paint every cell the pointer crosses the same way; one undo step on release. */
   const beginPaint = (start: Cell, stage: Konva.Stage | null) => {
     if (!stage || drag.current || paint.current || cycling.current || !inside(start)) return;
     const state: Paint = { edits: inputs.edits, result: committed, on: undefined, last: start, changed: false, release: () => {} };
@@ -642,23 +696,67 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
   };
 
   // What the chrome draws: while a pull is held, the pulled letter's outline
-  // and its handle on the previewed panel; otherwise the hovered letter's and
-  // the handle nearest the pointer. With Alt down, the cell outline instead.
-  const shownUnit = alt && !dragging ? null : dragging ? dragging.spec.unitIndex : hover?.unitIndex ?? null;
+  // and its handle on the previewed panel; otherwise the hovered letter's,
+  // and the tool's handles (Stretch: every end of the hovered letter that
+  // can fit; Move word: every word's route handle). Painting (the Paint
+  // tool, or Alt), the cell outline instead.
+  const shownUnit = painting && !dragging ? null : dragging ? dragging.spec.unitIndex : hover?.unitIndex ?? null;
   const outlines = useMemo(
     () => (shownUnit === null ? [] : unitRings(result, shownUnit).map((ring) => ring.flatMap(([x, y]) => [x * cell, y * cell]))),
     [result, shownUnit, cell]
   );
-  const handle = useMemo((): KufiHandle | null => {
-    if (shownUnit === null) return null;
-    if (!dragging) return hover?.nearest ?? null;
-    if (dragging.spec.wordIndex !== null) return routeHandleOf(result, units, dragging.spec.wordIndex);
-    const d = dragging.spec.end;
-    if (!d) return null;
-    const same = stretchEnds(result, shownUnit).filter((e) => e.kind === d.kind && e.stretchIndex === d.stretchIndex && e.dc === d.dc && e.dr === d.dr);
-    return nearestHandle(same, d.col, d.row);
-  }, [result, units, shownUnit, dragging, hover]);
-  const outlinedCell = flash ?? (alt && !dragging ? cellHover : null);
+  const wordIndices = useMemo(() => [...new Set(units.map((u) => u.wordIndex))], [units]);
+  const handles = useMemo((): KufiHandle[] => {
+    if (dragging) {
+      if (dragging.spec.wordIndex !== null) {
+        const h = routeHandleOf(result, units, dragging.spec.wordIndex);
+        return h ? [h] : [];
+      }
+      const d = dragging.spec.end;
+      if (!d) return [];
+      const same = stretchEnds(result, dragging.spec.unitIndex).filter(
+        (e) => e.kind === d.kind && e.stretchIndex === d.stretchIndex && e.dc === d.dc && e.dr === d.dr
+      );
+      const h = nearestHandle(same, d.col, d.row);
+      return h ? [h] : [];
+    }
+    if (painting) return [];
+    if (tool === "stretch") return shownUnit === null ? [] : stretchEnds(result, shownUnit).filter(endShown);
+    if (tool === "move")
+      return wordIndices.flatMap((w) => {
+        const h = routeHandleOf(result, units, w);
+        return h ? [h] : [];
+      });
+    return [];
+  }, [result, units, shownUnit, dragging, painting, tool, wordIndices, endShown]);
+  const onHandle = dragging ? null : hover?.on ?? null;
+  const sameHandle = (a: KufiHandle, b: KufiHandle | null) =>
+    !!b && a.kind === b.kind && a.unitIndex === b.unitIndex && a.col === b.col && a.row === b.row && a.dc === b.dc && a.dr === b.dr;
+  const outlinedCell = flash ?? (painting && !dragging ? cellHover : null);
+
+  // The notice beside its letter: only for these inputs, and only while the
+  // letter is on the panel drawn.
+  const noticeShown = notice && notice.key === fromKey ? notice : null;
+  const noticeBox = useMemo(() => {
+    if (!noticeShown) return null;
+    const p = placementOf(result, noticeShown.unitIndex);
+    if (!p) return null;
+    const b = placedBox(p);
+    return { x: p.col * cell, y: p.row * cell, width: b.w * cell, height: b.h * cell };
+  }, [noticeShown, result, cell]);
+  const noticeRef = useRef<Konva.Label>(null);
+  // The label keeps a constant size on screen (drawn at the inverse of the
+  // stage's zoom), so where it fits beside the box is known only once drawn.
+  useLayoutEffect(() => {
+    const label = noticeRef.current;
+    const parent = label?.getParent();
+    if (!label || !parent || !noticeBox) return;
+    const k = parent.getAbsoluteScale().x || 1;
+    label.scale({ x: 1 / k, y: 1 / k });
+    const at = kufiNoticeAt(noticeBox, { width, height }, { width: label.width() / k, height: label.height() / k }, cell / 2);
+    label.position(at);
+    label.getLayer()?.batchDraw();
+  }, [noticeBox, noticeShown, width, height, cell]);
 
   // Read-only scene data for the e2e harness, in dev builds only (like the
   // `__HARF__` bridge): with one hit node there is no per-letter node a test
@@ -746,8 +844,10 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           const p = pointer();
           const c = p?.cell ?? null;
           press.current = null;
-          if (e.evt.altKey) {
-            // Alt paints: claimed, whatever is under the pointer
+          // a gesture starting clears the last notice
+          if (notice) onNotice(fromKey, null);
+          if (e.evt.altKey || tool === "paint") {
+            // painting (the Paint tool, or Alt): claimed, whatever is under the pointer
             e.cancelBubble = true;
             if (c) beginPaint(c, e.target.getStage());
             return;
@@ -769,6 +869,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           }
         }}
         onTouchStart={(e) => {
+          if (notice) onNotice(fromKey, null);
           const p = pointer();
           const c = p?.cell ?? null;
           const h = hoverAt(p);
@@ -789,11 +890,11 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           const panel = panelNode();
           if (panel && (panel.x() !== p.panelX || panel.y() !== p.panelY)) return;
           if (p.unitIndex === null) onSelectLetter?.(null);
-          else void cycleForm(p.unitIndex);
+          else clickLetter(p.unitIndex);
         }}
         onTap={() => {
           const h = hoverAt(pointer());
-          if (h && !h.on) void cycleForm(h.unitIndex);
+          if (h && !h.on) clickLetter(h.unitIndex);
         }}
         // The first click changes the letter; a quick second one must not
         // reach the block's edit handler and focus the textarea.
@@ -816,19 +917,25 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           listening={false}
         />
       ))}
-      {handle && (
-        <Rect
-          name={handle.kind === "route" ? "kufi-route-handle" : "kufi-stretch-handle"}
-          // an end's square sits on the edge the stroke grows across, a slice grip on its
-          // cell, a route handle on the word's leading edge (`handleCentre`)
-          x={handleCentre(handle).x * cell - (HANDLE * cell) / 2}
-          y={handleCentre(handle).y * cell - (HANDLE * cell) / 2}
-          width={HANDLE * cell}
-          height={HANDLE * cell}
-          fill={accent}
-          listening={false}
-        />
-      )}
+      {handles.map((h, i) => {
+        // an end's square sits on the edge the stroke grows across, a slice grip on its
+        // cell, a route handle on the word's leading edge (`handleCentre`)
+        const side = (h.kind === "route" ? HANDLE : STRETCH_HANDLE) * cell;
+        const c = handleCentre(h);
+        return (
+          <Rect
+            key={i}
+            name={h.kind === "route" ? "kufi-route-handle" : "kufi-stretch-handle"}
+            x={c.x * cell - side / 2}
+            y={c.y * cell - side / 2}
+            width={side}
+            height={side}
+            fill={accent}
+            opacity={dragging || sameHandle(h, onHandle) ? 1 : IDLE_HANDLE_OPACITY}
+            listening={false}
+          />
+        );
+      })}
       {outlinedCell && (
         <Rect
           name="kufi-cell-outline"
@@ -842,6 +949,12 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           fillEnabled={false}
           listening={false}
         />
+      )}
+      {noticeShown && noticeBox && (
+        <Label ref={noticeRef} name="kufi-notice" listening={false}>
+          <Tag fill="rgba(20, 20, 20, 0.88)" cornerRadius={3} />
+          <Text text={noticeShown.text} fontSize={NOTICE_FONT_PX} padding={NOTICE_PAD_PX} fill="#ffffff" fontFamily="system-ui, sans-serif" />
+        </Label>
       )}
       {targets && (
         <Group name="kufi-edit-targets" listening={false} letters={targets.letters} ends={targets.ends} words={targets.words} grid={targets.grid} cellPx={targets.cell} />

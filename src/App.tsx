@@ -164,7 +164,8 @@ import { convertRunToStack, fillerShapes, teardropShape, type UnjoinedPair } fro
 import { assembleStackOutline } from "./lib/stackOutline";
 import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
-import { kufiCellSize, kufiPanelInputs, kufiPanelTextPatch, kufiReleasePins } from "./lib/kufi/kufiPanelBlock";
+import { kufiCellSize, kufiPanelInputs, kufiPanelTextPatch, kufiReleasePins, type KufiTool } from "./lib/kufi/kufiPanelBlock";
+import { KUFI_NOTICE_MS, type KufiNotice } from "./components/KufiPanelEditOverlay";
 import { kufiLayoutKey, requestKufiFit, seedKufiLayout } from "./lib/kufi/kufiLayoutClient";
 import type { KufiPackResult, KufiPanelEdits } from "./lib/kufi/kufiPack";
 import {
@@ -320,8 +321,17 @@ const App: React.FC = () => {
   const [confirmRequest, setConfirmRequest] = useState<ConfirmDialogRequest | null>(null);
   /** The stack block open in the editor window, or null. */
   const [stackEditorId, setStackEditorId] = useState<number | null>(null);
-  /** Why the last canvas edit of a Kufi panel changed nothing, for its status line; keyed to the inputs it was made on. */
-  const [kufiNotice, setKufiNotice] = useState<{ blockId: number; key: string; text: string } | null>(null);
+  /**
+   * Why the last canvas edit of a Kufi panel changed nothing, drawn beside
+   * the letter on the canvas; keyed to the inputs it was made on. Cleared
+   * after `KUFI_NOTICE_MS`, by the next gesture, and by a commit.
+   */
+  const [kufiNotice, setKufiNotice] = useState<({ blockId: number; key: string } & KufiNotice) | null>(null);
+  useEffect(() => {
+    if (!kufiNotice) return;
+    const t = setTimeout(() => setKufiNotice(null), KUFI_NOTICE_MS);
+    return () => clearTimeout(t);
+  }, [kufiNotice]);
   const [pendingPlacement, setPendingPlacement] = useState<PendingPlacement | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -331,10 +341,13 @@ const App: React.FC = () => {
    * clears it (`kufiLetter` below), and so does a change of selection.
    */
   const [kufiLetterPick, setKufiLetterPick] = useState<{ blockId: number; unitIndex: number; text: string; cols: number; rows: number } | null>(null);
+  /** The Kufi panel's canvas tool (the sidebar's tool row): editor state, not saved, back to Select when the selection changes. */
+  const [kufiTool, setKufiTool] = useState<KufiTool>("select");
   const [kufiLetterSelection, setKufiLetterSelection] = useState(selectedId);
   if (kufiLetterSelection !== selectedId) {
     setKufiLetterSelection(selectedId);
     setKufiLetterPick(null);
+    setKufiTool("select");
   }
   const [showStart, setShowStart] = useState(() => {
     if (!isBrowser) return false;
@@ -2157,14 +2170,18 @@ const App: React.FC = () => {
   }, []);
 
   /**
-   * Why a canvas edit changed nothing: shown in the Kufi panel's status line
-   * until the next edit or input change. Dropped, like a commit, if the
+   * Why a canvas edit changed nothing, drawn beside its letter for a moment;
+   * null (a gesture starting) clears it. Dropped, like a commit, if the
    * panel's inputs are no longer the ones the gesture was made against.
    */
-  const noticeKufiPanel = useCallback((id: number, fromKey: string, text: string) => {
+  const noticeKufiPanel = useCallback((id: number, fromKey: string, notice: KufiNotice | null) => {
+    if (notice === null) {
+      setKufiNotice(null);
+      return;
+    }
     const now = blocksRef.current.find((b) => b.id === id);
     if (!now || !isKufiPanel(now) || kufiLayoutKey(kufiPanelInputs(now)) !== fromKey) return;
-    setKufiNotice({ blockId: id, key: fromKey, text });
+    setKufiNotice({ blockId: id, key: fromKey, ...notice });
   }, []);
 
   /** A still click on a Kufi panel's letter selects it for the sidebar's letter options; on paper (null) clears it. */
@@ -3501,7 +3518,8 @@ const App: React.FC = () => {
         onFitKufiPanel={fitKufiPanelSize}
         onReleaseKufiPanelPins={releaseKufiPanelPins}
         onApplyKufiEdits={editKufiPanel}
-        kufiNotice={kufiNotice}
+        kufiTool={kufiTool}
+        onSetKufiTool={setKufiTool}
         kufiLetter={kufiLetter}
         onAddGuide={addGuideBlock}
         onAddSvgGuide={addSvgGuideBlock}
@@ -3640,6 +3658,8 @@ const App: React.FC = () => {
           onPickGlyphAlternate={pickGlyphAlternate}
           onEditKufiPanel={editKufiPanel}
           onKufiPanelNotice={noticeKufiPanel}
+          kufiNotice={kufiNotice}
+          kufiTool={kufiTool}
           onSelectKufiLetter={selectKufiLetter}
           onSetStrokeCut={setStrokeCut}
           onResizeShapeFillBlock={resizeShapeFillBlock}

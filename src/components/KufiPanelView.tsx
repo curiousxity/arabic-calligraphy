@@ -6,8 +6,8 @@ import { cellRings } from "../lib/kufi/kufiGrid";
 import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
 import { createBlockFillPainter } from "../lib/blockFill";
 import { useKufiPanelLayout } from "../hooks/useKufiPanelLayout";
-import { kufiCellSize, kufiPanelInputs } from "../lib/kufi/kufiPanelBlock";
-import { KufiPanelEditOverlay } from "./KufiPanelEditOverlay";
+import { kufiCellSize, kufiPanelInputs, type KufiTool } from "../lib/kufi/kufiPanelBlock";
+import { KufiPanelEditOverlay, type KufiNotice } from "./KufiPanelEditOverlay";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
@@ -31,8 +31,12 @@ export type KufiPanelViewProps = ReturnType<typeof kufiPanelProps> & {
    * none and gets no overlay.
    */
   onEditPanel?: (fromKey: string, edits: KufiPanelEdits, result: Ok) => void;
-  /** Why a canvas edit changed nothing, for the Kufi panel's status line; dropped if the inputs have moved on from `fromKey`. */
-  onPanelNotice?: (fromKey: string, text: string) => void;
+  /** Why a canvas edit changed nothing (drawn beside the letter), dropped if the inputs have moved on from `fromKey`; null when a gesture starts. */
+  onPanelNotice?: (fromKey: string, notice: KufiNotice | null) => void;
+  /** The notice on show for this panel, keyed to the inputs it was made on. */
+  notice?: ({ key: string } & KufiNotice) | null;
+  /** The canvas tool picked in the sidebar's tool row. */
+  tool?: KufiTool;
   /** A still click on a letter (its unit index) or on paper (null): the sidebar lists that letter's options. */
   onSelectLetter?: (unitIndex: number | null) => void;
 };
@@ -151,6 +155,8 @@ export const KufiPanelView: React.FC<KufiPanelViewProps> = (p) => {
           onPreview={setPreview}
           onCommit={p.onEditPanel}
           onNotice={p.onPanelNotice ?? noNotice}
+          notice={p.notice ?? null}
+          tool={p.tool ?? "select"}
           onSelectLetter={p.onSelectLetter}
         />
       )}

@@ -9,6 +9,8 @@ import { StackView } from "./StackView";
 import { MarkView } from "./MarkView";
 import { KufiPanelView } from "./KufiPanelView";
 import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
+import type { KufiTool } from "../lib/kufi/kufiPanelBlock";
+import type { KufiNotice } from "./KufiPanelEditOverlay";
 import { resolveGuidePath, type WritingSession } from "../lib/guides";
 import { isClosedPath } from "../lib/guideShapes";
 import { guideCaret, projectToGuide, type GuideCaret } from "../lib/guidePlacement";
@@ -182,8 +184,12 @@ export type CanvasStageProps = {
   onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
   /** A Kufi panel edited on the canvas (a form swap, a stretch): one undo step. See `KufiPanelEditOverlay`. */
   onEditKufiPanel?: (blockId: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => void;
-  /** Why a Kufi panel canvas edit changed nothing, for its status line. */
-  onKufiPanelNotice?: (blockId: number, fromKey: string, text: string) => void;
+  /** Why a Kufi panel canvas edit changed nothing (drawn beside the letter), or null when a gesture starts. */
+  onKufiPanelNotice?: (blockId: number, fromKey: string, notice: KufiNotice | null) => void;
+  /** The notice on show, for the panel and inputs it was made on. */
+  kufiNotice?: ({ blockId: number; key: string } & KufiNotice) | null;
+  /** The Kufi panel canvas tool picked in the sidebar. */
+  kufiTool?: KufiTool;
   /** A still click on a Kufi panel's letter (unit index) or paper (null). */
   onSelectKufiLetter?: (blockId: number, unitIndex: number | null) => void;
   onSetStrokeCut: (blockId: number, cut: StrokeCut) => void;
@@ -315,6 +321,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onEditKufiPanel,
   onKufiPanelNotice,
   onSelectKufiLetter,
+  kufiNotice = null,
+  kufiTool = "select",
   onResizeShapeFillBlock,
   showRulers,
   guides,
@@ -1261,7 +1269,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     locked={block.locked}
                     isSelected={block.id === selectedId}
                     onEditPanel={(fromKey, edits, result) => onEditKufiPanel?.(block.id, fromKey, edits, result)}
-                    onPanelNotice={(fromKey, text) => onKufiPanelNotice?.(block.id, fromKey, text)}
+                    onPanelNotice={(fromKey, notice) => onKufiPanelNotice?.(block.id, fromKey, notice)}
+                    notice={kufiNotice && kufiNotice.blockId === block.id ? kufiNotice : null}
+                    tool={kufiTool}
                     onSelectLetter={(unitIndex) => onSelectKufiLetter?.(block.id, unitIndex)}
                   />
                 );

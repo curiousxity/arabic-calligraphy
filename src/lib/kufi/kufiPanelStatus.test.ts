@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { kufiPanelStatus } from "./kufiPanelStatus";
+import { kufiNoticeAt, kufiPanelStatus } from "./kufiPanelStatus";
 import type { KufiPackResult } from "./kufiPack";
 
 const size = { cols: 9, rows: 11 };
@@ -45,5 +45,24 @@ describe("kufiPanelStatus", () => {
     expect(kufiPanelStatus({ ok: false, reason: "pinConflict", suggestions: [] }, false, size)?.text).toBe(
       "A pinned edit can't stay where it is at this size"
     );
+  });
+});
+
+describe("kufiNoticeAt", () => {
+  const panel = { width: 120, height: 120 };
+  const label = { width: 40, height: 14 };
+
+  it("puts the label to the right of the letter's box, level with its top, when it fits", () => {
+    expect(kufiNoticeAt({ x: 10, y: 30, width: 20, height: 30 }, panel, label, 4)).toEqual({ x: 34, y: 30 });
+  });
+
+  it("goes to the left when the right would leave the panel", () => {
+    expect(kufiNoticeAt({ x: 80, y: 30, width: 20, height: 30 }, panel, label, 4)).toEqual({ x: 36, y: 30 });
+  });
+
+  it("takes the roomier side when neither fits, and keeps the label inside the panel's height", () => {
+    const wide = { width: 100, height: 14 };
+    expect(kufiNoticeAt({ x: 10, y: 112, width: 20, height: 8 }, panel, wide, 4)).toEqual({ x: 34, y: 106 });
+    expect(kufiNoticeAt({ x: 90, y: -5, width: 20, height: 8 }, panel, wide, 4)).toEqual({ x: -14, y: 0 });
   });
 });

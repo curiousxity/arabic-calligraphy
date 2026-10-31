@@ -23,6 +23,9 @@ export const section: GuideSection = {
     "stretch",
     "letter forms",
     "alternates",
+    "tools",
+    "move word",
+    "paint",
     "كوفي",
     "كوفي مربع",
     "إعجام",
@@ -82,8 +85,8 @@ export const section: GuideSection = {
           shows; paint or undo to fix it.
         </li>
         <li>
-          Other lines tell you why the last edit changed nothing, which letters
-          were not drawn, and whether the outline will cut as a second line.
+          Other lines tell you which letters were not drawn, and whether the
+          outline will cut as a second line.
         </li>
       </ul>
       <p>
@@ -95,25 +98,49 @@ export const section: GuideSection = {
 
       <h4>Editing on the canvas</h4>
       <p>
-        Select the panel and move over it. There are no modes: the letter under
-        the pointer is outlined, and you simply act on it. Every edit is one
-        undo step, and the rest of the panel re-arranges around it. If an edit
-        cannot work, the stroke snaps back and the status line says why.
+        Select the panel. At the top of the Kufi panel section is a row of four
+        tools: <strong>Select</strong>, <strong>Stretch</strong>,{" "}
+        <strong>Move word</strong> and <strong>Paint</strong>. The one picked
+        is highlighted, and it decides what the canvas shows and what a click
+        or drag does. Every edit is one undo step, and the rest of the panel
+        re-arranges around it. If an edit cannot work, it snaps back and a
+        short message appears beside the letter for a moment, saying why.
+        Selecting another block puts the tools back to Select.
       </p>
       <ul>
         <li>
-          <strong>Stretch.</strong> A small square appears on the end of a
-          stroke that can grow. Drag it along the stroke to make it longer or
-          shorter, a square at a time. A stroke with no free end shows the
-          square on the stroke itself. Once the panel has been checked (see{" "}
-          <em>Other arrangements</em> below), the square shows only on strokes
-          that have a length that fits, and a drag of a square or two jumps
-          to the nearest length that fits.
+          <strong>Select</strong> (where you start). The letter under the
+          pointer is outlined. Click it (press and release without moving) to
+          change it to its next form; forms that do not fit are skipped, and a
+          letter with a single form says so. Dragging a letter moves the whole
+          panel.
         </li>
         <li>
-          <strong>Swap a letter's shape.</strong> Click a letter (press and
-          release without moving) to change it to its next form. Forms that do
-          not fit are skipped. A letter with a single form says so.
+          <strong>Stretch.</strong> Move over a letter and every stroke end of
+          it that can grow or shrink shows a square, a whole cell in size; the
+          one under the pointer is solid. Drag a square along its stroke to make
+          the stroke longer or shorter, a square at a time. A stroke with no
+          free end shows the square on the stroke itself. Once the panel has
+          been checked (see <em>Other arrangements</em> below), squares show
+          only on strokes that have a length that fits, and a drag of a square
+          or two jumps to the nearest length that fits. Clicking a letter here
+          picks it without changing its form.
+        </li>
+        <li>
+          <strong>Move word.</strong> Every word shows a small square on the
+          corner where it begins. Drag it along the word's line to slide the
+          word. On a tight panel there is often no room, so the word snaps back;
+          nothing else moves to make space. Clicking a letter here picks it
+          without changing its form.
+        </li>
+        <li>
+          <strong>Paint.</strong> The square under the pointer is outlined.
+          Click a square to fill it or clear it, or drag to paint several:
+          every square along the way is painted, however fast you move. A
+          square that would make a solid 2×2 block flashes red and is refused.
+          Use this last, because hand-painted squares are not rearranged when
+          you change anything else. Holding <strong>Alt</strong> paints the
+          same way from any tool. Touch screens cannot paint.
         </li>
         <li>
           <strong>See a letter's forms.</strong> The letter you click is also
@@ -122,23 +149,6 @@ export const section: GuideSection = {
           can be clicked to use them; the others are greyed out and say{" "}
           <em>Doesn't fit here</em>. Forms still being tried say{" "}
           <em>Checking…</em>. Clicking the empty part of the panel clears it.
-        </li>
-        <li>
-          <strong>Move a word.</strong> A word's first letter has a second
-          small square, on the corner where the word begins. Drag it along the
-          word's line to slide the word. On a tight panel there is often no
-          room, so the word snaps back; nothing else moves to make space.
-          Pressing the letter anywhere else moves the whole panel, or clicks
-          it.
-        </li>
-        <li>
-          <strong>Paint a square.</strong> Hold <strong>Alt</strong> and click a
-          square to fill it or clear it, or drag to paint several: every square
-          along the way is painted, however fast you move. A square that would
-          make a solid 2×2 block flashes red and is refused. Use this last,
-          because hand-painted squares are not rearranged when you change
-          anything else. It needs a mouse or a trackpad with a keyboard; touch
-          screens cannot paint.
         </li>
       </ul>
       <p>

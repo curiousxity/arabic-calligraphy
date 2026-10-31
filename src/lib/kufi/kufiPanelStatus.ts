@@ -25,3 +25,31 @@ export function kufiPanelStatus(result: KufiPackResult | undefined, failed: bool
   const base = result.reason === "tooLong" ? `Too long for ${kufiSizeLabel(size)}` : "Too short to fill a box";
   return result.suggestions.length > 0 ? say(`${base} — try`, result.suggestions) : say(base);
 }
+
+type Rect = { x: number; y: number; width: number; height: number };
+
+/**
+ * Where a canvas notice's label goes, beside a letter's box (all in the
+ * panel's px): to the right with `gap` between, else to the left, whichever
+ * keeps it inside the panel's width; when neither does, the roomier side.
+ * Level with the box's top, kept inside the panel's height where it fits.
+ */
+export function kufiNoticeAt(
+  box: Rect,
+  panel: { width: number; height: number },
+  label: { width: number; height: number },
+  gap: number
+): { x: number; y: number } {
+  const right = box.x + box.width + gap;
+  const left = box.x - gap - label.width;
+  const x =
+    right + label.width <= panel.width
+      ? right
+      : left >= 0
+        ? left
+        : panel.width - (box.x + box.width) >= box.x
+          ? right
+          : left;
+  const y = Math.max(0, Math.min(box.y, panel.height - label.height));
+  return { x, y };
+}

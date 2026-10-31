@@ -596,6 +596,8 @@ details:not([open]) > .sidebarPresetKeyboardSummary { margin-bottom: 0; padding-
 .kufiPanelSizeRow > * { min-width: 0; }
 .kufiPanelSizeField { margin-bottom: 0; }
 .kufiPanelFit { height: 36px; flex: none; }
+.kufiToolRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 6px; margin-bottom: 10px; }
+.kufiToolRow > * { min-width: 0; padding: 0 8px; }
 .kufiPanelStatus { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text-secondary); display: flex; flex-direction: column; gap: 2px; }
 .kufiPanelStatus:empty { display: none; }
 .kufiPanelSuggestion { border: none; background: none; padding: 0; color: var(--accent); font: inherit; font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }

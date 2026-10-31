@@ -3,12 +3,13 @@ import type { KufiPanelBlock } from "../../types";
 import { kufiPanelStatus, kufiSizeLabel } from "../../lib/kufi/kufiPanelStatus";
 import { useKufiPanelLayout } from "../../hooks/useKufiPanelLayout";
 import { cachedKufiLayout, kufiLayoutFailed, kufiLayoutKey, subscribeKufiLayouts } from "../../lib/kufi/kufiLayoutClient";
-import { kufiPanelInputs } from "../../lib/kufi/kufiPanelBlock";
+import { kufiPanelInputs, type KufiTool } from "../../lib/kufi/kufiPanelBlock";
 import { resolveKufiText } from "../../lib/kufi/kufiWords";
 import type { KufiPackResult, KufiPanelEdits } from "../../lib/kufi/kufiPack";
 import { useKufiExplore } from "../../hooks/useKufiExplore";
 import { KufiArrangements } from "./KufiArrangements";
 import { KufiLetterOptions } from "./KufiLetterOptions";
+import { KufiToolRow } from "./KufiToolRow";
 
 /**
  * Smallest box the size fields accept, in cells. There is no largest: Fit and
@@ -84,9 +85,9 @@ const CellsField: React.FC<{ id: string; label: string; value: number; onCommit:
  * whose message starts "Fit failed" if the packer's worker dies; the panel
  * catches it and says so.
  *
- * `notice` is why the last canvas edit (a click on a letter, a stretch)
- * changed nothing; it is shown only while the block and its layout inputs
- * are the ones it was made on.
+ * The **tool row** (`KufiToolRow`) at the top picks the canvas tool; why a
+ * canvas edit changed nothing is drawn beside the letter on the canvas, not
+ * here (`KufiPanelEditOverlay`).
  *
  * **Release hand edits** shows whenever the panel has pins (every committed
  * canvas gesture pins its letter at an absolute cell), on the same line as
@@ -102,10 +103,12 @@ export const KufiPanelPanel: React.FC<{
   onReleasePins?: () => void;
   /** Applies another arrangement of this panel (its edits and the packed result); one undo step. `fromKey` is the layout key it was found for. */
   onApplyEdits?: (fromKey: string, edits: KufiPanelEdits, result: Extract<KufiPackResult, { ok: true }>) => void;
-  notice?: { blockId: number; key: string; text: string } | null;
+  /** The canvas tool, and picking another; the row is left out without `onSetTool`. */
+  tool?: KufiTool;
+  onSetTool?: (tool: KufiTool) => void;
   /** The letter (unit index) clicked on the canvas: its forms are listed under the arrangements. */
   letter?: number | null;
-}> = ({ block, onSetSize, onFit, onReleasePins, onApplyEdits, notice = null, letter = null }) => {
+}> = ({ block, onSetSize, onFit, onReleasePins, onApplyEdits, tool = "select", onSetTool, letter = null }) => {
   // Registers this panel as a reader, so the layout is packed even if the
   // canvas has not asked yet; the status reads the exact inputs below.
   useKufiPanelLayout(block);
@@ -163,6 +166,7 @@ export const KufiPanelPanel: React.FC<{
 
   return (
     <div className="sectionPanel" data-testid="kufi-panel">
+      {onSetTool && <KufiToolRow tool={tool} onSetTool={onSetTool} />}
       <div className="kufiPanelSizeRow">
         <CellsField
           id={`${idBase}-cols`}
@@ -207,7 +211,6 @@ export const KufiPanelPanel: React.FC<{
           </div>
         ) : null}
         {!pinConflict && release && <div>{release}</div>}
-        {notice && notice.blockId === block.id && notice.key === key && <div>{notice.text}</div>}
         {unsupported.length > 0 && <div>Not drawn: {unsupported.join(" ")}</div>}
         {(block.strokeWidth ?? 0) > 0 && <div>The outline exports as a separate path.</div>}
       </div>

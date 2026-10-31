@@ -11,6 +11,12 @@ import type { KufiLayoutInputs } from "./kufiWorkerProtocol";
 /** Cells to the em (the removed block's figure): a cell is `fontSize / 8` px, so the size slider scales the panel. */
 export const KUFI_CELLS_PER_EM = 8;
 
+/**
+ * The canvas tool the Kufi panel's tool row has picked: which handles the
+ * edit overlay shows and what a press does. Editor state only, never saved.
+ */
+export type KufiTool = "select" | "stretch" | "move" | "paint";
+
 export const kufiCellSize = (fontSize: number) => fontSize / KUFI_CELLS_PER_EM;
 
 type PanelFields = { text: string; panelCols: number; panelRows: number; panelEdits?: KufiPanelEdits };

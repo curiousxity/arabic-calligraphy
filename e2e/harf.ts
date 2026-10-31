@@ -372,6 +372,21 @@ export async function namedNodeCount(page: Page, name: string, opts: { editor?: 
   );
 }
 
+/**
+ * The text a named node shows on the main stage: its own `text()`, or that of
+ * the first `Text` inside it (a Konva `Label`); null when no such node is drawn.
+ */
+export async function namedNodeText(page: Page, name: string): Promise<string | null> {
+  return page.evaluate((n) => {
+    const node = window.__HARF__!.getStage()?.findOne(`.${n}`) as
+      | { text?: () => string; findOne?: (s: string) => { text(): string } | undefined }
+      | undefined;
+    if (!node) return null;
+    if (typeof node.text === "function") return node.text();
+    return node.findOne?.("Text")?.text() ?? null;
+  }, name);
+}
+
 /** Page-space centres of the hover hit rects `DiacriticHoverHandles` mounts, one per mark. */
 export async function diacriticHitCenters(page: Page): Promise<Point[]> {
   return page.evaluate(() => {

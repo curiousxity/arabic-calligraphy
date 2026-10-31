@@ -15,6 +15,7 @@ import {
   kufiCellCenter,
   kufiEditTargets,
   namedNodeCount,
+  namedNodeText,
   openPanel,
   placeAtCanvas,
   setBlockText,
@@ -409,11 +410,105 @@ async function pointerAway(page: Page, box: Box) {
   await settleFrames(page);
 }
 
+type KufiToolName = "Select" | "Stretch" | "Move word" | "Paint";
+/** Picks a canvas tool from the Kufi panel's tool row. */
+async function chooseTool(page: Page, name: KufiToolName) {
+  const button = kufiPanel(page).getByRole("button", { name, exact: true });
+  await button.click();
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+}
+
+/** The refusal or confirmation drawn beside the letter on the canvas, or null when none is up. */
+const canvasNotice = (page: Page) => namedNodeText(page, "kufi-notice");
+/** Waits for the notice beside the letter to fade, so it is not in the pixels read next. */
+const noticeGone = (page: Page) => expect.poll(() => namedNodeCount(page, "kufi-notice"), { timeout: 5_000 }).toBe(0);
+
 // One worker, in order: each of these packs the 21×21 draft in the packer's
 // worker inside its time budget, and four drafts racing on one machine can
 // run that budget out and leave a different (or no) panel to edit.
 test.describe("editing on the canvas", () => {
   test.describe.configure({ mode: "default" });
+
+  test("the tool row picks which handles show", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const targets = await kufiEditTargets(page);
+    const kaf = targets.letters.find((l) => l.unit === 2)!;
+    const word = targets.words.find((w) => w.word === 2)!;
+    for (const name of ["Select", "Stretch", "Move word", "Paint"])
+      await expect(kufiPanel(page).getByRole("button", { name, exact: true })).toBeVisible();
+
+    // Select, the default: the letter outlines, and no handle of any kind shows.
+    await expect(kufiPanel(page).getByRole("button", { name: "Select", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.mouse.move(kaf.x, kaf.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-hover-outline")).toBeGreaterThan(0);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(0);
+    expect(await namedNodeCount(page, "kufi-route-handle")).toBe(0);
+
+    // Stretch: the hovered letter's stretch ends, and no route handle.
+    await chooseTool(page, "Stretch");
+    await page.mouse.move(kaf.x, kaf.y);
+    await page.mouse.move(kaf.x + 1, kaf.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBeGreaterThan(0);
+    expect(await namedNodeCount(page, "kufi-route-handle")).toBe(0);
+
+    // Move word: the route handles, on each word's first letter, and no stretch end.
+    await chooseTool(page, "Move word");
+    await page.mouse.move(word.x, word.y);
+    await page.mouse.move(word.x + 1, word.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-route-handle")).toBeGreaterThan(0);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(0);
+
+    // Paint: a cell outline and no letter chrome; a plain click paints, one step.
+    await chooseTool(page, "Paint");
+    const t = await kufiEditTargets(page);
+    const cell = paintableCell(t.grid)!;
+    const at = kufiCellCenter(t, cell.col, cell.row);
+    await page.mouse.move(at.x, at.y);
+    await page.mouse.move(at.x + 1, at.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-cell-outline")).toBe(1);
+    expect(await namedNodeCount(page, "kufi-hover-outline")).toBe(0);
+    await page.mouse.click(at.x + 1, at.y);
+    await expect.poll(async () => (await panelEdits(page))?.cells?.length).toBe(1);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+  });
+
+  test("a refusal shows beside the letter and fades", async ({ page }) => {
+    await withoutExploration(page);
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const cellPx = 6 * (await getStageScale(page));
+    await chooseTool(page, "Stretch");
+    // unit 8, seen:medial on the full top line: no stretch of it packs
+    const grip = (await kufiEditTargets(page)).ends.find((e) => e.unit === 8)!;
+    expect(grip).toBeDefined();
+    await page.mouse.move(grip.x, grip.y);
+    await settleFrames(page);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + grip.dc * 2 * cellPx, grip.y, { steps: 12 });
+    await page.waitForTimeout(1200);
+    await page.mouse.up();
+
+    await expect.poll(() => canvasNotice(page)).toBe("No room to stretch that here");
+    await expect(kufiPanel(page)).not.toContainText("No room");
+    // beside the letter: the label sits within a few cells of the pulled grip
+    const near = await page.evaluate(() => {
+      const stage = window.__HARF__!.getStage()!;
+      const r = stage.findOne(".kufi-notice")!.getClientRect();
+      const c = stage.container().getBoundingClientRect();
+      return { x: r.x + c.left, y: r.y + c.top, width: r.width, height: r.height };
+    });
+    const dx = Math.max(near.x - grip.x, 0, grip.x - (near.x + near.width));
+    const dy = Math.max(near.y - grip.y, 0, grip.y - (near.y + near.height));
+    expect(Math.hypot(dx, dy)).toBeLessThan(8 * cellPx);
+    await page.waitForTimeout(2500);
+    expect(await namedNodeCount(page, "kufi-notice")).toBe(0);
+  });
 
   test("hovering a letter outlines it, and a click cycles its form to the next one that packs, one step per click", async ({ page }) => {
     test.setTimeout(120_000);
@@ -484,27 +579,31 @@ test.describe("editing on the canvas", () => {
     await expect.poll(async () => (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x).toBe(x1);
   });
 
-  test("a click on a handle, with no pull, is a click on the letter", async ({ page }) => {
+  test("in the Stretch tool a click on a handle, with no pull, selects the letter and changes nothing; in Select a one-form letter says so beside it", async ({ page }) => {
     await withoutExploration(page);
     await openBaqarahPanel(page);
+    await chooseTool(page, "Stretch");
     const targets = await kufiEditTargets(page);
-    // an end handle of the feh (four forms): pressing and releasing on it cycles the form
+    // an end handle of the feh (four forms): pressing and releasing on it selects the letter, no form change
     const end = targets.ends.find((e) => e.unit === 4)!;
     expect(end).toBeDefined();
     await page.mouse.move(end.x, end.y);
     await settleFrames(page);
-    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(1);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBeGreaterThan(0);
     await page.mouse.click(end.x, end.y);
-    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
-    // a slice grip of the seen (one form): the click reaches the letter and says so
-    const grip = (await kufiEditTargets(page)).ends.find((e) => e.unit === 8 && e.kind === "slice")!;
-    expect(grip).toBeDefined();
-    await page.mouse.click(grip.x, grip.y);
-    await expect(kufiPanel(page)).toContainText("That letter has one form");
+    await expect(kufiPanel(page).getByTestId("kufi-letter-options")).toBeVisible();
+    await page.waitForTimeout(600);
+    expect(await panelEdits(page)).toBeUndefined();
+    // Select: a click on the seen (one form) reaches the letter and says so beside it
+    await chooseTool(page, "Select");
+    const seen = (await kufiEditTargets(page)).letters.find((l) => l.unit === 8)!;
+    await page.mouse.click(seen.x, seen.y);
+    await expect.poll(() => canvasNotice(page)).toBe("That letter has one form");
   });
 
   test("a drag cut short by losing the selection commits nothing and leaves no preview drawn", async ({ page }) => {
     const box = await openBaqarahPanel(page);
+    await chooseTool(page, "Stretch");
     await pointerAway(page, box);
     const before = await inkSignature(page, box);
     const cellPx = 6 * (await getStageScale(page));
@@ -534,20 +633,24 @@ test.describe("editing on the canvas", () => {
     expect(await panelEdits(page)).toBeUndefined();
   });
 
-  test("hovering a letter shows one handle, the stretch end nearest the pointer", async ({ page }) => {
+  test("in the Stretch tool, hovering a letter shows every one of its stretch ends", async ({ page }) => {
+    await withoutExploration(page);
     await openBaqarahPanel(page);
+    await chooseTool(page, "Stretch");
     const targets = await kufiEditTargets(page);
     const letter = targets.letters.find((l) => l.unit === 2)!;
-    expect(targets.ends.filter((e) => e.unit === 2).length).toBeGreaterThan(1);
+    const ends = targets.ends.filter((e) => e.unit === 2).length;
+    expect(ends).toBeGreaterThan(1);
     await page.mouse.move(letter.x, letter.y);
     await settleFrames(page);
     expect(await namedNodeCount(page, "kufi-hover-outline")).toBeGreaterThan(0);
-    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(1);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(ends);
   });
 
   test("a baseline joined on both sides still has a grip on its stretch slice", async ({ page }) => {
     await withoutExploration(page);
     const box = await openBaqarahPanel(page);
+    await chooseTool(page, "Stretch");
     await pointerAway(page, box);
     const before = await inkSignature(page, box);
     const cellPx = 6 * (await getStageScale(page));
@@ -560,15 +663,16 @@ test.describe("editing on the canvas", () => {
     await page.mouse.move(grip.x, grip.y);
     await settleFrames(page);
     expect(await hitTargetAt(page, grip)).toBe("Rect.kufi-edit-hit");
-    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(1);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(grips.length);
 
     // The top line is full, so no stretch of it packs: the pull snaps back and says so.
     await page.mouse.down();
     await page.mouse.move(grip.x + grip.dc * 2 * cellPx, grip.y, { steps: 12 });
     await page.waitForTimeout(1200);
     await page.mouse.up();
-    await expect(kufiPanel(page)).toContainText("No room to stretch that here");
+    await expect.poll(() => canvasNotice(page)).toBe("No room to stretch that here");
     expect(await panelEdits(page)).toBeUndefined();
+    await noticeGone(page);
     await pointerAway(page, box);
     expect(await inkSignature(page, box)).toEqual(before);
   });
@@ -576,6 +680,7 @@ test.describe("editing on the canvas", () => {
   test("dragging a stretch end two cells previews live, commits one step on release, and undoes", async ({ page }) => {
     const errors = collectConsoleErrors(page);
     const box = await openBaqarahPanel(page);
+    await chooseTool(page, "Stretch");
     await pointerAway(page, box);
     const before = await inkSignature(page, box);
     const cellPx = 6 * (await getStageScale(page));
@@ -634,6 +739,7 @@ test.describe("editing on the canvas", () => {
 
   test("dragging a word's route handle along its path asks the packer to move the word; where nothing packs it snaps back and says why", async ({ page }) => {
     const box = await openBaqarahPanel(page);
+    await chooseTool(page, "Move word");
     await pointerAway(page, box);
     const before = await inkSignature(page, box);
     const x0 = (await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x;
@@ -650,7 +756,7 @@ test.describe("editing on the canvas", () => {
     await page.mouse.move(word.x, word.y);
     await settleFrames(page);
     expect(await hitTargetAt(page, word)).toBe("Rect.kufi-edit-hit");
-    expect(await namedNodeCount(page, "kufi-route-handle")).toBe(1);
+    expect(await namedNodeCount(page, "kufi-route-handle")).toBeGreaterThan(0);
     expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(0);
     await page.mouse.down();
     await page.mouse.move(word.x + word.dc * 2 * targets.cellPx, word.y + word.dr * 2 * targets.cellPx, { steps: 12 });
@@ -658,19 +764,21 @@ test.describe("editing on the canvas", () => {
     await page.waitForTimeout(1200);
     await page.mouse.up();
 
-    await expect(kufiPanel(page)).toContainText("No room to move that word here");
+    await expect.poll(() => canvasNotice(page)).toBe("No room to move that word here");
     expect(await panelEdits(page)).toBeUndefined();
     // the press was the word's, not the panel's: nothing moved
     expect((await getBlocks(page)).find((b) => b.id === PANEL_ID)!.x).toBe(x0);
+    await noticeGone(page);
     await pointerAway(page, box);
     expect(await inkSignature(page, box)).toEqual(before);
     await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
 
-    // A still press elsewhere on a first letter is a click on the letter: الله
-    // has three forms, so the click either lands one or says none fits.
+    // In Select, a still press on the first letter is a click on the letter:
+    // الله has three forms, so the click either lands one or says none fits.
+    await chooseTool(page, "Select");
     await page.mouse.click(letter.x, letter.y);
     await expect
-      .poll(async () => (await panelEdits(page))?.forms?.[5] !== undefined || (await kufiPanel(page).innerText()).includes("No other form"))
+      .poll(async () => (await panelEdits(page))?.forms?.[5] !== undefined || (await canvasNotice(page)) === "No other form of that letter fits here")
       .toBe(true);
     await page.waitForTimeout(400);
 
@@ -714,9 +822,10 @@ test.describe("editing on the canvas", () => {
     const meemRow = rowOf(letter.y);
 
     // the word is dragged by its route handle, on the م's leading cell
+    await chooseTool(page, "Move word");
     await page.mouse.move(word.x, word.y);
     await settleFrames(page);
-    expect(await namedNodeCount(page, "kufi-route-handle")).toBe(1);
+    expect(await namedNodeCount(page, "kufi-route-handle")).toBeGreaterThan(0);
     await page.mouse.down();
     await page.mouse.move(word.x, word.y - 2 * targets.cellPx, { steps: 12 });
     // live: the م has moved two cells up its line in the drawn panel while nothing is committed
@@ -987,6 +1096,7 @@ test.describe("editing on the canvas", () => {
   test("a stretch nothing can pack snaps back, commits nothing, and says why", async ({ page }) => {
     await withoutExploration(page);
     const box = await openBaqarahPanel(page);
+    await chooseTool(page, "Stretch");
     await pointerAway(page, box);
     const before = await inkSignature(page, box);
     const cellPx = 6 * (await getStageScale(page));
@@ -1001,8 +1111,9 @@ test.describe("editing on the canvas", () => {
     await page.waitForTimeout(800);
     await page.mouse.up();
 
-    await expect(kufiPanel(page)).toContainText("No room to stretch that here");
+    await expect.poll(() => canvasNotice(page)).toBe("No room to stretch that here");
     expect(await panelEdits(page)).toBeUndefined();
+    await noticeGone(page);
     await pointerAway(page, box);
     expect(await inkSignature(page, box)).toEqual(before);
     await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
@@ -1011,6 +1122,7 @@ test.describe("editing on the canvas", () => {
   test("Release hand edits frees pinned letters after a size change they cannot survive, in one undo step", async ({ page }) => {
     const box = await openBaqarahPanel(page);
     await expect(kufiPanel(page)).not.toContainText("Release hand edits");
+    await chooseTool(page, "Stretch");
 
     // A hand edit: the kaf's right end pulled two cells, as in the stretch test
     // (a pull re-asks while the pointer rests, so it holds up under the full
@@ -1117,6 +1229,7 @@ test.describe("the selected letter's options", () => {
   test("once explored, a stretch slice no length fits shows no handle", async ({ page }) => {
     test.setTimeout(120_000);
     await openBaqarahPanel(page);
+    await chooseTool(page, "Stretch");
     // unit 8, seen:medial on the full top line: its grip shows before exploration knows better
     await explored(page);
     const targets = await kufiEditTargets(page);

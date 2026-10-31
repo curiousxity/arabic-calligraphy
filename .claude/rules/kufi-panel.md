@@ -4,6 +4,7 @@ paths:
   - "src/hooks/useKufiPanelLayout.ts"
   - "src/components/KufiPanel*.tsx"
   - "src/components/sidebar/KufiPanelPanel.tsx"
+  - "src/components/sidebar/KufiToolRow.tsx"
   - "e2e/kufi-panel.spec.ts"
 ---
 
@@ -140,8 +141,8 @@ unit `key` so a stale save is detected, not misapplied: `forms`, `stretch`,
   most moves are refused**: freeing the letters before the word on its line is
   all a re-route may do. On the Al-Baqarah panel nothing moves at plus or minus
   one or two cells (verified with a 20 s budget; the gap is irreducible under
-  the grammar). The tool is mostly idle on tight panels and says so in the
-  status line. Letting the rest of the panel re-arrange is an open decision
+  the grammar). The tool is mostly idle on tight panels and says so beside
+  the letter. Letting the rest of the panel re-arrange is an open decision
   (spec, future plan).
 - **2x2 rules, both ways.** A solid 2x2 of ink is forbidden; an *empty* 2x2
   (a hole) is a packing failure too. Painting (`cells`) can break either, and
@@ -219,7 +220,8 @@ exploration leaves untried things unknown, never "doesn't fit".
   explored try through `onApplyEdits` (one undo step), the drawn one is
   `aria-pressed`, untried ones say "Checking…", the rest are disabled with
   title "Doesn't fit here".
-- **Click cycle.** `cycleForm` walks `kufiFormCycle` order: a known fit
+- **Click cycle** (Select tool only; in Stretch and Move word a click only
+  selects). `cycleForm` walks `kufiFormCycle` order: a known fit
   commits its explored try (no pack under the pointer), a known misfit is
   skipped, an unknown form is asked of the packer as before. So once every
   form is known and none fits, the click says `NO_OTHER_FORM_FITS` at once.
@@ -254,35 +256,73 @@ resizes it).
 
 ## Canvas gestures (`KufiPanelEditOverlay`, `kufiHit.ts`, `kufiPull.ts`, `kufiPaint.ts`)
 
-No modes, no coloured dots: hover outlines and direct drags only. The overlay
-is **pointer-resolved** (one listening `Rect`; cell under the pointer found in
-arithmetic), like Next Shape; outline, handle and the e2e marker are
-`listening={false}`, so there is no Konva hover-leave race. A gesture's drag
-is a stage listener, not a node drag.
+**A visible tool row, not hidden gestures** (2026-10-31; the user could not
+find hover-only handles, half-cell targets or Alt-to-paint). The Kufi panel
+section starts with `sidebar/KufiToolRow.tsx`: four buttons, `Select` ·
+`Stretch` · `Move word` · `Paint`, `aria-pressed` on the current one.
+`KufiTool` lives in `kufiPanelBlock.ts`; App owns `kufiTool` (default
+`"select"`, **never saved**, reset to `"select"` when the selection changes,
+in the same render-time reset as `kufiLetterPick`) and threads it through
+Sidebar → `KufiPanelPanel` and CanvasStage → `KufiPanelView` → the overlay's
+`tool` prop. No keyboard shortcuts (none was free of the App's existing
+ones without checking each, and the row is the point).
 
-Priority on mouse down: **Alt first** (paints, claims the press whatever is
-under it) -> a **handle** -> any other cell of a letter, not claimed: a press
-that drifts drags the whole panel, a **still press (within `CLICK_SLOP`) is a
-click that selects the letter and cycles its form** among alternates that
-pack (skipping those that do not; a click that finds none says so; see "The
-selected letter's options" for what exploration changes).
+| tool | shows | press on a handle | still click on a letter |
+|---|---|---|---|
+| Select | letter outline only | (no handles) | select + cycle to the next fitting form |
+| Stretch | outline + **every** fitting end of the hovered letter, whole-cell squares | pull the stroke | select only |
+| Move word | outline + **every word's** route handle (0.7 cell) | drag the word | select only |
+| Paint | cell outline, no letter outline | — | paints (click or drag) |
+
+A still press on a handle (no pull) is a still click: it selects the letter
+(it used to cycle the form too). **Alt paints from any tool.** Each tool
+hit-tests only its own handles (`hoverAt`), so a route handle and a stretch
+end sharing a first letter's corner never compete. Non-hovered handles draw
+at `IDLE_HANDLE_OPACITY`, the one under the pointer solid. In every tool
+but Paint a press on a letter away from a handle is not claimed (a drift
+drags the panel); Paint claims every press. The e2e `kufi-edit-targets`
+publishes every end and word whatever the tool.
+
+**Refusals and confirmations draw beside the letter**, not in the sidebar.
+The overlay reports `onNotice(fromKey, { text, unitIndex })`; App holds
+`kufiNotice` (dropped if the inputs moved on from `fromKey`), clears it after
+`KUFI_NOTICE_MS` = 2000, on a commit, and when any gesture starts (the
+overlay sends `onNotice(fromKey, null)` on press). The overlay draws a Konva
+`Label` named `kufi-notice` (inside its `EXPORT_HIDDEN` group) beside the
+letter's placed box; `kufiNoticeAt` (pure, in `kufiPanelStatus.ts`) picks
+right, else left, else the roomier side, level with the box top and clamped
+to the panel's height. The label is drawn at the inverse of the stage's
+absolute scale (12 px type on screen at any zoom), so its size is known only
+once drawn: a `useLayoutEffect` scales and positions it imperatively. The
+sidebar's status line no longer carries a notice; e2e reads the label with
+`namedNodeText` (`e2e/harf.ts`).
+
+The overlay is **pointer-resolved** (one listening `Rect`; cell under the
+pointer found in arithmetic), like Next Shape; outline, handles, notice and
+the e2e marker are `listening={false}`, so there is no Konva hover-leave
+race. A gesture's drag is a stage listener, not a node drag.
+
+Priority on mouse down: **painting first** (the Paint tool or Alt; claims
+the press whatever is under it) -> a **handle of the current tool** -> any
+other cell of a letter, not claimed: a press that drifts drags the whole
+panel, a **still press (within `CLICK_SLOP`) is a click** (see the table;
+in Select it cycles the form among alternates that pack, skipping those
+that do not; a click that finds none says so; see "The selected letter's
+options" for what exploration changes).
 
 A letter's handles are its **stretch ends** (`stretchEnds`; an `end` is the
 last cell of a stroke a stretch point lengthens, or a **slice grip** on a
 stretchable slice with no free end) and, for a **word's first letter, its
 route handle** (`routeHandleOf`: the leading cell of the letter's box, on the
-baseline side; dragging it moves the word along its line). Hover shows **one
-square**, the handle whose drawn square (`handleCentre`) is nearest the
-pointer. A handle's hit cells are its own and the paper cell its square
-straddles onto (`hitStretchEnd`, `hitRouteHandle`); where a stretch end and a
-route handle share a cell (a first letter's leading corner is often a
-stroke's end) the pointer's place in the cell decides, so what hover shows is
-what a press takes. A press anywhere else on a first letter is the letter's
-own (panel drag or click), never the word's. `KufiEditTargets.words` (e2e)
-publishes a point on each route handle's square.
+baseline side; dragging it moves the word along its line). A handle's hit
+cells are its own and the paper cell its square straddles onto
+(`hitStretchEnd`, `hitRouteHandle`). A press anywhere else on a first letter
+is the letter's own (panel drag or click), never the word's.
+`KufiEditTargets.words` (e2e) publishes a point on each route handle's
+square.
 
-Alt-click toggles a cell, Alt-drag paints every cell crossed the way the
-first went: the cells between two pointer samples are filled in
+Painting: a click toggles a cell, a drag paints every cell crossed the way
+the first went: the cells between two pointer samples are filled in
 (`cellsBetween`, a 4-connected Bresenham walk), each painted on its own, so a
 fast hand paints the same line as a slow one and each cell gets the 2x2
 check. A cell that would make a solid 2x2 is refused and its outline flashes
@@ -299,8 +339,8 @@ Stretch and word drags ask the worker for a repack per cell crossed
 packed; a refused count is asked once more when the pointer rests
 (`PULL_REST_MS`), since the repack budget is a clock. Release commits that
 preview, pinned where the packer put the letter, as one undo step; if nothing
-reached packs, nothing commits and the stroke snaps back with a reason in
-the status line. A lengthened stroke may be pulled at most `MAX_PULL` cells
+reached packs, nothing commits and the stroke snaps back with a reason
+beside the letter. A lengthened stroke may be pulled at most `MAX_PULL` cells
 per drag.
 
 ## Tests
@@ -326,7 +366,8 @@ check a layout use the clock override; do not add wall-clock assertions.
   suggestions).
 - **A dot or filler square under a removed paint edit** reads as paper to the
   paint tool (the result carries no dot list), so it can be painted over wrongly.
-- **Touch has no Alt-paint**, and a touch press on a handle does not set
+- **Touch cannot paint** (neither Alt nor the Paint tool: `beginPaint`
+  listens for mouse events only), and a touch press on a handle does not set
   `lastLetterPress` (a double tap can slip through).
 - A reloaded panel with pins may rebuild its *unpinned* letters differently
   from the session that made it; pinned edits hold.
