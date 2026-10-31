@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { _internal, packKufiPanel, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
 import {
   KUFI_MAX_ARRANGEMENTS,
+  kufiLetterOptions,
+  kufiStretchTry,
   kufiChangesOf,
   pickArrangements,
   tryKufiChange,
@@ -124,4 +126,44 @@ describe("pickArrangements", () => {
     const picks = pickArrangements(current, [t(first), t(near), t(far)]);
     expect(picks.map((p) => p.result)).toEqual([first, far, near]);
   });
+});
+
+describe("kufiLetterOptions", () => {
+  it("marks the feh's fitting form and leaves untried ones unknown", () => {
+    const current = draft();
+    const unit = 4;
+    const tries = kufiChangesOf(BAQARAH, current)
+      .filter((c) => c.unitIndex === unit && c.kind === "form")
+      .map((c) => tryKufiChange(inputs, current, c));
+    const known = kufiLetterOptions(BAQARAH, current, { key: "k", tries, done: false, failed: false }, unit);
+    const byId = new Map(known.forms.map((f) => [f.glyphId, f]));
+    expect(known.forms).toHaveLength(4);
+    expect(byId.get("feh.final.1")?.fits).toBe(true);
+    expect(byId.get("feh.final.1")?.try?.result).not.toBeNull();
+    expect(byId.get("feh.final.0")?.fits).toBe(false);
+    // the current glyph is listed, fitting, with no try
+    expect(byId.get("feh.final.3")).toEqual({ glyphId: "feh.final.3", fits: true, try: null });
+    // no stretch tried yet: not known, so no entry
+    expect(known.stretch.size).toBe(0);
+
+    const none = kufiLetterOptions(BAQARAH, current, null, unit);
+    expect(none.forms.filter((f) => f.fits === null).map((f) => f.glyphId)).toEqual(["feh.final.0", "feh.final.1", "feh.final.2"]);
+  }, 30000);
+
+  it("lists a slice's fitting counts once every step of it is tried", () => {
+    const current = draft();
+    const unit = 2;
+    const planned = kufiChangesOf(BAQARAH, current).filter((c) => c.unitIndex === unit && c.kind === "stretch");
+    const si = planned[0].kind === "stretch" ? planned[0].stretchIndex : -1;
+    const slice = planned.filter((c) => c.kind === "stretch" && c.stretchIndex === si);
+    const tries = slice.map((c) => tryKufiChange(inputs, current, c));
+    const partial = kufiLetterOptions(BAQARAH, current, { key: "k", tries: tries.slice(0, -1), done: false, failed: false }, unit);
+    expect(partial.stretch.has(si)).toBe(false);
+    const full = kufiLetterOptions(BAQARAH, current, { key: "k", tries, done: false, failed: false }, unit);
+    const fitting = tries.filter((t) => t.result).map((t) => (t.change.kind === "stretch" ? t.change.counts[si] : NaN));
+    expect(full.stretch.get(si)).toEqual(fitting);
+    // the kaf's right end packs at +1 and +2 (see the e2e notes)
+    expect(fitting).toEqual(expect.arrayContaining([1, 2]));
+    expect(kufiStretchTry({ key: "k", tries, done: false, failed: false }, unit, si, 2)?.result).not.toBeNull();
+  }, 60000);
 });

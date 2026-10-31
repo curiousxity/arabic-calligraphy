@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PULL_REST_MS, pullAnswer, pullMove, pullRelease, pullRest, pullStart } from "./kufiPull";
+import { PULL_REST_MS, snapPull, pullAnswer, pullMove, pullRelease, pullRest, pullStart } from "./kufiPull";
 
 describe("a stretch pull", () => {
   it("asks for a count when the pointer crosses into a new one, clamped to the slice's range", () => {
@@ -82,5 +82,14 @@ describe("a stretch pull", () => {
     p = pullAnswer(p, 5, true).pull;
     p = pullMove(p, 0).pull;
     expect(pullRelease(p)).toEqual({ kind: "cancel" });
+  });
+});
+
+describe("snapPull", () => {
+  it("snaps to the nearest fitting count, or keeps the wanted one when nothing is known", () => {
+    expect(snapPull(3, [1, 2])).toBe(2);
+    expect(snapPull(3, null)).toBe(3);
+    expect(snapPull(-1, [-2, 1])).toBe(-2);
+    expect(snapPull(1, [1, 2])).toBe(1);
   });
 });

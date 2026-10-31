@@ -8,6 +8,7 @@ import { resolveKufiText } from "../../lib/kufi/kufiWords";
 import type { KufiPackResult, KufiPanelEdits } from "../../lib/kufi/kufiPack";
 import { useKufiExplore } from "../../hooks/useKufiExplore";
 import { KufiArrangements } from "./KufiArrangements";
+import { KufiLetterOptions } from "./KufiLetterOptions";
 
 /**
  * Smallest box the size fields accept, in cells. There is no largest: Fit and
@@ -102,7 +103,9 @@ export const KufiPanelPanel: React.FC<{
   /** Applies another arrangement of this panel (its edits and the packed result); one undo step. `fromKey` is the layout key it was found for. */
   onApplyEdits?: (fromKey: string, edits: KufiPanelEdits, result: Extract<KufiPackResult, { ok: true }>) => void;
   notice?: { blockId: number; key: string; text: string } | null;
-}> = ({ block, onSetSize, onFit, onReleasePins, onApplyEdits, notice = null }) => {
+  /** The letter (unit index) clicked on the canvas: its forms are listed under the arrangements. */
+  letter?: number | null;
+}> = ({ block, onSetSize, onFit, onReleasePins, onApplyEdits, notice = null, letter = null }) => {
   // Registers this panel as a reader, so the layout is packed even if the
   // canvas has not asked yet; the status reads the exact inputs below.
   useKufiPanelLayout(block);
@@ -211,6 +214,15 @@ export const KufiPanelPanel: React.FC<{
 
       {result?.ok && onApplyEdits && (
         <KufiArrangements current={result} state={explore} onApply={(a) => onApplyEdits(key, a.edits, a.result)} />
+      )}
+      {result?.ok && onApplyEdits && letter !== null && (
+        <KufiLetterOptions
+          text={block.text}
+          current={result}
+          state={explore}
+          unitIndex={letter}
+          onApply={(t) => t.result && onApplyEdits(key, t.edits, t.result)}
+        />
       )}
     </div>
   );

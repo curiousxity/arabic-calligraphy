@@ -210,6 +210,8 @@ export type SidebarProps = {
   onApplyKufiEdits?: (id: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => void;
   /** Why the last canvas edit of a Kufi panel changed nothing, keyed to the panel and its inputs. */
   kufiNotice?: { blockId: number; key: string; text: string } | null;
+  /** The Kufi panel letter clicked on the canvas, whose forms the Kufi panel section lists. */
+  kufiLetter?: { blockId: number; unitIndex: number } | null;
   /** Guides — see .claude/rules/guides.md. */
   onAddGuide?: (shape: GuideShape) => void;
   onAddSvgGuide?: (pathData: string) => void;
@@ -414,6 +416,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onReleaseKufiPanelPins,
   onApplyKufiEdits,
   kufiNotice,
+  kufiLetter,
   onAddGuide,
   onAddSvgGuide,
   onAddMark,
@@ -1443,6 +1446,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onReleasePins={onReleaseKufiPanelPins}
                 onApplyEdits={onApplyKufiEdits && ((fromKey, edits, result) => onApplyKufiEdits(selectedBlock.id, fromKey, edits, result))}
                 notice={kufiNotice ?? null}
+                letter={kufiLetter && kufiLetter.blockId === selectedBlock.id ? kufiLetter.unitIndex : null}
               />
             </CollapsibleSection>
           </div>

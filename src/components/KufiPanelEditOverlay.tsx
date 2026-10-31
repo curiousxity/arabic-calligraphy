@@ -33,8 +33,10 @@ import {
   kufiStretchEdits,
 } from "../lib/kufi/kufiPanelBlock";
 import { kufiLayoutKey, previewKufiLayout, type KufiLayoutInputs } from "../lib/kufi/kufiLayoutClient";
-import { PULL_REST_MS, pullAnswer, pullMove, pullRelease, pullRest, pullStart, type KufiPull } from "../lib/kufi/kufiPull";
+import { PULL_REST_MS, pullAnswer, pullMove, pullRelease, pullRest, pullStart, snapPull, type KufiPull } from "../lib/kufi/kufiPull";
 import { resolveKufiText } from "../lib/kufi/kufiWords";
+import { KUFI_STRETCH_STEPS, kufiLetterOptions, kufiStretchTry, type KufiLetterOptions, type KufiTry } from "../lib/kufi/kufiExplore";
+import { useKufiExplore } from "../hooks/useKufiExplore";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 type Cell = { col: number; row: number };
@@ -54,6 +56,8 @@ type Props = {
   onCommit: (fromKey: string, edits: KufiPanelEdits, result: Ok) => void;
   /** Why a gesture changed nothing, against the inputs it was made on. */
   onNotice: (fromKey: string, text: string) => void;
+  /** A still click on a letter selects it (its options show in the sidebar); a still click on paper clears it. */
+  onSelectLetter?: (unitIndex: number | null) => void;
 };
 
 /** How far a press may drift, in screen px, and still count as a click. */
@@ -103,6 +107,13 @@ type PullSpec = {
   deltaOf: (c: Cell) => number;
   /** The edits that preview this count, or null when the count cannot be asked for (the box would leave the panel). */
   editsFor: (count: number) => KufiPanelEdits | null;
+  /**
+   * What exploration knows about this count: the counts that fit on its side
+   * of the start, each with its explored try, or null when it has not been
+   * explored (a route, a slice not yet reached, a count further than
+   * `KUFI_STRETCH_STEPS` reach). Null asks the packer as before.
+   */
+  explored?: (count: number) => Array<{ count: number; try: KufiTry & { result: Ok } }> | null;
   /** What the commit saves: the shown preview's edits, pinned where it put the letters. */
   pinFor: (edits: KufiPanelEdits, result: Ok) => KufiPanelEdits;
   notice: string;
@@ -188,7 +199,7 @@ type Paint = {
  * step; if nothing the pointer reached packs, nothing is committed and the
  * stroke (or word) snaps back.
  */
-export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, inputs, cell, color, onPreview, onCommit, onNotice }) => {
+export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, inputs, cell, color, onPreview, onCommit, onNotice, onSelectLetter }) => {
   const [hover, setHover] = useState<Hover | null>(null);
   const [cellHover, setCellHover] = useState<Cell | null>(null);
   const [alt, setAlt] = useState(false);
@@ -201,12 +212,32 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
   const over = useRef(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** A press on a letter: where, and where the panel was, so a press that moved it is not a click. */
-  const press = useRef<{ unitIndex: number; x: number; y: number; panelX: number; panelY: number } | null>(null);
+  const press = useRef<{ unitIndex: number | null; x: number; y: number; panelX: number; panelY: number } | null>(null);
   const lastLetterPress = useRef(-Infinity);
   const cycling = useRef(false);
   const accent = useMemo(() => complementOf(color), [color]);
   const fromKey = kufiLayoutKey(inputs);
   const units = useMemo(() => resolveKufiText(inputs.text).units, [inputs.text]);
+  // What exploring the committed panel has found (the sidebar's strip reads
+  // the same state): each letter's forms and stretch lengths that fit,
+  // worked out per letter on first use.
+  const explore = useKufiExplore(inputs);
+  const optionsOf = useMemo(() => {
+    const memo = new Map<number, KufiLetterOptions>();
+    return (unitIndex: number): KufiLetterOptions => {
+      let o = memo.get(unitIndex);
+      if (!o) memo.set(unitIndex, (o = kufiLetterOptions(inputs.text, committed, explore, unitIndex)));
+      return o;
+    };
+  }, [inputs.text, committed, explore]);
+  /** A stretch end shows unless exploration has tried its slice and no length of it fits. */
+  const endShown = useCallback(
+    (e: KufiStretchEnd) => {
+      const fitting = optionsOf(e.unitIndex).stretch.get(e.stretchIndex);
+      return !fitting || fitting.length > 0;
+    },
+    [optionsOf]
+  );
 
   const width = result.cols * cell;
   const height = result.rows * cell;
@@ -291,7 +322,8 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
   const handlesOf = (r: Ok, unitIndex: number): KufiHandle[] => {
     const u = units[unitIndex];
     const route = u && firstUnitOfWord(units, u.wordIndex) === unitIndex ? routeHandleOf(r, units, u.wordIndex) : null;
-    return route ? [route, ...stretchEnds(r, unitIndex)] : stretchEnds(r, unitIndex);
+    const ends = stretchEnds(r, unitIndex).filter(endShown);
+    return route ? [route, ...ends] : ends;
   };
   /**
    * What the pointer is on. Of the handles whose hit cells include the
@@ -302,7 +334,8 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
   const hoverAt = (p: { at: { x: number; y: number }; cell: Cell } | null): Hover | null => {
     if (!p) return null;
     const { at, cell: c } = p;
-    const hits = [hitRouteHandle(result, units, c.col, c.row), hitStretchEnd(result, c.col, c.row)].filter((h): h is KufiHandle => h !== null);
+    const end = hitStretchEnd(result, c.col, c.row);
+    const hits = [hitRouteHandle(result, units, c.col, c.row), end && endShown(end) ? end : null].filter((h): h is KufiHandle => h !== null);
     const on = nearestHandleAt(hits, at.x, at.y);
     const unitIndex = on ? on.unitIndex : hitKufiUnit(result, c.col, c.row);
     if (unitIndex === null) return null;
@@ -327,10 +360,17 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
     }, FLASH_MS);
   };
 
-  /** Click: the next alternate of this letter that packs, tried in table order; one undo step. */
+  /**
+   * Click: selects the letter, and swaps it to the next alternate that packs,
+   * in table order; one undo step. A form exploration has tried is taken from
+   * its try (no pack under the pointer) or skipped; one not tried yet is
+   * asked of the packer as before. So once every form is known, a click that
+   * finds none says so at once.
+   */
   const cycleForm = useCallback(
     async (unitIndex: number) => {
       if (cycling.current || drag.current || paint.current) return;
+      onSelectLetter?.(unitIndex);
       const p = placementOf(committed, unitIndex);
       if (!p) return;
       const ids = kufiFormCycle(inputs.text, unitIndex, p.glyphId);
@@ -338,9 +378,16 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
         onNotice(fromKey, SINGLE_FORM);
         return;
       }
+      const known = optionsOf(unitIndex).forms;
       cycling.current = true;
       try {
         for (const id of ids) {
+          const option = known.find((f) => f.glyphId === id);
+          if (option?.fits === false) continue;
+          if (option?.fits && option.try?.result) {
+            onCommit(fromKey, option.try.edits, option.try.result);
+            return;
+          }
           const edits = kufiFormEdits(inputs.edits, unitIndex, id);
           // null is "superseded", not "does not pack": nothing else previews
           // while a cycle runs, but ask once more rather than skip the form
@@ -356,7 +403,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
         cycling.current = false;
       }
     },
-    [committed, inputs, fromKey, onCommit, onNotice]
+    [committed, inputs, fromKey, onCommit, onNotice, onSelectLetter, optionsOf]
   );
 
   const beginPull = (spec: PullSpec, stage: Konva.Stage | null) => {
@@ -421,7 +468,24 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
         state.shown = null;
         onPreview(null);
       }
-      if (m.request !== null) request(m.request);
+      if (m.request === null) return;
+      const known = spec.explored?.(m.request) ?? null;
+      if (known === null) {
+        request(m.request);
+        return;
+      }
+      if (known.length === 0) {
+        // exploration tried every count on this side and none fits: refused, with no repack and no retry
+        state.pull = pullAnswer(state.pull, m.request, false).pull;
+        return;
+      }
+      // snap to the nearest count that fits, shown from its explored try
+      const to = snapPull(m.request, known.map((k) => k.count));
+      const hit = known.find((k) => k.count === to)!;
+      state.pull = { ...state.pull, shown: to, refused: null };
+      if (state.shown?.count === to) return;
+      state.shown = { count: to, edits: hit.try.edits, result: hit.try.result };
+      onPreview(hit.try.result);
     };
     const release = (abort = false) => {
       if (state.ended) return;
@@ -481,6 +545,20 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           return kufiStretchEdits(inputs.edits, end.unitIndex, counts);
         },
         pinFor: (edits, r) => kufiPinEdits(edits, r, end.unitIndex),
+        explored: (count) => {
+          // explored only within the steps tried from the drawn count, and only once the whole slice is
+          if (Math.abs(count - at) > Math.max(...KUFI_STRETCH_STEPS)) return null;
+          const fitting = optionsOf(end.unitIndex).stretch.get(end.stretchIndex);
+          if (!fitting) return null;
+          const side = Math.sign(count - at);
+          const out: Array<{ count: number; try: KufiTry & { result: Ok } }> = [];
+          for (const c of fitting) {
+            if (Math.sign(c - at) !== side) continue;
+            const t = kufiStretchTry(explore, end.unitIndex, end.stretchIndex, c);
+            if (t?.result) out.push({ count: c, try: { ...t, result: t.result } });
+          }
+          return out;
+        },
         notice: NO_ROOM_TO_STRETCH,
       },
       stage
@@ -617,7 +695,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       };
     });
     const ends = result.placements.flatMap((p) =>
-      stretchEnds(result, p.unitIndex).map((e) => ({
+      stretchEnds(result, p.unitIndex).filter(endShown).map((e) => ({
         unit: p.unitIndex,
         si: e.stretchIndex,
         kind: e.kind,
@@ -643,7 +721,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
       grid.push(line);
     }
     return { letters: letters.filter((l) => l !== null), ends, words, grid, cell };
-  }, [result, units, cell]);
+  }, [result, units, cell, endShown]);
 
   return (
     <Group ref={groupRef} name={EXPORT_HIDDEN}>
@@ -682,11 +760,12 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
             lastLetterPress.current = performance.now();
             if (h.on.kind === "route") beginRoute(h.on.wordIndex, c, e.target.getStage());
             else beginStretch(h.on, c, e.target.getStage());
-          } else if (h) {
-            // not claimed: a press that drifts drags the whole panel
+          } else {
+            // not claimed: a press that drifts drags the whole panel; a still
+            // one on a letter is a click on it, on paper it clears the letter
             const panel = panelNode();
-            press.current = { unitIndex: h.unitIndex, x: e.evt.clientX, y: e.evt.clientY, panelX: panel?.x() ?? 0, panelY: panel?.y() ?? 0 };
-            lastLetterPress.current = performance.now();
+            press.current = { unitIndex: h?.unitIndex ?? null, x: e.evt.clientX, y: e.evt.clientY, panelX: panel?.x() ?? 0, panelY: panel?.y() ?? 0 };
+            if (h) lastLetterPress.current = performance.now();
           }
         }}
         onTouchStart={(e) => {
@@ -709,7 +788,8 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({ result, committed, input
           if (!p || Math.hypot(e.evt.clientX - p.x, e.evt.clientY - p.y) > CLICK_SLOP) return;
           const panel = panelNode();
           if (panel && (panel.x() !== p.panelX || panel.y() !== p.panelY)) return;
-          void cycleForm(p.unitIndex);
+          if (p.unitIndex === null) onSelectLetter?.(null);
+          else void cycleForm(p.unitIndex);
         }}
         onTap={() => {
           const h = hoverAt(pointer());

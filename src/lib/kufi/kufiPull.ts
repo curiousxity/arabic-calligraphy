@@ -67,3 +67,17 @@ export function pullRelease(p: KufiPull): PullRelease {
   if (p.count === p.base) return { kind: "cancel" };
   return { kind: "refused" };
 }
+
+/**
+ * The nearest count in `fitting` to `wanted` (the earlier one on a tie), or
+ * `wanted` when `fitting` is null (not explored) or empty. Exploration tries
+ * each slice only one and two cells either way from its drawn count
+ * (`KUFI_STRETCH_STEPS`), so a pull further than that is not explored and
+ * asks the packer as before.
+ */
+export function snapPull(wanted: number, fitting: number[] | null): number {
+  if (!fitting || fitting.length === 0) return wanted;
+  let best = fitting[0];
+  for (const c of fitting) if (Math.abs(c - wanted) < Math.abs(best - wanted)) best = c;
+  return best;
+}

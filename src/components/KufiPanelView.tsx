@@ -33,6 +33,8 @@ export type KufiPanelViewProps = ReturnType<typeof kufiPanelProps> & {
   onEditPanel?: (fromKey: string, edits: KufiPanelEdits, result: Ok) => void;
   /** Why a canvas edit changed nothing, for the Kufi panel's status line; dropped if the inputs have moved on from `fromKey`. */
   onPanelNotice?: (fromKey: string, text: string) => void;
+  /** A still click on a letter (its unit index) or on paper (null): the sidebar lists that letter's options. */
+  onSelectLetter?: (unitIndex: number | null) => void;
 };
 
 const noNotice = () => {};
@@ -149,6 +151,7 @@ export const KufiPanelView: React.FC<KufiPanelViewProps> = (p) => {
           onPreview={setPreview}
           onCommit={p.onEditPanel}
           onNotice={p.onPanelNotice ?? noNotice}
+          onSelectLetter={p.onSelectLetter}
         />
       )}
     </Group>

@@ -198,6 +198,47 @@ explore result is still cached (no "Looking…" again). The strip renders
 nothing when the current result is not ok; a failed exploration reads like a
 finished one. Hovering outlines the cells that differ from the current panel.
 
+## The selected letter's options (`kufiLetterOptions`, `KufiLetterOptions`)
+
+The same exploration says, per letter, which forms and stretch lengths fit
+before anything is tried. `kufiLetterOptions(text, current, state, unit)`
+(pure, in `kufiExplore.ts`) lists every form of the unit in table order with
+`fits: true | false | null` (null = not tried; the drawn glyph is `fits:
+true, try: null`) and, per stretch slice, the counts that fit, **only once
+every step of that slice has a try** (no entry = not known). A failed
+exploration leaves untried things unknown, never "doesn't fit".
+
+- **Selecting a letter.** A still click on a letter (the overlay's
+  `onSelectLetter`) sets App's `kufiLetterPick`, stored with the text and
+  box it was clicked in; `kufiLetter` is derived from it and is null once
+  the text or size differs, and a change of selection clears the pick
+  (reset during render, not in an effect). A still click on paper clears it.
+  The sidebar's **Letter forms** row (`sidebar/KufiLetterOptions.tsx`, under
+  the strip) draws each form's `rows` on a small canvas (`useSchemeTick`
+  repaints on a theme change); fitting forms are enabled and apply their
+  explored try through `onApplyEdits` (one undo step), the drawn one is
+  `aria-pressed`, untried ones say "Checking…", the rest are disabled with
+  title "Doesn't fit here".
+- **Click cycle.** `cycleForm` walks `kufiFormCycle` order: a known fit
+  commits its explored try (no pack under the pointer), a known misfit is
+  skipped, an unknown form is asked of the packer as before. So once every
+  form is known and none fits, the click says `NO_OTHER_FORM_FITS` at once.
+- **Stretch handles** (`endShown`): an end shows unless its slice is known
+  and has no fitting count; hidden ends are also dropped from hover, hits
+  and the e2e `ends`. A drag within `KUFI_STRETCH_STEPS` reach (two cells)
+  of the drawn count, on a known slice, snaps to the nearest fitting count
+  on the same side of the start (`snapPull`) and shows that count's
+  explored try; nothing fitting on that side is a refusal, with no repack.
+  **Beyond two cells, or on a slice not yet known, the pull asks the packer
+  per cell as before**: exploration never tried those counts. Routes are
+  not explored.
+- In a live browser the exploration's repacks run on a clock, as the drag
+  previews do, so what it finds can differ from a work-only unit test (unit
+  3's lam fits at `-1` with an unlimited clock, yet the canvas refused it in
+  the e2e). The e2e tests of the packer fallback block the explore worker
+  (`withoutExploration`, a `page.route` abort), which leaves every option
+  unknown.
+
 ## Export
 
 `KufiPanelView` draws the panel as **one traced outline**: `cellRings` traces
@@ -222,8 +263,9 @@ is a stage listener, not a node drag.
 Priority on mouse down: **Alt first** (paints, claims the press whatever is
 under it) -> a **handle** -> any other cell of a letter, not claimed: a press
 that drifts drags the whole panel, a **still press (within `CLICK_SLOP`) is a
-click that cycles the letter's form** among alternates that pack (skipping
-those that do not; a click that finds none says so).
+click that selects the letter and cycles its form** among alternates that
+pack (skipping those that do not; a click that finds none says so; see "The
+selected letter's options" for what exploration changes).
 
 A letter's handles are its **stretch ends** (`stretchEnds`; an `end` is the
 last cell of a stroke a stretch point lengthens, or a **slice grip** on a

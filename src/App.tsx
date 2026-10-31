@@ -325,6 +325,17 @@ const App: React.FC = () => {
   const [pendingPlacement, setPendingPlacement] = useState<PendingPlacement | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  /**
+   * The Kufi panel letter last clicked on the canvas, with the text and box it
+   * was clicked in: the sidebar lists its options. A change of text or size
+   * clears it (`kufiLetter` below), and so does a change of selection.
+   */
+  const [kufiLetterPick, setKufiLetterPick] = useState<{ blockId: number; unitIndex: number; text: string; cols: number; rows: number } | null>(null);
+  const [kufiLetterSelection, setKufiLetterSelection] = useState(selectedId);
+  if (kufiLetterSelection !== selectedId) {
+    setKufiLetterSelection(selectedId);
+    setKufiLetterPick(null);
+  }
   const [showStart, setShowStart] = useState(() => {
     if (!isBrowser) return false;
     // Touching the `localStorage` global can itself throw when site data is
@@ -2156,6 +2167,16 @@ const App: React.FC = () => {
     setKufiNotice({ blockId: id, key: fromKey, text });
   }, []);
 
+  /** A still click on a Kufi panel's letter selects it for the sidebar's letter options; on paper (null) clears it. */
+  const selectKufiLetter = useCallback((id: number, unitIndex: number | null) => {
+    const b = blocksRef.current.find((x) => x.id === id);
+    if (!b || !isKufiPanel(b) || unitIndex === null) {
+      setKufiLetterPick(null);
+      return;
+    }
+    setKufiLetterPick({ blockId: id, unitIndex, text: b.text, cols: b.panelCols, rows: b.panelRows });
+  }, []);
+
   // Guides: dashed construction paths that Curve text can attach to.
   // See .claude/rules/guides.md.
   const addGuideBlock = (shape: GuideShape) => {
@@ -3403,6 +3424,18 @@ const App: React.FC = () => {
   };
   // ---- /STREAM-G ----
 
+  const kufiLetterBlock = kufiLetterPick ? blocks.find((b) => b.id === kufiLetterPick.blockId) : undefined;
+  const kufiLetter =
+    kufiLetterPick &&
+    kufiLetterBlock &&
+    isKufiPanel(kufiLetterBlock) &&
+    kufiLetterBlock.id === selectedId &&
+    kufiLetterBlock.text === kufiLetterPick.text &&
+    kufiLetterBlock.panelCols === kufiLetterPick.cols &&
+    kufiLetterBlock.panelRows === kufiLetterPick.rows
+      ? { blockId: kufiLetterPick.blockId, unitIndex: kufiLetterPick.unitIndex }
+      : null;
+
   return (
     <div
       style={{
@@ -3469,6 +3502,7 @@ const App: React.FC = () => {
         onReleaseKufiPanelPins={releaseKufiPanelPins}
         onApplyKufiEdits={editKufiPanel}
         kufiNotice={kufiNotice}
+        kufiLetter={kufiLetter}
         onAddGuide={addGuideBlock}
         onAddSvgGuide={addSvgGuideBlock}
         onAddMark={addMarkBlock}
@@ -3606,6 +3640,7 @@ const App: React.FC = () => {
           onPickGlyphAlternate={pickGlyphAlternate}
           onEditKufiPanel={editKufiPanel}
           onKufiPanelNotice={noticeKufiPanel}
+          onSelectKufiLetter={selectKufiLetter}
           onSetStrokeCut={setStrokeCut}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           ghostBlock={

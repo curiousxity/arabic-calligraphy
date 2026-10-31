@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSchemeTick } from "../../hooks/useSchemeTick";
 import type { KufiPackResult } from "../../lib/kufi/kufiPack";
 import {
   pickArrangements,
@@ -10,19 +11,6 @@ type Ok = Extract<KufiPackResult, { ok: true }>;
 
 /** Canvas pixels per cell in a thumbnail. */
 const CELL_PX = 3;
-
-/** Bumps when the colour scheme changes, so canvas thumbnails (which read CSS variables once per draw) repaint. */
-function useSchemeTick(): number {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const mq = window.matchMedia?.("(prefers-color-scheme: light)");
-    if (!mq) return;
-    const bump = () => setTick((t) => t + 1);
-    mq.addEventListener("change", bump);
-    return () => mq.removeEventListener("change", bump);
-  }, []);
-  return tick;
-}
 
 /** A stable identity for a change, so thumbnails keep their key and hover as picks reorder. */
 const changeId = (a: KufiArrangement): string =>

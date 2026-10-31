@@ -7,7 +7,8 @@
 import { kufiGlyphById, kufiFormsOf, placementOf } from "./kufiHit";
 import { packKufiPanel, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
 import { kufiFormEdits, kufiPinEdits, kufiStretchEdits } from "./kufiPanelBlock";
-import { resolveKufiText } from "./kufiWords";
+import { resolveKufiText, type KufiUnit } from "./kufiWords";
+import type { KufiExploreState } from "./kufiExploreClient";
 import type { KufiLayoutInputs } from "./kufiWorkerProtocol";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
@@ -32,26 +33,95 @@ export function kufiChangesOf(text: string, current: Ok): KufiChange[] {
   const forms: KufiChange[] = [];
   const stretches: KufiChange[] = [];
   for (const unit of units) {
-    const p = placementOf(current, unit.index);
-    if (!p) continue;
-    for (const g of kufiFormsOf(unit)) {
-      if (g.id !== p.glyphId) forms.push({ kind: "form", unitIndex: unit.index, glyphId: g.id });
-    }
-    const glyph = kufiGlyphById(p.glyphId);
-    if (!glyph) continue;
-    const base = glyph.stretch.map((_, i) => p.stretch[i] ?? 0);
-    glyph.stretch.forEach((slice, stretchIndex) => {
-      for (const step of KUFI_STRETCH_STEPS) {
-        const count = base[stretchIndex] + step;
-        if (count < -(slice.min ?? 0)) continue;
-        const counts = base.slice();
-        counts[stretchIndex] = count;
-        stretches.push({ kind: "stretch", unitIndex: unit.index, stretchIndex, counts });
-      }
-    });
+    const c = unitChanges(unit, current);
+    forms.push(...c.forms);
+    stretches.push(...c.stretches);
   }
   return [...forms, ...stretches];
 }
+
+/** One unit's share of `kufiChangesOf`. */
+function unitChanges(unit: KufiUnit, current: Ok): { forms: KufiChange[]; stretches: KufiChange[] } {
+  const forms: KufiChange[] = [];
+  const stretches: KufiChange[] = [];
+  const p = placementOf(current, unit.index);
+  if (!p) return { forms, stretches };
+  for (const g of kufiFormsOf(unit)) {
+    if (g.id !== p.glyphId) forms.push({ kind: "form", unitIndex: unit.index, glyphId: g.id });
+  }
+  const glyph = kufiGlyphById(p.glyphId);
+  if (!glyph) return { forms, stretches };
+  const base = glyph.stretch.map((_, i) => p.stretch[i] ?? 0);
+  glyph.stretch.forEach((slice, stretchIndex) => {
+    for (const step of KUFI_STRETCH_STEPS) {
+      const count = base[stretchIndex] + step;
+      if (count < -(slice.min ?? 0)) continue;
+      const counts = base.slice();
+      counts[stretchIndex] = count;
+      stretches.push({ kind: "stretch", unitIndex: unit.index, stretchIndex, counts });
+    }
+  });
+  return { forms, stretches };
+}
+
+/**
+ * What exploration knows about one letter of the packed panel. `forms` lists
+ * every form of the letter in table order; `fits` is null for a form not
+ * tried yet (or never, when the exploration failed), and the current glyph is
+ * listed with fits: true and try: null. `stretch` has an entry for a slice
+ * only once every step of it (`KUFI_STRETCH_STEPS`) has been tried: the
+ * counts that fit, in step order, possibly none. A slice with no entry is
+ * not known.
+ */
+export type KufiLetterOptions = {
+  forms: Array<{ glyphId: string; fits: boolean | null; try: KufiTry | null }>;
+  /** stretchIndex -> counts that fit */
+  stretch: Map<number, number[]>;
+};
+
+/** One letter's options from what exploring `current` (the packed panel for `text`) has found so far. */
+export function kufiLetterOptions(text: string, current: Ok, state: KufiExploreState | null, unitIndex: number): KufiLetterOptions {
+  const unit = resolveKufiText(text).units[unitIndex];
+  const p = placementOf(current, unitIndex);
+  const stretch = new Map<number, number[]>();
+  if (!unit || !p) return { forms: [], stretch };
+  const tries = state ? state.tries.filter((t) => t.change.unitIndex === unitIndex) : [];
+  const forms = kufiFormsOf(unit).map((g) => {
+    if (g.id === p.glyphId) return { glyphId: g.id, fits: true, try: null };
+    const t = tries.find((x) => x.change.kind === "form" && x.change.glyphId === g.id) ?? null;
+    return { glyphId: g.id, fits: t ? t.result !== null : null, try: t };
+  });
+  const bySlice = new Map<number, number[][]>();
+  for (const c of unitChanges(unit, current).stretches) {
+    if (c.kind !== "stretch") continue;
+    const list = bySlice.get(c.stretchIndex) ?? [];
+    list.push(c.counts);
+    bySlice.set(c.stretchIndex, list);
+  }
+  for (const [stretchIndex, planned] of bySlice) {
+    const found = planned.map((counts) =>
+      tries.find((t) => t.change.kind === "stretch" && t.change.stretchIndex === stretchIndex && sameCounts(t.change.counts, counts))
+    );
+    if (found.some((t) => !t)) continue;
+    stretch.set(
+      stretchIndex,
+      found.filter((t) => t!.result !== null).map((t) => (t!.change as Extract<KufiChange, { kind: "stretch" }>).counts[stretchIndex])
+    );
+  }
+  return { forms, stretch };
+}
+
+/** The explored try that sets one slice of a letter to `count` (the others as drawn), if exploration has made it. */
+export function kufiStretchTry(state: KufiExploreState | null, unitIndex: number, stretchIndex: number, count: number): KufiTry | null {
+  if (!state) return null;
+  return (
+    state.tries.find(
+      (t) => t.change.kind === "stretch" && t.change.unitIndex === unitIndex && t.change.stretchIndex === stretchIndex && t.change.counts[stretchIndex] === count
+    ) ?? null
+  );
+}
+
+const sameCounts = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 /** Packs the panel with one change made to `current`; the saved edits pin the changed letter as the canvas does. */
 export function tryKufiChange(inputs: KufiLayoutInputs, current: Ok, change: KufiChange): KufiTry {

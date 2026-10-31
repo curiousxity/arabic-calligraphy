@@ -607,3 +607,7 @@ details:not([open]) > .sidebarPresetKeyboardSummary { margin-bottom: 0; padding-
 .kufiArrangement canvas { display: block; max-width: 100%; height: auto; }
 .kufiArrangement:hover { background: var(--key-hover); border-color: var(--accent); }
 .kufiArrangement[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); cursor: default; }
+.kufiLetterForm { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.kufiLetterForm:disabled { opacity: 0.4; cursor: not-allowed; }
+.kufiLetterForm:disabled:hover { background: var(--bg-input); border-color: var(--border); }
+.kufiLetterFormNote { font-size: 10px; line-height: 1.2; color: var(--text-muted); }

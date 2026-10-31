@@ -366,6 +366,30 @@ async function openBaqarahPanel(page: Page): Promise<Box> {
   return box;
 }
 
+/**
+ * Keeps the explore worker from loading, so the panel never learns its
+ * letters' options: the canvas falls back to asking the packer, as it does
+ * before exploration has reached a letter. The tests of that fallback (a
+ * refused pull snaps back and says why) use it, since in a live browser the
+ * exploration's repacks run on a clock and may or may not reach a count the
+ * drag's own repack refuses.
+ */
+async function withoutExploration(page: Page) {
+  await page.route(/kufiExplore\.worker/, (route) => route.abort());
+}
+
+/** Waits until the explore worker has tried every single change to the panel as drawn. */
+async function explored(page: Page) {
+  await expect(kufiPanel(page)).not.toContainText("Looking…", { timeout: 60_000 });
+}
+
+/** Waits until the selected letter's forms have all been tried. */
+async function formsExplored(page: Page) {
+  const options = kufiPanel(page).getByTestId("kufi-letter-options");
+  await expect(options).toBeVisible();
+  await expect(options).not.toContainText("Checking…", { timeout: 60_000 });
+}
+
 const panelEdits = async (page: Page) =>
   ((await getBlocks(page)).find((b) => b.id === PANEL_ID) as { panelEdits?: KufiPanelEdits } | undefined)?.panelEdits;
 
@@ -392,6 +416,7 @@ test.describe("editing on the canvas", () => {
   test.describe.configure({ mode: "default" });
 
   test("hovering a letter outlines it, and a click cycles its form to the next one that packs, one step per click", async ({ page }) => {
+    test.setTimeout(120_000);
     const errors = collectConsoleErrors(page);
     const box = await openBaqarahPanel(page);
     await pointerAway(page, box);
@@ -408,7 +433,9 @@ test.describe("editing on the canvas", () => {
     expect(await namedNodeCount(page, "kufi-edit-hit")).toBe(1);
     expect(await draggableDotCenters(page)).toEqual([]);
 
-    // Click: the next form in table order that packs (`.0` cannot), pinned where it landed.
+    // Click: the next form in table order that packs (`.0` cannot), pinned
+    // where it landed; once explored, it comes from the exploration's try.
+    await explored(page);
     await page.mouse.click(letter.x, letter.y);
     await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
     expect((await panelEdits(page))?.pinned?.[4]).toMatchObject({ unitIndex: 4, glyphId: "feh.final.1" });
@@ -418,6 +445,7 @@ test.describe("editing on the canvas", () => {
     // The outline follows the letter; a second click skips `.2` and comes back to the drawn form.
     const again = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
     expect(again.glyphId).toBe("feh.final.1");
+    await formsExplored(page);
     await page.mouse.click(again.x, again.y);
     await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.3");
 
@@ -457,6 +485,7 @@ test.describe("editing on the canvas", () => {
   });
 
   test("a click on a handle, with no pull, is a click on the letter", async ({ page }) => {
+    await withoutExploration(page);
     await openBaqarahPanel(page);
     const targets = await kufiEditTargets(page);
     // an end handle of the feh (four forms): pressing and releasing on it cycles the form
@@ -517,6 +546,7 @@ test.describe("editing on the canvas", () => {
   });
 
   test("a baseline joined on both sides still has a grip on its stretch slice", async ({ page }) => {
+    await withoutExploration(page);
     const box = await openBaqarahPanel(page);
     await pointerAway(page, box);
     const before = await inkSignature(page, box);
@@ -955,6 +985,7 @@ test.describe("editing on the canvas", () => {
   });
 
   test("a stretch nothing can pack snaps back, commits nothing, and says why", async ({ page }) => {
+    await withoutExploration(page);
     const box = await openBaqarahPanel(page);
     await pointerAway(page, box);
     const before = await inkSignature(page, box);
@@ -1037,6 +1068,66 @@ test.describe("editing on the canvas", () => {
     await page.getByRole("button", { name: "Undo" }).click();
     await expect.poll(async () => (await panelEdits(page))?.pinned?.[2]).toBeDefined();
     await expect(kufiPanel(page)).toContainText("A pinned edit can't stay where it is at this size", { timeout: 15_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The selected letter's options
+// ---------------------------------------------------------------------------
+
+test.describe("the selected letter's options", () => {
+  test.describe.configure({ mode: "default" });
+
+  test("the selected letter lists its forms and only fitting ones apply", async ({ page }) => {
+    test.setTimeout(120_000);
+    const box = await openBaqarahPanel(page);
+    await explored(page);
+    const letter = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
+    expect(letter.glyphId).toBe("feh.final.3");
+
+    // A click selects the letter (and swaps it to its next fitting form);
+    // undo takes the swap back and keeps the letter selected.
+    await page.mouse.click(letter.x, letter.y);
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    await pointerAway(page, box);
+
+    await formsExplored(page);
+    const options = kufiPanel(page).getByTestId("kufi-letter-options");
+    const form = (id: string) => options.locator(`[data-glyph-id="${id}"]`);
+    await expect(options.locator("[data-glyph-id]")).toHaveCount(4);
+    await expect(form("feh.final.3")).toHaveAttribute("aria-pressed", "true");
+    await expect(form("feh.final.1")).toBeEnabled();
+    for (const id of ["feh.final.0", "feh.final.2"]) {
+      await expect(form(id)).toBeDisabled();
+      await expect(form(id)).toHaveAttribute("title", "Doesn't fit here");
+    }
+
+    await form("feh.final.1").click();
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
+    expect((await panelEdits(page))?.pinned?.[4]).toMatchObject({ unitIndex: 4, glyphId: "feh.final.1" });
+    await expect(form("feh.final.1")).toHaveAttribute("aria-pressed", "true");
+
+    // One step.
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+  });
+
+  test("once explored, a stretch slice no length fits shows no handle", async ({ page }) => {
+    test.setTimeout(120_000);
+    await openBaqarahPanel(page);
+    // unit 8, seen:medial on the full top line: its grip shows before exploration knows better
+    await explored(page);
+    const targets = await kufiEditTargets(page);
+    expect(targets.ends.filter((e) => e.unit === 8)).toEqual([]);
+    const seen = targets.letters.find((l) => l.unit === 8)!;
+    await page.mouse.move(seen.x, seen.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-hover-outline")).toBeGreaterThan(0);
+    expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(0);
+    // the kaf's right end, which fits a step or two longer, keeps its handle
+    expect(targets.ends.some((e) => e.unit === 2 && e.dc === 1)).toBe(true);
   });
 });
 

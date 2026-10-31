@@ -21,6 +21,8 @@ export const section: GuideSection = {
     "dots",
     "ijam",
     "stretch",
+    "letter forms",
+    "alternates",
     "كوفي",
     "كوفي مربع",
     "إعجام",
@@ -103,12 +105,23 @@ export const section: GuideSection = {
           <strong>Stretch.</strong> A small square appears on the end of a
           stroke that can grow. Drag it along the stroke to make it longer or
           shorter, a square at a time. A stroke with no free end shows the
-          square on the stroke itself.
+          square on the stroke itself. Once the panel has been checked (see{" "}
+          <em>Other arrangements</em> below), the square shows only on strokes
+          that have a length that fits, and a drag of a square or two jumps
+          to the nearest length that fits.
         </li>
         <li>
           <strong>Swap a letter's shape.</strong> Click a letter (press and
           release without moving) to change it to its next form. Forms that do
           not fit are skipped. A letter with a single form says so.
+        </li>
+        <li>
+          <strong>See a letter's forms.</strong> The letter you click is also
+          shown in the Kufi panel section under <strong>Letter forms</strong>:
+          every form of it, the one drawn now highlighted. Forms that fit here
+          can be clicked to use them; the others are greyed out and say{" "}
+          <em>Doesn't fit here</em>. Forms still being tried say{" "}
+          <em>Checking…</em>. Clicking the empty part of the panel clears it.
         </li>
         <li>
           <strong>Move a word.</strong> A word's first letter has a second
