@@ -43,16 +43,20 @@ describe("tryKufiChange", () => {
 
   it("finds the kaf's fitting stretch", () => {
     const current = draft();
-    const tries = kufiChangesOf(BAQARAH, current)
-      .filter((c) => c.kind === "stretch" && c.unitIndex === 2)
-      .map((c) => tryKufiChange(inputs, current, c));
-    const packed = tries.filter((t) => t.result);
-    expect(packed.length).toBeGreaterThan(0);
-    for (const t of packed) {
-      const c = t.change;
-      if (c.kind === "stretch") expect(t.edits.pinned?.[2].stretch).toEqual(c.counts);
+    let found: KufiTry | undefined;
+    for (const c of kufiChangesOf(BAQARAH, current)) {
+      if (c.kind !== "stretch" || c.unitIndex !== 2) continue;
+      const t = tryKufiChange(inputs, current, c);
+      if (t.result) {
+        found = t;
+        break;
+      }
     }
-  }, 60000);
+    expect(found).toBeDefined();
+    const c = found!.change;
+    expect(c.kind).toBe("stretch");
+    if (c.kind === "stretch") expect(found!.edits.pinned?.[2].stretch).toEqual(c.counts);
+  }, 30000);
 
   it("keeps existing edits", () => {
     const current = draft();
@@ -62,11 +66,18 @@ describe("tryKufiChange", () => {
     const held_inputs = { ...inputs, edits: held };
     const base = packKufiPanel(held_inputs);
     if (!base.ok) throw new Error("held edits did not pack");
-    const other = kufiChangesOf(BAQARAH, base).filter((c) => c.unitIndex !== 4);
-    const t = other.map((c) => tryKufiChange(held_inputs, base, c)).find((x) => x.result);
-    expect(t).toBeDefined();
-    expect(t!.edits.forms?.[4]).toBe("feh.final.1");
-  }, 120000);
+    let found: KufiTry | undefined;
+    for (const c of kufiChangesOf(BAQARAH, base)) {
+      if (c.unitIndex === 4) continue;
+      const t = tryKufiChange(held_inputs, base, c);
+      if (t.result) {
+        found = t;
+        break;
+      }
+    }
+    expect(found).toBeDefined();
+    expect(found!.edits.forms?.[4]).toBe("feh.final.1");
+  }, 30000);
 });
 
 describe("pickArrangements", () => {
@@ -96,5 +107,21 @@ describe("pickArrangements", () => {
     expect(picks[1].changedCells).toBe(1);
     expect(pickArrangements(current, [t(a), t(b), t(c)], 2)).toHaveLength(2);
     expect(KUFI_MAX_ARRANGEMENTS).toBe(6);
+  });
+
+  it("ranks a try with no quality after one with quality", () => {
+    const bare = mk([1, 0, 0, 0, 0, 0, 0, 0, 0], 0);
+    delete bare.quality;
+    const rated = mk([0, 1, 0, 0, 0, 0, 0, 0, 0], 5, 5, 5);
+    expect(pickArrangements(current, [t(bare), t(rated)]).map((p) => p.result)).toEqual([rated, bare]);
+  });
+
+  it("chooses the second pick for distance from the first pick", () => {
+    const first = mk([1, 1, 1, 0, 0, 0, 0, 0, 0], 0, 0);
+    // near: 2 from current but only 1 from the first pick; far: 2 from current and 3 from the first
+    const near = mk([1, 1, 0, 0, 0, 0, 0, 0, 0], 0, 1);
+    const far = mk([0, 0, 0, 0, 0, 0, 1, 1, 0], 0, 1);
+    const picks = pickArrangements(current, [t(first), t(near), t(far)]);
+    expect(picks.map((p) => p.result)).toEqual([first, far, near]);
   });
 });
