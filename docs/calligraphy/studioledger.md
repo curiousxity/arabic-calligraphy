@@ -268,6 +268,13 @@ Times are minutes:seconds into the individual-letters lesson.
   smaller nib. The hamza (H01): the user chose that refit, "A is the way to go".
 - **Inspection:** "I'm going to need to see all of the strokes." Every shape is drawn as the app draws it, beside the
   studio's, for the user.
+- **The overnight refits (2026-10-30):** strokes that fold were refitted with the fold term and a turning pen. A
+  refit was offered only if it no longer folds and matches the studio no worse (iou within 0.01, worst miss within
+  0.01). That gave 358, over 353 shapes, and the user saw every one beside its old fit and the studio. They turned
+  down 045, 570r, 571r, 574r, 589, 665, 670g and 709 ("So far 045 is worse"). Those keep their old fits, and so do
+  the twins sharing a stroke with them (020 with 045, 572.s1 with 589). 350 refits went in, and the joint trims
+  were redone over the shapes they changed. Still open: 642 and 744 are "better but the tail is too thin", and 045's
+  hook still folds.
 
 **Every joint trimmed to the studio edge**
 
