@@ -988,21 +988,54 @@ describe("panels that packed before bars", () => {
 });
 
 describe("filler bars", () => {
-  for (const text of ["سبحان الله", "قل هو الله أحد"])
+  for (const text of ["سبحان الله", "بسم الله الرحمن الرحيم", "قل هو الله أحد"])
     it(`Fit packs «${text}»`, () => {
       const size = fitKufiPanel(text);
       const r = expectPacked(packKufiPanel({ text, ...size }), text);
       expect(r.quality).toHaveProperty("bars");
     }, 90000);
 
-  // Fit does not reach 17×19 within FIT_BUDGET_MS (squares first, then rectangles ranked by the
-  // greedy pass, where 17×19 is not among the first 30), so the near miss is packed at its size
   it("packs «بسم الله الرحمن الرحيم» at 17×19, its near miss, with bars that are bars", () => {
     const text = "بسم الله الرحمن الرحيم";
     const r = expectPacked(packKufiPanel({ text, cols: 17, rows: 19 }), text);
     expect(r.quality!.bars).toBeGreaterThan(0);
     expect(expectBarsAreBars(r, text)).toBe(r.quality!.bars);
   }, 20000);
+
+  it("a panel that packs without bars is the panel packed with the bar phase switched off", () => {
+    const fitted = (text: string) => {
+      _internal.setBarsOff(true);
+      try {
+        return fitKufiPanel(text);
+      } finally {
+        _internal.setBarsOff(false);
+      }
+    };
+    const cases: Array<[string, number, number]> = [
+      [ALLAH, 9, 9],
+      ["الحمد لله", 13, 13],
+      [BAQARAH, 21, 21],
+      [NASR, 15, 9],
+      ["الله أكبر", 11, 13],
+      ["الله أكبر", 15, 12],
+      ["الله أكبر", fitted("الله أكبر").cols, fitted("الله أكبر").rows],
+    ];
+    for (const [text, cols, rows] of cases) {
+      _internal.clearCaches();
+      _internal.setBarsOff(true);
+      let off: KufiPackResult;
+      try {
+        off = packKufiPanel({ text, cols, rows });
+      } finally {
+        _internal.setBarsOff(false);
+      }
+      expect(off.ok, `${text} ${cols}x${rows} packs without bars`).toBe(true);
+      _internal.clearCaches();
+      const on = expectPacked(packKufiPanel({ text, cols, rows }), text);
+      expect(on.quality?.bars, `${text} ${cols}x${rows}`).toBe(0);
+      expect(Array.from(on.cells).join(""), `${text} ${cols}x${rows}`).toBe(off.ok ? Array.from(off.cells).join("") : "");
+    }
+  }, 120000);
 
   it("never draws a bar where a panel packs without one", () => {
     const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);

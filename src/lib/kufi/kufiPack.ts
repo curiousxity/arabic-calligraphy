@@ -2146,13 +2146,17 @@ function beams(ctx: Ctx, start: Final | null): Final | null {
 }
 
 /**
- * The share of a search's work kept for filler bars while nothing packs
- * without them. Every panel known to pack bar-free packs within the rest
- * (الحمد لله at 13×13, the latest, after 65% of a first draft's work), and a
- * near miss needs most of the work to come near (Bismillah's at 17×19 is lost
- * at 0.2): closing it with bars takes little.
+ * Work the bar phase may spend beyond a search's cap, as a share of that cap.
+ * Only a search that did not pack without bars spends it, so the bar-free
+ * search keeps exactly its own budget (a near miss uses all of it to come
+ * near at all).
  */
-const BAR_SHARE = 0.1;
+const BAR_WORK = 0.1;
+/** Tests only: no bar phase at all, so a test can compare a panel with the one packed without bars. */
+let barsOff = false;
+function setBarsOff(off: boolean) {
+  barsOff = off;
+}
 
 /** Widening beams, each polished and replanned, until one packs or the budget is spent; the best panel found. */
 function search(ctx: Ctx): Final | null {
@@ -2167,16 +2171,14 @@ function searchInner(ctx: Ctx): Final | null {
   ctx.noClock = true;
   let best: Final | null = beamPass(ctx, 1, initState(ctx), 0, true);
   ctx.noClock = false;
-  // while nothing packs, the search without bars stops short, keeping BAR_SHARE of the work for bars
-  const workMax = ctx.workMax;
-  ctx.workMax = Math.floor(workMax * (1 - BAR_SHARE));
   best = beams(ctx, best);
-  ctx.workMax = workMax;
-  ctx.out = ctx.work >= workMax || performance.now() > ctx.deadline;
   // a panel the text nearly fills: filler bars may close what its letters leave open. Never
-  // tried where it packs without them, so a panel that packs bar-free keeps every cell.
-  if (best && !best.packed) {
+  // tried where it packs without them, so a panel that packs bar-free keeps every cell; the
+  // bar phase has work of its own (BAR_WORK), beyond the cap the bar-free search spent
+  if (best && !best.packed && !barsOff) {
     ctx.bars = true;
+    ctx.workMax += Math.floor(ctx.workMax * BAR_WORK);
+    ctx.out = ctx.work >= ctx.workMax || performance.now() > ctx.deadline;
     // the best panel closed by bars (its letters replayed, a move each, since a finished state
     // already holds its squares), polished and replanned; then the beams afresh with bars
     ctx.noClock = true;
@@ -2531,6 +2533,45 @@ function* squaresThenRanked(squares: Size[], ranked: () => Size[]): Generator<Si
   yield* ranked();
 }
 
+/** Squares Fit tries before any rectangle: the estimate and the sides either side of it, where the texts known to pack in a square pack. */
+const FIT_LEAD_SQUARES = 3;
+/** Rectangles Fit tries before the rest of its squares. */
+const FIT_LEAD_RECTS = 24;
+
+/**
+ * Rectangles in Fit's order: two by elongation (`byShape`), then one ranked
+ * by the greedy pass, and so on, each size once; the ranking is made only
+ * when first needed. The greedy pass puts some texts' box first (الله أكبر's
+ * 9×13) and others' far down (Bismillah's 17×19 is past its first 30 and
+ * tenth by elongation), so neither order alone reaches both.
+ */
+function* fitRectangles(byShape: Size[], rank: () => Size[]): Generator<Size> {
+  const seen = new Set<number>();
+  const fresh = (s: Size) => !seen.has(s.cols * 1024 + s.rows) && !!seen.add(s.cols * 1024 + s.rows);
+  let ranked: Size[] | null = null;
+  for (let i = 0, j = 0; i < byShape.length || j < (ranked?.length ?? 1); ) {
+    for (let k = 0; k < 2 && i < byShape.length; k++, i++) if (fresh(byShape[i])) yield byShape[i];
+    ranked ??= rank();
+    for (; j < ranked.length; j++)
+      if (fresh(ranked[j])) {
+        yield ranked[j++];
+        break;
+      }
+  }
+}
+
+/** Fit's sizes: the first squares, the first rectangles (`fitRectangles`), the other squares, then the other rectangles. A count, not a clock, decides the order. */
+function* fitSizes(squares: Size[], rects: Generator<Size>): Generator<Size> {
+  yield* squares.slice(0, FIT_LEAD_SQUARES);
+  for (let n = 0; n < FIT_LEAD_RECTS; n++) {
+    const x = rects.next();
+    if (x.done) break;
+    yield x.value;
+  }
+  yield* squares.slice(FIT_LEAD_SQUARES);
+  yield* rects;
+}
+
 /** Boxes in the given direction from (cols, rows) that pack: larger area for 1, smaller for -1. */
 function suggestions(
   text: string,
@@ -2808,7 +2849,8 @@ export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}): { cols: 
   let best: { size: Size; score: number } | null = null;
   const t0 = performance.now();
   const squares = sizesFrom(est, 0).map((n) => ({ cols: n, rows: n }));
-  for (const size of squaresThenRanked(squares, () => rankByGreedy(text, rectangleSizes(units), edits, pins))) {
+  const byShape = rectangleSizes(units);
+  for (const size of fitSizes(squares, fitRectangles(byShape, () => rankByGreedy(text, byShape, edits, pins)))) {
     if (performance.now() - t0 > FIT_BUDGET_MS) break;
     const { cols, rows } = size;
     // the same path a pack takes, so a size fit calls packable is one a pack packs
@@ -2938,6 +2980,7 @@ export const _internal = {
   beamPass,
   search,
   setClockOverride,
+  setBarsOff,
   CALL_BUDGET_MS,
   PINNED_CALL_MS,
   FIT_BUDGET_MS,
