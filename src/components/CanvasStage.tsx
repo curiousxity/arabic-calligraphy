@@ -183,6 +183,9 @@ export type CanvasStageProps = {
   alternateLetters: LetterAlternates[];
   onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
   /** A Kufi panel edited on the canvas (a form swap, a stretch): one undo step. See `KufiPanelEditOverlay`. */
+  /** The selected Kufi panel's Fit and size setter, drawn as buttons on a box the text doesn't fit. */
+  onFitKufiPanel?: () => void;
+  onSetKufiPanelSize?: (size: { cols: number; rows: number }) => void;
   onEditKufiPanel?: (blockId: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => void;
   /** Why a Kufi panel canvas edit changed nothing (drawn beside the letter), or null when a gesture starts. */
   onKufiPanelNotice?: (blockId: number, fromKey: string, notice: KufiNotice | null) => void;
@@ -319,6 +322,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   alternateLetters,
   onPickGlyphAlternate,
   onEditKufiPanel,
+  onFitKufiPanel,
+  onSetKufiPanelSize,
   onKufiPanelNotice,
   onSelectKufiLetter,
   kufiNotice = null,
@@ -1273,6 +1278,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     notice={kufiNotice && kufiNotice.blockId === block.id ? kufiNotice : null}
                     tool={kufiTool}
                     onSelectLetter={(unitIndex) => onSelectKufiLetter?.(block.id, unitIndex)}
+                    onFitPanel={block.id === selectedId ? onFitKufiPanel : undefined}
+                    onSetPanelSize={block.id === selectedId ? onSetKufiPanelSize : undefined}
                   />
                 );
               }

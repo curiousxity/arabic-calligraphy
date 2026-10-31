@@ -8,6 +8,9 @@ import { createBlockFillPainter } from "../lib/blockFill";
 import { useKufiPanelLayout } from "../hooks/useKufiPanelLayout";
 import { kufiCellSize, kufiPanelInputs, type KufiTool } from "../lib/kufi/kufiPanelBlock";
 import { KufiPanelEditOverlay, type KufiNotice } from "./KufiPanelEditOverlay";
+import { KufiUnfitFrame } from "./KufiUnfitFrame";
+import { kufiLayoutFailed } from "../lib/kufi/kufiLayoutClient";
+import { kufiPanelStatus } from "../lib/kufi/kufiPanelStatus";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
@@ -39,6 +42,10 @@ export type KufiPanelViewProps = ReturnType<typeof kufiPanelProps> & {
   tool?: KufiTool;
   /** A still click on a letter (its unit index) or on paper (null): the sidebar lists that letter's options. */
   onSelectLetter?: (unitIndex: number | null) => void;
+  /** Fit the box to the text; passed for the selected panel only (a mirror gets none), drawn as a canvas button when the text does not fit. */
+  onFitPanel?: () => void;
+  /** Set the box to a suggested size; same rule as `onFitPanel`. */
+  onSetPanelSize?: (s: { cols: number; rows: number }) => void;
 };
 
 const noNotice = () => {};
@@ -84,6 +91,14 @@ export const KufiPanelView: React.FC<KufiPanelViewProps> = (p) => {
   const rows = shown?.ok ? shown.rows : p.panelRows;
   const width = Math.max(cols, 1) * cell;
   const height = Math.max(rows, 1) * cell;
+
+  // A box the text does not fit (or one not arranged yet) draws its frame,
+  // the reason and, when selected, the ways back; ink panels draw neither.
+  const unfit =
+    shown?.ok || preview
+      ? null
+      : kufiPanelStatus(result ?? undefined, kufiLayoutFailed(inputs), { cols: p.panelCols, rows: p.panelRows });
+  const canAct = !!result && !result.ok;
 
   return (
     <Group
@@ -145,6 +160,16 @@ export const KufiPanelView: React.FC<KufiPanelViewProps> = (p) => {
           ctx.restore();
         }}
       />
+      {unfit && (
+        <KufiUnfitFrame
+          width={width}
+          height={height}
+          color={p.color}
+          status={unfit}
+          onFit={p.isSelected && canAct ? p.onFitPanel : undefined}
+          onSetSize={p.isSelected && canAct ? p.onSetPanelSize : undefined}
+        />
+      )}
       {p.isSelected && p.onEditPanel && result?.ok && (
         <KufiPanelEditOverlay
           result={shown?.ok ? shown : result}

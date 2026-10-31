@@ -68,8 +68,10 @@ export const section: GuideSection = {
         </li>
         <li>
           <strong>Too long for the box / Too short to fill a box.</strong> The
-          text will not fill that size. Press one of the suggested sizes, or
-          Fit.
+          text will not fill that size. The box stays on the canvas as a dashed
+          frame with this message in it; with the panel selected, press one of
+          the suggested sizes, or Fit, right there on the canvas. The frame is
+          only a guide and is not exported.
         </li>
         <li>
           <strong>A pinned edit can't stay where it is at this size.</strong>{" "}

@@ -11,6 +11,7 @@ import {
   gotoApp,
   hitTargetAt,
   inkPixels,
+  nodeClientBox,
   kufiCellBox,
   kufiCellCenter,
   kufiEditTargets,
@@ -22,6 +23,7 @@ import {
   settleFrames,
   type Box,
 } from "./harf";
+import type Konva from "konva";
 import type { KufiPanelEdits } from "../src/lib/kufi/kufiPack";
 
 /**
@@ -88,7 +90,9 @@ test("a Kufi panel draws the phrase as one traced outline, on canvas and in SVG"
   // ok:false (too short for the box) draws nothing inside the block.
   const box = await blockClientBox(page, PANEL_ID);
   expect(box.width).toBeGreaterThan(50);
-  expect(await inkPixels(page, box)).toBe(0);
+  // Only the editor frame and its message are drawn there (no ink; the export test below checks that).
+  expect(await namedNodeCount(page, "kufi-unfit-frame")).toBe(1);
+  expect(await inkPixels(page, box)).toBeLessThan(box.width * box.height * 0.05);
 
   // Watch the main thread while the first draft packs: the longest gap
   // between animation frames. On the main thread a draft freezes the UI for its whole search.
@@ -1294,4 +1298,53 @@ test.describe("arrangements strip", () => {
     await expect(kufiPanel(page).getByRole("heading", { name: "Arrangements" })).toHaveCount(0);
     await expect(kufiPanel(page)).not.toContainText("Looking…");
   });
+});
+
+/** The page-space centre of the first canvas node named `name` whose text is `label`. */
+async function canvasButtonCenter(page: Page, name: string, label: string) {
+  return page.evaluate(
+    ([n, l]) => {
+      const stage = window.__HARF__!.getStage();
+      const node = stage?.find(`.${n}`).find((g) => (g as Konva.Group).findOne<Konva.Text>("Text")?.text() === l);
+      if (!stage || !node) return null;
+      const r = node.getClientRect();
+      const c = stage.container().getBoundingClientRect();
+      return { x: c.left + r.x + r.width / 2, y: c.top + r.y + r.height / 2 };
+    },
+    [name, label] as const
+  );
+}
+
+test("a box too big still shows its frame and a way back", async ({ page }) => {
+  const errors = collectConsoleErrors(page);
+  await openBaqarahPanel(page);
+  await sizeField(page, "Width").fill("23");
+  await sizeField(page, "Width").press("Enter");
+  await sizeField(page, "Height").fill("23");
+  await sizeField(page, "Height").press("Enter");
+  await expect(kufiPanel(page)).toContainText("Too short to fill a box", { timeout: 15_000 });
+
+  // The frame is drawn at the box's size, with the reason beside it.
+  await expect.poll(() => namedNodeCount(page, "kufi-unfit-frame")).toBe(1);
+  const frame = (await nodeClientBox(page, ".kufi-unfit-frame"))!;
+  const box = await blockClientBox(page, PANEL_ID);
+  expect(frame.width).toBeCloseTo(box.width, 0);
+  expect(frame.height).toBeCloseTo(box.height, 0);
+  expect(await namedNodeText(page, "kufi-unfit-text")).toContain("Too short to fill a box");
+
+  // It is chrome: the export holds no path for the panel.
+  await openPanel(page, /^Save & Export/);
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export SVG" }).click();
+  let svg = "";
+  for await (const chunk of await (await downloadPromise).createReadStream()) svg += (chunk as Buffer).toString("utf8");
+  expect(svg.match(/<path\b[^>]*>/g) ?? []).toHaveLength(0);
+
+  // A suggested size on the canvas sets the box back.
+  await expect.poll(() => canvasButtonCenter(page, "kufi-unfit-size", "21×21")).not.toBeNull();
+  const at = (await canvasButtonCenter(page, "kufi-unfit-size", "21×21"))!;
+  await page.mouse.click(at.x, at.y);
+  await expect.poll(async () => [(await panelOf(page, PANEL_ID))?.panelCols, (await panelOf(page, PANEL_ID))?.panelRows]).toEqual([21, 21]);
+  await expect.poll(() => namedNodeCount(page, "kufi-unfit-frame")).toBe(0);
+  expect(errors).toEqual([]);
 });

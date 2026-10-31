@@ -3657,6 +3657,8 @@ const App: React.FC = () => {
           alternateLetters={glyphAlternatesState.letters}
           onPickGlyphAlternate={pickGlyphAlternate}
           onEditKufiPanel={editKufiPanel}
+          onFitKufiPanel={() => void fitKufiPanelSize().catch((err: unknown) => console.warn(err))}
+          onSetKufiPanelSize={setKufiPanelSize}
           onKufiPanelNotice={noticeKufiPanel}
           kufiNotice={kufiNotice}
           kufiTool={kufiTool}

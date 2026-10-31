@@ -332,7 +332,7 @@ suppressed while the pointer is over the panel. A window blur mid-gesture
 aborts it (nothing commits) and clears the drawn chrome.
 
 A new panel has `fontSize` 112 (14 px cells): `CLICK_SLOP` (10 px) and the
-handle (0.7 cell) must stay under a cell for the tools to be usable at 100%.
+handles (the stretch square is 1 cell, the route handle 0.7) must stay within a cell for the tools to be usable at 100%.
 
 Stretch and word drags ask the worker for a repack per cell crossed
 (`previewKufiLayout`, newest wins) and keep showing the last preview that
@@ -342,6 +342,21 @@ preview, pinned where the packer put the letter, as one undo step; if nothing
 reached packs, nothing commits and the stroke snaps back with a reason
 beside the letter. A lengthened stroke may be pulled at most `MAX_PULL` cells
 per drag.
+
+## A box that doesn't fit still shows (`KufiUnfitFrame`)
+
+When the packed result is not ok (or has not arrived), `KufiPanelView` draws
+`KufiUnfitFrame` inside an `EXPORT_HIDDEN` group: a dashed frame (node
+`kufi-unfit-frame`) at the box size in the panel colour at 40% opacity, the
+status line from `kufiPanelStatus` (`kufi-unfit-text`) and, on the selected
+panel with an answer in hand, `Fit` and each suggested size as Konva buttons
+(`kufi-unfit-fit`, `kufi-unfit-size`). "Arranging…" shows the text and no
+buttons; a mirror gets the frame and never buttons (it is passed no
+`onFitPanel`/`onSetPanelSize`; CanvasStage passes them for the selected panel
+only). Text and buttons are drawn at the inverse of the stage's zoom (13 px on
+screen); buttons cancel bubble on press and click so they neither drag the
+panel nor deselect it. The export still holds no path for the panel, and the
+hit area is unchanged.
 
 ## Tests
 
