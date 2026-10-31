@@ -184,6 +184,10 @@ LEAD_FULL = os.environ.get("PEN_LEAD_FULL", "1") == "1"
 # the next letter (the user, 2026-10-29: "where the stroke connects to the next letter"); 105.s0's narrowed to 0.9 and
 # left the face's top corner bare.
 FULLSTART = {x for x in os.environ.get("PEN_FULLSTART", "").split(",") if x}
+# PEN_FULLEND ("314.s0,..."): these strokes end at the full nib, the squared face at their end. 314.s0, the sin's
+# first stroke, ends in a square whose top corner meets the next stroke's tooth; its fit took a 0.7 nib and left the
+# corner bare, so the sin's second tooth in the Bismillah came out a sliver (the user, 2026-10-31: "the sin tooth").
+FULLEND = {x for x in os.environ.get("PEN_FULLEND", "").split(",") if x}
 # PEN_JOINT ("301.s1,..."): a PEN_CUT stroke's two halves finished together at the peak where they meet, from the fits
 # in PEN_JOINT_FROM (a JSON {"stroke~cN": {"nodes", "pen_scale"}}): each half is refitted against the whole stroke's
 # outline with the other half's ink counted as on the page (gpufit's `others`), the first half then the second, each
@@ -198,6 +202,52 @@ JOINT = {x for x in os.environ.get("PEN_JOINT", "").split(",") if x}
 # by half: 356.s0's left half turns about 90 degrees into its hook at its free end, as it should.
 FREEHOLD = {x for x in os.environ.get("PEN_FREEHOLD", "").split(",") if x}
 FREEHOLD_L = float(os.environ.get("PEN_FREEHOLD_L", 1.0))
+# PEN_NEXT (a JSON {"105.s0": {"exit": "136.s0", "shift": [dx, dy], "nodes": [...]}}): a letter's entry stroke fitted
+# at its join with the letter before it, the pen not lifting there (the user, 2026-10-29: "one continuous stroke ...
+# follow the studio"). The exit stroke's outline joins the target, its letter-mates are ignored, and its fitted ink
+# (nodes in main nibs, its own frame) counts as on the page; shift is screen px from the exit's frame to this
+# stroke's, from the word's placements. Fitted apart, the Bismillah's ha->ya left a step under the join and its
+# ha->mim a nub (2026-10-30); the tooth finish at those joins rounded counters into lobes.
+NEXT = json.loads(os.environ.get("PEN_NEXT", "{}"))
+_next = [None]  # (exit piece, its letter-mates, its nodes) in this stroke's frame while fit runs on a PEN_NEXT stroke
+
+
+def next_of(stroke):
+    if stroke not in NEXT:
+        return None
+    x = NEXT[stroke]; dx, dy = x["shift"]
+    xpiece, xmates, xO = job_of(x["exit"])
+    sh = lambda p: [(p[0][0], p[0][1], p[0][2] + dx, p[0][3] + dy), p[1]]  # noqa: E731
+    O = np.array(origin(stroke.split(".")[0]), float)
+    nodes = [{**q, "p": [round(float(v), 4) for v in (np.array(q["p"]) * PPN + xO + [dx, dy] - O) / PPN]} for q in x["nodes"]]
+    return sh(xpiece), [sh(p) for p in xmates], nodes
+
+
+def _with_next(refs, others, ignore, P):
+    if not _next[0]:
+        return list(refs), list(others), list(ignore)
+    xp, xm, xn = _next[0]
+    return list(refs) + [xp], list(others) + [[{**q, "width": q.get("width", 1) * PEN / P} for q in xn]], list(ignore) + xm
+
+
+def nscore(mine, refs, O, ppn, P, ignore=()):  # gpu_score, with the exit stroke when fitting a PEN_NEXT stroke
+    r, o, i = _with_next(refs, (), ignore, P)
+    return gpu_score(list(mine) + o, r, O, ppn, P, i)
+
+
+def nworst(nodes, pieces, O, ppn, P, others=(), windows=(), ignore=()):
+    r, o, i = _with_next(pieces, others, ignore, P)
+    return gpufit.window_worst(nodes, r, O, ppn, P, o, windows, i)
+
+
+def nrefine_pens(nodes, pieces, O, ppn, P, pens, ignore=(), others=(), **kw):
+    r, o, i = _with_next(pieces, others, ignore, P)
+    return gpufit.refine_pens(nodes, r, O, ppn, P, pens, ignore=i, others=o, **kw)
+
+
+def nrefine(nodes, pieces, O, ppn, P, ignore=(), others=(), **kw):
+    r, o, i = _with_next(pieces, others, ignore, P)
+    return gpufit.refine(nodes, r, O, ppn, P, ignore=i, others=o, **kw)
 
 
 def end_windows(nodes, pen=PEN, stroke=None):
@@ -748,6 +798,7 @@ def fit(stroke, log, size=None, lead=None):
     lead: the right half's result, when PEN_LEAD starts this left half from its end (led)."""
     t0 = time.time()
     piece, ignore, O = job_of(stroke)
+    _next[0] = next_of(stroke)  # PEN_NEXT: the letter before, its ink on the page
     _turn[0] = (TURN_ON and stroke in CUT_AT) or stroke in TURNS  # every refine of this stroke, set again by the next fit
     hair = "~h" in stroke  # a tip-drawn hairline of a PEN_SPLIT stroke: the small pen, filled
     fill = stroke in FILL or hair
@@ -777,15 +828,16 @@ def fit(stroke, log, size=None, lead=None):
         untrimmed, "trim": nuqta pulled back} when the trim moved anything."""
         if not TRIM:
             return p, s, {}
-        t, moved = trim_ends(stroke, p, piece, ignore, O, P, keep_start=bool(held))
+        # a PEN_NEXT join end runs under the letter before: ink on its outline is no overshoot to trim
+        t, moved = trim_ends(stroke, p, piece, ignore + ([_next[0][0]] if _next[0] else []), O, P, keep_start=bool(held))
         if not moved:
             return p, s, {}
-        ts = gpu_score([t], [piece], O, PPN, P, ignore)
-        ts["window_worst"] = round(gpufit.window_worst(t, [piece], O, PPN, P, (), end_windows(nodes, P, stroke), ignore), 4)
+        ts = nscore([t], [piece], O, PPN, P, ignore)
+        ts["window_worst"] = round(nworst(t, [piece], O, PPN, P, (), end_windows(nodes, P, stroke), ignore), 4)
         return t, ts, {"raw": s, "trim": moved}
     if fill:
         for sname, nodes in starts:
-            p, s = gpufit.refine(with_tips(nodes), [piece], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ignore, widths_free=True,
+            p, s = nrefine(with_tips(nodes), [piece], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ignore, widths_free=True,
                                  corner=CORNER, windows=end_windows(nodes, P, stroke), judge="gpu")
             p, s, raw = kept(p, s, nodes)
             tried.append({"start": sname, "angle0": None, "anchor": None, "score": s, "nodes": p, "pen": None, **raw})
@@ -793,7 +845,7 @@ def fit(stroke, log, size=None, lead=None):
     def pen_of(nodes, a, anc):
         lift = LIFT_LONG if length(nodes) >= LONG else LIFT
         # a held start is the full nib: let narrow, 347.s0's left half began 0.14 nuqta under the peak's shoulder (k16)
-        return {"angle": a, "lift_start": 0.0 if (held and LEAD_FULL) or stroke in FULLSTART else lift, "lift_end": lift, "anchor": list(anc), "size": SIZE and not size,
+        return {"angle": a, "lift_start": 0.0 if (held and LEAD_FULL) or stroke in FULLSTART else lift, "lift_end": 0.0 if stroke in FULLEND else lift, "anchor": list(anc), "size": SIZE and not size,
                 **({"turns": turns_of(nodes)} if ROTATE else {})}
 
     def turns_of(nodes):  # each node turns on its own, but none within FREEHOLD_L of a PEN_FREEHOLD half's free end
@@ -812,7 +864,7 @@ def fit(stroke, log, size=None, lead=None):
         """Every pen side by side in one loop on the card (gpufit.refine_pens; the user, 2026-10-26: "make that change
         for the diwani branch as well"), with this start's schedule; each try goes into tried."""
         sched = 0 if length(nodes) >= SHORT else 1
-        res = gpufit.refine_pens(with_tips(nodes), [piece], O, PPN, P, pens, rough=ROUGH, edge=EDGE, ignore=ignore, fixed=held,
+        res = nrefine_pens(with_tips(nodes), [piece], O, PPN, P, pens, rough=ROUGH, edge=EDGE, ignore=ignore, fixed=held,
                                  schedules=(sched,), corner=CORNER, windows=end_windows(nodes, P, stroke), judge="gpu")
         for pen, (p, s) in zip(pens, res):
             a, anc = pen["angle"], pen["anchor"]
@@ -844,7 +896,7 @@ def fit(stroke, log, size=None, lead=None):
     if best["pen"] is not None:  # the other schedule, from the same start (a restart: the lift does not carry over)
         nodes = dict(starts)[best["start"]]
         other = 1 - (0 if length(nodes) >= SHORT else 1)
-        (p, s), = gpufit.refine_pens(with_tips(nodes), [piece], O, PPN, P, [best["pen"]], rough=ROUGH, edge=EDGE, ignore=ignore, fixed=held,
+        (p, s), = nrefine_pens(with_tips(nodes), [piece], O, PPN, P, [best["pen"]], rough=ROUGH, edge=EDGE, ignore=ignore, fixed=held,
                                      schedules=(other,), corner=CORNER, windows=end_windows(nodes, P, stroke), judge="gpu")
         p, s, raw = kept(p, s, nodes)
         log(stroke, "other schedule", s["iou"], s["gap95"], raw.get("trim", ""))
@@ -854,8 +906,8 @@ def fit(stroke, log, size=None, lead=None):
     if stroke.endswith("~c0") and stroke[:-3] in LEAD and best["pen"] is not None:  # its end level with the peak
         lv = [level_top(q, piece, O, PEN / P) for q in best["nodes"]]  # k16: the next to last stood over the peak too
         if lv != best["nodes"]:
-            s = gpu_score([lv], [piece], O, PPN, P, ignore)
-            s["window_worst"] = round(gpufit.window_worst(lv, [piece], O, PPN, P, (), end_windows(dict(starts)[best["start"]], P, stroke), ignore), 4)
+            s = nscore([lv], [piece], O, PPN, P, ignore)
+            s["window_worst"] = round(nworst(lv, [piece], O, PPN, P, (), end_windows(dict(starts)[best["start"]], P, stroke), ignore), 4)
             log(stroke, "lead: end levelled", best["nodes"][-1]["p"], "to", lv[-1]["p"], s["iou"], s["gap95"])
             best = {**best, "nodes": lv, "score": s}
     n = best["nodes"]
@@ -882,6 +934,66 @@ def fit(stroke, log, size=None, lead=None):
     return out, pics
 
 
+
+# PEN_THROUGH ("1", with PEN_NEXT): the exit stroke and the entry stroke fitted as one pen movement through the join,
+# then split back into the two strokes where they meet (the user, 2026-10-29: "The pen should not lift at the joint ...
+# it should be one continuous stroke"). Split, each letter keeps its own strokes, so a raised, dropped or stretched
+# letter still carries its half. Counting the exit's ink as on the page and fitting the entry alone (PEN_NEXT alone)
+# left the entry's start loose under the exit: a notch and hook at the ha->ya, a spike at the ha->mim (2026-10-31).
+THROUGH = os.environ.get("PEN_THROUGH", "0") == "1"
+
+
+def through_fit(entry, log):
+    """{exit: ..., entry: ...}, each in its own frame and main-nib widths, from one refine over exit + entry."""
+    t0 = time.time()
+    x = NEXT[entry]; dx, dy = x["shift"]
+    piece, ignore, O = job_of(entry)
+    xp, xm, xn = next_of(entry)
+    _next[0] = None
+    xO = np.array(origin(x["exit"].split(".")[0]), float)
+    refs, ign = [piece, xp], ignore + xm
+    ring = (ref_ring(piece) - O) / PPN  # the exit's end nearer the entry's outline is the join: its path runs into it
+    near = lambda q: np.linalg.norm(ring - q["p"], axis=1).min()  # noqa: E731
+    if near(xn[0]) < near(xn[-1]):
+        xn = xn[::-1]
+    junction = np.array(xn[-1]["p"])
+    exit_path = [{"p": q["p"], "angle": q["angle"]} for q in xn]
+    starts = [("band", band_start(piece, O, ignore, PEN))]
+    if x.get("entry_nodes"):
+        starts.append(("fit", [{"p": q["p"], "angle": q["angle"]} for q in x["entry_nodes"]]))
+    tried = []
+    for sname, ns in starts:
+        if np.linalg.norm(np.array(ns[0]["p"]) - junction) > np.linalg.norm(np.array(ns[-1]["p"]) - junction):
+            ns = ns[::-1]
+        ns = [q for q in ns if np.linalg.norm(np.array(q["p"]) - junction) > LEAD_SKIP] or ns
+        dj = lambda q: np.linalg.norm(np.array(q["p"]) - junction)  # noqa: E731
+        while len(ns) > 2 and dj(ns[0]) >= dj(ns[1]):  # from the join the path only moves away: a dip back is a hook
+            ns = ns[1:]
+        path = exit_path + ns
+        k = len(exit_path) - 1  # the exit's last node: the split
+        lift = LIFT_LONG if length(path) >= LONG else LIFT
+        pens = [{"angle": [q["angle"] for q in path], "lift_start": lift, "lift_end": lift, "anchor": list(anc), "size": SIZE,
+                 "turns": list(range(1, len(path)))} for anc in ANCHORS]
+        res = gpufit.refine_pens(with_tips(path), refs, O, PPN, PEN, pens, rough=ROUGH, edge=EDGE, ignore=ign, corner=CORNER,
+                                 windows=end_windows(path), judge="gpu", schedules=(0,))
+        for pen, (p, s) in zip(pens, res):
+            tried.append({"start": sname, "anchor": pen["anchor"], "score": s, "nodes": p, "k": k})
+            log(entry, "through", sname, pen["anchor"], s["iou"], s["gap95"], "%.0fs" % (time.time() - t0))
+    best = max(tried, key=lambda c: judge(c["score"]))
+    n, k = best["nodes"], best["k"]
+    back = lambda q: {**q, "p": [round(float(v), 4) for v in (np.array(q["p"]) * PPN + O - [dx, dy] - xO) / PPN]}  # noqa: E731
+    halves = {x["exit"]: [back(q) for q in n[:k + 1]], entry: n[k:]}  # the junction node in both: they meet
+    out = {}
+    for st, hn in halves.items():
+        hp, hi, hO = job_of(st)
+        out[st] = {"recipe": "pen", "nodes": hn, "score": gpu_score([hn], [hp], hO, PPN, PEN, hi), "through": entry,
+                   "whole": best["score"], "start": best["start"], "anchor": best["anchor"], "lifts": lifts(hn),
+                   "length": round(length(hn), 2), "seconds": round(time.time() - t0),
+                   "tried": [{k_: v for k_, v in c.items() if k_ != "nodes"} for c in tried]}
+        log(st, "through: own outline", out[st]["score"]["iou"], out[st]["score"]["gap95"])
+    pics = {entry + ".through": picture(entry, piece, ign + [xp], O, None, n)}
+    return out, pics
+
 if __name__ == "__main__":
     od, names = sys.argv[1], sys.argv[2:]
     res, pics = {}, {}
@@ -896,6 +1008,12 @@ if __name__ == "__main__":
         # the bigger (301.s1, 309.s1, 312.s1), it is fitted first only to set the shared size, then again behind the
         # right half at that size (the smaller half setting the size bulged 297.s1, k1)
         return h + [h[0]] if s in LEAD and h[0].endswith("~c1") else h
+    if THROUGH:  # each named stroke is an entry, fitted through its join with the exit (PEN_NEXT)
+        for s in names:
+            r_, p_ = through_fit(s, log); res.update(r_); pics.update(p_)
+        json.dump(res, open(os.path.join(od, "pen.json"), "w"))
+        json.dump(pics, open(os.path.join(od, "pics.json"), "w"))
+        names = []
     if JOINT:  # the halves come fitted (PEN_JOINT_FROM); only the joint is finished here
         src = json.loads(os.environ["PEN_JOINT_FROM"])
         for s in [s for s in names if s in JOINT]:

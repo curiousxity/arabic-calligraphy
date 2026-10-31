@@ -755,7 +755,22 @@ and trimming against the studio's outline near the peak copied its facets and V 
 through the tooth's thin rising stroke). 299.s1 has one smooth peak; 309.s1's notch is filled; 301.s1's is mostly
 filled, and the slight kink on its slope stays (a bend outward, which a closing cannot change). Under 0.01 square
 nuqta changes a tooth. **309.s1, 301.s1 and 299.s1 are approved** with the right half levelled to the peak and the
-joint finished. The finish is the joining step's finish too.
+joint finished. The finish is for a tooth's peak only: at the Bismillah's joins between letters (2026-10-30) it
+rounded the counters' tips into lobes (joins 2 and 8) and drew a hook (join 7), even held to the studio's ink. There
+the sharp inner corners are real: an angle belongs where two strokes meet.
+
+**The Bismillah, review sheet 1 (2026-10-31).** Approved: **003.s0, 059.s0, 059.s1, 136.s0, 136.s1, 136.s2, 151.s0**.
+059.s2 stays open (the user: it "is going to end up with an irregularity when it joins to another letter").
+
+**Joins between letters.** Fitted as they are, six of the eight Bismillah joins already look like the studio's. Two
+did not: a step under the ha->ya (136.s0 -> 105.s0) and a nub at the ha->mim (151.s0 -> 672.s0). In the word, the
+sin's second tooth came out a sliver: 314.s0 and 314.s1 both took a 0.7 nib (the user: "it is the sin tooth").
+- `PEN_NEXT`: the entry stroke refitted alone with the exit stroke's ink counted as on the page. Every join got worse
+  (ha->ya 0.917 to 0.871 in a 1.5-nib zone, a notch and a hook; ha->mim a spike; the sin's tooth lost). With the
+  exit's ink there, the entry gains nothing by covering the joint, and its start drifts loose.
+- 314.s0 at the full nib (`PEN_SIZE=0`, and with `PEN_FULLEND`): the sin's tooth did not come back; it is 314.s1's start.
+- `PEN_THROUGH`: exit and entry fitted as one pen movement through the join, then split where they meet, so each
+  letter keeps its strokes and a raised, dropped or stretched letter still carries its half.
 
 The pick before the review, each pair against the sheet's whole outline:
 
