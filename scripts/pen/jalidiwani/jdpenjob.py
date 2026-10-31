@@ -986,7 +986,9 @@ def through_fit(entry, log):
     best = max(tried, key=lambda c: judge(c["score"]))
     n, k = best["nodes"], best["k"]
     back = lambda q: {**q, "p": [round(float(v), 4) for v in (np.array(q["p"]) * PPN + O - [dx, dy] - xO) / PPN]}  # noqa: E731
-    halves = {x["exit"]: [back(q) for q in n[:k + 1]], entry: n[k:]}  # the junction node in both: they meet
+    # the exit runs one node on into the entry, under the entry's own ink: meeting at a single node left a hairline seam
+    # where the two were drawn separately (join 7, 136.s0+105.s0, 2026-10-31)
+    halves = {x["exit"]: [back(q) for q in n[:k + 2]], entry: n[k:]}
     out = {}
     for st, hn in halves.items():
         hp, hi, hO = job_of(st)

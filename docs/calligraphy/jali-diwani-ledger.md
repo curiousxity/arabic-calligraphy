@@ -771,7 +771,8 @@ sin's second tooth came out a sliver: 314.s0 and 314.s1 both took a 0.7 nib (the
 - 314.s0 at the full nib (`PEN_SIZE=0`, and with `PEN_FULLEND`): the sin's tooth did not come back; it is 314.s1's start.
 - `PEN_THROUGH`: exit and entry fitted as one pen movement through the join, then split where they meet, so each
   letter keeps its strokes and a raised, dropped or stretched letter still carries its half. At the ha->ya (th1) the
-  step under the join went; the ha->mim's nub stayed. Awaiting the user.
+  step under the join went; the ha->mim's nub stayed. The user approved the ha->ya (2026-10-31) with the seam closed:
+  meeting at one node, the halves drawn apart left a hairline, so the exit now runs one node on under the entry's ink.
 - 314.s1 at the full nib (sq3): the sin's second tooth is solid again, a little shorter than the studio's.
 
 **Heads that turn back (the catalogue's overnight fits, 2026-10-31).** A stroke that rises and turns sharply back
