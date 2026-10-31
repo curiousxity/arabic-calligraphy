@@ -689,6 +689,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
       paint.current = null;
       stage.off(".kufipaint");
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchend", onUp);
       onPreview(null);
       if (abort) {
         setAlt(false);
@@ -701,9 +702,10 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
     state.release = release;
     paint.current = state;
     at(start);
-    stage.on("mousemove.kufipaint", move);
-    stage.on("mouseup.kufipaint", onUp);
+    stage.on("mousemove.kufipaint touchmove.kufipaint", move);
+    stage.on("mouseup.kufipaint touchend.kufipaint", onUp);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchend", onUp);
   };
 
   // What the chrome draws: while a pull is held, the pulled letter's outline
@@ -741,19 +743,27 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
     return [];
   }, [result, units, shownUnit, dragging, painting, tool, wordIndices, endShown]);
   // While a stretch is held: a faint mark at the end's place for each length
-  // of that slice exploration found to fit (none while the slice is unknown).
+  // of that slice exploration found to fit (none while the slice is unknown),
+  // measured from where the end is drawn now, so the marks follow the letter
+  // when a preview moves it.
   const fitMarks = useMemo((): Cell[] => {
     const e = dragging?.spec.kind === "stretch" ? dragging.spec.end : null;
     if (!dragging || !e) return [];
     const counts = optionsOf(e.unitIndex).stretch.get(e.stretchIndex);
     if (!counts) return [];
+    const same = stretchEnds(result, e.unitIndex).filter(
+      (x) => x.kind === e.kind && x.stretchIndex === e.stretchIndex && x.dc === e.dc && x.dr === e.dr
+    );
+    const now = nearestHandle(same, e.col, e.row);
+    const p = placementOf(result, e.unitIndex);
+    const from = now && p ? { end: now, count: p.stretch[e.stretchIndex] ?? 0 } : { end: e, count: dragging.spec.base };
     return counts
       .map((count) => {
-        const d = count - dragging.spec.base;
-        return { col: e.col + d * e.dc, row: e.row + d * e.dr };
+        const d = count - from.count;
+        return { col: from.end.col + d * e.dc, row: from.end.row + d * e.dr };
       })
-      .filter((c) => c.col >= 0 && c.row >= 0 && c.col < committed.cols && c.row < committed.rows);
-  }, [dragging, optionsOf, committed]);
+      .filter((c) => c.col >= 0 && c.row >= 0 && c.col < result.cols && c.row < result.rows);
+  }, [dragging, optionsOf, result]);
   const onHandle = dragging ? null : hover?.on ?? null;
   const sameHandle = (a: KufiHandle, b: KufiHandle | null) =>
     !!b && a.kind === b.kind && a.unitIndex === b.unitIndex && a.col === b.col && a.row === b.row && a.dc === b.dc && a.dr === b.dr;
@@ -897,6 +907,12 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
           if (notice) onNotice(fromKey, null);
           const p = pointer();
           const c = p?.cell ?? null;
+          if (tool === "paint") {
+            // the Paint tool paints under a finger as under the mouse
+            e.cancelBubble = true;
+            if (c) beginPaint(c, e.target.getStage());
+            return;
+          }
           const h = hoverAt(p);
           if (h?.on && c) {
             e.cancelBubble = true;
@@ -918,6 +934,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
           else clickLetter(p.unitIndex);
         }}
         onTap={() => {
+          if (tool === "paint") return;
           const h = hoverAt(pointer());
           if (h && !h.on) clickLetter(h.unitIndex);
         }}

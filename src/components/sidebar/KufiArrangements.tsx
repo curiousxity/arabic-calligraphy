@@ -29,27 +29,33 @@ const Thumb: React.FC<{ result: Ok; against?: Ok | null }> = ({
     const ctx = ref.current?.getContext("2d");
     if (!ctx) return;
     const { cols, rows, cells } = result;
-    ctx.clearRect(0, 0, cols * CELL_PX, rows * CELL_PX);
-    const css = getComputedStyle(ref.current!);
+    // whole device pixels per cell, so cells stay sharp on any screen
+    const px = Math.max(1, Math.round(CELL_PX * (window.devicePixelRatio || 1)));
+    const canvas = ref.current!;
+    canvas.width = cols * px;
+    canvas.height = rows * px;
+    canvas.style.width = `${(cols * px) / (window.devicePixelRatio || 1)}px`;
+    const css = getComputedStyle(canvas);
     ctx.fillStyle = css.getPropertyValue("--text-primary").trim() || "#000";
     for (let i = 0; i < cols * rows; i++)
       if (cells[i])
         ctx.fillRect(
-          (i % cols) * CELL_PX,
-          Math.floor(i / cols) * CELL_PX,
-          CELL_PX,
-          CELL_PX,
+          (i % cols) * px,
+          Math.floor(i / cols) * px,
+          px,
+          px,
         );
     if (against && against.cols === cols && against.rows === rows) {
       ctx.strokeStyle = css.getPropertyValue("--accent").trim() || "#c00";
-      ctx.lineWidth = 1;
+      const lw = Math.max(1, Math.round(px / CELL_PX));
+      ctx.lineWidth = lw;
       for (let i = 0; i < cols * rows; i++)
         if (!!cells[i] !== !!against.cells[i])
           ctx.strokeRect(
-            (i % cols) * CELL_PX + 0.5,
-            Math.floor(i / cols) * CELL_PX + 0.5,
-            CELL_PX - 1,
-            CELL_PX - 1,
+            (i % cols) * px + lw / 2,
+            Math.floor(i / cols) * px + lw / 2,
+            px - lw,
+            px - lw,
           );
     }
   }, [result, against, scheme]);

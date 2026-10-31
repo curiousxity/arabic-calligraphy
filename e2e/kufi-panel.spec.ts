@@ -1202,6 +1202,38 @@ test.describe("editing on the canvas", () => {
     await expect.poll(async () => (await panelEdits(page))?.pinned?.[2]).toBeDefined();
     await expect(kufiPanel(page)).toContainText("A pinned edit can't stay where it is at this size", { timeout: 15_000 });
   });
+
+  test.describe("on a touchscreen", () => {
+    test.use({ hasTouch: true });
+
+    test("the Paint tool paints the cells a finger drags across, as one step", async ({ page }) => {
+      const box = await openBaqarahPanel(page);
+      await pointerAway(page, box);
+      await chooseTool(page, "Paint");
+      const t = await kufiEditTargets(page);
+      const run = paintableRun(t.grid)!;
+      expect(run).not.toBeNull();
+      const from = kufiCellCenter(t, run[0].col, run[0].row);
+      const to = kufiCellCenter(t, run[2].col, run[2].row);
+      const cdp = await page.context().newCDPSession(page);
+      const finger = (type: "touchStart" | "touchMove" | "touchEnd", p?: { x: number; y: number }) =>
+        cdp.send("Input.dispatchTouchEvent", { type, touchPoints: p ? [{ id: 0, x: p.x, y: p.y }] : [] });
+
+      await finger("touchStart", from);
+      for (let i = 1; i <= 12; i++)
+        await finger("touchMove", { x: from.x + ((to.x - from.x) * i) / 12, y: from.y + ((to.y - from.y) * i) / 12 });
+      await finger("touchEnd");
+
+      await expect.poll(async () => (await panelEdits(page))?.cells?.length).toBe(3);
+      expect((await panelEdits(page))!.cells!.every((c) => c.on)).toBe(true);
+      // the panel stayed put: the finger painted, it did not drag the block
+      const after = centerOf(await blockClientBox(page, PANEL_ID));
+      const before = centerOf(box);
+      expect(Math.hypot(after.x - before.x, after.y - before.y)).toBeLessThan(1);
+      await page.getByRole("button", { name: "Undo" }).click();
+      await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1343,6 +1375,19 @@ test.describe("arrangements strip", () => {
     await expect(kufiPanel(page)).toContainText(/Too (long|short)|Couldn.t arrange/, { timeout: 20_000 });
     await expect(kufiPanel(page).getByRole("heading", { name: "Arrangements" })).toHaveCount(0);
     await expect(kufiPanel(page)).not.toContainText("Looking…");
+  });
+
+  test.describe("on a dense screen", () => {
+    test.use({ deviceScaleFactor: 2 });
+
+    test("thumbnails draw a whole number of device pixels per cell, at the same size on the page", async ({ page }) => {
+      await openBaqarahPanel(page);
+      const current = kufiPanel(page).getByRole("button", { name: "Current arrangement" }).locator("canvas");
+      await expect(current).toBeVisible();
+      // 21 cells of 3 CSS px, at 2 device px per CSS px
+      await expect.poll(() => current.evaluate((c: HTMLCanvasElement) => [c.width, c.height])).toEqual([126, 126]);
+      expect((await current.boundingBox())!.width).toBeCloseTo(63, 0);
+    });
   });
 });
 
