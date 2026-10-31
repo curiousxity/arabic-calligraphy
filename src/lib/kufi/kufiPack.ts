@@ -103,6 +103,8 @@ export type KufiPackResult =
       placements: KufiPlacement[];
       /** True when the painted or erased cells of `edits.cells` leave a hole, a solid 2×2 or a frame break: the packing itself was sound. */
       editsBreakPacking: boolean;
+      /** The packed panel's filler squares, cells cut and cells grown (`Final`); optional, so a missing quality ranks last. */
+      quality?: { squares: number; cut: number; grow: number };
     }
   | { ok: false; reason: "tooShort" | "tooLong" | "pinConflict"; suggestions: Array<{ cols: number; rows: number }> };
 
@@ -2190,7 +2192,7 @@ function okResult(units: KufiUnit[], f: Final, cols: number, rows: number, edits
   // the user's painted cells go over the packed lattice (`kufiGrid`, shared with the canvas paint tool)
   applyCellEdits(cells, cols, rows, (k) => placements[k] ?? null, edits);
   const editsBreakPacking = (edits.cells?.length ?? 0) > 0 && !packedCells(cells, cols, rows);
-  return { ok: true, cols, rows, cells, placements, editsBreakPacking };
+  return { ok: true, cols, rows, cells, placements, editsBreakPacking, quality: { squares: f.squares, cut: f.cut, grow: f.grow } };
 }
 
 /**

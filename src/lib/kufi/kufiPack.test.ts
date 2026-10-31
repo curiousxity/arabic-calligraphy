@@ -18,6 +18,8 @@ beforeAll(() => _internal.setClockOverride(Infinity));
 afterAll(() => _internal.setClockOverride(null));
 
 const BAQARAH = "لا يكلف الله نفسا إلا وسعها";
+// `quality` counts only unpinned letters, so a repack of pinned letters reports less of it: layouts are compared without it
+const layoutOf = (r: KufiPackResult) => (r.ok ? { ...r, quality: undefined } : r);
 const ALLAH = "الله";
 const SHAHADA = "لا إله إلا الله محمد رسول الله";
 const NASR = "نصر من الله";
@@ -344,7 +346,7 @@ describe("pins", () => {
   it("a repack with previous and no new edit is the same panel", () => {
     const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
     const again = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r });
-    expect(again).toEqual(r);
+    expect(layoutOf(again)).toEqual(layoutOf(r));
   }, 20000);
 });
 
@@ -353,9 +355,9 @@ describe("routes", () => {
     const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
     _internal.clearCaches();
     const fresh = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, edits: { routes: { 1: 3 } } });
-    expect(fresh).toEqual(r);
+    expect(layoutOf(fresh)).toEqual(layoutOf(r));
     const again = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: r, edits: { routes: { 1: 3 } } });
-    expect(again).toEqual(r);
+    expect(layoutOf(again)).toEqual(layoutOf(r));
   }, 30000);
 
   it("a word moves along its path by its first letter's pin, the letters before it lengthening along the line to absorb the shift", () => {
@@ -805,5 +807,16 @@ describe("the scorer", () => {
       failed: 0,
       packed: true,
     });
+  });
+});
+
+describe("quality", () => {
+  it("reports a packed panel's filler, shortening and lengthening", () => {
+    const result = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.quality).toEqual({ squares: 0, cut: expect.any(Number), grow: expect.any(Number) });
+    expect(result.quality!.cut).toBeGreaterThanOrEqual(0);
+    expect(result.quality!.grow).toBeGreaterThanOrEqual(0);
   });
 });
