@@ -65,6 +65,10 @@ SPLIT = {x for x in os.environ.get("PEN_SPLIT", "").split(",") if x}
 # cut, the right half first, as the line is written right to left (k1's 301.s1~c1 ran out of the peak backwards).
 CUT = {x for x in os.environ.get("PEN_CUT", "").split(",") if x}
 CUT_AT = {}  # "stroke~cN": the cut's midpoint, screen px, set by job_of
+# PEN_CUT_MARGIN (nuqta, default 1.0): how far from either end of the path the cut's peak may be. A head that turns
+# back at the top (074.s0, 076.s0, 084.s0: up, then a sharp turn back down into a flag) has its peak under a nuqta
+# from the end, and fitted whole the flag rounded off or went (2026-10-31).
+CUT_MARGIN = float(os.environ.get("PEN_CUT_MARGIN", 1.0))
 # A tooth's right half starts with the flick in reverse (the studio ledger, from the sin lesson 4:36-4:44: the nib comes
 # down on its corner at the hairline's tip and opens to full width as it climbs, at one angle; Thuluth's 170.s0 narrows
 # over its first 3.3 nuqta, which a turning nib could not draw). Its fit also tries one angle with the start free to
@@ -412,7 +416,7 @@ def cut_piece(piece, O, ignore):
     best_k, best_cos = None, math.cos(math.radians(TIP_ANGLE))
     for k in range(len(ring)):
         jn = np.linalg.norm(dense - ring[k], axis=1).argmin()
-        if not PPN <= t[jn] <= arc[-1] - PPN:
+        if not CUT_MARGIN * PPN <= t[jn] <= arc[-1] - CUT_MARGIN * PPN:
             continue
         a_, b_ = at(ra[k] - 0.25 * PPN), at(ra[k] + 0.25 * PPN)
         u_, v_ = a_ - ring[k], b_ - ring[k]
