@@ -239,3 +239,25 @@ Expected: PASS, including Step 1's cell literals unchanged.
 - [ ] **Step 2:** Try **deeper inner bands**: an inner ring's band may be 5, 6 or 7 cells deep, chosen per ring by the search. Record the same table.
 - [ ] **Step 2b:** Run the built two-line layout (Task 2) on the Shahada at the widths Task 1 proposes, with bars. Record the same table.
 - [ ] **Step 3:** Render each of the three approaches' best Shahada panel as a PNG (the probe's ASCII grid drawn at 12 px a cell is enough), check each picture, and report both tables and pictures to the user with a recommendation. Stop there: the spec is amended and a new plan written only after the user picks.
+
+---
+
+### Task 6: The Shahada packs on one ring
+
+Added after Task 5. The user dropped two lines (Task 2: "you can split it up if you don't have enough room" only) and approved closing the Shahada's holes on one ring.
+
+**Files:**
+- Modify: `src/lib/kufi/kufiPack.ts` (`ROW_MAX`, Fit's work), the letter table that defines forms for ه ح م د (find it from `kufiPack.ts`'s imports)
+- Test: `src/lib/kufi/kufiPack.test.ts`
+
+**Interfaces:**
+- Consumes: Tasks 1 and 3 (rectangles, bars, Fit order R9). Task 5's spike diff and tables: `scratchpad/shahada-spike/` (path given in the dispatch).
+- Produces: no new API. `fitKufiPanel(SHAHADA)` returns a size that packs.
+
+- [ ] **Step 1: Failing test.** `it("the Shahada packs through Fit")`: `SHAHADA = "لا إله إلا الله محمد رسول الله"`; `const size = fitKufiPanel(SHAHADA)`; `expectPacked(packKufiPanel({ text: SHAHADA, ...size }), SHAHADA)`, with `expectBarsAreBars`. Clock override Infinity, timeout as the Bismillah test.
+- [ ] **Step 2: Levers, in this order, keeping each only if it helps:** (a) `ROW_MAX` 7 or 8 (the spike's 8 gave 23×25 with 12 holes, 0 edge breaks); (b) taller or wider forms for ه ح م د, each built from an existing form of that letter by lengthening its existing strokes, never a new shape; (c) more search work for long texts only (texts whose estimated side exceeds Baqarah's), inside Fit; (d) anything else the probes show is the blocker, recorded in the report.
+- [ ] **Step 3: Guards.** The three pinned panels (الله 9×9, الحمد لله 13×13, Baqarah 21×21) and the Fit results for سبحان الله, Bismillah, قل هو الله أحد stay as today's tests pin them. Every existing test stays green.
+- [ ] **Step 4: Render** the packed Shahada as a PNG (the spike's `render.mjs` approach) and save it in the report directory.
+- [ ] **Step 5: Verify and commit.** Typecheck (app and e2e), lint, `npm test`, build. Commit `feat(kufi): the Shahada packs on one ring`.
+
+If no combination packs it, do not commit half-measures: report the best result per lever (size, holes, failed letters, edge breaks) and what blocks it, status BLOCKED.
