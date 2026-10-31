@@ -15,6 +15,8 @@ const MAX_TEXT_W = 260;
  * What a panel draws when its text does not fit the box (or has not been
  * arranged yet): a dashed frame at the box's size, the status line centred,
  * and, on the selected panel, `Fit` and each suggested size as buttons.
+ * While a Fit is running (`fitPending`) the buttons give way to "Finding a
+ * size…", so a second press cannot queue a second Fit.
  * Editor chrome only: the whole group is `EXPORT_HIDDEN`, so an unpacked panel
  * still exports no ink. The text and buttons are drawn at the inverse of the
  * stage's zoom (13 px type at any zoom); the frame is in panel px.
@@ -26,13 +28,14 @@ export const KufiUnfitFrame: React.FC<{
   status: KufiPanelStatus;
   onFit?: () => void;
   onSetSize?: (s: Size) => void;
-}> = ({ width, height, color, status, onFit, onSetSize }) => {
+  fitPending?: boolean;
+}> = ({ width, height, color, status, onFit, onSetSize, fitPending = false }) => {
   const ui = useRef<Konva.Group>(null);
   const textRef = useRef<Konva.Text>(null);
   // Drawn at the inverse of the stage's zoom, so known only once mounted.
   useLayoutEffect(() => {
     const g = ui.current;
-    const k = g?.getParent()?.getAbsoluteScale().x || 1;
+    const k = Math.abs(g?.getParent()?.getAbsoluteScale().x ?? 1) || 1;
     if (!g) return;
     g.scale({ x: 1 / k, y: 1 / k });
     const t = textRef.current;
@@ -45,8 +48,10 @@ export const KufiUnfitFrame: React.FC<{
   });
 
   const labels: { label: string; act: () => void; name: string }[] = [];
-  if (onFit) labels.push({ label: "Fit", act: onFit, name: "kufi-unfit-fit" });
-  if (onSetSize) {
+  // no buttons while a Fit runs: the status line says so instead
+  const busy = fitPending && (!!onFit || !!onSetSize);
+  if (onFit && !busy) labels.push({ label: "Fit", act: onFit, name: "kufi-unfit-fit" });
+  if (onSetSize && !busy) {
     for (const s of status.suggestions) labels.push({ label: kufiSizeLabel(s), act: () => onSetSize(s), name: "kufi-unfit-size" });
   }
   const buttonW = (l: string) => Math.max(44, l.length * 9 + 18);
@@ -80,7 +85,7 @@ export const KufiUnfitFrame: React.FC<{
           height={labels.length > 0 ? 38 : TYPE * 2}
           verticalAlign={labels.length > 0 ? "bottom" : "top"}
           align="center"
-          text={status.text}
+          text={busy ? "Finding a size…" : status.text}
           fontSize={TYPE}
           fill={color}
           listening={false}

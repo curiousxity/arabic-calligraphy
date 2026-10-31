@@ -514,7 +514,7 @@ test.describe("editing on the canvas", () => {
     expect(await namedNodeCount(page, "kufi-notice")).toBe(0);
   });
 
-  test("hovering a letter outlines it, and a click cycles its form to the next one that packs, one step per click", async ({ page }) => {
+  test("hovering a letter outlines it, a click picks it, and a click on the picked letter cycles its form to the next one that packs, one step per click", async ({ page }) => {
     test.setTimeout(120_000);
     const errors = collectConsoleErrors(page);
     const box = await openBaqarahPanel(page);
@@ -532,16 +532,23 @@ test.describe("editing on the canvas", () => {
     expect(await namedNodeCount(page, "kufi-edit-hit")).toBe(1);
     expect(await draggableDotCenters(page)).toEqual([]);
 
-    // Click: the next form in table order that packs (`.0` cannot), pinned
-    // where it landed; once explored, it comes from the exploration's try.
+    // A first click only picks the letter: its options show, nothing changes.
     await explored(page);
+    await page.mouse.click(letter.x, letter.y);
+    await expect(kufiPanel(page).getByTestId("kufi-letter-options")).toBeVisible();
+    await page.waitForTimeout(400);
+    expect(await panelEdits(page)).toBeUndefined();
+
+    // A click on the picked letter: the next form in table order that packs
+    // (`.0` cannot), pinned where it landed; once explored, it comes from the
+    // exploration's try.
     await page.mouse.click(letter.x, letter.y);
     await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
     expect((await panelEdits(page))?.pinned?.[4]).toMatchObject({ unitIndex: 4, glyphId: "feh.final.1" });
     await pointerAway(page, box);
     expect(await inkSignature(page, box)).not.toEqual(before);
 
-    // The outline follows the letter; a second click skips `.2` and comes back to the drawn form.
+    // The outline follows the letter, still picked; another click skips `.2` and comes back to the drawn form.
     const again = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
     expect(again.glyphId).toBe("feh.final.1");
     await formsExplored(page);
@@ -598,9 +605,14 @@ test.describe("editing on the canvas", () => {
     await expect(kufiPanel(page).getByTestId("kufi-letter-options")).toBeVisible();
     await page.waitForTimeout(600);
     expect(await panelEdits(page)).toBeUndefined();
-    // Select: a click on the seen (one form) reaches the letter and says so beside it
+    // Select: a first click on the seen (one form) picks it and says nothing;
+    // a click on the picked letter reaches its form and says so beside it
     await chooseTool(page, "Select");
     const seen = (await kufiEditTargets(page)).letters.find((l) => l.unit === 8)!;
+    await page.mouse.click(seen.x, seen.y);
+    await expect(kufiPanel(page).getByTestId("kufi-letter-options")).toContainText("That letter has one form");
+    await page.waitForTimeout(400);
+    expect(await canvasNotice(page)).toBeNull();
     await page.mouse.click(seen.x, seen.y);
     await expect.poll(() => canvasNotice(page)).toBe("That letter has one form");
   });
@@ -778,8 +790,13 @@ test.describe("editing on the canvas", () => {
     await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
 
     // In Select, a still press on the first letter is a click on the letter:
-    // الله has three forms, so the click either lands one or says none fits.
+    // the first picks it, and the next (on the picked letter) cycles its form;
+    // الله has three forms, so that click either lands one or says none fits.
     await chooseTool(page, "Select");
+    await page.mouse.click(letter.x, letter.y);
+    await expect(kufiPanel(page).getByTestId("kufi-letter-options")).toBeVisible();
+    await page.waitForTimeout(400);
+    expect(await panelEdits(page)).toBeUndefined();
     await page.mouse.click(letter.x, letter.y);
     await expect
       .poll(async () => (await panelEdits(page))?.forms?.[5] !== undefined || (await canvasNotice(page)) === "No other form of that letter fits here")
@@ -1201,8 +1218,13 @@ test.describe("the selected letter's options", () => {
     const letter = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
     expect(letter.glyphId).toBe("feh.final.3");
 
-    // A click selects the letter (and swaps it to its next fitting form);
-    // undo takes the swap back and keeps the letter selected.
+    // A click picks the letter and changes nothing; a click on the picked
+    // letter swaps it to its next fitting form; undo takes the swap back and
+    // keeps the letter picked.
+    await page.mouse.click(letter.x, letter.y);
+    await expect(kufiPanel(page).getByTestId("kufi-letter-options")).toBeVisible();
+    await page.waitForTimeout(400);
+    expect(await panelEdits(page)).toBeUndefined();
     await page.mouse.click(letter.x, letter.y);
     await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
     await page.getByRole("button", { name: "Undo" }).click();
@@ -1245,6 +1267,30 @@ test.describe("the selected letter's options", () => {
     expect(await namedNodeCount(page, "kufi-stretch-handle")).toBe(0);
     // the kaf's right end, which fits a step or two longer, keeps its handle
     expect(targets.ends.some((e) => e.unit === 2 && e.dc === 1)).toBe(true);
+  });
+
+  test("while a stretch is held, the lengths that fit are marked, and the marks go on release", async ({ page }) => {
+    test.setTimeout(120_000);
+    const box = await openBaqarahPanel(page);
+    await chooseTool(page, "Stretch");
+    await explored(page);
+    await pointerAway(page, box);
+    const cellPx = 6 * (await getStageScale(page));
+    // unit 2, the kaf: its right end fits a step or two longer
+    const end = (await kufiEditTargets(page)).ends.find((e) => e.unit === 2 && e.si === 0 && e.dc === 1 && e.dr === 0)!;
+    expect(end).toBeDefined();
+    await page.mouse.move(end.x, end.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-fit-mark")).toBe(0);
+    await page.mouse.down();
+    await page.mouse.move(end.x + cellPx, end.y, { steps: 6 });
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-fit-mark")).toBeGreaterThan(0);
+    // back to the start: the release commits nothing, and the marks go
+    await page.mouse.move(end.x, end.y, { steps: 6 });
+    await page.mouse.up();
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-fit-mark")).toBe(0);
   });
 });
 

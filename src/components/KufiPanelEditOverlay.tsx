@@ -65,6 +65,8 @@ type Props = {
   tool?: KufiTool;
   /** A still click on a letter selects it (its options show in the sidebar); a still click on paper clears it. */
   onSelectLetter?: (unitIndex: number | null) => void;
+  /** The letter picked now (App's `kufiLetter` for this panel): in Select, a click on it cycles its form; a click on another letter only picks that one. */
+  pickedUnit?: number | null;
 };
 
 /** A refusal or confirmation, drawn as a short label beside the letter it is about. */
@@ -88,6 +90,8 @@ const HANDLE = 0.7;
 const STRETCH_HANDLE = 1;
 /** The ends not under the pointer draw this faint, so the letter's ink still reads beneath them. */
 const IDLE_HANDLE_OPACITY = 0.55;
+/** The marks at the lengths that fit, drawn while a stretch is held: fainter still, so the pulled end reads over them. */
+const FIT_MARK_OPACITY = 0.35;
 /** How long the cell outline shows red after a refused paint: the one transient coloured cue. */
 export const FLASH_MS = 300;
 export const FLASH_COLOR = "#e03131";
@@ -167,13 +171,15 @@ type Paint = {
  * sidebar's tool row (`KufiToolRow`; App state, Select by default, back to
  * Select when the selection changes):
  *
- * - **Select**: hover outlines a letter; a still click selects it and swaps
- *   it to its next square-Kufi alternate that packs (a click that finds none
- *   says so beside the letter). No handles.
+ * - **Select**: hover outlines a letter; a still click on a letter not
+ *   picked yet only picks it (the sidebar lists its options); a still click
+ *   on the picked letter swaps it to its next square-Kufi alternate that
+ *   packs (a click that finds none says so beside the letter). No handles.
  * - **Stretch**: hover outlines a letter and shows **every** stretch end of
  *   it that can fit, each a whole-cell square; drag one to lengthen or
  *   shorten that stroke in whole cells while the rest of the panel repacks
- *   around it live. A still click on a letter (or a handle) only selects it.
+ *   around it live, with a faint mark at each length exploration found to
+ *   fit. A still click on a letter (or a handle) only selects it.
  * - **Move word**: every word's route handle shows; drag one to slide the
  *   word along its line. A still click on a letter only selects it.
  * - **Paint**: the cell under the pointer outlines; click or drag paints, as
@@ -245,6 +251,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
   notice = null,
   tool = "select",
   onSelectLetter,
+  pickedUnit = null,
 }) => {
   const [hover, setHover] = useState<Hover | null>(null);
   const [cellHover, setCellHover] = useState<Cell | null>(null);
@@ -378,8 +385,8 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
     const { at, cell: c } = p;
     const hits: KufiHandle[] = [];
     if (tool === "stretch") {
-      const end = hitStretchEnd(result, c.col, c.row);
-      if (end && endShown(end)) hits.push(end);
+      const end = hitStretchEnd(result, c.col, c.row, endShown);
+      if (end) hits.push(end);
     } else if (tool === "move") {
       const route = hitRouteHandle(result, units, c.col, c.row);
       if (route) hits.push(route);
@@ -389,9 +396,9 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
     if (unitIndex === null) return null;
     return { unitIndex, on };
   };
-  /** A still click on a letter: in Select it also swaps the form; in the other tools it only selects. */
+  /** A still click on a letter picks it; in Select, a click on the letter already picked swaps its form. */
   const clickLetter = (unitIndex: number) => {
-    if (tool === "select") void cycleForm(unitIndex);
+    if (tool === "select" && unitIndex === pickedUnit) void cycleForm(unitIndex);
     else onSelectLetter?.(unitIndex);
   };
   const updateHover = (altKey: boolean) => {
@@ -414,11 +421,12 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
   };
 
   /**
-   * Click: selects the letter, and swaps it to the next alternate that packs,
+   * Click on the picked letter: swaps it to the next alternate that packs,
    * in table order; one undo step. A form exploration has tried is taken from
    * its try (no pack under the pointer) or skipped; one not tried yet is
-   * asked of the packer as before. So once every form is known, a click that
-   * finds none says so at once.
+   * asked of the packer while exploration is still running, and skipped once
+   * it is done or failed (the sidebar then says "Not checked" and disables it
+   * too). So once every form is known, a click that finds none says so at once.
    */
   const cycleForm = useCallback(
     async (unitIndex: number) => {
@@ -432,11 +440,14 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
         return;
       }
       const known = optionsOf(unitIndex).forms;
+      // exploration over (done or failed): a form it never reached is "not checked", skipped as the sidebar disables it
+      const settled = !!explore?.done;
       cycling.current = true;
       try {
         for (const id of ids) {
           const option = known.find((f) => f.glyphId === id);
           if (option?.fits === false) continue;
+          if (option && option.fits === null && settled) continue;
           if (option?.fits && option.try?.result) {
             onCommit(fromKey, option.try.edits, option.try.result);
             return;
@@ -456,7 +467,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
         cycling.current = false;
       }
     },
-    [committed, inputs, fromKey, onCommit, onNotice, onSelectLetter, optionsOf]
+    [committed, inputs, fromKey, onCommit, onNotice, onSelectLetter, optionsOf, explore]
   );
 
   const beginPull = (spec: PullSpec, stage: Konva.Stage | null) => {
@@ -729,6 +740,20 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
       });
     return [];
   }, [result, units, shownUnit, dragging, painting, tool, wordIndices, endShown]);
+  // While a stretch is held: a faint mark at the end's place for each length
+  // of that slice exploration found to fit (none while the slice is unknown).
+  const fitMarks = useMemo((): Cell[] => {
+    const e = dragging?.spec.kind === "stretch" ? dragging.spec.end : null;
+    if (!dragging || !e) return [];
+    const counts = optionsOf(e.unitIndex).stretch.get(e.stretchIndex);
+    if (!counts) return [];
+    return counts
+      .map((count) => {
+        const d = count - dragging.spec.base;
+        return { col: e.col + d * e.dc, row: e.row + d * e.dr };
+      })
+      .filter((c) => c.col >= 0 && c.row >= 0 && c.col < committed.cols && c.row < committed.rows);
+  }, [dragging, optionsOf, committed]);
   const onHandle = dragging ? null : hover?.on ?? null;
   const sameHandle = (a: KufiHandle, b: KufiHandle | null) =>
     !!b && a.kind === b.kind && a.unitIndex === b.unitIndex && a.col === b.col && a.row === b.row && a.dc === b.dc && a.dr === b.dr;
@@ -914,6 +939,22 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
           stroke={accent}
           strokeWidth={OUTLINE_PX}
           strokeScaleEnabled={false}
+          listening={false}
+        />
+      ))}
+      {fitMarks.map((m, i) => (
+        <Rect
+          key={`fit-${i}`}
+          name="kufi-fit-mark"
+          x={m.col * cell}
+          y={m.row * cell}
+          width={cell}
+          height={cell}
+          stroke={accent}
+          strokeWidth={OUTLINE_PX}
+          strokeScaleEnabled={false}
+          fill={accent}
+          opacity={FIT_MARK_OPACITY}
           listening={false}
         />
       ))}

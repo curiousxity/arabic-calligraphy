@@ -194,10 +194,13 @@ cache itself and starts once it is packed. `pickArrangements` ranks tries
 panel and of each other. A thumbnail click goes through App's `editKufiPanel`
 (`onApplyEdits` -> `onApplyKufiEdits`) with `fromKey` = the key of the inputs
 it was found for: it seeds the layout cache with the explored result, pushes
-one history step and sets `panelEdits`, so undo is one step and the old panel's
-explore result is still cached (no "Looking…" again). The strip renders
-nothing when the current result is not ok; a failed exploration reads like a
-finished one. Hovering outlines the cells that differ from the current panel.
+one history step and sets `panelEdits`, so undo is one step and, **if the old
+panel's exploration had finished**, its result is still cached (no "Looking…"
+again; one that had not finished shows "Looking…" after the undo until it
+does). The strip renders nothing when the current result is not ok, or when
+painted cells break packing (`editsBreakPacking`): `useKufiExplore` does not
+explore such a panel, since every try would carry the same gap and read as
+"doesn't fit". A failed exploration reads like a finished one. Hovering outlines the cells that differ from the current panel.
 
 ## The selected letter's options (`kufiLetterOptions`, `KufiLetterOptions`)
 
@@ -220,14 +223,36 @@ exploration leaves untried things unknown, never "doesn't fit".
   explored try through `onApplyEdits` (one undo step), the drawn one is
   `aria-pressed`, untried ones say "Checking…", the rest are disabled with
   title "Doesn't fit here".
-- **Click cycle** (Select tool only; in Stretch and Move word a click only
-  selects). `cycleForm` walks `kufiFormCycle` order: a known fit
-  commits its explored try (no pack under the pointer), a known misfit is
-  skipped, an unknown form is asked of the packer as before. So once every
-  form is known and none fits, the click says `NO_OTHER_FORM_FITS` at once.
+- **Pick, then cycle** (Select tool only; in Stretch and Move word a click
+  only selects). App passes the picked unit down (`kufiLetter` ->
+  CanvasStage -> `KufiPanelView` -> the overlay's `pickedUnit`). A still
+  click on a letter that is not the picked one only picks it (the sidebar
+  lists its options); a still click on the picked letter runs `cycleForm`.
+  The pick survives the commit (it is keyed on text and box, not edits), so
+  repeated clicks keep cycling. `cycleForm` walks `kufiFormCycle` order: a
+  known fit commits its explored try (no pack under the pointer), a known
+  misfit is skipped.
+- **Untried forms: one rule for sidebar and canvas.** While exploration is
+  still running, an untried form says "Checking…" in the sidebar and a
+  canvas click asks the packer for it live. Once exploration is **done or
+  failed**, an untried form (cut off by the budget, or never reached) is
+  "Not checked": disabled in the sidebar and **skipped** by the canvas
+  click, so the two never disagree. So once every form is known or settled
+  and none fits, the click says `NO_OTHER_FORM_FITS` at once. The one
+  exception is a panel never explored (painted cells break packing): the
+  sidebar says "Not checked" for every other form, and a canvas click still
+  asks the packer, since nothing else ever will.
 - **Stretch handles** (`endShown`): an end shows unless its slice is known
   and has no fitting count; hidden ends are also dropped from hover, hits
-  and the e2e `ends`. A drag within `KUFI_STRETCH_STEPS` reach (two cells)
+  and the e2e `ends`. The hit test takes the filter itself
+  (`hitStretchEnd(result, col, row, endShown)`): filtering its answer
+  afterwards let a hidden end that came first in the cell (a neighbour's, or
+  a sibling slice's) win the press, so a drawn handle could not be grabbed
+  and the press dragged the panel. **While a stretch is held**, a faint cell
+  (`kufi-fit-mark`, `FIT_MARK_OPACITY`, in the chrome colour, inside the
+  overlay's `EXPORT_HIDDEN` group) marks the end's place at each count of
+  that slice's fitting counts (`optionsOf(unit).stretch.get(stretchIndex)`),
+  measured from the end pressed; none while the slice is not known. A drag within `KUFI_STRETCH_STEPS` reach (two cells)
   of the drawn count, on a known slice, snaps to the nearest fitting count
   on the same side of the start (`snapPull`) and shows that count's
   explored try; nothing fitting on that side is a refusal, with no repack.
@@ -269,7 +294,7 @@ ones without checking each, and the row is the point).
 
 | tool | shows | press on a handle | still click on a letter |
 |---|---|---|---|
-| Select | letter outline only | (no handles) | select + cycle to the next fitting form |
+| Select | letter outline only | (no handles) | pick; on the picked letter, cycle to the next fitting form |
 | Stretch | outline + **every** fitting end of the hovered letter, whole-cell squares | pull the stroke | select only |
 | Move word | outline + **every word's** route handle (0.7 cell) | drag the word | select only |
 | Paint | cell outline, no letter outline | — | paints (click or drag) |
@@ -306,8 +331,9 @@ Priority on mouse down: **painting first** (the Paint tool or Alt; claims
 the press whatever is under it) -> a **handle of the current tool** -> any
 other cell of a letter, not claimed: a press that drifts drags the whole
 panel, a **still press (within `CLICK_SLOP`) is a click** (see the table;
-in Select it cycles the form among alternates that pack, skipping those
-that do not; a click that finds none says so; see "The selected letter's
+in Select it picks the letter, and on the already-picked letter cycles the
+form among alternates that pack, skipping those that do not; a click that
+finds none says so; see "The selected letter's
 options" for what exploration changes).
 
 A letter's handles are its **stretch ends** (`stretchEnds`; an `end` is the
@@ -356,7 +382,14 @@ buttons; a mirror gets the frame and never buttons (it is passed no
 only). Text and buttons are drawn at the inverse of the stage's zoom (13 px on
 screen); buttons cancel bubble on press and click so they neither drag the
 panel nor deselect it. The export still holds no path for the panel, and the
-hit area is unchanged.
+hit area is unchanged. **One Fit at a time:** App holds `kufiFitPending`
+(block id and the layout key it was pressed on); while it matches the
+panel's inputs, `fitKufiPanelSize` returns at once on a second press, the
+canvas buttons give way to "Finding a size…" (`fitPending`), and the
+sidebar's Fit is disabled with the same words, whichever was pressed. Once the
+inputs change the pending Fit no longer applies (its answer is dropped) and
+the buttons return. The zoom is read as `Math.abs(getAbsoluteScale().x)`,
+so a mirrored parent cannot flip the text.
 
 ## Tests
 

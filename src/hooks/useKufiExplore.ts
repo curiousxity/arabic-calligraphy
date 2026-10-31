@@ -7,7 +7,8 @@ import type { KufiLayoutInputs } from "../lib/kufi/kufiWorkerProtocol";
  * What exploring single changes to the packed panel for `inputs` has found so
  * far, computed in its own worker. The packed result is read from the layout
  * cache for exactly these inputs, so exploration can never start from another
- * layout; it starts once that result is in and packed. Null until it starts.
+ * layout; it starts once that result is in and packed (and not while painted
+ * cells break packing: then it never starts). Null until it starts.
  */
 export function useKufiExplore(inputs: KufiLayoutInputs): KufiExploreState | null {
   const key = kufiLayoutKey(inputs);
@@ -17,7 +18,9 @@ export function useKufiExplore(inputs: KufiLayoutInputs): KufiExploreState | nul
 
   const getCurrent = useCallback(() => cachedKufiLayout(stable), [stable]);
   const current = useSyncExternalStore(subscribeKufiLayouts, getCurrent, getCurrent);
-  const ok = current?.ok ? current : null;
+  // a panel whose painted cells break packing is not explored: every try
+  // would carry the same gap and read as "doesn't fit"
+  const ok = current?.ok && !current.editsBreakPacking ? current : null;
 
   useEffect(() => {
     if (ok) exploreKufiPanel(stable, ok);

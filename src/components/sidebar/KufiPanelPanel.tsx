@@ -108,7 +108,9 @@ export const KufiPanelPanel: React.FC<{
   onSetTool?: (tool: KufiTool) => void;
   /** The letter (unit index) clicked on the canvas: its forms are listed under the arrangements. */
   letter?: number | null;
-}> = ({ block, onSetSize, onFit, onReleasePins, onApplyEdits, tool = "select", onSetTool, letter = null }) => {
+  /** A Fit of this panel is running, whoever pressed it (the canvas has a Fit button too): shown as busy here. */
+  fitPending?: boolean;
+}> = ({ block, onSetSize, onFit, onReleasePins, onApplyEdits, tool = "select", onSetTool, letter = null, fitPending = false }) => {
   // Registers this panel as a reader, so the layout is packed even if the
   // canvas has not asked yet; the status reads the exact inputs below.
   useKufiPanelLayout(block);
@@ -132,7 +134,7 @@ export const KufiPanelPanel: React.FC<{
   const explore = useKufiExplore(inputs);
   const [fitState, setFit] = useState<{ state: "busy" | "failed"; key: string; press: number } | null>(null);
   const pressRef = useRef(0);
-  const fit = fitState && fitState.key === key ? fitState.state : "idle";
+  const fit = fitPending ? "busy" : fitState && fitState.key === key ? fitState.state : "idle";
 
   const unsupported = useMemo(() => [...new Set(resolveKufiText(block.text).unsupported)], [block.text]);
   const size = { cols: block.panelCols, rows: block.panelRows };
@@ -215,7 +217,7 @@ export const KufiPanelPanel: React.FC<{
         {(block.strokeWidth ?? 0) > 0 && <div>The outline exports as a separate path.</div>}
       </div>
 
-      {result?.ok && onApplyEdits && (
+      {result?.ok && !result.editsBreakPacking && onApplyEdits && (
         <KufiArrangements current={result} state={explore} onApply={(a) => onApplyEdits(key, a.edits, a.result)} />
       )}
       {result?.ok && onApplyEdits && letter !== null && (

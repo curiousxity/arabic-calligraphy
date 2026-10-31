@@ -120,7 +120,7 @@ describe("pickArrangements", () => {
 
   it("chooses the second pick for distance from the first pick", () => {
     const first = mk([1, 1, 1, 0, 0, 0, 0, 0, 0], 0, 0);
-    // near: 2 from current but only 1 from the first pick; far: 2 from current and 3 from the first
+    // near: 2 from current but only 1 from the first pick; far: 2 from current and 5 from the first
     const near = mk([1, 1, 0, 0, 0, 0, 0, 0, 0], 0, 1);
     const far = mk([0, 0, 0, 0, 0, 0, 1, 1, 0], 0, 1);
     const picks = pickArrangements(current, [t(first), t(near), t(far)]);

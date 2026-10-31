@@ -215,6 +215,8 @@ export type SidebarProps = {
   onSetKufiTool?: (tool: KufiTool) => void;
   /** The Kufi panel letter clicked on the canvas, whose forms the Kufi panel section lists. */
   kufiLetter?: { blockId: number; unitIndex: number } | null;
+  /** The Kufi panel whose Fit is running (from the sidebar or the canvas), or null. */
+  kufiFitPendingId?: number | null;
   /** Guides — see .claude/rules/guides.md. */
   onAddGuide?: (shape: GuideShape) => void;
   onAddSvgGuide?: (pathData: string) => void;
@@ -421,6 +423,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   kufiTool,
   onSetKufiTool,
   kufiLetter,
+  kufiFitPendingId = null,
   onAddGuide,
   onAddSvgGuide,
   onAddMark,
@@ -1452,6 +1455,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 tool={kufiTool}
                 onSetTool={onSetKufiTool}
                 letter={kufiLetter && kufiLetter.blockId === selectedBlock.id ? kufiLetter.unitIndex : null}
+                fitPending={kufiFitPendingId === selectedBlock.id}
               />
             </CollapsibleSection>
           </div>

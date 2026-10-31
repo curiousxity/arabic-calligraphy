@@ -55,8 +55,9 @@ export const section: GuideSection = {
         looks for the smallest square box your text fills; it can take several
         seconds for a long text. If you would rather choose, the size fields
         take any number from 3 up, and the line under them suggests sizes to
-        try. Changing the size changes the whole arrangement, so set it before
-        you fine-tune.
+        try. While Fit is working the panel says <em>Finding a size…</em> and
+        the Fit buttons wait for it. Changing the size changes the whole
+        arrangement, so set it before you fine-tune.
       </p>
 
       <h4>The status line</h4>
@@ -112,10 +113,11 @@ export const section: GuideSection = {
       <ul>
         <li>
           <strong>Select</strong> (where you start). The letter under the
-          pointer is outlined. Click it (press and release without moving) to
-          change it to its next form; forms that do not fit are skipped, and a
-          letter with a single form says so. Dragging a letter moves the whole
-          panel.
+          pointer is outlined. Click a letter (press and release without
+          moving) to pick it: its forms show in the sidebar and nothing
+          changes. Click the picked letter again to change it to its next
+          form; forms that do not fit are skipped, and a letter with a single
+          form says so. Dragging a letter moves the whole panel.
         </li>
         <li>
           <strong>Stretch.</strong> Move over a letter and every stroke end of
@@ -124,8 +126,9 @@ export const section: GuideSection = {
           the stroke longer or shorter, a square at a time. A stroke with no
           free end shows the square on the stroke itself. Once the panel has
           been checked (see <em>Other arrangements</em> below), squares show
-          only on strokes that have a length that fits, and a drag of a square
-          or two jumps to the nearest length that fits. Clicking a letter here
+          only on strokes that have a length that fits, faint squares mark
+          those lengths while you drag, and a drag of a square or two jumps to
+          the nearest length that fits. Clicking a letter here
           picks it without changing its form.
         </li>
         <li>
@@ -150,7 +153,9 @@ export const section: GuideSection = {
           every form of it, the one drawn now highlighted. Forms that fit here
           can be clicked to use them; the others are greyed out and say{" "}
           <em>Doesn't fit here</em>. Forms still being tried say{" "}
-          <em>Checking…</em>. Clicking the empty part of the panel clears it.
+          <em>Checking…</em>; a form the check never reached says{" "}
+          <em>Not checked</em>, and clicking the letter on the canvas skips it
+          too. Clicking the empty part of the panel clears it.
         </li>
       </ul>
       <p>

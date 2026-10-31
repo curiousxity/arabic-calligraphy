@@ -214,11 +214,14 @@ export function stretchEnds(result: Ok, unitIndex: number): KufiStretchEnd[] {
 /**
  * The handle covering the cell: an end cell or the paper cell just beyond
  * it, or a slice grip's own cell. Checked before `hitKufiUnit`, so a press
- * on a handle is a stretch and never a click on the letter.
+ * on a handle is a stretch and never a click on the letter. `accept` skips
+ * ends the caller does not draw (a slice known to fit no length), so a hidden
+ * end sharing the cell never takes the press from a drawn one.
  */
-export function hitStretchEnd(result: Ok, col: number, row: number): KufiStretchEnd | null {
+export function hitStretchEnd(result: Ok, col: number, row: number, accept?: (end: KufiStretchEnd) => boolean): KufiStretchEnd | null {
   for (const p of result.placements) {
     for (const e of stretchEnds(result, p.unitIndex)) {
+      if (accept && !accept(e)) continue;
       if (e.col === col && e.row === row) return e;
       if (e.kind === "end" && e.col + e.dc === col && e.row + e.dr === row) return e;
     }

@@ -343,6 +343,9 @@ const App: React.FC = () => {
   const [kufiLetterPick, setKufiLetterPick] = useState<{ blockId: number; unitIndex: number; text: string; cols: number; rows: number } | null>(null);
   /** The Kufi panel's canvas tool (the sidebar's tool row): editor state, not saved, back to Select when the selection changes. */
   const [kufiTool, setKufiTool] = useState<KufiTool>("select");
+  /** The Kufi panel Fit running now, keyed to the inputs it was pressed on (see `fitKufiPanelSize`). */
+  const [kufiFitPending, setKufiFitPending] = useState<{ blockId: number; key: string } | null>(null);
+  const kufiFitPendingRef = useRef<{ blockId: number; key: string } | null>(null);
   const [kufiLetterSelection, setKufiLetterSelection] = useState(selectedId);
   if (kufiLetterSelection !== selectedId) {
     setKufiLetterSelection(selectedId);
@@ -2134,12 +2137,30 @@ const App: React.FC = () => {
    * Fit's step. The answer is dropped if the panel's text, box or edits
    * changed during the wait, so a size typed meanwhile is never overwritten.
    * Rejects (message "Fit failed …") if the packer's worker dies.
+   *
+   * One Fit at a time per panel inputs: while one runs (`kufiFitPending`,
+   * keyed to the inputs it was pressed on), a second press from the sidebar or
+   * the canvas returns at once instead of queueing another, and both show
+   * "Finding a size…" in place of their buttons.
    */
   const fitKufiPanelSize = async () => {
     if (!selectedBlock || !isKufiPanel(selectedBlock)) return;
     const { id, text, panelEdits, panelCols, panelRows } = selectedBlock;
     const editsKey = JSON.stringify(panelEdits ?? null);
-    const size = await requestKufiFit(text, panelEdits);
+    const pending = { blockId: id, key: kufiLayoutKey(kufiPanelInputs(selectedBlock)) };
+    const running = kufiFitPendingRef.current;
+    if (running && running.blockId === pending.blockId && running.key === pending.key) return;
+    kufiFitPendingRef.current = pending;
+    setKufiFitPending(pending);
+    let size: { cols: number; rows: number };
+    try {
+      size = await requestKufiFit(text, panelEdits);
+    } finally {
+      if (kufiFitPendingRef.current === pending) {
+        kufiFitPendingRef.current = null;
+        setKufiFitPending(null);
+      }
+    }
     const now = blocksRef.current.find((b) => b.id === id);
     if (!now || !isKufiPanel(now) || now.text !== text) return;
     if (now.panelCols !== panelCols || now.panelRows !== panelRows) return;
@@ -3452,6 +3473,13 @@ const App: React.FC = () => {
     kufiLetterBlock.panelRows === kufiLetterPick.rows
       ? { blockId: kufiLetterPick.blockId, unitIndex: kufiLetterPick.unitIndex }
       : null;
+  // A Fit counts as running only for the inputs it was pressed on: once the
+  // text, box or edits change, its answer is dropped and the buttons return.
+  const kufiFitBlock = kufiFitPending ? blocks.find((b) => b.id === kufiFitPending.blockId) : undefined;
+  const kufiFitPendingId =
+    kufiFitPending && kufiFitBlock && isKufiPanel(kufiFitBlock) && kufiLayoutKey(kufiPanelInputs(kufiFitBlock)) === kufiFitPending.key
+      ? kufiFitPending.blockId
+      : null;
 
   return (
     <div
@@ -3521,6 +3549,7 @@ const App: React.FC = () => {
         kufiTool={kufiTool}
         onSetKufiTool={setKufiTool}
         kufiLetter={kufiLetter}
+        kufiFitPendingId={kufiFitPendingId}
         onAddGuide={addGuideBlock}
         onAddSvgGuide={addSvgGuideBlock}
         onAddMark={addMarkBlock}
@@ -3663,6 +3692,8 @@ const App: React.FC = () => {
           kufiNotice={kufiNotice}
           kufiTool={kufiTool}
           onSelectKufiLetter={selectKufiLetter}
+          kufiLetter={kufiLetter}
+          kufiFitPendingId={kufiFitPendingId}
           onSetStrokeCut={setStrokeCut}
           onResizeShapeFillBlock={resizeShapeFillBlock}
           ghostBlock={

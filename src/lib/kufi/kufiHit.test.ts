@@ -169,6 +169,22 @@ describe("stretchEnds / hitStretchEnd", () => {
     expect(stretchEnds(cut, 0).map((e) => e.row).sort()).toEqual([1, 5]);
   });
 
+  it("an end the caller rejects never takes the cell from another end sharing it", () => {
+    // two upright bars in one column with one paper cell between them: (1, 8)
+    // is beyond the first bar's foot and beyond the second bar's top
+    const cols = 4;
+    const rows = 17;
+    const placements: KufiPlacement[] = [
+      { unitIndex: 0, key: "alef:isolated", glyphId: "alef.isolated.0", col: 1, row: 1, turn: 0, stretch: [0] },
+      { unitIndex: 1, key: "alef:isolated", glyphId: "alef.isolated.0", col: 1, row: 9, turn: 0, stretch: [0] },
+    ];
+    const r: Ok = { ok: true, cols, rows, cells: new Uint8Array(cols * rows), placements, editsBreakPacking: false };
+    for (const p of placements) for (const i of placementInk(r, p)) r.cells[i] = 1;
+    expect(hitStretchEnd(r, 1, 8)).toMatchObject({ unitIndex: 0, dr: 1 });
+    expect(hitStretchEnd(r, 1, 8, (e) => e.unitIndex !== 0)).toMatchObject({ unitIndex: 1, dr: -1 });
+    expect(hitStretchEnd(r, 1, 8, () => false)).toBeNull();
+  });
+
   it("a handle wins over the letter under it", () => {
     const r = panel();
     expect(hitKufiUnit(r, 1, 1)).toBe(0);

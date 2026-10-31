@@ -46,6 +46,10 @@ export type KufiPanelViewProps = ReturnType<typeof kufiPanelProps> & {
   onFitPanel?: () => void;
   /** Set the box to a suggested size; same rule as `onFitPanel`. */
   onSetPanelSize?: (s: { cols: number; rows: number }) => void;
+  /** A Fit of this panel is running: the canvas buttons give way to "Finding a size…" until it settles. */
+  fitPending?: boolean;
+  /** The letter picked in this panel (App's `kufiLetter`), or null: in Select, a click on it cycles its form. */
+  pickedUnit?: number | null;
 };
 
 const noNotice = () => {};
@@ -168,6 +172,7 @@ export const KufiPanelView: React.FC<KufiPanelViewProps> = (p) => {
           status={unfit}
           onFit={p.isSelected && canAct ? p.onFitPanel : undefined}
           onSetSize={p.isSelected && canAct ? p.onSetPanelSize : undefined}
+          fitPending={p.isSelected && !!p.fitPending}
         />
       )}
       {p.isSelected && p.onEditPanel && result?.ok && (
@@ -183,6 +188,7 @@ export const KufiPanelView: React.FC<KufiPanelViewProps> = (p) => {
           notice={p.notice ?? null}
           tool={p.tool ?? "select"}
           onSelectLetter={p.onSelectLetter}
+          pickedUnit={p.pickedUnit ?? null}
         />
       )}
     </Group>

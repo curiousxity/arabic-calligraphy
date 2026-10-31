@@ -31,7 +31,10 @@ const GlyphPreview: React.FC<{ rows: string[] }> = ({ rows }) => {
  * The forms of the letter clicked on the canvas, from what exploring the
  * panel has found: a form that fits here applies on click (its explored try,
  * one undo step through the caller), the drawn one is pressed, one not tried
- * yet says "Checking…", and the rest are disabled.
+ * yet says "Checking…" while exploration runs and "Not checked" once it is
+ * done or failed (or never runs: painted cells break packing), and the rest
+ * are disabled. A canvas click skips a "Not checked" form too, except on a
+ * panel never explored, where it asks the packer.
  */
 export const KufiLetterOptions: React.FC<{
   text: string;
@@ -41,8 +44,9 @@ export const KufiLetterOptions: React.FC<{
   onApply: (t: KufiTry) => void;
 }> = ({ text, current, state, unitIndex, onApply }) => {
   const options = useMemo(() => kufiLetterOptions(text, current, state, unitIndex), [text, current, state, unitIndex]);
-  // a failed exploration tries no more: an untried form is then unknown, not pending
-  const finished = !!state && state.done;
+  // a finished or failed exploration tries no more, and a panel whose painted
+  // cells break packing is never explored: an untried form is then unknown, not pending
+  const finished = (!!state && state.done) || current.editsBreakPacking;
   if (options.forms.length === 0) return null;
 
   return (

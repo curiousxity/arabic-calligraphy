@@ -183,10 +183,12 @@ export type CanvasStageProps = {
   alternateLetters: LetterAlternates[];
   onPickGlyphAlternate: (blockId: number, letter: number, choice: AlternateChoice | null) => void;
   /** A Kufi panel edited on the canvas (a form swap, a stretch): one undo step. See `KufiPanelEditOverlay`. */
+  onEditKufiPanel?: (blockId: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => void;
   /** The selected Kufi panel's Fit and size setter, drawn as buttons on a box the text doesn't fit. */
   onFitKufiPanel?: () => void;
   onSetKufiPanelSize?: (size: { cols: number; rows: number }) => void;
-  onEditKufiPanel?: (blockId: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => void;
+  /** The Kufi panel whose Fit is running (its canvas buttons give way to "Finding a size…"), or null. */
+  kufiFitPendingId?: number | null;
   /** Why a Kufi panel canvas edit changed nothing (drawn beside the letter), or null when a gesture starts. */
   onKufiPanelNotice?: (blockId: number, fromKey: string, notice: KufiNotice | null) => void;
   /** The notice on show, for the panel and inputs it was made on. */
@@ -195,6 +197,8 @@ export type CanvasStageProps = {
   kufiTool?: KufiTool;
   /** A still click on a Kufi panel's letter (unit index) or paper (null). */
   onSelectKufiLetter?: (blockId: number, unitIndex: number | null) => void;
+  /** The Kufi letter picked now (App's `kufiLetter`): in Select, a click on it cycles its form. */
+  kufiLetter?: { blockId: number; unitIndex: number } | null;
   onSetStrokeCut: (blockId: number, cut: StrokeCut) => void;
   onResizeShapeFillBlock: (id: number, scale: number) => void;
   showRulers: boolean;
@@ -326,6 +330,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onSetKufiPanelSize,
   onKufiPanelNotice,
   onSelectKufiLetter,
+  kufiLetter = null,
+  kufiFitPendingId = null,
   kufiNotice = null,
   kufiTool = "select",
   onResizeShapeFillBlock,
@@ -1280,6 +1286,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onSelectLetter={(unitIndex) => onSelectKufiLetter?.(block.id, unitIndex)}
                     onFitPanel={block.id === selectedId ? onFitKufiPanel : undefined}
                     onSetPanelSize={block.id === selectedId ? onSetKufiPanelSize : undefined}
+                    fitPending={kufiFitPendingId === block.id}
+                    pickedUnit={kufiLetter && kufiLetter.blockId === block.id ? kufiLetter.unitIndex : null}
                   />
                 );
               }
