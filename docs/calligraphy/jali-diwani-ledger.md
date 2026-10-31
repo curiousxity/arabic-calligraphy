@@ -770,7 +770,17 @@ sin's second tooth came out a sliver: 314.s0 and 314.s1 both took a 0.7 nib (the
   exit's ink there, the entry gains nothing by covering the joint, and its start drifts loose.
 - 314.s0 at the full nib (`PEN_SIZE=0`, and with `PEN_FULLEND`): the sin's tooth did not come back; it is 314.s1's start.
 - `PEN_THROUGH`: exit and entry fitted as one pen movement through the join, then split where they meet, so each
-  letter keeps its strokes and a raised, dropped or stretched letter still carries its half.
+  letter keeps its strokes and a raised, dropped or stretched letter still carries its half. At the ha->ya (th1) the
+  step under the join went; the ha->mim's nub stayed. Awaiting the user.
+- 314.s1 at the full nib (sq3): the sin's second tooth is solid again, a little shorter than the studio's.
+
+**Heads that turn back (the catalogue's overnight fits, 2026-10-31).** A stroke that rises and turns sharply back
+down into a flag (074, 076, 077, 084, 086, 087, 108, 731) lost the flag fitted whole: rounded off or gone. The flag is
+a second move, as a tooth is: `PEN_CUT` with the peak allowed within `PEN_CUT_MARGIN` of the end (0.3, or 0.15
+nuqta). 074.s0 0.929 to 0.946, 084.s0 0.82 to 0.931, 108.s0 0.831 to 0.951, each flag back. 731.s0 kept its flag but
+drew a spike at its other end. 075.s0 and 095.s0 find no peak to cut at; 086.s0's cut falls at the flag's far edge.
+The thin crossing loops 484.s0 and 485.s0 (0.19, 0.27) fit with the small pen walking the skeleton (`PEN_SMALL`,
+`PEN_WALK`): 0.91 each; 732.s0 with the walk, 0.805 to 0.892.
 
 The pick before the review, each pair against the sheet's whole outline:
 
