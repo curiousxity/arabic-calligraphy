@@ -19,7 +19,12 @@ afterAll(() => _internal.setClockOverride(null));
 
 const BAQARAH = "لا يكلف الله نفسا إلا وسعها";
 // `quality` counts only unpinned letters, so a repack of pinned letters reports less of it: layouts are compared without it
-const layoutOf = (r: KufiPackResult) => (r.ok ? { ...r, quality: undefined } : r);
+const layoutOf = (r: KufiPackResult) => {
+  if (!r.ok) return r;
+  const layout = { ...r };
+  delete layout.quality;
+  return layout;
+};
 const ALLAH = "الله";
 const SHAHADA = "لا إله إلا الله محمد رسول الله";
 const NASR = "نصر من الله";

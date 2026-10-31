@@ -103,7 +103,11 @@ export type KufiPackResult =
       placements: KufiPlacement[];
       /** True when the painted or erased cells of `edits.cells` leave a hole, a solid 2×2 or a frame break: the packing itself was sound. */
       editsBreakPacking: boolean;
-      /** The packed panel's filler squares, cells cut and cells grown (`Final`); optional, so a missing quality ranks last. */
+      /**
+       * The packed panel's filler squares, cells cut and cells grown (`Final`); optional, so a missing quality ranks last.
+       * Exempt letters (pinned or fixed, see `devParts`/`lettersOf`) count zero in cut and grow, so cut and grow compare
+       * fairly only between results packed with the same pins (e.g. repacks of one panel).
+       */
       quality?: { squares: number; cut: number; grow: number };
     }
   | { ok: false; reason: "tooShort" | "tooLong" | "pinConflict"; suggestions: Array<{ cols: number; rows: number }> };
