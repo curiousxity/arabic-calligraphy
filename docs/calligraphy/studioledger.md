@@ -273,8 +273,13 @@ Times are minutes:seconds into the individual-letters lesson.
   0.01). That gave 358, over 353 shapes, and the user saw every one beside its old fit and the studio. They turned
   down 045, 570r, 571r, 574r, 589, 665, 670g and 709 ("So far 045 is worse"). Those keep their old fits, and so do
   the twins sharing a stroke with them (020 with 045, 572.s1 with 589). 350 refits went in, and the joint trims
-  were redone over the shapes they changed. Still open: 642 and 744 are "better but the tail is too thin", and 045's
-  hook still folds.
+  were redone over the shapes they changed. 045's hook was then drawn at one nib angle, which no longer folds. Still
+  open: 742 and 744, whose tails are too thin; three tries (weighted ends, a tail drawn across) did not fix them.
+- **Named defects (2026-10-31):** the user named defects in 024, 032r, 033r, 048, 049, 065 and 068, and each was
+  refitted at one nib angle and with a turning pen, with no fold and no lift. Taken: 032r and 033r at one nib angle
+  (the turning pen left a notch at the top left) and 065's second stroke with a turning pen (iou 0.952 to 0.980).
+  Kept: 024 (the turning pen's hook "has a point"), 048, 049, and 068, whose left-end spike is where the pen arrives
+  from the letter before and belongs to the joins.
 
 **Every joint trimmed to the studio edge**
 
