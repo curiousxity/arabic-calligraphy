@@ -2274,8 +2274,12 @@ function sizesFrom(n: number, dir: 0 | 1 | -1): number[] {
 
 type Size = { cols: number; rows: number };
 
-/** Ranking the rectangles by the greedy pass takes at most this of a Fit or of a failure's suggestions. */
-const RANK_BUDGET_MS = 500;
+/**
+ * The greedy pass scores this many rectangles, the first in their listed order
+ * (about 8 ms each); the rest follow unscored. A count, not a clock, so the
+ * same text gives the same rectangles on a busy machine.
+ */
+const RANK_MAX_SIZES = 60;
 /** Smallest side of a rectangular candidate. */
 const MIN_RECT_SIDE = 7;
 /** A rectangle's width is tried this far either side of the text's area at its height. */
@@ -2304,13 +2308,13 @@ function rectangleSizes(units: KufiUnit[]): Size[] {
 /**
  * `sizes` best first by the greedy pass alone (the pass `searchInner` starts
  * with): a packing one before the rest, then the lower score; ties keep the
- * order given. About 10 ms a size on the Al-Baqarah and Shahada texts; sizes
- * not reached by `deadline` (a long text) are unscored and keep the order given.
+ * order given. About 8 ms a size on the Al-Baqarah and Shahada texts, so only
+ * the first `RANK_MAX_SIZES` are scored; the rest keep the order given, after them.
  */
-function rankByGreedy(text: string, sizes: Size[], edits: KufiPanelEdits, pins: Map<number, Pin>, deadline: number): Size[] {
-  const scored = sizes.map((s, k) => {
+function rankByGreedy(text: string, sizes: Size[], edits: KufiPanelEdits, pins: Map<number, Pin>): Size[] {
+  const scored = sizes.slice(0, RANK_MAX_SIZES).map((s, k) => {
     let f: Final | null = null;
-    if (performance.now() < deadline && !outOfRoom(text, s.cols, s.rows)) {
+    if (!outOfRoom(text, s.cols, s.rows)) {
       const ctx = makeCtx(text, s.cols, s.rows, edits, pins, PACK_BUDGET_MS, true);
       ctx.noClock = true;
       f = beamPass(ctx, 1, initState(ctx), 0, true);
@@ -2318,7 +2322,13 @@ function rankByGreedy(text: string, sizes: Size[], edits: KufiPanelEdits, pins: 
     return { s, k, packed: f?.packed ?? false, score: f ? f.score : Infinity };
   });
   scored.sort((a, b) => Number(b.packed) - Number(a.packed) || a.score - b.score || a.k - b.k);
-  return scored.map((x) => x.s);
+  return [...scored.map((x) => x.s), ...sizes.slice(RANK_MAX_SIZES)];
+}
+
+/** The squares, then the rectangles ranked only once the squares are used up. */
+function* squaresThenRanked(squares: Size[], ranked: () => Size[]): Generator<Size> {
+  yield* squares;
+  yield* ranked();
 }
 
 /** Boxes in the given direction from (cols, rows) that pack: larger area for 1, smaller for -1. */
@@ -2338,7 +2348,9 @@ function suggestions(
   const from = dir > 0 ? Math.max(Math.max(cols, rows) + 1, est) : Math.min(Math.min(cols, rows) - 1, est);
   const squares = sizesFrom(from, dir).map((n) => ({ cols: n, rows: n }));
   const rects = rectangleSizes(units).filter((s) => (dir > 0 ? s.cols * s.rows > area : s.cols * s.rows < area));
-  for (const s of [...squares, ...rankByGreedy(text, rects, edits, pins, Math.min(deadline, performance.now() + RANK_BUDGET_MS)).slice(0, SUGGEST_TRIES * 3)]) {
+  let tried = 0;
+  for (const s of squaresThenRanked(squares, () => rankByGreedy(text, rects, edits, pins))) {
+    if (++tried > squares.length + SUGGEST_TRIES * 3) break;
     const left = Math.min(PACK_BUDGET_MS, deadline - performance.now());
     // a search shorter than this cannot finish even its first passes
     // what is left of the call's time, on the clock: suggestions never run the call over
@@ -2595,7 +2607,7 @@ export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}): { cols: 
   let best: { size: Size; score: number } | null = null;
   const t0 = performance.now();
   const squares = sizesFrom(est, 0).map((n) => ({ cols: n, rows: n }));
-  for (const size of [...squares, ...rankByGreedy(text, rectangleSizes(units), edits, pins, t0 + RANK_BUDGET_MS)]) {
+  for (const size of squaresThenRanked(squares, () => rankByGreedy(text, rectangleSizes(units), edits, pins))) {
     if (performance.now() - t0 > FIT_BUDGET_MS) break;
     const { cols, rows } = size;
     // the same path a pack takes, so a size fit calls packable is one a pack packs
