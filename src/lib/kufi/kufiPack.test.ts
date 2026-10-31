@@ -282,6 +282,18 @@ describe("budgets", () => {
     expect(_internal.FIRST_DRAFT_CLOCK_MS).toBeLessThan(2000);
   });
 
+  it("a pinned Fit stays within FIT_BUDGET_MS plus one pinned call", () => {
+    const draft = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 });
+    if (!draft.ok) throw new Error("no draft");
+    const preview = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, previous: draft, edits: { stretch: { 2: [2] } } });
+    if (!preview.ok) throw new Error("no preview");
+    const committed = { stretch: { 2: [2] }, pinned: { 2: preview.placements[2] } };
+    _internal.clearCaches();
+    const t = performance.now();
+    fitKufiPanel(BAQARAH, committed);
+    expect(performance.now() - t).toBeLessThan(_internal.FIT_BUDGET_MS + _internal.PINNED_CALL_MS);
+  }, 60000);
+
   it("300-char text returns within budget", () => {
     let text = BAQARAH;
     while (text.length <= 300) text += " " + BAQARAH;
@@ -541,6 +553,30 @@ describe("fitKufiPanel", () => {
       expectPacked(packKufiPanel({ text, ...size }), text);
     }
   }, 30000);
+
+  it("fits «الله أكبر», which packs only in a rectangle", () => {
+    const size = fitKufiPanel("الله أكبر");
+    expect(size.cols).not.toBe(size.rows);
+    expectPacked(packKufiPanel({ text: "الله أكبر", ...size }), "الله أكبر");
+  }, 60000);
+
+  it("keeps the square sizes of the texts that pack in one", () => {
+    expect(fitKufiPanel(ALLAH)).toEqual({ cols: 9, rows: 9 });
+    expect(fitKufiPanel("الحمد لله")).toEqual({ cols: 13, rows: 13 });
+    expect(fitKufiPanel(BAQARAH)).toEqual({ cols: 21, rows: 21 });
+  }, 60000);
+
+  it("suggests a rectangle when only rectangles pack", () => {
+    const r = packKufiPanel({ text: "الله أكبر", cols: 13, rows: 13 });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.suggestions.length).toBeGreaterThanOrEqual(1);
+    for (const s of r.suggestions) expectPacked(packKufiPanel({ text: "الله أكبر", ...s }), "الله أكبر");
+  }, 60000);
+
+  it("accepts a very wide box: no proportion is capped", () => {
+    expect(() => packKufiPanel({ text: ALLAH, cols: 41, rows: 9 })).not.toThrow();
+  }, 60000);
 });
 
 // The reference 21x21 panel's choices, as the packer writes them (see "the scorer" below): its

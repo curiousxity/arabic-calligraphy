@@ -2272,7 +2272,56 @@ function sizesFrom(n: number, dir: 0 | 1 | -1): number[] {
   return out;
 }
 
-/** Square sizes from (cols, rows) on, in the given direction, that pack. */
+type Size = { cols: number; rows: number };
+
+/** Ranking the rectangles by the greedy pass takes at most this of a Fit or of a failure's suggestions. */
+const RANK_BUDGET_MS = 500;
+/** Smallest side of a rectangular candidate. */
+const MIN_RECT_SIDE = 7;
+/** A rectangle's width is tried this far either side of the text's area at its height. */
+const RECT_WIDTH_SPREAD = 2;
+
+/**
+ * Rectangular boxes the text may fill, in the order they are tried when
+ * nothing else ranks them: by elongation, then by distance from the area
+ * estimate, then rows, then cols. Each height up to twice the estimated side
+ * is tried, with the widths round the text's area at that height. The squares
+ * are the callers' own (they go first, and keep the sizes squares-only Fit gave).
+ */
+function rectangleSizes(units: KufiUnit[]): Size[] {
+  const est = estimateSide(units);
+  const area = est * est;
+  const out: Size[] = [];
+  for (let rows = MIN_RECT_SIDE; rows <= 2 * est; rows++) {
+    const mid = Math.round(area / rows);
+    for (let cols = mid - RECT_WIDTH_SPREAD; cols <= mid + RECT_WIDTH_SPREAD; cols++) if (cols >= MIN_RECT_SIDE && cols !== rows) out.push({ cols, rows });
+  }
+  const elong = (s: Size) => Math.max(s.cols, s.rows) / Math.min(s.cols, s.rows);
+  const off = (s: Size) => Math.abs(s.cols * s.rows - area);
+  return out.sort((a, b) => elong(a) - elong(b) || off(a) - off(b) || a.rows - b.rows || a.cols - b.cols);
+}
+
+/**
+ * `sizes` best first by the greedy pass alone (the pass `searchInner` starts
+ * with): a packing one before the rest, then the lower score; ties keep the
+ * order given. About 10 ms a size on the Al-Baqarah and Shahada texts; sizes
+ * not reached by `deadline` (a long text) are unscored and keep the order given.
+ */
+function rankByGreedy(text: string, sizes: Size[], edits: KufiPanelEdits, pins: Map<number, Pin>, deadline: number): Size[] {
+  const scored = sizes.map((s, k) => {
+    let f: Final | null = null;
+    if (performance.now() < deadline && !outOfRoom(text, s.cols, s.rows)) {
+      const ctx = makeCtx(text, s.cols, s.rows, edits, pins, PACK_BUDGET_MS, true);
+      ctx.noClock = true;
+      f = beamPass(ctx, 1, initState(ctx), 0, true);
+    }
+    return { s, k, packed: f?.packed ?? false, score: f ? f.score : Infinity };
+  });
+  scored.sort((a, b) => Number(b.packed) - Number(a.packed) || a.score - b.score || a.k - b.k);
+  return scored.map((x) => x.s);
+}
+
+/** Boxes in the given direction from (cols, rows) that pack: larger area for 1, smaller for -1. */
 function suggestions(
   text: string,
   units: KufiUnit[],
@@ -2281,17 +2330,20 @@ function suggestions(
   edits: KufiPanelEdits,
   dir: 1 | -1,
   deadline: number
-): Array<{ cols: number; rows: number }> {
+): Size[] {
+  const out: Size[] = [];
+  const pins = explicitPins(units, edits) ?? new Map<number, Pin>();
+  const area = cols * rows;
   const est = estimateSide(units);
   const from = dir > 0 ? Math.max(Math.max(cols, rows) + 1, est) : Math.min(Math.min(cols, rows) - 1, est);
-  const out: Array<{ cols: number; rows: number }> = [];
-  const pins = explicitPins(units, edits) ?? new Map<number, Pin>();
-  for (const n of sizesFrom(from, dir)) {
+  const squares = sizesFrom(from, dir).map((n) => ({ cols: n, rows: n }));
+  const rects = rectangleSizes(units).filter((s) => (dir > 0 ? s.cols * s.rows > area : s.cols * s.rows < area));
+  for (const s of [...squares, ...rankByGreedy(text, rects, edits, pins, Math.min(deadline, performance.now() + RANK_BUDGET_MS)).slice(0, SUGGEST_TRIES * 3)]) {
     const left = Math.min(PACK_BUDGET_MS, deadline - performance.now());
     // a search shorter than this cannot finish even its first passes
     // what is left of the call's time, on the clock: suggestions never run the call over
-    const f = freshFinal(text, n, n, edits, pins, left < MIN_SEARCH_MS ? 0 : left, true);
-    if (f?.packed) out.push({ cols: n, rows: n });
+    const f = freshFinal(text, s.cols, s.rows, edits, pins, left < MIN_SEARCH_MS ? 0 : left, true);
+    if (f?.packed) out.push(s);
     if (out.length >= 2 || left < MIN_SEARCH_MS) break;
   }
   return out;
@@ -2534,23 +2586,24 @@ const MIN_SEARCH_MS = 250;
  */
 export const CALL_BUDGET_MS = 1750;
 
-/** A square size that packs `text`, trying sizes round an estimate; the closest attempt when none does. */
+/** A box that packs `text`, trying sizes of any proportion round an estimate; the closest attempt when none does. */
 export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}): { cols: number; rows: number } {
   const { units } = resolveKufiText(text);
   const est = estimateSide(units);
   if (letterCount(units) < 2) return { cols: est, rows: est };
   const pins = explicitPins(units, edits) ?? new Map<number, Pin>();
-  let best: { n: number; score: number } | null = null;
+  let best: { size: Size; score: number } | null = null;
   const t0 = performance.now();
-  for (const n of sizesFrom(est, 0)) {
+  const squares = sizesFrom(est, 0).map((n) => ({ cols: n, rows: n }));
+  for (const size of [...squares, ...rankByGreedy(text, rectangleSizes(units), edits, pins, t0 + RANK_BUDGET_MS)]) {
     if (performance.now() - t0 > FIT_BUDGET_MS) break;
+    const { cols, rows } = size;
     // the same path a pack takes, so a size fit calls packable is one a pack packs
-    const f = pins.size > 0 ? packPinned(text, units, n, n, edits, pins) : freshFinal(text, n, n, edits, pins, PACK_BUDGET_MS);
-    if (f?.packed) return { cols: n, rows: n };
-    if (f && (!best || f.score < best.score)) best = { n, score: f.score };
+    const f = pins.size > 0 ? packPinned(text, units, cols, rows, edits, pins) : freshFinal(text, cols, rows, edits, pins, PACK_BUDGET_MS);
+    if (f?.packed) return { cols, rows };
+    if (f && (!best || f.score < best.score)) best = { size, score: f.score };
   }
-  const n = best?.n ?? est;
-  return { cols: n, rows: n };
+  return best?.size ?? { cols: est, rows: est };
 }
 
 /**
@@ -2674,6 +2727,9 @@ export const _internal = {
   setClockOverride,
   CALL_BUDGET_MS,
   PINNED_CALL_MS,
+  FIT_BUDGET_MS,
+  rectangleSizes,
+  rankByGreedy,
   better,
   devOf,
   placedList,
