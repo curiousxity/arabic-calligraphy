@@ -280,6 +280,9 @@ Times are minutes:seconds into the individual-letters lesson.
   (the turning pen left a notch at the top left) and 065's second stroke with a turning pen (iou 0.952 to 0.980).
   Kept: 024 (the turning pen's hook "has a point"), 048, 049, and 068, whose left-end spike is where the pen arrives
   from the letter before and belongs to the joins.
+- **Two-piece strokes that still folded (2026-10-31):** eight were refitted as two strokes with the fold term. The
+  user took 259g's ("259g after looks better") and kept 224's old fit ("224 before looks better"); the other six
+  barely changed and keep theirs.
 
 **Every joint trimmed to the studio edge**
 
