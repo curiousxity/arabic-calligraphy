@@ -1,23 +1,28 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { exploreKufiPanel, kufiExploreSnapshot, subscribeKufiExplore, type KufiExploreState } from "../lib/kufi/kufiExploreClient";
-import { kufiLayoutKey } from "../lib/kufi/kufiLayoutClient";
-import type { KufiPackResult } from "../lib/kufi/kufiPack";
+import { cachedKufiLayout, kufiLayoutKey, subscribeKufiLayouts } from "../lib/kufi/kufiLayoutClient";
 import type { KufiLayoutInputs } from "../lib/kufi/kufiWorkerProtocol";
 
 /**
- * What exploring single changes to a packed panel has found so far, computed
- * in its own worker. `current` must be the cached result for exactly these
- * inputs; exploration starts only when it packed. Null until it starts.
+ * What exploring single changes to the packed panel for `inputs` has found so
+ * far, computed in its own worker. The packed result is read from the layout
+ * cache for exactly these inputs, so exploration can never start from another
+ * layout; it starts once that result is in and packed. Null until it starts.
  */
-export function useKufiExplore(inputs: KufiLayoutInputs, current: KufiPackResult | null): KufiExploreState | null {
+export function useKufiExplore(inputs: KufiLayoutInputs): KufiExploreState | null {
   const key = kufiLayoutKey(inputs);
+  // An equal-but-new inputs object must not change the snapshot readers.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the inputs' content, not their identity
+  const stable = useMemo(() => inputs, [key]);
+
+  const getCurrent = useCallback(() => cachedKufiLayout(stable), [stable]);
+  const current = useSyncExternalStore(subscribeKufiLayouts, getCurrent, getCurrent);
   const ok = current?.ok ? current : null;
 
   useEffect(() => {
-    if (ok) exploreKufiPanel(inputs, ok);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the inputs' content, not their identity
-  }, [key, ok]);
+    if (ok) exploreKufiPanel(stable, ok);
+  }, [stable, ok]);
 
-  const getSnapshot = useCallback(() => kufiExploreSnapshot(inputs), [inputs]);
+  const getSnapshot = useCallback(() => kufiExploreSnapshot(stable), [stable]);
   return useSyncExternalStore(subscribeKufiExplore, getSnapshot, getSnapshot);
 }

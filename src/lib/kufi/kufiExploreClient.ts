@@ -29,16 +29,21 @@ import {
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
-export type KufiExploreState = { key: string; tries: KufiTry[]; done: boolean };
+/** `failed`: the worker died or went silent; `done` is then true too, with what had arrived. */
+export type KufiExploreState = { key: string; tries: KufiTry[]; done: boolean; failed: boolean };
 
 export type KufiExploreWorkerLike = {
   postMessage(m: KufiExploreRequest): void;
   onmessage: ((e: { data: KufiExploreResponse }) => void) | null;
   onerror: ((e: unknown) => void) | null;
+  onmessageerror?: ((e: unknown) => void) | null;
   terminate(): void;
 };
 
 const CACHE_LIMIT = 16;
+
+/** Longest silence tolerated from a running job (since its last try or done) before the worker is taken for dead. */
+export const KUFI_EXPLORE_WATCHDOG_MS = 20_000;
 
 /** No `Worker` (Node, very old browsers): explore on a timer so callers still see async replies. */
 function inProcessWorker(): KufiExploreWorkerLike {
@@ -76,6 +81,7 @@ let worker: KufiExploreWorkerLike | null = null;
 /** Insertion order is age: the first key is the oldest. */
 const states = new Map<string, KufiExploreState>();
 let running: { id: number; key: string } | null = null;
+let watchdog: ReturnType<typeof setTimeout> | null = null;
 let nextId = 1;
 const listeners = new Set<() => void>();
 
@@ -83,14 +89,32 @@ function notify() {
   for (const l of listeners) l();
 }
 
+function clearWatchdog() {
+  if (watchdog !== null) clearTimeout(watchdog);
+  watchdog = null;
+}
+
+function armWatchdog() {
+  clearWatchdog();
+  const id = running?.id;
+  watchdog = setTimeout(() => {
+    watchdog = null;
+    if (running?.id === id) onWorkerError(new Error(`kufi explore worker silent for ${KUFI_EXPLORE_WATCHDOG_MS} ms`));
+  }, KUFI_EXPLORE_WATCHDOG_MS);
+}
+
 function stopWorker() {
+  clearWatchdog();
   worker?.terminate();
   worker = null;
   running = null;
 }
 
 function trim() {
-  while (states.size > CACHE_LIMIT) states.delete(states.keys().next().value as string);
+  for (const k of [...states.keys()]) {
+    if (states.size <= CACHE_LIMIT) break;
+    if (k !== running?.key) states.delete(k);
+  }
 }
 
 function setState(s: KufiExploreState) {
@@ -104,38 +128,45 @@ function onReply(data: KufiExploreResponse) {
   if (!running || data.id !== running.id) return;
   const prev = states.get(running.key);
   if (!prev) return;
-  if (data.kind === "try") setState({ ...prev, tries: [...prev.tries, data.try] });
+  if (data.kind === "try") {
+    armWatchdog();
+    setState({ ...prev, tries: [...prev.tries, data.try] });
+  }
   else {
     stopWorker();
     setState({ ...prev, done: true });
   }
 }
 
-/** A worker that fails ends the exploration with what it had: marked done, never retried. */
+/** A worker that fails or goes silent ends the exploration with what it had: done and failed. */
 function onWorkerError(err: unknown) {
   console.error("kufi explore worker failed", err);
   const key = running?.key;
   stopWorker();
   const prev = key === undefined ? undefined : states.get(key);
-  if (prev) setState({ ...prev, done: true });
+  if (prev) setState({ ...prev, done: true, failed: true });
 }
 
-/** Starts exploring the single changes to `current` (the packed result for exactly `inputs`), unless already running or done. */
+/** Starts exploring the single changes to `current` (the packed result for exactly `inputs`), unless already running or done. A failed key is explored again. */
 export function exploreKufiPanel(inputs: KufiLayoutInputs, current: Ok): void {
   const key = kufiLayoutKey(inputs);
-  if (states.has(key)) return;
+  const known = states.get(key);
+  if (known && !known.failed) return;
+  states.delete(key);
   // The running job is unfinished: its partial state goes with it.
   if (running) states.delete(running.key);
   stopWorker();
-  states.set(key, { key, tries: [], done: false });
-  trim();
+  states.set(key, { key, tries: [], done: false, failed: false });
   const id = nextId++;
   running = { id, key };
+  trim();
   try {
     const w = factory();
     w.onmessage = (e) => onReply(e.data);
     w.onerror = (err) => onWorkerError(err);
+    w.onmessageerror = (err) => onWorkerError(err);
     worker = w;
+    armWatchdog();
     w.postMessage({ id, inputs: { ...inputs }, current });
   } catch (err) {
     onWorkerError(err);

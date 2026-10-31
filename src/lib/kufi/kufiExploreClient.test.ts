@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, vi } 
 import { _internal, packKufiPanel, type KufiPackResult } from "./kufiPack";
 import { kufiChangesOf, type KufiTry } from "./kufiExplore";
 import {
+  KUFI_EXPLORE_WATCHDOG_MS,
   _resetKufiExplore,
   _setKufiExploreWorkerFactory,
   exploreKufiPanel,
@@ -23,6 +24,7 @@ class FakeWorker implements KufiExploreWorkerLike {
   posted: KufiExploreRequest[] = [];
   onmessage: ((e: { data: KufiExploreResponse }) => void) | null = null;
   onerror: ((e: unknown) => void) | null = null;
+  onmessageerror: ((e: unknown) => void) | null = null;
   terminated = false;
   terminate() {
     this.terminated = true;
@@ -108,6 +110,75 @@ describe("exploreKufiPanel", () => {
     wa.reply({ id: idA, kind: "try", try: tryOf(2) });
     expect(kufiExploreSnapshot(B)).toBe(before);
     expect(kufiExploreSnapshot(A)).toBeNull();
+  });
+});
+
+describe("failure", () => {
+  const D = (n: number) => ({ text: "الله", cols: n, rows: n });
+
+  it("a silent worker fails after the watchdog and a later request restarts it", () => {
+    vi.useFakeTimers();
+    try {
+      exploreKufiPanel(A, okResult());
+      const w = workers[0];
+      w.reply({ id: w.posted[0].id, kind: "try", try: tryOf(1) });
+      vi.advanceTimersByTime(KUFI_EXPLORE_WATCHDOG_MS - 1);
+      expect(kufiExploreSnapshot(A)!.failed).toBe(false);
+      w.reply({ id: w.posted[0].id, kind: "try", try: tryOf(2) });
+      vi.advanceTimersByTime(KUFI_EXPLORE_WATCHDOG_MS - 1);
+      expect(kufiExploreSnapshot(A)!.failed).toBe(false);
+      vi.advanceTimersByTime(1);
+      const s = kufiExploreSnapshot(A)!;
+      expect(s).toMatchObject({ done: true, failed: true });
+      expect(s.tries).toHaveLength(2);
+      expect(w.terminated).toBe(true);
+      exploreKufiPanel(A, okResult());
+      expect(workers).toHaveLength(2);
+      expect(workers[1].posted).toHaveLength(1);
+      expect(kufiExploreSnapshot(A)).toMatchObject({ done: false, failed: false, tries: [] });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a worker error or unreadable reply fails the job", () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    exploreKufiPanel(A, okResult());
+    workers[0].onerror?.(new Error("boom"));
+    expect(kufiExploreSnapshot(A)).toMatchObject({ done: true, failed: true });
+    exploreKufiPanel(B, okResult());
+    workers[1].onmessageerror?.(new Error("bad"));
+    expect(kufiExploreSnapshot(B)).toMatchObject({ done: true, failed: true });
+    quiet.mockRestore();
+  });
+
+  it("a completed job is not failed", () => {
+    exploreKufiPanel(A, okResult());
+    workers[0].reply({ id: workers[0].posted[0].id, kind: "done" });
+    expect(kufiExploreSnapshot(A)).toMatchObject({ done: true, failed: false });
+  });
+
+  it("trim keeps the running key and drops the oldest others", () => {
+    for (let n = 3; n < 3 + 16; n++) {
+      exploreKufiPanel(D(n), okResult());
+      const w = workers[workers.length - 1];
+      w.reply({ id: w.posted[0].id, kind: "done" });
+    }
+    expect(kufiExploreSnapshot(D(3))).not.toBeNull();
+    exploreKufiPanel(D(40), okResult());
+    expect(kufiExploreSnapshot(D(3))).toBeNull();
+    expect(kufiExploreSnapshot(D(40))).not.toBeNull();
+    expect(kufiExploreSnapshot(D(4))).not.toBeNull();
+  });
+
+  it("A, then B, then A explores A again", () => {
+    exploreKufiPanel(A, okResult());
+    exploreKufiPanel(B, okResult());
+    exploreKufiPanel(A, okResult());
+    expect(workers).toHaveLength(3);
+    expect(workers[2].posted).toHaveLength(1);
+    expect(workers[1].terminated).toBe(true);
+    expect(kufiExploreSnapshot(B)).toBeNull();
   });
 });
 
