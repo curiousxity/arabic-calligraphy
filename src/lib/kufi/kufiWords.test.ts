@@ -107,14 +107,10 @@ describe("resolveKufiText", () => {
       ]);
     });
 
-    it("draws single-letter presentation forms as their letters", () => {
+    it("reports single-letter presentation forms instead of drawing them dotless", () => {
       const { units, unsupported } = resolveKufiText("ﺑﺴﻢ");
-      expect(unsupported).toEqual([]);
-      expect(units.map((u) => [u.key, u.textOffset])).toEqual([
-        ["beh:initial", 0],
-        ["seen:medial", 1],
-        ["meem:final", 2],
-      ]);
+      expect(units).toEqual([]);
+      expect(unsupported).toEqual(["ﺑ", "ﺴ", "ﻢ"]);
     });
   });
 });

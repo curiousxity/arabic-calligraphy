@@ -152,9 +152,10 @@ type Paint = {
  * every letter of the word pinned where it landed, and the offset recorded
  * in `edits.routes`. A press anywhere else on a first letter is the letter's
  * own, as on any letter: a drift drags the whole panel, a still press is a
- * click. Where a route handle and a stretch end share a cell the route wins
- * (`hitRouteHandle` is checked first; the stretch has its other end). Where
- * nothing packs the word snaps back and the status line says so.
+ * click. Where a route handle and a stretch end share a cell, the pointer's
+ * place in the cell decides: the handle whose drawn square is nearer wins
+ * (`nearestHandleAt`; an exact tie goes to the route), on hover and press
+ * alike. Where nothing packs the word snaps back and the status line says so.
  *
  * **Alt paints single cells.** Holding Alt shows a thin outline round the
  * cell under the pointer (any cell, paper or ink); Alt-click toggles it and

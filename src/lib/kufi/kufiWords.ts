@@ -23,15 +23,17 @@ const ALEF_FORMS = new Set([0x0627, 0x0623, 0x0625, 0x0622]);
 const isSpace = (ch: string) => /\s/.test(ch);
 
 /**
- * True for the Arabic Presentation Forms (A: U+FB50–U+FDFF, B: U+FE70–U+FEFF):
- * the shaped glyph code points a keyboard or a pasted PDF can produce, such as
+ * True for the two presentation-form ligatures the panel draws as ligatures:
  * ﷲ (U+FDF2) and the lam-alef forms ﻻ ﻼ ﻷ ﻸ ﻹ ﻺ ﻵ ﻶ (U+FEF5–U+FEFC). They are
- * the letters they look like, so they are normalised (NFKC) to those letters
- * before resolving, each expanded letter keeping the form's own text offset.
+ * normalised (NFKC) to their letters before resolving, each expanded letter
+ * keeping the form's own text offset. Other presentation forms stay
+ * unsupported: a shaped single letter would lose its dots (the packer reads
+ * them from the original character), and an isolated haraka form normalises
+ * to a space that splits the word.
  */
 const isPresentationForm = (ch: string) => {
   const cp = ch.codePointAt(0) ?? 0;
-  return (cp >= 0xfb50 && cp <= 0xfdff) || (cp >= 0xfe70 && cp <= 0xfeff);
+  return cp === 0xfdf2 || (cp >= 0xfef5 && cp <= 0xfefc);
 };
 
 /**

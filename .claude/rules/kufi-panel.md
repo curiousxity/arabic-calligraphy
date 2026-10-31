@@ -36,10 +36,13 @@ shared cell arithmetic (`cellRings`, `packedCells`, `applyCellEdits`);
 `kufiAlphabet.ts` the authored forms (`KUFI_FORMS`, stretch points, joins,
 `dotCells`); `kufiWords.ts` turns text into `KufiUnit`s (one per letter or
 ligature, with a `key`, a `wordIndex` and a UTF-16 `textOffset`).
-**Presentation forms** (U+FB50–U+FDFF, U+FE70–U+FEFF: ﷲ, the lam-alef forms
-ﻻ ﻼ ﻷ ﻸ ﻹ ﻺ ﻵ ﻶ, shaped single letters) are normalised NFKC to their letters
-before resolving; every unit made from one carries the form's own
-`textOffset`, so edits keyed on it still find their place.
+**Presentation forms:** only ﷲ (U+FDF2) and the lam-alef forms
+ﻻ ﻼ ﻷ ﻸ ﻹ ﻺ ﻵ ﻶ (U+FEF5–U+FEFC) are normalised NFKC to their letters before
+resolving; every unit made from one carries the form's own `textOffset`, so
+edits keyed on it still find their place. Other presentation forms stay
+"Not drawn": a shaped single letter would lose its dots (the packer reads
+dots from the original character), and an isolated haraka form normalises to
+a space that would split the word.
 
 ## The packer (`kufiPack.ts`, pure)
 
