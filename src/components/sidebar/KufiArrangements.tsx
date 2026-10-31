@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { KufiPackResult } from "../../lib/kufi/kufiPack";
-import { pickArrangements, type KufiArrangement } from "../../lib/kufi/kufiExplore";
+import {
+  pickArrangements,
+  type KufiArrangement,
+} from "../../lib/kufi/kufiExplore";
 import type { KufiExploreState } from "../../lib/kufi/kufiExploreClient";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
@@ -8,9 +11,32 @@ type Ok = Extract<KufiPackResult, { ok: true }>;
 /** Canvas pixels per cell in a thumbnail. */
 const CELL_PX = 3;
 
+/** Bumps when the colour scheme changes, so canvas thumbnails (which read CSS variables once per draw) repaint. */
+function useSchemeTick(): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-color-scheme: light)");
+    if (!mq) return;
+    const bump = () => setTick((t) => t + 1);
+    mq.addEventListener("change", bump);
+    return () => mq.removeEventListener("change", bump);
+  }, []);
+  return tick;
+}
+
+/** A stable identity for a change, so thumbnails keep their key and hover as picks reorder. */
+const changeId = (a: KufiArrangement): string =>
+  a.change.kind === "form"
+    ? `form:${a.change.unitIndex}:${a.change.glyphId}`
+    : `stretch:${a.change.unitIndex}:${a.change.stretchIndex}:${a.change.counts.join(",")}`;
+
 /** One panel's cells, ink in the text colour; with `against`, the cells that differ from it outlined. */
-const Thumb: React.FC<{ result: Ok; against?: Ok | null }> = ({ result, against = null }) => {
+const Thumb: React.FC<{ result: Ok; against?: Ok | null }> = ({
+  result,
+  against = null,
+}) => {
   const ref = useRef<HTMLCanvasElement>(null);
+  const scheme = useSchemeTick();
   useEffect(() => {
     const ctx = ref.current?.getContext("2d");
     if (!ctx) return;
@@ -19,16 +45,34 @@ const Thumb: React.FC<{ result: Ok; against?: Ok | null }> = ({ result, against 
     const css = getComputedStyle(ref.current!);
     ctx.fillStyle = css.getPropertyValue("--text-primary").trim() || "#000";
     for (let i = 0; i < cols * rows; i++)
-      if (cells[i]) ctx.fillRect((i % cols) * CELL_PX, Math.floor(i / cols) * CELL_PX, CELL_PX, CELL_PX);
+      if (cells[i])
+        ctx.fillRect(
+          (i % cols) * CELL_PX,
+          Math.floor(i / cols) * CELL_PX,
+          CELL_PX,
+          CELL_PX,
+        );
     if (against && against.cols === cols && against.rows === rows) {
       ctx.strokeStyle = css.getPropertyValue("--accent").trim() || "#c00";
       ctx.lineWidth = 1;
       for (let i = 0; i < cols * rows; i++)
         if (!!cells[i] !== !!against.cells[i])
-          ctx.strokeRect((i % cols) * CELL_PX + 0.5, Math.floor(i / cols) * CELL_PX + 0.5, CELL_PX - 1, CELL_PX - 1);
+          ctx.strokeRect(
+            (i % cols) * CELL_PX + 0.5,
+            Math.floor(i / cols) * CELL_PX + 0.5,
+            CELL_PX - 1,
+            CELL_PX - 1,
+          );
     }
-  }, [result, against]);
-  return <canvas ref={ref} width={result.cols * CELL_PX} height={result.rows * CELL_PX} aria-hidden="true" />;
+  }, [result, against, scheme]);
+  return (
+    <canvas
+      ref={ref}
+      width={result.cols * CELL_PX}
+      height={result.rows * CELL_PX}
+      aria-hidden="true"
+    />
+  );
 };
 
 /**
@@ -41,39 +85,60 @@ export const KufiArrangements: React.FC<{
   state: KufiExploreState | null;
   onApply: (a: KufiArrangement) => void;
 }> = ({ current, state, onApply }) => {
-  const [hover, setHover] = useState<number | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
   const finished = !!state && (state.done || state.failed);
-  const picks = state ? pickArrangements(current, state.tries) : [];
+  const tries = state?.tries;
+  const picks = useMemo(
+    () => (tries ? pickArrangements(current, tries) : []),
+    [current, tries],
+  );
 
   return (
     <div className="kufiArrangements">
       <h4 className="kufiArrangementsTitle">Arrangements</h4>
-      {picks.length === 0 && (
-        <div className="kufiArrangementsNote">{finished ? "No other arrangement fits this box" : "Looking…"}</div>
-      )}
       <div className="kufiArrangementsStrip">
-        <button type="button" className="kufiArrangement" aria-pressed="true" aria-label="Current arrangement" title="Current arrangement">
+        <button
+          type="button"
+          className="kufiArrangement"
+          aria-pressed="true"
+          aria-disabled="true"
+          aria-label="Current arrangement"
+          title="Current arrangement"
+          tabIndex={-1}
+        >
           <Thumb result={current} />
         </button>
-        {picks.map((a, i) => (
-          <button
-            key={i}
-            type="button"
-            className="kufiArrangement"
-            aria-pressed="false"
-            aria-label={`Arrangement ${i + 1}`}
-            title={`${a.changedCells} cells differ`}
-            onClick={() => onApply(a)}
-            onMouseEnter={() => setHover(i)}
-            onMouseLeave={() => setHover((h) => (h === i ? null : h))}
-            onFocus={() => setHover(i)}
-            onBlur={() => setHover((h) => (h === i ? null : h))}
-          >
-            <Thumb result={a.result} against={hover === i ? current : null} />
-          </button>
-        ))}
+        {picks.map((a, i) => {
+          const id = changeId(a);
+          return (
+            <button
+              key={id}
+              type="button"
+              className="kufiArrangement"
+              aria-pressed="false"
+              aria-label={`Arrangement ${i + 1}`}
+              title={`${a.changedCells} cells differ`}
+              onClick={() => onApply(a)}
+              onMouseEnter={() => setHover(id)}
+              onMouseLeave={() => setHover((h) => (h === id ? null : h))}
+              onFocus={() => setHover(id)}
+              onBlur={() => setHover((h) => (h === id ? null : h))}
+            >
+              <Thumb
+                result={a.result}
+                against={hover === id ? current : null}
+              />
+            </button>
+          );
+        })}
       </div>
-      {picks.length > 0 && !finished && <div className="kufiArrangementsNote">Looking…</div>}
+      {!finished ? (
+        <div className="kufiArrangementsNote">Looking…</div>
+      ) : picks.length === 0 ? (
+        <div className="kufiArrangementsNote">
+          No other arrangement fits this box
+        </div>
+      ) : null}
     </div>
   );
 };
