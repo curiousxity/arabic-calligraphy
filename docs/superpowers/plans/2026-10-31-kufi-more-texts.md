@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fit and suggestions try rectangular boxes; a new filler, the bar, closes the near misses (سبحان الله, Bismillah, قل هو الله أحد); a spike finds the shape that will pack the Shahada.
+**Goal:** Fit and suggestions try rectangles of any proportion; a two-line layout joins the ring; a new filler, the bar, closes the near misses (سبحان الله, Bismillah, قل هو الله أحد); a spike finds the shape that will pack the Shahada.
 
-**Architecture:** All packing changes stay in the pure packer `src/lib/kufi/kufiPack.ts`. Rectangles change only the size order of `fitKufiPanel` and `suggestions`. Bars are a closing pass in `finish()` beside the lone-square `fillPass`, switched on only in a second phase of `searchInner` when the first phase found no packed panel, so every text that packs today keeps its panel exactly. The rest of the app sees bars only as ink cells plus `quality.bars`.
+**Architecture:** All packing changes stay in the pure packer `src/lib/kufi/kufiPack.ts`. Rectangles change only the size order of `fitKufiPanel` and `suggestions`. Two lines is a second set of line templates chosen by a `layout` input, stored on the block as `panelLayout`. Bars are a closing pass in `finish()` beside the lone-square `fillPass`, switched on only in a second phase of `searchInner` when the first phase found no packed panel, so every text that packs today keeps its panel exactly. The rest of the app sees bars only as ink cells plus `quality.bars`.
 
 **Tech Stack:** TypeScript, Vitest (Node), Playwright (Chromium), React 19 + Konva.
 
@@ -13,7 +13,8 @@
 ## Global Constraints
 
 - The packer stays pure and deterministic: work budget plus clock safety net; `PACK_BUDGET_MS` = 1400, `REPACK_BUDGET_MS` = 150, `FIT_BUDGET_MS` = 9000 unchanged.
-- New result fields are additive: `quality` gains `bars: number`.
+- New result fields are additive: `quality` gains `bars: number`. New block field `panelLayout?: "ring" | "lines"`; absent means ring, so old saves load unchanged.
+- Two lines: both upright, read right to left, top line first; the text breaks only between words.
 - Ranking: packed, then fewest filler squares, then fewest bars, then least shortening, then least lengthening, then score.
 - الله 9×9, الحمد لله 13×13 and Al-Baqarah 21×21 keep their panels cell for cell.
 - A filler bar: straight, one cell wide, at least 2 cells long, parallel to the baseline of the letter(s) it touches, touching ink only at its two ends, never in a dot zone (`dotZone`), and closing at least one open window or frame break.
@@ -22,11 +23,12 @@
 
 ## Review Focus
 
-1. **A text that packs today, re-fitted:** Fit on الله, الحمد لله and Baqarah must still return 9×9, 13×13 and 21×21, not a rectangle ranked first. Task 1 pins this.
-2. **Fit with pins:** a pinned panel's Fit goes through `packPinned` (up to `PINNED_CALL_MS` per size); more candidate sizes must not take it past `FIT_BUDGET_MS` plus one call. Task 1 pins this.
-3. **A drag preview on a bar-closed panel:** a repack from `previous` must still find bars when it needs them (it runs `searchInner` too), or every edit on such a panel is refused. Task 2 pins this.
-4. **A bar that reads as a stroke:** a bar continuing a letter's tall stroke (across the line) would lengthen an alef or a lam. Task 2's validity helper rejects it.
-5. **Arrangements on a bar-closed panel:** options rank with `bars` (a missing `bars` counts 0 for old results). Task 3 pins this.
+1. **Two lines on a box too short for two bands** (fewer than 11 rows): the packer says tooShort/tooLong, never a panel with a missing line. Task 2 pins this.
+2. **A text that packs today, re-fitted:** Fit on الله, الحمد لله and Baqarah must still return 9×9, 13×13 and 21×21, not a rectangle ranked first. Task 1 pins this.
+3. **Fit with pins:** a pinned panel's Fit goes through `packPinned` (up to `PINNED_CALL_MS` per size); more candidate sizes must not take it past `FIT_BUDGET_MS` plus one call. Task 1 pins this.
+4. **A drag preview on a bar-closed panel:** a repack from `previous` must still find bars when it needs them (it runs `searchInner` too), or every edit on such a panel is refused. Task 2 pins this.
+5. **A bar that reads as a stroke:** a bar continuing a letter's tall stroke (across the line) would lengthen an alef or a lam. Task 2's validity helper rejects it.
+(Arrangements on a bar-closed panel rank with `bars`, a missing `bars` counting 0: Task 4 pins this.)
 
 ---
 
@@ -70,7 +72,7 @@ And in the timing block (clock on), `"a pinned Fit stays within FIT_BUDGET_MS pl
 Run: `npx vitest run src/lib/kufi/kufiPack.test.ts -t "rectangle"`
 Expected: FAIL (Fit returns a square that does not pack; suggestions empty).
 
-- [ ] **Step 3: Implement.** Candidate sizes are every `(cols, rows)` with both sides within ±3 of `estimateSide` and `|cols − rows| ≤ 3`, ordered by `max(|cols−est|, |rows−est|)`, then squares before rectangles, then `|cols − rows|`, then cols. Rank them cheaply first: run the greedy pass alone (`beamPass` at width 1, as `searchInner` starts) on each and order by its score, keeping squares first among equal scores; then full-search in that order until one packs or `FIT_BUDGET_MS` is spent. Measure the greedy pass on Baqarah and the Shahada first; if one costs over 30 ms, rank by the estimate only and note the measurement in the commit body. Suggestions take the same candidates, filtered to the requested direction (larger area for `tooLong`, smaller for `tooShort`), at most 2, within the call's existing deadline.
+- [ ] **Step 3: Implement.** Candidate sizes, any proportion: for each height `rows` from 7 to 2 × `estimateSide`, the widths `cols` within ±2 of `round(est² / rows)` (the text's area at that height), each side at least 7. Their order, used as the tie-break after the greedy ranking below: squares first, then by elongation `max(cols, rows) / min(cols, rows)`, then by distance from the area estimate, then rows, then cols. Rank them cheaply first: run the greedy pass alone (`beamPass` at width 1, as `searchInner` starts) on each and order by its score, keeping squares first among equal scores; then full-search in that order until one packs or `FIT_BUDGET_MS` is spent. Measure the greedy pass on Baqarah and the Shahada first; if one costs over 30 ms, rank by the estimate only and note the measurement in the commit body. Suggestions take the same candidates, filtered to the requested direction (larger area for `tooLong`, smaller for `tooShort`), at most 2, within the call's existing deadline. Add a test that a very wide size, 41×9, is accepted by `packKufiPanel` (a result, ok or not, without throwing), so no proportion is capped.
 
 - [ ] **Step 4: Run the file and the whole suite**
 
@@ -81,14 +83,70 @@ Expected: PASS (the flaky wall-clock "budgets" test predates this; rerun once if
 
 ---
 
-### Task 2: Filler bars close the near misses
+### Task 2: Two lines
+
+**Files:**
+- Modify: `src/lib/kufi/kufiPack.ts` (a `layout` input on `packKufiPanel`, `fitKufiPanel`, `makeCtx`; the line templates; `outOfRoom`; the cache keys), `src/lib/kufi/kufiWorkerProtocol.ts`, `src/lib/kufi/kufiLayoutClient.ts` (the inputs key), `src/lib/kufi/kufiExplore.ts` (passes `layout` through)
+- Modify: `src/types.ts` (`KufiPanelBlock.panelLayout?: "ring" | "lines"`), `src/App.tsx` (Fit stores the layout it found), `src/components/sidebar/KufiPanelPanel.tsx` (a Ring / Two lines choice)
+- Test: `src/lib/kufi/kufiPack.test.ts`, `e2e/kufi-panel.spec.ts`
+
+**Interfaces:**
+- Consumes: Task 1's candidate sizes.
+- Produces: `type KufiLayout = "ring" | "lines"`; `packKufiPanel({ text, cols, rows, layout?, edits?, previous? })` (default `"ring"`); `fitKufiPanel(text, edits?, layout?: KufiLayout | "any")` returning `{ cols, rows, layout }`; suggestions carry `layout`.
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+describe("two lines", () => {
+  it("packs a text on two upright lines, top line first, broken between words", () => {
+    const text = "سبحان الله وبحمده";
+    const size = fitKufiPanel(text, {}, "lines");
+    expect(size.layout).toBe("lines");
+    const r = expectPacked(packKufiPanel({ text, ...size }), text);
+    expect(r.placements.every((p) => p.turn === 0)).toBe(true);
+    const units = resolveKufiText(text).units;
+    const lineOf = (k: number) => (r.placements[k].row < r.rows / 2 ? 0 : 1);
+    for (let k = 1; k < units.length; k++) {
+      expect(lineOf(k)).toBeGreaterThanOrEqual(lineOf(k - 1));
+      if (lineOf(k) !== lineOf(k - 1)) expect(units[k].wordIndex).not.toBe(units[k - 1].wordIndex);
+    }
+  }, 90000);
+
+  it("a box too short for two bands says so", () => {
+    const r = packKufiPanel({ text: BAQARAH, cols: 40, rows: 8, layout: "lines" });
+    expect(r.ok).toBe(false);
+  }, 30000);
+
+  it("ring stays the default: no layout gives the ring panel", () => {
+    const a = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 });
+    const b = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21, layout: "ring" });
+    expect(a).toEqual(b);
+  }, 20000);
+});
+```
+
+(If `سبحان الله وبحمده` does not pack as two lines once built, use the shortest text from the spec's table that does, and say so in the commit body.)
+
+- [ ] **Step 2: Run, expect FAIL.** `npx vitest run src/lib/kufi/kufiPack.test.ts -t "two lines"`
+
+- [ ] **Step 3: Implement.** The `lines` layout has two line templates, both `rot` 0: the top line's baseline at row `BAND` (its band rows 0–5), the bottom line's at row `rows − 1`, with the ring's offsets (`RINGK_OFF` for the top, `RING0_OFF` for the bottom) so the bands can interlock. Reading order fills the top line first; a piece may start the bottom line only at a word start. Everything after line choice (search, scoring, fills, dots, natural phase) is shared. `outOfRoom` counts the two lines for this layout. Every cache key and the layout client's inputs key include the layout. `fitKufiPanel` with `"any"` tries, for each candidate size in Task 1's order, the ring then two lines, and returns the first that packs.
+
+- [ ] **Step 4: Wire the block.** `panelLayout` flows from the block into the pack and explore requests; Fit writes the `cols`, `rows` and `layout` it found in one undo step; the Kufi panel section shows two toggle buttons, `Ring` and `Two lines` (`aria-pressed`), switching the layout as one undo step and keeping the size. Old saves without the field read as ring.
+
+- [ ] **Step 5: e2e** `"Two lines lays the text on two upright lines"`: add a panel, type `سبحان الله وبحمده`, press `Two lines`, press Fit, poll until the `kufi-unfit-frame` count is 0, and assert the block's box is wider than tall. Run `npm run e2e -- kufi-panel -g "Two lines"`.
+
+- [ ] **Step 6: Verify and commit.** Typecheck (app and e2e), lint, `npm test`, build. Commit `feat(kufi): a two-line layout beside the ring`.
+
+---
+
+### Task 3: Filler bars close the near misses
 
 **Files:**
 - Modify: `src/lib/kufi/kufiPack.ts` (`K_BAR`, `barPass`, `finish`, `Final`, `better`, `searchInner`, `W`, the `quality` field and its doc comment, the header comment)
 - Test: `src/lib/kufi/kufiPack.test.ts`
 
 **Interfaces:**
-- Consumes: Task 1's Fit.
+- Consumes: Task 1's Fit and Task 2's `layout` (bars apply to both layouts).
 - Produces: `quality: { squares; bars; cut; grow }` on an ok result; `const K_BAR = 5` cells in `Final.kind`; `Ctx.bars: boolean`.
 
 - [ ] **Step 1: Pin today's panels before changing anything.** Add a test `"panels that packed before bars keep every cell"` that packs ALLAH 9×9, `"الحمد لله"` 13×13 and BAQARAH 21×21 and compares `Array.from(r.cells).join("")` with string literals. Generate the literals by running the packer at the current HEAD (clock override on), paste them in, and run to see it pass before any other change.
@@ -148,7 +206,7 @@ Expected: PASS, including Step 1's cell literals unchanged.
 
 ---
 
-### Task 3: Bars across the app, and the notes
+### Task 4: Bars across the app, and the notes
 
 **Files:**
 - Modify: `src/lib/kufi/kufiExplore.ts` (`rank`), `src/lib/kufi/kufiExplore.test.ts`
@@ -156,7 +214,7 @@ Expected: PASS, including Step 1's cell literals unchanged.
 - Test: `e2e/kufi-panel.spec.ts`
 
 **Interfaces:**
-- Consumes: `quality.bars` from Task 2.
+- Consumes: `quality.bars` from Task 3.
 
 - [ ] **Step 1: Write the failing unit test** in `kufiExplore.test.ts`: `"ranks fewer bars ahead of less shortening"` — two fake tries with `quality` `{ squares: 0, bars: 1, cut: 0, grow: 0 }` and `{ squares: 0, bars: 0, cut: 3, grow: 0 }` (built the way the file's existing rank tests build tries); `pickArrangements` returns the zero-bar one first. Also a try whose `quality` lacks `bars` ranks as `bars: 0`.
 
@@ -166,17 +224,18 @@ Expected: PASS, including Step 1's cell literals unchanged.
 
 - [ ] **Step 4: Write the e2e test** `"Fit packs «سبحان الله» and draws it"`: add a Kufi panel, type `سبحان الله`, press Fit, then poll until the status no longer shows a "Too long"/"Too short" message and `kufi-unfit-frame` count is 0; assert ink in the block's box (`inkPixels` > 15% of its area, as `openBaqarahPanel` does). Run: `npm run e2e -- kufi-panel -g "سبحان"`. Expected: PASS.
 
-- [ ] **Step 5: Notes.** In `.claude/rules/kufi-panel.md`: rectangles in Fit and suggestions; the filler bar rule and its rung in the ranking; bars only in the second phase. Replace the "Most texts do not pack" gap with what packs now and that the Shahada and short single words still do not; remove the stale "Touch cannot paint" gap (fixed in `dd7c1ca`). One line in the guide section that some texts need a box that is not square and may be closed by a short straight bar. One line in `PROGRESS.md` pointing to the note.
+- [ ] **Step 5: Notes.** In `.claude/rules/kufi-panel.md`: rectangles of any proportion in Fit and suggestions; the two-line layout and `panelLayout`; the filler bar rule and its rung in the ranking; bars only in the second phase. Replace the "Most texts do not pack" gap with what packs now and that the Shahada and short single words still do not; remove the stale "Touch cannot paint" gap (fixed in `dd7c1ca`). One line each in the guide section: some texts need a box that is not square; Two lines sets the text on two upright lines; a panel may be closed by a short straight bar. One line in `PROGRESS.md` pointing to the note.
 
 - [ ] **Step 6: Verify and commit.** Run `npx tsc --noEmit -p tsconfig.app.json && npx tsc --noEmit -p e2e/tsconfig.json && npm run lint && npm test && npm run build`, then `npm run e2e -- kufi-panel`. Commit `feat(kufi): rank arrangements by bars; notes for rectangles and bars`.
 
 ---
 
-### Task 4: Shahada spike (throwaway, not committed)
+### Task 5: Shahada spike (throwaway, not committed)
 
 **Files:**
 - Create (untracked, deleted after): `src/lib/kufi/zzshahada.test.ts`, local copies as needed.
 
 - [ ] **Step 1:** On a scratch copy of the packer, try **a core word**: when the remaining text cannot finish the inner ring, the remaining word(s) go into the core inside the last full ring, on lines of their own (bottom first, as the frame does). Record for the Shahada, sizes 19–27 (and rectangles within 3): packed or not, holes, bars, squares.
 - [ ] **Step 2:** Try **deeper inner bands**: an inner ring's band may be 5, 6 or 7 cells deep, chosen per ring by the search. Record the same table.
-- [ ] **Step 3:** Render each approach's best Shahada panel as a PNG (the probe's ASCII grid drawn at 12 px a cell is enough), check each picture, and report both tables and pictures to the user with a recommendation. Stop there: the spec is amended and a new plan written only after the user picks.
+- [ ] **Step 2b:** Run the built two-line layout (Task 2) on the Shahada at the widths Task 1 proposes, with bars. Record the same table.
+- [ ] **Step 3:** Render each of the three approaches' best Shahada panel as a PNG (the probe's ASCII grid drawn at 12 px a cell is enough), check each picture, and report both tables and pictures to the user with a recommendation. Stop there: the spec is amended and a new plan written only after the user picks.

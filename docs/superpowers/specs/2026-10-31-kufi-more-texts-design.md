@@ -36,11 +36,23 @@ Three different problems, then:
 
 ## Goals, in build order
 
-1. **Fit and suggestions try rectangles.** Fit tries sizes near its
-   estimate with width and height up to 3 apart, squares first among
-   equals, within the current `FIT_BUDGET_MS`; suggestions after a failure
-   may be rectangles too. Test: الله أكبر packs via Fit.
-2. **A closer for near misses** *(my call: filler bars)*. A **filler bar**
+1. **Fit and suggestions try rectangles of any proportion** *(the user: "the
+   rectangle can be any length")*. Fit walks the box heights and, for each,
+   the widths that give about the text's area, squares first, then the
+   least elongated, within the current `FIT_BUDGET_MS`; suggestions after
+   a failure may be rectangles too. Test: الله أكبر packs via Fit.
+2. **Two lines** *(the user: "you can have two lines as well"; how, my
+   call)*. A second layout beside the ring: the text on two horizontal
+   lines, one band above the other with a one-cell gap, both upright and
+   read right to left, the top line first. The text breaks between words
+   (a word stays whole on its line). Every other rule holds: bands
+   interlock, strokes stretch to fill a line, dots, fillers, no holes, a
+   closed frame. The panel block stores its layout (`panelLayout`, absent
+   = ring, so old saves are unchanged); Fit tries both layouts and keeps
+   the first that packs in its size order, rings first at equal size; the
+   sidebar shows Ring / Two lines so the user can switch. Test: a long
+   text packs as two lines in a wide box.
+3. **A closer for near misses** *(my call: filler bars)*. A **filler bar**
    is a straight run of ink one cell wide, at least two cells long, lying
    along a line (parallel to its baseline), touching letters only at its
    ends. It reads as an extended baseline, the way a tatweel does, never as
@@ -51,7 +63,7 @@ Three different problems, then:
    still preferred, and one bar is preferred over several scattered
    squares. Test: سبحان الله, Bismillah and قل هو الله أحد each pack at
    some size, through Fit.
-3. **The Shahada** *(spike first)*. A throwaway spike tries the two likely
+4. **The Shahada** *(spike first; two lines is now a third candidate)*. A throwaway spike tries the two likely
    shapes for the leftover patch and keeps whichever packs the Shahada with
    fewer filler bars and squares:
    - **a core word**: the last word (or words) moves into the core, inside
@@ -60,6 +72,7 @@ Three different problems, then:
    - **deeper inner bands**: an inner ring's band may be deeper than 5
      cells (tall strokes stretch to fill it), so the rings absorb the
      spare area instead of leaving it as a patch.
+   - **two lines** in a wide box, once goal 2 is built.
    The spike's finding comes back to the user with pictures before it is
    built; this spec is amended then.
 
@@ -68,8 +81,8 @@ Three different problems, then:
 - Repeating a short text round the frame (محمد four times, turned): it
   changes the text, so it waits for the user's say-so.
 - Words bending round a corner.
-- Other layouts (not a ring from the bottom right), flowing Kufi, touch
-  tools.
+- Layouts other than the ring and two lines (one line, three or more
+  lines, other ring directions), flowing Kufi, touch tools.
 - Re-route rearranging the rest of the panel (still the user's decision).
 
 ## Anti-goals (it fails even if it works)
