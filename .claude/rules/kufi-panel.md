@@ -180,6 +180,24 @@ packer runs in a Web Worker (`kufiPack.worker.ts`, protocol in
   `sidebar/KufiPanelPanel.tsx`, the status line in `kufiPanelStatus.ts` (pure).
   The size fields have a minimum of 3 cells and no maximum.
 
+## Arrangements strip (`KufiArrangements`, `useKufiExplore`)
+
+The sidebar's Kufi panel section shows thumbnails of other valid layouts, each
+one change from the current panel (another form of one letter, one stretch
+slice a step longer or shorter). `kufiExplore.ts` (pure) lists the changes and
+tries each through the packer; `kufiExploreClient.ts` runs that in a worker of
+its own, never the pack worker, one job at a time, results cached by the
+layout key. `useKufiExplore(inputs)` reads the current result from the layout
+cache itself and starts once it is packed. `pickArrangements` ranks tries
+(filler squares, then cut, then grow) and drops duplicates of the current
+panel and of each other. A thumbnail click goes through App's `editKufiPanel`
+(`onApplyEdits` -> `onApplyKufiEdits`) with `fromKey` = the key of the inputs
+it was found for: it seeds the layout cache with the explored result, pushes
+one history step and sets `panelEdits`, so undo is one step and the old panel's
+explore result is still cached (no "Looking…" again). The strip renders
+nothing when the current result is not ok; a failed exploration reads like a
+finished one. Hovering outlines the cells that differ from the current panel.
+
 ## Export
 
 `KufiPanelView` draws the panel as **one traced outline**: `cellRings` traces

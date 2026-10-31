@@ -140,6 +140,19 @@ export const section: GuideSection = {
         stand for.
       </p>
 
+      <h4>Other arrangements</h4>
+      <p>
+        Under the status line, the <strong>Arrangements</strong> strip shows
+        small pictures of other ways this text can fill the same box, each one
+        change away from what you have: another form of one letter, or one
+        stroke a square longer or shorter. The first picture is your current
+        panel. Hover a picture to outline the squares that differ, and click it
+        to use it; one undo brings the old panel back. It says{" "}
+        <em>Looking…</em> while it searches, and{" "}
+        <em>No other arrangement fits this box</em> when there is nothing to
+        offer, which is common on a tight panel.
+      </p>
+
       <h4>Dots belong to their letters</h4>
       <p>
         Dots are part of the letter, never decoration. A letter takes all of its

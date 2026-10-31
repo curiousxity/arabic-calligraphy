@@ -599,3 +599,11 @@ details:not([open]) > .sidebarPresetKeyboardSummary { margin-bottom: 0; padding-
 .kufiPanelStatus { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text-secondary); display: flex; flex-direction: column; gap: 2px; }
 .kufiPanelStatus:empty { display: none; }
 .kufiPanelSuggestion { border: none; background: none; padding: 0; color: var(--accent); font: inherit; font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.kufiArrangements { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kufiArrangementsTitle { margin: 0; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.kufiArrangementsNote { font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+.kufiArrangementsStrip { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.kufiArrangement { display: block; padding: 3px; line-height: 0; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; min-width: 0; max-width: 100%; }
+.kufiArrangement canvas { display: block; max-width: 100%; height: auto; }
+.kufiArrangement:hover { background: var(--key-hover); border-color: var(--accent); }
+.kufiArrangement[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); cursor: default; }

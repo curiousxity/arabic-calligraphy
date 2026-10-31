@@ -1039,3 +1039,55 @@ test.describe("editing on the canvas", () => {
     await expect(kufiPanel(page)).toContainText("A pinned edit can't stay where it is at this size", { timeout: 15_000 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// The arrangements strip
+// ---------------------------------------------------------------------------
+
+test.describe("arrangements strip", () => {
+  test.describe.configure({ mode: "default" });
+
+  test("shows other arrangements and applies one in one undo step", async ({ page }) => {
+    const box = await openBaqarahPanel(page);
+    await pointerAway(page, box);
+    const before = await inkSignature(page, box);
+
+    await expect(kufiPanel(page).getByRole("heading", { name: "Arrangements" })).toBeVisible();
+    const first = kufiPanel(page).getByRole("button", { name: "Arrangement 1" });
+    await expect(first).toBeVisible({ timeout: 20_000 });
+    await expect(kufiPanel(page).getByRole("button", { name: "Current arrangement" })).toHaveAttribute("aria-pressed", "true");
+    expect(await panelEdits(page)).toBeUndefined();
+
+    await first.click();
+    await expect.poll(async () => panelEdits(page)).toBeDefined();
+    await pointerAway(page, box);
+    await expect.poll(async () => JSON.stringify(await inkSignature(page, box))).not.toBe(JSON.stringify(before));
+
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).toEqual(before);
+
+    // Explored already for these inputs: the options are back at once.
+    await expect(kufiPanel(page).getByRole("button", { name: "Arrangement 1" })).toBeVisible();
+    await expect(kufiPanel(page)).not.toContainText("Looking…");
+  });
+
+  test("a panel that does not pack shows no arrangements", async ({ page }) => {
+    await openBaqarahPanel(page);
+    const cols = sizeField(page, "Width");
+    await cols.click();
+    await cols.press("ControlOrMeta+a");
+    await cols.pressSequentially("23");
+    await cols.press("Enter");
+    const rows = sizeField(page, "Height");
+    await rows.click();
+    await rows.press("ControlOrMeta+a");
+    await rows.pressSequentially("23");
+    await rows.press("Enter");
+    await expect.poll(async () => (await panelOf(page, PANEL_ID))?.panelRows).toBe(23);
+    await expect(kufiPanel(page)).toContainText(/Too (long|short)|Couldn.t arrange/, { timeout: 20_000 });
+    await expect(kufiPanel(page).getByRole("heading", { name: "Arrangements" })).toHaveCount(0);
+    await expect(kufiPanel(page)).not.toContainText("Looking…");
+  });
+});

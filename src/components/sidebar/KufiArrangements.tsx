@@ -1,0 +1,79 @@
+import { useEffect, useRef, useState } from "react";
+import type { KufiPackResult } from "../../lib/kufi/kufiPack";
+import { pickArrangements, type KufiArrangement } from "../../lib/kufi/kufiExplore";
+import type { KufiExploreState } from "../../lib/kufi/kufiExploreClient";
+
+type Ok = Extract<KufiPackResult, { ok: true }>;
+
+/** Canvas pixels per cell in a thumbnail. */
+const CELL_PX = 3;
+
+/** One panel's cells, ink in the text colour; with `against`, the cells that differ from it outlined. */
+const Thumb: React.FC<{ result: Ok; against?: Ok | null }> = ({ result, against = null }) => {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const ctx = ref.current?.getContext("2d");
+    if (!ctx) return;
+    const { cols, rows, cells } = result;
+    ctx.clearRect(0, 0, cols * CELL_PX, rows * CELL_PX);
+    const css = getComputedStyle(ref.current!);
+    ctx.fillStyle = css.getPropertyValue("--text-primary").trim() || "#000";
+    for (let i = 0; i < cols * rows; i++)
+      if (cells[i]) ctx.fillRect((i % cols) * CELL_PX, Math.floor(i / cols) * CELL_PX, CELL_PX, CELL_PX);
+    if (against && against.cols === cols && against.rows === rows) {
+      ctx.strokeStyle = css.getPropertyValue("--accent").trim() || "#c00";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < cols * rows; i++)
+        if (!!cells[i] !== !!against.cells[i])
+          ctx.strokeRect((i % cols) * CELL_PX + 0.5, Math.floor(i / cols) * CELL_PX + 0.5, CELL_PX - 1, CELL_PX - 1);
+    }
+  }, [result, against]);
+  return <canvas ref={ref} width={result.cols * CELL_PX} height={result.rows * CELL_PX} aria-hidden="true" />;
+};
+
+/**
+ * Other valid layouts of the panel, one change away from the current one,
+ * found by the explore worker. Click applies one (the caller commits it as a
+ * single undo step). Nothing shows when the current panel is not packed.
+ */
+export const KufiArrangements: React.FC<{
+  current: Ok;
+  state: KufiExploreState | null;
+  onApply: (a: KufiArrangement) => void;
+}> = ({ current, state, onApply }) => {
+  const [hover, setHover] = useState<number | null>(null);
+  const finished = !!state && (state.done || state.failed);
+  const picks = state ? pickArrangements(current, state.tries) : [];
+
+  return (
+    <div className="kufiArrangements">
+      <h4 className="kufiArrangementsTitle">Arrangements</h4>
+      {picks.length === 0 && (
+        <div className="kufiArrangementsNote">{finished ? "No other arrangement fits this box" : "Looking…"}</div>
+      )}
+      <div className="kufiArrangementsStrip">
+        <button type="button" className="kufiArrangement" aria-pressed="true" aria-label="Current arrangement" title="Current arrangement">
+          <Thumb result={current} />
+        </button>
+        {picks.map((a, i) => (
+          <button
+            key={i}
+            type="button"
+            className="kufiArrangement"
+            aria-pressed="false"
+            aria-label={`Arrangement ${i + 1}`}
+            title={`${a.changedCells} cells differ`}
+            onClick={() => onApply(a)}
+            onMouseEnter={() => setHover(i)}
+            onMouseLeave={() => setHover((h) => (h === i ? null : h))}
+            onFocus={() => setHover(i)}
+            onBlur={() => setHover((h) => (h === i ? null : h))}
+          >
+            <Thumb result={a.result} against={hover === i ? current : null} />
+          </button>
+        ))}
+      </div>
+      {picks.length > 0 && !finished && <div className="kufiArrangementsNote">Looking…</div>}
+    </div>
+  );
+};

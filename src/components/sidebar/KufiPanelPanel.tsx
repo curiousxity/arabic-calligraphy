@@ -5,6 +5,9 @@ import { useKufiPanelLayout } from "../../hooks/useKufiPanelLayout";
 import { cachedKufiLayout, kufiLayoutFailed, kufiLayoutKey, subscribeKufiLayouts } from "../../lib/kufi/kufiLayoutClient";
 import { kufiPanelInputs } from "../../lib/kufi/kufiPanelBlock";
 import { resolveKufiText } from "../../lib/kufi/kufiWords";
+import type { KufiPackResult, KufiPanelEdits } from "../../lib/kufi/kufiPack";
+import { useKufiExplore } from "../../hooks/useKufiExplore";
+import { KufiArrangements } from "./KufiArrangements";
 
 /**
  * Smallest box the size fields accept, in cells. There is no largest: Fit and
@@ -96,8 +99,10 @@ export const KufiPanelPanel: React.FC<{
   onSetSize: (size: Size) => void;
   onFit: () => Promise<void>;
   onReleasePins?: () => void;
+  /** Applies another arrangement of this panel (its edits and the packed result); one undo step. `fromKey` is the layout key it was found for. */
+  onApplyEdits?: (fromKey: string, edits: KufiPanelEdits, result: Extract<KufiPackResult, { ok: true }>) => void;
   notice?: { blockId: number; key: string; text: string } | null;
-}> = ({ block, onSetSize, onFit, onReleasePins, notice = null }) => {
+}> = ({ block, onSetSize, onFit, onReleasePins, onApplyEdits, notice = null }) => {
   // Registers this panel as a reader, so the layout is packed even if the
   // canvas has not asked yet; the status reads the exact inputs below.
   useKufiPanelLayout(block);
@@ -118,6 +123,7 @@ export const KufiPanelPanel: React.FC<{
   // (The panel is keyed by block id at the call site, so it never carries to
   // another block.)
   const key = kufiLayoutKey(inputs);
+  const explore = useKufiExplore(inputs);
   const [fitState, setFit] = useState<{ state: "busy" | "failed"; key: string; press: number } | null>(null);
   const pressRef = useRef(0);
   const fit = fitState && fitState.key === key ? fitState.state : "idle";
@@ -202,6 +208,10 @@ export const KufiPanelPanel: React.FC<{
         {unsupported.length > 0 && <div>Not drawn: {unsupported.join(" ")}</div>}
         {(block.strokeWidth ?? 0) > 0 && <div>The outline exports as a separate path.</div>}
       </div>
+
+      {result?.ok && onApplyEdits && (
+        <KufiArrangements current={result} state={explore} onApply={(a) => onApplyEdits(key, a.edits, a.result)} />
+      )}
     </div>
   );
 };

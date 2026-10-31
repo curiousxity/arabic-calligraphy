@@ -3467,6 +3467,7 @@ const App: React.FC = () => {
         onSetKufiPanelSize={setKufiPanelSize}
         onFitKufiPanel={fitKufiPanelSize}
         onReleaseKufiPanelPins={releaseKufiPanelPins}
+        onApplyKufiEdits={editKufiPanel}
         kufiNotice={kufiNotice}
         onAddGuide={addGuideBlock}
         onAddSvgGuide={addSvgGuideBlock}

@@ -34,6 +34,7 @@ import type { HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
 import { hasOwnFont, hasOwnText, supportsDiacriticOverrides } from "../lib/blockCapabilities";
 import { KufiPanelPanel } from "./sidebar/KufiPanelPanel";
+import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
 import {
   SelectRow,
   ColorRow,
@@ -205,6 +206,8 @@ export type SidebarProps = {
   onFitKufiPanel?: () => Promise<void>;
   /** Releases the selected Kufi panel's pins (its letters may move again); one undo step. */
   onReleaseKufiPanelPins?: () => void;
+  /** Applies one of the Kufi panel's other arrangements to block `id`; one undo step, dropped if its inputs moved on from `fromKey`. */
+  onApplyKufiEdits?: (id: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => void;
   /** Why the last canvas edit of a Kufi panel changed nothing, keyed to the panel and its inputs. */
   kufiNotice?: { blockId: number; key: string; text: string } | null;
   /** Guides — see .claude/rules/guides.md. */
@@ -409,6 +412,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSetKufiPanelSize,
   onFitKufiPanel,
   onReleaseKufiPanelPins,
+  onApplyKufiEdits,
   kufiNotice,
   onAddGuide,
   onAddSvgGuide,
@@ -1437,6 +1441,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onSetSize={onSetKufiPanelSize}
                 onFit={onFitKufiPanel}
                 onReleasePins={onReleaseKufiPanelPins}
+                onApplyEdits={onApplyKufiEdits && ((fromKey, edits, result) => onApplyKufiEdits(selectedBlock.id, fromKey, edits, result))}
                 notice={kufiNotice ?? null}
               />
             </CollapsibleSection>
