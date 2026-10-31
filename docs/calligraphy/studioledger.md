@@ -283,6 +283,11 @@ Times are minutes:seconds into the individual-letters lesson.
 - **Two-piece strokes that still folded (2026-10-31):** eight were refitted as two strokes with the fold term. The
   user took 259g's ("259g after looks better") and kept 224's old fit ("224 before looks better"); the other six
   barely changed and keep theirs.
+- **742 and 744's thin tails (2026-10-31):** the fit held the nib almost parallel to the upstroke (5-15 degrees
+  off), so the tail came out a needle. The user: "you have to change the nib angle on the upstroke and then lift the
+  pen". Every upstroke node nearer than D degrees to the path's direction is turned to D the other way round (eased
+  in over two nodes), and the last two nodes narrow to a quarter of the nib. Turning the nib the other way bent the
+  stroke out of shape. Taken: 742 at 12 degrees, 744 at 10 (it already sits 13-15 off, so only the lift changes it).
 
 **Every joint trimmed to the studio edge**
 
