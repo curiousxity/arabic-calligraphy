@@ -23,6 +23,11 @@
  * - A dotted letter carries its whole dot set from `dotCells`, or none. Dots
  *   are never filler. A lone square may plug a hole, but never where it could
  *   be read as a letter's dot.
+ * - Where the text runs out before the box does, a filler bar may close what
+ *   is left: a straight run one cell wide, at least two long, along the
+ *   baseline of the letter it extends and touching ink only at its ends, so it
+ *   reads as a lengthened baseline, never as a letter. Bars are tried only
+ *   when the panel does not pack without them (`searchInner`).
  *
  * ## The search
  *
@@ -34,6 +39,8 @@
  * plus the open windows in band areas the reading order has already passed.
  * Beams widen pass by pass until a pass packs or the time budget runs out;
  * every pass is deterministic, so the same input always gives the same panel.
+ * Packed panels rank by fewest filler squares, then fewest bars, then least
+ * shortening, then least lengthening (`better`).
  */
 
 import type { JoiningForm } from "../arabicJoining";
@@ -104,11 +111,11 @@ export type KufiPackResult =
       /** True when the painted or erased cells of `edits.cells` leave a hole, a solid 2×2 or a frame break: the packing itself was sound. */
       editsBreakPacking: boolean;
       /**
-       * The packed panel's filler squares, cells cut and cells grown (`Final`); optional, so a missing quality ranks last.
+       * The packed panel's filler squares, filler bars, cells cut and cells grown (`Final`); optional, so a missing quality ranks last.
        * Exempt letters (pinned or fixed, see `devParts`/`lettersOf`) count zero in cut and grow, so cut and grow compare
        * fairly only between results packed with the same pins (e.g. repacks of one panel).
        */
-      quality?: { squares: number; cut: number; grow: number };
+      quality?: { squares: number; bars: number; cut: number; grow: number };
     }
   | { ok: false; reason: "tooShort" | "tooLong" | "pinConflict"; suggestions: Array<{ cols: number; rows: number }> };
 
@@ -143,6 +150,8 @@ const W = {
   hole: 10,
   edge: 6,
   square: 25,
+  /** Under a square, so the score orders unpacked panels the way `better` orders packed ones. */
+  bar: 12,
   split: 2,
   uturn: 1,
   stretch: 0.04,
@@ -504,6 +513,7 @@ const K_GLYPH = 1;
 const K_JOIN = 2;
 const K_DOT = 3;
 const K_FILL = 4;
+const K_BAR = 5;
 
 type Placed = {
   letter: number;
@@ -569,6 +579,8 @@ type Ctx = {
   noClock: boolean;
   /** Set during repair moves: a replayed move that no longer fits gives way to the letter's best one that does. */
   mend: boolean;
+  /** Set while filler bars may close a panel (`barPass`): only once it has not packed without them. */
+  bars: boolean;
 };
 
 function initState(ctx: Ctx): St {
@@ -1358,6 +1370,7 @@ type Final = {
   edge: number;
   ink2: number;
   squares: number;
+  bars: number;
   score: number;
   packed: boolean;
   /** Distance from natural stroke lengths (`devOf`), and its cells cut and grown, compared only between packed panels. */
@@ -1369,14 +1382,17 @@ type Final = {
 /**
  * Whether `a` is the better panel, in the order a calligrapher fills one:
  * packed first (never traded away); then the fewest filler squares, since
- * space is filled by lengthening strokes before any square; then the least
- * shortening, then the least lengthening (`devOf`); then the lower score.
- * Two squares near each other are never drawn at all (`fillPass`).
+ * space is filled by lengthening strokes before any square; then the fewest
+ * filler bars, so one bar beats several scattered squares while any
+ * lengthening (which needs no bar) beats a bar; then the least shortening,
+ * then the least lengthening (`devOf`); then the lower score. Two squares
+ * near each other are never drawn at all (`fillPass`).
  */
 function better(a: Final, b: Final | null): boolean {
   if (!b) return true;
   if (a.packed !== b.packed) return a.packed;
   if (a.packed && a.squares !== b.squares) return a.squares < b.squares;
+  if (a.packed && a.bars !== b.bars) return a.bars < b.bars;
   if (a.packed && a.cut !== b.cut) return a.cut < b.cut;
   if (a.packed && a.grow !== b.grow) return a.grow < b.grow;
   return a.score < b.score - 1e-9;
@@ -1502,6 +1518,130 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
 }
 
 /**
+ * Where a filler bar may end against a letter, per cell, as bits: 1 a bar
+ * along the row on the cell's left, 2 on its right, 4 a bar along the column
+ * above it, 8 below. Only a letter's glyph, and only along its baseline's
+ * axis: at a cell on its own baseline (which a run joined off the line's
+ * baseline carries with it), from either side; elsewhere only where the
+ * letter's stroke runs straight on through the cell, from the side it would
+ * run on to. So a bar draws a baseline or a stroke on along the line, never a
+ * tail off the tip of a tall stroke.
+ */
+function barEnds(ctx: Ctx, st: St): Uint8Array {
+  const { cols, rows } = ctx;
+  const out = new Uint8Array(ctx.n);
+  const axis = new Int8Array(ctx.n).fill(-1);
+  const mine = (r: number, c: number, li: number) => r >= 0 && c >= 0 && r < rows && c < cols && st.kind[r * cols + c] === K_GLYPH && st.letter[r * cols + c] === li;
+  for (const p of placedList(st)) {
+    const L = st.lines[p.line];
+    const a = L.rot % 180 === 0 ? 0 : 1;
+    const ink = p.shape.ink;
+    for (let k = 0; k < ink.length; k += 2) {
+      const i = at(ctx, L, p.x0 + ink[k], p.yb + ink[k + 1]);
+      if (i < 0 || st.kind[i] !== K_GLYPH) continue;
+      axis[i] = a;
+      if (ink[k + 1] === 0) out[i] = a === 0 ? 3 : 12;
+    }
+  }
+  for (let i = 0; i < ctx.n; i++) {
+    if (axis[i] < 0) continue;
+    const r = (i / cols) | 0;
+    const c = i - r * cols;
+    const li = st.letter[i];
+    if (axis[i] === 0) out[i] |= (mine(r, c + 1, li) ? 1 : 0) | (mine(r, c - 1, li) ? 2 : 0);
+    else out[i] |= (mine(r + 1, c, li) ? 4 : 0) | (mine(r - 1, c, li) ? 8 : 0);
+  }
+  return out;
+}
+
+/**
+ * Filler bars, for the run of paper a lone square cannot close: where the
+ * text ran out, at a line's tail. A bar is a straight run one cell wide and at
+ * least two long, never in a dot zone, with nothing beside it, touching ink
+ * only at its ends and there only a letter, along its baseline (`ends`), so
+ * it reads as that baseline or stroke drawn on. A bar across a line could
+ * pass for an alef or a lam, one off a tall stroke's tip for a lam's tail,
+ * and one touching the same run at both ends would close a counter, so none
+ * of them is drawn. Candidates are the maximal runs of paper that pass,
+ * trimmed by a cell at an end that touches the wrong ink; they are taken
+ * greedily by the empty windows and frame breaks they close (most first, ties
+ * by first cell, rows before columns), the rule re-checked after each. Each
+ * bar gets its own owner id. Returns the count.
+ */
+function barPass(ctx: Ctx, own: Int32Array, ends: Uint8Array, kind: Uint8Array, zone: Uint8Array, nextId: number): number {
+  const { cols, rows } = ctx;
+  const paper = (r: number, c: number) => r < 0 || c < 0 || r >= rows || c >= cols || own[r * cols + c] === 0;
+  // empty windows by their top-left cell, and frame breaks by their first cell, in rows r0..r1 and cols c0..c1
+  const gaps = (r0: number, r1: number, c0: number, c1: number) => {
+    let n = 0;
+    for (let r = Math.max(0, r0); r <= Math.min(rows - 2, r1); r++)
+      for (let c = Math.max(0, c0); c <= Math.min(cols - 2, c1); c++) if (paper(r, c) && paper(r + 1, c) && paper(r, c + 1) && paper(r + 1, c + 1)) n++;
+    for (let c = Math.max(0, c0); c <= Math.min(cols - 2, c1); c++)
+      for (const r of [0, rows - 1]) if (r >= r0 && r <= r1 && paper(r, c) && paper(r, c + 1)) n++;
+    for (let r = Math.max(0, r0); r <= Math.min(rows - 2, r1); r++)
+      for (const c of [0, cols - 1]) if (c >= c0 && c <= c1 && paper(r, c) && paper(r + 1, c)) n++;
+    return n;
+  };
+  let bars = 0;
+  for (;;) {
+    let best: { cells: number[]; closes: number } | null = null;
+    // dir 0: along a row; 1: along a column
+    for (const dir of [0, 1]) {
+      const across = dir === 0 ? rows : cols;
+      const len = dir === 0 ? cols : rows;
+      for (let a = 0; a < across; a++) {
+        const idx = (b: number) => (dir === 0 ? a * cols + b : b * cols + a);
+        const ok = (b: number) => {
+          const i = idx(b);
+          if (own[i] || zone[i]) return false;
+          return dir === 0 ? paper(a - 1, b) && paper(a + 1, b) : paper(b, a - 1) && paper(b, a + 1);
+        };
+        // the ink beyond an end, or -1 for paper or the panel's edge
+        const beyond = (b: number) => (b < 0 || b >= len || !own[idx(b)] ? -1 : idx(b));
+        // the ink at the near end has the bar after it, at the far end before it (see `barEnds`)
+        const fits = (t: number, after: boolean) => t < 0 || (ends[t] & (dir === 0 ? (after ? 2 : 1) : after ? 8 : 4)) !== 0;
+        for (let b = 0; b < len; ) {
+          if (!ok(b)) {
+            b++;
+            continue;
+          }
+          let e = b;
+          while (e + 1 < len && ok(e + 1)) e++;
+          const next = e + 1;
+          let s = b;
+          if (!fits(beyond(s - 1), true)) s++;
+          if (!fits(beyond(e + 1), false)) e--;
+          const t0 = beyond(s - 1);
+          const t1 = beyond(e + 1);
+          if (t0 >= 0 && t1 >= 0 && own[t0] === own[t1]) e--;
+          b = next;
+          // a bar extends a letter: one touching none would float
+          if (e - s + 1 < 2 || (beyond(s - 1) < 0 && beyond(e + 1) < 0)) continue;
+          const cells: number[] = [];
+          for (let k = s; k <= e; k++) cells.push(idx(k));
+          const r0 = (cells[0] / cols) | 0;
+          const c0 = cells[0] - r0 * cols;
+          const r1 = (cells[cells.length - 1] / cols) | 0;
+          const c1 = cells[cells.length - 1] - r1 * cols;
+          const before = gaps(r0 - 1, r1, c0 - 1, c1);
+          for (const i of cells) own[i] = -1;
+          const closes = before - gaps(r0 - 1, r1, c0 - 1, c1);
+          for (const i of cells) own[i] = 0;
+          if (closes >= 1 && (!best || closes > best.closes || (closes === best.closes && cells[0] < best.cells[0]))) best = { cells, closes };
+        }
+      }
+    }
+    if (!best) return bars;
+    const id = nextId++;
+    for (const i of best.cells) {
+      own[i] = id;
+      kind[i] = K_BAR;
+    }
+    bars++;
+  }
+}
+
+/**
  * Draws the dots of every placed letter that has none yet, in reading order:
  * the authored set where it fits, else the set nudged one cell along the
  * line either way (`DOT_SHIFT`), else none. Works on `s` in place.
@@ -1548,7 +1688,11 @@ function finish(ctx: Ctx, st0: St): Final {
   const owner = st.owner;
   const kind = st.kind;
   const ink2 = count2x2(ctx, owner, true);
-  const squares = fillPass(ctx, owner, kind, dotZone(ctx, st), st.ids + 1);
+  const zone = dotZone(ctx, st);
+  // bars only in the search's second phase, and only where something is left open
+  const open = ctx.bars && (count2x2(ctx, owner, false) > 0 || edgeBreaks(ctx, owner) > 0);
+  const bars = open ? barPass(ctx, owner, barEnds(ctx, st), kind, zone, st.ids + 1) : 0;
+  const squares = fillPass(ctx, owner, kind, zone, st.ids + 1 + bars);
   const holes = count2x2(ctx, owner, false);
   const edge = edgeBreaks(ctx, owner);
   const score =
@@ -1557,11 +1701,12 @@ function finish(ctx: Ctx, st0: St): Final {
     W.hole * holes +
     W.edge * edge +
     W.square * squares +
+    W.bar * bars +
     W.split * st.splits +
     W.uturn * st.uturns +
     W.stretch * st.stretch +
     W.dotsOff * st.dotsOff;
-  return { st, owner, kind, holes, edge, ink2, squares, score, packed: !holes && !edge && !ink2 && !st.failed, dev: st.dev, cut: st.cut, grow: st.grow };
+  return { st, owner, kind, holes, edge, ink2, squares, bars, score, packed: !holes && !edge && !ink2 && !st.failed, dev: st.dev, cut: st.cut, grow: st.grow };
 }
 
 // ---------------------------------------------------------------------------
@@ -1986,6 +2131,29 @@ function replan(ctx: Ctx, start: Final, B: number, natural = false): Final {
 const REPLAN_ROUNDS = 8;
 const REPLAN_BEAM = 8;
 
+/** The beams, widening, only until something packs: a packing (a greedy one too) goes straight on to the natural phase. */
+function beams(ctx: Ctx, start: Final | null): Final | null {
+  let best = start;
+  for (const B of BEAMS) {
+    if (best?.packed) break;
+    let f = beamPass(ctx, B);
+    if (!f) break;
+    if (!f.packed) f = polish(ctx, f);
+    if (!f.packed) f = replan(ctx, f, Math.max(REPLAN_BEAM, B >> 1));
+    if (better(f, best)) best = f;
+  }
+  return best;
+}
+
+/**
+ * The share of a search's work kept for filler bars while nothing packs
+ * without them. Every panel known to pack bar-free packs within the rest
+ * (الحمد لله at 13×13, the latest, after 65% of a first draft's work), and a
+ * near miss needs most of the work to come near (Bismillah's at 17×19 is lost
+ * at 0.2): closing it with bars takes little.
+ */
+const BAR_SHARE = 0.1;
+
 /** Widening beams, each polished and replanned, until one packs or the budget is spent; the best panel found. */
 function search(ctx: Ctx): Final | null {
   const f = searchInner(ctx);
@@ -1995,17 +2163,30 @@ function search(ctx: Ctx): Final | null {
 
 function searchInner(ctx: Ctx): Final | null {
   // a greedy pass first, so there is always an answer within the budget
+  ctx.bars = false;
   ctx.noClock = true;
   let best: Final | null = beamPass(ctx, 1, initState(ctx), 0, true);
   ctx.noClock = false;
-  // the beams only until something packs: a greedy packing goes straight on to the natural phase
-  for (const B of BEAMS) {
-    if (best?.packed) break;
-    let f = beamPass(ctx, B);
-    if (!f) break;
-    if (!f.packed) f = polish(ctx, f);
-    if (!f.packed) f = replan(ctx, f, Math.max(REPLAN_BEAM, B >> 1));
-    if (better(f, best)) best = f;
+  // while nothing packs, the search without bars stops short, keeping BAR_SHARE of the work for bars
+  const workMax = ctx.workMax;
+  ctx.workMax = Math.floor(workMax * (1 - BAR_SHARE));
+  best = beams(ctx, best);
+  ctx.workMax = workMax;
+  ctx.out = ctx.work >= workMax || performance.now() > ctx.deadline;
+  // a panel the text nearly fills: filler bars may close what its letters leave open. Never
+  // tried where it packs without them, so a panel that packs bar-free keeps every cell.
+  if (best && !best.packed) {
+    ctx.bars = true;
+    // the best panel closed by bars (its letters replayed, a move each, since a finished state
+    // already holds its squares), polished and replanned; then the beams afresh with bars
+    ctx.noClock = true;
+    const s = replayFrom(ctx, initState(ctx), planOf(ctx, best.st), 0);
+    ctx.noClock = false;
+    let f = s ? finish(ctx, s) : null;
+    if (f && !f.packed) f = polish(ctx, f);
+    if (f && !f.packed) f = replan(ctx, f, REPLAN_BEAM);
+    if (!f?.packed) f = beams(ctx, f);
+    if (f && better(f, best)) best = f;
   }
   // strokes change length only when they must: of the packed panels the budget
   // still reaches, keep the one with fewest squares, then least cut, then least grown
@@ -2107,6 +2288,7 @@ function makeCtx(
     out: false,
     noClock: false,
     mend: false,
+    bars: false,
   };
 }
 
@@ -2149,8 +2331,26 @@ function boxCell(turn: Turn, h: number, w: number, row: number, col: number, i: 
   }
 }
 
-/** Which of the `DOT_SHIFT` ways the placed letter's dots are inked in `cells`, or 0. */
-function dotsDrawn(text: string, unit: KufiUnit, p: KufiPlacement, cells: Uint8Array, cols: number, rows: number): number {
+/** The cells the placements' glyphs ink (joins, dots and fillers are not glyph ink). */
+function glyphCells(units: KufiUnit[], placements: KufiPlacement[], cols: number, rows: number): Uint8Array {
+  const out = new Uint8Array(cols * rows);
+  for (const p of placements) {
+    const g = kufiFormsOf(units[p.unitIndex]).find((x) => x.id === p.glyphId);
+    if (!g) continue;
+    const sh = shapeOf(g, normalCounts(g, p.stretch));
+    for (let k = 0; k < sh.ink.length; k += 2) {
+      const [r, c] = boxCell(p.turn, sh.h, sh.w, p.row, p.col, sh.baseRow - sh.ink[k + 1], sh.ink[k]);
+      if (r >= 0 && c >= 0 && r < rows && c < cols) out[r * cols + c] = 1;
+    }
+  }
+  return out;
+}
+
+/**
+ * Which of the `DOT_SHIFT` ways the placed letter's dots are inked in `cells`, or 0. A lone cell
+ * of a glyph (`glyph`: الله has one) is that letter's own, never a dot.
+ */
+function dotsDrawn(text: string, unit: KufiUnit, p: KufiPlacement, cells: Uint8Array, glyph: Uint8Array, cols: number, rows: number): number {
   const g = kufiFormsOf(unit).find((x) => x.id === p.glyphId);
   if (!g) return 0;
   const d = unit.skeleton === "allah" || unit.skeleton === "lamAlef" ? null : dotsOf(text[unit.textOffset] ?? "", unit.form);
@@ -2164,7 +2364,7 @@ function dotsDrawn(text: string, unit: KufiUnit, p: KufiPlacement, cells: Uint8A
       const [r, c] = boxCell(p.turn, sh.h, sh.w, p.row, p.col, sh.baseRow - set[k + 1], set[k] + DOT_SHIFT[v]);
       const ink = (rr: number, cc: number) => rr >= 0 && cc >= 0 && rr < rows && cc < cols && cells[rr * cols + cc] === 1;
       // a drawn dot is ink with nothing beside it; covered cells are another letter's
-      all = ink(r, c) && !ink(r - 1, c) && !ink(r + 1, c) && !ink(r, c - 1) && !ink(r, c + 1);
+      all = ink(r, c) && !glyph[r * cols + c] && !ink(r - 1, c) && !ink(r + 1, c) && !ink(r, c - 1) && !ink(r, c + 1);
     }
     if (all) return v;
   }
@@ -2196,7 +2396,7 @@ function okResult(units: KufiUnit[], f: Final, cols: number, rows: number, edits
   // the user's painted cells go over the packed lattice (`kufiGrid`, shared with the canvas paint tool)
   applyCellEdits(cells, cols, rows, (k) => placements[k] ?? null, edits);
   const editsBreakPacking = (edits.cells?.length ?? 0) > 0 && !packedCells(cells, cols, rows);
-  return { ok: true, cols, rows, cells, placements, editsBreakPacking, quality: { squares: f.squares, cut: f.cut, grow: f.grow } };
+  return { ok: true, cols, rows, cells, placements, editsBreakPacking, quality: { squares: f.squares, bars: f.bars, cut: f.cut, grow: f.grow } };
 }
 
 /**
@@ -2475,6 +2675,7 @@ function repack(
   }
   // the last round frees every line: the implicit pins are dropped, a fresh pack in what is left
   const rounds = [new Set([...[...dirty].map((k) => keys[k]), ...first]), near, null];
+  const glyph = glyphCells(units, prev, cols, rows);
   let best: Final | null = null;
   let workLeft = REPACK_WORK;
   for (const free of rounds) {
@@ -2484,7 +2685,7 @@ function repack(
     const pins = new Map(explicit);
     units.forEach((u, k) => {
       if (pins.has(k) || !free || free.has(keys[k])) return;
-      pins.set(k, pinOf(prev[k], dotsDrawn(text, u, prev[k], cells, cols, rows), false));
+      pins.set(k, pinOf(prev[k], dotsDrawn(text, u, prev[k], cells, glyph, cols, rows), false));
     });
     const ctx = makeCtx(text, cols, rows, edits, pins, left, true);
     ctx.workMax = Math.min(ctx.workMax, workLeft);

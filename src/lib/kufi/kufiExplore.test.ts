@@ -35,12 +35,13 @@ describe("kufiChangesOf", () => {
 });
 
 describe("tryKufiChange", () => {
-  it("finds the feh's fitting form", () => {
+  it("finds the feh's fitting forms: one bar-free, two only with filler bars", () => {
     const current = draft();
     const form = (glyphId: string): KufiChange => ({ kind: "form", unitIndex: 4, glyphId });
-    expect(tryKufiChange(inputs, current, form("feh.final.1")).result).not.toBeNull();
-    expect(tryKufiChange(inputs, current, form("feh.final.0")).result).toBeNull();
-    expect(tryKufiChange(inputs, current, form("feh.final.2")).result).toBeNull();
+    expect(tryKufiChange(inputs, current, form("feh.final.1")).result?.quality?.bars).toBe(0);
+    // these leave a line's tail open, which filler bars close
+    expect(tryKufiChange(inputs, current, form("feh.final.0")).result?.quality?.bars).toBeGreaterThan(0);
+    expect(tryKufiChange(inputs, current, form("feh.final.2")).result?.quality?.bars).toBeGreaterThan(0);
   }, 30000);
 
   it("finds the kaf's fitting stretch", () => {
@@ -90,7 +91,7 @@ describe("pickArrangements", () => {
     cells: Uint8Array.from(cells),
     placements: [],
     editsBreakPacking: false,
-    quality: { squares, cut, grow },
+    quality: { squares, bars: 0, cut, grow },
   });
   const change: KufiChange = { kind: "form", unitIndex: 0, glyphId: "x" };
   const t = (result: Ok | null): KufiTry => ({ change, edits: {}, result });
@@ -140,7 +141,8 @@ describe("kufiLetterOptions", () => {
     expect(known.forms).toHaveLength(4);
     expect(byId.get("feh.final.1")?.fits).toBe(true);
     expect(byId.get("feh.final.1")?.try?.result).not.toBeNull();
-    expect(byId.get("feh.final.0")?.fits).toBe(false);
+    // fits with filler bars (see tryKufiChange above)
+    expect(byId.get("feh.final.0")?.fits).toBe(true);
     // the current glyph is listed, fitting, with no try
     expect(byId.get("feh.final.3")).toEqual({ glyphId: "feh.final.3", fits: true, try: null });
     // no stretch tried yet: not known, so no entry

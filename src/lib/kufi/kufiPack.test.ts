@@ -119,7 +119,7 @@ function expectDotsAreLetters(r: Ok, text: string, units: KufiUnit[]): number[] 
     if (cells[i] && !glyph[i] && !ink(rr - 1, cc) && !ink(rr + 1, cc) && !ink(rr, cc - 1) && !ink(rr, cc + 1)) lone.add(i);
   }
   const dotOf = new Set<number>();
-  const zone = new Set<number>();
+  const zone = dotZoneOf(r);
   for (const p of r.placements) {
     const u = units[p.unitIndex];
     const g = glyphOf(p.glyphId);
@@ -130,13 +130,6 @@ function expectDotsAreLetters(r: Ok, text: string, units: KufiUnit[]): number[] 
       const [rr, cc] = boxCell(p.turn, h, w, p.row, p.col, c.row, c.col + shift);
       return rr * cols + cc;
     };
-    // the cells where a lone square could pass for a dot: every one- or two-dot set the glyph has
-    for (const [key, set] of Object.entries(g.dots ?? {})) {
-      if (key.endsWith("3") || !set) continue;
-      const repr: Record<string, string> = { above1: "ن", above2: "ت", below1: "ب", below2: "ي" };
-      for (const c of dotCells(g, repr[key], "initial", p.stretch))
-        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) zone.add(at({ row: c.row + dr, col: c.col + dc }, 0));
-    }
     const d = u.skeleton === "allah" || u.skeleton === "lamAlef" ? null : dotsOf(ch, u.form);
     if (!d) continue;
     const own = dotCells(g, ch, u.form, p.stretch);
@@ -166,6 +159,121 @@ function fillersOf(r: Ok, text: string): number[] {
   return expectDotsAreLetters(r, text, resolveKufiText(text).units);
 }
 
+/** The cells where a lone square or a bar could pass for a dot: every one- or two-dot set each placed glyph has, and the cells round them. */
+function dotZoneOf(r: Ok): Set<number> {
+  const zone = new Set<number>();
+  const repr: Record<string, string> = { above1: "ن", above2: "ت", below1: "ب", below2: "ي" };
+  for (const p of r.placements) {
+    const g = glyphOf(p.glyphId);
+    const rows = stretchGlyph(g, p.stretch);
+    for (const [key, set] of Object.entries(g.dots ?? {})) {
+      if (key.endsWith("3") || !set) continue;
+      for (const c of dotCells(g, repr[key], "initial", p.stretch))
+        for (let dr = -1; dr <= 1; dr++)
+          for (let dc = -1; dc <= 1; dc++) {
+            const [rr, cc] = boxCell(p.turn, rows.length, rows[0].length, p.row, p.col, c.row + dr, c.col + dc);
+            zone.add(rr * r.cols + cc);
+          }
+    }
+  }
+  return zone;
+}
+
+/**
+ * Every non-letter, non-dot ink run that is not a lone square: a bar, by the
+ * spec's rule. Straight, one cell wide, at least 2 long, with no ink beside
+ * it but at its two ends, none of it in a dot zone, and parallel to the
+ * baseline of every letter it touches. A run joining two letters of one run
+ * (a join stroke or a U-turn) is the letters' own and not a bar.
+ */
+function expectBarsAreBars(r: Ok, text: string): number {
+  const { units } = resolveKufiText(text);
+  const { cols, rows, cells } = r;
+  const ink = (rr: number, cc: number) => rr >= 0 && cc >= 0 && rr < rows && cc < cols && cells[rr * cols + cc] === 1;
+  const placedAt = new Int32Array(cols * rows).fill(-1);
+  for (const p of r.placements) for (const i of glyphInk(r, p)) placedAt[i] = p.unitIndex;
+  // dots and filler squares: lone ink outside the glyphs
+  const lone = new Set<number>();
+  for (let i = 0; i < cols * rows; i++) {
+    const rr = (i / cols) | 0;
+    const cc = i % cols;
+    if (cells[i] && placedAt[i] < 0 && !ink(rr - 1, cc) && !ink(rr + 1, cc) && !ink(rr, cc - 1) && !ink(rr, cc + 1)) lone.add(i);
+  }
+  const zone = dotZoneOf(r);
+  const seen = new Uint8Array(cols * rows);
+  let bars = 0;
+  for (let i0 = 0; i0 < cols * rows; i0++) {
+    if (!cells[i0] || placedAt[i0] >= 0 || lone.has(i0) || seen[i0]) continue;
+    // the 4-connected group of non-letter ink
+    const group: number[] = [];
+    const stack = [i0];
+    seen[i0] = 1;
+    while (stack.length) {
+      const i = stack.pop()!;
+      group.push(i);
+      const rr = (i / cols) | 0;
+      const cc = i % cols;
+      for (const [dr, dc] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        if (!ink(rr + dr, cc + dc)) continue;
+        const j = (rr + dr) * cols + cc + dc;
+        if (seen[j] || placedAt[j] >= 0) continue;
+        seen[j] = 1;
+        stack.push(j);
+      }
+    }
+    // the letters it touches
+    const touched = new Map<number, number[]>();
+    for (const i of group) {
+      const rr = (i / cols) | 0;
+      const cc = i % cols;
+      for (const [dr, dc] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        if (!ink(rr + dr, cc + dc)) continue;
+        const u = placedAt[(rr + dr) * cols + cc + dc];
+        if (u >= 0) touched.set(u, [...(touched.get(u) ?? []), i]);
+      }
+    }
+    const us = [...touched.keys()].sort((a, b) => a - b);
+    if (us.length === 2 && us[1] === us[0] + 1 && units[us[0]].joinsNext) continue;
+    bars++;
+    const rs = group.map((i) => (i / cols) | 0);
+    const cs = group.map((i) => i % cols);
+    const row = rs.every((v) => v === rs[0]);
+    const col = cs.every((v) => v === cs[0]);
+    const where = `the bar at r${rs[0]}c${cs[0]}`;
+    expect(row || col, `${where} is straight`).toBe(true);
+    expect(group.length, `${where} is at least 2 long`).toBeGreaterThanOrEqual(2);
+    const lo = Math.min(...(row ? cs : rs));
+    const hi = Math.max(...(row ? cs : rs));
+    expect(hi - lo + 1, `${where} has no gap`).toBe(group.length);
+    for (const i of group) {
+      const rr = (i / cols) | 0;
+      const cc = i % cols;
+      expect(zone.has(i), `${where} lies in a dot zone at r${rr}c${cc}`).toBe(false);
+      const sides = row ? [ink(rr - 1, cc), ink(rr + 1, cc)] : [ink(rr, cc - 1), ink(rr, cc + 1)];
+      expect(sides, `${where} has ink beside it at r${rr}c${cc}`).toEqual([false, false]);
+    }
+    for (const [u, at] of touched) {
+      for (const i of at) {
+        const along = row ? i % cols : (i / cols) | 0;
+        expect(along === lo || along === hi, `${where} touches unit ${u} only at an end`).toBe(true);
+      }
+      const turn = r.placements[u].turn;
+      expect(turn === 0 || turn === 2 ? row : col, `${where} runs along the baseline of unit ${u}`).toBe(true);
+    }
+  }
+  return bars;
+}
+
 function expectPacked(r: KufiPackResult, text: string): Ok {
   expect(r.ok).toBe(true);
   if (!r.ok) throw new Error("not packed");
@@ -174,6 +282,7 @@ function expectPacked(r: KufiPackResult, text: string): Ok {
   const { units } = resolveKufiText(text);
   expectReadingOrder(r, units);
   expectDotsAreLetters(r, text, units);
+  expectBarsAreBars(r, text);
   return r;
 }
 
@@ -628,13 +737,17 @@ describe("natural stroke lengths", () => {
 
 describe("the ranking of packed panels", () => {
   type F = Parameters<typeof _internal.better>[0];
-  const panel = (o: Partial<{ packed: boolean; squares: number; cut: number; grow: number; score: number }>) =>
-    ({ packed: true, squares: 0, cut: 0, grow: 0, score: 0, ...o }) as unknown as F;
+  const panel = (o: Partial<{ packed: boolean; squares: number; bars: number; cut: number; grow: number; score: number }>) =>
+    ({ packed: true, squares: 0, bars: 0, cut: 0, grow: 0, score: 0, ...o }) as unknown as F;
 
-  it("is packed, then fewest squares, then least cut, then least growth, then score, strictly in that order", () => {
+  it("is packed, then fewest squares, then fewest bars, then least cut, then least growth, then score, strictly in that order", () => {
     const b = _internal.better;
     expect(b(panel({ packed: true, squares: 3, cut: 9, grow: 99 }), panel({ packed: false }))).toBe(true);
     expect(b(panel({ squares: 0, cut: 9 }), panel({ squares: 1, cut: 0 }))).toBe(true);
+    // one bar is preferred to a square, and any lengthening or shortening to a bar
+    expect(b(panel({ squares: 0, bars: 3 }), panel({ squares: 1, bars: 0 }))).toBe(true);
+    expect(b(panel({ bars: 0, cut: 9, grow: 99 }), panel({ bars: 1 }))).toBe(true);
+    expect(b(panel({ bars: 1 }), panel({ bars: 0, cut: 9 }))).toBe(false);
     // one cell of cut outranks any amount of growth
     expect(b(panel({ cut: 0, grow: 500 }), panel({ cut: 1, grow: 0 }))).toBe(true);
     expect(b(panel({ cut: 1, grow: 0 }), panel({ cut: 0, grow: 500 }))).toBe(false);
@@ -851,12 +964,66 @@ describe("the scorer", () => {
   });
 });
 
+describe("panels that packed before bars", () => {
+  // the cells as packed before filler bars existed: bars are tried only where a panel does not pack without them
+  it("panels that packed before bars keep every cell", () => {
+    const before: Array<[string, number, string]> = [
+      [ALLAH, 9, "111010101101010101101010101101010101101010101001010101111010101101010101111111111"],
+      [
+        "الحمد لله",
+        13,
+        "1010111111101101010101010111101010101011000101010101111010101010110101010101011110101010101100000101010110111010111011000101010001111110101110110000000000011111111111101",
+      ],
+      [
+        BAQARAH,
+        21,
+        "111111111111111010111100010001010101010101101011101010101010111100010100000001010010111011101111101010111000000001010101010101111010101110101010101101010001010101000000111110111110101011111100000100000101010101111110101110101011101100000101010000000000111110101110101010101000000100100101010101111010111111111110101000000000000000000101101110101111111010111101010101000000010010101110101110111110111100010100010100000101111111111111101010111",
+      ],
+    ];
+    for (const [text, n, cells] of before) {
+      const r = expectPacked(packKufiPanel({ text, cols: n, rows: n }), text);
+      expect(Array.from(r.cells).join(""), text).toBe(cells);
+    }
+  }, 60000);
+});
+
+describe("filler bars", () => {
+  for (const text of ["سبحان الله", "قل هو الله أحد"])
+    it(`Fit packs «${text}»`, () => {
+      const size = fitKufiPanel(text);
+      const r = expectPacked(packKufiPanel({ text, ...size }), text);
+      expect(r.quality).toHaveProperty("bars");
+    }, 90000);
+
+  // Fit does not reach 17×19 within FIT_BUDGET_MS (squares first, then rectangles ranked by the
+  // greedy pass, where 17×19 is not among the first 30), so the near miss is packed at its size
+  it("packs «بسم الله الرحمن الرحيم» at 17×19, its near miss, with bars that are bars", () => {
+    const text = "بسم الله الرحمن الرحيم";
+    const r = expectPacked(packKufiPanel({ text, cols: 17, rows: 19 }), text);
+    expect(r.quality!.bars).toBeGreaterThan(0);
+    expect(expectBarsAreBars(r, text)).toBe(r.quality!.bars);
+  }, 20000);
+
+  it("never draws a bar where a panel packs without one", () => {
+    const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
+    expect(r.quality?.bars).toBe(0);
+  }, 20000);
+
+  it("a repack of a bar-closed panel still packs (a drag preview is not refused)", () => {
+    const text = "سبحان الله";
+    const size = fitKufiPanel(text);
+    const first = expectPacked(packKufiPanel({ text, ...size }), text);
+    const again = packKufiPanel({ text, ...size, edits: {}, previous: first });
+    expectPacked(again, text);
+  }, 90000);
+});
+
 describe("quality", () => {
   it("reports a packed panel's filler, shortening and lengthening", () => {
     const result = packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.quality).toEqual({ squares: 0, cut: expect.any(Number), grow: expect.any(Number) });
+    expect(result.quality).toEqual({ squares: 0, bars: 0, cut: expect.any(Number), grow: expect.any(Number) });
     expect(result.quality!.cut).toBeGreaterThanOrEqual(0);
     expect(result.quality!.grow).toBeGreaterThanOrEqual(0);
   });

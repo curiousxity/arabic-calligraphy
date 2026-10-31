@@ -142,12 +142,14 @@ const diff = (a: Uint8Array, b: Uint8Array) => {
 
 const sameCells = (a: Uint8Array, b: Uint8Array) => a.length === b.length && diff(a, b) === 0;
 
-const rank = (r: Ok) => (r.quality ? [r.quality.squares, r.quality.cut, r.quality.grow] : [Infinity, Infinity, Infinity]);
+// the packer's own order (`better`): filler squares, then filler bars, then cut, then grown
+const rank = (r: Ok) =>
+  r.quality ? [r.quality.squares, r.quality.bars, r.quality.cut, r.quality.grow] : [Infinity, Infinity, Infinity, Infinity];
 
 function byQuality(a: Ok, b: Ok): number {
   const x = rank(a);
   const y = rank(b);
-  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
   return 0;
 }
 
