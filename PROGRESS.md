@@ -101,6 +101,13 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-10-31 — Kufi panel: rectangles and filler bars
+
+- Fit and suggestions try boxes of any proportion; filler bars close panels the
+  text nearly fills. Now packs الله أكبر, سبحان الله, قل هو الله أحد and
+  Bismillah; the Shahada and single short words still do not. Details and the
+  Bismillah timing gap: [kufi-panel.md](.claude/rules/kufi-panel.md).
+
 ### 2026-10-30 — Kufi panel (square Kufi, single box) — on `claude/kufi-square`, not merged
 
 - **Kufi panel** block: text packed into one box of cells and drawn as one
@@ -108,10 +115,8 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
   Fit, status line), canvas edits (stretch, swap, move a word, Alt-paint),
   user-guide page. How it works: [kufi-panel.md](.claude/rules/kufi-panel.md).
   Awaiting the user's trial in the app.
-- Known limits, details in the note: most texts do not pack (Shahada does not
-  at any size; Al-Baqarah-like texts do); moving a word is refused on tight
-  panels; a dot or filler square under a removed paint edit reads as paper;
-  touch has no Alt-paint; `e2e/kufi-panel.spec.ts` is load-sensitive in
+- Known limits, details in the note: some texts do not pack (see the 2026-10-31 entry); moving a word is refused on tight
+  panels; a dot or filler square under a removed paint edit reads as paper; `e2e/kufi-panel.spec.ts` is load-sensitive in
   parallel runs. `e2e/marks.spec.ts` fails independently of this work.
 
 ### 2026-10-16 — Mark library

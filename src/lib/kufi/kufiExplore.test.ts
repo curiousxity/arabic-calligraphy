@@ -119,6 +119,14 @@ describe("pickArrangements", () => {
     expect(pickArrangements(current, [t(bare), t(rated)]).map((p) => p.result)).toEqual([rated, bare]);
   });
 
+  it("ranks fewer bars ahead of less shortening", () => {
+    const withBar = mk([1, 0, 0, 0, 0, 0, 0, 0, 0], 0, 0, 0);
+    withBar.quality = { squares: 0, bars: 1, cut: 0, grow: 0 };
+    const shortened = mk([0, 1, 0, 0, 0, 0, 0, 0, 0], 0, 3, 0);
+    expect(pickArrangements(current, [t(withBar), t(shortened)]).map((p) => p.result)).toEqual([shortened, withBar]);
+    expect(pickArrangements(current, [t(shortened), t(withBar)]).map((p) => p.result)).toEqual([shortened, withBar]);
+  });
+
   it("chooses the second pick for distance from the first pick", () => {
     const first = mk([1, 1, 1, 0, 0, 0, 0, 0, 0], 0, 0);
     // near: 2 from current but only 1 from the first pick; far: 2 from current and 5 from the first

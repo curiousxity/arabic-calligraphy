@@ -52,8 +52,10 @@ export const section: GuideSection = {
         <strong>Width</strong> and <strong>Height</strong> in the Kufi panel
         section count squares. The text has to fill the box exactly, with no
         holes, so only some sizes work for a given text. <strong>Fit</strong>{" "}
-        looks for the smallest square box your text fills; it can take several
-        seconds for a long text. If you would rather choose, the size fields
+        looks for the smallest box your text fills; it can take several
+        seconds for a long text. Some texts need a box that is not square, and
+        Fit and the suggested sizes offer those too. A panel may be closed by a
+        short straight bar along a line, where the letters leave a small gap. If you would rather choose, the size fields
         take any number from 3 up, and the line under them suggests sizes to
         try. While Fit is working the panel says <em>Finding a size…</em> and
         the Fit buttons wait for it. Changing the size changes the whole
@@ -93,9 +95,9 @@ export const section: GuideSection = {
         </li>
       </ul>
       <p>
-        Many texts will not fill any box. Texts of several short words with
-        tall letters, such as the verse «لا يكلف الله نفسا إلا وسعها», work
-        well; others, such as the Shahada, usually show "Too long" or "Too
+        Several short words work well, such as «سبحان الله», «الله أكبر» and
+        «قل هو الله أحد», and so does «لا يكلف الله نفسا إلا وسعها». The Shahada
+        and short single words such as «محمد» usually show "Too long" or "Too
         short" at every size for now.
       </p>
 

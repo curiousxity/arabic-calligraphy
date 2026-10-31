@@ -73,8 +73,33 @@ are no better).
   A greedy packing must still run this phase (an early return once skipped it).
 - **Ranking, in order:** packed first; then fewest filler squares (never two
   within two cells of each other, because a pair reads as a dot set); then
-  least shortening; then least lengthening. Lengthening is how space is
+  fewest filler bars; then least shortening; then least lengthening. Lengthening is how space is
   filled, so it is preferred to a filler square.
+- **Filler bars** (`barPass`, `barEnds`) close a panel the text nearly fills.
+  A bar is a straight run one cell wide and at least two long, never in a dot
+  zone, with nothing beside it, touching ink only at its ends. Each rung is a
+  rule a bar must pass: it closes at least one empty window or frame break
+  (taken greedily, most closed first); it may end against a letter only on
+  that letter's baseline or where its own stroke runs straight on (`barEnds`,
+  stricter than "touches ink": a bar never reads as a tail off a tall stroke
+  or a stroke across a line); and it never touches the same run at both ends
+  (that would close a counter). **Bars are the search's second phase**, tried
+  only when nothing packs without them, so a panel that packs bar-free keeps
+  every cell. `BAR_WORK` (10%) is added to the work cap for that phase only; the
+  bar-free search keeps exactly its own budget. Quality carries `bars`
+  (required), and `kufiExplore`'s `rank` is `[squares, bars, cut, grow]`; a
+  try with no `quality` at all ranks last.
+- **Rectangles.** Fit and the suggestions for tooLong/tooShort try boxes of any
+  proportion, not only squares. Fit's order (`fitSizes`): the first
+  `FIT_LEAD_SQUARES` (3) squares, then `FIT_LEAD_RECTS` (24) rectangles
+  (`fitRectangles`: two by elongation, then one ranked by the greedy pass, and
+  so on), then the remaining squares, then the remaining rectangles. A count,
+  never a clock, decides it, so a busy machine tries the same sizes. The
+  suggestions keep their old order. Rectangle sides are at least
+  `MIN_RECT_SIDE` (7).
+- **`dotsDrawn`** reads a placed letter's dot set from the cells (for the
+  implicit pins of a repack). A lone cell of a glyph (الله has one) is that
+  letter's own, never a dot; reading it as one once pinned a wrong dot shift.
 - **Deterministic work budget plus a clock safety net.** A search stops after
   a fixed count of moves (`WORK_PER_MS` x budget), so a busy machine gives the
   same panel as a quiet one. The clock only ends a search that would run past
@@ -401,11 +426,13 @@ check a layout use the clock override; do not add wall-clock assertions.
 
 ## Known gaps
 
-- **Most texts do not pack.** Only Al-Baqarah-like texts (several short words,
-  dense in tall letters) pack, at 9 to 21 squares. The Shahada and most of the
-  other texts tried do not at any size: a band holds one word's pieces, and
-  there are few corner / turn options. Making them pack is first on the future
-  plan.
+- **Some texts still do not pack.** Fit now packs الله أكبر, سبحان الله
+  (13x15), قل هو الله أحد and Bismillah (17x19), by rectangles and bars, as
+  well as the Al-Baqarah-like texts. The Shahada and short single words such
+  as محمد do not at any size: a band holds one word's pieces, and there are
+  few corner / turn options.
+- **Bismillah's Fit is close to the clock.** It reaches its size at about 6 s
+  of the 9 s wall-clock `FIT_BUDGET_MS`, so a slow machine may stop before it.
 - **Moving a word mostly refuses on tight panels** (the Baqarah finding above).
 - **A Fit with pins can run about 12.5 s** (`FIT_BUDGET_MS` is checked between
   sizes, plus one `PINNED_CALL_MS`), under the 30 s watchdog but ahead of every
@@ -414,8 +441,7 @@ check a layout use the clock override; do not add wall-clock assertions.
   suggestions).
 - **A dot or filler square under a removed paint edit** reads as paper to the
   paint tool (the result carries no dot list), so it can be painted over wrongly.
-- **Touch cannot paint** (neither Alt nor the Paint tool: `beginPaint`
-  listens for mouse events only), and a touch press on a handle does not set
-  `lastLetterPress` (a double tap can slip through).
+- **A touch press on a handle does not set `lastLetterPress`** (a double tap
+  can slip through). The Paint tool does paint by touch.
 - A reloaded panel with pins may rebuild its *unpinned* letters differently
   from the session that made it; pinned edits hold.

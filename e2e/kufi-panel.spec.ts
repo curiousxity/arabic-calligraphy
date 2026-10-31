@@ -224,6 +224,25 @@ test("Fit sizes the panel to a new text, and undoes in one step", async ({ page 
   expect(errors).toEqual([]);
 });
 
+test("Fit packs «سبحان الله» and draws it", async ({ page }) => {
+  const errors = collectConsoleErrors(page);
+  await gotoApp(page);
+  const id = await addKufiPanel(page);
+  await setBlockText(page, "سبحان الله", id);
+  await kufiPanel(page).getByRole("button", { name: "Fit" }).click();
+
+  // Fit runs in the worker and can take seconds: it lands on a rectangle, not a square.
+  await expect.poll(async () => (await panelOf(page, id))?.panelCols, { timeout: 60_000 }).toBe(13);
+  expect((await panelOf(page, id))!.panelRows).toBe(15);
+  await expect(kufiPanel(page)).not.toContainText(/Too (long|short)/, { timeout: 60_000 });
+  await expect.poll(() => namedNodeCount(page, "kufi-unfit-frame"), { timeout: 60_000 }).toBe(0);
+  const box = await blockClientBox(page, id);
+  await expect
+    .poll(async () => inkPixels(page, await blockClientBox(page, id)), { timeout: 60_000 })
+    .toBeGreaterThan(box.width * box.height * 0.15);
+  expect(errors).toEqual([]);
+});
+
 test("a box too small for the text offers sizes that fit", async ({ page }) => {
   await gotoApp(page);
   const id = await addKufiPanel(page);
@@ -540,24 +559,24 @@ test.describe("editing on the canvas", () => {
     expect(await panelEdits(page)).toBeUndefined();
 
     // A click on the picked letter: the next form in table order that packs
-    // (`.0` cannot), pinned where it landed; once explored, it comes from the
-    // exploration's try.
+    // (`.0` does, with filler bars), pinned where it landed; once explored, it
+    // comes from the exploration's try.
     await page.mouse.click(letter.x, letter.y);
-    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
-    expect((await panelEdits(page))?.pinned?.[4]).toMatchObject({ unitIndex: 4, glyphId: "feh.final.1" });
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.0");
+    expect((await panelEdits(page))?.pinned?.[4]).toMatchObject({ unitIndex: 4, glyphId: "feh.final.0" });
     await pointerAway(page, box);
     expect(await inkSignature(page, box)).not.toEqual(before);
 
-    // The outline follows the letter, still picked; another click skips `.2` and comes back to the drawn form.
+    // The outline follows the letter, still picked; another click goes on to the next form.
     const again = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
-    expect(again.glyphId).toBe("feh.final.1");
+    expect(again.glyphId).toBe("feh.final.0");
     await formsExplored(page);
     await page.mouse.click(again.x, again.y);
-    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.3");
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
 
     // Two clicks, two steps.
     await page.getByRole("button", { name: "Undo" }).click();
-    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.0");
     await page.getByRole("button", { name: "Undo" }).click();
     await expect.poll(async () => panelEdits(page)).toBeUndefined();
     await pointerAway(page, box);
@@ -1258,7 +1277,7 @@ test.describe("the selected letter's options", () => {
     await page.waitForTimeout(400);
     expect(await panelEdits(page)).toBeUndefined();
     await page.mouse.click(letter.x, letter.y);
-    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.0");
     await page.getByRole("button", { name: "Undo" }).click();
     await expect.poll(async () => panelEdits(page)).toBeUndefined();
     await pointerAway(page, box);
@@ -1268,11 +1287,8 @@ test.describe("the selected letter's options", () => {
     const form = (id: string) => options.locator(`[data-glyph-id="${id}"]`);
     await expect(options.locator("[data-glyph-id]")).toHaveCount(4);
     await expect(form("feh.final.3")).toHaveAttribute("aria-pressed", "true");
-    await expect(form("feh.final.1")).toBeEnabled();
-    for (const id of ["feh.final.0", "feh.final.2"]) {
-      await expect(form(id)).toBeDisabled();
-      await expect(form(id)).toHaveAttribute("title", "Doesn't fit here");
-    }
+    // all four fit, two of them only with filler bars
+    for (const id of ["feh.final.0", "feh.final.1", "feh.final.2"]) await expect(form(id)).toBeEnabled();
 
     await form("feh.final.1").click();
     await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
