@@ -303,7 +303,13 @@ Times are minutes:seconds into the individual-letters lesson.
   nib is now 3–12% wider with its centre raised, which lifts the inside edge onto the studio's and leaves the outside
   edge where it was. Turning the nib there instead pushed ink past the studio's edge. Placed after our alif as the
   studio places it, the word matches except a small difference at the alif's bottom tip. A word shape enters the
-  library only once all its strokes are accepted; W01–W04 still wait.
+  library only once all its strokes are accepted.
+- **The word lams (W01–W04, 2026-11-01):** the lams the studio reshapes inside words: كل's final lam (W01),
+  السلام's first lam (W02) and its lam-alif (W03), and الحب's lam (W04), fitted like W05. Three of their joining strokes along the line (W01.s1, W02.s1, W04.s1) are the catalogue's own
+  strokes, but the word's outline sits a hair off the catalogue's (0.04–0.08 stamp units), so the outline match missed
+  them and they drew without that stroke. They are now matched by shape and copy the catalogue's fits (457.s5, 521.s3,
+  522.s1, in `twins.py`), and their joints are trimmed like every other shape's. Shown ours / studio / overlap in the
+  final review; the user: "Approved".
 
 **Every joint trimmed to the studio edge**
 
