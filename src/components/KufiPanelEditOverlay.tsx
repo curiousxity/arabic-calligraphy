@@ -209,7 +209,8 @@ type Paint = {
  * the word's line asks the packer to hold the word that many cells further
  * on (or back), live, as a stretch does, in steps of two cells only
  * (`evenRouteStep`: the lattice's parity refuses every odd move, and a
- * refused move costs the packer up to about half a second). The packer may
+ * refused move costs the packer about half a second, measured, and at most
+ * about 1.55 s: the rounds' 150 ms clock and the step's 1400 ms). The packer may
  * rearrange the rest of the panel round the word; while such a preview is
  * shown, every other letter it changed is outlined in `MOVED_COLOR`.
  * Release commits the preview with every letter of the word pinned where it

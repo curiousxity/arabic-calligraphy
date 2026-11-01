@@ -177,17 +177,23 @@ unit `key` so a stale save is detected, not misapplied: `forms`, `stretch`,
   The repack from `previous` first frees only the letters before the word on
   its line (today's rounds, unchanged). **Only when every round fails**, a
   move may **rearrange every unpinned letter**: a fresh search (`repack`'s
-  `rearrange` out-object, reached only from `packKufiPanel`'s `previous`
-  path, `PACK_BUDGET_MS` / `PACK_WORK`) that keeps the explicit pins and the
-  moved first letter. Committing a move that changed **any letter outside
+  `rearrange` flag, a boolean parameter set only from `packKufiPanel`'s
+  `previous` path, `PACK_BUDGET_MS` / `PACK_WORK`) that keeps the explicit
+  pins and the moved first letter. The step runs only when no round was cut
+  by the wall clock (rounds ended by their work budget count, as نصر +2's
+  do): a repack the clock cut short is refused as before the step, and the
+  rest retry (`PULL_REST_MS`) asks again, so a busy machine never shows a
+  rearranged panel for a move a quiet one packs in a round. Committing a move that changed **any letter outside
   the word** (`kufiMovedUnits`) pins **every letter of the panel**
   (`kufiPinWordEdits`), whichever step packed it: under the real clock a move
   may pack in the second or third round instead of the rearranging step, and
   those reshuffle letters too, which a reload would rebuild by another road.
   The panel stays rigid until "Release hand edits". A move that changed
   nothing else pins the word only.
-  A packed rearranged move costs about 0.1 to 0.5 s, a refused one up to
-  about 0.57 s. **Moves go in steps of two cells** (`evenRouteStep` in
+  A packed rearranged move costs about 0.1 to 0.5 s; a refused one measured
+  about 0.5 s on the development machine, where the search ends on its work.
+  The bound is the rounds' 150 ms clock plus the step's strict 1400 ms
+  clock, about 1.55 s, which a slow machine can reach. **Moves go in steps of two cells** (`evenRouteStep` in
   `kufiPull.ts`): the lattice is stroke, gap, stroke, so a word moved one
   cell lands its strokes on gaps, and no ±1 move packed in any measured
   panel. The drag snaps to the nearest even step (an odd distance goes on,

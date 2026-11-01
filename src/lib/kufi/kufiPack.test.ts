@@ -570,6 +570,38 @@ describe("a moved word rearranging the panel", () => {
     expect(moved.placements[3]).not.toEqual(committed.placements[3]);
   }, 30000);
 
+  it("a repack the clock cut short never reaches the step", () => {
+    const { committed, units } = nasr();
+    const edits = kufiRouteEdits(undefined, committed, units, 0, 2)!;
+    const input = { text: NASR, cols: 15, rows: 9, previous: committed, edits };
+    const reached = (pack: () => void) => {
+      const before = _internal.stats.rearranges;
+      pack();
+      return _internal.stats.rearranges - before;
+    };
+    // work-bounded, the rounds end on their work and the step packs the move
+    expect(reached(() => expect(packKufiPanel(input).ok).toBe(true))).toBe(1);
+    // the product's clock, racing ahead a second on every reading: the rounds stop on the clock,
+    // nothing packs, and the move is refused as it was before the step (the rest retry asks again)
+    _internal.setClockOverride(null);
+    const real = performance.now.bind(performance);
+    let skew = 0;
+    const spy = vi.spyOn(performance, "now").mockImplementation(() => real() + (skew += 1000));
+    try {
+      expect(reached(() => expect(packKufiPanel(input).ok).toBe(false))).toBe(0);
+    } finally {
+      spy.mockRestore();
+      _internal.setClockOverride(Infinity);
+    }
+    // a deadline already past: every round starts, but each search ends on the clock
+    _internal.setClockOverride(0);
+    try {
+      expect(reached(() => packKufiPanel(input))).toBe(0);
+    } finally {
+      _internal.setClockOverride(Infinity);
+    }
+  }, 30000);
+
   it("a move that packed before packs the same, cell for cell (يكلف at +2 on Al-Baqarah)", () => {
     const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
     const units = resolveKufiText(BAQARAH).units;

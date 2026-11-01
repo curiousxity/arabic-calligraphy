@@ -2261,8 +2261,8 @@ const REPACK_WORK = REPACK_BUDGET_MS * WORK_PER_MS;
  * REPACK_WORK.
  */
 const WORK_SLACK = 1000;
-/** Moves tried by searches since last reset, for the budget tests. */
-const stats = { work: 0, naturalRuns: 0, fitSizes: 0 };
+/** Moves tried by searches since last reset, for the budget tests; `rearranges` counts repacks that reached the rearranging step. */
+const stats = { work: 0, naturalRuns: 0, fitSizes: 0, rearranges: 0 };
 
 /**
  * Tests only: a deadline every search uses instead of its clock (Infinity:
@@ -2698,7 +2698,15 @@ function boxIndices(p: KufiPlacement, units: KufiUnit[], cols: number, rows: num
  * alone (the user's, the moved first letter's among them), at a first
  * draft's budget, so the rest of the panel may rearrange round the word. It
  * runs only after every round failed, so a move that packed before packs the
- * same, and only for a moved word, so no other edit reaches it. The rebuild
+ * same, and only for a moved word, so no other edit reaches it. It runs only
+ * when the rounds ran to completion, ended by their own work budget and never
+ * by the wall clock: a repack the clock cut short (a round that could not
+ * start in time, or whose search ended past its deadline) returns its best
+ * panel as before, which the editor refuses and asks again when the pointer
+ * rests. So a busy machine never gives a rearranged panel for a move a quiet
+ * one packs in a round. (Rounds that spend the repack's work before the last
+ * one still count: the work budget ends them alike on every machine, and نصر
+ * at +2, the step's own case, ends that way.) The rebuild
  * of a saved panel (`packPinned`) never asks for it: whichever round packed
  * a move, the editor pins the whole panel on commit when any letter outside
  * the word changed (`kufiPinWordEdits`), so a reload holds it without one.
@@ -2760,10 +2768,17 @@ function repack(
   const glyph = glyphCells(units, prev, cols, rows);
   let best: Final | null = null;
   let workLeft = REPACK_WORK;
+  // no round was cut by the clock: only then may a moved word rearrange the rest
+  let complete = true;
   for (const free of rounds) {
     // under the tests' clock override every round gets the whole budget: no wall clock at all
     const left = clockOverride !== null ? REPACK_BUDGET_MS : REPACK_BUDGET_MS - (performance.now() - t0);
-    if (left <= 0 || workLeft <= 0) break;
+    // out of time is a cut; out of work is where the work budget ends the rounds, on any machine
+    if (left <= 0) {
+      complete = false;
+      break;
+    }
+    if (workLeft <= 0) break;
     const pins = new Map(explicit);
     units.forEach((u, k) => {
       if (pins.has(k) || !free || free.has(keys[k])) return;
@@ -2773,10 +2788,13 @@ function repack(
     ctx.workMax = Math.min(ctx.workMax, workLeft);
     const f = search(ctx);
     workLeft -= ctx.work;
+    // a search that ended past its deadline stopped on the clock (never under an Infinity override)
+    if (performance.now() > ctx.deadline) complete = false;
     if (f && (!best || f.score < best.score)) best = f;
     if (best?.packed) break;
   }
-  if (rearrange && first.size > 0 && !best?.packed) {
+  if (rearrange && complete && first.size > 0 && !best?.packed) {
+    stats.rearranges++;
     // work-bounded like a first draft, cached by its inputs: a refused cell asked again costs nothing
     const f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS, true);
     if (f?.packed) return f;
@@ -2835,7 +2853,9 @@ const PINNED_CALL_MS = 2 * 1750; // 2 × CALL_BUDGET_MS
 
 /**
  * Packs `text` into a box of `cols` x `rows` cells. With `previous` (a packed
- * result for the same text and box) only the lines of edited units move.
+ * result for the same text and box) only the lines of edited units move,
+ * except for a moved word that no round of the repack packs: then every
+ * letter the user did not pin may rearrange round it (see `repack`).
  * A panel with holes is never reported as ok: the reason says whether the
  * text ran out of room (`tooLong`) or did not fill the box (`tooShort`), with
  * nearby sizes that do pack. Cell edits are painted over the packed panel.
