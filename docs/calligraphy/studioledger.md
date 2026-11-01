@@ -328,6 +328,15 @@ Times are minutes:seconds into the individual-letters lesson.
   four times the fit's weight on changes of bend and of the nib's turning (`PEN_ROUGH` 0.2 in `me/penjob.py`):
   0.965 and 0.960 against 0.980 and 0.964, the bends even. The user: "061 smoother approved". The same setting broke
   048's loop (0.852), and on 049 the kinks were in the strokes it copied from 025, not its own.
+- **025 and 049's stems, 048's loop (2026-11-01):** the user: "048 and 049 are not smooth enough", then of 025: "use
+  the same fix for both". 049's stem and bottom stroke copied 025's (one outline); the stem kinked. Each now has its
+  own stem, turning pen, no fold, no lift: 0.985 both, against 0.961 for the shared fit. 049 keeps 025's bottom
+  stroke, whose joining end runs past 049's studio stroke (in 025 the next letter covers it); the user: "The left ^ of
+  049 needs to be extended", so it stays long. Where 049's stem meets that stroke, its tail poked out below, so the
+  corner is the studio's outline (`me/endcap.py`; for the copied stroke in the joint trims, since a twin takes its
+  edge trims from its source). 048, a fill at 0.953 with a lumpy edge after nine refits, is written as two strokes
+  cut at the top of its loop, each with a turning pen: 0.970, the cut filled and trimmed like every split joint. The
+  user: "They all look good".
 
 **Every joint trimmed to the studio edge**
 
