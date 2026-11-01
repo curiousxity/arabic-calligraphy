@@ -363,6 +363,13 @@ Times are minutes:seconds into the individual-letters lesson.
   the bump moved 5 units left of the lowest node (`me/dipfix.py`, a negative THIN and SHIFT). 396.s3 dipped low like
   112's: lifted 1.2 and narrowed 0.6, so the outer edge is on the studio's; a sliver stays inside, under the studio's
   faceted point. The user: "395 and 396 are good".
+- **422, 432, 439 and 441 (2026-11-01):** the user: "Initial right stroke of 422 is off", "Fix the = on 432. Trim ( on
+  441 and 439". 422.s0, at one nib angle (0.954), refitted with a turning pen and four times the smoothness weight:
+  0.985, its right end then the studio's straight cut. 432's tail tip ran straighter and past the studio's curl: the
+  tip is the stroke's own studio outline, smoothed, over a band whose sides run beside the tail's edges down to where
+  ours and the studio's are closest. 439 and 441's head base stroke copies 031.s2, which is longer than theirs: each
+  is trimmed to its own studio end in its joint trims, so 031 keeps its length. The user: "Approve 422, 432, 439,
+  441".
 
 **Every joint trimmed to the studio edge**
 
