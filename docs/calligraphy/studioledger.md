@@ -294,6 +294,16 @@ Times are minutes:seconds into the individual-letters lesson.
   strokes, so it never looked there. Each letter now also takes the point where it meets its neighbour in a word (in
   its own units, from the studio's word) as a joint, under the same rule: ink past the studio's edge, wholly within
   1.5 nibs of it, is erased. Only 077 and 618b have such a point so far.
+- **الله's لله, the studio's own shape (W05, 2026-10-31):** the user: "Use the studio shape for allah". The studio
+  writes the two lams and the ha of الله as one shape of six strokes, not as the separate letters. Fitted at one nib
+  angle and with a turning pen. The turning pen won five strokes, and one nib angle won the second (a smoother middle
+  bowl). The joints are trimmed like every other shape's. The user: "C is the best but there is a subtle
+  irregularity in the second bowl where you can see blue overlay". At the bottom of the second bowl (s4), where the
+  nib turns through flat, the inside edge dipped about a twentieth of a nib under the studio's. Over that stretch the
+  nib is now 3–12% wider with its centre raised, which lifts the inside edge onto the studio's and leaves the outside
+  edge where it was. Turning the nib there instead pushed ink past the studio's edge. Placed after our alif as the
+  studio places it, the word matches except a small difference at the alif's bottom tip. A word shape enters the
+  library only once all its strokes are accepted; W01–W04 still wait.
 
 **Every joint trimmed to the studio edge**
 

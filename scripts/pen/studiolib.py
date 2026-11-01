@@ -106,8 +106,10 @@ def main(sp, out):
     ids = {s: [sid for sid, _h, _c in lst] for s, lst in reg["shapes"].items()}
     for k in rev:
         s = k.split(".")[0]
-        # a letter the studio reshapes inside a word (db status "word", me/wordlams.py) waits for the user's approval
-        if db.get(s, {}).get("status") == "word" and os.environ.get("STUDIOLIB_WORDS") != "1":
+        # a letter the studio reshapes inside a word (db status "word", me/wordlams.py) waits for the user's approval:
+        # it goes in once every one of its strokes is accepted in penreview (or all of them with STUDIOLIB_WORDS=1)
+        if db.get(s, {}).get("status") == "word" and os.environ.get("STUDIOLIB_WORDS") != "1" \
+                and not all(rev[x].get("accepted") for x in rev if x.split(".")[0] == s):
             continue
         if "~" not in k and s not in ids:
             ids[s] = [sid for sid, _d in stamp_strokes(s)]

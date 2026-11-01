@@ -44,6 +44,10 @@ halves were fitted later, so `studiolib.py` adds every shape the review holds an
 the stroke of the same outline (the registry's outline hash) where it has no fit of its own. It prints any stroke
 still without a fit.
 
+Word shapes (`W01`…, db status `word`) are letters the studio reshapes inside a word, such as الله's لله (`W05`).
+One goes in only when every one of its strokes is `accepted` in the review, which records the user's approval
+(`STUDIOLIB_WORDS=1` builds them all, for trials only).
+
 ## Rebuilding
 
 `python -I -X utf8 scripts/pen/studiolib.py SCRATCH` with SCRATCH the fitting folder (studio/registry.json,
