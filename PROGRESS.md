@@ -101,6 +101,20 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-11-01 — Kufi star panel — on `claude/kufi-star`, not merged
+
+- **Kufi star** block: a 4-, 5- or 6-fold star construction (centre, wedges,
+  corners), each region's text packed on its own rotated lattice, copies by
+  rotation, drawn and exported as one outline. Add Kufi star button, Kufi star
+  sidebar section (fold, star, size, construction lines) and **Find layouts**,
+  which evaluates the text and offers splits (repeat, alternate, run, corners,
+  centre) with previews and plain notes on what does not fit; one click
+  approves, one undo takes it back. User-guide page. How it works:
+  [kufi-star.md](.claude/rules/kufi-star.md).
+- Known limits: text stands only on each region's outer edge, so corners and
+  longer words (محمد alone) do not fit yet; text on the slanted sides is the
+  recorded follow-up. Awaiting the user's trial in the app.
+
 ### 2026-11-01 — Kufi panel: a moved word may rearrange the panel — on `claude/kufi-reroute`, not merged
 
 - Move word steps two squares at a time (a one-square move never packs); when

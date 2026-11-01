@@ -30,7 +30,10 @@
  *   of the `*KufiStar*` functions are the same slots, cache and failure
  *   handling for a whole star's layout (`layoutKufiStar`), keyed by
  *   `kufiStarKey`; stars and panels are packed newest wanted first, still
- *   one job at a time.
+ *   one job at a time. A slot's last star layout is drawn while new inputs
+ *   wait only if fold, k and size are unchanged: its regions belong to its
+ *   own construction. `requestKufiStarOffers` (Find layouts) is queued like
+ *   a Fit.
  *
  * The worker is injectable (`_setKufiWorkerFactory`) so Vitest, which runs in
  * Node with no `Worker`, can drive the protocol by hand. Without a `Worker`
@@ -41,6 +44,7 @@
 
 import { packKufiPanel, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
 
+import type { KufiStarEvaluation } from "./kufiStarEvaluate";
 import { kufiStarKey, kufiStarTextCount, layoutKufiStar, type KufiStarInputs, type KufiStarLayout } from "./kufiStarLayout";
 import {
   runKufiRequest,
@@ -95,6 +99,10 @@ const failed = new Set<string>();
 type FitWaiter = { resolve: (s: { cols: number; rows: number }) => void; reject: (e: Error) => void };
 const fits: Array<{ req: KufiWorkerRequest } & FitWaiter> = [];
 const fitWaiters = new Map<number, FitWaiter>();
+type EvalWaiter = { resolve: (e: KufiStarEvaluation) => void; reject: (e: Error) => void };
+/** "Find layouts" requests for star panels, queued like Fit. */
+const starEvals: Array<{ req: KufiWorkerRequest } & EvalWaiter> = [];
+const starEvalWaiters = new Map<number, EvalWaiter>();
 type PreviewJob = { input: KufiLayoutInputs & { previous: KufiPackResult } } & {
   resolve: (r: KufiPackResult | null) => void;
   reject: (e: Error) => void;
@@ -106,7 +114,8 @@ const previewWaiters = new Map<number, PreviewJob>();
 const starResults = new Map<string, KufiStarLayout>();
 const starInputsByKey = new Map<string, KufiStarInputs>();
 const starWanted = new Map<string, { key: string; seq: number }>();
-const starLatest = new Map<string, KufiStarLayout>();
+/** The last layout each star slot was shown, with the inputs it was laid out for. */
+const starLatest = new Map<string, { layout: KufiStarLayout; inputs: KufiStarInputs }>();
 const starFailed = new Set<string>();
 let inFlight: { id: number; key?: string; preview?: boolean; star?: boolean } | null = null;
 /** The in-flight job's watchdog timer. */
@@ -253,6 +262,13 @@ function pump() {
     post(fit.req, KUFI_FIT_WATCHDOG_MS);
     return;
   }
+  const evaluation = starEvals.shift();
+  if (evaluation) {
+    inFlight = { id: evaluation.req.id };
+    starEvalWaiters.set(evaluation.req.id, { resolve: evaluation.resolve, reject: evaluation.reject });
+    post(evaluation.req, KUFI_FIT_WATCHDOG_MS);
+    return;
+  }
   const preview = pendingPreview;
   if (preview) {
     pendingPreview = null;
@@ -295,7 +311,8 @@ function deliver(key: string, r: KufiPackResult) {
 
 function deliverStar(key: string, r: KufiStarLayout) {
   rememberStar(key, r);
-  for (const [slot, w] of starWanted) if (w.key === key) starLatest.set(slot, r);
+  const inputs = starInputsByKey.get(key);
+  if (inputs) for (const [slot, w] of starWanted) if (w.key === key) starLatest.set(slot, { layout: r, inputs });
   notify();
 }
 
@@ -307,6 +324,9 @@ function onReply(data: KufiWorkerResponse) {
   if (data.kind === "fit") {
     fitWaiters.get(data.id)?.resolve(data.size);
     fitWaiters.delete(data.id);
+  } else if (data.kind === "starEvaluate") {
+    starEvalWaiters.get(data.id)?.resolve(data.evaluation);
+    starEvalWaiters.delete(data.id);
   } else if (data.kind === "star") {
     if (job.star && job.key) deliverStar(job.key, data.layout);
   } else if (job.preview) {
@@ -383,6 +403,9 @@ function onWorkerError(err: unknown) {
       const fit = fitWaiters.get(job.id);
       fitWaiters.delete(job.id);
       fit?.reject(new Error("Fit failed: the packer's worker stopped"));
+      const evaluation = starEvalWaiters.get(job.id);
+      starEvalWaiters.delete(job.id);
+      evaluation?.reject(new Error("Find layouts failed: the packer's worker stopped"));
     }
   } finally {
     pump();
@@ -499,7 +522,33 @@ export function seedKufiLayout(inputs: KufiLayoutInputs, result: KufiPackResult)
   deliver(key, result);
 }
 
-/** What a star slot should draw for these inputs now: their layout, else the slot's last one, else null. */
+/**
+ * Evaluates `text` for a star panel and offers splits (`evaluateKufiStar`),
+ * in the worker, queued like a Fit. Rejects with an Error whose message
+ * starts "Find layouts failed" if the worker dies; it is never run on the
+ * main thread, where its budget would freeze the page.
+ */
+export function requestKufiStarOffers(text: string): Promise<KufiStarEvaluation> {
+  return new Promise((resolve, reject) => {
+    starEvals.push({ req: { id: nextId++, kind: "starEvaluate", text }, resolve, reject });
+    pump();
+  });
+}
+
+/** Stores a star layout the caller knows satisfies `inputs` (an approved offer's), so the panel draws it with no second pack. */
+export function seedKufiStarLayout(inputs: KufiStarInputs, layout: KufiStarLayout): void {
+  const key = kufiStarKey(inputs);
+  if (!starInputsByKey.has(key)) starInputsByKey.set(key, { ...inputs, regions: [...inputs.regions] });
+  deliverStar(key, layout);
+}
+
+/**
+ * What a star slot should draw for these inputs now: their layout, else the
+ * slot's last one when it was laid out on the same construction (fold, k and
+ * size), else null. A layout's region indices and masks belong to its own
+ * construction, so one from another fold, star or size is never drawn on
+ * this one; the view shows its arranging state instead.
+ */
 export function kufiStarLayoutSnapshot(slot: string, inputs: KufiStarInputs): KufiStarLayout | null {
   const key = kufiStarKey(inputs);
   const hit = starResults.get(key);
@@ -507,7 +556,10 @@ export function kufiStarLayoutSnapshot(slot: string, inputs: KufiStarInputs): Ku
     touchStar(key);
     return hit;
   }
-  return starLatest.get(slot) ?? null;
+  const last = starLatest.get(slot);
+  if (!last) return null;
+  const same = last.inputs.fold === inputs.fold && last.inputs.k === inputs.k && last.inputs.size === inputs.size;
+  return same ? last.layout : null;
 }
 
 /** True when the layout threw on these inputs (in the worker and again on the main thread). */
@@ -531,7 +583,7 @@ export function requestKufiStarLayout(slot: string, inputs: KufiStarInputs): voi
   const hit = starResults.get(key);
   if (hit) {
     touchStar(key);
-    starLatest.set(slot, hit);
+    starLatest.set(slot, { layout: hit, inputs: starInputsByKey.get(key)! });
     return;
   }
   pump();
@@ -578,6 +630,8 @@ export function _resetKufiLayouts(): void {
   starFailed.clear();
   fits.length = 0;
   fitWaiters.clear();
+  starEvals.length = 0;
+  starEvalWaiters.clear();
   pendingPreview = null;
   previewWaiters.clear();
   inFlight = null;

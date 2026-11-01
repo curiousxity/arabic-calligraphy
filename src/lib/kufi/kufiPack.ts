@@ -2344,6 +2344,11 @@ function setClockOverride(deadline: number | null) {
   clockOverride = deadline;
 }
 
+/** True while the tests' clock override is set: a caller with its own budget (the star evaluation) then counts work instead of time. */
+export function kufiClockOverridden(): boolean {
+  return clockOverride !== null;
+}
+
 function spent(ctx: Ctx): boolean {
   return ctx.out || ctx.work >= ctx.workMax || performance.now() > ctx.deadline;
 }
@@ -2553,7 +2558,7 @@ const AREA_FACTOR = 1.17;
 /** Most sizes `fitKufiPanel` tries, and the suggestions after a failure. */
 const FIT_TRIES = 9;
 /** `fitKufiPanel` stops trying sizes after this. */
-const FIT_BUDGET_MS = 9000;
+export const FIT_BUDGET_MS = 9000;
 /**
  * Under the tests' clock override, Fit stops after this many sizes instead of
  * on FIT_BUDGET_MS, so its answer never depends on machine load. The clock

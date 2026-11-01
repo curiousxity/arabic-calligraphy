@@ -613,3 +613,8 @@ details:not([open]) > .sidebarPresetKeyboardSummary { margin-bottom: 0; padding-
 .kufiLetterForm:disabled { opacity: 0.4; cursor: not-allowed; }
 .kufiLetterForm:disabled:hover { background: var(--bg-input); border-color: var(--border); }
 .kufiLetterFormNote { font-size: 10px; line-height: 1.2; color: var(--text-muted); }
+.kufiStarOfferList { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.kufiStarOffer { display: flex; align-items: center; gap: 8px; text-align: start; line-height: 1.4; color: var(--text-primary); }
+.kufiStarOffer svg { flex: none; }
+.kufiStarOfferNote { font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+.kufiStarOffer--misfit { color: var(--text-secondary); }

@@ -70,7 +70,8 @@ at a time in this order; the first is being designed now. The packer today
 lays every panel as one ring of bands around a square or rectangle (see
 [kufi-panel.md](kufi-panel.md)).
 
-1. **Radial (star) panels.** Words run outward from a geometric star or
+1. **Radial (star) panels** — *built 2026-11-01* (branch `claude/kufi-star`,
+   not merged), see [kufi-star.md](kufi-star.md). Words run outward from a geometric star or
    rosette at the centre, along rays, with the square's corners filled. The
    reference has eight rays, but the count is not fixed: the layout comes
    from a geometric construction (a grid of circles and lines), not from one

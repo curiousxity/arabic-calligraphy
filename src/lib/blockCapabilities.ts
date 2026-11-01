@@ -33,12 +33,13 @@ export const hasOwnFont = (
 /**
  * The block types whose own `text` is drawn and can be edited in Content:
  * the three font renderers plus the Kufi panel, which packs its text into
- * lattice cells without a font.
+ * lattice cells without a font, and the Kufi star, whose text is what
+ * Find layouts splits over its regions.
  */
 export const hasOwnText = (
   b: Block
-): b is Extract<Block, { type: "text" | "shapeFill" | "textPath" | "kufiPanel" }> =>
-  hasOwnFont(b) || b.type === "kufiPanel";
+): b is Extract<Block, { type: "text" | "shapeFill" | "textPath" | "kufiPanel" | "kufiStar" }> =>
+  hasOwnFont(b) || b.type === "kufiPanel" || b.type === "kufiStar";
 
 /**
  * A square-Kufi panel. Every per-glyph tool below (diacritics, stroke cuts,

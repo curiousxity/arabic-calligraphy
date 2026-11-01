@@ -2111,8 +2111,9 @@ const App: React.FC = () => {
     );
   };
 
-  // A Kufi star panel is the construction alone for now (no text in its
-  // regions yet). The block's x,y is the outline's top-left corner, and the
+  // A new Kufi star panel is the construction alone, every region blank: its
+  // text goes in through Content and the sidebar's Find layouts (see
+  // kufi-star.md). The block's x,y is the outline's top-left corner, and the
   // click that places it is the star's centre.
   const addKufiStar = () => {
     const id = createNextId();
