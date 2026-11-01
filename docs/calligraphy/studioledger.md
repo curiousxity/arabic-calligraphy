@@ -314,6 +314,16 @@ Times are minutes:seconds into the individual-letters lesson.
   Its head held one nib angle and its left edge kinked partway down, with the head's corner past the studio's edge
   and studio ink bare under it. Refitted with a turning pen, no fold and no lift: 0.968 against 0.938, and the edge
   runs smooth. Pair 018 copies this head (twin), so its joints were trimmed again too. The user: "043 is good".
+- **068 and 069's joining end (2026-11-01):** the user: "There is a little irregularity on the left joining edge of
+  068 and 069". Where the stroke meets the letter before it, the nib's corner stood past the studio's edge and the
+  joint trims, traced on a pixel grid, left a staircase. Over a box at that end the ink is now the studio's own
+  outline, cut as vector shapes (`me/endcap.py`: erase past the edge, fill the studio's ink, earlier patches clipped
+  to the edge). The user: "much better".
+- **112 and 113's tail dip rounded (2026-11-01):** the user: "can we round out the last dip curve?" The tail (112.s7,
+  113.s3) dipped lower and narrower than the studio's broad, flat-bottomed dip. Lifting the whole path there pushed the
+  inner edge above the studio's, since the studio's dip is thinner at its bottom; so the nib narrows there instead,
+  by 2 and 2.8 stamp units at the lowest node, easing off over 8 units either side, and its centre rises by half as
+  much: the inner edge stays, the outer comes up into a round U (`me/dipfix.py`). The user: "much better".
 
 **Every joint trimmed to the studio edge**
 
