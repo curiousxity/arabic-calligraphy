@@ -76,6 +76,13 @@ lays every panel as one ring of bands around a square or rectangle (see
    from a geometric construction (a grid of circles and lines), not from one
    eight-way template. This is also the likely home for the Shahada, which
    the ring cannot fit.
+   - **Follow-up: text along a region's slanted sides** (decided 2026-11-01).
+     The first build lines text only on each wedge's outer edge and drops
+     the edge rule inside regions, so one short word sits against the outer
+     edge, the inner half stays sparse, and corners and longer words (محمد)
+     do not fit. The fix is to let lines also stand on the slanted sides, as
+     the ring panel lines all four sides, so a wedge fills as densely as the
+     reference.
 2. **Panels in other shapes.** Square Kufi filling a triangle, trapezoid,
    diamond or small square, as in mosaic tilework where several such panels
    tile one wall.
