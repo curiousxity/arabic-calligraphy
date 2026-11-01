@@ -69,6 +69,32 @@ CUT_AT = {}  # "stroke~cN": the cut's midpoint, screen px, set by job_of
 # back at the top (074.s0, 076.s0, 084.s0: up, then a sharp turn back down into a flag) has its peak under a nuqta
 # from the end, and fitted whole the flag rounded off or went (2026-10-31).
 CUT_MARGIN = float(os.environ.get("PEN_CUT_MARGIN", 1.0))
+# PEN_THREE ("074.s0,..."): a head that turns back into a flag, written as three moves (the user, 2026-11-01: "The stroke
+# starts with the pen moving towards the left. Then there is a second stroke that goes up to 11 o'clock, and the third
+# stroke starts slightly higher where you get the notch and then rolls down"). three_piece cuts the outline: "~c0" the
+# flag's block, the nib along its right edge moving left; "~c1" from the block's foot up to the peak; "~c2" from the
+# notch down the tail. Cut in two at the peak (PEN_CUT), the notch filled in and 084's flag came out ragged.
+THREE = {x for x in os.environ.get("PEN_THREE", "").split(",") if x}
+# PEN_KEEP (JSON, {"074.s0~c0": its pen.json record}): moves already approved, taken as fitted and not fitted again.
+KEEP = json.loads(os.environ.get("PEN_KEEP", "{}"))
+# PEN_FOLLOW ("074.s0~c1,..."): a move that starts where the move before it ("~c(N-1)") ended: the same nib angle, the
+# full nib, its bottom corner on the other's bottom corner. The user (2026-11-01, 074.s0): "The green strokes should
+# start matching the bottom of the red stroke so we don't end up with that notch on the bottom"; started free, the
+# climb's foot sat beside the block's and left a notch under the flag.
+FOLLOW = {x for x in os.environ.get("PEN_FOLLOW", "").split(",") if x}
+FOLLOW_W = 1.0  # a degree off the held angle costs (deg / 2) ** 2 of this: held
+# PEN_FOLLOW_ANG (degrees, unset): the followed start's nib at this angle, its bottom corner still on the move before's;
+# and the move only ever goes left. At the end's own angle (127.8) 074's climb went right first and swelled at the peak
+# (the user, 2026-11-01: "The green stroke needs to have a steeper angle and move steeper to the left").
+FOLLOW_ANG = os.environ.get("PEN_FOLLOW_ANG")
+FOLLOW_ANG = float(FOLLOW_ANG) if FOLLOW_ANG else None
+FOLLOW_LEFT = 0.05  # nuqta a segment may move right before it costs a whole overlap
+# PEN_FOLLOW_HOLD (nuqta, 0): the held angle kept over this much of the move's start, so its start face draws a whole
+# edge: 074's climb at 95-115 degrees turned off within a node and left the neck's underside at 45 degrees where the
+# studio's runs at 62 (the user: "I'm trying to match the angle of the bottom of the neck", 118 here).
+FOLLOW_HOLD = float(os.environ.get("PEN_FOLLOW_HOLD", 0))
+# PEN_FOLLOW_AT ("x,y", nuqta, unset): the start's bottom corner here, not on the move before's.
+FOLLOW_AT = os.environ.get("PEN_FOLLOW_AT")
 # A tooth's right half starts with the flick in reverse (the studio ledger, from the sin lesson 4:36-4:44: the nib comes
 # down on its corner at the hairline's tip and opens to full width as it climbs, at one angle; Thuluth's 170.s0 narrows
 # over its first 3.3 nuqta, which a turning nib could not draw). Its fit also tries one angle with the start free to
@@ -146,7 +172,11 @@ def job_of(stroke):
         body, hairs, slivers = split_piece(piece)
         parts = [body] + hairs; i = int(h[1:]) if h else 0
         piece, ignore = parts[i], ignore + [p for j, p in enumerate(parts) if j != i] + slivers
-    if base in CUT and h.startswith("c"):  # one half "~cN", the other beside the shape's strokes
+    if base in THREE and h.startswith("c"):  # one of three moves "~cN", the other two beside the shape's strokes
+        parts, ats = three_piece(piece)
+        i = int(h[1:]); CUT_AT[stroke] = ats[i]
+        piece, ignore = parts[i], ignore + [q for j, q in enumerate(parts) if j != i]
+    elif base in CUT and h.startswith("c"):  # one half "~cN", the other beside the shape's strokes
         parts = cut_piece(piece, np.array(origin(k), float), ignore)
         if parts is None:
             raise RuntimeError(f"{stroke}: no tooth to cut at")
@@ -450,6 +480,74 @@ def cut_piece(piece, O, ignore):
     return (out if halves[0][:, 0].mean() >= halves[1][:, 0].mean() else out[::-1]), (ring[k] + X) / 2
 
 
+def three_piece(piece):
+    """PEN_THREE's cut of a flag head: ([block, climb, roll] as pieces in the stroke's own frame, [each one's cut point,
+    screen px]). The notch is the outline's sharpest inward corner, the flag's top corner the next; the block's right
+    edge is its two sharpest outward corners between them, and the nib lies along it. The block is cut off by the nib's
+    line through the top corner; the roll by the narrowest chord from the notch across the stem."""
+    ring = ref_ring(piece)
+    N = PPN
+
+    def geom(ring):
+        ra = np.r_[0, np.cumsum(np.linalg.norm(np.diff(ring, axis=0, append=ring[:1]), axis=1))][:-1]
+        L = ra[-1] + np.linalg.norm(ring[0] - ring[-1])
+        closed, rc = np.vstack([ring, ring[:1]]), np.r_[ra, L]
+        at = lambda s_: np.array([np.interp(s_ % L, rc, closed[:, 0]), np.interp(s_ % L, rc, closed[:, 1])])  # noqa: E731
+        area = 0.5 * np.sum(ring[:, 0] * np.roll(ring[:, 1], -1) - np.roll(ring[:, 0], -1) * ring[:, 1])
+        ang, inward = [], []
+        for k in range(len(ring)):
+            a, b = at(ra[k] - 0.12 * N), at(ra[k] + 0.12 * N)
+            u, v = a - ring[k], b - ring[k]
+            ang.append(math.degrees(math.acos(np.clip(u @ v / (np.linalg.norm(u) * np.linalg.norm(v) + 1e-9), -1, 1))))
+            inward.append(((ring[k] - a)[0] * (b - ring[k])[1] - (ring[k] - a)[1] * (b - ring[k])[0]) * area < 0)
+        return ra, L, np.array(ang), np.array(inward)
+    ra, L, ang, inward = geom(ring)
+    conc = [k for k in np.argsort(ang) if inward[k] and ang[k] < 150]
+    if len(conc) < 2:
+        raise RuntimeError("no notch and flag corner to cut at")
+    n, c = conc[0], next(k for k in conc[1:] if min(abs(ra[k] - ra[conc[0]]), L - abs(ra[k] - ra[conc[0]])) > 0.1 * N)
+    if (ra[c] - ra[n]) % L > L / 2:  # the flag's way round, notch to top corner, forward
+        ring = ring[::-1].copy(); n, c = len(ring) - 1 - n, len(ring) - 1 - c
+        ra, L, ang, inward = geom(ring)
+    m = len(ring)
+    fwd = lambda a, b: [q % m for q in range(a, b + 1 if b >= a else b + m + 1)]  # noqa: E731
+    flag = fwd(n, c)[1:-1]
+    out_ = sorted([k for k in flag if not inward[k]], key=lambda k: ang[k])
+    # the two corners a nib apart at least: 108.s0's bottom corner is three vertices within a hair
+    f2, f1 = sorted([out_[0], next(k for k in out_[1:] if np.linalg.norm(ring[k] - ring[out_[0]]) > 0.4 * N)],
+                    key=lambda k: (ra[k] - ra[n]) % L)
+    d = ring[f2] - ring[f1]; d /= np.linalg.norm(d)  # the nib, down the block's right edge
+
+    def hit(o, d, idx):  # the ray o + t d's first crossing of the segments after vertices idx
+        best = None
+        for i in idx:
+            A, B = ring[i], ring[(i + 1) % m]
+            M = np.array([d, A - B]).T
+            if abs(np.linalg.det(M)) < 1e-9:
+                continue
+            t, w = np.linalg.solve(M, A - o)
+            if t > 1e-6 and 0 <= w <= 1 and (best is None or t < best[0]):
+                best = (t, i, A + w * (B - A))
+        return best
+    xb = hit(ring[c], d, fwd(n, f2)[:-1])
+    if xb is None:
+        raise RuntimeError("the block's cut meets no edge")
+    _, b, XB = xb
+    # the roll's cut: from the notch straight up to the peak, the sharpest outward corner within 0.6 nuqta on from
+    # the flag's top corner. The roll starts there, "slightly higher, where you get the notch"; cut across the stem at
+    # the notch instead, the climb's piece kept a strip of the neck left of the peak, and the climb ran on left past
+    # the peak to cover it and flattened the point (fbm, 2026-11-01)
+    pk = min((q for q in fwd(c, n)[1:-1] if not inward[q] and (ra[q] - ra[c]) % L < 0.6 * N), key=lambda q: ang[q])
+    block = [XB] + [ring[q] for q in fwd(b + 1, c)]
+    climb = [ring[q] for q in fwd(c, pk)] + [ring[n]] + ([ring[q] for q in fwd(n + 1, b)] if b != n else []) + [XB]
+    roll = [ring[q] for q in fwd(pk, n)]
+    XA = ring[pk]
+    (a_, d_, e, f), _ = piece
+    out = [[(a_, d_, e, f), "M " + " L ".join("%.4f %.4f" % ((x - e) / a_, (y - f) / d_) for x, y in hv) + " Z"]
+           for hv in (block, climb, roll)]
+    return out, [(ring[c] + XB) / 2, (ring[c] + XB) / 2, (ring[n] + XA) / 2]
+
+
 def tooth_tips(piece, O, nodes, sub=4):
     """The outline's tooth tips along a start path: (ring, [(ring index, the centre-line point beside it, its distance
     along the path)] tallest first, the path's arc lengths), or None. A tooth is where the outline stands out from the
@@ -518,9 +616,22 @@ _turn = [False]  # set by fit for a cut half's refines
 
 def _turn_cost_b(a, rough):
     import torch
-    if not _turn[0] or a.shape[1] < 2:
-        return a.new_zeros(a.shape[0])
-    return rough * ((torch.diff(a[..., 2], 1, dim=1) / TURN_DEG) ** 2).sum(1)
+    out = a.new_zeros(a.shape[0])
+    if _turn[0] and a.shape[1] >= 2:
+        out = out + rough * ((torch.diff(a[..., 2], 1, dim=1) / TURN_DEG) ** 2).sum(1)
+    if _hold[0] is not None:  # PEN_FOLLOW: the start's nib held at the move before's end
+        out = out + FOLLOW_W * ((torch.remainder(a[:, 0, 2] - _hold[0] + 90, 180) - 90) / 2) ** 2
+        if FOLLOW_HOLD > 0 and a.shape[1] > 1:  # every node within FOLLOW_HOLD of the start, by the chord from it
+            near = ((a[:, 1:, :2] - a[:, :1, :2]).norm(dim=-1) < FOLLOW_HOLD).float()
+            out = out + FOLLOW_W * (((torch.remainder(a[:, 1:, 2] - _hold[0] + 90, 180) - 90) / 2) ** 2 * near).sum(1)
+        if FOLLOW_ANG is not None:
+            out = out + ((torch.relu(torch.diff(a[..., 0], dim=1)) / FOLLOW_LEFT) ** 2).sum(1)
+            # and never down the page: 074's climb hooked down-left past the peak and rounded it into a dome (fbl)
+            out = out + ((torch.relu(torch.diff(a[..., 1], dim=1)) / FOLLOW_LEFT) ** 2).sum(1)
+    return out
+
+
+_hold = [None]  # PEN_FOLLOW's held start angle, set by fit
 
 
 def _tip_cost_b(a, rough, bend="position"):
@@ -550,7 +661,7 @@ def _tip_cost_b(a, rough, bend="position"):
 
 
 def _tip_cost(a, rough, bend="position"):
-    return _tip_cost_b(a[None], rough, bend)[0] if _tips or _turn[0] else _shape_cost(a, rough, bend)
+    return _tip_cost_b(a[None], rough, bend)[0] if _tips or _turn[0] or _hold[0] is not None else _shape_cost(a, rough, bend)
 
 
 gpufit._shape_cost_b, gpufit.shape_cost = _tip_cost_b, _tip_cost
@@ -771,6 +882,34 @@ def led(nodes, lead):
     return head + rest
 
 
+def followed(nodes, prev, P):
+    """A PEN_FOLLOW start path: the full nib (P, screen px) at the move before's end angle, its bottom corner on that
+    end's bottom corner, then the path's own nodes from LEAD_SKIP on, only moving away."""
+    e = prev["nodes"][-1]
+    down = lambda deg: (lambda v: v if v[1] >= 0 else -v)(np.array([math.cos(math.radians(deg)), -math.sin(math.radians(deg))]))  # noqa: E731
+    bottom = np.array(e["p"]) + down(e["angle"]) * e.get("width", 1) * PEN / PPN / 2  # the end's corner lower on the page
+    if FOLLOW_AT:
+        bottom = np.array([float(v) for v in FOLLOW_AT.split(",")])
+    ang = follow_angle(prev)
+    a = bottom - down(ang) * P / PPN / 2
+    rest = [q for q in nodes if np.linalg.norm(np.array(q["p"]) - a) > LEAD_SKIP]
+    d = lambda q: np.linalg.norm(np.array(q["p"]) - a)  # noqa: E731
+    while len(rest) > 2 and d(rest[0]) >= d(rest[1]):
+        rest = rest[1:]
+    while len(rest) > 1 and FOLLOW_ANG is not None and (rest[0]["p"][0] > a[0] or rest[0]["p"][1] > a[1]):  # up and left
+        rest = rest[1:]
+    head = [{"p": [round(float(v), 4) for v in a], "angle": ang}]
+    if FOLLOW_HOLD > 0 and rest:  # a node FOLLOW_HOLD on towards the path, on the start's one angle (turns_of)
+        u = np.array(rest[0]["p"]) - a; L = np.linalg.norm(u)
+        if L > FOLLOW_HOLD * 1.2:
+            head.append({"p": [round(float(v), 4) for v in a + u / L * FOLLOW_HOLD], "angle": ang, "held": True})
+    return head + rest
+
+
+def follow_angle(prev):
+    return FOLLOW_ANG if FOLLOW_ANG is not None else prev["nodes"][-1]["angle"]
+
+
 def joint_refit(base, res, log):
     """PEN_JOINT: res[base~c0], res[base~c1] refitted in turn against base's whole outline, each with the other's ink."""
     piece, ignore, O = job_of(base)
@@ -797,13 +936,14 @@ def joint_refit(base, res, log):
     return res
 
 
-def fit(stroke, log, size=None, lead=None):
+def fit(stroke, log, size=None, lead=None, follow=None):
     """size: a nib size, in main nibs, the stroke is held to (a PEN_CUT half after its other half); else it may move.
     lead: the right half's result, when PEN_LEAD starts this left half from its end (led)."""
     t0 = time.time()
     piece, ignore, O = job_of(stroke)
     _next[0] = next_of(stroke)  # PEN_NEXT: the letter before, its ink on the page
     _turn[0] = (TURN_ON and stroke in CUT_AT) or stroke in TURNS  # every refine of this stroke, set again by the next fit
+    _hold[0] = follow_angle(follow) if follow else None
     hair = "~h" in stroke  # a tip-drawn hairline of a PEN_SPLIT stroke: the small pen, filled
     fill = stroke in FILL or hair
     # a mark narrower than the nib cannot be the main pen's: it is a small-pen mark (T21.s0, 0.56 nuqta to a 0.82 nib)
@@ -824,6 +964,10 @@ def fit(stroke, log, size=None, lead=None):
         starts = [(n_, led(ns, lead)) for n_, ns in starts if n_ != "free"]
         held = (0, -1)  # the start and the tail's end (PEN_LEAD)
         log(stroke, "lead: held start", starts[0][1][0]["p"], "then", starts[0][1][1]["p"])
+    if follow:  # PEN_FOLLOW: every start from the move before's end
+        starts = [(n_, followed(ns, follow, P)) for n_, ns in starts if n_ != "free"]
+        held = (0,)
+        log(stroke, "follow: held start", starts[0][1][0]["p"], "angle", round(_hold[0], 1))
     tried = []
 
     def kept(p, s, nodes):
@@ -849,11 +993,17 @@ def fit(stroke, log, size=None, lead=None):
     def pen_of(nodes, a, anc):
         lift = LIFT_LONG if length(nodes) >= LONG else LIFT
         # a held start is the full nib: let narrow, 347.s0's left half began 0.14 nuqta under the peak's shoulder (k16)
-        return {"angle": a, "lift_start": 0.0 if (held and LEAD_FULL) or stroke in FULLSTART else lift, "lift_end": 0.0 if stroke in FULLEND else lift, "anchor": list(anc), "size": SIZE and not size,
+        le = 0.0 if stroke in FULLEND else lift
+        if follow:  # PEN_FOLLOW: the start node begins at the held angle (the fit turns the nib a few degrees a step, and
+            P0 = np.array(nodes[0]["p"])  # every node of the held stretch (PEN_FOLLOW_HOLD) starts there too
+            a = [float(_hold[0]) if i == 0 or np.linalg.norm(np.array(q["p"]) - P0) < FOLLOW_HOLD else float(x)
+                 for i, (q, x) in enumerate(zip(nodes, np.broadcast_to(a, len(nodes))))]  # from 50 it stayed at 99, f3g)
+            le = min(le, length(nodes) / 2)  # a short move's end zone reached back over its start and narrowed it
+        return {"angle": a, "lift_start": 0.0 if (held and LEAD_FULL) or stroke in FULLSTART else lift, "lift_end": le, "anchor": list(anc), "size": SIZE and not size,
                 **({"turns": turns_of(nodes)} if ROTATE else {})}
 
     def turns_of(nodes):  # each node turns on its own, but none within FREEHOLD_L of a PEN_FREEHOLD half's free end
-        ts = list(range(1, len(nodes)))
+        ts = [i for i in range(1, len(nodes)) if not nodes[i].get("held")]  # PEN_FOLLOW_HOLD's node: the start's angle
         if stroke not in FREEHOLD or stroke not in CUT_AT:
             return ts
         P_ = np.array([q["p"] for q in nodes]); arc = np.r_[0, np.cumsum(np.linalg.norm(np.diff(P_, axis=0), axis=1))]
@@ -1014,6 +1164,8 @@ if __name__ == "__main__":
         # the bigger (301.s1, 309.s1, 312.s1), it is fitted first only to set the shared size, then again behind the
         # right half at that size (the smaller half setting the size bulged 297.s1, k1)
         return h + [h[0]] if s in LEAD and h[0].endswith("~c1") else h
+    def three(s):  # a PEN_THREE stroke's moves, the biggest first: its size holds the others
+        return sorted([f"{s}~c{i}" for i in range(3)], key=lambda h: -cv2.contourArea(ref_ring(job_of(h)[0]).astype(np.float32)))
     if THROUGH:  # each named stroke is an entry, fitted through its join with the exit (PEN_NEXT)
         for s in names:
             r_, p_ = through_fit(s, log); res.update(r_); pics.update(p_)
@@ -1029,15 +1181,20 @@ if __name__ == "__main__":
         json.dump(res, open(os.path.join(od, "pen.json"), "w"))
         json.dump(pics, open(os.path.join(od, "pics.json"), "w"))
     sized = {}  # a PEN_CUT stroke's shared nib size, from its first fit
+    for k_, v_ in KEEP.items():  # PEN_KEEP: approved moves, as fitted
+        res[k_] = v_; sized.setdefault(k_.split("~")[0], v_["size"])
     for st in [p for s in names for p in ([s] + [f"{s}~h{i}" for i in range(1, hairs(s) + 1)] if s in SPLIT
-                                          else bigger_first(s) if s in CUT else [s])]:
+                                          else [s] if "~" in s else three(s) if s in THREE else bigger_first(s) if s in CUT else [s])]:
+        if st in KEEP:
+            continue
         base = st.split("~")[0]
-        size = sized.get(base) if st.endswith(("~c0", "~c1")) else None
+        size = sized.get(base) if st.endswith(("~c0", "~c1", "~c2")) else None
         lead = st.endswith("~c1") and st[:-3] in LEAD and res.get(st[:-1] + "0")
         if lead and size is None:  # the bigger left half's first pass: no right half yet to start from
             lead = None
-        res[st], p = fit(st, log, size=size, lead=lead or None)
-        if st.endswith(("~c0", "~c1")) and base not in sized:
+        prev = st in FOLLOW and res.get(st[:-1] + str(int(st[-1]) - 1))
+        res[st], p = fit(st, log, size=size, lead=lead or None, follow=prev or None)
+        if st.endswith(("~c0", "~c1", "~c2")) and base not in sized:
             sized[base] = res[st]["size"]
         pics.update(p)
         json.dump(res, open(os.path.join(od, "pen.json"), "w"))
