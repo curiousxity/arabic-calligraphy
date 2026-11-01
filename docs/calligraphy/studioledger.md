@@ -351,6 +351,13 @@ Times are minutes:seconds into the individual-letters lesson.
   cut's trims are traced on a pixel grid and left a staircase, so over the curl and the cut's zone the ink is the
   stroke's own studio outline, smoothed (`me/endcap.py`, ENDCAP_OWN, ENDCAP_SMOOTH), and so is the upper stroke's
   tip beside it. The user: "142 approved".
+- **345, 352 and 354's bottom stroke ends (2026-11-01):** the user: "345 and 352 right side of the bottom stroke is a
+  little off", "The left side of that stroke on 345 is also off", "354 has the same problems as 345". The studio
+  starts that stroke with a clean slanted cut, sharp at both corners, and ends it with a gently curved edge; ours
+  ended square at both, its corners past the edge and the studio's left bare. At each end the ink is the stroke's own
+  studio outline, lightly smoothed so the cut stays crisp (`me/endcap.py`, ENDCAP_OWN, ENDCAP_SMOOTH=1), over a
+  polygon whose sides run along the stroke's edges at a shallow angle, so ours eases into the studio's over a few
+  units instead of stepping where the box would cross. The user: "345, 354, 352 all good".
 
 **Every joint trimmed to the studio edge**
 
