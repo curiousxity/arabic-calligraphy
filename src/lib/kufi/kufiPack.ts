@@ -1127,7 +1127,8 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
     for (const off of t < 4 ? RING0_OFF : RINGK_OFF) lineOpts.push({ mode: 1, t, off, base: null });
   }
   const shapes = letter.cands.length ? letter.cands : letter.entry;
-  for (const lo of lineOpts) {
+  let placed = false;
+  const tryLine = (lo: { mode: 0 | 1; t: number; off: number; base: number | null }) => {
     for (const sh of shapes) {
       let L: Line | null;
       let base = lo.base;
@@ -1141,7 +1142,7 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
       if (pin) {
         const x0 = pinX0(L, sh, pin);
         if (x0 === null || x0 + sh.maxJ > start) continue;
-        tryDots({ mode: lo.mode, shape: sh, t: lo.t, off: lo.off, base, x0, jext: 0, climb: 0 });
+        if (tryDots({ mode: lo.mode, shape: sh, t: lo.t, off: lo.off, base, x0, jext: 0, climb: 0 })) placed = true;
         continue;
       }
       // slide to the first place the letter fits
@@ -1149,6 +1150,19 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
         if (tryDots({ mode: lo.mode, shape: sh, t: lo.t, off: lo.off, base, x0: X - sh.maxJ, jext: 0, climb: 0 })) break;
       }
     }
+  };
+  for (const lo of lineOpts) tryLine(lo);
+  // A pin the lines above cannot take may still be one a packed panel holds: a replay
+  // (`reapply`) may open a line past a side, or past the next line, which they never do. Only
+  // then, the pin opens the first template line of its side still ahead, so a pin taken from any
+  // packed panel can be placed again; a pin the lines above take never gets a second way.
+  if (pin && !placed && !stop) {
+    const tried = new Set(lineOpts.filter((lo) => lo.mode === 1).map((lo) => lo.t));
+    for (let t = st.tpl; t < ctx.nTpl; t++)
+      if (SIDE_ROT[t & 3] / 90 === pin.turn) {
+        if (!tried.has(t)) tryLine({ mode: 1, t, off: 0, base: null });
+        break;
+      }
   }
   return stop;
 }
@@ -2240,11 +2254,15 @@ const REPACK_WORK = REPACK_BUDGET_MS * WORK_PER_MS;
 /**
  * A search stops trying moves this far short of its cap: moves already chosen
  * (a beam's survivors, a replay's last letter) are still applied after it
- * stops, and must not take it past PACK_WORK or REPACK_WORK.
+ * stops, and must not take it past its cap. The cap is PACK_WORK or
+ * REPACK_WORK for a search that packs without bars; one that goes on to the
+ * bar phase has BAR_WORK more on top, so a bar-closed first draft spends about
+ * PACK_WORK x 1.1 (614,900 moves measured) and a repack about 8% past
+ * REPACK_WORK.
  */
 const WORK_SLACK = 1000;
 /** Moves tried by searches since last reset, for the budget tests. */
-const stats = { work: 0, naturalRuns: 0 };
+const stats = { work: 0, naturalRuns: 0, fitSizes: 0 };
 
 /**
  * Tests only: a deadline every search uses instead of its clock (Infinity:
@@ -2461,6 +2479,13 @@ const AREA_FACTOR = 1.17;
 const FIT_TRIES = 9;
 /** `fitKufiPanel` stops trying sizes after this. */
 const FIT_BUDGET_MS = 9000;
+/**
+ * Under the tests' clock override, Fit stops after this many sizes instead of
+ * on FIT_BUDGET_MS, so its answer never depends on machine load. The clock
+ * reaches 25 to 46 sizes on the development machine (a failing text); the
+ * texts Fit is known to pack return by the 17th (Bismillah).
+ */
+const FIT_MAX_SIZES = 32;
 const SUGGEST_TRIES = 6;
 
 function sizesFrom(n: number, dir: 0 | 1 | -1): number[] {
@@ -2848,10 +2873,14 @@ export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}): { cols: 
   const pins = explicitPins(units, edits) ?? new Map<number, Pin>();
   let best: { size: Size; score: number } | null = null;
   const t0 = performance.now();
+  let tried = 0;
   const squares = sizesFrom(est, 0).map((n) => ({ cols: n, rows: n }));
   const byShape = rectangleSizes(units);
   for (const size of fitSizes(squares, fitRectangles(byShape, () => rankByGreedy(text, byShape, edits, pins)))) {
-    if (performance.now() - t0 > FIT_BUDGET_MS) break;
+    // the product stops on the clock; under the tests' override, on a count of sizes, so a loaded machine tries the same ones
+    if (clockOverride !== null ? tried >= FIT_MAX_SIZES : performance.now() - t0 > FIT_BUDGET_MS) break;
+    tried++;
+    stats.fitSizes++;
     const { cols, rows } = size;
     // the same path a pack takes, so a size fit calls packable is one a pack packs
     const f = pins.size > 0 ? packPinned(text, units, cols, rows, edits, pins) : freshFinal(text, cols, rows, edits, pins, PACK_BUDGET_MS);
@@ -2984,6 +3013,7 @@ export const _internal = {
   CALL_BUDGET_MS,
   PINNED_CALL_MS,
   FIT_BUDGET_MS,
+  FIT_MAX_SIZES,
   rectangleSizes,
   rankByGreedy,
   better,

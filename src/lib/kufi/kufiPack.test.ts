@@ -1049,6 +1049,68 @@ describe("filler bars", () => {
     const again = packKufiPanel({ text, ...size, edits: {}, previous: first });
     expectPacked(again, text);
   }, 90000);
+
+  it("Fit stops on a count of sizes under the clock override, so a loaded machine fits Bismillah at 17×19 too", () => {
+    const text = "بسم الله الرحمن الرحيم";
+    _internal.clearCaches();
+    // a clock that races ahead a second on every reading: Fit's 9 s are gone after the tenth reading
+    const real = performance.now.bind(performance);
+    let skew = 0;
+    const spy = vi.spyOn(performance, "now").mockImplementation(() => real() + (skew += 1000));
+    try {
+      _internal.stats.fitSizes = 0;
+      expect(fitKufiPanel(text)).toEqual({ cols: 17, rows: 19 });
+      expect(_internal.stats.fitSizes).toBeLessThanOrEqual(_internal.FIT_MAX_SIZES);
+    } finally {
+      spy.mockRestore();
+    }
+  }, 90000);
+});
+
+// A panel Fit returns is one the editor must be able to work on: packed again cold, repacked
+// from itself as a drag preview starts, and pinned letter by letter as a saved panel reloads.
+describe("a panel Fit returns survives a repack", () => {
+  const cases: Array<[string, number, number]> = [
+    ["سبحان الله", 13, 15],
+    ["بسم الله الرحمن الرحيم", 17, 19],
+    ["قل هو الله أحد", 11, 22],
+    ["إن شاء الله", 13, 13],
+    ["الله أكبر", 9, 13],
+  ];
+  for (const [text, cols, rows] of cases)
+    it(`«${text}» at ${cols}×${rows}: packed cold, repacked from itself and pinned in place, it is the same panel`, () => {
+      _internal.clearCaches();
+      expect(fitKufiPanel(text)).toEqual({ cols, rows });
+      // Fit's own panel, from its cache
+      const fit = expectPacked(packKufiPanel({ text, cols, rows }), text);
+      _internal.clearCaches();
+      expect(layoutOf(packKufiPanel({ text, cols, rows }))).toEqual(layoutOf(fit));
+      expect(layoutOf(packKufiPanel({ text, cols, rows, previous: fit }))).toEqual(layoutOf(fit));
+      const pinned = Object.fromEntries(fit.placements.map((p, k) => [k, p]));
+      _internal.clearCaches();
+      const reloaded = expectPacked(packKufiPanel({ text, cols, rows, edits: { pinned } }), text);
+      expect(reloaded.placements).toEqual(fit.placements);
+      expect(Array.from(reloaded.cells).join("")).toBe(Array.from(fit.cells).join(""));
+    }, 90000);
+
+  it("«إن شاء الله» at 13×13, closed by bars, takes a stretch edit", () => {
+    const text = "إن شاء الله";
+    const fit = expectPacked(packKufiPanel({ text, cols: 13, rows: 13 }), text);
+    expect(fit.quality!.bars).toBeGreaterThan(0);
+    let packs = 0;
+    for (const [k, p] of fit.placements.entries())
+      for (let i = 0; i < p.stretch.length; i++)
+        for (const d of [-1, 1]) {
+          const stretch = p.stretch.slice();
+          stretch[i] += d;
+          const r = packKufiPanel({ text, cols: 13, rows: 13, previous: fit, edits: { stretch: { [k]: stretch } } });
+          if (r.ok) {
+            expectPacked(r, text);
+            packs++;
+          }
+        }
+    expect(packs).toBeGreaterThan(0);
+  }, 90000);
 });
 
 describe("quality", () => {
