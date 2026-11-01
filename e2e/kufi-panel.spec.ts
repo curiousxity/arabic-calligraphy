@@ -1327,10 +1327,12 @@ test.describe("the selected letter's options", () => {
     expect(await panelEdits(page)).toBeUndefined();
 
     // Every form has been tried (or exploration is over): each is the drawn one,
-    // fits, or does not. Which fit is the clock's to say: exploration's repacks
-    // run on the clock, and under load feh.final.0 and .2, which fit only with
-    // filler bars, are refused (kufiExplore.test.ts shows all four fit on the
-    // work budget alone).
+    // fits, or does not. Which fit is partly the clock's to say: exploration's
+    // repacks run on the clock, and under load feh.final.0 and .2, which fit only
+    // with filler bars, are refused (kufiExplore.test.ts shows all four fit on the
+    // work budget alone). At least one other form must fit: feh.final.1 fits
+    // without bars down to a 40 ms clock, so a list with none enabled is a fault
+    // in exploration, not load.
     const options = kufiPanel(page).getByTestId("kufi-letter-options");
     const form = (id: string) => options.locator(`[data-glyph-id="${id}"]`);
     await expect(options.locator("[data-glyph-id]")).toHaveCount(4);
@@ -1341,29 +1343,22 @@ test.describe("the selected letter's options", () => {
       if (await form(id).isEnabled()) fitting.push(id);
       else await expect(form(id)).toHaveAttribute("title", /^(Doesn't fit here|Not checked)$/);
     }
+    expect(fitting, "at least one form other than the drawn one fits").not.toEqual([]);
 
     // A click on the picked letter swaps it to the first form after the drawn
     // one, wrapping round, that the options list shows as fitting; undo takes
     // the swap back and keeps the letter picked.
     await page.mouse.click(letter.x, letter.y);
-    if (fitting.length > 0) {
-      await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe(fitting[0]);
-      await page.getByRole("button", { name: "Undo" }).click();
-      await expect.poll(async () => panelEdits(page)).toBeUndefined();
-      await expect(options).toBeVisible();
-    } else {
-      await expect.poll(() => canvasNotice(page)).toBe("No other form of that letter fits here");
-      expect(await panelEdits(page)).toBeUndefined();
-    }
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe(fitting[0]);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    await expect(options).toBeVisible();
     await pointerAway(page, box);
     await expect(form("feh.final.3")).toHaveAttribute("aria-pressed", "true");
 
-    // A fitting form's button applies it, pinned, in one undo step; a form that
-    // does not fit cannot be pressed. feh.final.1 fits without bars, so it is the
-    // one most likely to survive a loaded clock.
-    for (const id of others) if (!fitting.includes(id)) await expect(form(id)).toBeDisabled();
+    // A fitting form's button applies it, pinned, in one undo step. feh.final.1
+    // fits without bars, so it is the one most likely to survive a loaded clock.
     const pick = fitting.includes("feh.final.1") ? "feh.final.1" : fitting[fitting.length - 1];
-    if (pick === undefined) return;
     await form(pick).click();
     await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe(pick);
     expect((await panelEdits(page))?.pinned?.[4]).toMatchObject({ unitIndex: 4, glyphId: pick });
