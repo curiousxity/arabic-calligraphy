@@ -54,12 +54,24 @@ export function layoutKufiStar(i: KufiStarInputs): KufiStarLayout {
 /**
  * The star's status line (the pattern of `kufiPanelStatus`): `layout` is the
  * answer for the current inputs (null while the worker is still packing),
- * `failed` whether the packer threw on them. Null when there is nothing to say.
+ * `failed` whether the packer threw on them. An outline wider than 0 adds
+ * the panel's warning that it exports as a second path (the SVG is then no
+ * longer one path a laser cutter can follow). Null when there is nothing to say.
  */
-export function kufiStarStatus(layout: KufiStarLayout | null, failed: boolean): string | null {
+export function kufiStarStatus(layout: KufiStarLayout | null, failed: boolean, strokeWidth = 0): string | null {
+  const text = kufiStarTextStatus(layout, failed);
+  const outline = strokeWidth > 0 ? "The outline exports as a separate path." : null;
+  return text && outline ? `${text}
+${outline}` : text ?? outline;
+}
+
+function kufiStarTextStatus(layout: KufiStarLayout | null, failed: boolean): string | null {
   if (failed) return "Couldn't arrange this text";
   if (!layout) return "Arranging…";
   const n = layout.unpacked.length;
   if (n === 0) return null;
   return n === 1 ? "1 region doesn't fit" : `${n} regions don't fit`;
 }
+
+/** A layout with nothing to report: what a star with no region text is, as far as its status goes. */
+export const KUFI_STAR_NO_TEXT: KufiStarLayout = { regions: [], unpacked: [] };

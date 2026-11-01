@@ -62,7 +62,7 @@ describe("kufiPanelProps", () => {
 });
 
 describe("kufiStarProps", () => {
-  it("carries every star field for a mirror", () => {
+  it("carries every star field", () => {
     const b = {
       id: 5, type: "kufiStar", text: "", x: 0, y: 0, fontSize: 112, color: "#222", fontFamily: "Amiri",
       stroke: "#000", shadowColor: "#000", starFold: 5, starK: 2, starSize: 30,

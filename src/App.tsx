@@ -167,7 +167,7 @@ import { sanitizeLegacyBlocks } from "./lib/legacySaves";
 import { kufiCellSize, kufiPanelInputs, kufiPanelTextPatch, kufiReleasePins, type KufiTool } from "./lib/kufi/kufiPanelBlock";
 import { KUFI_NOTICE_MS, type KufiNotice } from "./components/KufiPanelEditOverlay";
 import { starConstruction, STAR_KS } from "./lib/kufi/kufiStarGeometry";
-import { starOutlineBox } from "./lib/kufi/kufiStarPath";
+import { starOutlineBox, starPositionKeepingCentre } from "./lib/kufi/kufiStarPath";
 import { kufiLayoutKey, requestKufiFit, seedKufiLayout } from "./lib/kufi/kufiLayoutClient";
 import type { KufiPackResult, KufiPanelEdits } from "./lib/kufi/kufiPack";
 import {
@@ -2148,11 +2148,7 @@ const App: React.FC = () => {
     const cell = kufiCellSize(b.fontSize);
     const before = starOutlineBox(starConstruction(b.starFold, b.starK, b.starSize));
     const after = starOutlineBox(starConstruction(next.starFold, next.starK, next.starSize));
-    updateSelectedBlock({
-      ...patch,
-      x: b.x + (before.minX - after.minX) * cell,
-      y: b.y + (before.minY - after.minY) * cell,
-    });
+    updateSelectedBlock({ ...patch, ...starPositionKeepingCentre(b, b.rotation ?? 0, before, after, cell) });
   };
 
   /** Width and height of the selected Kufi panel, in cells: one undo step. */

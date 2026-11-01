@@ -95,4 +95,15 @@ describe("kufiStarKey and kufiStarStatus", () => {
     expect(kufiStarStatus(null, true)).toBe("Couldn't arrange this text");
     expect(kufiStarStatus({ regions: [], unpacked: [1, 3] }, false)).toBe("2 regions don't fit");
   });
+
+  it("warns that an outline wider than 0 exports as a separate path, as the Kufi panel does", () => {
+    const none = { regions: [], unpacked: [] };
+    const warning = "The outline exports as a separate path.";
+    expect(kufiStarStatus(none, false, 0)).toBeNull();
+    expect(kufiStarStatus(none, false, 2)).toBe(warning);
+    expect(kufiStarStatus({ regions: [], unpacked: [1] }, false, 0.5)).toBe(`1 region doesn't fit
+${warning}`);
+    expect(kufiStarStatus(null, true, 1)).toBe(`Couldn't arrange this text
+${warning}`);
+  });
 });

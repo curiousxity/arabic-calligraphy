@@ -13,6 +13,7 @@ import {
   ensureKufiStarLayouts,
   kufiStarLayoutFailed,
   kufiStarLayoutSnapshot,
+  kufiStarSnapshot,
   releaseKufiStarLayout,
   requestKufiStarLayout,
   requestKufiStarOffers,
@@ -31,6 +32,19 @@ import {
   type KufiWorkerResponse,
 } from "./kufiLayoutClient";
 import type { KufiStarInputs, KufiStarLayout } from "./kufiStarLayout";
+
+/** Set by a test to make the main-thread star layout throw, as a broken packer would. */
+const starLayoutThrows = vi.hoisted(() => ({ on: false }));
+vi.mock("./kufiStarLayout", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./kufiStarLayout")>();
+  return {
+    ...real,
+    layoutKufiStar: (i: KufiStarInputs) => {
+      if (starLayoutThrows.on) throw new Error("layout threw");
+      return real.layoutKufiStar(i);
+    },
+  };
+});
 
 class FakeWorker implements KufiWorkerLike {
   posted: KufiWorkerRequest[] = [];
@@ -77,6 +91,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  starLayoutThrows.on = false;
   unsubscribe();
   _resetKufiLayouts();
 });
@@ -482,6 +497,33 @@ describe("kufi star layouts", () => {
     expect(got?.unpacked).toEqual([]);
     expect(kufiStarLayoutFailed(S1)).toBe(false);
     vi.restoreAllMocks();
+  });
+
+  it("a first layout that fails changes the snapshot, which stays the same object between notifications", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    starLayoutThrows.on = true;
+    requestKufiStarLayout("s1", S1);
+    const pending = kufiStarSnapshot("s1", S1);
+    expect(pending).toEqual({ layout: null, failed: false });
+    expect(kufiStarSnapshot("s1", S1)).toBe(pending);
+    const before = notified;
+    worker.onerror?.(new Error("boom"));
+    expect(notified).toBeGreaterThan(before);
+    const failedSnap = kufiStarSnapshot("s1", S1);
+    expect(failedSnap).not.toBe(pending);
+    expect(failedSnap).toEqual({ layout: null, failed: true });
+    expect(kufiStarSnapshot("s1", S1)).toBe(failedSnap);
+    starLayoutThrows.on = false;
+    vi.restoreAllMocks();
+  });
+
+  it("the snapshot carries the layout once it arrives", () => {
+    requestKufiStarLayout("s1", S1);
+    const r = layoutOf();
+    worker.reply({ id: worker.last().id, kind: "star", layout: r });
+    const snap = kufiStarSnapshot("s1", S1);
+    expect(snap).toEqual({ layout: r, failed: false });
+    expect(kufiStarSnapshot("s1", S1)).toBe(snap);
   });
 
   it("Find layouts runs in the worker and resolves with its evaluation", async () => {

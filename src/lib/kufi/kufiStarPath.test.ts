@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { starConstruction } from "./kufiStarGeometry";
-import { kufiStarPath, starOutlineBox } from "./kufiStarPath";
+import { kufiStarPath, starOutlineBox, starPositionKeepingCentre } from "./kufiStarPath";
 
 const CELL = 10;
 
@@ -79,5 +79,35 @@ describe("kufiStarPath", () => {
     const six = starConstruction(6, 4, 12);
     expect(() => kufiStarPath(six, [], true, CELL)).not.toThrow();
     expect(() => kufiStarPath(six, six.regions.map((r) => new Uint8Array(r.mask.cols * r.mask.rows)), true, CELL)).not.toThrow();
+  });
+});
+
+describe("starPositionKeepingCentre", () => {
+  /** The centre (the construction's origin) on the canvas, for a block at `pos` turned by `deg` about it. */
+  const worldCentre = (pos: { x: number; y: number }, deg: number, box: { minX: number; minY: number }) => {
+    const lx = -box.minX * CELL, ly = -box.minY * CELL;
+    const t = (deg * Math.PI) / 180;
+    return { x: pos.x + lx * Math.cos(t) - ly * Math.sin(t), y: pos.y + lx * Math.sin(t) + ly * Math.cos(t) };
+  };
+  const before = starOutlineBox(starConstruction(4, 3, 24));
+  const after = starOutlineBox(starConstruction(6, 4, 30));
+  const pos = { x: 100, y: 200 };
+
+  it("unrotated: moves the top-left by the box's change, the centre staying put", () => {
+    const next = starPositionKeepingCentre(pos, 0, before, after, CELL);
+    expect(next.x).toBeCloseTo(pos.x + (after.minX - before.minX) * CELL, 6);
+    expect(next.y).toBeCloseTo(pos.y + (after.minY - before.minY) * CELL, 6);
+    expect(worldCentre(next, 0, after).x).toBeCloseTo(worldCentre(pos, 0, before).x, 6);
+    expect(worldCentre(next, 0, after).y).toBeCloseTo(worldCentre(pos, 0, before).y, 6);
+  });
+
+  it("rotated 45°: the centre stays put on the canvas", () => {
+    const next = starPositionKeepingCentre(pos, 45, before, after, CELL);
+    const was = worldCentre(pos, 45, before), now = worldCentre(next, 45, after);
+    expect(now.x).toBeCloseTo(was.x, 6);
+    expect(now.y).toBeCloseTo(was.y, 6);
+    // The unrotated shift would move it.
+    const naive = { x: pos.x + (after.minX - before.minX) * CELL, y: pos.y + (after.minY - before.minY) * CELL };
+    expect(Math.hypot(worldCentre(naive, 45, after).x - was.x, worldCentre(naive, 45, after).y - was.y)).toBeGreaterThan(1);
   });
 });

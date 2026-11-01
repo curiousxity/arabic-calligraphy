@@ -1,4 +1,4 @@
-import type { Block, GuideBlock, MirrorBlock, MirrorMode } from "../types";
+import type { Block, GuideBlock, KufiStarBlock, MirrorBlock, MirrorMode } from "../types";
 
 /**
  * The pure half of the muthanna / radial feature: everything about a mirror
@@ -24,8 +24,13 @@ export const NEW_MIRROR_OFFSET = 180;
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
-/** A block that may legally be a mirror's source: anything but a mirror or a guide. */
-export type MirrorSource = Exclude<Block, MirrorBlock | GuideBlock>;
+/**
+ * A block that may legally be a mirror's source: anything but a mirror, a
+ * guide or a Kufi star. A star is excluded because Add mirror always
+ * reflects (`mirrorX`), and a reflected star's text reads backwards; its
+ * copies are made by rotation inside the star itself.
+ */
+export type MirrorSource = Exclude<Block, MirrorBlock | GuideBlock | KufiStarBlock>;
 
 /**
  * One radial copy's placement, in the mirror block's own local space.
@@ -43,7 +48,7 @@ export type RadialCopyTransform = { rotation: number; x: number; y: number };
  * no chain can close on itself, and the renderer never recurses.
  */
 export const isMirrorSourceCandidate = (block: Block | null | undefined): block is MirrorSource =>
-  !!block && block.type !== "mirror" && block.type !== "guide";
+  !!block && block.type !== "mirror" && block.type !== "guide" && block.type !== "kufiStar";
 
 /** True when `sourceId` names a block in `blocks` that may be mirrored. */
 export const canMirrorSourceId = (blocks: Block[], sourceId: number): boolean =>

@@ -8,6 +8,27 @@ export function starOutlineBox(c: StarConstruction): { minX: number; minY: numbe
   return { minX, minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
 }
 
+/**
+ * Where a star block's x,y goes when its construction changes (fold, star or
+ * size) so that the star's centre stays where it was on the canvas. The block's
+ * x,y is the outline box's top-left, and Konva turns the block's Group about
+ * that point by `rotationDeg` (clockwise, y down), so the centre's offset from
+ * x,y is the box's `-min` turned by the rotation; the shift is the change in
+ * that offset, turned the same way.
+ */
+export function starPositionKeepingCentre(
+  pos: { x: number; y: number },
+  rotationDeg: number,
+  before: { minX: number; minY: number },
+  after: { minX: number; minY: number },
+  cellPx: number
+): { x: number; y: number } {
+  const dx = (after.minX - before.minX) * cellPx, dy = (after.minY - before.minY) * cellPx;
+  const t = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(t), sin = Math.sin(t);
+  return { x: pos.x + dx * cos - dy * sin, y: pos.y + dx * sin + dy * cos };
+}
+
 const num = (v: number) => String(Math.round(v * 100) / 100);
 
 /**

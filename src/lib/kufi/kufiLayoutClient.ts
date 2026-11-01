@@ -117,6 +117,8 @@ const starWanted = new Map<string, { key: string; seq: number }>();
 /** The last layout each star slot was shown, with the inputs it was laid out for. */
 const starLatest = new Map<string, { layout: KufiStarLayout; inputs: KufiStarInputs }>();
 const starFailed = new Set<string>();
+/** Each star slot's last `kufiStarSnapshot`, reused while unchanged. */
+const starSnapshots = new Map<string, KufiStarSnapshot>();
 let inFlight: { id: number; key?: string; preview?: boolean; star?: boolean } | null = null;
 /** The in-flight job's watchdog timer. */
 let watchdog: ReturnType<typeof setTimeout> | null = null;
@@ -562,6 +564,29 @@ export function kufiStarLayoutSnapshot(slot: string, inputs: KufiStarInputs): Ku
   return same ? last.layout : null;
 }
 
+/** What a star slot draws and says: its layout (as `kufiStarLayoutSnapshot`) and whether its inputs failed. */
+export type KufiStarSnapshot = { layout: KufiStarLayout | null; failed: boolean };
+
+/**
+ * A star slot's `useSyncExternalStore` snapshot: the layout to draw and
+ * whether the layout threw on these inputs, in one value, so a failure alone
+ * (a first layout that throws, with nothing drawn before or after) still
+ * changes the snapshot and re-renders out of "Arranging…". The object is kept
+ * per slot and reused while both fields are unchanged, so the snapshot is
+ * referentially stable between notifications. (Per slot, not per inputs key:
+ * the layout part falls back to the slot's own last layout, so two slots on
+ * one key may differ.)
+ */
+export function kufiStarSnapshot(slot: string, inputs: KufiStarInputs): KufiStarSnapshot {
+  const layout = kufiStarLayoutSnapshot(slot, inputs);
+  const failed = kufiStarLayoutFailed(inputs);
+  const last = starSnapshots.get(slot);
+  if (last && last.layout === layout && last.failed === failed) return last;
+  const next = { layout, failed };
+  starSnapshots.set(slot, next);
+  return next;
+}
+
 /** True when the layout threw on these inputs (in the worker and again on the main thread). */
 export function kufiStarLayoutFailed(inputs: KufiStarInputs): boolean {
   return starFailed.has(kufiStarKey(inputs));
@@ -594,6 +619,7 @@ export function releaseKufiStarLayout(slot: string): void {
   const key = starWanted.get(slot)?.key;
   starWanted.delete(slot);
   starLatest.delete(slot);
+  starSnapshots.delete(slot);
   if (key !== undefined) forgetStarIfUnused(key);
 }
 
@@ -628,6 +654,7 @@ export function _resetKufiLayouts(): void {
   starWanted.clear();
   starLatest.clear();
   starFailed.clear();
+  starSnapshots.clear();
   fits.length = 0;
   fitWaiters.clear();
   starEvals.length = 0;

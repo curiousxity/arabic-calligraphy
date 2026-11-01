@@ -9,6 +9,18 @@ type Size = { cols: number; rows: number };
 
 export type KufiPanelStatus = { text: string; suggestions: Size[] };
 
+/**
+ * The dashed frame (Konva props, in the block's colour) of something with no
+ * ink to show: a panel's box in `KufiUnfitFrame`, a star's unpacked region in
+ * `KufiStarView`. Editor chrome only.
+ */
+export const KUFI_UNFIT_FRAME_STYLE = {
+  opacity: 0.4,
+  strokeWidth: 2,
+  strokeScaleEnabled: false,
+  dash: [8, 6],
+} as const;
+
 export const kufiSizeLabel = (s: Size) => `${s.cols}×${s.rows}`;
 
 /**

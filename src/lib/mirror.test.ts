@@ -108,6 +108,12 @@ describe("cycle guard", () => {
     expect(isMirrorSourceCandidate(text(1))).toBe(true);
   });
 
+  it("rejects a Kufi star: a reflection would read backwards", () => {
+    const star = { ...text(3), type: "kufiStar", starFold: 4, starK: 3, starSize: 24, starRegions: [], starLines: true } as Block;
+    expect(isMirrorSourceCandidate(star)).toBe(false);
+    expect(canMirrorSourceId([star], 3)).toBe(false);
+  });
+
   it("rejects a mirror as a source — one level only", () => {
     expect(isMirrorSourceCandidate(mirror(2, 1))).toBe(false);
   });

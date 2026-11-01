@@ -64,7 +64,17 @@ it), and its bottom row is the one along the ring edge. **A mask can be
 - **Whitespace-only region text counts as empty** (pattern only, `null`),
   exactly as `""`.
 - The status line (`kufiStarStatus`) says how many regions did not pack;
-  those regions draw empty.
+  those regions draw no ink, only a dashed outline of their polygon
+  (`kufi-star-unpacked`, `KufiUnfitFrame`'s style, `EXPORT_HIDDEN` so it never
+  exports), so with the lines off an unpacked region is not blank paper. An
+  outline width above 0 adds the panel's "The outline exports as a separate
+  path." (see [kufi-panel.md](kufi-panel.md), Export).
+- **Never a mirror's source.** `isMirrorSourceCandidate` rejects `kufiStar`, so
+  Add mirror is disabled for a star: Add mirror always reflects (`mirrorX`),
+  and a reflected star reads backwards. Its copies come by rotation, inside it.
+- **Changing fold, star or size keeps the centre where it was**, rotated or
+  not: `starPositionKeepingCentre` (`kufiStarPath.ts`) turns the outline box's
+  change by the block's rotation, since the Group turns about its x,y.
 
 ## Worker and cache
 
@@ -77,8 +87,11 @@ One star layout is one worker job (all its packs), with a watchdog of
 keeps each slot's last layout *with the inputs it was laid out for*; while new
 inputs are pending, `kufiStarLayoutSnapshot` reuses it only when fold, k and
 size are unchanged (a region-text edit), and otherwise returns null, so the
-view shows "Arranging…". A layout's region indices and masks belong to its
-construction; drawing one on another (an approved offer changes all three at
+view shows "Arranging…". The view's snapshot is `kufiStarSnapshot`, the
+layout *and* whether the inputs failed, reused per slot while both are
+unchanged: a failure alone must change the snapshot, or a first layout that
+throws never re-renders out of "Arranging…". A layout's region indices and
+masks belong to its construction; drawing one on another (an approved offer changes all three at
 once) put a wedge's cells in the wrong place.
 
 ## Evaluation and offers (`kufiStarEvaluate.ts`, pure)

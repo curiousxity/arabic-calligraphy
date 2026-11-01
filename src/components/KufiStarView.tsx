@@ -1,15 +1,15 @@
 import React, { useLayoutEffect, useMemo, useRef } from "react";
-import { Group, Shape, Text } from "react-konva";
+import { Group, Line, Shape, Text } from "react-konva";
 import type Konva from "konva";
 import type { kufiStarProps } from "../lib/blockRenderProps";
 import { createBlockFillPainter } from "../lib/blockFill";
 import { kufiCellSize } from "../lib/kufi/kufiPanelBlock";
 import { starConstruction } from "../lib/kufi/kufiStarGeometry";
 import { kufiStarPath, starOutlineBox } from "../lib/kufi/kufiStarPath";
-import { kufiStarInputs, kufiStarStatus, kufiStarTextCount } from "../lib/kufi/kufiStarLayout";
-import { kufiStarLayoutFailed } from "../lib/kufi/kufiLayoutClient";
+import { KUFI_STAR_NO_TEXT, kufiStarInputs, kufiStarStatus, kufiStarTextCount } from "../lib/kufi/kufiStarLayout";
 import { useKufiStarLayout } from "../hooks/useKufiStarLayout";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
+import { KUFI_UNFIT_FRAME_STYLE } from "../lib/kufi/kufiPanelStatus";
 
 export type KufiStarViewProps = ReturnType<typeof kufiStarProps> & {
   id?: string;
@@ -88,12 +88,13 @@ const KufiStarStatusLine: React.FC<{ width: number; height: number; color: strin
  * region's text is packed in the worker (`useKufiStarLayout`); a region of a
  * kind shares the kind's packing and is placed through its own frame, so the
  * copies are the same cells by rotation. A region that did not pack draws
- * empty, and the status line says how many did not.
+ * no ink, only a dashed outline of its polygon as editor chrome (so it is not
+ * blank paper with the lines off), and the status line says how many did not.
  */
 export const KufiStarView: React.FC<KufiStarViewProps> = (p) => {
   const cell = kufiCellSize(p.fontSize);
   const construction = useMemo(() => starConstruction(p.starFold, p.starK, p.starSize), [p.starFold, p.starK, p.starSize]);
-  const layout = useKufiStarLayout(p);
+  const { layout, failed } = useKufiStarLayout(p);
   const inputs = useMemo(
     () => kufiStarInputs(p),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the four layout fields, not the props object
@@ -106,8 +107,19 @@ export const KufiStarView: React.FC<KufiStarViewProps> = (p) => {
     });
     return pathRings(kufiStarPath(construction, cells, p.starLines, cell));
   }, [construction, layout, p.starLines, cell]);
-  const status = kufiStarTextCount(inputs) === 0 ? null : kufiStarStatus(layout, kufiStarLayoutFailed(inputs));
+  // With no region text there is nothing to arrange; only the outline warning can apply.
+  const noText = kufiStarTextCount(inputs) === 0;
+  const status = kufiStarStatus(noText ? KUFI_STAR_NO_TEXT : layout, !noText && failed, p.strokeWidth);
   const box = useMemo(() => starOutlineBox(construction), [construction]);
+  // Each unpacked region's polygon in px (origin at the outline box's top-left, as the path).
+  const unpackedOutlines = useMemo(
+    () =>
+      (layout?.unpacked ?? []).flatMap((i) => {
+        const polygon = construction.regions[i]?.polygon;
+        return polygon ? [polygon.flatMap((q) => [(q.x - box.minX) * cell, (q.y - box.minY) * cell])] : [];
+      }),
+    [layout, construction, box, cell]
+  );
   const width = box.width * cell;
   const height = box.height * cell;
 
@@ -165,7 +177,23 @@ export const KufiStarView: React.FC<KufiStarViewProps> = (p) => {
           ctx.restore();
         }}
       />
-      {status && <KufiStarStatusLine width={width} height={height} color={p.color} text={status} />}
+      {unpackedOutlines.length > 0 && (
+        <Group name={EXPORT_HIDDEN} listening={false}>
+          {unpackedOutlines.map((points, i) => (
+            <Line
+              key={i}
+              name="kufi-star-unpacked"
+              points={points}
+              closed
+              stroke={p.color}
+              {...KUFI_UNFIT_FRAME_STYLE}
+              dash={[...KUFI_UNFIT_FRAME_STYLE.dash]}
+              listening={false}
+            />
+          ))}
+        </Group>
+      )}
+      {status &&<KufiStarStatusLine width={width} height={height} color={p.color} text={status} />}
     </Group>
   );
 };

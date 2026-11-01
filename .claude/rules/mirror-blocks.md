@@ -41,6 +41,9 @@ shamsa). It is the one primitive both compositions reduce to.
   buttons) *and* when resolving (`resolveMirrorSource` returns null for a
   mirror source), so the renderer cannot recurse even from a hand-edited save.
   Nesting is a deferred feature, not an oversight.
+- **A Kufi star is never a source** (`isMirrorSourceCandidate`, with mirror
+  and guide): a reflection reads its text backwards. See
+  [kufi-star.md](kufi-star.md).
 - **The inner content is `listening={false}`**, so no per-glyph hover overlay
   can ever mount inside a mirror and the source's own drag surface cannot
   swallow the gesture. `MirrorBlockView` passes none of those overlays' arming

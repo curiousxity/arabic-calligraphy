@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useRef } from "react";
 import { Group, Rect, Text } from "react-konva";
 import type Konva from "konva";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
-import { kufiSizeLabel, type KufiPanelStatus } from "../lib/kufi/kufiPanelStatus";
+import { KUFI_UNFIT_FRAME_STYLE, kufiSizeLabel, type KufiPanelStatus } from "../lib/kufi/kufiPanelStatus";
 
 type Size = { cols: number; rows: number };
 
@@ -69,10 +69,8 @@ export const KufiUnfitFrame: React.FC<{
         width={width}
         height={height}
         stroke={color}
-        opacity={0.4}
-        strokeWidth={2}
-        strokeScaleEnabled={false}
-        dash={[8, 6]}
+        {...KUFI_UNFIT_FRAME_STYLE}
+        dash={[...KUFI_UNFIT_FRAME_STYLE.dash]}
         listening={false}
       />
       <Group ref={ui} x={width / 2} y={height / 2}>
