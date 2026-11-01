@@ -149,11 +149,21 @@ export function kufiRouteEdits(edits: KufiPanelEdits | undefined, committed: Ok,
   });
 }
 
-/** What a committed re-route saves: every letter of the word pinned where the packer put it. */
-export function kufiPinWordEdits(edits: KufiPanelEdits, result: Ok, units: KufiUnit[], wordIndex: number): KufiPanelEdits {
+/**
+ * What a committed re-route saves: every letter of the word pinned where the
+ * packer put it, and every other letter the move changed (another glyph,
+ * turn, place or stretch than in `before`, the panel the drag started from).
+ * A move may rearrange the rest of the panel, and a reload rebuilds only
+ * what is pinned exactly; the letters it left alone rebuild as they were.
+ */
+export function kufiPinWordEdits(edits: KufiPanelEdits, before: Ok, result: Ok, units: KufiUnit[], wordIndex: number): KufiPanelEdits {
   let out = edits;
   units.forEach((u, k) => {
-    if (u.wordIndex === wordIndex) out = kufiPinEdits(out, result, k);
+    const a = placementOf(before, k);
+    const b = placementOf(result, k);
+    const changed =
+      !a || !b || a.glyphId !== b.glyphId || a.turn !== b.turn || a.col !== b.col || a.row !== b.row || a.stretch.join() !== b.stretch.join();
+    if (u.wordIndex === wordIndex || changed) out = kufiPinEdits(out, result, k);
   });
   return out;
 }

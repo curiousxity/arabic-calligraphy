@@ -647,7 +647,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
         max: base + MAX_PULL,
         deltaOf: (c) => routeOffsetFor(committed, units, wordIndex, c.col, c.row) - pressedAt,
         editsFor: (count) => kufiRouteEdits(inputs.edits, committed, units, wordIndex, count),
-        pinFor: (edits, r) => kufiPinWordEdits(edits, r, units, wordIndex),
+        pinFor: (edits, r) => kufiPinWordEdits(edits, committed, r, units, wordIndex),
         notice: NO_ROOM_TO_ROUTE,
       },
       stage

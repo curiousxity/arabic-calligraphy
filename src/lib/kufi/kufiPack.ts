@@ -2692,6 +2692,15 @@ function boxIndices(p: KufiPlacement, units: KufiUnit[], cols: number, rows: num
  * shift, and the word's own joins and letters may give or take the rest.
  * The search still ranks by natural length, so nothing stretches that need
  * not, and explicit pins stay hard.
+ *
+ * With `rearrange` (a repack from the editor's `previous`), a moved word that
+ * no round packs gets one more step: a fresh search with the explicit pins
+ * alone (the user's, the moved first letter's among them), at a first
+ * draft's budget, so the rest of the panel may rearrange round the word. It
+ * runs only after every round failed, so a move that packed before packs the
+ * same, and only for a moved word, so no other edit reaches it. The rebuild
+ * of a saved panel (`packPinned`) never asks for it: the editor pins what the
+ * step moved (`kufiPinWordEdits`), so a reload holds it without one.
  */
 function repack(
   text: string,
@@ -2701,7 +2710,8 @@ function repack(
   edits: KufiPanelEdits,
   prev: KufiPlacement[],
   cells: Uint8Array,
-  explicit: Map<number, Pin>
+  explicit: Map<number, Pin>,
+  rearrange = false
 ): Final | null {
   const t0 = performance.now();
   const dirty = new Set<number>();
@@ -2759,6 +2769,11 @@ function repack(
     workLeft -= ctx.work;
     if (f && (!best || f.score < best.score)) best = f;
     if (best?.packed) break;
+  }
+  if (rearrange && first.size > 0 && !best?.packed) {
+    // work-bounded like a first draft, cached by its inputs: a refused cell asked again costs nothing
+    const f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS, true);
+    if (f?.packed) return f;
   }
   return best;
 }
@@ -2843,7 +2858,7 @@ export function packKufiPanel(input: {
     prev.placements.length === units.length &&
     prev.placements.every((p, k) => p.unitIndex === k && p.key === units[k].key)
   ) {
-    f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit);
+    f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit, true);
     repacked = true;
   } else if (explicit.size > 0) {
     f = packPinned(text, units, cols, rows, edits, explicit);

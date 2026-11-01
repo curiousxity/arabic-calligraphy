@@ -185,9 +185,21 @@ describe("kufiPanelBlock", () => {
 
     it("a committed re-route pins every letter of the word where the packer put it", () => {
       const result: Ok = { ...committed, placements: placements.map((p, i) => (i >= 1 && i <= 4 ? { ...p, col: p.col - 2 } : p)) };
-      const out = kufiPinWordEdits({ routes: { 1: 2 }, pinned: { 0: placements[0] } }, result, units, 1);
+      const out = kufiPinWordEdits({ routes: { 1: 2 }, pinned: { 0: placements[0] } }, committed, result, units, 1);
       expect(out.pinned).toEqual({ 0: placements[0], 1: result.placements[1], 2: result.placements[2], 3: result.placements[3], 4: result.placements[4] });
       expect(out.routes).toEqual({ 1: 2 });
+    });
+
+    it("a committed re-route also pins every other letter the move changed, and only those", () => {
+      // the word moved, and the move rearranged the لا before it: another glyph, place and stretch
+      const lam = { ...placements[0], glyphId: "lamAlef.isolated.1", col: 17, stretch: [1] };
+      const result: Ok = { ...committed, placements: placements.map((p, i) => (i === 0 ? lam : i >= 1 ? { ...p, col: p.col - 2 } : p)) };
+      expect(kufiPinWordEdits({}, committed, result, units, 1).pinned).toEqual(Object.fromEntries(result.placements.map((p, i) => [i, p])));
+      // a letter whose turn alone changed counts as moved; one that did not change is left unpinned
+      const turned: Ok = { ...committed, placements: placements.map((p, i) => (i === 0 ? { ...p, turn: 2 as const } : p)) };
+      expect(Object.keys(kufiPinWordEdits({}, committed, turned, units, 1).pinned!).map(Number)).toEqual([0, 1, 2, 3, 4]);
+      const still = kufiPinWordEdits({}, committed, committed, units, 1);
+      expect(Object.keys(still.pinned!).map(Number)).toEqual([1, 2, 3, 4]);
     });
   });
 });
