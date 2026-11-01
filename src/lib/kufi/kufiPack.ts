@@ -119,6 +119,9 @@ export type KufiPackResult =
     }
   | { ok: false; reason: "tooShort" | "tooLong" | "pinConflict"; suggestions: Array<{ cols: number; rows: number }> };
 
+/** A region's usable cells: row-major, 1 = usable, local y down, its bottom row the one its lines stand on. */
+export type KufiMask = { cols: number; rows: number; cells: Uint8Array };
+
 // ---------------------------------------------------------------------------
 // Dials
 // ---------------------------------------------------------------------------
@@ -435,6 +438,19 @@ function tabOf(L: Line, cols: number, rows: number): Int32Array {
   return t;
 }
 
+/** `tabOf` in a context: in a region, cells outside the mask are off-panel (-1) too. */
+function tabIn(ctx: Ctx, L: Line): Int32Array {
+  const t = tabOf(L, ctx.cols, ctx.rows);
+  const region = ctx.region;
+  if (!region) return t;
+  let m = region.tabs.get(L);
+  if (!m) {
+    m = t.map((i) => (i >= 0 && region.cells[i] ? i : -1));
+    region.tabs.set(L, m);
+  }
+  return m;
+}
+
 /** Lines are immutable, so each is made once per panel size. */
 const lineCache = new Map<number, Line>();
 
@@ -477,10 +493,13 @@ const SIDE_ROT: Rot[] = [0, 90, 180, 270];
 const RING0_OFF = [0, 1, 2];
 const RINGK_OFF = [-2, -1, 0, 1, 2];
 
-/** Template line t: ring t>>2, side t&3 (bottom, left, top, right), at the given offset from its ring. */
-function templateLine(cols: number, rows: number, t: number, off: number): Line | null {
-  const ring = t >> 2;
-  const side = t & 3;
+/**
+ * Template line t: ring t / sides, side t % sides (bottom, left, top, right), at the given offset
+ * from its ring. A panel has 4 sides; a region (`packKufiRegion`) 1, its upright bottom lines.
+ */
+function templateLine(cols: number, rows: number, t: number, off: number, sides = 4): Line | null {
+  const ring = Math.floor(t / sides);
+  const side = t % sides;
   const dist = ring * (BAND + 1) + off;
   if (dist < 0) return null;
   const rot = SIDE_ROT[side];
@@ -581,7 +600,41 @@ type Ctx = {
   mend: boolean;
   /** Set while filler bars may close a panel (`barPass`): only once it has not packed without them. */
   bars: boolean;
+  /** Template lines per ring: 4 round a panel's frame, 1 (upright, from the bottom up) in a region. */
+  sides: number;
+  /** Packing into a region's mask (`packKufiRegion`); null for a whole panel, whose every path is unchanged. */
+  region: Region | null;
 };
+
+/**
+ * A region's mask, read by the packer: cells outside it are off-panel (no ink, `at` and the
+ * line tables give -1), and only windows wholly inside it can be holes. A region has no edge
+ * rule: a panel's frame is lined by a baseline on every side, but a region's lines all stand
+ * on its bottom row, so only its bottom edge carries a line of text and nothing lines its
+ * slanted sides or the star's notch. Holding those to the frame's rule would leave nothing
+ * packable.
+ */
+type Region = {
+  cells: Uint8Array;
+  /** Per line, `tabOf` with the cells outside the mask taken out. */
+  tabs: Map<Line, Int32Array>;
+  /** 1 at a 2×2 window's top-left cell when all four of its cells are usable. */
+  win: Uint8Array;
+};
+
+function regionOf(mask: KufiMask): Region {
+  const { cols, rows, cells } = mask;
+  const usable = (r: number, c: number) => r >= 0 && c >= 0 && r < rows && c < cols && cells[r * cols + c] === 1;
+  const win = new Uint8Array(cols * rows);
+  for (let r = 0; r + 1 < rows; r++)
+    for (let c = 0; c + 1 < cols; c++) if (usable(r, c) && usable(r, c + 1) && usable(r + 1, c) && usable(r + 1, c + 1)) win[r * cols + c] = 1;
+  return { cells, tabs: new Map(), win };
+}
+
+/** True when the 2×2 window at top-left i can be a hole: inside the panel, or wholly inside a region's mask. */
+function inWindow(ctx: Ctx, i: number): boolean {
+  return !ctx.region || ctx.region.win[i] === 1;
+}
 
 function initState(ctx: Ctx): St {
   return {
@@ -678,7 +731,8 @@ function at(ctx: Ctx, L: Line, x: number, y: number): number {
   const r = L.ar * x + L.br * y + L.cr;
   const c = L.ac * x + L.bc * y + L.cc;
   if (r < 0 || c < 0 || r >= ctx.rows || c >= ctx.cols) return -1;
-  return r * ctx.cols + c;
+  const i = r * ctx.cols + c;
+  return ctx.region && !ctx.region.cells[i] ? -1 : i;
 }
 
 /** Writes the shape's cells at (x0, yb) into `scratch`; returns the count, or -1 if any falls outside. */
@@ -688,12 +742,15 @@ function shapeCells(ctx: Ctx, L: Line, sh: Shape, x0: number, yb: number): numbe
   const { ar, br, ac, bc } = L;
   const cr = L.cr + ar * x0 + br * yb;
   const cc = L.cc + ac * x0 + bc * yb;
+  const use = ctx.region?.cells;
   let n = 0;
   for (let k = 0; k < ink.length; k += 2) {
     const r = ar * ink[k] + br * ink[k + 1] + cr;
     const c = ac * ink[k] + bc * ink[k + 1] + cc;
     if (r < 0 || c < 0 || r >= rows || c >= cols) return -1;
-    scratch[n++] = r * cols + c;
+    const i = r * cols + c;
+    if (use && !use[i]) return -1;
+    scratch[n++] = i;
   }
   return n;
 }
@@ -826,7 +883,10 @@ function apply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
   if (mv.mode === 0 || mv.mode === 1) {
     if (mv.mode === 0) L = st.lines[st.cur];
     else {
-      const t = mv.base !== null ? lineOf(ctx.cols, ctx.rows, SIDE_ROT[mv.t & 3], mv.base) : templateLine(ctx.cols, ctx.rows, mv.t, mv.off);
+      const t =
+        mv.base !== null
+          ? lineOf(ctx.cols, ctx.rows, SIDE_ROT[mv.t % ctx.sides], mv.base)
+          : templateLine(ctx.cols, ctx.rows, mv.t, mv.off, ctx.sides);
       if (!t) return null;
       L = t;
       newLine = t;
@@ -1106,9 +1166,11 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
   if (letter.joinedPrev && st.seg) {
     for (const sh of letter.cands)
       for (let e = 0; e <= JEXT_MAX; e++) tryDots({ mode: 2, shape: sh, t: 0, off: 0, base: null, x0: 0, jext: e, climb: 0 });
-    for (const sh of letter.entry)
-      for (let c = CLIMB_MIN; c <= CLIMB_MAX; c++)
-        tryDots({ mode: 3, shape: sh, t: 0, off: 0, base: null, x0: 0, jext: 0, climb: c });
+    // a U-turn reads its next line upside down: never in a region, whose lines are all upright
+    if (!ctx.region)
+      for (const sh of letter.entry)
+        for (let c = CLIMB_MIN; c <= CLIMB_MAX; c++)
+          tryDots({ mode: 3, shape: sh, t: 0, off: 0, base: null, x0: 0, jext: 0, climb: c });
     return stop;
   }
 
@@ -1117,14 +1179,14 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
   if (st.cur >= 0) lineOpts.push({ mode: 0, t: 0, off: 0, base: null });
   for (let inc = 1; inc <= 2; inc++) {
     const t = st.tpl + inc - 1;
-    if (t >= ctx.nTpl || (inc === 2 && t - 1 < 4)) continue; // never skip a side of the frame
+    if (t >= ctx.nTpl || (inc === 2 && t - 1 < ctx.sides)) continue; // never skip a side of the frame (a region's bottom line)
     if (pin) {
       // a pinned letter opens its line where the pin says, whatever the template offset
-      if (SIDE_ROT[t & 3] / 90 !== pin.turn) continue;
+      if (SIDE_ROT[t % ctx.sides] / 90 !== pin.turn) continue;
       lineOpts.push({ mode: 1, t, off: 0, base: null });
       continue;
     }
-    for (const off of t < 4 ? RING0_OFF : RINGK_OFF) lineOpts.push({ mode: 1, t, off, base: null });
+    for (const off of t < ctx.sides ? RING0_OFF : RINGK_OFF) lineOpts.push({ mode: 1, t, off, base: null });
   }
   const shapes = letter.cands.length ? letter.cands : letter.entry;
   let placed = false;
@@ -1135,8 +1197,8 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
       if (lo.mode === 0) L = st.lines[st.cur];
       else if (pin) {
         base = pinBase(sh, pin);
-        L = lineOf(ctx.cols, ctx.rows, SIDE_ROT[lo.t & 3], base);
-      } else L = templateLine(ctx.cols, ctx.rows, lo.t, lo.off);
+        L = lineOf(ctx.cols, ctx.rows, SIDE_ROT[lo.t % ctx.sides], base);
+      } else L = templateLine(ctx.cols, ctx.rows, lo.t, lo.off, ctx.sides);
       if (!L) continue;
       const start = lo.mode === 0 ? st.cursor[st.cur] : L.len - 1;
       if (pin) {
@@ -1159,7 +1221,7 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
   if (pin && !placed && !stop) {
     const tried = new Set(lineOpts.filter((lo) => lo.mode === 1).map((lo) => lo.t));
     for (let t = st.tpl; t < ctx.nTpl; t++)
-      if (SIDE_ROT[t & 3] / 90 === pin.turn) {
+      if (SIDE_ROT[t % ctx.sides] / 90 === pin.turn) {
         if (!tried.has(t)) tryLine({ mode: 1, t, off: 0, base: null });
         break;
       }
@@ -1233,7 +1295,7 @@ function localScore(ctx: Ctx, st: St, rec: Applied): number {
     for (let c = Math.max(0, c0 - 2); c <= Math.min(cols - 2, c1 + 1); c++) {
       const i = r * cols + c;
       const j = i + cols;
-      if (own[i] || own[i + 1] || own[j] || own[j + 1]) continue;
+      if (own[i] || own[i + 1] || own[j] || own[j + 1] || !inWindow(ctx, i)) continue;
       if (adj[i] && adj[i + 1] && adj[j] && adj[j + 1]) perm++;
     }
   return W.fail * st.failed + W.hole * perm + W.split * st.splits + W.uturn * st.uturns + W.stretch * st.stretch;
@@ -1262,7 +1324,7 @@ function completable(ctx: Ctx, st: St, li: number): boolean {
 
 /** Writes line L's band cells with x >= x0 into `into` at weight 2 (depth -2..2) or 1 (depth 3), keeping the larger. */
 function markBand(ctx: Ctx, L: Line, x0: number, into: Uint8Array) {
-  const tab = tabOf(L, ctx.cols, ctx.rows);
+  const tab = tabIn(ctx, L);
   const len = L.len;
   // depths 3 and 4 are where the next ring interlocks: depth 3 counts half, depth 4 not at all
   for (let y = -2; y < BAND - 1; y++) {
@@ -1304,7 +1366,7 @@ function partialScore(ctx: Ctx, st: St): number {
   // what the current line can still reach (ahead of its cursor, to a stroke's height) is never settled
   if (st.cur >= 0) {
     const L = st.lines[st.cur];
-    const tab = tabOf(L, cols, rows);
+    const tab = tabIn(ctx, L);
     const xe = Math.min(L.len - 1, st.cursor[st.cur] + 1);
     for (let y = TAB_LO; y <= TAB_HI; y++) {
       const row = (y - TAB_LO) * L.len;
@@ -1335,7 +1397,7 @@ function partialScore(ctx: Ctx, st: St): number {
     let i = r * cols;
     for (let c = 0; c + 1 < cols; c++, i++) {
       const j = i + cols;
-      if (own[i] || own[i + 1] || own[j] || own[j + 1]) continue;
+      if (own[i] || own[i + 1] || own[j] || own[j + 1] || !inWindow(ctx, i)) continue;
       if (virt[i] === vg || virt[i + 1] === vg || virt[j] === vg || virt[j + 1] === vg) continue;
       if (adj[i] && adj[i + 1] && adj[j] && adj[j + 1]) {
         perm++;
@@ -1357,13 +1419,16 @@ function partialScore(ctx: Ctx, st: St): number {
     if (adj[a] && adj[b]) edge++;
     else if (mk[a] && mk[b]) soft += 0.6;
   };
-  for (let c = 0; c + 1 < cols; c++) {
-    pair(c, c + 1);
-    pair((rows - 1) * cols + c, (rows - 1) * cols + c + 1);
-  }
-  for (let r = 0; r + 1 < rows; r++) {
-    pair(r * cols, (r + 1) * cols);
-    pair(r * cols + cols - 1, (r + 1) * cols + cols - 1);
+  // a region has no edge rule (see `Region`)
+  if (!ctx.region) {
+    for (let c = 0; c + 1 < cols; c++) {
+      pair(c, c + 1);
+      pair((rows - 1) * cols + c, (rows - 1) * cols + c + 1);
+    }
+    for (let r = 0; r + 1 < rows; r++) {
+      pair(r * cols, (r + 1) * cols);
+      pair(r * cols + cols - 1, (r + 1) * cols + cols - 1);
+    }
   }
   return (
     W.fail * st.failed +
@@ -1422,12 +1487,14 @@ function count2x2(ctx: Ctx, own: Int32Array, ink: boolean): number {
       const b = own[i + 1] !== 0;
       const d = own[i + cols] !== 0;
       const e = own[i + cols + 1] !== 0;
-      if (ink ? a && b && d && e : !a && !b && !d && !e) n++;
+      if (ink ? a && b && d && e : !a && !b && !d && !e && inWindow(ctx, i)) n++;
     }
   return n;
 }
 
+/** Pairs of neighbouring frame cells both empty. A region has no edge rule (see `Region`), so none. */
 function edgeBreaks(ctx: Ctx, own: Int32Array): number {
+  if (ctx.region) return 0;
   const { cols, rows } = ctx;
   let n = 0;
   for (let c = 0; c + 1 < cols; c++) {
@@ -1487,8 +1554,9 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
       for (let c0 = c - 1; c0 <= c; c0++) {
         if (r0 < 0 || c0 < 0 || r0 + 1 >= rows || c0 + 1 >= cols) continue;
         const i = r0 * cols + c0;
-        if (!own[i] && !own[i + 1] && !own[i + cols] && !own[i + cols + 1]) n++;
+        if (!own[i] && !own[i + 1] && !own[i + cols] && !own[i + cols + 1] && inWindow(ctx, i)) n++;
       }
+    if (ctx.region) return n; // a region has no frame breaks to close
     if (r === 0 || r === rows - 1) n += (c > 0 && !own[r * cols + c - 1] ? 1 : 0) + (c < cols - 1 && !own[r * cols + c + 1] ? 1 : 0);
     if (c === 0 || c === cols - 1) n += (r > 0 && !own[(r - 1) * cols + c] ? 1 : 0) + (r < rows - 1 && !own[(r + 1) * cols + c] ? 1 : 0);
     return n;
@@ -1497,7 +1565,7 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c;
-      if (own[i] || zone[i] || !iso(r, c)) continue;
+      if (own[i] || zone[i] || (ctx.region && !ctx.region.cells[i]) || !iso(r, c)) continue;
       const n = closes(r, c);
       if (n >= FILL_MIN) cand.push([i, n]);
     }
@@ -1589,7 +1657,9 @@ function barPass(ctx: Ctx, own: Int32Array, ends: Uint8Array, kind: Uint8Array, 
   const gaps = (r0: number, r1: number, c0: number, c1: number) => {
     let n = 0;
     for (let r = Math.max(0, r0); r <= Math.min(rows - 2, r1); r++)
-      for (let c = Math.max(0, c0); c <= Math.min(cols - 2, c1); c++) if (paper(r, c) && paper(r + 1, c) && paper(r, c + 1) && paper(r + 1, c + 1)) n++;
+      for (let c = Math.max(0, c0); c <= Math.min(cols - 2, c1); c++)
+        if (paper(r, c) && paper(r + 1, c) && paper(r, c + 1) && paper(r + 1, c + 1) && inWindow(ctx, r * cols + c)) n++;
+    if (ctx.region) return n; // a region has no frame breaks
     for (let c = Math.max(0, c0); c <= Math.min(cols - 2, c1); c++)
       for (const r of [0, rows - 1]) if (r >= r0 && r <= r1 && paper(r, c) && paper(r, c + 1)) n++;
     for (let r = Math.max(0, r0); r <= Math.min(rows - 2, r1); r++)
@@ -1607,7 +1677,7 @@ function barPass(ctx: Ctx, own: Int32Array, ends: Uint8Array, kind: Uint8Array, 
         const idx = (b: number) => (dir === 0 ? a * cols + b : b * cols + a);
         const ok = (b: number) => {
           const i = idx(b);
-          if (own[i] || zone[i]) return false;
+          if (own[i] || zone[i] || (ctx.region && !ctx.region.cells[i])) return false;
           return dir === 0 ? paper(a - 1, b) && paper(a + 1, b) : paper(b, a - 1) && paper(b, a + 1);
         };
         // the ink beyond an end, or -1 for paper or the panel's edge
@@ -1772,7 +1842,7 @@ function reapply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
     start = st.cursor[st.cur];
   } else {
     if (mv.t < st.tpl) return null;
-    len = (mv.t & 1) === 0 ? ctx.cols : ctx.rows;
+    len = ((mv.t % ctx.sides) & 1) === 0 ? ctx.cols : ctx.rows;
     start = len - 1;
   }
   const sh = mv.shape;
@@ -2038,7 +2108,7 @@ function lettersNear(ctx: Ctx, f: Final, target: "holes" | "squares"): Set<numbe
   for (let r = 0; r + 1 < rows; r++)
     for (let c = 0; c + 1 < cols; c++) {
       const i = r * cols + c;
-      const hole = !own[i] && !own[i + 1] && !own[i + cols] && !own[i + cols + 1];
+      const hole = !own[i] && !own[i + 1] && !own[i + cols] && !own[i + cols + 1] && inWindow(ctx, i);
       if (target === "holes" ? hole : f.kind[i] === K_FILL) holes.push([r, c]);
     }
   const out = new Set<number>();
@@ -2285,17 +2355,22 @@ function makeCtx(
   edits: KufiPanelEdits,
   pins: Map<number, Pin>,
   budgetMs: number,
-  strictClock = false
+  strictClock = false,
+  mask: KufiMask | null = null
 ): Ctx {
   const { units } = resolveKufiText(text);
   const rings = Math.max(1, Math.floor((Math.min(cols, rows) - 1) / (2 * (BAND + 1))) + 1);
   const letters = lettersOf(text, units, edits, pins);
+  // a region stacks upright lines from its bottom row up, one ring per band
+  const regionLines = Math.floor((rows - 1) / (BAND + 1)) + 1;
   return {
     cols,
     rows,
     n: cols * rows,
     letters,
-    nTpl: rings * 4,
+    nTpl: mask ? regionLines : rings * 4,
+    sides: mask ? 1 : 4,
+    region: mask ? regionOf(mask) : null,
     zob: zobrist(cols * rows),
     // the work budget makes a search give the same panel on a busy machine as on a quiet
     // one; the clock is a safety net, loose for panels the size of a real one and tight
@@ -2894,6 +2969,26 @@ export function packKufiPanel(input: {
   if (f?.packed) return okResult(units, f, cols, rows, edits);
   // after an edit the box is the user's: say why, but do not spend a first draft's time on other sizes
   return failure(text, units, f, cols, rows, edits, repacked ? 0 : t0 + CALL_BUDGET_MS);
+}
+
+/**
+ * Text packed into the usable cells of a mask on upright lines stacked from the bottom row up.
+ * Same result shape as packKufiPanel (cols/rows are the mask's). The panel's grammar holds
+ * inside the mask: no ink outside it, no solid 2×2, no empty 2×2 wholly inside it, upright
+ * lines only, no U-turns. There is no edge rule: only a region's bottom edge carries a line of
+ * text, so its other edges (the slanted sides, the notch) are not held to the frame's rule and
+ * may run to paper. No edits, pins or suggestions: a region's size is the star's, not the
+ * user's to pick here. Pure and deterministic, on PACK_BUDGET_MS / PACK_WORK.
+ */
+export function packKufiRegion(input: { text: string; mask: KufiMask }): KufiPackResult {
+  const { text, mask } = input;
+  const { cols, rows } = mask;
+  const { units } = resolveKufiText(text);
+  if (letterCount(units) < 2) return { ok: false, reason: "tooShort", suggestions: [] };
+  if (!mask.cells.some((v) => v === 1)) return { ok: false, reason: "tooLong", suggestions: [] };
+  const f = search(makeCtx(text, cols, rows, {}, new Map(), PACK_BUDGET_MS, false, mask));
+  if (f?.packed) return okResult(units, f, cols, rows, {});
+  return { ok: false, reason: !f || f.st.failed > 0 ? "tooLong" : "tooShort", suggestions: [] };
 }
 
 /** Suggestions skip a size when less than this is left. */
