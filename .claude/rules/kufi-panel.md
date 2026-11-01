@@ -466,7 +466,9 @@ check a layout use the clock override; do not add wall-clock assertions.
   well as the Al-Baqarah-like texts. **The Shahada does not pack** at any
   size, nor do short single words such as محمد: a band holds one word's
   pieces, and there are few corner / turn options. The Shahada stays a known
-  limit for a later layout with a word in the centre.
+  limit for a later layout with a word in the centre. The planned next
+  layouts (radial star panels, other shapes, flowing angular Kufi) are listed
+  in [deferred-features.md](deferred-features.md).
 - **Bismillah's Fit is close to the clock in the product.** It reaches its
   size (the 17th size tried) at about 6 s of the 9 s wall-clock
   `FIT_BUDGET_MS`, so a slow machine may stop before it. Under the tests'

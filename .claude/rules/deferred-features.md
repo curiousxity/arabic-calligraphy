@@ -63,6 +63,25 @@ These are capabilities that have been explicitly identified as valuable but deli
   Wessam), which would need a different notion of "body" than touch
   connectivity.
 
+## Kufi panel: layouts beyond the ring
+
+Raised 2026-11-01 from reference pictures. Each is its own project, taken one
+at a time in this order; the first is being designed now. The packer today
+lays every panel as one ring of bands around a square or rectangle (see
+[kufi-panel.md](kufi-panel.md)).
+
+1. **Radial (star) panels.** Words run outward from a geometric star or
+   rosette at the centre, along rays, with the square's corners filled. The
+   reference has eight rays, but the count is not fixed: the layout comes
+   from a geometric construction (a grid of circles and lines), not from one
+   eight-way template. This is also the likely home for the Shahada, which
+   the ring cannot fit.
+2. **Panels in other shapes.** Square Kufi filling a triangle, trapezoid,
+   diamond or small square, as in mosaic tilework where several such panels
+   tile one wall.
+3. **Flowing angular Kufi.** A further style: angular letters that are not
+   locked to the square lattice. Not yet described.
+
 ## Roadmap: towards a pen that behaves like a calligrapher's
 
 Raised 2026-10-16 while comparing HarfCanvas with Kelk. The gap is that Kelk
