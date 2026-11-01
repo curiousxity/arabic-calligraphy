@@ -52,7 +52,8 @@ export const section: GuideSection = {
         <strong>Width</strong> and <strong>Height</strong> in the Kufi panel
         section count squares. The text has to fill the box exactly, with no
         holes, so only some sizes work for a given text. <strong>Fit</strong>{" "}
-        looks for the smallest box your text fills; it can take several
+        tries sizes near your text's own and gives you the first box it
+        fills, which is not always the smallest; it can take several
         seconds for a long text. Some texts need a box that is not square, and
         Fit and the suggested sizes offer those too. A panel may be closed by a
         short straight bar along a line, where the letters leave a small gap. If you would rather choose, the size fields

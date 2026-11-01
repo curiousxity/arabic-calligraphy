@@ -1,5 +1,7 @@
 # Square Kufi panel: making most texts pack
 
+> **Status (2026-10-31):** Two lines (Task 2) was dropped by the user. The Shahada (Task 6) was stopped and stays a known limit, for a later layout with a word in the centre. Rectangles, filler bars and the ranking by bars shipped.
+
 Follows `2026-10-31-kufi-panel-usability-design.md`. The user asked for the
 next step on the Kufi panel and skipped the questions; every call below is
 mine unless marked as theirs.

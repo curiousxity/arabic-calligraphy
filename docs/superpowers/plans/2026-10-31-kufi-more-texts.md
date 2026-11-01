@@ -1,5 +1,7 @@
 # Square Kufi: More Texts Pack — Implementation Plan
 
+> **Status (2026-10-31):** Two lines (Task 2) was dropped by the user. The Shahada (Task 6) was stopped and stays a known limit, for a later layout with a word in the centre. Rectangles, filler bars and the ranking by bars shipped.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fit and suggestions try rectangles of any proportion; a two-line layout joins the ring; a new filler, the bar, closes the near misses (سبحان الله, Bismillah, قل هو الله أحد); a spike finds the shape that will pack the Shahada.

@@ -105,8 +105,10 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 - Fit and suggestions try boxes of any proportion; filler bars close panels the
   text nearly fills. Now packs الله أكبر, سبحان الله, قل هو الله أحد and
-  Bismillah; the Shahada and single short words still do not. Details and the
-  Bismillah timing gap: [kufi-panel.md](.claude/rules/kufi-panel.md).
+  Bismillah. **The Shahada does not pack** (a known limit, left for a later
+  layout with a word in the centre), nor do single short words. Two lines was
+  dropped. Details and the Bismillah timing gap:
+  [kufi-panel.md](.claude/rules/kufi-panel.md).
 
 ### 2026-10-30 — Kufi panel (square Kufi, single box) — on `claude/kufi-square`, not merged
 

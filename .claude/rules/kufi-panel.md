@@ -93,10 +93,22 @@ are no better).
   proportion, not only squares. Fit's order (`fitSizes`): the first
   `FIT_LEAD_SQUARES` (3) squares, then `FIT_LEAD_RECTS` (24) rectangles
   (`fitRectangles`: two by elongation, then one ranked by the greedy pass, and
-  so on), then the remaining squares, then the remaining rectangles. A count,
-  never a clock, decides it, so a busy machine tries the same sizes. The
-  suggestions keep their old order. Rectangle sides are at least
+  so on), then the remaining squares, then the remaining rectangles. A count
+  decides the *order*, so a busy machine tries the same sizes in the same
+  order; how *far* Fit gets down it is the 9 s `FIT_BUDGET_MS` clock in the
+  product (25 to 46 sizes for a failing text on the development machine) and
+  `FIT_MAX_SIZES` (32 sizes) under the tests' clock override, so a layout
+  test of Fit never depends on load. Fit returns the first size in this order
+  that packs, not the smallest. The suggestions keep their old order. Rectangle sides are at least
   `MIN_RECT_SIDE` (7).
+- **A pin goes back where a packed panel put it.** The search's replays
+  (`reapply`) may open a line past a side of the frame, or past the next
+  template line, which the move generator (`forMoves`) never does for a free
+  letter. A pinned letter whose usual lines cannot take it therefore also
+  tries the first template line of its side still ahead, so every placement
+  of a packed panel can be pinned and repacked (an empty repack of إن شاء الله
+  13x13 used to give `tooLong`, its own pins `pinConflict`). Only where the
+  usual lines fail, so no pin that placed before gets a second way.
 - **`dotsDrawn`** reads a placed letter's dot set from the cells (for the
   implicit pins of a repack). A lone cell of a glyph (الله has one) is that
   letter's own, never a dot; reading it as one once pinned a wrong dot shift.
@@ -215,7 +227,7 @@ tries each through the packer; `kufiExploreClient.ts` runs that in a worker of
 its own, never the pack worker, one job at a time, results cached by the
 layout key. `useKufiExplore(inputs)` reads the current result from the layout
 cache itself and starts once it is packed. `pickArrangements` ranks tries
-(filler squares, then cut, then grow) and drops duplicates of the current
+(filler squares, then bars, then cut, then grow) and drops duplicates of the current
 panel and of each other. A thumbnail click goes through App's `editKufiPanel`
 (`onApplyEdits` -> `onApplyKufiEdits`) with `fromKey` = the key of the inputs
 it was found for: it seeds the layout cache with the explored result, pushes
@@ -428,11 +440,15 @@ check a layout use the clock override; do not add wall-clock assertions.
 
 - **Some texts still do not pack.** Fit now packs الله أكبر, سبحان الله
   (13x15), قل هو الله أحد and Bismillah (17x19), by rectangles and bars, as
-  well as the Al-Baqarah-like texts. The Shahada and short single words such
-  as محمد do not at any size: a band holds one word's pieces, and there are
-  few corner / turn options.
-- **Bismillah's Fit is close to the clock.** It reaches its size at about 6 s
-  of the 9 s wall-clock `FIT_BUDGET_MS`, so a slow machine may stop before it.
+  well as the Al-Baqarah-like texts. **The Shahada does not pack** at any
+  size, nor do short single words such as محمد: a band holds one word's
+  pieces, and there are few corner / turn options. The Shahada stays a known
+  limit for a later layout with a word in the centre.
+- **Bismillah's Fit is close to the clock in the product.** It reaches its
+  size (the 17th size tried) at about 6 s of the 9 s wall-clock
+  `FIT_BUDGET_MS`, so a slow machine may stop before it. Under the tests'
+  clock override Fit counts sizes instead (`FIT_MAX_SIZES`), so its test does
+  not depend on load.
 - **Moving a word mostly refuses on tight panels** (the Baqarah finding above).
 - **A Fit with pins can run about 12.5 s** (`FIT_BUDGET_MS` is checked between
   sizes, plus one `PINNED_CALL_MS`), under the 30 s watchdog but ahead of every
