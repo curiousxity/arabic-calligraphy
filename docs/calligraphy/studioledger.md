@@ -370,6 +370,11 @@ Times are minutes:seconds into the individual-letters lesson.
   ours and the studio's are closest. 439 and 441's head base stroke copies 031.s2, which is longer than theirs: each
   is trimmed to its own studio end in its joint trims, so 031 keeps its length. The user: "Approve 422, 432, 439,
   441".
+- **The medial kaf's starting hook, 481 to 490 (2026-11-01):** the user: "Can you fix the initial curve of 481-490?
+  Some of them are the same". The curl that opens the top stroke and its hairline fell short of the studio outside
+  the curl and at the tip. Seven strokes hold it (481.s0, 482.s2, 483.s0, 484.s0, 486.s0, 489.s0, 490.s2); 485, 487,
+  488 and the pair 445 copy one of them. Over the right 60 units of each, the ink is the stroke's own studio outline,
+  smoothed. The user: "Both the redraws and pages look good".
 
 **Every joint trimmed to the studio edge**
 
