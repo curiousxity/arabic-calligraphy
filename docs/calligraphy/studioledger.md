@@ -358,6 +358,11 @@ Times are minutes:seconds into the individual-letters lesson.
   studio outline, lightly smoothed so the cut stays crisp (`me/endcap.py`, ENDCAP_OWN, ENDCAP_SMOOTH=1), over a
   polygon whose sides run along the stroke's edges at a shallow angle, so ours eases into the studio's over a few
   units instead of stepping where the box would cross. The user: "345, 354, 352 all good".
+- **395 and 396's dips (2026-11-01):** the user: "395 and 396 dips problems". 395.s5's inner edge sagged under the
+  studio's at the dip, its outer edge right: the nib widens there by 2.4 stamp units with its centre raised 1.2,
+  the bump moved 5 units left of the lowest node (`me/dipfix.py`, a negative THIN and SHIFT). 396.s3 dipped low like
+  112's: lifted 1.2 and narrowed 0.6, so the outer edge is on the studio's; a sliver stays inside, under the studio's
+  faceted point. The user: "395 and 396 are good".
 
 **Every joint trimmed to the studio edge**
 
