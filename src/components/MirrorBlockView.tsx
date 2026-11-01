@@ -7,6 +7,7 @@ import { TextOnPathText } from "./TextOnPathText";
 import { StackView } from "./StackView";
 import { MarkView } from "./MarkView";
 import { KufiPanelView } from "./KufiPanelView";
+import { KufiStarView } from "./KufiStarView";
 import { radialCopyTransforms, type MirrorSource } from "../lib/mirror";
 import type { MirrorMode } from "../types";
 import {
@@ -14,6 +15,7 @@ import {
   shapedTextProps,
   markProps,
   kufiPanelProps,
+  kufiStarProps,
   stackProps,
   textPathProps,
 } from "../lib/blockRenderProps";
@@ -139,6 +141,7 @@ export const MirrorBlockView: React.FC<MirrorBlockViewProps> = ({
     }
     if (source.type === "stack") return <StackView {...common} {...stackProps(source)} />;
     if (source.type === "mark") return <MarkView {...common} {...markProps(source)} />;
+    if (source.type === "kufiStar") return <KufiStarView {...common} {...kufiStarProps(source)} />;
     if (source.type === "kufiPanel") return <KufiPanelView {...common} {...kufiPanelProps(source)} />;
     return <ShapedText {...common} {...shapedTextProps(source)} />;
   }, [source, sourceGuideD, sourceGuideClosed]);

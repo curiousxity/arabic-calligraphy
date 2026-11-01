@@ -15,6 +15,7 @@ import {
   MirrorIcon,
   MedallionIcon,
   KufiPanelIcon,
+  KufiStarIcon,
 } from "../Icons";
 
 /** How long the pointer must rest on an Add button before its demo opens. */
@@ -46,6 +47,8 @@ export type BlockControlsPanelProps = {
   canAddMedallion?: boolean;
   /** A square-Kufi panel of its own text, sized to fit it. */
   onAddKufiPanel?: () => void;
+  /** A Kufi star panel: the construction of a 4-, 5- or 6-fold star. */
+  onAddKufiStar?: () => void;
   onDuplicateBlock: () => void;
   onDeleteBlock: () => void;
   onUndo: () => void;
@@ -75,6 +78,7 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
   onAddMedallion,
   canAddMedallion,
   onAddKufiPanel,
+  onAddKufiStar,
   onDuplicateBlock,
   onDeleteBlock,
   onUndo,
@@ -189,6 +193,19 @@ export const BlockControlsPanel: React.FC<BlockControlsPanelProps> = ({
                 onClick={onAddKufiPanel}
               >
                 <KufiPanelIcon size={15} />
+              </button>
+            </span>
+          )}
+
+          {onAddKufiStar && (
+            <span className="blockControlDemo" title="Add a Kufi star panel">
+              <button
+                type="button"
+                className="sidebarCircleButton"
+                aria-label="Add Kufi star"
+                onClick={onAddKufiStar}
+              >
+                <KufiStarIcon size={15} />
               </button>
             </span>
           )}

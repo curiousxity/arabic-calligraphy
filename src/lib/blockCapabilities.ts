@@ -48,6 +48,9 @@ export const hasOwnText = (
 export const isKufiPanel = (b: Block): b is Extract<Block, { type: "kufiPanel" }> =>
   b.type === "kufiPanel";
 
+/** A Kufi star panel: no font, no shaped glyphs, so the same per-glyph tools skip it. */
+export const isKufiStar = (b: Block): b is Extract<Block, { type: "kufiStar" }> => b.type === "kufiStar";
+
 /**
  * The block types whose renderers mount `DiacriticHoverHandles`: text, Shape
  * Fill and Curve (where an offset is in the letter's own tilted frame). A

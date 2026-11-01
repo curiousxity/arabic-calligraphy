@@ -28,6 +28,8 @@ const blockTypeIcon = (b: Block) =>
     "✒"
   ) : b.type === "kufiPanel" ? (
     "▦"
+  ) : b.type === "kufiStar" ? (
+    "✦"
   ) : (
     "T"
   );
@@ -38,6 +40,7 @@ const defaultLabel = (b: Block) =>
   : b.type === "stack" ? `Stack · ${b.source.text}`
   : b.type === "mark" ? `Mark · ${findMark(b.markId)?.name ?? "custom"}`
   : b.type === "kufiPanel" ? `Kufi panel · ${b.text}`
+  : b.type === "kufiStar" ? `Kufi star · ${b.starFold}-fold`
   : `Block ${b.id}`;
 
 export type LayersPanelProps = {

@@ -8,6 +8,7 @@ import { GuideView } from "./GuideView";
 import { StackView } from "./StackView";
 import { MarkView } from "./MarkView";
 import { KufiPanelView } from "./KufiPanelView";
+import { KufiStarView } from "./KufiStarView";
 import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
 import type { KufiTool } from "../lib/kufi/kufiPanelBlock";
 import type { KufiNotice } from "./KufiPanelEditOverlay";
@@ -100,6 +101,7 @@ import {
   shapedTextProps,
   markProps,
   kufiPanelProps,
+  kufiStarProps,
   stackProps,
   textPathProps,
 } from "../lib/blockRenderProps";
@@ -1288,6 +1290,21 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onSetPanelSize={block.id === selectedId ? onSetKufiPanelSize : undefined}
                     fitPending={kufiFitPendingId === block.id}
                     pickedUnit={kufiLetter && kufiLetter.blockId === block.id ? kufiLetter.unitIndex : null}
+                  />
+                );
+              }
+
+              if (block.type === "kufiStar") {
+                return (
+                  <KufiStarView
+                    key={block.id}
+                    {...commonProps}
+                    {...kufiStarProps(block)}
+                    x={block.x}
+                    y={block.y}
+                    opacity={block.opacity ?? 1}
+                    locked={block.locked}
+                    isSelected={block.id === selectedId}
                   />
                 );
               }

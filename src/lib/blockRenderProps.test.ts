@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { kufiPanelProps, markProps, shapedTextProps, textPathProps } from "./blockRenderProps";
+import { kufiPanelProps, kufiStarProps, markProps, shapedTextProps, textPathProps } from "./blockRenderProps";
 import type { Block } from "../types";
 import { resolveGuidePath } from "./guides";
 
@@ -58,5 +58,18 @@ describe("kufiPanelProps", () => {
       stroke: "#000", shadowColor: "#000", panelCols: 9, panelRows: 11, panelEdits,
     } as unknown as Extract<Block, { type: "kufiPanel" }>;
     expect(kufiPanelProps(b)).toMatchObject({ text: "الله", fontSize: 48, color: "#222", panelCols: 9, panelRows: 11, panelEdits });
+  });
+});
+
+describe("kufiStarProps", () => {
+  it("carries every star field for a mirror", () => {
+    const b = {
+      id: 5, type: "kufiStar", text: "", x: 0, y: 0, fontSize: 112, color: "#222", fontFamily: "Amiri",
+      stroke: "#000", shadowColor: "#000", starFold: 5, starK: 2, starSize: 30,
+      starRegions: ["", "الله", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], starLines: false,
+    } as unknown as Extract<Block, { type: "kufiStar" }>;
+    expect(kufiStarProps(b)).toMatchObject({
+      fontSize: 112, color: "#222", starFold: 5, starK: 2, starSize: 30, starRegions: b.starRegions, starLines: false,
+    });
   });
 });

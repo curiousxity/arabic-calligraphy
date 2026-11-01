@@ -376,6 +376,14 @@ export const MedallionIcon: React.FC<IconProps> = (props) => (
   </IconBase>
 );
 
+/** A Kufi star panel: an eight-pointed star in a square frame. */
+export const KufiStarIcon: React.FC<IconProps> = (props) => (
+  <IconBase {...props}>
+    <rect x="3" y="3" width="18" height="18" />
+    <path d="M12 6l2.3 3.7L18 12l-3.7 2.3L12 18l-2.3-3.7L6 12l3.7-2.3z" />
+  </IconBase>
+);
+
 /** A square-Kufi panel: a frame with a squared spiral inside, all straight runs on a lattice. */
 export const KufiPanelIcon: React.FC<IconProps> = (props) => (
   <IconBase {...props}>

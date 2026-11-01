@@ -5,7 +5,7 @@ import {
   URDU,
   PRESETS,
 } from "../lib/presets";
-import type { Block } from "../types";
+import type { Block, KufiStarBlock } from "../types";
 import type { NamedProjectMeta } from "../App";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import type { StarterTemplate } from "../lib/templates";
@@ -34,6 +34,7 @@ import type { HistoryTimelineEntry } from "./sidebar/HistoryPopover";
 import { makeId } from "./sidebar/utils";
 import { hasOwnFont, hasOwnText, supportsDiacriticOverrides } from "../lib/blockCapabilities";
 import { KufiPanelPanel } from "./sidebar/KufiPanelPanel";
+import { KufiStarPanel } from "./sidebar/KufiStarPanel";
 import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
 import type { KufiTool } from "../lib/kufi/kufiPanelBlock";
 import {
@@ -201,6 +202,10 @@ export type SidebarProps = {
   onAddTextPathBlock?: () => void;
   /** Adds a square-Kufi panel, sized to its text once Fit answers. */
   onAddKufiPanel?: () => void;
+  /** Adds a Kufi star panel. */
+  onAddKufiStar?: () => void;
+  /** Patches the selected Kufi star: one undo step per call. */
+  onSetKufiStar?: (patch: Partial<KufiStarBlock>) => void;
   /** The selected Kufi panel's box in cells. */
   onSetKufiPanelSize?: (size: { cols: number; rows: number }) => void;
   /** Fits the selected Kufi panel's box to its text; rejects "Fit failed …" if the packer's worker dies. */
@@ -416,6 +421,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddShapeFillBlock,
   onAddTextPathBlock,
   onAddKufiPanel,
+  onAddKufiStar,
+  onSetKufiStar,
   onSetKufiPanelSize,
   onFitKufiPanel,
   onReleaseKufiPanelPins,
@@ -502,6 +509,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showStack, setShowStack] = useState(true);
   const [showMark, setShowMark] = useState(true);
   const [showKufiPanel, setShowKufiPanel] = useState(true);
+  const [showKufiStar, setShowKufiStar] = useState(true);
   // Closed by default: four groups of preview buttons are most of a screen.
   const [showMarks, setShowMarks] = useState(false);
 
@@ -1036,6 +1044,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onAddShapeFillBlock={onAddShapeFillBlock}
           onAddTextPathBlock={onAddTextPathBlock}
           onAddKufiPanel={onAddKufiPanel}
+          onAddKufiStar={onAddKufiStar}
           onAddGuide={onAddGuide}
           onAddSvgGuide={onAddSvgGuide}
           onAddMirrorBlock={onAddMirrorBlock}
@@ -1457,6 +1466,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 letter={kufiLetter && kufiLetter.blockId === selectedBlock.id ? kufiLetter.unitIndex : null}
                 fitPending={kufiFitPendingId === selectedBlock.id}
               />
+            </CollapsibleSection>
+          </div>
+        )}
+
+        {selectedBlock?.type === "kufiStar" && onSetKufiStar && (
+          <div className="sidebarPanel">
+            <CollapsibleSection title="Kufi star" isOpen={showKufiStar} onToggle={() => setShowKufiStar((v) => !v)}>
+              <KufiStarPanel key={selectedBlock.id} block={selectedBlock} onPatch={onSetKufiStar} />
             </CollapsibleSection>
           </div>
         )}

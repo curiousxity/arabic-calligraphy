@@ -65,7 +65,7 @@ import {
   type WritingSession,
 } from "./lib/guides";
 import { DEFAULT_ATTACHMENT } from "./lib/guidePlacement";
-import type { GuideAttachment, GuideBlock, GuideParams, GuideShape, KufiPanelBlock, MarkBlock } from "./types";
+import type { GuideAttachment, GuideBlock, GuideParams, GuideShape, KufiPanelBlock, KufiStarBlock, MarkBlock } from "./types";
 import { markScale, type MarkItem } from "./lib/markLibrary";
 import type { Block, DiacriticOverride, DetachedMarkOverride, StackBlock, StrokeCut } from "./types";
 import type { Session } from "@supabase/supabase-js";
@@ -166,6 +166,8 @@ import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
 import { kufiCellSize, kufiPanelInputs, kufiPanelTextPatch, kufiReleasePins, type KufiTool } from "./lib/kufi/kufiPanelBlock";
 import { KUFI_NOTICE_MS, type KufiNotice } from "./components/KufiPanelEditOverlay";
+import { starConstruction, STAR_KS } from "./lib/kufi/kufiStarGeometry";
+import { starOutlineBox } from "./lib/kufi/kufiStarPath";
 import { kufiLayoutKey, requestKufiFit, seedKufiLayout } from "./lib/kufi/kufiLayoutClient";
 import type { KufiPackResult, KufiPanelEdits } from "./lib/kufi/kufiPack";
 import {
@@ -2109,6 +2111,49 @@ const App: React.FC = () => {
     );
   };
 
+  // A Kufi star panel is the construction alone for now (no text in its
+  // regions yet). The block's x,y is the outline's top-left corner, and the
+  // click that places it is the star's centre.
+  const addKufiStar = () => {
+    const id = createNextId();
+    const fontSize = 112;
+    const cell = kufiCellSize(fontSize);
+    const star: KufiStarBlock = {
+      ...DEFAULT_BLOCK,
+      id,
+      text: "",
+      type: "kufiStar",
+      fontSize,
+      color: "#1a1a1a",
+      // An outline would export as a second path; a new panel has none.
+      strokeWidth: 0,
+      starFold: 4,
+      starK: STAR_KS[4][0],
+      starSize: 24,
+      starRegions: Array.from({ length: 13 }, () => ""),
+      starLines: true,
+      x: 0,
+      y: 0,
+    };
+    const box = starOutlineBox(starConstruction(star.starFold, star.starK, star.starSize));
+    beginPlacement(star, box.width * cell, box.height * cell, box.minX * cell, box.minY * cell, "New Kufi star");
+  };
+
+  /** Changes the selected Kufi star (fold, star, size, lines): one undo step, the star's centre kept where it was. */
+  const setKufiStar = (patch: Partial<KufiStarBlock>) => {
+    if (!selectedBlock || selectedBlock.type !== "kufiStar") return;
+    const b = selectedBlock;
+    const next = { ...b, ...patch };
+    const cell = kufiCellSize(b.fontSize);
+    const before = starOutlineBox(starConstruction(b.starFold, b.starK, b.starSize));
+    const after = starOutlineBox(starConstruction(next.starFold, next.starK, next.starSize));
+    updateSelectedBlock({
+      ...patch,
+      x: b.x + (before.minX - after.minX) * cell,
+      y: b.y + (before.minY - after.minY) * cell,
+    });
+  };
+
   /** Width and height of the selected Kufi panel, in cells: one undo step. */
   const setKufiPanelSize = (size: { cols: number; rows: number }) => {
     if (!selectedBlock || !isKufiPanel(selectedBlock)) return;
@@ -3542,6 +3587,8 @@ const App: React.FC = () => {
         onAddShapeFillBlock={addShapeFillBlock}
         onAddTextPathBlock={addTextPathBlock}
         onAddKufiPanel={addKufiPanel}
+        onAddKufiStar={addKufiStar}
+        onSetKufiStar={setKufiStar}
         onSetKufiPanelSize={setKufiPanelSize}
         onFitKufiPanel={fitKufiPanelSize}
         onReleaseKufiPanelPins={releaseKufiPanelPins}

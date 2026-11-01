@@ -74,4 +74,21 @@ describe("sanitizeLegacyBlocks", () => {
     expect(out).toHaveLength(1);
     expect(out[0]).toEqual(panel);
   });
+
+  it("kufiStar round-trips with every star field", () => {
+    const star = {
+      ...legacyText,
+      id: 3,
+      type: "kufiStar",
+      text: "",
+      starFold: 6,
+      starK: 4,
+      starSize: 30,
+      starRegions: Array.from({ length: 19 }, (_, i) => (i === 2 ? "الله" : "")),
+      starLines: false,
+    };
+    const parsed = JSON.parse(JSON.stringify({ version: 5, blocks: [star] })) as { blocks: unknown[] };
+    const out = dropOrphanedAttachments(dropOrphanedMirrors(sanitizeLegacyBlocks(parsed.blocks)));
+    expect(out).toEqual([star]);
+  });
 });

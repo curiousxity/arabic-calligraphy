@@ -6,7 +6,8 @@ export type BlockType =
   | "guide"
   | "stack"
   | "mark"
-  | "kufiPanel";
+  | "kufiPanel"
+  | "kufiStar";
 export type FontStyle = "normal" | "bold" | "italic" | "bold italic";
 export type TextAlign = "left" | "center" | "right";
 
@@ -376,6 +377,25 @@ export type KufiPanelBlock = BlockCommon & {
   panelEdits?: KufiPanelEdits;
 };
 
+/**
+ * A star panel: the compass-and-ruler construction of a 4-, 5- or 6-fold
+ * Kufi star (`lib/kufi/kufiStarGeometry.ts`), drawn as one traced outline.
+ * `fontSize / 8` is the cell size in px, as for `kufiPanel`; `fontFamily` is
+ * inert. The block's x,y is the outline's top-left corner.
+ */
+export type KufiStarBlock = BlockCommon & {
+  type: "kufiStar";
+  starFold: 4 | 5 | 6;
+  /** The {m/k} star offered by `STAR_KS[starFold]`. */
+  starK: number;
+  /** The ring's apothem in cells. */
+  starSize: number;
+  /** The text in each region by index (`1 + 3n` entries); "" = pattern only. */
+  starRegions: string[];
+  /** Draw the construction lines (one cell wide bands). */
+  starLines: boolean;
+};
+
 export type Block =
   | TextBlock
   | ShapeFillBlock
@@ -384,4 +404,5 @@ export type Block =
   | GuideBlock
   | StackBlock
   | MarkBlock
-  | KufiPanelBlock;
+  | KufiPanelBlock
+  | KufiStarBlock;
