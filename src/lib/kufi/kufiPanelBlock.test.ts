@@ -201,5 +201,10 @@ describe("kufiPanelBlock", () => {
       const still = kufiPinWordEdits({}, committed, committed, units, 1);
       expect(Object.keys(still.pinned!).map(Number)).toEqual([1, 2, 3, 4]);
     });
+
+    it("a panel the packer rearranged round the word is pinned whole, unchanged letters too", () => {
+      const result: Ok = { ...committed, placements: placements.map((p, i) => (i >= 1 ? { ...p, col: p.col - 2 } : p)), rearranged: true };
+      expect(kufiPinWordEdits({}, committed, result, units, 1).pinned).toEqual(Object.fromEntries(result.placements.map((p, i) => [i, p])));
+    });
   });
 });

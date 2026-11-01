@@ -19,11 +19,13 @@ beforeAll(() => _internal.setClockOverride(Infinity));
 afterAll(() => _internal.setClockOverride(null));
 
 const BAQARAH = "لا يكلف الله نفسا إلا وسعها";
-// `quality` counts only unpinned letters, so a repack of pinned letters reports less of it: layouts are compared without it
+// `quality` counts only unpinned letters, so a repack of pinned letters reports less of it: layouts are compared without it,
+// and without `rearranged`, which says how a panel was found, not what it is
 const layoutOf = (r: KufiPackResult) => {
   if (!r.ok) return r;
   const layout = { ...r };
   delete layout.quality;
+  delete layout.rearranged;
   return layout;
 };
 const ALLAH = "الله";
@@ -532,6 +534,26 @@ function layoutHash(r: KufiPackResult): string {
 }
 
 describe("a moved word rearranging the panel", () => {
+  const PANELS: Array<[string, number, number]> = [
+    [NASR, 15, 9],
+    ["سبحان الله", 13, 15],
+    ["إن شاء الله", 13, 13],
+    ["قل هو الله أحد", 11, 22],
+    ["بسم الله الرحمن الرحيم", 17, 19],
+    ["الحمد لله", 13, 13],
+    [BAQARAH, 21, 21],
+  ];
+  /** Every move of `route` cells the panel lets a word make (the box stays on the panel), with the panel it starts from. */
+  const movesOf = (route: number) =>
+    PANELS.flatMap(([text, cols, rows]) => {
+      const committed = expectPacked(packKufiPanel({ text, cols, rows }), text);
+      const units = resolveKufiText(text).units;
+      const words = Math.max(...units.map((u) => u.wordIndex)) + 1;
+      return Array.from({ length: words }, (_, w) => w).flatMap((w) => {
+        const edits = kufiRouteEdits(undefined, committed, units, w, route);
+        return edits ? [{ text, cols, rows, committed, units, w, edits }] : [];
+      });
+    });
   const nasr = () => {
     const committed = expectPacked(packKufiPanel({ text: NASR, cols: 15, rows: 9 }), NASR);
     return { committed, units: resolveKufiText(NASR).units };
@@ -548,6 +570,7 @@ describe("a moved word rearranging the panel", () => {
     expect(moved.placements[0]).toEqual(edits.pinned![0]);
     // the rest did rearrange: the م of the next word moved too
     expect(moved.placements[3]).not.toEqual(committed.placements[3]);
+    expect(moved.rearranged).toBe(true);
   }, 30000);
 
   it("a move that packed before packs the same, cell for cell (يكلف at +2 on Al-Baqarah)", () => {
@@ -557,29 +580,17 @@ describe("a moved word rearranging the panel", () => {
     // the packer's result before the rearranging step: the first round packs, nothing outside the word changed
     expect(layoutHash(moved)).toBe("951deba1");
     if (!moved.ok) return;
+    expect("rearranged" in moved).toBe(false);
     moved.placements.forEach((p, k) => {
       if (units[k].wordIndex !== 1) expect(p, `unit ${k}`).toEqual(r.placements[k]);
     });
   }, 30000);
 
-  it("a move of one cell still never packs", () => {
-    const panels: Array<[string, number, number]> = [
-      [NASR, 15, 9],
-      [BAQARAH, 21, 21],
-    ];
-    let tried = 0;
-    for (const [text, cols, rows] of panels) {
-      const r = expectPacked(packKufiPanel({ text, cols, rows }), text);
-      const units = resolveKufiText(text).units;
-      const words = Math.max(...units.map((u) => u.wordIndex)) + 1;
-      for (let w = 0; w < words; w++) {
-        const edits = kufiRouteEdits(undefined, r, units, w, 1);
-        if (!edits) continue;
-        tried++;
-        expect(packKufiPanel({ text, cols, rows, previous: r, edits }).ok, `${text} word ${w}`).toBe(false);
-      }
-    }
-    expect(tried).toBeGreaterThan(3);
+  it("a move of one cell still never packs, on any bundled panel", () => {
+    const moves = movesOf(1);
+    expect(moves.length).toBeGreaterThan(10);
+    for (const { text, cols, rows, committed, w, edits } of moves)
+      expect(packKufiPanel({ text, cols, rows, previous: committed, edits }).ok, `${text} word ${w}`).toBe(false);
   }, 120000);
 
   it("letters the user pinned stay at their pins while the rest rearranges", () => {
@@ -600,12 +611,31 @@ describe("a moved word rearranging the panel", () => {
     const edits = kufiRouteEdits(undefined, committed, units, 0, 2)!;
     const moved = expectPacked(packKufiPanel({ text: NASR, cols: 15, rows: 9, previous: committed, edits }), NASR);
     const saved = kufiPinWordEdits(edits, committed, moved, units, 0);
-    // the word and the letters it moved are pinned; الله, which did not move, is not
-    expect(Object.keys(saved.pinned!).map(Number).sort()).toEqual([0, 1, 2, 3, 4]);
+    // a rearranged panel is pinned whole, الله too though it did not move
+    expect(Object.keys(saved.pinned!).map(Number).sort()).toEqual([0, 1, 2, 3, 4, 5]);
     _internal.clearCaches();
     const reopened = packKufiPanel({ text: NASR, cols: 15, rows: 9, edits: saved });
     expect(layoutOf(reopened)).toEqual(layoutOf(moved));
   }, 30000);
+
+  it("every two-cell move that packs, on every bundled panel, reopens identical from its committed edits", () => {
+    let packed = 0;
+    let rearranged = 0;
+    for (const route of [-2, 2])
+      for (const { text, cols, rows, committed, units, w, edits } of movesOf(route)) {
+        const moved = packKufiPanel({ text, cols, rows, previous: committed, edits });
+        if (!moved.ok) continue;
+        packed++;
+        if (moved.rearranged) rearranged++;
+        const saved = kufiPinWordEdits(edits, committed, moved, units, w);
+        _internal.clearCaches();
+        const reopened = packKufiPanel({ text, cols, rows, edits: saved });
+        expect(layoutOf(reopened), `${text} word ${w} at ${route}`).toEqual(layoutOf(moved));
+      }
+    // nasr's two, إن شاء الله, قل هو الله أحد, Bismillah and two on Al-Baqarah; five of them rearranged
+    expect(packed).toBe(7);
+    expect(rearranged).toBe(5);
+  }, 300000);
 
   it("an edit other than a move never reaches the step: a stretch repacks as before, packed or not", () => {
     const r = expectPacked(packKufiPanel({ text: BAQARAH, cols: 21, rows: 21 }), BAQARAH);
