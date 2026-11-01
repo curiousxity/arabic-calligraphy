@@ -11,12 +11,12 @@
  * and the whole call is bounded: by `budgetMs` on the clock, or, under the
  * tests' clock override, by `STAR_EVAL_MAX_TRIES` packs, so a test's
  * answer never depends on machine load. The work runs likeliest first
- * (classic star before the alternative, repeat and alternate before run,
+ * (each fold's default star before its other one, repeat and alternate before run,
  * corners and centre), so a cut still leaves the best offers.
  * Pure: no React, no Konva, no `./harfbuzz`.
  */
 import { kufiClockOverridden, packKufiRegion, type KufiMask, type KufiPackResult } from "./kufiPack";
-import { STAR_KS, starConstruction, type StarConstruction, type StarFold, type StarRegionKind } from "./kufiStarGeometry";
+import { defaultStarK, STAR_KS, starConstruction, type StarConstruction, type StarFold, type StarRegionKind } from "./kufiStarGeometry";
 import type { KufiStarInputs, KufiStarLayout } from "./kufiStarLayout";
 import { resolveKufiText } from "./kufiWords";
 
@@ -53,8 +53,9 @@ const STAR_NO_FIT_SIZE = 24;
 const SIZE_STEP = 1;
 /**
  * The size scan stops after this many `tooShort` answers in a row. The
- * longest run measured before a fit is 3 (الله: 4-fold wedge 21-23 then 24,
- * 6-fold 29-31 then 32; الله محمد on 6-fold alternative 37-39 then 40).
+ * longest run measured before a fit is 3 (before regions took whole letters
+ * only: الله, 4-fold classic wedge 21-23 then 24, 6-fold 29-31 then 32; الله
+ * محمد on 6-fold alternative 37-39 then 40). The unit test pins today's fits.
  */
 const ROOMY_STOP = 5;
 /** Under the clock override, the evaluation stops after this many packs (cache hits are free). */
@@ -244,8 +245,8 @@ function firstMask(c: StarConstruction, kind: StarRegionKind): KufiMask {
  * The first size at which `text` packs a region of `kind`, or null. A region
  * that reports `tooShort` has more room than the text can fill, and larger
  * sizes mostly only add room, so `ROOMY_STOP` such answers in a row end the
- * scan. Fewer are not enough: الله is `tooShort` in a 4-fold wedge at 21, 22
- * and 23 and packs at 24.
+ * scan. Fewer are not enough: runs of three `tooShort` before a fit have
+ * been measured (see `ROOMY_STOP`).
  */
 const firstFits = new Map<string, number | null>();
 function firstFit(clock: Clock, fold: StarFold, k: number, kind: StarRegionKind, text: string): number | null {
@@ -363,12 +364,15 @@ export function evaluateKufiStar(text: string, budgetMs: number): KufiStarEvalua
   };
 
   const { early, late, runNeeds } = plansFor(drawn);
-  const [classic, alternative] = [0, 1];
+  // first each fold's default star (`defaultStarK`), then its other one
+  const [first, other] = [0, 1];
+  const starOf = (fold: StarFold, ki: number) =>
+    ki === first ? defaultStarK(fold) : STAR_KS[fold].find((k) => k !== defaultStarK(fold));
   const steps: Array<{ plans: Plan[]; ki: number }> = [
-    { plans: early, ki: classic },
-    { plans: early, ki: alternative },
-    { plans: late, ki: classic },
-    { plans: late, ki: alternative },
+    { plans: early, ki: first },
+    { plans: early, ki: other },
+    { plans: late, ki: first },
+    { plans: late, ki: other },
   ];
   let complete = true;
   try {
@@ -376,7 +380,7 @@ export function evaluateKufiStar(text: string, budgetMs: number): KufiStarEvalua
       for (const plan of plans) {
         for (const fold of FOLDS) {
           if (plan.pattern === "run" && runNeeds(fold) > 0) continue;
-          const k = STAR_KS[fold][ki];
+          const k = starOf(fold, ki);
           if (k === undefined) continue;
           const offer = offerFor(clock, plan, fold, k);
           if (offer) offers.push(offer);

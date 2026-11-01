@@ -1,7 +1,7 @@
 import React, { useId, useMemo, useState } from "react";
 import type { KufiStarBlock } from "../../types";
 import { CheckboxRow } from "./FormControls";
-import { STAR_KS, starConstruction, type StarFold } from "../../lib/kufi/kufiStarGeometry";
+import { defaultStarK, STAR_KS, starConstruction, type StarFold } from "../../lib/kufi/kufiStarGeometry";
 import { kufiStarPath, starOutlineBox } from "../../lib/kufi/kufiStarPath";
 import type { KufiStarEvaluation, KufiStarOffer } from "../../lib/kufi/kufiStarEvaluate";
 import { requestKufiStarOffers, seedKufiStarLayout } from "../../lib/kufi/kufiLayoutClient";
@@ -152,7 +152,7 @@ export const KufiStarPanel: React.FC<{
               className={`sidebarPillButton${f === block.starFold ? " sidebarPillButton--active" : ""}`}
               aria-pressed={f === block.starFold}
               onClick={() => {
-                if (f !== block.starFold) onPatch({ starFold: f, starK: STAR_KS[f][0], starRegions: emptyStarRegions(f) });
+                if (f !== block.starFold) onPatch({ starFold: f, starK: defaultStarK(f), starRegions: emptyStarRegions(f) });
               }}
             >
               {f}

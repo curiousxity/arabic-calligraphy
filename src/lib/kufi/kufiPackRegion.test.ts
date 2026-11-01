@@ -41,17 +41,19 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
     expect(r).toEqual({ ok: false, reason: "tooLong", suggestions: [] });
   });
 
-  it("measure, then pin: الله first packs in a 4-fold classic wedge at size 24", () => {
-    // Measured 2026-11-01 (sizes 12..60, see task-3-report.md): 4-fold الله wedge 24, 5-fold 25,
-    // 6-fold 32; no corner and no محمد wedge or corner packs. Sizes 12..23 are too small or holed.
-    const wedge = (size: number) => starConstruction(4, STAR_KS[4][0], size).regions[1].mask;
-    for (let size = 12; size < 24; size++) expect(packKufiRegion({ text: "الله", mask: wedge(size) }).ok).toBe(false);
-    const mask = wedge(24);
-    expect([mask.cols, mask.rows]).toEqual([16, 10]);
+  it("measure, then pin: الله first packs in a 4-fold alternative wedge at size 23, in its full-height form", () => {
+    // Measured 2026-11-01 (sizes 12..60) with the region's whole-letter forms only: الله first packs a
+    // wedge at 4-fold alternative 23, 5-fold 27 (both stars), 6-fold classic 32, 6-fold alternative 30;
+    // never in the 4-fold classic wedge. No corner and no محمد wedge or corner packs.
+    const wedge = (size: number) => starConstruction(4, STAR_KS[4][1], size).regions[1].mask;
+    for (let size = 12; size < 23; size++) expect(packKufiRegion({ text: "الله", mask: wedge(size) }).ok).toBe(false);
+    const mask = wedge(23);
     const r = packKufiRegion({ text: "الله", mask });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expectRegionGrammar(r, mask);
+    // never the الله whose alef is drawn in two pieces
+    expect(r.placements.map((p) => p.glyphId)).not.toContain("allah.isolated.2");
     // "#" ink, "." paper inside the mask, " " outside it
     const art: string[] = [];
     for (let y = 0; y < mask.rows; y++) {
@@ -66,7 +68,7 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
   });
 
   it("is deterministic: the same call twice gives equal results", () => {
-    const mask = starConstruction(4, STAR_KS[4][0], 24).regions[1].mask;
+    const mask = starConstruction(4, STAR_KS[4][1], 23).regions[1].mask;
     const a = packKufiRegion({ text: "الله", mask });
     _internal.clearCaches();
     const b = packKufiRegion({ text: "الله", mask });

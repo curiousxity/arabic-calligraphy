@@ -23,7 +23,8 @@ describe("evaluateKufiStar", { timeout: 120_000 }, () => {
 
   it("الله محمد: an alternate offer puts الله in the A wedges and محمد in the B wedges, does not fit, and says محمد does not", () => {
     const e = evaluateKufiStar("الله محمد", 0);
-    const alt = e.offers.find((o) => o.pattern === "alternate");
+    // on a star whose wedge fits الله (not the 4-fold classic one, which fits it at no size)
+    const alt = e.offers.find((o) => o.pattern === "alternate" && !(o.inputs.fold === 4 && o.inputs.k === STAR_KS[4][0]));
     expect(alt).toBeDefined();
     const kinds = kindsOf(alt!);
     alt!.inputs.regions.forEach((t, i) =>
@@ -84,10 +85,10 @@ describe("evaluateKufiStar", { timeout: 120_000 }, () => {
 });
 
 describe("the size scan", { timeout: 120_000 }, () => {
-  it("finds الله repeated in every wedge of each classic star at its measured size: 4-fold 24, 5-fold 25, 6-fold 32", () => {
+  it("finds الله repeated in every wedge at its measured size: 4-fold alternative 23, 5-fold classic 27, 6-fold classic 32", () => {
     const e = evaluateKufiStar("الله", 0);
-    for (const [fold, size] of [[4, 24], [5, 25], [6, 32]] as const) {
-      const o = e.offers.find((x) => x.pattern === "repeat" && x.inputs.fold === fold && x.inputs.k === STAR_KS[fold][0]);
+    for (const [fold, k, size] of [[4, STAR_KS[4][1], 23], [5, STAR_KS[5][0], 27], [6, STAR_KS[6][0], 32]] as const) {
+      const o = e.offers.find((x) => x.pattern === "repeat" && x.inputs.fold === fold && x.inputs.k === k);
       expect(o, `${fold}-fold`).toBeDefined();
       expect(o!.fits).toBe(true);
       expect(o!.inputs.size).toBe(size);

@@ -12,13 +12,13 @@ beforeEach(() => _internal.resetRegionPacks());
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
-/** 4-fold classic at size 24, where الله packs a wedge (see kufiPackRegion.test.ts). */
-const c = starConstruction(4, STAR_KS[4][0], 24);
+/** 4-fold alternative at size 23, where الله packs a wedge (see kufiPackRegion.test.ts). */
+const c = starConstruction(4, STAR_KS[4][1], 23);
 const wedgeA = c.regions.filter((r) => r.kind === "wedgeA");
 const withText = (fill: (i: number) => string): KufiStarInputs => ({
   fold: 4,
-  k: STAR_KS[4][0],
-  size: 24,
+  k: STAR_KS[4][1],
+  size: 23,
   regions: c.regions.map((r) => fill(r.index)),
 });
 const allahInWedgeA = withText((i) => (c.regions[i].kind === "wedgeA" ? "الله" : ""));
@@ -84,7 +84,7 @@ describe("kufiStarKey and kufiStarStatus", () => {
   it("the key changes with any input", () => {
     const base = kufiStarKey(allahInWedgeA);
     expect(kufiStarKey({ ...allahInWedgeA, size: 25 })).not.toBe(base);
-    expect(kufiStarKey({ ...allahInWedgeA, k: 2 })).not.toBe(base);
+    expect(kufiStarKey({ ...allahInWedgeA, k: 3 })).not.toBe(base);
     expect(kufiStarKey({ ...allahInWedgeA, regions: allahInWedgeA.regions.map(() => "") })).not.toBe(base);
   });
 

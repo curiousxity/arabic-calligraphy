@@ -14,7 +14,7 @@ test("Add Kufi star draws the 4-fold construction and the lines toggle hides it"
     .poll(async () => (await getBlocks(page)).some((b) => b.type === "kufiStar" && !before.has(b.id)))
     .toBe(true);
   const star = (await getBlocks(page)).find((b) => b.type === "kufiStar" && !before.has(b.id))!;
-  expect(star).toMatchObject({ type: "kufiStar", starFold: 4, starK: 3, starSize: 24, starLines: true });
+  expect(star).toMatchObject({ type: "kufiStar", starFold: 4, starK: 2, starSize: 24, starLines: true });
 
   // The starter text may sit under the star, so the lines are judged by how much ink they add.
   const box = await blockClientBox(page, star.id);
@@ -61,7 +61,8 @@ test("Find layouts offers a split and approving it draws the panel", async ({ pa
   await page.getByRole("checkbox", { name: "Show construction lines" }).uncheck();
   await expect.poll(async () => ((await getBlocks(page)).find((b) => b.id === id) as { starLines?: boolean }).starLines).toBe(false);
   const before = await inkPixels(page, await blockClientBox(page, id));
-  await offers.first().click();
+  // a 4-fold offer: a larger star's text can lie outside the viewport, where no pixels are drawn to count
+  await offers.filter({ hasText: /^Fits: .*4-fold/ }).first().click();
   await expect.poll(async () => (await starOf(page, id))?.starRegions?.some((t) => t !== "")).toBe(true);
   await expect
     .poll(async () => inkPixels(page, await blockClientBox(page, id)), { timeout: 20_000 })

@@ -166,7 +166,7 @@ import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
 import { kufiCellSize, kufiPanelInputs, kufiPanelTextPatch, kufiReleasePins, type KufiTool } from "./lib/kufi/kufiPanelBlock";
 import { KUFI_NOTICE_MS, type KufiNotice } from "./components/KufiPanelEditOverlay";
-import { starConstruction, STAR_KS } from "./lib/kufi/kufiStarGeometry";
+import { defaultStarK, starConstruction } from "./lib/kufi/kufiStarGeometry";
 import { starOutlineBox, starPositionKeepingCentre } from "./lib/kufi/kufiStarPath";
 import { kufiLayoutKey, requestKufiFit, seedKufiLayout } from "./lib/kufi/kufiLayoutClient";
 import type { KufiPackResult, KufiPanelEdits } from "./lib/kufi/kufiPack";
@@ -2129,7 +2129,7 @@ const App: React.FC = () => {
       // An outline would export as a second path; a new panel has none.
       strokeWidth: 0,
       starFold: 4,
-      starK: STAR_KS[4][0],
+      starK: defaultStarK(4),
       starSize: 24,
       starRegions: Array.from({ length: 13 }, () => ""),
       starLines: true,

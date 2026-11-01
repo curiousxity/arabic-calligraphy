@@ -25,7 +25,10 @@ clock-override rules all hold here.
 `size` is the ring's apothem in cells; the star's circle has radius
 `size / RING_RATIO` (1.55). `STAR_KS` offers two stars per fold, the classic
 first (`{8/3}`, `{10/3}`, `{12/4}`) and one alternative (`k` = 2), to keep the
-evaluation inside its budget.
+evaluation inside its budget. `defaultStarK(fold)` is the star a new panel or a
+fold change starts on: the classic one, except **4-fold starts on the
+alternative**, because الله fits the 4-fold classic wedge at no size up to 60
+once the region uses whole letters only (below).
 
 **Region indexing.** 0 is the centre star; 1..m are the wedges clockwise from
 the top, **odd indices are `wedgeA`**, even `wedgeB`; m+1..m+n are the corners
@@ -57,6 +60,19 @@ it), and its bottom row is the one along the ring edge. **A mask can be
   after the frame rule left nothing packable at any size up to 60.
   Consequence: one short word sits against the outer edge and the inner part
   is sparse; محمد packs no wedge alone and no corner packs either word.
+- **Whole letters only** (`lettersOf(..., whole)`). A region drops every
+  glyph authored in more than one piece (`parts` > 1): today that is
+  `allah.isolated.2`, the five-row الله whose alef is a short stroke with a
+  square above it. A panel's frame holds that form together; in a wedge it
+  read as a broken alef (the user's call, 2026-11-01, checked against a
+  square-Kufi reference). Panels still use it. Cost: الله needs its 7-row
+  forms, so it first packs a wedge at 4-fold alternative 23, 5-fold 27,
+  6-fold classic 32 and 6-fold alternative 30, never in the 4-fold classic
+  wedge.
+- **Filler bars may still end on a letter's baseline** in a region, as in a
+  panel, so the word stands on a bar running the width of the wedge.
+  Forbidding that was tried: nothing packed at any size, because only a
+  baseline bar can close the paper beside a short word.
 - **Copies by rotation, never mirror.** Every region of a kind is a rotation
   of the kind's first, with the same mask, so `layoutKufiStar` packs each
   distinct (kind, text) once and every other region of that kind takes the
@@ -109,19 +125,20 @@ tries each **pattern** on every fold and each `STAR_KS` star:
 | `centre` | the longest word in the centre, the rest likewise |
 
 - **Sizes: every one from 12 to 60.** Each size gives other masks, and a
-  text may fit at one size only (الله repeated in every wedge of the classic
-  stars fits at 24 on 4-fold, **25** on 5-fold and 32 on 6-fold; steps of 2
-  lost 5-fold entirely). For each part (kind, text) the first size that packs
+  text may fit at one size only (before the whole-letters rule, الله fitted
+  the 5-fold classic wedge at 25 alone, and steps of 2 lost 5-fold
+  entirely). For each part (kind, text) the first size that packs
   is found once; the scan stops after **five** `tooShort` answers in a row
   (`ROOMY_STOP`: the region has more room than the text fills). The longest
   run measured before a fit is three (الله: 21-23 on 4-fold, 29-31 on 6-fold),
-  so fewer would cut real fits off; a unit test pins the three sizes above.
+  so fewer would cut real fits off; a unit test pins الله's first fits
+  (4-fold alternative 23, 5-fold classic 27, 6-fold classic 32).
   Small sizes pack in milliseconds, so the scan up to the first fit is cheap;
   "الله" evaluates in about 0.3 s, and "الله محمد" stops on the 9 s budget
   with six offers. An offer fits
   at the first size from the latest part's first fit where every part packs.
   An offer some part of which never fits is still made, at the size where the
-  parts that do fit all pack (24, a new star's, when none does), its note
+  parts that do fit all pack (the scan's first size when none does), its note
   naming what does not fit ("محمد does not fit a wedge").
 - **Cache.** Packs are cached between calls by the region's mask and the text
   (the mask is what fold, k, size and kind decide, so wedgeA and wedgeB share
@@ -130,7 +147,8 @@ tries each **pattern** on every fold and each `STAR_KS` star:
   overrun it a little). Under the tests' clock override it stops after
   `STAR_EVAL_MAX_TRIES` (120) real packs instead (cache hits are free), so a
   test's offers never depend on load. The order is likeliest first: repeat
-  and alternate on the classic star, then on the alternative, then run,
+  and alternate on each fold's default star (`defaultStarK`), then on its
+  other one, then run,
   corners and centre the same way, so a cut leaves the best offers.
   `complete: false` says the budget ended it.
 - **Ranking.** Fitting first; among them fewer filler squares plus bars

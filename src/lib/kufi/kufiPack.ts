@@ -363,9 +363,10 @@ function normalCounts(g: KufiGlyph, counts: number[]): number[] {
   });
 }
 
-function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins: Map<number, Pin>): Letter[] {
+function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins: Map<number, Pin>, whole = false): Letter[] {
   return units.map((u, i) => {
-    const all = kufiFormsOf(u);
+    // a region has no frame to hold a letter drawn in pieces together: there الله's gapped alef reads broken
+    const all = whole ? kufiFormsOf(u).filter((g) => (g.parts ?? 1) === 1) : kufiFormsOf(u);
     const pin = pins.get(i) ?? null;
     const form = edits.forms?.[i];
     const fixed = edits.stretch?.[i];
@@ -2365,7 +2366,7 @@ function makeCtx(
 ): Ctx {
   const { units } = resolveKufiText(text);
   const rings = Math.max(1, Math.floor((Math.min(cols, rows) - 1) / (2 * (BAND + 1))) + 1);
-  const letters = lettersOf(text, units, edits, pins);
+  const letters = lettersOf(text, units, edits, pins, !!mask);
   // a region stacks upright lines from its bottom row up, one ring per band
   const regionLines = Math.floor((rows - 1) / (BAND + 1)) + 1;
   return {
