@@ -16,8 +16,9 @@ import {
 } from "../lib/artboard";
 import { triggerDownload } from "../lib/download";
 import type { ExportFormat } from "../lib/exportPresets";
-import { ensureKufiLayouts } from "../lib/kufi/kufiLayoutClient";
+import { ensureKufiLayouts, ensureKufiStarLayouts } from "../lib/kufi/kufiLayoutClient";
 import { kufiPanelInputs } from "../lib/kufi/kufiPanelBlock";
+import { kufiStarInputs } from "../lib/kufi/kufiStarLayout";
 
 /** Per-call export overrides. Every field defaults to the app's long-standing behaviour. */
 export type ExportOptions = {
@@ -127,12 +128,15 @@ export function useExport(
     opts: { transparent?: boolean },
     fn: (stage: Konva.Stage) => T | Promise<T>
   ): Promise<T> => {
-    // A Kufi panel's layout comes from a worker, so the canvas may still be
-    // showing the previous draft. Export is not interactive: pack whatever
-    // the cache lacks right here, then let React and Konva redraw (two
-    // frames) so the stage holds the panel for the current inputs.
+    // A Kufi panel's (or star's) layout comes from a worker, so the canvas
+    // may still be showing the previous draft. Export is not interactive:
+    // pack whatever the cache lacks right here, then let React and Konva
+    // redraw (two frames) so the stage holds the layout for the current inputs.
     const kufi = blocks.flatMap((b) => (b.type === "kufiPanel" ? [kufiPanelInputs(b)] : []));
-    if (ensureKufiLayouts(kufi)) {
+    const stars = blocks.flatMap((b) => (b.type === "kufiStar" ? [kufiStarInputs(b)] : []));
+    const packedPanels = ensureKufiLayouts(kufi);
+    const packedStars = ensureKufiStarLayouts(stars);
+    if (packedPanels || packedStars) {
       await nextFrame();
       await nextFrame();
     }

@@ -8,7 +8,13 @@ import {
   _resetKufiLayouts,
   _setKufiWorkerFactory,
   cachedKufiLayout,
+  cachedKufiStarLayout,
   ensureKufiLayouts,
+  ensureKufiStarLayouts,
+  kufiStarLayoutFailed,
+  kufiStarLayoutSnapshot,
+  releaseKufiStarLayout,
+  requestKufiStarLayout,
   kufiLayoutFailed,
   kufiLayoutSnapshot,
   previewKufiLayout,
@@ -22,6 +28,7 @@ import {
   type KufiWorkerRequest,
   type KufiWorkerResponse,
 } from "./kufiLayoutClient";
+import type { KufiStarInputs, KufiStarLayout } from "./kufiStarLayout";
 
 class FakeWorker implements KufiWorkerLike {
   posted: KufiWorkerRequest[] = [];
@@ -405,5 +412,65 @@ describe("kufi layout client", () => {
     it("gives a Fit longer than a pack", () => {
       expect(KUFI_FIT_WATCHDOG_MS).toBeGreaterThan(KUFI_PACK_WATCHDOG_MS);
     });
+  });
+});
+
+describe("kufi star layouts", () => {
+  // Empty regions: a real layout of these packs nothing, so the main-thread fallbacks stay fast.
+  const S1: KufiStarInputs = { fold: 4, k: 3, size: 24, regions: Array.from({ length: 13 }, () => "") };
+  const S2: KufiStarInputs = { ...S1, size: 25 };
+  const layoutOf = (): KufiStarLayout => ({ regions: [], unpacked: [] });
+
+  it("posts a star request, caches the answer by its inputs and serves equal inputs from the cache", () => {
+    requestKufiStarLayout("s1", S1);
+    const job = worker.last();
+    expect(job).toMatchObject({ kind: "star", star: S1 });
+    expect(kufiStarLayoutSnapshot("s1", S1)).toBeNull();
+    const r = layoutOf();
+    worker.reply({ id: job.id, kind: "star", layout: r });
+    expect(kufiStarLayoutSnapshot("s1", S1)).toBe(r);
+    expect(cachedKufiStarLayout(S1)).toBe(r);
+    expect(notified).toBeGreaterThan(0);
+    const posted = worker.posted.length;
+    requestKufiStarLayout("s2", { ...S1, regions: [...S1.regions] });
+    expect(kufiStarLayoutSnapshot("s2", S1)).toBe(r);
+    expect(worker.posted.length).toBe(posted);
+  });
+
+  it("keeps showing the last layout while new inputs are pending, and drops a stale reply's slot", () => {
+    requestKufiStarLayout("s1", S1);
+    const r1 = layoutOf();
+    worker.reply({ id: worker.last().id, kind: "star", layout: r1 });
+    requestKufiStarLayout("s1", S2);
+    expect(worker.last()).toMatchObject({ kind: "star", star: S2 });
+    expect(kufiStarLayoutSnapshot("s1", S2)).toBe(r1);
+    releaseKufiStarLayout("s1");
+    expect(kufiStarLayoutSnapshot("s1", S2)).toBeNull();
+  });
+
+  it("one job in flight: a panel wanted while a star packs waits behind it", () => {
+    requestKufiStarLayout("s1", S1);
+    const star = worker.last();
+    wantKufiLayout("p1", A);
+    expect(worker.posted.length).toBe(1);
+    worker.reply({ id: star.id, kind: "star", layout: layoutOf() });
+    expect(worker.last()).toMatchObject({ kind: "pack", input: { cols: 9 } });
+  });
+
+  it("a worker error lays the star out on the main thread", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    requestKufiStarLayout("s1", S1);
+    worker.onerror?.(new Error("boom"));
+    const got = kufiStarLayoutSnapshot("s1", S1);
+    expect(got?.regions.length).toBe(13);
+    expect(got?.unpacked).toEqual([]);
+    expect(kufiStarLayoutFailed(S1)).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it("export lays out what the cache lacks, on the calling thread", () => {
+    expect(ensureKufiStarLayouts([S1])).toBe(true);
+    expect(cachedKufiStarLayout(S1)?.regions.length).toBe(13);
+    expect(ensureKufiStarLayouts([S1])).toBe(false);
   });
 });

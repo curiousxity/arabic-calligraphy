@@ -1,11 +1,15 @@
-import React, { useMemo } from "react";
-import { Group, Shape } from "react-konva";
+import React, { useLayoutEffect, useMemo, useRef } from "react";
+import { Group, Shape, Text } from "react-konva";
 import type Konva from "konva";
 import type { kufiStarProps } from "../lib/blockRenderProps";
 import { createBlockFillPainter } from "../lib/blockFill";
 import { kufiCellSize } from "../lib/kufi/kufiPanelBlock";
 import { starConstruction } from "../lib/kufi/kufiStarGeometry";
 import { kufiStarPath, starOutlineBox } from "../lib/kufi/kufiStarPath";
+import { kufiStarInputs, kufiStarStatus, kufiStarTextCount } from "../lib/kufi/kufiStarLayout";
+import { kufiStarLayoutFailed } from "../lib/kufi/kufiLayoutClient";
+import { useKufiStarLayout } from "../hooks/useKufiStarLayout";
+import { EXPORT_HIDDEN } from "../lib/exportChrome";
 
 export type KufiStarViewProps = ReturnType<typeof kufiStarProps> & {
   id?: string;
@@ -35,20 +39,74 @@ function pathRings(d: string): Array<Array<[number, number]>> {
     });
 }
 
+const STATUS_TYPE = 13;
+const STATUS_W = 260;
+
+/**
+ * The star's status line, centred near the bottom of its box: editor chrome
+ * only (`EXPORT_HIDDEN`), drawn at the inverse of the stage's zoom (13 px type
+ * at any zoom), as `KufiUnfitFrame` draws a panel's.
+ */
+const KufiStarStatusLine: React.FC<{ width: number; height: number; color: string; text: string }> = ({
+  width,
+  height,
+  color,
+  text,
+}) => {
+  const ui = useRef<Konva.Group>(null);
+  useLayoutEffect(() => {
+    const g = ui.current;
+    if (!g) return;
+    const k = Math.abs(g.getParent()?.getAbsoluteScale().x ?? 1) || 1;
+    g.scale({ x: 1 / k, y: 1 / k });
+    g.getLayer()?.batchDraw();
+  });
+  return (
+    <Group name={EXPORT_HIDDEN} listening={false}>
+      <Group ref={ui} x={width / 2} y={height}>
+        <Text
+          name="kufi-star-status"
+          x={-STATUS_W / 2}
+          y={-STATUS_TYPE * 2}
+          width={STATUS_W}
+          align="center"
+          text={text}
+          fontSize={STATUS_TYPE}
+          fill={color}
+          listening={false}
+        />
+      </Group>
+    </Group>
+  );
+};
+
 /**
  * Draws a Kufi star panel: its construction as **one** traced outline in one
  * Shape, so the SVG export holds a single `<path>`. Points are in px, not
  * under `ctx.scale` (the SVG exporter loses a path drawn under a scale);
- * outline before fill; the fill through `createBlockFillPainter`. Stage 1:
- * no region text yet, so the ink is the construction lines.
+ * outline before fill; the fill through `createBlockFillPainter`. Each
+ * region's text is packed in the worker (`useKufiStarLayout`); a region of a
+ * kind shares the kind's packing and is placed through its own frame, so the
+ * copies are the same cells by rotation. A region that did not pack draws
+ * empty, and the status line says how many did not.
  */
 export const KufiStarView: React.FC<KufiStarViewProps> = (p) => {
   const cell = kufiCellSize(p.fontSize);
   const construction = useMemo(() => starConstruction(p.starFold, p.starK, p.starSize), [p.starFold, p.starK, p.starSize]);
-  const rings = useMemo(
-    () => pathRings(kufiStarPath(construction, construction.regions.map(() => null), p.starLines, cell)),
-    [construction, p.starLines, cell]
+  const layout = useKufiStarLayout(p);
+  const inputs = useMemo(
+    () => kufiStarInputs(p),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the four layout fields, not the props object
+    [p.starFold, p.starK, p.starSize, p.starRegions]
   );
+  const rings = useMemo(() => {
+    const cells = construction.regions.map((r) => {
+      const res = layout?.regions[r.index]?.result;
+      return res?.ok ? res.cells : null;
+    });
+    return pathRings(kufiStarPath(construction, cells, p.starLines, cell));
+  }, [construction, layout, p.starLines, cell]);
+  const status = kufiStarTextCount(inputs) === 0 ? null : kufiStarStatus(layout, kufiStarLayoutFailed(inputs));
   const box = useMemo(() => starOutlineBox(construction), [construction]);
   const width = box.width * cell;
   const height = box.height * cell;
@@ -107,6 +165,7 @@ export const KufiStarView: React.FC<KufiStarViewProps> = (p) => {
           ctx.restore();
         }}
       />
+      {status && <KufiStarStatusLine width={width} height={height} color={p.color} text={status} />}
     </Group>
   );
 };

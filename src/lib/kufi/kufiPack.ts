@@ -2981,6 +2981,7 @@ export function packKufiPanel(input: {
  * user's to pick here. Pure and deterministic, on PACK_BUDGET_MS / PACK_WORK.
  */
 export function packKufiRegion(input: { text: string; mask: KufiMask }): KufiPackResult {
+  regionPackCount++;
   const { text, mask } = input;
   const { cols, rows } = mask;
   const { units } = resolveKufiText(text);
@@ -2990,6 +2991,9 @@ export function packKufiRegion(input: { text: string; mask: KufiMask }): KufiPac
   if (f?.packed) return okResult(units, f, cols, rows, {});
   return { ok: false, reason: !f || f.st.failed > 0 ? "tooLong" : "tooShort", suggestions: [] };
 }
+
+/** Calls of packKufiRegion since the last resetRegionPacks: lets tests count packs without a mock. */
+let regionPackCount = 0;
 
 /** Suggestions skip a size when less than this is left. */
 const MIN_SEARCH_MS = 250;
@@ -3165,6 +3169,10 @@ export const _internal = {
   PACK_WORK,
   REPACK_WORK,
   FIRST_DRAFT_CLOCK_MS,
+  regionPacks: () => regionPackCount,
+  resetRegionPacks: () => {
+    regionPackCount = 0;
+  },
 };
 
 /** Every cache, so a timing is cold. */

@@ -5,16 +5,19 @@
  */
 import { kufiChangesOf, tryKufiChange, type KufiTry } from "./kufiExplore";
 import { fitKufiPanel, packKufiPanel, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
+import { layoutKufiStar, type KufiStarInputs, type KufiStarLayout } from "./kufiStarLayout";
 
 export type KufiLayoutInputs = { text: string; cols: number; rows: number; edits?: KufiPanelEdits };
 
 export type KufiWorkerRequest =
   | { id: number; kind: "pack"; input: KufiLayoutInputs & { previous?: KufiPackResult }; text?: undefined }
-  | { id: number; kind: "fit"; text: string; edits?: KufiPanelEdits; input?: undefined };
+  | { id: number; kind: "fit"; text: string; edits?: KufiPanelEdits; input?: undefined }
+  | { id: number; kind: "star"; star: KufiStarInputs; input?: undefined; text?: undefined };
 
 export type KufiWorkerResponse =
   | { id: number; kind: "pack"; result: KufiPackResult }
-  | { id: number; kind: "fit"; size: { cols: number; rows: number } };
+  | { id: number; kind: "fit"; size: { cols: number; rows: number } }
+  | { id: number; kind: "star"; layout: KufiStarLayout };
 
 export type KufiWorkerLike = {
   postMessage(msg: KufiWorkerRequest): void;
@@ -27,6 +30,7 @@ export type KufiWorkerLike = {
 /** Runs a request on the calling thread: the worker's own body, and the fallback when there is no `Worker`. */
 export function runKufiRequest(req: KufiWorkerRequest): KufiWorkerResponse {
   if (req.kind === "fit") return { id: req.id, kind: "fit", size: fitKufiPanel(req.text, req.edits) };
+  if (req.kind === "star") return { id: req.id, kind: "star", layout: layoutKufiStar(req.star) };
   return { id: req.id, kind: "pack", result: packKufiPanel(req.input) };
 }
 
