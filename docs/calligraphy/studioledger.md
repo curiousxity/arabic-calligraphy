@@ -324,6 +324,10 @@ Times are minutes:seconds into the individual-letters lesson.
   inner edge above the studio's, since the studio's dip is thinner at its bottom; so the nib narrows there instead,
   by 2 and 2.8 stamp units at the lowest node, easing off over 8 units either side, and its centre rises by half as
   much: the inner edge stays, the outer comes up into a round U (`me/dipfix.py`). The user: "much better".
+- **061 smoother (2026-11-01):** the user: "-61 could be slightly smoother as well". Refitted with a turning pen and
+  four times the fit's weight on changes of bend and of the nib's turning (`PEN_ROUGH` 0.2 in `me/penjob.py`):
+  0.965 and 0.960 against 0.980 and 0.964, the bends even. The user: "061 smoother approved". The same setting broke
+  048's loop (0.852), and on 049 the kinks were in the strokes it copied from 025, not its own.
 
 **Every joint trimmed to the studio edge**
 
