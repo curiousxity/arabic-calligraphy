@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PULL_REST_MS, snapPull, pullAnswer, pullMove, pullRelease, pullRest, pullStart } from "./kufiPull";
+import { PULL_REST_MS, evenRouteStep, snapPull, pullAnswer, pullMove, pullRelease, pullRest, pullStart } from "./kufiPull";
 
 describe("a stretch pull", () => {
   it("asks for a count when the pointer crosses into a new one, clamped to the slice's range", () => {
@@ -91,5 +91,21 @@ describe("snapPull", () => {
     expect(snapPull(3, null)).toBe(3);
     expect(snapPull(-1, [-2, 1])).toBe(-2);
     expect(snapPull(1, [1, 2])).toBe(1);
+  });
+});
+
+describe("a route pull", () => {
+  it("steps two cells at a time: an odd distance goes on to the next even step, away from the start", () => {
+    expect([-4, -3, -2, -1, 0, 1, 2, 3, 4, 5].map(evenRouteStep)).toEqual([-4, -4, -2, -2, 0, 2, 2, 4, 4, 6]);
+    expect(Object.is(evenRouteStep(0), 0)).toBe(true);
+  });
+
+  it("never asks the pull for an odd count away from the committed route", () => {
+    let p = pullStart(2, 2 - 12, 2 + 12);
+    for (let d = -15; d <= 15; d++) {
+      const m = pullMove(p, evenRouteStep(d));
+      if (m.request !== null) expect(Math.abs(m.request - 2) % 2).toBe(0);
+      p = m.pull;
+    }
   });
 });

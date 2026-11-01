@@ -101,6 +101,14 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-11-01 — Kufi panel: a moved word may rearrange the panel — on `claude/kufi-reroute`, not merged
+
+- Move word steps two squares at a time (a one-square move never packs); when
+  no nearer change makes room, the packer may rearrange the rest of the panel,
+  and the preview outlines every other letter that moved. A rearranged move
+  commits with the whole panel pinned until "Release hand edits". Details:
+  [kufi-panel.md](.claude/rules/kufi-panel.md) ("Routes are a record only").
+
 ### 2026-10-31 — Kufi panel: rectangles and filler bars
 
 - Fit and suggestions try boxes of any proportion; filler bars close panels the

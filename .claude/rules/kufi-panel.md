@@ -174,13 +174,27 @@ unit `key` so a stale save is detected, not misapplied: `forms`, `stretch`,
 - **Routes are a record only.** The packer does not read `routes`. A word
   moves by a pin on its first letter, with the word's other pins released so
   its letters follow; the route number is what the next drag starts from.
-  A slide that opens a gap behind the word never packs, and on **tight panels
-  most moves are refused**: freeing the letters before the word on its line is
-  all a re-route may do. On the Al-Baqarah panel nothing moves at plus or minus
-  one or two cells (verified with a 20 s budget; the gap is irreducible under
-  the grammar). The tool is mostly idle on tight panels and says so beside
-  the letter. Letting the rest of the panel re-arrange is an open decision
-  (spec, future plan).
+  The repack from `previous` first frees only the letters before the word on
+  its line (today's rounds, unchanged). **Only when every round fails**, a
+  move may **rearrange every unpinned letter**: a fresh search (`repack`'s
+  `rearrange` out-object, reached only from `packKufiPanel`'s `previous`
+  path, `PACK_BUDGET_MS` / `PACK_WORK`) that keeps the explicit pins and the
+  moved first letter. A result it produced carries `rearranged: true`, and
+  committing it pins **every letter of the panel** (`kufiPinWordEdits`), so
+  the panel stays rigid until "Release hand edits"; otherwise the commit pins
+  the word and every other letter the move changed (`kufiMovedUnits`).
+  A packed rearranged move costs about 0.1 to 0.5 s, a refused one up to
+  about 0.57 s. **Moves go in steps of two cells** (`evenRouteStep` in
+  `kufiPull.ts`): the lattice is stroke, gap, stroke, so a word moved one
+  cell lands its strokes on gaps, and no ±1 move packed in any measured
+  panel. The drag snaps to the nearest even step (an odd distance goes on,
+  away from the start) and never sends an odd one, which would only cost a
+  refusal. On Al-Baqarah, word 1 moves +2 (by today's rounds, no other letter
+  changes); most other moves on tight panels are still refused, and the tool
+  says so beside the letter. While a move's preview is shown, every letter
+  outside the word that it changed is outlined in `MOVED_COLOR`
+  (`kufi-moved-outline`, the hover outline's stroke); none when nothing else
+  moved.
 - **2x2 rules, both ways.** A solid 2x2 of ink is forbidden; an *empty* 2x2
   (a hole) is a packing failure too. Painting (`cells`) can break either, and
   the panel is *not* hidden: it stays `ok:true` with `editsBreakPacking: true`,
@@ -397,8 +411,8 @@ aborts it (nothing commits) and clears the drawn chrome.
 A new panel has `fontSize` 112 (14 px cells): `CLICK_SLOP` (10 px) and the
 handles (the stretch square is 1 cell, the route handle 0.7) must stay within a cell for the tools to be usable at 100%.
 
-Stretch and word drags ask the worker for a repack per cell crossed
-(`previewKufiLayout`, newest wins) and keep showing the last preview that
+Stretch and word drags ask the worker for a repack per cell crossed (a
+word per two cells, `evenRouteStep`; `previewKufiLayout`, newest wins) and keep showing the last preview that
 packed; a refused count is asked once more when the pointer rests
 (`PULL_REST_MS`), since the repack budget is a clock. Release commits that
 preview, pinned where the packer put the letter, as one undo step; if nothing
@@ -449,7 +463,8 @@ check a layout use the clock override; do not add wall-clock assertions.
   `FIT_BUDGET_MS`, so a slow machine may stop before it. Under the tests'
   clock override Fit counts sizes instead (`FIT_MAX_SIZES`), so its test does
   not depend on load.
-- **Moving a word mostly refuses on tight panels** (the Baqarah finding above).
+- **Moving a word mostly refuses on tight panels**, even with the rearrange
+  step (7 of 64 measured ±1/±2 moves pack; see "Routes are a record only").
 - **A Fit with pins can run about 12.5 s** (`FIT_BUDGET_MS` is checked between
   sizes, plus one `PINNED_CALL_MS`), under the 30 s watchdog but ahead of every
   other job in `pump`, so drag previews wait for it. Export packs on the main

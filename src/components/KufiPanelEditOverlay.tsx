@@ -28,6 +28,7 @@ import { cellsBetween, paintKufiCell } from "../lib/kufi/kufiPaint";
 import {
   kufiFormCycle,
   kufiFormEdits,
+  kufiMovedUnits,
   kufiPinEdits,
   kufiPinWordEdits,
   kufiRouteEdits,
@@ -36,7 +37,7 @@ import {
 } from "../lib/kufi/kufiPanelBlock";
 import { kufiNoticeAt } from "../lib/kufi/kufiPanelStatus";
 import { kufiLayoutKey, previewKufiLayout, type KufiLayoutInputs } from "../lib/kufi/kufiLayoutClient";
-import { PULL_REST_MS, pullAnswer, pullMove, pullRelease, pullRest, pullStart, snapPull, type KufiPull } from "../lib/kufi/kufiPull";
+import { PULL_REST_MS, evenRouteStep, pullAnswer, pullMove, pullRelease, pullRest, pullStart, snapPull, type KufiPull } from "../lib/kufi/kufiPull";
 import { resolveKufiText } from "../lib/kufi/kufiWords";
 import { KUFI_STRETCH_STEPS, kufiLetterOptions, kufiStretchTry, type KufiLetterOptions, type KufiTry } from "../lib/kufi/kufiExplore";
 import { useKufiExplore } from "../hooks/useKufiExplore";
@@ -95,6 +96,12 @@ const FIT_MARK_OPACITY = 0.35;
 /** How long the cell outline shows red after a refused paint: the one transient coloured cue. */
 export const FLASH_MS = 300;
 export const FLASH_COLOR = "#e03131";
+/**
+ * The outline round each letter outside the dragged word that a Move word
+ * preview changed: the hover outline's stroke in a colour of its own, so the
+ * letters the packer rearranged read apart from the word being moved.
+ */
+export const MOVED_COLOR = "#0ca678";
 
 export const NO_ROOM_TO_STRETCH = "No room to stretch that here";
 export const NO_ROOM_TO_ROUTE = "No room to move that word here";
@@ -200,9 +207,14 @@ type Paint = {
  * **A word's first letter carries a route handle** (`routeHandleOf`: its
  * leading cell, on the baseline side), shown in the Move word tool. Dragging it along
  * the word's line asks the packer to hold the word that many cells further
- * on (or back), live, as a stretch does; release commits the preview with
- * every letter of the word pinned where it landed, and the offset recorded
- * in `edits.routes`. A press anywhere else on a first letter is the letter's
+ * on (or back), live, as a stretch does, in steps of two cells only
+ * (`evenRouteStep`: the lattice's parity refuses every odd move, and a
+ * refused move costs the packer up to about half a second). The packer may
+ * rearrange the rest of the panel round the word; while such a preview is
+ * shown, every other letter it changed is outlined in `MOVED_COLOR`.
+ * Release commits the preview with every letter of the word pinned where it
+ * landed (and every changed letter, or the whole panel when it was
+ * rearranged), and the offset recorded in `edits.routes`. A press anywhere else on a first letter is the letter's
  * own, as on any letter: a drift drags the whole panel, a still press is a
  * click. Each tool hit-tests only its own handles, so a route handle and a
  * stretch end sharing a cell never compete. Where nothing packs the word
@@ -645,7 +657,8 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
         base,
         min: base - MAX_PULL,
         max: base + MAX_PULL,
-        deltaOf: (c) => routeOffsetFor(committed, units, wordIndex, c.col, c.row) - pressedAt,
+        // two cells at a time: an odd move never packs, so it is never asked for
+        deltaOf: (c) => evenRouteStep(routeOffsetFor(committed, units, wordIndex, c.col, c.row) - pressedAt),
         editsFor: (count) => kufiRouteEdits(inputs.edits, committed, units, wordIndex, count),
         pinFor: (edits, r) => kufiPinWordEdits(edits, committed, r, units, wordIndex),
         notice: NO_ROOM_TO_ROUTE,
@@ -718,6 +731,14 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
     () => (shownUnit === null ? [] : unitRings(result, shownUnit).map((ring) => ring.flatMap(([x, y]) => [x * cell, y * cell]))),
     [result, shownUnit, cell]
   );
+  // While a word's move is previewed, the other letters it changed.
+  const routeWord = dragging?.spec.kind === "route" ? dragging.spec.wordIndex : null;
+  const movedOutlines = useMemo(() => {
+    if (routeWord === null || result === committed) return [];
+    return kufiMovedUnits(committed, result, units, routeWord).flatMap((k) =>
+      unitRings(result, k).map((ring) => ring.flatMap(([x, y]) => [x * cell, y * cell]))
+    );
+  }, [routeWord, result, committed, units, cell]);
   const wordIndices = useMemo(() => [...new Set(units.map((u) => u.wordIndex))], [units]);
   const handles = useMemo((): KufiHandle[] => {
     if (dragging) {
@@ -954,6 +975,18 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
           points={points}
           closed
           stroke={accent}
+          strokeWidth={OUTLINE_PX}
+          strokeScaleEnabled={false}
+          listening={false}
+        />
+      ))}
+      {movedOutlines.map((points, i) => (
+        <Line
+          key={`moved-${i}`}
+          name="kufi-moved-outline"
+          points={points}
+          closed
+          stroke={MOVED_COLOR}
           strokeWidth={OUTLINE_PX}
           strokeScaleEnabled={false}
           listening={false}

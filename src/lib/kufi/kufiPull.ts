@@ -81,3 +81,17 @@ export function snapPull(wanted: number, fitting: number[] | null): number {
   for (const c of fitting) if (Math.abs(c - wanted) < Math.abs(best - wanted)) best = c;
   return best;
 }
+
+/**
+ * A word's route moves in steps of two cells: the lattice is stroke, gap,
+ * stroke, so a word moved one cell lands its strokes where gaps were and
+ * nothing packs (no ±1 move packed in any measured panel). `delta`, cells
+ * along the path from the press, goes to the nearest even step; an odd one
+ * (halfway between two) goes away from the start, so one cell of drag
+ * already asks for two. Odd steps are never sent to the packer.
+ */
+export function evenRouteStep(delta: number): number {
+  const d = Math.round(delta);
+  const k = Math.ceil(Math.abs(d) / 2) * 2;
+  return d < 0 ? -k : k;
+}

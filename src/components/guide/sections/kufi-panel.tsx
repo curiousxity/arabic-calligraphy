@@ -137,9 +137,10 @@ export const section: GuideSection = {
         <li>
           <strong>Move word.</strong> Every word shows a small square on the
           corner where it begins. Drag it along the word's line to slide the
-          word. On a tight panel there is often no room, so the word snaps back;
-          nothing else moves to make space. Clicking a letter here picks it
-          without changing its form.
+          word, two squares at a time. Other letters may shift to make room;
+          while you drag, each one that shifts is outlined. On a tight panel
+          there is often no room, so the word snaps back. Clicking a letter
+          here picks it without changing its form.
         </li>
         <li>
           <strong>Paint.</strong> The square under the pointer is outlined.

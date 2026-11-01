@@ -835,8 +835,9 @@ test.describe("editing on the canvas", () => {
    * the م, opens word 1 at the bottom-left corner), الله along the top. The
    * ص before the corner has a stretch along the bottom line, so من can be
    * dragged two cells up its path: the ص lengthens by two and the ر moves
-   * into the corner under the م. One cell up does not pack (the ر has no
-   * room under a م moved only one), so the drag passes a refusal on its way.
+   * into the corner under the م. One cell up would not pack (the ر has no
+   * room under a م moved only one), so the drag steps two cells at a time
+   * and never asks for it.
    */
   const NASR = "نصر من الله";
   const savedNasr = {
@@ -884,6 +885,56 @@ test.describe("editing on the canvas", () => {
     expect(await inkSignature(page, box)).not.toEqual(before);
     await page.getByRole("button", { name: "Undo" }).click();
     await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).toEqual(before);
+    await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+    expect(errors).toEqual([]);
+  });
+
+  /**
+   * The same panel, word 0 (نصر, along the bottom) dragged two cells on: no
+   * nearer change makes room, so the packer rearranges the panel round it,
+   * moving two other letters, which the preview outlines.
+   */
+  test("Move word rearranges the panel and one undo restores it", async ({ page }) => {
+    const errors = collectConsoleErrors(page);
+    await openSavedPanel(page, savedNasr);
+    const box = await blockClientBox(page, PANEL_ID);
+    await expect
+      .poll(async () => inkPixels(page, await blockClientBox(page, PANEL_ID)), { timeout: 15_000 })
+      .toBeGreaterThan(box.width * box.height * 0.15);
+    await expect.poll(async () => (await kufiEditTargets(page)).letters.length).toBe(6);
+    await pointerAway(page, box);
+    const before = await inkSignature(page, box);
+    const targets = await kufiEditTargets(page);
+    const cellsBefore = targets.grid;
+    const word = targets.words.find((w) => w.word === 0)!;
+    expect(word).toMatchObject({ unit: 0 });
+
+    await chooseTool(page, "Move word");
+    await page.mouse.move(word.x, word.y);
+    await settleFrames(page);
+    expect(await namedNodeCount(page, "kufi-route-handle")).toBeGreaterThan(0);
+    expect(await namedNodeCount(page, "kufi-moved-outline")).toBe(0);
+    await page.mouse.down();
+    await page.mouse.move(word.x + word.dc * 2 * targets.cellPx, word.y + word.dr * 2 * targets.cellPx, { steps: 12 });
+    // live: the letters the move shifted outside the word are outlined, nothing committed yet
+    await expect.poll(() => namedNodeCount(page, "kufi-moved-outline"), { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
+    expect(await panelEdits(page)).toBeUndefined();
+    await page.mouse.up();
+
+    // committed as one step: the route recorded, and the rearranged panel pinned whole
+    await expect.poll(async () => (await panelEdits(page))?.routes?.[0]).toBe(2);
+    const edits = (await panelEdits(page))!;
+    expect(Object.keys(edits.pinned ?? {}).length).toBe(6);
+    expect(await namedNodeCount(page, "kufi-moved-outline")).toBe(0);
+    await pointerAway(page, box);
+    expect(await inkSignature(page, box)).not.toEqual(before);
+    expect((await kufiEditTargets(page)).grid).not.toEqual(cellsBefore);
+
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect.poll(async () => panelEdits(page)).toBeUndefined();
+    await expect.poll(async () => (await kufiEditTargets(page)).grid).toEqual(cellsBefore);
     await pointerAway(page, box);
     expect(await inkSignature(page, box)).toEqual(before);
     await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();

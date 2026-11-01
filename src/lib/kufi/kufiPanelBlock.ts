@@ -159,13 +159,29 @@ export function kufiRouteEdits(edits: KufiPanelEdits | undefined, committed: Ok,
  * its unmoved alef longer). It stays rigid until "Release hand edits".
  */
 export function kufiPinWordEdits(edits: KufiPanelEdits, before: Ok, result: Ok, units: KufiUnit[], wordIndex: number): KufiPanelEdits {
+  const moved = new Set(kufiMovedUnits(before, result, units, wordIndex));
   let out = edits;
   units.forEach((u, k) => {
+    if (result.rearranged || u.wordIndex === wordIndex || moved.has(k)) out = kufiPinEdits(out, result, k);
+  });
+  return out;
+}
+
+/**
+ * The letters outside word `wordIndex` that a move changed: another glyph,
+ * turn, place or stretch in `result` than in `before`, or missing from
+ * either. What a route preview outlines, and what a commit pins beside the
+ * word. In unit order.
+ */
+export function kufiMovedUnits(before: Ok, result: Ok, units: KufiUnit[], wordIndex: number): number[] {
+  const out: number[] = [];
+  units.forEach((u, k) => {
+    if (u.wordIndex === wordIndex) return;
     const a = placementOf(before, k);
     const b = placementOf(result, k);
     const changed =
       !a || !b || a.glyphId !== b.glyphId || a.turn !== b.turn || a.col !== b.col || a.row !== b.row || a.stretch.join() !== b.stretch.join();
-    if (result.rearranged || u.wordIndex === wordIndex || changed) out = kufiPinEdits(out, result, k);
+    if (changed) out.push(k);
   });
   return out;
 }

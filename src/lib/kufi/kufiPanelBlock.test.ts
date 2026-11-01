@@ -6,6 +6,7 @@ import {
   kufiPanelInputs,
   kufiPanelTextPatch,
   kufiPinEdits,
+  kufiMovedUnits,
   kufiPinWordEdits,
   kufiReleasePins,
   kufiRouteEdits,
@@ -200,6 +201,17 @@ describe("kufiPanelBlock", () => {
       expect(Object.keys(kufiPinWordEdits({}, committed, turned, units, 1).pinned!).map(Number)).toEqual([0, 1, 2, 3, 4]);
       const still = kufiPinWordEdits({}, committed, committed, units, 1);
       expect(Object.keys(still.pinned!).map(Number)).toEqual([1, 2, 3, 4]);
+    });
+
+    it("the letters a move changed outside the word are listed, and none when nothing else moved", () => {
+      expect(kufiMovedUnits(committed, committed, units, 1)).toEqual([]);
+      const word: Ok = { ...committed, placements: placements.map((p, i) => (i >= 1 ? { ...p, col: p.col - 2 } : p)) };
+      expect(kufiMovedUnits(committed, word, units, 1)).toEqual([]);
+      const lam = { ...placements[0], stretch: [1] };
+      const both: Ok = { ...word, placements: word.placements.map((p, i) => (i === 0 ? lam : p)) };
+      expect(kufiMovedUnits(committed, both, units, 1)).toEqual([0]);
+      const missing: Ok = { ...committed, placements: placements.slice(1) };
+      expect(kufiMovedUnits(committed, missing, units, 1)).toEqual([0]);
     });
 
     it("a panel the packer rearranged round the word is pinned whole, unchanged letters too", () => {
