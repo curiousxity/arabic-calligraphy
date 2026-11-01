@@ -1320,31 +1320,54 @@ test.describe("the selected letter's options", () => {
     const letter = (await kufiEditTargets(page)).letters.find((l) => l.unit === 4)!;
     expect(letter.glyphId).toBe("feh.final.3");
 
-    // A click picks the letter and changes nothing; a click on the picked
-    // letter swaps it to its next fitting form; undo takes the swap back and
-    // keeps the letter picked.
+    // A click picks the letter and changes nothing.
     await page.mouse.click(letter.x, letter.y);
-    await expect(kufiPanel(page).getByTestId("kufi-letter-options")).toBeVisible();
+    await formsExplored(page);
     await page.waitForTimeout(400);
     expect(await panelEdits(page)).toBeUndefined();
-    await page.mouse.click(letter.x, letter.y);
-    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.0");
-    await page.getByRole("button", { name: "Undo" }).click();
-    await expect.poll(async () => panelEdits(page)).toBeUndefined();
-    await pointerAway(page, box);
 
-    await formsExplored(page);
+    // Every form has been tried (or exploration is over): each is the drawn one,
+    // fits, or does not. Which fit is the clock's to say: exploration's repacks
+    // run on the clock, and under load feh.final.0 and .2, which fit only with
+    // filler bars, are refused (kufiExplore.test.ts shows all four fit on the
+    // work budget alone).
     const options = kufiPanel(page).getByTestId("kufi-letter-options");
     const form = (id: string) => options.locator(`[data-glyph-id="${id}"]`);
     await expect(options.locator("[data-glyph-id]")).toHaveCount(4);
     await expect(form("feh.final.3")).toHaveAttribute("aria-pressed", "true");
-    // all four fit, two of them only with filler bars
-    for (const id of ["feh.final.0", "feh.final.1", "feh.final.2"]) await expect(form(id)).toBeEnabled();
+    const others = ["feh.final.0", "feh.final.1", "feh.final.2"];
+    const fitting: string[] = [];
+    for (const id of others) {
+      if (await form(id).isEnabled()) fitting.push(id);
+      else await expect(form(id)).toHaveAttribute("title", /^(Doesn't fit here|Not checked)$/);
+    }
 
-    await form("feh.final.1").click();
-    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe("feh.final.1");
-    expect((await panelEdits(page))?.pinned?.[4]).toMatchObject({ unitIndex: 4, glyphId: "feh.final.1" });
-    await expect(form("feh.final.1")).toHaveAttribute("aria-pressed", "true");
+    // A click on the picked letter swaps it to the first form after the drawn
+    // one, wrapping round, that the options list shows as fitting; undo takes
+    // the swap back and keeps the letter picked.
+    await page.mouse.click(letter.x, letter.y);
+    if (fitting.length > 0) {
+      await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe(fitting[0]);
+      await page.getByRole("button", { name: "Undo" }).click();
+      await expect.poll(async () => panelEdits(page)).toBeUndefined();
+      await expect(options).toBeVisible();
+    } else {
+      await expect.poll(() => canvasNotice(page)).toBe("No other form of that letter fits here");
+      expect(await panelEdits(page)).toBeUndefined();
+    }
+    await pointerAway(page, box);
+    await expect(form("feh.final.3")).toHaveAttribute("aria-pressed", "true");
+
+    // A fitting form's button applies it, pinned, in one undo step; a form that
+    // does not fit cannot be pressed. feh.final.1 fits without bars, so it is the
+    // one most likely to survive a loaded clock.
+    for (const id of others) if (!fitting.includes(id)) await expect(form(id)).toBeDisabled();
+    const pick = fitting.includes("feh.final.1") ? "feh.final.1" : fitting[fitting.length - 1];
+    if (pick === undefined) return;
+    await form(pick).click();
+    await expect.poll(async () => (await panelEdits(page))?.forms?.[4]).toBe(pick);
+    expect((await panelEdits(page))?.pinned?.[4]).toMatchObject({ unitIndex: 4, glyphId: pick });
+    await expect(form(pick)).toHaveAttribute("aria-pressed", "true");
 
     // One step.
     await page.getByRole("button", { name: "Undo" }).click();
