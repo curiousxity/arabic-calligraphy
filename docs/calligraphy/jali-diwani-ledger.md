@@ -792,6 +792,33 @@ drew a spike at its other end. 075.s0 and 095.s0 find no peak to cut at; 086.s0'
 The thin crossing loops 484.s0 and 485.s0 (0.19, 0.27) fit with the small pen walking the skeleton (`PEN_SMALL`,
 `PEN_WALK`): 0.91 each; 732.s0 with the walk, 0.805 to 0.892.
 
+**The flag head is three moves (the user, 2026-11-01; approved on 074, 084 and 108).** "The stroke starts with the
+pen moving towards the left. Then there is a second stroke that goes up to 11 o'clock, and the third stroke starts
+slightly higher where you get the notch and then rolls down." `PEN_THREE` cuts the head (`three_piece`):
+- **red, the block:** cut off by the nib's line through the flag's top corner, the nib lying along the flag's right
+  edge;
+- **green, the climb:** from the flag's top corner to the peak, down the notch and the neck's underside;
+- **blue, the roll:** its cut runs from the notch straight up to the peak. Cut across the stem at the notch instead,
+  the climb kept a strip of the neck and ran on left past the peak to cover it, flattening the point.
+
+Green follows red (`PEN_FOLLOW`): it starts at the corner where the neck's underside meets the flag's bottom
+(`PEN_FOLLOW_AT`), so no notch is left between them ("the green strokes should start matching the bottom of the
+red stroke"). The underside is the trace of the nib's lower corner as the pen climbs up and to the left, not a nib
+face, so the nib is held at 80 degrees (`PEN_FOLLOW_ANG`), near upright, along its first half nuqta (`PEN_FOLLOW_HOLD`),
+and never moves right or down. Holding the nib along the underside's own angle (118 degrees) spilled; a dome at the
+peak went when the roll's cut moved to the peak. Blue is fitted last with red and green kept (`PEN_KEEP`).
+
+**Red and green are a pair (the user: "You have to use them together").** 074's pair is carried to the other flags
+whole, by one affine map from six points of the head (the flag's top corner, the peak, the notch, the neck's bottom
+corner, the flag's two right corners): 084's head is 074's, 108's is narrower. Fitting 108's red on its own ran it
+the wrong way.
+
+| stroke | overlap | studio ink missed / ours outside (sq nuqta) |
+|---|---|---|
+| 074.s0 | 0.970 | 0.016 / 0.018 |
+| 084.s0 | 0.960 | 0.047 / 0.013 (most of it the tail's blunt lip) |
+| 108.s0 | 0.953 | 0.020 / 0.015 |
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |
