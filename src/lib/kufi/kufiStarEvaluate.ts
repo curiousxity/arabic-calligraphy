@@ -1,8 +1,10 @@
 /**
  * Evaluates a text for a Kufi star panel and offers ways to split it over
  * the regions (`.claude/rules/kufi-star.md`, "Evaluation"). Each pattern is
- * tried on every fold and each `STAR_KS` star, at sizes 12 to 60 in steps of
- * 2; an offer fits at the first size where every region with text packs.
+ * tried on every fold and each `STAR_KS` star, at every size from 12 to 60
+ * (each size gives other masks, and some texts fit at one size only: الله in
+ * a 5-fold wedge at 25); an offer fits at the first size where every region
+ * with text packs.
  *
  * Packs are slow (up to ~1.4 s each), so they are cached across calls by the
  * region's mask and the text (the mask is what fold, k, size and kind decide),
@@ -48,9 +50,15 @@ export const STAR_MIN_SIZE = 12;
 export const STAR_MAX_SIZE = 60;
 /** The size an offer takes when none of its texts fits a region at any size: a new star's. */
 const STAR_NO_FIT_SIZE = 24;
-const SIZE_STEP = 2;
+const SIZE_STEP = 1;
+/**
+ * The size scan stops after this many `tooShort` answers in a row. The
+ * longest run measured before a fit is 3 (الله: 4-fold wedge 21-23 then 24,
+ * 6-fold 29-31 then 32; الله محمد on 6-fold alternative 37-39 then 40).
+ */
+const ROOMY_STOP = 5;
 /** Under the clock override, the evaluation stops after this many packs (cache hits are free). */
-export const STAR_EVAL_MAX_TRIES = 60;
+export const STAR_EVAL_MAX_TRIES = 120;
 /** Pack results kept between calls. */
 const PACK_CACHE_LIMIT = 2000;
 
@@ -234,9 +242,10 @@ function firstMask(c: StarConstruction, kind: StarRegionKind): KufiMask {
 
 /**
  * The first size at which `text` packs a region of `kind`, or null. A region
- * that reports `tooShort` has more room than the text can fill; larger sizes
- * only add room, so two such answers in a row end the scan (one is not
- * enough: الله is `tooShort` in a 4-fold wedge at 22 and packs at 24).
+ * that reports `tooShort` has more room than the text can fill, and larger
+ * sizes mostly only add room, so `ROOMY_STOP` such answers in a row end the
+ * scan. Fewer are not enough: الله is `tooShort` in a 4-fold wedge at 21, 22
+ * and 23 and packs at 24.
  */
 const firstFits = new Map<string, number | null>();
 function firstFit(clock: Clock, fold: StarFold, k: number, kind: StarRegionKind, text: string): number | null {
@@ -253,7 +262,7 @@ function firstFit(clock: Clock, fold: StarFold, k: number, kind: StarRegionKind,
       break;
     }
     roomy = r.reason === "tooShort" ? roomy + 1 : 0;
-    if (roomy === 2) break;
+    if (roomy === ROOMY_STOP) break;
   }
   firstFits.set(id, found);
   return found;

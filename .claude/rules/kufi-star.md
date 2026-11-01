@@ -95,10 +95,17 @@ tries each **pattern** on every fold and each `STAR_KS` star:
 | `corners` | the shortest word in the corners, the rest by `alternate` (2+ left) or `repeat` |
 | `centre` | the longest word in the centre, the rest likewise |
 
-- **Sizes** 12 to 60 in steps of 2. For each part (kind, text) the first size
-  that packs is found once; the scan stops after **two** `tooShort` answers in
-  a row (the region has more room than the text fills; one is not enough:
-  الله is `tooShort` in a 4-fold wedge at 22 and packs at 24). An offer fits
+- **Sizes: every one from 12 to 60.** Each size gives other masks, and a
+  text may fit at one size only (الله repeated in every wedge of the classic
+  stars fits at 24 on 4-fold, **25** on 5-fold and 32 on 6-fold; steps of 2
+  lost 5-fold entirely). For each part (kind, text) the first size that packs
+  is found once; the scan stops after **five** `tooShort` answers in a row
+  (`ROOMY_STOP`: the region has more room than the text fills). The longest
+  run measured before a fit is three (الله: 21-23 on 4-fold, 29-31 on 6-fold),
+  so fewer would cut real fits off; a unit test pins the three sizes above.
+  Small sizes pack in milliseconds, so the scan up to the first fit is cheap;
+  "الله" evaluates in about 0.3 s, and "الله محمد" stops on the 9 s budget
+  with six offers. An offer fits
   at the first size from the latest part's first fit where every part packs.
   An offer some part of which never fits is still made, at the size where the
   parts that do fit all pack (24, a new star's, when none does), its note
@@ -108,7 +115,7 @@ tries each **pattern** on every fold and each `STAR_KS` star:
   packs), up to 2000 entries.
 - **Budget.** The worker passes `FIT_BUDGET_MS` (9 s; a pack in progress may
   overrun it a little). Under the tests' clock override it stops after
-  `STAR_EVAL_MAX_TRIES` (60) real packs instead (cache hits are free), so a
+  `STAR_EVAL_MAX_TRIES` (120) real packs instead (cache hits are free), so a
   test's offers never depend on load. The order is likeliest first: repeat
   and alternate on the classic star, then on the alternative, then run,
   corners and centre the same way, so a cut leaves the best offers.
@@ -136,7 +143,5 @@ drawing its approved regions. The block's `text` is edited in Content
 - **Follow-up: text standing on the slanted sides** (option C, recorded in
   [deferred-features.md](deferred-features.md)). Until then corners and
   longer words (محمد) do not fit, and wedges are sparse.
-- **5-fold misses its one size for الله.** الله packs a 5-fold wedge only at
-  25, which the even size steps skip; 5-fold offers for it are non-fitting.
 - One star layout is one long worker job (up to about 27 s for a 6-fold star
   with 19 different texts); panel jobs wait behind it.

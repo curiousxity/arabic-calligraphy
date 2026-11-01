@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { _internal } from "./kufiPack";
-import { starConstruction } from "./kufiStarGeometry";
+import { STAR_KS, starConstruction } from "./kufiStarGeometry";
 import { _resetKufiStarEvaluation, evaluateKufiStar, STAR_MAX_OFFERS, type KufiStarOffer } from "./kufiStarEvaluate";
 
 // Offers are asserted on the work cap alone (STAR_EVAL_MAX_TRIES), so machine load cannot change them.
@@ -80,5 +80,17 @@ describe("evaluateKufiStar", { timeout: 120_000 }, () => {
     expect(e.offers.some((o) => o.pattern === "run")).toBe(false);
     expect(e.notes).toContain("Running the words round 4-fold needs 6 more words");
     expect(e.notes).toContain("Running the words round 6-fold needs 10 more words");
+  });
+});
+
+describe("the size scan", { timeout: 120_000 }, () => {
+  it("finds الله repeated in every wedge of each classic star at its measured size: 4-fold 24, 5-fold 25, 6-fold 32", () => {
+    const e = evaluateKufiStar("الله", 0);
+    for (const [fold, size] of [[4, 24], [5, 25], [6, 32]] as const) {
+      const o = e.offers.find((x) => x.pattern === "repeat" && x.inputs.fold === fold && x.inputs.k === STAR_KS[fold][0]);
+      expect(o, `${fold}-fold`).toBeDefined();
+      expect(o!.fits).toBe(true);
+      expect(o!.inputs.size).toBe(size);
+    }
   });
 });

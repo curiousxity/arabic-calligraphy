@@ -56,6 +56,10 @@ test("Find layouts offers a split and approving it draws the panel", async ({ pa
   const offers = panel.getByTestId("kufi-star-offer");
   await expect(offers.first()).toBeVisible({ timeout: 30_000 });
 
+  // Lines off, so the ink is the text alone: an empty star draws nothing, and
+  // the approved offer (likely another construction, with other lines) adds ink.
+  await page.getByRole("checkbox", { name: "Show construction lines" }).uncheck();
+  await expect.poll(async () => ((await getBlocks(page)).find((b) => b.id === id) as { starLines?: boolean }).starLines).toBe(false);
   const before = await inkPixels(page, await blockClientBox(page, id));
   await offers.first().click();
   await expect.poll(async () => (await starOf(page, id))?.starRegions?.some((t) => t !== "")).toBe(true);
