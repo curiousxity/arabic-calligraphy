@@ -337,6 +337,13 @@ Times are minutes:seconds into the individual-letters lesson.
   edge trims from its source). 048, a fill at 0.953 with a lumpy edge after nine refits, is written as two strokes
   cut at the top of its loop, each with a turning pen: 0.970, the cut filled and trimmed like every split joint. The
   user: "They all look good".
+- **159, the ra's tail (2026-11-01):** the user: "159 ... need better overlap, smoother", then "can you smoothen out
+  the tail". Refitted with a turning pen, no fold, no lift (0.958): the kink where the upstroke starts went, but the
+  nib turns 186 degrees through the bowl's bottom and left a nub on the inner edge. Turning it the short way spoiled
+  the bowl, and easing the turn's pace only shrank the nub; so over a band along the inner edge and the whole
+  upstroke the ink is the studio's outline (`me/endcap.py` with a polygon), corner-cut three rounds and thinned to
+  0.03 units first, since the studio's outline is short straight pieces and a stroke is smooth. The user: "159 is
+  much better. Approved".
 
 **Every joint trimmed to the studio edge**
 
