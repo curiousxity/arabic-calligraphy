@@ -213,8 +213,8 @@ type Paint = {
  * rearrange the rest of the panel round the word; while such a preview is
  * shown, every other letter it changed is outlined in `MOVED_COLOR`.
  * Release commits the preview with every letter of the word pinned where it
- * landed (and every changed letter, or the whole panel when it was
- * rearranged), and the offset recorded in `edits.routes`. A press anywhere else on a first letter is the letter's
+ * landed (or the whole panel, when any letter outside the word changed),
+ * and the offset recorded in `edits.routes`. A press anywhere else on a first letter is the letter's
  * own, as on any letter: a drift drags the whole panel, a still press is a
  * click. Each tool hit-tests only its own handles, so a route handle and a
  * stretch end sharing a cell never compete. Where nothing packs the word

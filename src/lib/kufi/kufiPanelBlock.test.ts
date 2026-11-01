@@ -191,16 +191,24 @@ describe("kufiPanelBlock", () => {
       expect(out.routes).toEqual({ 1: 2 });
     });
 
-    it("a committed re-route also pins every other letter the move changed, and only those", () => {
+    it("a committed re-route that changed any letter outside the word pins the whole panel", () => {
       // the word moved, and the move rearranged the لا before it: another glyph, place and stretch
       const lam = { ...placements[0], glyphId: "lamAlef.isolated.1", col: 17, stretch: [1] };
       const result: Ok = { ...committed, placements: placements.map((p, i) => (i === 0 ? lam : i >= 1 ? { ...p, col: p.col - 2 } : p)) };
       expect(kufiPinWordEdits({}, committed, result, units, 1).pinned).toEqual(Object.fromEntries(result.placements.map((p, i) => [i, p])));
-      // a letter whose turn alone changed counts as moved; one that did not change is left unpinned
+      // a letter whose turn alone changed counts as moved
       const turned: Ok = { ...committed, placements: placements.map((p, i) => (i === 0 ? { ...p, turn: 2 as const } : p)) };
       expect(Object.keys(kufiPinWordEdits({}, committed, turned, units, 1).pinned!).map(Number)).toEqual([0, 1, 2, 3, 4]);
+      // word 0 moved and one letter of word 1 changed: word 1's unchanged letters are pinned too
+      const one: Ok = { ...committed, placements: placements.map((p, i) => (i === 0 ? { ...p, col: 16 } : i === 1 ? { ...p, stretch: [1] } : p)) };
+      expect(kufiPinWordEdits({}, committed, one, units, 0).pinned).toEqual(Object.fromEntries(one.placements.map((p, i) => [i, p])));
+    });
+
+    it("a committed re-route that changed nothing outside the word pins the word only", () => {
       const still = kufiPinWordEdits({}, committed, committed, units, 1);
       expect(Object.keys(still.pinned!).map(Number)).toEqual([1, 2, 3, 4]);
+      const word0: Ok = { ...committed, placements: placements.map((p, i) => (i === 0 ? { ...p, col: 16 } : p)) };
+      expect(kufiPinWordEdits({}, committed, word0, units, 0).pinned).toEqual({ 0: word0.placements[0] });
     });
 
     it("the letters a move changed outside the word are listed, and none when nothing else moved", () => {
@@ -212,11 +220,6 @@ describe("kufiPanelBlock", () => {
       expect(kufiMovedUnits(committed, both, units, 1)).toEqual([0]);
       const missing: Ok = { ...committed, placements: placements.slice(1) };
       expect(kufiMovedUnits(committed, missing, units, 1)).toEqual([0]);
-    });
-
-    it("a panel the packer rearranged round the word is pinned whole, unchanged letters too", () => {
-      const result: Ok = { ...committed, placements: placements.map((p, i) => (i >= 1 ? { ...p, col: p.col - 2 } : p)), rearranged: true };
-      expect(kufiPinWordEdits({}, committed, result, units, 1).pinned).toEqual(Object.fromEntries(result.placements.map((p, i) => [i, p])));
     });
   });
 });

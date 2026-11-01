@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { KUFI_FORMS, dotCells, dotsOf, stretchGlyph, stretchedBase, type KufiGlyph } from "./kufiAlphabet";
 import { emptyBlocks2x2, inkBlocks2x2, rotateRows, type Turn } from "./kufiGrid";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
-import { kufiPinWordEdits, kufiRouteEdits } from "./kufiPanelBlock";
+import { kufiMovedUnits, kufiPinWordEdits, kufiRouteEdits } from "./kufiPanelBlock";
 import {
   fitKufiPanel,
   kufiFormsOf,
@@ -19,13 +19,11 @@ beforeAll(() => _internal.setClockOverride(Infinity));
 afterAll(() => _internal.setClockOverride(null));
 
 const BAQARAH = "لا يكلف الله نفسا إلا وسعها";
-// `quality` counts only unpinned letters, so a repack of pinned letters reports less of it: layouts are compared without it,
-// and without `rearranged`, which says how a panel was found, not what it is
+// `quality` counts only unpinned letters, so a repack of pinned letters reports less of it: layouts are compared without it
 const layoutOf = (r: KufiPackResult) => {
   if (!r.ok) return r;
   const layout = { ...r };
   delete layout.quality;
-  delete layout.rearranged;
   return layout;
 };
 const ALLAH = "الله";
@@ -570,7 +568,6 @@ describe("a moved word rearranging the panel", () => {
     expect(moved.placements[0]).toEqual(edits.pinned![0]);
     // the rest did rearrange: the م of the next word moved too
     expect(moved.placements[3]).not.toEqual(committed.placements[3]);
-    expect(moved.rearranged).toBe(true);
   }, 30000);
 
   it("a move that packed before packs the same, cell for cell (يكلف at +2 on Al-Baqarah)", () => {
@@ -580,7 +577,6 @@ describe("a moved word rearranging the panel", () => {
     // the packer's result before the rearranging step: the first round packs, nothing outside the word changed
     expect(layoutHash(moved)).toBe("951deba1");
     if (!moved.ok) return;
-    expect("rearranged" in moved).toBe(false);
     moved.placements.forEach((p, k) => {
       if (units[k].wordIndex !== 1) expect(p, `unit ${k}`).toEqual(r.placements[k]);
     });
@@ -611,7 +607,7 @@ describe("a moved word rearranging the panel", () => {
     const edits = kufiRouteEdits(undefined, committed, units, 0, 2)!;
     const moved = expectPacked(packKufiPanel({ text: NASR, cols: 15, rows: 9, previous: committed, edits }), NASR);
     const saved = kufiPinWordEdits(edits, committed, moved, units, 0);
-    // a rearranged panel is pinned whole, الله too though it did not move
+    // the move changed letters outside the word, so the panel is pinned whole, الله too though it did not move
     expect(Object.keys(saved.pinned!).map(Number).sort()).toEqual([0, 1, 2, 3, 4, 5]);
     _internal.clearCaches();
     const reopened = packKufiPanel({ text: NASR, cols: 15, rows: 9, edits: saved });
@@ -620,21 +616,25 @@ describe("a moved word rearranging the panel", () => {
 
   it("every two-cell move that packs, on every bundled panel, reopens identical from its committed edits", () => {
     let packed = 0;
-    let rearranged = 0;
+    let whole = 0;
     for (const route of [-2, 2])
       for (const { text, cols, rows, committed, units, w, edits } of movesOf(route)) {
         const moved = packKufiPanel({ text, cols, rows, previous: committed, edits });
         if (!moved.ok) continue;
         packed++;
-        if (moved.rearranged) rearranged++;
         const saved = kufiPinWordEdits(edits, committed, moved, units, w);
+        const pinned = Object.keys(saved.pinned ?? {}).length;
+        if (kufiMovedUnits(committed, moved, units, w).length > 0) {
+          whole++;
+          expect(pinned, `${text} word ${w} at ${route}`).toBe(units.length);
+        } else expect(pinned, `${text} word ${w} at ${route}`).toBe(units.filter((u) => u.wordIndex === w).length);
         _internal.clearCaches();
         const reopened = packKufiPanel({ text, cols, rows, edits: saved });
         expect(layoutOf(reopened), `${text} word ${w} at ${route}`).toEqual(layoutOf(moved));
       }
-    // nasr's two, إن شاء الله, قل هو الله أحد, Bismillah and two on Al-Baqarah; five of them rearranged
+    // nasr's two, إن شاء الله, قل هو الله أحد, Bismillah and two on Al-Baqarah; all but Al-Baqarah's word 1 changed other letters
     expect(packed).toBe(7);
-    expect(rearranged).toBe(5);
+    expect(whole).toBe(6);
   }, 300000);
 
   it("an edit other than a move never reaches the step: a stretch repacks as before, packed or not", () => {

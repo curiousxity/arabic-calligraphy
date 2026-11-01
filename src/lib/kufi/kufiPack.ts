@@ -116,12 +116,6 @@ export type KufiPackResult =
        * fairly only between results packed with the same pins (e.g. repacks of one panel).
        */
       quality?: { squares: number; bars: number; cut: number; grow: number };
-      /**
-       * Set only when a moved word packed by rearranging the rest of the panel (the last step of a repack from
-       * `previous`, see `repack`). Such a panel came from a fresh search, not from a repack of a draft, so a reload
-       * rebuilds it exactly only with every letter pinned: the editor pins the whole panel on commit (`kufiPinWordEdits`).
-       */
-      rearranged?: true;
     }
   | { ok: false; reason: "tooShort" | "tooLong" | "pinConflict"; suggestions: Array<{ cols: number; rows: number }> };
 
@@ -2704,11 +2698,10 @@ function boxIndices(p: KufiPlacement, units: KufiUnit[], cols: number, rows: num
  * alone (the user's, the moved first letter's among them), at a first
  * draft's budget, so the rest of the panel may rearrange round the word. It
  * runs only after every round failed, so a move that packed before packs the
- * same, and only for a moved word, so no other edit reaches it. When its
- * result is returned, `rearrange.used` is set, and the caller marks the
- * result `rearranged`. The rebuild of a saved panel (`packPinned`) never
- * asks for it: the editor pins the whole of a rearranged panel on commit
- * (`kufiPinWordEdits`), so a reload holds it without one.
+ * same, and only for a moved word, so no other edit reaches it. The rebuild
+ * of a saved panel (`packPinned`) never asks for it: whichever round packed
+ * a move, the editor pins the whole panel on commit when any letter outside
+ * the word changed (`kufiPinWordEdits`), so a reload holds it without one.
  *
  * "A moved word" is read from the pins' shape: a word's first letter pinned
  * with its glyph, turn and stretch as they were and its cell changed. Only
@@ -2724,7 +2717,7 @@ function repack(
   prev: KufiPlacement[],
   cells: Uint8Array,
   explicit: Map<number, Pin>,
-  rearrange?: { used: boolean }
+  rearrange = false
 ): Final | null {
   const t0 = performance.now();
   const dirty = new Set<number>();
@@ -2786,10 +2779,7 @@ function repack(
   if (rearrange && first.size > 0 && !best?.packed) {
     // work-bounded like a first draft, cached by its inputs: a refused cell asked again costs nothing
     const f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS, true);
-    if (f?.packed) {
-      rearrange.used = true;
-      return f;
-    }
+    if (f?.packed) return f;
   }
   return best;
 }
@@ -2867,7 +2857,6 @@ export function packKufiPanel(input: {
   const prev = input.previous;
   let f: Final | null;
   let repacked = false;
-  const rearrange = { used: false };
   if (
     prev?.ok &&
     prev.cols === cols &&
@@ -2875,18 +2864,14 @@ export function packKufiPanel(input: {
     prev.placements.length === units.length &&
     prev.placements.every((p, k) => p.unitIndex === k && p.key === units[k].key)
   ) {
-    f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit, rearrange);
+    f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit, true);
     repacked = true;
   } else if (explicit.size > 0) {
     f = packPinned(text, units, cols, rows, edits, explicit);
     // the pinned path spends its own bound; suggestions get a call's budget of their own
     t0 = performance.now();
   } else f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS);
-  if (f?.packed) {
-    const r = okResult(units, f, cols, rows, edits);
-    // only a rearranged panel carries the field, so every other result is as it was
-    return rearrange.used && r.ok ? { ...r, rearranged: true } : r;
-  }
+  if (f?.packed) return okResult(units, f, cols, rows, edits);
   // after an edit the box is the user's: say why, but do not spend a first draft's time on other sizes
   return failure(text, units, f, cols, rows, edits, repacked ? 0 : t0 + CALL_BUDGET_MS);
 }

@@ -179,10 +179,13 @@ unit `key` so a stale save is detected, not misapplied: `forms`, `stretch`,
   move may **rearrange every unpinned letter**: a fresh search (`repack`'s
   `rearrange` out-object, reached only from `packKufiPanel`'s `previous`
   path, `PACK_BUDGET_MS` / `PACK_WORK`) that keeps the explicit pins and the
-  moved first letter. A result it produced carries `rearranged: true`, and
-  committing it pins **every letter of the panel** (`kufiPinWordEdits`), so
-  the panel stays rigid until "Release hand edits"; otherwise the commit pins
-  the word and every other letter the move changed (`kufiMovedUnits`).
+  moved first letter. Committing a move that changed **any letter outside
+  the word** (`kufiMovedUnits`) pins **every letter of the panel**
+  (`kufiPinWordEdits`), whichever step packed it: under the real clock a move
+  may pack in the second or third round instead of the rearranging step, and
+  those reshuffle letters too, which a reload would rebuild by another road.
+  The panel stays rigid until "Release hand edits". A move that changed
+  nothing else pins the word only.
   A packed rearranged move costs about 0.1 to 0.5 s, a refused one up to
   about 0.57 s. **Moves go in steps of two cells** (`evenRouteStep` in
   `kufiPull.ts`): the lattice is stroke, gap, stroke, so a word moved one

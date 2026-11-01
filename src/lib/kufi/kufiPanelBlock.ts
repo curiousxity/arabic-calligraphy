@@ -150,19 +150,20 @@ export function kufiRouteEdits(edits: KufiPanelEdits | undefined, committed: Ok,
 }
 
 /**
- * What a committed re-route saves: every letter of the word pinned where the
- * packer put it, and every other letter the move changed (another glyph,
- * turn, place or stretch than in `before`, the panel the drag started from).
- * A panel the packer `rearranged` round the word is pinned whole: it came
- * from a fresh search, and a reload rebuilds its unpinned letters by another
+ * What a committed re-route saves. When the move changed no letter outside
+ * the word (`kufiMovedUnits` empty), the word alone, every letter pinned
+ * where the packer put it. When it changed any, every letter of the panel:
+ * the rounds that free other lines and the fresh rearranging search both
+ * reshuffle letters, and a reload rebuilds the unpinned ones by another
  * road that may land elsewhere (إن شاء الله 13×13, word 1 at +2, reopened
- * its unmoved alef longer). It stays rigid until "Release hand edits".
+ * its unmoved alef longer). Which round packed does not matter, and the
+ * clock decides that. The panel stays rigid until "Release hand edits".
  */
 export function kufiPinWordEdits(edits: KufiPanelEdits, before: Ok, result: Ok, units: KufiUnit[], wordIndex: number): KufiPanelEdits {
-  const moved = new Set(kufiMovedUnits(before, result, units, wordIndex));
+  const whole = kufiMovedUnits(before, result, units, wordIndex).length > 0;
   let out = edits;
   units.forEach((u, k) => {
-    if (result.rearranged || u.wordIndex === wordIndex || moved.has(k)) out = kufiPinEdits(out, result, k);
+    if (whole || u.wordIndex === wordIndex) out = kufiPinEdits(out, result, k);
   });
   return out;
 }
@@ -170,8 +171,8 @@ export function kufiPinWordEdits(edits: KufiPanelEdits, before: Ok, result: Ok, 
 /**
  * The letters outside word `wordIndex` that a move changed: another glyph,
  * turn, place or stretch in `result` than in `before`, or missing from
- * either. What a route preview outlines, and what a commit pins beside the
- * word. In unit order.
+ * either. What a route preview outlines; when it is not empty, a commit
+ * pins the whole panel (`kufiPinWordEdits`). In unit order.
  */
 export function kufiMovedUnits(before: Ok, result: Ok, units: KufiUnit[], wordIndex: number): number[] {
   const out: number[] = [];

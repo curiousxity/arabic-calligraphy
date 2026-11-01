@@ -923,7 +923,7 @@ test.describe("editing on the canvas", () => {
     expect(await panelEdits(page)).toBeUndefined();
     await page.mouse.up();
 
-    // committed as one step: the route recorded, and the rearranged panel pinned whole
+    // committed as one step: the route recorded, and, since other letters moved, the whole panel pinned
     await expect.poll(async () => (await panelEdits(page))?.routes?.[0]).toBe(2);
     const edits = (await panelEdits(page))!;
     expect(Object.keys(edits.pinned ?? {}).length).toBe(6);
