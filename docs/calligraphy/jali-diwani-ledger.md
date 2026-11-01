@@ -774,6 +774,15 @@ sin's second tooth came out a sliver: 314.s0 and 314.s1 both took a 0.7 nib (the
   step under the join went; the ha->mim's nub stayed. The user approved the ha->ya (2026-10-31) with the seam closed:
   meeting at one node, the halves drawn apart left a hairline, so the exit now runs one node on under the entry's ink.
 - 314.s1 at the full nib (sq3): the sin's second tooth is solid again, a little shorter than the studio's.
+- The ha->mim (151.s0 -> 672.s0) stays one movement (the user, 2026-10-31: "One movement"). Its nub is still open:
+  it is in the studio's own outline, and fitting the ha on into the mim's stem (672.s1) matched only 0.464.
+- The sin's teeth (2026-11-01): 314.s1 at the full nib with its start full (`PEN_FULLSTART`, sq4) and 314.s0 cut in
+  two at the full nib (`PEN_CUT`, `PEN_CUTWIN=free`, `PEN_CUT_MARGIN=0.15`, `PEN_FULLEND`, sc1), finished where the
+  two meet without the shave: the height and walls match the studio's. The points were needles where the studio's
+  are a little round. Holding the nib 40 or 55 degrees across the way up at the tooth's start rounded nothing (a flat
+  nib makes a slanted flat) and cut the teeth down; turning the nib, narrowing it, or rounding by an opening did too.
+  **Approved: a small round cap of our own ink on each point** (`jdfinish.cap`, 0.012 nuqta; the user: "Small"). The
+  studio's first tooth is still a little thicker along its length; a cap does not change that.
 
 **Heads that turn back (the catalogue's overnight fits, 2026-10-31).** A stroke that rises and turns sharply back
 down into a flag (074, 076, 077, 084, 086, 087, 108, 731) lost the flag fitted whole: rounded off or gone. The flag is
