@@ -344,6 +344,13 @@ Times are minutes:seconds into the individual-letters lesson.
   upstroke the ink is the studio's outline (`me/endcap.py` with a polygon), corner-cut three rounds and thinned to
   0.03 units first, since the studio's outline is short straight pieces and a stroke is smooth. The user: "159 is
   much better. Approved".
+- **142's joining end (2026-11-01):** the user: "Joining portion of 142 needs work". The studio starts the lower
+  stroke with a curl and a blunt cap; ours, at one nib angle, sat turned against it all along that start. A turning
+  pen alone fitted worse (0.949); written as two strokes, the curl then the body, cut across the stroke just past the
+  curl, each with a turning pen: 0.976 against 0.968, the cut filled and trimmed. The curl's nib-tip fill and the
+  cut's trims are traced on a pixel grid and left a staircase, so over the curl and the cut's zone the ink is the
+  stroke's own studio outline, smoothed (`me/endcap.py`, ENDCAP_OWN, ENDCAP_SMOOTH), and so is the upper stroke's
+  tip beside it. The user: "142 approved".
 
 **Every joint trimmed to the studio edge**
 
