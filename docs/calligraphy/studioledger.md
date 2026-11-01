@@ -310,6 +310,10 @@ Times are minutes:seconds into the individual-letters lesson.
   them and they drew without that stroke. They are now matched by shape and copy the catalogue's fits (457.s5, 521.s3,
   522.s1, in `twins.py`), and their joints are trimmed like every other shape's. Shown ours / studio / overlap in the
   final review; the user: "Approved".
+- **043's head with a turning nib (2026-11-01):** in the final review the user asked for work on 043 (Ba Initial 1).
+  Its head held one nib angle and its left edge kinked partway down, with the head's corner past the studio's edge
+  and studio ink bare under it. Refitted with a turning pen, no fold and no lift: 0.968 against 0.938, and the edge
+  runs smooth. Pair 018 copies this head (twin), so its joints were trimmed again too. The user: "043 is good".
 
 **Every joint trimmed to the studio edge**
 
