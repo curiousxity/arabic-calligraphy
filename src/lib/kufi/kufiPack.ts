@@ -193,6 +193,8 @@ type Shape = {
   dots: Partial<Record<KufiDotKey, Int16Array>>;
   /** Cells added over every slice (shortening is free). */
   cost: number;
+  /** The stroke length a tall letter's deviation is measured by (`stemOf`). */
+  stem: number;
 };
 
 type Letter = {
@@ -217,6 +219,26 @@ type Letter = {
 
 const TALL = new Set(["alef", "lam", "lamAlef"]);
 /**
+ * The length a tall letter's deviation is measured by (`devParts`): the rows
+ * of its box above the baseline, or for الله its longest stroke standing on
+ * the line, the shafts' height. The heh's box is not the word's stem, so
+ * among a star's forms of الله the tall ones (the shafts two cells above the
+ * heh's box, bare or meeting a bar) are the natural length and the five-row
+ * one a stem cut by two, taken only where no tall form packs. الله is a
+ * tall letter in a star alone (`lettersOf`), so a rectangular panel's
+ * layouts are unchanged.
+ */
+function stemOf(g: KufiGlyph, rows: string[], baseRow: number): number {
+  if (!g.id.startsWith("allah.")) return baseRow + 1;
+  let stem = 0;
+  for (let j = 0; j < (rows[0]?.length ?? 0); j++) {
+    let n = 0;
+    while (baseRow - n >= 0 && rows[baseRow - n][j] === "#") n++;
+    stem = Math.max(stem, n);
+  }
+  return stem;
+}
+/**
  * Orders a letter's alternatives nearest natural length first, for the moves
  * that look for one: a cell of cut outweighs this many cells of growth. The
  * ranking of whole panels (`better`) compares cut and growth strictly in turn.
@@ -240,9 +262,8 @@ function devParts(letter: Letter, sh: Shape): { cut: number; grow: number } {
     else grow += n;
   });
   if (letter.natural >= 0) {
-    const stem = sh.baseRow + 1;
-    if (stem < letter.natural) cut += letter.natural - stem;
-    else grow += stem - letter.natural;
+    if (sh.stem < letter.natural) cut += letter.natural - sh.stem;
+    else grow += sh.stem - letter.natural;
   }
   return { cut, grow };
 }
@@ -341,6 +362,7 @@ function shapeOf(g: KufiGlyph, counts: number[]): Shape {
     dots,
     // cutting a tall stroke to the band is what panels do; only growth costs
     cost: counts.reduce((a, n) => a + Math.max(0, n), 0),
+    stem: stemOf(g, rows, baseRow),
   };
   shapeCache.set(key, s);
   return s;
@@ -387,11 +409,17 @@ function drawnWhole(g: KufiGlyph): boolean {
   return parts === 1 || (parts === 2 && /^#+$/.test(g.rows[0]) && /^\.+$/.test(g.rows[1]));
 }
 
-function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins: Map<number, Pin>, place: KufiPlace = "panel"): Letter[] {
+function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins: Map<number, Pin>, place: KufiPlace = "panel", rows = Infinity): Letter[] {
   const whole = place !== "panel";
+  // in a star, الله is a tall letter too: its natural length is its tall form's shafts (`stemOf`), so the
+  // packer takes that form wherever it fits and the five-row one where it does not
+  const tall = (u: KufiUnit) => TALL.has(u.skeleton) || (whole && u.skeleton === "allah");
   return units.map((u, i) => {
-    // a region has no frame to hold a letter drawn in pieces together: there الله's gapped alef reads broken
-    const all = kufiFormsOf(u, place);
+    // a region has no frame to hold a letter drawn in pieces together: there الله's gapped alef reads broken;
+    // and a form taller than the region's box even at its shortest (the tall الله in the octagon's five-row
+    // band; a seven-row alef shortens to five) is not among its alternates, so it sets no natural length there
+    const shortest = (g: KufiGlyph) => g.rows.length - g.stretch.reduce((n, s) => n + (s.axis === "row" ? s.min ?? 0 : 0), 0);
+    const all = kufiFormsOf(u, place).filter((g) => !whole || shortest(g) <= rows);
     const pin = pins.get(i) ?? null;
     const form = edits.forms?.[i];
     const fixed = edits.stretch?.[i];
@@ -421,7 +449,7 @@ function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins:
       dotKey: d ? dotKey(d) : null,
       pin,
       // over the glyphs allowed: a form the user chose sets its own natural length
-      natural: TALL.has(u.skeleton) && glyphs.length ? Math.max(...glyphs.map((g) => g.rows.length - g.base)) : -1,
+      natural: tall(u) && glyphs.length ? Math.max(...glyphs.map((g) => stemOf(g, g.rows, g.rows.length - 1 - g.base))) : -1,
       exempt: !!pin || !!fixed,
     };
   });
@@ -1519,6 +1547,8 @@ type Final = {
   dev: number;
   cut: number;
   grow: number;
+  /** Packed into a region's mask, where the least shortening ranks before the fewest bars (`better`). */
+  region: boolean;
 };
 
 /**
@@ -1529,11 +1559,19 @@ type Final = {
  * lengthening (which needs no bar) beats a bar; then the least shortening,
  * then the least lengthening (`devOf`); then the lower score. Two squares
  * near each other are never drawn at all (`fillPass`).
+ *
+ * In a region the least shortening comes before the fewest bars: a region's
+ * bars are its line run to the sides and its shafts carried up, the design's
+ * own strokes (nearly every region closes its base row with one), while a
+ * word drawn short beside the room for its tall form is the fault the user
+ * sees (الله squat in a wedge, 2026-11-02, where the tall form packed with
+ * one bar more on the base row).
  */
 function better(a: Final, b: Final | null): boolean {
   if (!b) return true;
   if (a.packed !== b.packed) return a.packed;
   if (a.packed && a.squares !== b.squares) return a.squares < b.squares;
+  if (a.packed && a.region && a.cut !== b.cut) return a.cut < b.cut;
   if (a.packed && a.bars !== b.bars) return a.bars < b.bars;
   if (a.packed && a.cut !== b.cut) return a.cut < b.cut;
   if (a.packed && a.grow !== b.grow) return a.grow < b.grow;
@@ -1950,8 +1988,10 @@ function finish(ctx: Ctx, st0: St): Final {
   const zone = dotZone(ctx, st);
   // bars only in the search's second phase, and only where something is left open
   const open = ctx.bars && (count2x2(ctx, owner, false) > 0 || edgeBreaks(ctx, owner) > 0);
-  const bars = open ? barPass(ctx, owner, barEnds(ctx, st), kind, zone, st.ids + 1) : 0;
-  const squares = fillPass(ctx, owner, kind, zone, st.ids + 1 + bars);
+  const drawn = open ? barPass(ctx, owner, barEnds(ctx, st), kind, zone, st.ids + 1) : 0;
+  const squares = fillPass(ctx, owner, kind, zone, st.ids + 1 + drawn);
+  // a form's own bars (`KufiGlyph.bars`, the tall الله under its bar) count with the drawn ones
+  const bars = drawn + placedList(st).reduce((n, p) => n + (p.shape.g.bars ?? 0), 0);
   const holes = count2x2(ctx, owner, false);
   const edge = edgeBreaks(ctx, owner);
   const score =
@@ -1965,7 +2005,7 @@ function finish(ctx: Ctx, st0: St): Final {
     W.uturn * st.uturns +
     W.stretch * st.stretch +
     W.dotsOff * st.dotsOff;
-  return { st, owner, kind, holes, edge, ink2, squares, bars, score, packed: !holes && !edge && !ink2 && !st.failed, dev: st.dev, cut: st.cut, grow: st.grow };
+  return { st, owner, kind, holes, edge, ink2, squares, bars, score, packed: !holes && !edge && !ink2 && !st.failed, dev: st.dev, cut: st.cut, grow: st.grow, region: !!ctx.region };
 }
 
 // ---------------------------------------------------------------------------
@@ -2544,7 +2584,7 @@ function makeCtx(
   const place: KufiPlace = mask ? "star" : "panel";
   const { units } = resolveKufiText(text);
   const rings = Math.max(1, Math.floor((Math.min(cols, rows) - 1) / (2 * (BAND + 1))) + 1);
-  const letters = lettersOf(text, units, edits, pins, place);
+  const letters = lettersOf(text, units, edits, pins, place, rows);
   // a region stacks upright lines from its bottom row up, one ring per band
   const regionLines = Math.floor((rows - 1) / (BAND + 1)) + 1;
   return {

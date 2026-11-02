@@ -422,17 +422,42 @@ describe("KUFI_FORMS: pieces read off the reference panel", () => {
     expect(g.parts).toBe(3);
   });
 
-  it("only the gapped الله and the الله under its bar are drawn in more than one piece", () => {
-    expect(ENTRIES.filter((e) => (e.g.parts ?? 1) !== 1).map(label)).toEqual(["allah.isolated.2", "allah.isolated.4"]);
+  it("only the gapped الله is drawn in more than one piece", () => {
+    expect(ENTRIES.filter((e) => (e.g.parts ?? 1) !== 1).map(label)).toEqual(["allah.isolated.2"]);
   });
 
-  it("has a star الله of four uprights at a line's height, the heh with its own wall, and the same under its bar", () => {
-    const g = glyphById("allah.isolated.3");
-    expect(g.rows).toEqual(["###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"]);
-    expect(g.parts).toBeUndefined();
-    expect(g.only).toBe("star");
-    expect(glyphById("allah.isolated.4").rows).toEqual(["#########", ".........", ...g.rows]);
-    expect(glyphById("allah.isolated.4")).toMatchObject({ parts: 2, only: "star" });
+  it("has three star forms of الله: five rows on four uprights, the tall one with its shafts two above the heh's box, and the tall one under its bar", () => {
+    // The five-row form, the fallback where no tall form has room: the heh's own wall under its bar,
+    // widening through the heh's box only (no row slice: four uprights grown evenly read as "اللله")
+    const five = glyphById("allah.isolated.3");
+    expect(five.rows).toEqual(["###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"]);
+    expect(five.stretch).toEqual([{ axis: "col", index: 1 }]);
+    expect(five).toMatchObject({ only: "star" });
+    expect(five.parts).toBeUndefined();
+    expect(five.bars).toBeUndefined();
+    // the tall form: the panel's allah.isolated.1 (the Topkapi proportion), its row slice on the shafts alone
+    const tall = glyphById("allah.isolated.5");
+    expect(tall.rows).toEqual(glyphById("allah.isolated.1").rows);
+    expect(tall.rows).toEqual(["....#.#.#", "....#.#.#", ...five.rows.slice(0, 4), "#########"]);
+    expect(tall.stretch).toEqual([
+      { axis: "row", index: 1 },
+      { axis: "col", index: 1 },
+    ]);
+    expect(tall).toMatchObject({ only: "star" });
+    expect(tall.parts).toBeUndefined();
+    expect(tall.bars).toBeUndefined();
+    // the tall form under its bar, the shafts meeting it, one gap row over the heh's box; the bar is a filler bar
+    const barred = glyphById("allah.isolated.6");
+    expect(barred.rows).toEqual(["#########", ...tall.rows.slice(1)]);
+    expect(barred.stretch).toEqual(tall.stretch);
+    expect(barred).toMatchObject({ only: "star", bars: 1 });
+    expect(barred.parts).toBeUndefined();
+    expect(components(barred.rows)).toBe(1);
+    // there is no allah.isolated.4 any more (the five-row form under a bar: four equal uprights)
+    expect(KUFI_FORMS.allah.isolated!.map((g) => g.id)).toEqual(["allah.isolated.0", "allah.isolated.1", "allah.isolated.2", "allah.isolated.3", "allah.isolated.5", "allah.isolated.6"]);
+    // in every star form the heh's walls never grow: a row slice, where there is one, lies in the shafts alone
+    for (const g of KUFI_FORMS.allah.isolated!.filter((x) => x.only === "star"))
+      for (const s of g.stretch) if (s.axis === "row") expect(g.rows[s.index], g.id).toBe("....#.#.#");
   });
 
   it("every الله form shows alef, lam, lam and the heh's own wall: four uprights the height of its body, never a heh hanging off a lam", () => {

@@ -274,7 +274,11 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
       for (const p of b.placements) {
         let box: number[] = [];
         if (p.glyphId.startsWith("heh.")) box = Array.from({ length: stretchGlyph(kufiGlyphById(p.glyphId)!.glyph, p.stretch)[0].length }, (_, j) => p.col + j);
-        else if (p.glyphId.startsWith("allah.")) box = Array.from({ length: 3 + (p.stretch[1] ?? 0) }, (_, j) => p.col + j);
+        else if (p.glyphId.startsWith("allah.")) {
+          const g = kufiGlyphById(p.glyphId)!.glyph;
+          const wide = p.stretch[g.stretch.findIndex((s) => s.axis === "col")] ?? 0;
+          box = Array.from({ length: 3 + wide }, (_, j) => p.col + j);
+        }
         for (const c of box) expect(shafts, `${text} at ${size}: ${p.glyphId} at ${p.col}, column ${c}`).not.toContain(c);
       }
     }

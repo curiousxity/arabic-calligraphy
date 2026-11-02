@@ -47,9 +47,10 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
   });
 
   it("الله: every fold gets a dense fit on its classic star, the word three times in a 5-fold wedge, twice in a 6-fold one, once in a 4-fold one", () => {
-    // On the star's four-upright الله, with a word's shafts carried up together or not at all
-    // (2026-11-02; see kufiPackRegion.test.ts), a 4-fold wedge holds the word once (20 to 27) and
-    // never twice; a 5-fold wedge three times at 40, a 6-fold wedge twice from 34.
+    // On the star's الله (five rows, or tall with its shafts two above the heh's box), with a word's
+    // shafts carried up together or not at all (2026-11-02; see kufiPackRegion.test.ts), a 4-fold
+    // wedge holds the word once (20 to 27) and never twice; a 5-fold wedge three times at 40, a
+    // 6-fold wedge twice from 34.
     const e = evalAllah();
     for (const fold of [4, 5, 6] as StarFold[]) {
       const dense = e.offers.filter((x) => x.pattern === "repeat" && x.fits && x.inputs.fold === fold && x.inputs.k === defaultStarK(fold));
@@ -156,18 +157,33 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
 });
 
 describe("the size scan", { timeout: 600_000 }, () => {
-  it("pins الله's fits: 4-fold classic ×1 at 20, 5-fold classic ×1 at 24 and ×3 at 40, 6-fold classic ×1 at 30 and ×2 at 40", () => {
-    // Measured 2026-11-02 under the work cap, on the star's four-upright الله with a word's shafts
-    // carried up together or not at all. The merged form's fits (4-fold 18 and ×2 at 28 with the
+  it("pins الله's fits: 4-fold classic ×1 at 23 (tall) and 20, 5-fold classic ×1 at 24 and ×3 at 40, 6-fold classic ×1 at 30 and ×2 at 40", () => {
+    // Measured 2026-11-02 under the work cap, on the star's الله with a word's shafts carried up
+    // together or not at all and the tall form preferred: a 4-fold wedge holds the five-row word
+    // at 20 (a cut stem, two cells) and the tall one from 23, so the scan goes on from 20 and
+    // offers 23 too, ranked first. The merged form's fits (4-fold 18 and ×2 at 28 with the
     // corners filled, 5-fold 21 and ×3 at 34, 6-fold 24 and ×3 at 39) are gone with it.
     const e = evalAllah();
     const at = (fold: StarFold, size: number) =>
       e.offers.find((x) => x.pattern === "repeat" && x.fits && x.inputs.fold === fold && x.inputs.k === defaultStarK(fold) && x.inputs.size === size);
+    expect(wordsOf(at(4, 23)!.inputs.regions[1])).toHaveLength(1);
+    expect(at(4, 23)!.quality.cut).toBe(0);
     expect(wordsOf(at(4, 20)!.inputs.regions[1])).toHaveLength(1);
     expect(at(4, 20)!.inputs.regions[9]).toBe("");
+    expect(at(4, 20)!.quality.cut).toBe(16); // two cells a word, eight wedges
+    expect(e.offers.indexOf(at(4, 23)!)).toBeLessThan(e.offers.indexOf(at(4, 20)!));
     expect(wordsOf(at(5, 24)!.inputs.regions[1])).toHaveLength(1);
+    expect(at(5, 24)!.quality.cut).toBe(0);
     expect(wordsOf(at(5, 40)!.inputs.regions[1])).toHaveLength(3);
     expect(wordsOf(at(6, 30)!.inputs.regions[1])).toHaveLength(1);
+    expect(at(6, 30)!.quality.cut).toBe(0);
     expect(wordsOf(at(6, 40)!.inputs.regions[1])).toHaveLength(2);
+    // every wedge offer of الله draws the word tall where its wedge has room for a tall form: the tall forms
+    // (.5 bare, .6 under its bar) at 23, 24 and 30, the five-row one at 20 and in the stacked pairs and triples
+    const forms = (o: KufiStarOffer) => new Set(o.layout.regions.flatMap((r) => (r.result?.ok ? r.result.placements.map((p) => p.glyphId) : [])));
+    expect(forms(at(4, 23)!)).toEqual(new Set(["allah.isolated.5"]));
+    expect(forms(at(5, 24)!)).toEqual(new Set(["allah.isolated.5"]));
+    expect(forms(at(6, 30)!)).toEqual(new Set(["allah.isolated.6"]));
+    expect(forms(at(4, 20)!)).toEqual(new Set(["allah.isolated.3"]));
   });
 });

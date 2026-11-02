@@ -9,7 +9,9 @@
  * fold and each `STAR_KS` star over the sizes from `STAR_MIN_SIZE` up; an
  * offer fits at a size where every wedge (and the centre, when it holds a
  * word) packs, and a plan is offered at up to `FITS_PER_PLAN` growing sizes,
- * the larger ones denser.
+ * the larger ones denser, or the same words standing taller (a fit drawing a
+ * tall letter short, الله on its five-row form, scans `CUT_SCAN` sizes on for
+ * its tall form before jumping to the next word count).
  *
  * Packs are slow (up to ~1.4 s each, failures slowest), so they are cached
  * across calls by the region's mask and the text (the mask is what fold, k,
@@ -39,8 +41,12 @@ export type KufiStarOffer = {
   fits: boolean;
   /** Plain words: what goes where, and what does not fit. */
   note: string;
-  /** Summed over every region with text; `words` the placements drawn; size is `inputs.size`. */
-  quality: { squares: number; bars: number; words: number; size: number };
+  /**
+   * Summed over every region with text; `words` the placements drawn; `cut` the cells the tall
+   * letters stand short of their natural length (الله on its five-row form in a wedge, two a
+   * word); size is `inputs.size`.
+   */
+  quality: { squares: number; bars: number; cut: number; words: number; size: number };
   /** The packed regions, for the preview (and the layout cache on approval). */
   layout: KufiStarLayout;
 };
@@ -67,8 +73,14 @@ const OCTAGON_SCAN = 8;
 const OFFERS_PER_FOLD_PATTERN = 2;
 export const STAR_MIN_SIZE = 12;
 export const STAR_MAX_SIZE = 60;
-/** Fits offered per plan and star: after one, the scan goes on until a size holds strictly more words (denser). */
+/** Fits offered per plan and star: after one, the scan goes on until a size holds strictly more words (denser) or the same words taller (less cut). */
 const FITS_PER_PLAN = 3;
+/**
+ * After a fit that draws a tall letter short (`quality.cut`: الله on its five-row form), the
+ * sizes tried one by one, before the jump to the next word count, for a fit of the same words
+ * standing tall: a 4-fold wedge holds الله squat at 20 to 22 and tall from 23 (2026-11-02).
+ */
+const CUT_SCAN = 3;
 /** Under the clock override, the evaluation stops after this many packs (cache hits are free). */
 export const STAR_EVAL_MAX_TRIES = 300;
 /** Pack results kept between calls. */
@@ -390,15 +402,16 @@ function attempt(clock: Clock, plan: Plan, c: StarConstruction, fails: { n: numb
 }
 
 function qualityOf(layout: KufiStarLayout, size: number) {
-  let squares = 0, bars = 0, words = 0;
+  let squares = 0, bars = 0, cut = 0, words = 0;
   for (const r of layout.regions) {
     if (r.result?.ok) {
       squares += r.result.quality?.squares ?? 0;
       bars += r.result.quality?.bars ?? 0;
+      cut += r.result.quality?.cut ?? 0;
       words += r.result.placements.length;
     }
   }
-  return { squares, bars, words, size };
+  return { squares, bars, cut, words, size };
 }
 
 const KIND_ORDER: StarRegionKind[] = ["wedgeA", "wedgeB", "corner", "centre"];
@@ -454,7 +467,7 @@ function octagonOffers(clock: Clock, text: string, offers: KufiStarOffer[]): voi
         pattern: "octagon",
         fits: true,
         note: `${text}${times(n)} along each side, the tall strokes lengthened to an octagon in a square of ${size}`,
-        quality: { squares: 0, bars: 0, words: band.placements.length, size },
+        quality: { squares: 0, bars: 0, cut: band.quality?.cut ?? 0, words: band.placements.length, size },
         layout: { regions: [{ text: side, result: band }], unpacked: [], octagon },
       });
       break;
@@ -469,8 +482,13 @@ type Task = {
   k: number;
   size: number;
   fits: number;
-  /** Words the last fit drew: the next fit must draw more. */
+  /** Words the last offer drew, and its cut: the next offer must draw more, or the same words with less cut. */
   words: number;
+  cut: number;
+  /** The words a wedge held at the last fit (`counts.nA`): what the jump past it must promise more than. */
+  nA: number;
+  /** Sizes still to try one by one after a fit with a cut stem (`CUT_SCAN`), before the jump. */
+  after: number;
   fails: { n: number };
   best: { size: number; a: Attempt } | null;
   done: boolean;
@@ -496,26 +514,35 @@ function step(clock: Clock, t: Task): KufiStarOffer | null {
   const fails = { n: 0 };
   const a = attempt(clock, t.plan, c, fails);
   if (fails.n > 0) t.fails.n++;
+  let offer: KufiStarOffer | null = null;
   if (a.missing === 0) {
-    const offer = offerOf(t.plan, t.fold, t.k, t.size, a);
-    // a filled plan's next size worth packing is the first whose wedge estimate promises one more
-    // word (every size between would pack the same words again, slowly); a run tries each size
-    t.size++;
-    if (t.plan.fill) {
-      const base = t.plan.wedges(t.fold)[1];
-      while (t.size <= STAR_MAX_SIZE && estimate(firstMask(constructionOf(t.fold, t.k, t.size), "wedgeA"), base) <= a.counts.nA) t.size++;
-    }
-    // a fit no denser than the last is not another offer
-    if (offer.quality.words <= t.words) return null;
-    t.fits++;
-    t.words = offer.quality.words;
-    if (t.fits >= FITS_PER_PLAN) t.done = true;
-    return offer;
+    const o = offerOf(t.plan, t.fold, t.k, t.size, a);
+    // a fit is another offer when denser than the last, or the same words standing taller (less cut)
+    const better = o.quality.words > t.words || (o.quality.words === t.words && o.quality.cut < t.cut);
+    t.nA = a.counts.nA;
+    if (better) {
+      offer = o;
+      t.fits++;
+      t.words = o.quality.words;
+      t.cut = o.quality.cut;
+      if (t.fits >= FITS_PER_PLAN) t.done = true;
+      // a fit drawing a tall letter short may stand tall a size or two on: those sizes are tried first
+      t.after = o.quality.cut > 0 ? CUT_SCAN : 0;
+    } else t.after--;
+  } else {
+    if (!t.best || a.missing < t.best.a.missing || (a.missing === t.best.a.missing && Math.abs(t.size - STAR_NO_FIT_SIZE) < Math.abs(t.best.size - STAR_NO_FIT_SIZE)))
+      t.best = { size: t.size, a };
+    t.after--;
   }
-  if (!t.best || a.missing < t.best.a.missing || (a.missing === t.best.a.missing && Math.abs(t.size - STAR_NO_FIT_SIZE) < Math.abs(t.best.size - STAR_NO_FIT_SIZE)))
-    t.best = { size: t.size, a };
   t.size++;
-  return null;
+  // a filled plan's next size worth packing is the first whose wedge estimate promises one more
+  // word than the last fit held (every size between would pack the same words again, slowly),
+  // once the sizes after a cut fit are tried; a run tries each size
+  if (t.plan.fill && t.nA > 0 && t.after <= 0) {
+    const base = t.plan.wedges(t.fold)[1];
+    while (t.size <= STAR_MAX_SIZE && estimate(firstMask(constructionOf(t.fold, t.k, t.size), "wedgeA"), base) <= t.nA) t.size++;
+  }
+  return offer;
 }
 
 /** Words drawn per region holding text: how densely an offer fills its panel, comparable across folds. */
@@ -534,7 +561,8 @@ function cornersFilled(o: KufiStarOffer): boolean {
  * star is nearly the same offer, and the panel can switch stars); corners filled before empty
  * (a 4-fold star at 34 holds الله four times a wedge but nothing in its corners; at 28, twice
  * and the corners too, which is the reference); then denser first, then fewer filler squares,
- * then the smaller size; then the closest misses (fewer regions unpacked).
+ * then fewer cut stems (الله tall before squat, at the same density), then the smaller size;
+ * then the closest misses (fewer regions unpacked).
  */
 function rank(a: KufiStarOffer, b: KufiStarOffer): number {
   if (a.fits !== b.fits) return a.fits ? -1 : 1;
@@ -546,6 +574,7 @@ function rank(a: KufiStarOffer, b: KufiStarOffer): number {
   const da = density(a), db = density(b);
   if (da !== db) return db - da;
   if (a.quality.squares !== b.quality.squares) return a.quality.squares - b.quality.squares;
+  if (a.quality.cut !== b.quality.cut) return a.quality.cut - b.quality.cut;
   return a.quality.size - b.quality.size;
 }
 
@@ -593,7 +622,7 @@ export function evaluateKufiStar(text: string, budgetMs: number): KufiStarEvalua
   for (const plan of plans)
     for (const fold of FOLDS) {
       if (plan.pattern === "run" && runNeeds(fold) > 0) continue;
-      for (const k of STAR_KS[fold]) tasks.push({ plan, fold, k, size: STAR_MIN_SIZE, fits: 0, words: 0, fails: { n: 0 }, best: null, done: false });
+      for (const k of STAR_KS[fold]) tasks.push({ plan, fold, k, size: STAR_MIN_SIZE, fits: 0, words: 0, cut: 0, nA: 0, after: 0, fails: { n: 0 }, best: null, done: false });
     }
   let complete = true;
   try {

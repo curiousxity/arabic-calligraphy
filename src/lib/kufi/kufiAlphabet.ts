@@ -134,6 +134,12 @@ export type KufiGlyph = {
    */
   only?: Exclude<KufiPlace, "panel">;
   /**
+   * Filler bars drawn into the form itself (the bar the tall الله's shafts meet), counted with
+   * the packer's own bars, so a form without them is taken wherever it packs and this one only
+   * where its bar closes something.
+   */
+  bars?: number;
+  /**
    * The letter's own dot sets (iʿjām), one per dot pattern its letters need,
    * in the glyph box's coordinates; cells may lie outside the box. Letters
    * sharing this skeleton pick their set with `dotsOf`; `dotCells` does both.
@@ -190,7 +196,7 @@ const g = (
   rows: string[],
   stretch: KufiStretch[],
   joins?: KufiGlyph["joins"],
-  more?: Pick<KufiGlyph, "inset" | "parts" | "only">
+  more?: Pick<KufiGlyph, "inset" | "parts" | "only" | "bars">
 ): KufiGlyph => ({ id, rows, base, stretch, ...(joins ? { joins } : {}), ...more });
 
 /**
@@ -571,20 +577,39 @@ export const KUFI_FORMS: KufiFormTable = {
       g("allah.isolated.0", 0, ["###.#.#.#", "#.#.#.#.#", "#.#.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }, { axis: "col", index: 3 }]),
       g("allah.isolated.1", 0, ["....#.#.#", "....#.#.#", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }, { axis: "col", index: 3 }]),
       g("allah.isolated.2", 0, ["###.#.#.#", "..#.#.#..", "###.#.#.#", "#.#.#.#.#", "#######.#"], [{ axis: "row", index: 3 }, { axis: "col", index: 3 }], undefined, { parts: 3 }),
-      // in a star (a wedge or the octagon's band) the word stands on four uprights at a line's
-      // height, the heh with a wall of its own under its bar: `allah.isolated.1` at five rows. The
-      // layouts lengthen the alef and both lams together, by bars to a wedge's slanted side or
-      // inward to the octagon, and never the heh's wall, so the lams rise above the heh as in the
-      // references (the Topkapi Scroll's الله: alef, lam, lam tall together, the heh's short wall
-      // ending at its bar). A merged form with the heh hanging off the second lam (three uprights)
-      // read as the heh's stem rising whenever a lam beside it was carried up (2026-11-02). **The
-      // word widens through the heh's box** (column 1: its bars grow, its counter stays one row),
-      // the one column that widens without a hole, so a word can fill the end of a wedge's line
-      // (a wide heh is how square Kufi stretches the word; without it one الله fills no wedge)
-      g("allah.isolated.3", 0, ["###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 3 }, { axis: "col", index: 1 }], undefined, { only: "star" }),
-      // the same under the bar of its shadda and dagger alef, one gap above the word: its tops are
-      // capped, so nothing of it is lengthened
-      g("allah.isolated.4", 0, ["#########", ".........", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 5 }, { axis: "col", index: 1 }], undefined, { parts: 2, only: "star" }),
+      // in a star (a wedge or the octagon's band) the word stands on four uprights, the heh with a
+      // wall of its own under its bar, and the layouts lengthen the alef and both lams together, by
+      // bars to a wedge's slanted side or inward to the octagon, and never the heh's wall, so the
+      // lams rise above the heh as in the references (the Topkapi Scroll's الله: alef, lam, lam
+      // tall together, the heh's short wall ending at its bar). A merged form with the heh hanging
+      // off the second lam (three uprights) read as the heh's stem rising whenever a lam beside it
+      // was carried up (2026-11-02). **The word widens through the heh's box** (column 1: its bars
+      // grow, its counter stays one row), the one column that widens without a hole, so a word can
+      // fill the end of a wedge's line (a wide heh is how square Kufi stretches the word; without
+      // it one الله fills no wedge). None of the star forms grows its rows evenly: four equal
+      // uprights read as "اللله" (2026-11-01), so only the tall form's shafts stretch, never the
+      // heh's wall.
+      //
+      // The five-row form, `allah.isolated.1` at a line's height: the octagon's band (five rows,
+      // the shafts lengthened out of it) and a wedge's fallback where the tall form has no room
+      g("allah.isolated.3", 0, ["###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "col", index: 1 }], undefined, { only: "star" }),
+      // (`allah.isolated.4`, the five-row form under a bar one gap above it, is gone: four equal
+      // uprights under a bar, which `.6` below replaces with the same cells and the shafts tall)
+      //
+      // The tall form, the panel's `allah.isolated.1`: the alef and both lams stand two cells
+      // above the heh's capped box (the proportion of the Topkapi Scroll's الله), and its row slice
+      // grows the three shafts alone, so the word reads alef, lam, lam tall beside a short heh even
+      // where nothing carries the shafts on. The packer prefers it in a wedge wherever it fits (see
+      // `stemOf` in kufiPack.ts: the word's stem is its longest stroke on the line, 7 here, 5 in
+      // the five-row form, which counts as a cut stem)
+      g("allah.isolated.5", 0, ["....#.#.#", "....#.#.#", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1 }, { axis: "col", index: 1 }], undefined, { only: "star" }),
+      // the tall form under its bar, the shafts meeting it as a lam meets the line above in a
+      // panel: the bar closes the space above the heh's box where the bare tall form would leave
+      // an empty 2x2 there (a wedge with room above the word), and one gap row keeps the box its
+      // own. The bar counts as a filler bar (`bars`), so the bare tall form is taken wherever it
+      // packs and this one only where the bar is needed; its tops are all capped, so nothing of
+      // it is lengthened. A bar a gap row above the shafts would leave a hole over the heh's box
+      g("allah.isolated.6", 0, ["#########", "....#.#.#", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1 }, { axis: "col", index: 1 }], undefined, { only: "star", bars: 1 }),
     ],
   },
 };

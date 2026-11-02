@@ -68,11 +68,15 @@ export const section: GuideSection = {
         so no single stroke stands up alone beside the rest of its word; a heh
         keeps its box, as in the old panels, and «الله» always reads alef, lam,
         lam and heh. In the wedges layout the letters stand on the outer edge
-        of each wedge and their tall strokes are carried up to the slanted
-        sides the same way, so a short word such as «الله» fits well, while
-        longer words, several words in one wedge and the corners often do not
-        fit yet. An offer that does not fit can still be chosen: those parts
-        stay as pattern, and the panel says how many did not fit.
+        of each wedge, and «الله» is drawn with its alef and lams standing
+        two squares above the heh's box wherever the wedge has room for that,
+        bare or meeting a bar across the top of the word; only in the
+        smallest wedges, or where two or three words stack in one, does it
+        stand at the line's height. Offers with the tall word come first
+        among those of the same fill. Longer words, several words in one
+        wedge and the corners often do not fit yet. An offer that does not
+        fit can still be chosen: those parts stay as pattern, and the panel
+        says how many did not fit.
       </p>
     </>
   ),

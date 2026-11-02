@@ -51,13 +51,17 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
   });
 
   it("measure, then pin: الله first packs in a 4-fold classic wedge at size 20, on four uprights, its feet on the base row", () => {
-    // Measured 2026-11-02 (sizes 12..50) with the star's four-upright الله (9 wide, the heh's own
-    // wall), the base row on the ring edge, the heh free to widen and a word's shafts carried up
-    // together or not at all: one الله packs a 4-fold wedge at 20 to 27 and never two or more (the
-    // pocket above a heh's box has no legal filler, and two words no longer stand on one line
-    // before the slanted sides close); a 4-fold corner holds one at 29 to 31, three at 46. 5-fold
-    // wedges hold one at 24 to 29, three at 40; 6-fold one at 30 to 33, two at 34 to 40. (The
-    // merged three-upright form held two in a 4-fold wedge at 27 and 28, one from 18.)
+    // Measured 2026-11-02 (sizes 12..50) with the star's الله (9 wide, the heh's own wall; five
+    // rows, or tall with the shafts two above the heh's box, bare or under a bar), the base row on
+    // the ring edge, the heh free to widen and a word's shafts carried up together or not at all:
+    // one الله packs a 4-fold wedge at 20 to 27 (five-row at 20 to 22, tall at 23, tall under its
+    // bar at 24 to 27) and never two or more (the pocket above a heh's box has no legal filler,
+    // and two words no longer stand on one line before the slanted sides close); a 4-fold corner
+    // holds one at 29 to 31, tall, and nothing more up to 60 (three packed at 46 while the
+    // five-row form grew its rows evenly). 5-fold wedges hold one at 24 to 29 (tall at 24 and 25,
+    // under its bar from 26), three at 40; 6-fold one at 30 (under its bar), two at 34 to 40, on
+    // the five-row form. (The merged three-upright form held two in a 4-fold wedge at 27 and 28,
+    // one from 18.)
     const wedge = (size: number) => starConstruction(4, STAR_KS[4][0], size).regions[1].mask;
     for (let size = 12; size < 20; size++) expect(packKufiRegion({ text: "الله", mask: wedge(size) }).ok).toBe(false);
     const mask = wedge(20);
@@ -65,7 +69,8 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expectRegionGrammar(r, mask);
-    // the star form: four uprights at the line's height, never the panel's taller forms (.0, .1) nor the gapped alef (.2)
+    // the five-row star form: the wedge at 20 has no room for the tall one (.5, .6); never the panel's
+    // forms (.0, .1) nor the gapped alef (.2)
     expect(r.placements.map((p) => p.glyphId)).toEqual(["allah.isolated.3"]);
     // the edge rule on the base row: the feet line it, no two neighbouring usable cells empty
     for (let x = 0; x + 1 < mask.cols; x++) {
@@ -105,7 +110,7 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
   /** الله repeated, in the wedges and corners that pack it (measured 2026-11-02, see above). */
   const rep = (n: number) => Array.from({ length: n }, () => "الله").join(" ");
   const FITS: Array<[fold: 4 | 5 | 6, size: number, region: number, text: string]> = [
-    [4, 20, 1, rep(1)], [4, 25, 1, rep(1)], [4, 29, 9, rep(1)], [4, 46, 9, rep(3)],
+    [4, 20, 1, rep(1)], [4, 23, 1, rep(1)], [4, 25, 1, rep(1)], [4, 29, 9, rep(1)],
     [5, 24, 1, rep(1)], [5, 28, 1, rep(1)], [5, 40, 1, rep(3)],
     [6, 30, 1, rep(1)], [6, 34, 1, rep(2)], [6, 38, 1, rep(2)],
   ];
@@ -167,6 +172,53 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
     expect(words).toBeGreaterThan(10);
   });
 
+  it("the tall form is taken wherever it fits: its heh wall never rises and its shafts top out two cells or more above the heh's bar", () => {
+    // The user, 2026-11-02: الله on four equal uprights with nothing rising read as "اللله". The tall
+    // forms (.5 bare, .6 under its bar) stand the alef and both lams two cells above the heh's
+    // capped box, the Topkapi Scroll's proportion; the five-row form (.3) is drawn only where no
+    // tall form packs, at the smallest wedges. The heh's wall (the glyph's first column) never rises.
+    const forms = new Map<string, string[]>();
+    let tall = 0;
+    for (const { fold, size, region, mask, r } of packedFits()) {
+      expectRegionGrammar(r, mask);
+      forms.set(`${fold}-${size}-${region}`, r.placements.map((p) => p.glyphId));
+      for (const p of r.placements) {
+        const found = kufiGlyphById(p.glyphId)!;
+        const rows = stretchGlyph(found.glyph, p.stretch);
+        const where = `${fold}-fold ${size} region ${region}: ${p.glyphId} at ${p.col},${p.row}`;
+        // the heh's left wall: its top is the box's bar (or the word's bar over it), never carried up
+        expect(riseOf(r, p, rows, 0), where).toBe(0);
+        // the heh's box is the body's five rows standing on the line, whatever the shafts do above
+        const hehTop = rows.length - 5;
+        expect(rows[hehTop].startsWith("###") && rows[hehTop + 1].startsWith(".."), where).toBe(true);
+        if (p.glyphId === "allah.isolated.3") continue;
+        tall++;
+        // the shafts (the last three ink columns, the lams and the alef) stand two or more above the box, as drawn and as risen
+        const shafts = [rows[0].length - 5, rows[0].length - 3, rows[0].length - 1];
+        for (const j of shafts) {
+          let top = 0;
+          while (rows[top][j] !== "#") top++;
+          expect(hehTop - top + riseOf(r, p, rows, j)!, `${where} column ${j}`).toBeGreaterThanOrEqual(2);
+        }
+      }
+      // the bar of a word under its bar counts with the filler bars
+      const barred = r.placements.filter((p) => p.glyphId === "allah.isolated.6").length;
+      expect(r.quality?.bars ?? 0, `${fold}-fold ${size} region ${region}`).toBeGreaterThanOrEqual(barred);
+    }
+    expect(tall).toBeGreaterThanOrEqual(5);
+    // where each form is taken: bare where the wedge's sides close over the heh's pocket (4-fold 23, 5-fold
+    // 24, a corner's acute end), under its bar where the wedge has room above the word (4-fold 25, 5-fold 28,
+    // 6-fold 30), five rows where no tall form fits (4-fold 20, the stacked pairs of a 6-fold wedge)
+    expect(forms.get("4-23-1")).toEqual(["allah.isolated.5"]);
+    expect(forms.get("5-24-1")).toEqual(["allah.isolated.5"]);
+    expect(forms.get("4-29-9")).toEqual(["allah.isolated.5"]);
+    expect(forms.get("4-25-1")).toEqual(["allah.isolated.6"]);
+    expect(forms.get("5-28-1")).toEqual(["allah.isolated.6"]);
+    expect(forms.get("6-30-1")).toEqual(["allah.isolated.6"]);
+    expect(forms.get("4-20-1")).toEqual(["allah.isolated.3"]);
+    expect(forms.get("6-34-1")).toEqual(["allah.isolated.3", "allah.isolated.3"]);
+  });
+
   it("a word's shafts rise together or not at all: never a lone lengthened shaft beside its unlengthened siblings", () => {
     // The user, 2026-11-02: one tall stroke beside the heh's box read as the heh's stem. Per word,
     // every shaft (`kufiShaftTops`) is carried up, by lengths the slanted side may vary, or none is.
@@ -193,9 +245,29 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
         else still++;
       }
     }
-    // both outcomes occur: words carried up as one, and words left at the line's height
-    expect(risen).toBeGreaterThan(0);
+    // words left at the line's height occur in the star's own fits; since the tall form and its row slice take
+    // the shafts to a wedge's sides (2026-11-02), none of those fits needs a bar to carry a word up, so the
+    // rise is exercised on a mask of its own: a strip five cells wide and six rows tall over the shafts of one
+    // الله (the heh's pocket outside the mask), too tall for the slice's cap of two, so bars carry all three up
     expect(still).toBeGreaterThan(0);
+    const strip: KufiMask = { cols: 9, rows: 13, cells: new Uint8Array(9 * 13) };
+    for (let y = 0; y < 13; y++) for (let x = 0; x < 9; x++) if (y >= 6 || x >= 4) strip.cells[y * 9 + x] = 1;
+    const r = packKufiRegion({ text: "الله", mask: strip });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expectRegionGrammar(r, strip);
+    expect(r.placements.map((p) => p.glyphId)).toEqual(["allah.isolated.5"]);
+    const p = r.placements[0];
+    const rows = stretchGlyph(kufiGlyphById(p.glyphId)!.glyph, p.stretch);
+    const tops = kufiShaftTops("allah", rows);
+    const rises = tops.flatMap((t, j) => (t < 0 ? [] : [riseOf(r, p, rows, j)!]));
+    expect(rises).toHaveLength(3);
+    for (const n of rises) expect(n).toBeGreaterThanOrEqual(2);
+    expect(new Set(rises).size).toBe(1);
+    expect(riseOf(r, p, rows, 0)).toBe(0);
+    expect(r.quality?.bars).toBe(3);
+    risen++;
+    expect(risen).toBeGreaterThan(0);
   });
 
   it("is deterministic: the same call twice gives equal results", () => {

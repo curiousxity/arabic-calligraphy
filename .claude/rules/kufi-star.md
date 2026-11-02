@@ -48,10 +48,18 @@ with its repeats, as the wedge regions carry theirs):
   bottom band's line runs from the left edge to `DEPTH` short of the right
   edge (N - 6 cells), packed by `packKufiRegion` on a 5 x (N - 6) mask
   with **`bars: false`** (no filler bars; the region's "no lone squares"
-  rule already holds) and **`place: "octagon"`** (the band's own letter
-  forms, see "A letter's forms by place"), so a side packs only when the
-  text repeated fills its line by stretching (الله's heh box widens by up
-  to `COL_MAX`). The
+  rule already holds) and the star's letter forms (see "A letter's forms by
+  place": the band is five rows, so of الله's star forms only the five-row
+  `allah.isolated.3` is among its alternates, and nothing in the band
+  counts as a cut stem), so a side packs only when the text repeated fills
+  its line by stretching (الله's heh box widens by up to `COL_MAX`). **The
+  band keeps five rows** (2026-11-02): the tall الله forms would need a
+  seven-row band, pushing the interior in by four cells, moving every
+  measured square (15, 25, 35, 45) and the pinned geometry, and gaining
+  nothing: the octagon already lengthens every word's shafts far above the
+  heh's box, and the one word that stays squat, a side's first, does so
+  because its heh and first lam lie under the next band's corner, not for
+  want of a form. The
   other three bands are the bottom one turned clockwise about the centre
   (`octagonTurn`, cell to cell; N may be odd or even), so the text reads as
   a panel's outer ring: upright below, upward on the left, upside down
@@ -219,18 +227,49 @@ error; the packer reports `tooLong`.
   and where a letter has such forms they replace its other forms there; a
   rectangular panel takes the forms marked for no place, so its tuned
   layouts are unchanged; a star otherwise takes the unmarked forms drawn
-  whole. Today that is الله: `allah.isolated.3` (five rows, 9 wide, four
-  uprights with the heh's own wall under its bar: the panel's
-  `allah.isolated.1` at a line's height) and `allah.isolated.4` (the same
-  under the bar of its shadda and dagger alef, one gap above), so every
-  الله in every layout reads alef, lam, lam and a heh, as the Topkapi
-  Scroll's does, with the three shafts lengthened together above the heh's
-  short wall. The wedges had merged forms of three uprights (the heh
+  whole. A form taller than the region's box even at its shortest is not
+  among its alternates there (a seven-row alef shortens to five and stays).
+  Today that is الله, three forms, all 9 wide with the heh's own wall under
+  its bar, so every الله in every layout reads alef, lam, lam and a heh, as
+  the Topkapi Scroll's does:
+  - **`allah.isolated.5`, the tall form** (2026-11-02): the panel's
+    `allah.isolated.1`, the alef and both lams standing two cells above the
+    heh's capped box, the proportion of Topkapi cat. 77; its row slice grows
+    the three shafts alone (up to `REGION_ROW_MAX`), so the word reads tall
+    beside a short heh even where nothing carries the shafts on.
+  - **`allah.isolated.6`, the tall form under its bar**, the shafts meeting
+    the bar as a lam meets the line above in a panel, one gap row over the
+    heh's box. It is for a wedge with room above the word: the bare tall
+    form's pocket above the heh's box (two rows by four columns) is an
+    empty 2x2 wherever its margin is usable, and no filler may close it (a
+    square is forbidden in a region; a bar a gap row above the shafts would
+    leave the hole under it; the heh's box is not lengthened). The bar is a
+    filler bar of the form's own (`KufiGlyph.bars`, counted with the drawn
+    ones), so the bare form is taken wherever it packs and this one only
+    where its bar closes the pocket.
+  - **`allah.isolated.3`, the five-row form**, `.1` at a line's height, the
+    fallback where no tall form has room: the smallest wedges (4-fold 20 to
+    22) and the stacked pairs and triples (6-fold ×2, two of the three in
+    5-fold ×3). It is the octagon band's only form (five rows).
+  **The packer prefers the tall forms** (`stemOf` in `kufiPack.ts`): in a
+  star الله is a tall letter whose stem is its longest stroke on the line,
+  7 in the tall forms, 5 in the five-row one, so the five-row form is a
+  stem cut by two and the ranking's "least shortening" takes a tall form
+  wherever one packs; **in a region the least shortening ranks before the
+  fewest bars** (`better`), since a region's bars are its line run to the
+  sides and its shafts carried up, the design's own strokes, while a word
+  drawn short beside the room for its tall form is the fault the user sees
+  (at 5-fold 24 the tall form packs with one base-row bar more than the
+  five-row one). A rectangular panel's الله is not a tall letter (`TALL`),
+  so its layouts are unchanged. **No star form grows its rows evenly**: the
+  five-row form has no row slice (four equal uprights read as "اللله",
+  2026-11-01), and `allah.isolated.4`, the five-row body under a bar a gap
+  row above it, is gone (replaced by `.6`, the same cells with the shafts
+  reaching the bar). The wedges had merged forms of three uprights (the heh
   hanging off the second lam, 7 wide) until 2026-11-02: the merged lam was
   the heh's wall, and once only shafts were carried up a word showed the
   heh's box with one tall stroke beside it, which the user read as the heh's
-  stem; four *equal* uprights had read as "اللله" (2026-11-01), which the
-  lengthening now answers. **The word widens through the heh's box**
+  stem. **The word widens through the heh's box**
   (column stretch at index 1, up to `COL_MAX`): the one column that widens
   without a hole, and how a word fills the end of a wedge's line.
   **Row stretch is capped at `REGION_ROW_MAX` (2)** in regions: a stem grown
@@ -257,6 +296,11 @@ error; the packer reports `tooLong`.
   one; a shaft with ink beside its top or no room above it means none of
   the word's rise. One lengthened shaft beside its unlengthened siblings
   read as another letter's stem (the lam beside the heh's box as the heh's).
+  Since the tall form and its row slice take الله's shafts to a wedge's
+  sides (2026-11-02), no measured fit of الله needs a bar to carry a word up
+  (the 4-fold corner at 46 did, and went with the even row growth);
+  `kufiPackRegion.test.ts` exercises the rise on a mask of its own, a strip
+  six rows tall over the shafts, past the slice's cap.
   **No lone filler squares in a region** (`fillPass`): between repeated
   short words a square reads as a letter's dot, and a region packs without
   them or not at all.
@@ -273,22 +317,33 @@ error; the packer reports `tooLong`.
   wedge at 28 (on the merged form of the time) packed only with the heh's
   wall carried up: the legal packing (the barred form right, the plain form
   left, its second lam carried up) tied with the other plan and lost the hash.
-- **Measured fits of الله** (2026-11-02, classic stars, the four-upright
-  9-wide form, a word's shafts carried up together or not at all): one a
-  wedge at 4-fold 20-27, 5-fold 24-29, 6-fold 30-33; three a 5-fold wedge
-  at 40, two a 6-fold wedge at 34-40; a 4-fold corner holds one at 29-31
-  and three at 46; 5-fold corners one from 47; 6-fold corners nothing up to
-  50; **a 4-fold wedge never holds two**: the pocket the slanted side leaves
-  above a heh's box has no legal filler (a lam is two cells away; the barred
+- **Measured fits of الله** (2026-11-02, classic stars, the 9-wide forms
+  above, a word's shafts carried up together or not at all): one a wedge
+  at 4-fold 20-27 (five-row at 20-22, tall at 23, tall under its bar at
+  24-27), 5-fold 24-29 (tall at 24-25, under its bar from 26), 6-fold 30
+  only (under its bar; 31-33 held the five-row form under a bar before
+  the forms changed); three a 5-fold wedge at 40 (one under its bar, two
+  five-row), two a 6-fold wedge at 34-40 (five-row pairs; at 40 one under
+  its bar); a 4-fold corner holds one at 29-31, tall, and nothing more up
+  to 60 (three packed at 46 while the five-row form grew its rows evenly);
+  5-fold corners one from 47, tall; 6-fold corners nothing up to 50; **a
+  4-fold wedge never holds two**: the pocket the slanted side leaves above
+  a heh's box has no legal filler (a lam is two cells away; the barred
   form needs the full width at its bar's row; a word slides to its first fit
   and no further), and two 9-wide words no longer stand on one line before
-  the sides close. (The merged 7-wide form held one from 18, two at 27-28
-  with the corners filled, three a 5-fold wedge at 34, three a 6-fold at 39.)
+  the sides close. The tall form fits where the wedge's sides close over the
+  pocket above the heh's box (the word's top near the mask's top: small
+  wedges, a corner's acute end); with room above the word the pocket is a
+  hole and the form under its bar takes over; where even that has no room
+  (two lines in a wedge) the five-row form stands. (The merged 7-wide form
+  held one from 18, two at 27-28 with the corners filled, three a 5-fold
+  wedge at 34, three a 6-fold at 39.)
   محمد fits a 4-fold wedge twice at 29, 32 and 35 (once never: one word
   leaves the line's end open). `kufiPackRegion.test.ts` pins the first fit,
   the 6-fold 34 and corner 29 fits, that no capped top is ever carried up,
-  that every packed الله stands on four uprights, and that each word's
-  shafts rise all or none.
+  that every packed الله stands on four uprights, which form each measured
+  fit takes (the tall one's heh wall never rising, its shafts two or more
+  above the heh's bar), and that each word's shafts rise all or none.
 - **Copies by rotation, never mirror.** Every region of a kind is a rotation
   of the kind's first, with the same mask, so `layoutKufiStar` packs each
   distinct (kind, text) once and every other region of that kind takes the
@@ -359,17 +414,23 @@ counts against nothing (6-fold corners never hold الله).
   holds a word) fills. After a fit the task jumps to the first size whose
   wedge estimate promises one more word (every size between would pack the
   same words again, slowly) and offers again only when strictly more words
-  are drawn, up to `FITS_PER_PLAN` (3) fits. A scheduler steps the task of
+  are drawn, or the same words with fewer cut stems (`quality.cut`, the
+  packs' own: الله on its five-row form is two a word), up to
+  `FITS_PER_PLAN` (3) fits. **A fit with a cut stem first tries the next
+  `CUT_SCAN` (3) sizes one by one** before the jump, since the tall form
+  may stand a size or two on: الله fits a 4-fold wedge five-row at 20 and
+  tall at 23, so both are offered and 23 ranks first. A scheduler steps the task of
   lowest `priority` (every fold's first fit, 4-fold first, before any second
   one; default stars before alternatives; run and centre last; a task that
   failed at `PATIENCE` (8) sizes with room for its text, before any fit, is
   set aside until the rest have had their turn), round robin among equals.
   A task that never fits is offered at its closest miss (fewest wedges
   missing, nearest size 24), its note naming what does not fit ("محمد does
-  not fit a wedge"). Under the work cap "الله" gets 4-fold ×1 at 20, 5-fold
-  ×1 at 24 and ×3 at 40, 6-fold ×1 at 30 and ×2 at 40 (the merged form's
-  4-fold 18 and 28, 5-fold 21 and 34, 6-fold 24 and 39 went with it; 4-fold
-  34 and 5-fold 45 were offers while the heh's wall rose); "الله محمد" gets
+  not fit a wedge"). Under the work cap "الله" gets 4-fold ×1 at 23 (tall)
+  and at 20 (five-row), 5-fold ×1 at 24 (tall) and ×3 at 40, 6-fold ×1 at
+  30 (tall under its bar) and ×2 at 40 (the merged form's 4-fold 18 and
+  28, 5-fold 21 and 34, 6-fold 24 and 39 went with it; 4-fold 34 and
+  5-fold 45 were offers while the heh's wall rose); "الله محمد" gets
   the repeat fits (4-fold 30 with الله in the corners, 5-fold 36; the
   6-fold one is beyond the cap) and alternate misses (the pair in turn
   fitted the 4-fold star at 29 while الله twice a wedge packed there; now
@@ -392,6 +453,7 @@ counts against nothing (6-fold corners never hold الله).
   it twice a wedge and once a corner on the merged form, 34 four a wedge
   while the heh's wall rose);
   then denser first (words drawn per region holding text), then fewer filler squares,
+  then fewer cut stems (الله tall before squat at the same density),
   then the smaller size; non-fitting after, fewer unpacked regions first.
   `pick` keeps at most `OFFERS_PER_FOLD_PATTERN` (2) per fold and pattern,
   `STAR_MAX_OFFERS` (8) in all, so one construction's sizes never crowd the
