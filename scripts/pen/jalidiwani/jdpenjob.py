@@ -12,7 +12,7 @@ the best by overlap less outline gap less the end windows' worst miss kept, then
   python jdpenjob.py OUT stroke ...      writes OUT/pen.json {stroke: {...}} and OUT/pics.json {stroke: png base64}
 env PEN_LIFT (nuqta at each end that may lift, default 1.0), PEN_SIZE ("1": the nib's size may move, default "1"),
 PEN_FILL ("a.s0,b.s1": strokes filled with a small pen or the nib's tip, fitted freely, not held to the pen)."""
-import base64, json, math, os, sys, time
+import base64, json, math, os, re, sys, time
 import numpy as np, cv2
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -21,6 +21,20 @@ from ribbon import bands, smooth_path  # noqa: E402
 from pieces import ref_ring, score, skeleton_samples, _thin  # noqa: E402
 import gpufit  # noqa: E402
 from gpufit import gpu_score  # noqa: E402
+import pieces  # noqa: E402
+from ribbon import ring_samples as _ring_samples  # noqa: E402
+
+
+def fine_samples(segs, fine=6):
+    """ribbon.ring_samples about a screen px apart, not a sheet unit apart. The studio's sheet units are 5.6 screen px,
+    so the outline every fit and picture was judged on drew its curves as chords: the one-nib flag heads lost overlap
+    on it while gaining on the true curves (074 0.959 to 0.964, 108 0.919 to 0.931, 2026-11-02). Set here, not in the
+    shared pieces.py, so only Jali Diwani's fits see it (jdcatalog.ring's own trick, for every ref_ring)."""
+    pts, starts = _ring_samples([tuple((x * fine, y * fine) for x, y in sg) for sg in segs])
+    return pts / fine, starts
+
+
+pieces.ring_samples = fine_samples
 
 Q = os.environ.get("HARF_Q", "")
 LIFT = float(os.environ.get("PEN_LIFT", 1.0))
@@ -95,6 +109,21 @@ FOLLOW_LEFT = 0.05  # nuqta a segment may move right before it costs a whole ove
 FOLLOW_HOLD = float(os.environ.get("PEN_FOLLOW_HOLD", 0))
 # PEN_FOLLOW_AT ("x,y", nuqta, unset): the start's bottom corner here, not on the move before's.
 FOLLOW_AT = os.environ.get("PEN_FOLLOW_AT")
+# PEN_MEET ("095.s0~c2,..."): a PEN_FOLLOW move that starts as the move before ended: its first node that end's own
+# node (place, angle, width), the rest settled round it with the start held (meet). Held full from the end's bottom
+# corner, the nib stood over a narrowed end, its top corner a spike over 095.s0's peak; a fresh fit's start never
+# narrowed enough to match (n095g, 0.86 of the nib to green's 0.73). The user, 2026-11-02: clear the red, the neck's
+# irregularities, and the tail ("fix the = slightly on all 3": 731's tip trimmed 0.1 nuqta short, 095's a hair high)
+MEET = {x for x in os.environ.get("PEN_MEET", "").split(",") if x}
+MEET_STEP, MEET_SHORT = 0.01, 0.01  # nuqta: the meet's tail trim, finer than TRIM_STEP and TRIM_SHORT
+# the settle's weight on the worst local miss, at the tail's window and one at the meeting point (the neck under 095's
+# peak kept a thin wedge, and its tail stood a hair high, at CORNER's 2; n095p, 2026-11-02)
+MEET_CORNER = float(os.environ.get("PEN_MEET_CORNER", 2.0))  # CORNER's default
+# PEN_POLISH (JSON, {"731.s0~c2": its pen.json record}): a fitted move taken as it is and only met (meet), its coarse
+# tail trim undone first, not fitted again: a fresh fit of 731's blue came out 0.94 with the bowl low, where the one the
+# user saw was 0.977 (n731m, 2026-11-02)
+POLISH = json.loads(os.environ.get("PEN_POLISH", "{}"))
+POLISH_MEET = os.environ.get("PEN_POLISH_MEET", "1") == "1"  # 0: the tail alone, no meet (approved moves)
 # A tooth's right half starts with the flick in reverse (the studio ledger, from the sin lesson 4:36-4:44: the nib comes
 # down on its corner at the hairline's tip and opens to full width as it climbs, at one angle; Thuluth's 170.s0 narrows
 # over its first 3.3 nuqta, which a turning nib could not draw). Its fit also tries one angle with the start free to
@@ -106,6 +135,7 @@ FOLLOW_AT = os.environ.get("PEN_FOLLOW_AT")
 # the spike once the halves share one pen.
 FLICK = os.environ.get("PEN_FLICK", "0") == "1"
 END_BACK = 0.25  # nuqta: a cut half's free end starts this far short of the outline's farthest point
+END_REACH = 1.0  # nuqta: that farthest point is looked for this near the path's free end, on the way it runs
 TRIM = os.environ.get("PEN_TRIM", "1") == "1"  # every try's hairline ends pulled back to the outline before the pick
 TRIM_STEP, TRIM_TOL, TRIM_NEAR, TRIM_SHORT, TRIM_MAX = 0.05, 0.02, 0.5, 0.03, 1.0  # nuqta, jdtip.py's but the cap
 TRIM_HAIR = 0.35  # pens: an end whose ink is narrower than this is a hairline tip (jdtip.py's HAIR)
@@ -480,6 +510,24 @@ def cut_piece(piece, O, ignore):
     return (out if halves[0][:, 0].mean() >= halves[1][:, 0].mean() else out[::-1]), (ring[k] + X) / 2
 
 
+def sheet_marks(piece, ring):
+    """The flag head's marks on the sheet, as indices of the nearest ring points (the flag's bottom corner, its top
+    corner, the peak, the notch), or None when the path is not a flag head's. Every flag head's path (074, 075, 076,
+    077, 084, 086, 087, 095, 108, 731) starts at the flag's bottom corner with the nib's own edge, 3.56 units at 79
+    degrees, then the top edge to the peak, round the roll, and back from the notch along the underside one nib below
+    the top edge. Red and green are that one nib swept along the top edge (the user, 2026-11-01: "flag heads are
+    perfect now")."""
+    (a, d, e, f), path = piece
+    v = [float(x) for x in re.findall(r"-?\d+\.?\d*", path)]
+    if not path.lstrip().startswith("M") or "C" not in path or (len(v) - 2) % 6 or len(v) < 26:
+        return None
+    pts = np.array([v[:2]] + [v[2 + 6 * i + 4:2 + 6 * i + 6] for i in range((len(v) - 2) // 6)])
+    edge = pts[1] - pts[0]
+    if not 3.3 < np.linalg.norm(edge) < 3.8 or not 75 < math.degrees(math.atan2(-edge[1], edge[0])) < 84:
+        return None
+    return [int(np.linalg.norm(ring - (q * [a, d] + [e, f]), axis=1).argmin()) for q in (pts[0], pts[1], pts[2], pts[-2])]
+
+
 def three_piece(piece):
     """PEN_THREE's cut of a flag head: ([block, climb, roll] as pieces in the stroke's own frame, [each one's cut point,
     screen px]). The notch is the outline's sharpest inward corner, the flag's top corner the next; the block's right
@@ -502,6 +550,22 @@ def three_piece(piece):
             inward.append(((ring[k] - a)[0] * (b - ring[k])[1] - (ring[k] - a)[1] * (b - ring[k])[0]) * area < 0)
         return ra, L, np.array(ang), np.array(inward)
     ra, L, ang, inward = geom(ring)
+    (a_, d_, e, f), _ = piece
+    as_piece = lambda hv: [(a_, d_, e, f), "M " + " L ".join("%.4f %.4f" % ((x - e) / a_, (y - f) / d_) for x, y in hv) + " Z"]  # noqa: E731
+    # A flag head drawn as the one nib (sheet_marks): red and green are one sweep, kept as drawn (PEN_KEEP), so their
+    # piece is all of the head from the notch round the flag to the peak, given as both; the roll is cut by the nib at
+    # the peak, peak to notch. The search below found no flag corner on 095.s0's soft corners and no peak on 731.s0's,
+    # a whole nuqta on from the corner; on 074, 084 and 108 the roll's piece is the one it cut.
+    marks = sheet_marks(piece, ring)
+    if marks:
+        _, _, pk, n = marks
+        m = len(ring)
+        fwd = lambda a, b: [q % m for q in range(a, b + 1 if b >= a else b + m + 1)]  # noqa: E731
+        if (ra[marks[1]] - ra[n]) % L > L / 2:  # forward from the notch round the flag
+            fwd = lambda a, b: [q % m for q in range(a, b - 1 if b <= a else b - m - 1, -1)]  # noqa: E731
+        rest, roll = as_piece([ring[q] for q in fwd(n, pk)]), as_piece([ring[q] for q in fwd(pk, n)])
+        cut = (ring[n] + ring[pk]) / 2
+        return [rest, rest, roll], [cut, cut, cut]
     conc = [k for k in np.argsort(ang) if inward[k] and ang[k] < 150]
     if len(conc) < 2:
         raise RuntimeError("no notch and flag corner to cut at")
@@ -774,9 +838,16 @@ def orient(stroke, nodes, O, piece):
     d0, d1 = (np.linalg.norm(np.array(nodes[i]["p"]) * PPN + O - at) for i in (0, -1))
     nodes = nodes[::-1] if (d0 < d1) == stroke.endswith("~c0") else nodes
     ring = ref_ring(piece)
-    far = ring[np.linalg.norm(ring - at, axis=1).argmax()]
     i = 0 if stroke.endswith("~c0") else -1  # the free end
     end = np.array(nodes[i]["p"]) * PPN + O
+    # on from the free end only, the way the path runs there: on 731.s0's S the outline's farthest point from the head's
+    # cut is the bowl's bottom, and the path ran from the tail's tip back down to it, which spun the nib at the tip (b731).
+    # Every stroke fitted from 2026-11-02 on; fits approved before it keep the paths they were fitted with
+    u = end - (np.array(nodes[1 if i == 0 else -2]["p"]) * PPN + O); u /= max(np.linalg.norm(u), 1e-9)
+    near = ring[(np.linalg.norm(ring - end, axis=1) < END_REACH * PPN) & ((ring - end) @ u > 0)]
+    if not len(near):
+        return nodes
+    far = near[np.linalg.norm(near - at, axis=1).argmax()]
     gap = np.linalg.norm(far - end)
     if gap <= END_BACK * PPN:
         return nodes
@@ -808,7 +879,7 @@ def end_miss(nodes, piece, ignore, O, P, c, sub=4):
     return float(out), float(short)
 
 
-def trim_ends(stroke, nodes, piece, ignore, O, P, keep_start=False):
+def trim_ends(stroke, nodes, piece, ignore, O, P, keep_start=False, step=TRIM_STEP, short=TRIM_SHORT):
     """The stroke's free hairline ends pulled back to where the outline's ink stops (the user, 2026-10-21, jdtip.py's
     rule; before the pick, 2026-10-29). An end drawn with the nib edge-on runs a hair past the outline's tip: the
     fitter's soft ink barely feels it, the judge's end window does, and a try that followed the whole stroke lost to
@@ -837,15 +908,15 @@ def trim_ends(stroke, nodes, piece, ignore, O, P, keep_start=False):
             t = [dict(q) for q in nodes]
             a, b = np.array(t[i]["p"]), np.array(t[j]["p"])
             L = np.linalg.norm(b - a)
-            if L <= TRIM_STEP:  # within a step of its neighbour: the end node goes, its angle and width kept
+            if L <= step:  # within a step of its neighbour: the end node goes, its angle and width kept
                 keep = {x: t[i][x] for x in ("angle", "width") if x in t[i]}
                 del t[i]; t[i].update(keep)
             else:
-                t[i]["p"] = [round(float(v), 4) for v in a + (b - a) * TRIM_STEP / L]
+                t[i]["p"] = [round(float(v), 4) for v in a + (b - a) * step / L]
             to, ts = end_miss(t, piece, ignore, O, P, c)
-            if ts > s0 + TRIM_SHORT or to > o - 0.002:  # past the outline's own end, or the ink outside is not this end's
+            if ts > s0 + short or to > o - 0.002:  # past the outline's own end, or the ink outside is not this end's
                 break
-            nodes, o, back = t, to, back + TRIM_STEP
+            nodes, o, back = t, to, back + step
         if back:
             moved["start" if i == 0 else "end"] = round(back, 2)
     return nodes, moved
@@ -904,6 +975,215 @@ def followed(nodes, prev, P):
         if L > FOLLOW_HOLD * 1.2:
             head.append({"p": [round(float(v), 4) for v in a + u / L * FOLLOW_HOLD], "angle": ang, "held": True})
     return head + rest
+
+
+def meet(stroke, nodes, prev, piece, ignore, O, P, windows):
+    """PEN_MEET: nodes (widths in this move's nib P) with the first node the move before's end node, the others settled
+    round it (positions and angles; widths as fitted, the start held), then the tail trimmed on the finer rule. The
+    settle never hands back worse than it is given (gpufit.refine). (nodes, score, nuqta trimmed)."""
+    e = prev["nodes"][-1]
+    n = [{**nodes[0], "p": list(e["p"]), "angle": e["angle"], "width": e.get("width", 1) * PEN / P}] + nodes[1:]
+    windows = [(*e["p"], END_R * P / PEN)] + list(windows)  # the neck too: where the two moves meet
+    for i in reversed(range(min(MEET_SPLIT, len(n) - 1))):  # from the last split back, so indices hold
+        q, r_ = n[i], n[i + 1]
+        n.insert(i + 1, {"p": [round((q["p"][k] + r_["p"][k]) / 2, 4) for k in (0, 1)], "angle": (q["angle"] + r_["angle"]) / 2,
+                         "width": (q.get("width", 1) + r_.get("width", 1)) / 2})
+    n, s = nrefine(n, [piece], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ignore, fixed=(0,), corner=MEET_CORNER,
+                   windows=windows, widths_free=MEET_WIDTHS, judge="gpu")
+    if MEET_WIDTHS:  # no wider than the nib (095's tail went to 1.2 of it, n095w2), then settled again on those widths
+        n = [{**q, "width": min(q.get("width", 1), 1.0)} for q in n]
+        n, s = nrefine(n, [piece], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ignore, fixed=(0,), corner=MEET_CORNER,
+                       windows=windows, judge="gpu")
+    n, moved = trim_ends(stroke, n, piece, ignore, O, P, keep_start=True, step=MEET_STEP, short=MEET_SHORT)
+    s = nscore([n], [piece], O, PPN, P, ignore)
+    s["window_worst"] = round(nworst(n, [piece], O, PPN, P, (), windows, ignore), 4)
+    return n, s, moved
+
+
+# PEN_MEET_SPLIT (n): the meet's first n segments each split at their midpoint before the settle: from the meeting
+# point blue's first node was 0.28 nuqta on, and the edge under 095's neck could only run straight there (n095t)
+MEET_SPLIT = int(os.environ.get("PEN_MEET_SPLIT", 0))
+# PEN_MEET_WIDTHS=1: the settle moves the nib's widths too (gpufit's widths_free), the start's held: from green's end
+# at 0.73 of the nib, blue widened to 0.88 over its first segment, and its underside stood out under 095's neck (n095s2)
+MEET_WIDTHS = os.environ.get("PEN_MEET_WIDTHS", "0") == "1"
+NUDGE_R, NUDGE_STEP = 0.04, 0.01  # nuqta: the tail tip's search (tail_nudge)
+# degrees it may turn too: on 731's upright tail a 6 degree turn put a sliver of nib out along the tail's side (n731t)
+NUDGE_DEG = int(os.environ.get("PEN_NUDGE_DEG", 6))
+# PEN_NUDGE_W=1: the tip's search turns, fills and shifts the tail's end, faded in (tail_ramp): the studio's tail stays
+# fuller to its tip than our taper, 095's underside 0.04 nuqta short over its last 0.23 (n095c; the user, 2026-11-02)
+NUDGE_W = os.environ.get("PEN_NUDGE_W", "0") == "1"
+# with NUDGE_W the tip turns up to CAP_DEG across the stroke, faded in over one of RAMP_L (tail_ramp)
+CAP_DEG = 20
+RAMP_L = (0.15, 0.25, 0.4)  # nuqta the tip's change fades in over (ramped)
+
+
+def tail_nudge(nodes, piece, ignore, O, P):
+    """The tail's last node moved up to NUDGE_R nuqta and turned up to NUDGE_DEG degrees, whichever leaves the least
+    miss either way at the tip, measured at end_miss's fine raster: under a screen pixel, a tip the fitter cannot see
+    (095's stood 0.035 nuqta high, 731's 0.02 short, after every settle; n095q5, n731q5, 2026-11-02). Kept only when
+    the worse of out and short falls. With NUDGE_W, tail_ramp instead. (nodes, (out, short) before, after)."""
+    c = np.array(nodes[-1]["p"]) * PPN + O
+    m = lambda ns: end_miss(ns, piece, ignore, O, P, c)  # noqa: E731
+    if NUDGE_W:
+        return tail_ramp(nodes, m)
+    best = (max(m(nodes)), nodes); before = m(nodes)
+    k = int(round(NUDGE_R / NUDGE_STEP))
+    for dx in range(-k, k + 1):
+        for dy in range(-k, k + 1):
+            if math.hypot(dx, dy) > k + 1e-9:
+                continue
+            for da in range(-NUDGE_DEG, NUDGE_DEG + 1, 2):
+                e = nodes[-1]
+                t = nodes[:-1] + [{**e, "p": [round(e["p"][0] + dx * NUDGE_STEP, 4), round(e["p"][1] + dy * NUDGE_STEP, 4)],
+                                   "angle": e["angle"] + da}]
+                v = max(m(t))
+                if v < best[0] - 1e-4:
+                    best = (v, t)
+    return best[1], before, m(best[1])
+
+
+def ramped(nodes, da, dw, dp, L):
+    """nodes with a turn da (degrees), a width change dw (nibs, never past the nib) and a shift dp (nuqta) at the tip,
+    each fading to nothing over the tail's last L nuqta, (1 - d/L) ** 2 of it at d nuqta back along the path: no node
+    changes alone, so the edge keeps no step (a one-node turn left a step under 095's tail, n095k)."""
+    P_ = np.array([q["p"] for q in nodes], float)
+    back = np.r_[np.cumsum(np.linalg.norm(np.diff(P_, axis=0), axis=1)[::-1])[::-1], 0.0]
+    out = []
+    for q, d in zip(nodes, back):
+        w = max(0.0, 1 - d / L) ** 2
+        if w == 0:
+            out.append(q); continue
+        out.append({**q, "p": [round(float(q["p"][0] + dp[0] * w), 4), round(float(q["p"][1] + dp[1] * w), 4)],
+                    "angle": float(q["angle"] + da * w), "width": round(float(min(q.get("width", 1) + dw * w, 1.0)), 4)})
+    return out
+
+
+def tail_ramp(nodes, m):
+    """PEN_NUDGE_W: the studio's tails end in a blunt cut 0.07 to 0.1 nuqta across where ours ran to a needle (the
+    user, 2026-11-02, "=" on all of them): a turn, a fuller nib and a shift at the tip, faded in over the tail's last
+    stretch (ramped), searched in turn twice; kept only when the worse of out and short falls."""
+    before = m(nodes); best = (max(before), (0.0, 0.0, (0.0, 0.0), RAMP_L[0]))
+    for _ in range(2):
+        da0, dw0, dp0, L0 = best[1]
+        for L in RAMP_L:
+            for da in range(-CAP_DEG, CAP_DEG + 1, 2):
+                v = max(m(ramped(nodes, da, dw0, dp0, L)))
+                if v < best[0] - 1e-4:
+                    best = (v, (float(da), dw0, dp0, L))
+        da0, dw0, dp0, L0 = best[1]
+        for dw in (-0.1, 0.0, 0.1, 0.2, 0.3):
+            v = max(m(ramped(nodes, da0, dw, dp0, L0)))
+            if v < best[0] - 1e-4:
+                best = (v, (da0, dw, dp0, L0))
+        da0, dw0, dp0, L0 = best[1]
+        k = int(round(NUDGE_R / NUDGE_STEP))
+        for dx in range(-k, k + 1):
+            for dy in range(-k, k + 1):
+                if math.hypot(dx, dy) > k + 1e-9:
+                    continue
+                dp = (dx * NUDGE_STEP, dy * NUDGE_STEP)
+                v = max(m(ramped(nodes, da0, dw0, dp, L0)))
+                if v < best[0] - 1e-4:
+                    best = (v, (da0, dw0, dp, L0))
+    out = ramped(nodes, *best[1][:3], best[1][3])
+    return out, before, m(out)
+
+
+# PEN_TAIL_FIT=1: polish ends with tail_fit. The user, 2026-11-02 ("=" on all of them): the studio's tails end in a
+# blunt knob 0.03 to 0.1 nuqta deep where ours ran to a needle, and neither the whole-stroke settle nor a search at the
+# tip (tail_nudge, tail_ramp: under 0.01 nuqta gained, n095r..n086r) moved it: against the whole stroke the knob's
+# area hardly counts. The fitter's grid sees it (200 px to the nuqta); it needed the score to be the tail's alone
+TAIL_FIT = os.environ.get("PEN_TAIL_FIT", "0") == "1"
+TAIL_R, TAIL_L = 0.6, 0.6  # nuqta: the studio's ink judged within TAIL_R of the tip; nodes within TAIL_L of it move
+TAIL_SMOOTH = os.environ.get("PEN_TAIL_SMOOTH", "0") == "1"  # the moved widths evened, from the last held node's to
+                                                             # the tip's, before the positions settle (086: a waist)
+TAIL_SEED = os.environ.get("PEN_TAIL_SEED", "0") == "1"  # the tip started blunt and at the outline's far end (095)
+TAIL_SEED_W = float(os.environ.get("PEN_TAIL_SEED_W", 0.9))
+TAIL_WFREE = os.environ.get("PEN_TAIL_WFREE", "1") == "1"  # 0: widths held, the nib narrows its line by turning only
+TAIL_SPLIT = os.environ.get("PEN_TAIL_SPLIT", "1") == "1"
+TAIL_TRIED_NODES = None
+TAIL_TRIED = None  # the refit's (out, short), kept or not
+
+
+def tail_piece(piece, c, R):
+    """piece's outline clipped to the disc of R screen px round c, as a piece in screen px (None if it misses)."""
+    ring = ref_ring(piece); sub = 8
+    x1, y1 = c - R - 2
+    W = H = int((2 * R + 4) * sub) + 1
+    M = np.zeros((H, W), np.uint8)
+    cv2.fillPoly(M, [np.round((ring - [x1, y1]) * sub * 16).astype(np.int32)], 1, cv2.LINE_8, 4)
+    D = np.zeros_like(M); cv2.circle(D, (int((c[0] - x1) * sub), int((c[1] - y1) * sub)), int(R * sub), 1, -1)
+    cs, _ = cv2.findContours(M & D, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    if not cs:
+        return None
+    hv = max(cs, key=cv2.contourArea)[:, 0] / sub + [x1, y1]
+    return [(1.0, 1.0, 0.0, 0.0), "M " + " L ".join("%.4f %.4f" % (x, y) for x, y in hv) + " Z"]
+
+
+def tail_fit(nodes, piece, ignore, O, P):
+    """The tail refitted against its own ink: the studio's outline within TAIL_R of the tip is the reference, the rest
+    of the stroke's outline neither right nor wrong (an ignore piece; ink out past the outline still costs), and only the
+    nodes within TAIL_L of the tip move, their widths too, then no wider than the nib and settled again on those widths
+    (meet's rule). The last two segments are split first, for the knob's bend. Kept only when the worse of out and short
+    at the tip (end_miss) falls. (nodes, (out, short) before, after)."""
+    c = np.array(nodes[-1]["p"]) * PPN + O
+    m = lambda ns: end_miss(ns, piece, ignore, O, P, c)  # noqa: E731
+    before = m(nodes)
+    tp = tail_piece(piece, c, TAIL_R * PPN)
+    if tp is None:
+        return nodes, before, before
+    n = [dict(q) for q in nodes]
+    if TAIL_SEED:  # a needle has no slope toward a knob: the tip set wide, out to the outline's farthest ink that way
+        a, b = np.array(n[-2]["p"]), np.array(n[-1]["p"]); u = (b - a) / np.linalg.norm(b - a)
+        rg = (ref_ring(piece) - O) / PPN; rg = rg[np.linalg.norm(rg - b, axis=1) <= TAIL_R]  # the tail's own ink only
+        far = max(float(((rg - b) @ u).max(initial=0.0)) - TAIL_SEED_W * P / PPN / 2, 0.0)
+        n[-1] = {**n[-1], "p": [round(float(v), 4) for v in b + u * far], "width": max(n[-1].get("width", 1), TAIL_SEED_W)}
+    for i in (len(n) - 2, len(n) - 3):
+        if i >= 0 and TAIL_SPLIT:
+            q, r_ = n[i], n[i + 1]
+            n.insert(i + 1, {"p": [round((q["p"][k] + r_["p"][k]) / 2, 4) for k in (0, 1)],
+                             "angle": (q["angle"] + r_["angle"]) / 2, "width": (q.get("width", 1) + r_.get("width", 1)) / 2})
+    P_ = np.array([q["p"] for q in n], float)
+    back = np.r_[np.cumsum(np.linalg.norm(np.diff(P_, axis=0), axis=1)[::-1])[::-1], 0.0]
+    fixed = tuple(i for i in range(len(n)) if back[i] > TAIL_L)
+    ign = list(ignore) + [piece]
+    t = n
+    if TAIL_WFREE:
+        t, _ = nrefine(n, [tp], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ign, fixed=fixed, widths_free=True, judge="gpu")
+    t = [{**q, "width": min(q.get("width", 1), 1.0)} for q in t]
+    if TAIL_SMOOTH and fixed:
+        k = fixed[-1]; w0, w1 = t[k].get("width", 1), t[-1]["width"]
+        d = np.r_[0.0, np.cumsum(np.linalg.norm(np.diff([q["p"] for q in t[k:]], axis=0), axis=1))]
+        for j in range(k + 1, len(t)):
+            t[j] = {**t[j], "width": w0 + (w1 - w0) * d[j - k] / d[-1]}
+    t, _ = nrefine(t, [tp], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ign, fixed=fixed, judge="gpu")
+    after = m(t)
+    global TAIL_TRIED, TAIL_TRIED_NODES
+    TAIL_TRIED, TAIL_TRIED_NODES = [round(x, 3) for x in after], t
+    return (t, before, after) if max(after) < max(before) - 1e-4 else (nodes, before, before)
+
+
+def polish(stroke, rec, prev, log):
+    """PEN_POLISH: rec's nodes, their free end run back out by the nuqta its trim took, then met (meet)."""
+    piece, ignore, O = job_of(stroke)
+    ps = rec.get("pen_scale", 1.0); P = PEN * ps
+    n = [{**q, "width": q.get("width", 1) / ps} for q in rec["nodes"]]
+    back = (rec.get("trim") or {}).get("end", 0.0)
+    if back:
+        a, b = np.array(n[-2]["p"]), np.array(n[-1]["p"])
+        n[-1] = {**n[-1], "p": [round(float(v), 4) for v in b + (b - a) / np.linalg.norm(b - a) * back]}
+    if POLISH_MEET:
+        p, s, moved = meet(stroke, n, prev, piece, ignore, O, P, end_windows(n, P, stroke))
+    else:  # the tail alone: an approved move's start where it was approved (075, 086)
+        p, moved = trim_ends(stroke, n, piece, ignore, O, P, keep_start=True, step=MEET_STEP, short=MEET_SHORT)
+    p, b, a = (tail_fit if TAIL_FIT else tail_nudge)(p, piece, ignore, O, P)
+    s = nscore([p], [piece], O, PPN, P, ignore)
+    log(stroke, "tail nudge", b, "->", a)
+    log(stroke, "polish", rec["score"]["iou"], rec["score"]["gap95"], "->", s["iou"], s["gap95"], "untrim", back, "trim", moved)
+    p = [{**q, "width": round(q.get("width", 1) * ps, 4)} for q in p]  # main-nib widths, as fit's
+    return {**rec, "nodes": p, "score": s, "lifts": lifts(p), "trim": moved or None,
+            "polish": {"before": rec["score"], "untrim": back, "tip": [round(x, 3) for x in a], "tip_before": [round(x, 3) for x in b],
+                       "tried": TAIL_TRIED, "tried_nodes": TAIL_TRIED_NODES and [{**q, "width": round(q.get("width", 1) * ps, 4)} for q in TAIL_TRIED_NODES]}}
 
 
 def follow_angle(prev):
@@ -1057,6 +1337,10 @@ def fit(stroke, log, size=None, lead=None, follow=None):
         if judge(s) > judge(best["score"]):
             best = {k: v for k, v in best.items() if k not in ("raw", "trim")}
             best = {**best, "nodes": p, "score": s, "schedule": other, **raw}
+    if follow and stroke in MEET:  # PEN_MEET: the start is the move before's end, the rest settled round it
+        p, s, moved = meet(stroke, best["nodes"], follow, piece, ignore, O, P, end_windows(dict(starts)[best["start"]], P, stroke))
+        log(stroke, "meet", best["score"]["iou"], best["score"]["gap95"], "->", s["iou"], s["gap95"], moved)
+        best = {**best, "nodes": p, "score": s, "meet": {"before": best["score"], "trim": moved}}
     if stroke.endswith("~c0") and stroke[:-3] in LEAD and best["pen"] is not None:  # its end level with the peak
         lv = [level_top(q, piece, O, PEN / P) for q in best["nodes"]]  # k16: the next to last stood over the peak too
         if lv != best["nodes"]:
@@ -1077,7 +1361,7 @@ def fit(stroke, log, size=None, lead=None, follow=None):
            "cpu_score": cpu, "pen_scale": round(P / PEN, 4), "start": best["start"], "anchor": best["anchor"], "prune": prune,
            "angle": round(n[len(n) // 2]["angle"] % 180, 1),
            "angles": [round(min(q["angle"] for q in n), 1), round(max(q["angle"] for q in n), 1)],
-           "size": round(max(q.get("width", 1) for q in n), 3), "length": round(length(n), 2), "lifts": lifts(n), "trim": best.get("trim"),
+           "size": round(max(q.get("width", 1) for q in n), 3), "length": round(length(n), 2), "lifts": lifts(n), "trim": best.get("trim"), "meet": best.get("meet"),
            "free": {"score": r_old["score"]} if r_old else None,
            "alt": {"score": alt["score"], "anchor": alt["anchor"], "start": alt["start"], "nodes": an} if alt else None,
            "tried": [{k: (v if k != "pen" or not v else {**v, "angle": "own" if len(set(np.atleast_1d(v["angle"]))) > 1 else float(np.atleast_1d(v["angle"])[0])}) for k, v in c.items() if k != "nodes"} for c in tried], "seconds": round(time.time() - t0)}
@@ -1186,6 +1470,11 @@ if __name__ == "__main__":
     for st in [p for s in names for p in ([s] + [f"{s}~h{i}" for i in range(1, hairs(s) + 1)] if s in SPLIT
                                           else [s] if "~" in s else three(s) if s in THREE else bigger_first(s) if s in CUT else [s])]:
         if st in KEEP:
+            continue
+        if st in POLISH:  # PEN_POLISH: taken as fitted, its start met to the move before's end
+            res[st] = polish(st, POLISH[st], res[st[:-1] + str(int(st[-1]) - 1)], log)
+            json.dump(res, open(os.path.join(od, "pen.json"), "w"))
+            json.dump(pics, open(os.path.join(od, "pics.json"), "w"))
             continue
         base = st.split("~")[0]
         size = sized.get(base) if st.endswith(("~c0", "~c1", "~c2")) else None
