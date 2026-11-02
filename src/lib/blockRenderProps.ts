@@ -124,6 +124,7 @@ export const kufiPanelProps = (b: Extract<Block, { type: "kufiPanel" }>) => ({
 /** A Kufi star panel, for `KufiStarView`. */
 export const kufiStarProps = (b: Extract<Block, { type: "kufiStar" }>) => ({
   ...typographicProps(b),
+  starLayout: b.starLayout,
   starFold: b.starFold,
   starK: b.starK,
   starSize: b.starSize,

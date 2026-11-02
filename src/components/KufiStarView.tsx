@@ -5,7 +5,7 @@ import type { kufiStarProps } from "../lib/blockRenderProps";
 import { createBlockFillPainter } from "../lib/blockFill";
 import { kufiCellSize } from "../lib/kufi/kufiPanelBlock";
 import { starConstruction } from "../lib/kufi/kufiStarGeometry";
-import { kufiStarPath, starOutlineBox } from "../lib/kufi/kufiStarPath";
+import { kufiStarBox, kufiStarLayoutPath } from "../lib/kufi/kufiStarPath";
 import { KUFI_STAR_NO_TEXT, kufiStarInputs, kufiStarStatus, kufiStarTextCount } from "../lib/kufi/kufiStarLayout";
 import { useKufiStarLayout } from "../hooks/useKufiStarLayout";
 import { EXPORT_HIDDEN } from "../lib/exportChrome";
@@ -81,45 +81,42 @@ const KufiStarStatusLine: React.FC<{ width: number; height: number; color: strin
 };
 
 /**
- * Draws a Kufi star panel: its construction as **one** traced outline in one
+ * Draws a Kufi star panel: its layout as **one** traced outline in one
  * Shape, so the SVG export holds a single `<path>`. Points are in px, not
  * under `ctx.scale` (the SVG exporter loses a path drawn under a scale);
- * outline before fill; the fill through `createBlockFillPainter`. Each
- * region's text is packed in the worker (`useKufiStarLayout`); a region of a
+ * outline before fill; the fill through `createBlockFillPainter`. The text
+ * is packed in the worker (`useKufiStarLayout`). In the octagon layout the
+ * square is one grid (`kufiOctagonPath`); in the wedges layout a region of a
  * kind shares the kind's packing and is placed through its own frame, so the
- * copies are the same cells by rotation. A region that did not pack draws
- * no ink, only a dashed outline of its polygon as editor chrome (so it is not
- * blank paper with the lines off), and the status line says how many did not.
+ * copies are the same cells by rotation. A region that did not pack (the
+ * octagon's side, when its text does not) draws no ink, only a dashed
+ * outline of its polygon as editor chrome (so it is not blank paper with the
+ * lines off), and the status line says so.
  */
 export const KufiStarView: React.FC<KufiStarViewProps> = (p) => {
   const cell = kufiCellSize(p.fontSize);
-  const construction = useMemo(() => starConstruction(p.starFold, p.starK, p.starSize), [p.starFold, p.starK, p.starSize]);
   const { layout, failed } = useKufiStarLayout(p);
   const inputs = useMemo(
     () => kufiStarInputs(p),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the four layout fields, not the props object
-    [p.starFold, p.starK, p.starSize, p.starRegions]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the five layout fields, not the props object
+    [p.starLayout, p.starFold, p.starK, p.starSize, p.starRegions]
   );
-  const rings = useMemo(() => {
-    const cells = construction.regions.map((r) => {
-      const res = layout?.regions[r.index]?.result;
-      return res?.ok ? res.cells : null;
-    });
-    return pathRings(kufiStarPath(construction, cells, p.starLines, cell));
-  }, [construction, layout, p.starLines, cell]);
+  const rings = useMemo(() => pathRings(kufiStarLayoutPath(inputs, layout, p.starLines, cell)), [inputs, layout, p.starLines, cell]);
   // With no region text there is nothing to arrange; only the outline warning can apply.
   const noText = kufiStarTextCount(inputs) === 0;
   const status = kufiStarStatus(noText ? KUFI_STAR_NO_TEXT : layout, !noText && failed, p.strokeWidth);
-  const box = useMemo(() => starOutlineBox(construction), [construction]);
-  // Each unpacked region's polygon in px (origin at the outline box's top-left, as the path).
-  const unpackedOutlines = useMemo(
-    () =>
-      (layout?.unpacked ?? []).flatMap((i) => {
-        const polygon = construction.regions[i]?.polygon;
-        return polygon ? [polygon.flatMap((q) => [(q.x - box.minX) * cell, (q.y - box.minY) * cell])] : [];
-      }),
-    [layout, construction, box, cell]
-  );
+  const box = useMemo(() => kufiStarBox(inputs), [inputs]);
+  // Each unpacked region's polygon in px (origin at the box's top-left, as the path): the octagon's square, or a wedge.
+  const unpackedOutlines = useMemo(() => {
+    const unpacked = layout?.unpacked ?? [];
+    if (unpacked.length === 0) return [];
+    if (inputs.layout === "octagon") return [[0, 0, box.width * cell, 0, box.width * cell, box.height * cell, 0, box.height * cell]];
+    const construction = starConstruction(inputs.fold, inputs.k, inputs.size);
+    return unpacked.flatMap((i) => {
+      const polygon = construction.regions[i]?.polygon;
+      return polygon ? [polygon.flatMap((q) => [(q.x - box.minX) * cell, (q.y - box.minY) * cell])] : [];
+    });
+  }, [layout, inputs, box, cell]);
   const width = box.width * cell;
   const height = box.height * cell;
 

@@ -6,11 +6,12 @@ import {
   subscribeKufiLayouts,
   type KufiStarSnapshot,
 } from "../lib/kufi/kufiLayoutClient";
-import { kufiStarInputs, kufiStarKey } from "../lib/kufi/kufiStarLayout";
+import { kufiStarInputs, kufiStarKey, type KufiStarLayoutKind } from "../lib/kufi/kufiStarLayout";
 import type { StarFold } from "../lib/kufi/kufiStarGeometry";
 
 /** The fields a star's layout depends on: nothing else of the block is read. */
 export type KufiStarLayoutSource = {
+  starLayout?: KufiStarLayoutKind;
   starFold: StarFold;
   starK: number;
   starSize: number;
@@ -30,10 +31,10 @@ export type KufiStarLayoutSource = {
  */
 export function useKufiStarLayout(block: KufiStarLayoutSource): KufiStarSnapshot {
   const slot = useId();
-  const { starFold, starK, starSize, starRegions } = block;
+  const { starLayout, starFold, starK, starSize, starRegions } = block;
   const inputs = useMemo(
-    () => kufiStarInputs({ starFold, starK, starSize, starRegions }),
-    [starFold, starK, starSize, starRegions]
+    () => kufiStarInputs({ starLayout, starFold, starK, starSize, starRegions }),
+    [starLayout, starFold, starK, starSize, starRegions]
   );
   // An equal-but-new regions array (an undo, a reload) must not re-request.
   const key = kufiStarKey(inputs);

@@ -1,6 +1,7 @@
 /**
- * Evaluates a text for a Kufi star panel and offers ways to split it over
- * the regions (`.claude/rules/kufi-star.md`, "Evaluation"). A region is
+ * Evaluates a text for a Kufi star panel: first the octagon squares (the
+ * text once, twice, ... along each side, `octagonOffers`), then ways to split
+ * it over the wedge regions (`.claude/rules/kufi-star.md`, "Evaluation"). A region is
  * **filled**: its text is repeated as often as the region packs it (a wedge
  * of a size-29 4-fold star holds الله twice, its corner once), as traditional
  * panels repeat a short phrase to fill their fields; a corner that cannot
@@ -23,11 +24,13 @@
  * Pure: no React, no Konva, no `./harfbuzz`.
  */
 import { kufiClockOverridden, kufiFormsOf, packKufiRegion, type KufiMask, type KufiPackResult } from "./kufiPack";
+import { octagonBandMask, octagonFromBand, OCTAGON_MAX_SIZE, OCTAGON_MIN_SIZE } from "./kufiOctagon";
 import { defaultStarK, STAR_KS, starConstruction, type StarConstruction, type StarFold, type StarRegionKind } from "./kufiStarGeometry";
-import type { KufiStarInputs, KufiStarLayout } from "./kufiStarLayout";
+import { octagonSizeFor, type KufiStarInputs, type KufiStarLayout } from "./kufiStarLayout";
 import { resolveKufiText } from "./kufiWords";
 
-export type KufiStarPattern = "repeat" | "alternate" | "run" | "centre";
+/** `octagon`: the octagon-in-a-square layout; the rest are splits of the wedges layout. */
+export type KufiStarPattern = "octagon" | "repeat" | "alternate" | "run" | "centre";
 
 export type KufiStarOffer = {
   /** What approving it sets: the region texts carry their repeats ("الله الله"). */
@@ -52,7 +55,14 @@ export type KufiStarEvaluation = {
   complete: boolean;
 };
 
+/** Wedge offers kept; the octagon squares (up to `OCTAGON_OFFERS`) come before them. */
 export const STAR_MAX_OFFERS = 8;
+/** Octagon squares offered: the text once, twice, ... along each side, smallest first. */
+export const OCTAGON_OFFERS = 4;
+/** Most repeats of the text along a side tried for the octagon. */
+const OCTAGON_REPEATS = 6;
+/** Sizes scanned for one repeat count, from the line its forms take at their authored widths less two. */
+const OCTAGON_SCAN = 8;
 /** Offers kept per fold and pattern, so one construction's sizes do not crowd out the other folds. */
 const OFFERS_PER_FOLD_PATTERN = 2;
 export const STAR_MIN_SIZE = 12;
@@ -415,7 +425,40 @@ function offerOf(plan: Plan, fold: StarFold, k: number, size: number, a: Attempt
   const where = `${fold}-fold, ${k === STAR_KS[fold][0] ? "classic" : "alternative"} star, size ${size}`;
   const head = plan.describe(a.counts.nA, a.counts.nB, a.counts.nC);
   const note = fits ? `${head} (${where})` : `${head} (${where}): ${misfits(c, a.layout)}`;
-  return { inputs: { fold, k, size, regions: a.regions }, pattern: plan.pattern, fits, note, quality: qualityOf(a.layout, size), layout: a.layout };
+  return { inputs: { layout: "wedges", fold, k, size, regions: a.regions }, pattern: plan.pattern, fits, note, quality: qualityOf(a.layout, size), layout: a.layout };
+}
+
+/**
+ * The octagon squares: `text` once, twice, ... (`OCTAGON_REPEATS`) along each
+ * side, each at the smallest square whose line its repeats pack (scanned up
+ * from the line their authored widths take, less two, `OCTAGON_SCAN` sizes;
+ * a line the text leaves open ends the scan, since a bigger one is worse).
+ * Each pack is one short line, so this costs little; the packs share the
+ * cache. Smallest first; at most `OCTAGON_OFFERS`.
+ */
+function octagonOffers(clock: Clock, text: string, offers: KufiStarOffer[]): void {
+  for (let n = 1; n <= OCTAGON_REPEATS && offers.length < OCTAGON_OFFERS; n++) {
+    const side = repeat(text, n);
+    const from = Math.max(OCTAGON_MIN_SIZE, octagonSizeFor(side) - 2);
+    if (from > OCTAGON_MAX_SIZE) break;
+    for (let size = from; size <= Math.min(OCTAGON_MAX_SIZE, from + OCTAGON_SCAN); size++) {
+      const band = lookup(clock, octagonBandMask(size), side);
+      if (!band.ok) {
+        if (band.reason === "tooShort") break;
+        continue;
+      }
+      const octagon = octagonFromBand(size, band);
+      offers.push({
+        inputs: { layout: "octagon", fold: 4, k: defaultStarK(4), size, regions: [side] },
+        pattern: "octagon",
+        fits: true,
+        note: `${text}${times(n)} along each side, the tall strokes lengthened to an octagon in a square of ${size}`,
+        quality: { squares: 0, bars: 0, words: band.placements.length, size },
+        layout: { regions: [{ text: side, result: band }], unpacked: [], octagon },
+      });
+      break;
+    }
+  }
 }
 
 /** One plan on one construction, scanning sizes upward; `best` is its closest miss so far. */
@@ -534,6 +577,16 @@ export function evaluateKufiStar(text: string, budgetMs: number): KufiStarEvalua
     over: () => (capped ? clock.tries >= STAR_EVAL_MAX_TRIES : performance.now() - t0 > budgetMs),
   };
 
+  // the octagon squares first: a handful of one-line packs, offered before every star construction
+  const octagon: KufiStarOffer[] = [];
+  try {
+    octagonOffers(clock, drawn.join(" "), octagon);
+  } catch (e) {
+    if (!(e instanceof OutOfBudget)) throw e;
+    return { words, offers: octagon, notes, complete: false };
+  }
+  if (octagon.length === 0) notes.push(`${drawn.join(" ")} does not fit along a side of a square up to ${OCTAGON_MAX_SIZE} cells`);
+
   const { plans, runNeeds } = plansFor(drawn);
   const tasks: Task[] = [];
   for (const plan of plans)
@@ -569,7 +622,7 @@ export function evaluateKufiStar(text: string, budgetMs: number): KufiStarEvalua
   }
 
   const sorted = offers.map((o, i) => ({ o, i })).sort((a, b) => rank(a.o, b.o) || a.i - b.i).map((x) => x.o);
-  return { words, offers: pick(sorted), notes, complete };
+  return { words, offers: [...octagon, ...pick(sorted)], notes, complete };
 }
 
 /** Tests only: forget every cached pack. */

@@ -3047,14 +3047,22 @@ export function packKufiPanel(input: {
  * (`fillPass`, `barEnds`). No edits, pins or suggestions: a region's size is the star's, not
  * the user's to pick here. Pure and deterministic, on PACK_BUDGET_MS / PACK_WORK.
  */
-export function packKufiRegion(input: { text: string; mask: KufiMask }): KufiPackResult {
+export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boolean }): KufiPackResult {
   regionPackCount++;
   const { text, mask } = input;
   const { cols, rows } = mask;
   const { units } = resolveKufiText(text);
   if (letterCount(units) < 2) return { ok: false, reason: "tooShort", suggestions: [] };
   if (!mask.cells.some((v) => v === 1)) return { ok: false, reason: "tooLong", suggestions: [] };
-  const f = search(makeCtx(text, cols, rows, {}, new Map(), PACK_BUDGET_MS, false, mask));
+  // `bars: false`: no filler bars at all (the octagon layout fills by lengthening strokes, not by bars)
+  const wereOff = barsOff;
+  if (input.bars === false) barsOff = true;
+  let f: Final | null;
+  try {
+    f = search(makeCtx(text, cols, rows, {}, new Map(), PACK_BUDGET_MS, false, mask));
+  } finally {
+    barsOff = wereOff;
+  }
   if (f?.packed) return okResult(units, f, cols, rows, {});
   return { ok: false, reason: !f || f.st.failed > 0 ? "tooLong" : "tooShort", suggestions: [] };
 }

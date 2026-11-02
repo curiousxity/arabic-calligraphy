@@ -434,7 +434,7 @@ describe("kufi layout client", () => {
 
 describe("kufi star layouts", () => {
   // Empty regions: a real layout of these packs nothing, so the main-thread fallbacks stay fast.
-  const S1: KufiStarInputs = { fold: 4, k: 3, size: 24, regions: Array.from({ length: 13 }, () => "") };
+  const S1: KufiStarInputs = { layout: "wedges", fold: 4, k: 3, size: 24, regions: Array.from({ length: 13 }, () => "") };
   const S2: KufiStarInputs = { ...S1, size: 25 };
   const layoutOf = (): KufiStarLayout => ({ regions: [], unpacked: [] });
 

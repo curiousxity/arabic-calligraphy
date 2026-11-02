@@ -16,6 +16,7 @@ type Ok = Extract<KufiPackResult, { ok: true }>;
 const c = starConstruction(4, STAR_KS[4][1], 23);
 const wedgeA = c.regions.filter((r) => r.kind === "wedgeA");
 const withText = (fill: (i: number) => string): KufiStarInputs => ({
+  layout: "wedges",
   fold: 4,
   k: STAR_KS[4][1],
   size: 23,

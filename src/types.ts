@@ -53,6 +53,7 @@ import type { BlockFill } from "./lib/blockFill";
 import type { SvgCmd } from "./lib/svgPath";
 import type { Pt } from "./lib/strokeCuts";
 import type { KufiPanelEdits } from "./lib/kufi/kufiPack";
+import type { KufiStarLayoutKind } from "./lib/kufi/kufiStarLayout";
 // ---- /STREAM-F ----
 
 type BlockCommon = {
@@ -385,10 +386,16 @@ export type KufiPanelBlock = BlockCommon & {
  */
 export type KufiStarBlock = BlockCommon & {
   type: "kufiStar";
+  /**
+   * `octagon`: the text round the four sides of a square, its tall strokes lengthened to an open
+   * octagon at the centre (`lib/kufi/kufiOctagon.ts`; `starSize` is the square's side, `starRegions[0]`
+   * the side's text). `wedges`, and absent (saves before 2026-11-02): the star construction below.
+   */
+  starLayout?: KufiStarLayoutKind;
   starFold: 4 | 5 | 6;
   /** The {m/k} star offered by `STAR_KS[starFold]`. */
   starK: number;
-  /** The ring's apothem in cells. */
+  /** The ring's apothem in cells (the square's side for `octagon`). */
   starSize: number;
   /** The text in each region by index (`1 + 3n` entries); "" = pattern only. */
   starRegions: string[];

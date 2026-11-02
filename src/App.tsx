@@ -166,8 +166,9 @@ import { isOverrideGlyphChar } from "./lib/glyphOverrides";
 import { sanitizeLegacyBlocks } from "./lib/legacySaves";
 import { kufiCellSize, kufiPanelInputs, kufiPanelTextPatch, kufiReleasePins, type KufiTool } from "./lib/kufi/kufiPanelBlock";
 import { KUFI_NOTICE_MS, type KufiNotice } from "./components/KufiPanelEditOverlay";
-import { defaultStarK, starConstruction } from "./lib/kufi/kufiStarGeometry";
-import { starOutlineBox, starPositionKeepingCentre } from "./lib/kufi/kufiStarPath";
+import { defaultStarK } from "./lib/kufi/kufiStarGeometry";
+import { kufiStarBox, starPositionKeepingCentre } from "./lib/kufi/kufiStarPath";
+import { kufiStarInputs } from "./lib/kufi/kufiStarLayout";
 import { kufiLayoutKey, requestKufiFit, seedKufiLayout } from "./lib/kufi/kufiLayoutClient";
 import type { KufiPackResult, KufiPanelEdits } from "./lib/kufi/kufiPack";
 import {
@@ -2113,8 +2114,9 @@ const App: React.FC = () => {
 
   // A new Kufi star panel is the construction alone, every region blank: its
   // text goes in through Content and the sidebar's Find layouts (see
-  // kufi-star.md). The block's x,y is the outline's top-left corner, and the
-  // click that places it is the star's centre.
+  // kufi-star.md). A new star is the octagon layout with الله three times
+  // along each side, so it draws at once. The block's x,y is the outline's
+  // top-left corner, and the click that places it is the star's centre.
   const addKufiStar = () => {
     const id = createNextId();
     const fontSize = 112;
@@ -2122,32 +2124,33 @@ const App: React.FC = () => {
     const star: KufiStarBlock = {
       ...DEFAULT_BLOCK,
       id,
-      text: "",
+      text: "الله",
       type: "kufiStar",
       fontSize,
       color: "#1a1a1a",
       // An outline would export as a second path; a new panel has none.
       strokeWidth: 0,
+      starLayout: "octagon",
       starFold: 4,
       starK: defaultStarK(4),
-      starSize: 24,
-      starRegions: Array.from({ length: 13 }, () => ""),
+      starSize: 29,
+      starRegions: ["الله الله الله"],
       starLines: true,
       x: 0,
       y: 0,
     };
-    const box = starOutlineBox(starConstruction(star.starFold, star.starK, star.starSize));
+    const box = kufiStarBox(kufiStarInputs(star));
     beginPlacement(star, box.width * cell, box.height * cell, box.minX * cell, box.minY * cell, "New Kufi star");
   };
 
-  /** Changes the selected Kufi star (fold, star, size, lines): one undo step, the star's centre kept where it was. */
+  /** Changes the selected Kufi star (layout, fold, star, size, lines): one undo step, the star's centre kept where it was. */
   const setKufiStar = (patch: Partial<KufiStarBlock>) => {
     if (!selectedBlock || selectedBlock.type !== "kufiStar") return;
     const b = selectedBlock;
     const next = { ...b, ...patch };
     const cell = kufiCellSize(b.fontSize);
-    const before = starOutlineBox(starConstruction(b.starFold, b.starK, b.starSize));
-    const after = starOutlineBox(starConstruction(next.starFold, next.starK, next.starSize));
+    const before = kufiStarBox(kufiStarInputs(b));
+    const after = kufiStarBox(kufiStarInputs(next));
     updateSelectedBlock({ ...patch, ...starPositionKeepingCentre(b, b.rotation ?? 0, before, after, cell) });
   };
 

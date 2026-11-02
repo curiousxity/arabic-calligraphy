@@ -1,8 +1,10 @@
 import React, { useId, useMemo, useState } from "react";
 import type { KufiStarBlock } from "../../types";
 import { CheckboxRow } from "./FormControls";
-import { defaultStarK, STAR_KS, starConstruction, type StarFold } from "../../lib/kufi/kufiStarGeometry";
-import { kufiStarPath, starOutlineBox } from "../../lib/kufi/kufiStarPath";
+import { defaultStarK, STAR_KS, type StarFold } from "../../lib/kufi/kufiStarGeometry";
+import { kufiStarBox, kufiStarLayoutPath } from "../../lib/kufi/kufiStarPath";
+import { kufiStarInputs, octagonSideText, octagonSizeFor, type KufiStarLayoutKind } from "../../lib/kufi/kufiStarLayout";
+import { OCTAGON_MAX_SIZE, OCTAGON_MIN_SIZE } from "../../lib/kufi/kufiOctagon";
 import type { KufiStarEvaluation, KufiStarOffer } from "../../lib/kufi/kufiStarEvaluate";
 import { requestKufiStarOffers, seedKufiStarLayout } from "../../lib/kufi/kufiLayoutClient";
 
@@ -10,6 +12,10 @@ const KUFI_STAR_MIN_SIZE = 12;
 const KUFI_STAR_MAX_SIZE = 60;
 const FOLDS: StarFold[] = [4, 5, 6];
 const K_LABELS = ["Classic", "Alternative"];
+const LAYOUTS: Array<{ kind: KufiStarLayoutKind; label: string; title: string }> = [
+  { kind: "octagon", label: "Octagon", title: "The text round the four sides of a square, its tall strokes lengthened to an octagon at the centre" },
+  { kind: "wedges", label: "Wedges", title: "A star construction: a centre star, a ring of wedges and corners, each holding its own text" },
+];
 
 /** A fold's blank region list: the centre, 2n wedges and n corners, `1 + 3n` in all. */
 const emptyStarRegions = (fold: StarFold): string[] => Array.from({ length: 1 + 3 * fold }, () => "");
@@ -17,16 +23,11 @@ const emptyStarRegions = (fold: StarFold): string[] => Array.from({ length: 1 + 
 /** Preview width in px; the height follows the star's outline. */
 const PREVIEW_PX = 76;
 
-/** One offer drawn small: its construction and the regions that packed, one path, as the canvas draws it. */
+/** One offer drawn small: its layout, one path, as the canvas draws it (unpacked regions empty). */
 const OfferPreview: React.FC<{ offer: KufiStarOffer; lines: boolean }> = ({ offer, lines }) => {
   const { d, w, h } = useMemo(() => {
-    const c = starConstruction(offer.inputs.fold, offer.inputs.k, offer.inputs.size);
-    const cells = c.regions.map((r) => {
-      const res = offer.layout.regions[r.index]?.result;
-      return res?.ok ? res.cells : null;
-    });
-    const box = starOutlineBox(c);
-    return { d: kufiStarPath(c, cells, lines, 1), w: box.width, h: box.height };
+    const box = kufiStarBox(offer.inputs);
+    return { d: kufiStarLayoutPath(offer.inputs, offer.layout, lines, 1), w: box.width, h: box.height };
   }, [offer, lines]);
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width={PREVIEW_PX} height={(PREVIEW_PX * h) / w} aria-hidden="true">
@@ -37,9 +38,10 @@ const OfferPreview: React.FC<{ offer: KufiStarOffer; lines: boolean }> = ({ offe
 
 /**
  * Find layouts: evaluates the block's text in the worker and lists the
- * offers, fitting ones first, each a small preview with its note. A click
- * approves one (fold, star, size and every region's text in one `onPatch`,
- * so one undo step). Offers made for another text are kept but marked stale.
+ * offers, the octagon squares first, then the star constructions, fitting
+ * ones first, each a small preview with its note. A click approves one
+ * (layout, fold, star, size and every region's text in one `onPatch`, so
+ * one undo step). Offers made for another text are kept but marked stale.
  */
 const KufiStarOffers: React.FC<{ block: KufiStarBlock; onPatch: (patch: Partial<KufiStarBlock>) => void }> = ({
   block,
@@ -67,7 +69,13 @@ const KufiStarOffers: React.FC<{ block: KufiStarBlock; onPatch: (patch: Partial<
 
   const approve = (o: KufiStarOffer) => {
     seedKufiStarLayout(o.inputs, o.layout);
-    onPatch({ starFold: o.inputs.fold, starK: o.inputs.k, starSize: o.inputs.size, starRegions: [...o.inputs.regions] });
+    onPatch({
+      starLayout: o.inputs.layout,
+      starFold: o.inputs.fold,
+      starK: o.inputs.k,
+      starSize: o.inputs.size,
+      starRegions: [...o.inputs.regions],
+    });
   };
 
   const stale = found !== null && found.text !== text;
@@ -119,71 +127,114 @@ const KufiStarOffers: React.FC<{ block: KufiStarBlock; onPatch: (patch: Partial<
 };
 
 /**
- * The Kufi star type panel: fold, which star, the ring's size and the
- * construction lines. Every change is one `onPatch` call, so one undo step.
- * Changing the fold resets the star to the classic one and the regions to
- * blank, since region indices mean something else in another fold.
- * Find layouts (`KufiStarOffers`) is the way text gets into the regions.
+ * The Kufi star type panel: the layout (octagon or wedges), and for the
+ * wedges its fold and star; the size and the construction lines. Every
+ * change is one `onPatch` call, so one undo step. Changing the layout or
+ * the fold resets the regions, since region indices mean something else in
+ * another construction: a switch to the octagon puts the block's text (else
+ * الله) once along each side at the size that line takes, a switch to the
+ * wedges starts them blank on the classic 4-fold star. Find layouts
+ * (`KufiStarOffers`) is the way text gets into the regions.
  */
 export const KufiStarPanel: React.FC<{
   block: KufiStarBlock;
   onPatch: (patch: Partial<KufiStarBlock>) => void;
 }> = ({ block, onPatch }) => {
   const id = useId();
+  const layout = kufiStarInputs(block).layout;
+  const octagon = layout === "octagon";
+  const minSize = octagon ? OCTAGON_MIN_SIZE : KUFI_STAR_MIN_SIZE;
+  const maxSize = octagon ? OCTAGON_MAX_SIZE : KUFI_STAR_MAX_SIZE;
   const [draft, setDraft] = useState<{ for: number; text: string } | null>(null);
   const shown = draft && draft.for === block.starSize ? draft.text : String(block.starSize);
 
   const commit = (text: string) => {
     const v = Number(text);
     if (text.trim() === "" || !Number.isFinite(v)) return;
-    const size = Math.min(KUFI_STAR_MAX_SIZE, Math.max(KUFI_STAR_MIN_SIZE, Math.round(v)));
+    const size = Math.min(maxSize, Math.max(minSize, Math.round(v)));
     if (size !== block.starSize) onPatch({ starSize: size });
+  };
+
+  const setLayout = (kind: KufiStarLayoutKind) => {
+    if (kind === layout) return;
+    if (kind === "octagon") {
+      const side = block.text.trim() === "" ? "الله" : block.text.trim();
+      onPatch({ starLayout: "octagon", starFold: 4, starK: defaultStarK(4), starSize: octagonSizeFor(side), starRegions: [side] });
+    } else {
+      onPatch({ starLayout: "wedges", starFold: 4, starK: defaultStarK(4), starSize: 24, starRegions: emptyStarRegions(4) });
+    }
   };
 
   return (
     <div className="sectionPanel" data-testid="kufi-star-panel">
       <div className="field">
-        <span className="fieldTitle">Fold</span>
-        <div className="kufiToolRow" role="group" aria-label="Fold">
-          {FOLDS.map((f) => (
+        <span className="fieldTitle">Layout</span>
+        <div className="kufiToolRow" role="group" aria-label="Layout">
+          {LAYOUTS.map((l) => (
             <button
-              key={f}
+              key={l.kind}
               type="button"
-              className={`sidebarPillButton${f === block.starFold ? " sidebarPillButton--active" : ""}`}
-              aria-pressed={f === block.starFold}
-              onClick={() => {
-                if (f !== block.starFold) onPatch({ starFold: f, starK: defaultStarK(f), starRegions: emptyStarRegions(f) });
-              }}
+              className={`sidebarPillButton${l.kind === layout ? " sidebarPillButton--active" : ""}`}
+              aria-pressed={l.kind === layout}
+              title={l.title}
+              onClick={() => setLayout(l.kind)}
             >
-              {f}
+              {l.label}
             </button>
           ))}
         </div>
       </div>
-      <div className="field">
-        <span className="fieldTitle">Star</span>
-        <div className="kufiToolRow" role="group" aria-label="Star">
-          {STAR_KS[block.starFold].map((k, i) => (
-            <button
-              key={k}
-              type="button"
-              className={`sidebarPillButton${k === block.starK ? " sidebarPillButton--active" : ""}`}
-              aria-pressed={k === block.starK}
-              onClick={() => k !== block.starK && onPatch({ starK: k })}
-            >
-              {K_LABELS[i] ?? `{${2 * block.starFold}/${k}}`}
-            </button>
-          ))}
+      {octagon && (
+        <div className="kufiArrangementsNote" dir="auto">
+          Along each side: {octagonSideText({ regions: block.starRegions }) || "nothing yet"}
         </div>
-      </div>
+      )}
+      {!octagon && (
+        <div className="field">
+          <span className="fieldTitle">Fold</span>
+          <div className="kufiToolRow" role="group" aria-label="Fold">
+            {FOLDS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={`sidebarPillButton${f === block.starFold ? " sidebarPillButton--active" : ""}`}
+                aria-pressed={f === block.starFold}
+                onClick={() => {
+                  if (f !== block.starFold) onPatch({ starFold: f, starK: defaultStarK(f), starRegions: emptyStarRegions(f) });
+                }}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {!octagon && (
+        <div className="field">
+          <span className="fieldTitle">Star</span>
+          <div className="kufiToolRow" role="group" aria-label="Star">
+            {STAR_KS[block.starFold].map((k, i) => (
+              <button
+                key={k}
+                type="button"
+                className={`sidebarPillButton${k === block.starK ? " sidebarPillButton--active" : ""}`}
+                aria-pressed={k === block.starK}
+                onClick={() => k !== block.starK && onPatch({ starK: k })}
+              >
+                {K_LABELS[i] ?? `{${2 * block.starFold}/${k}}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <label className="field" htmlFor={`${id}-size`}>
         <span className="fieldTitle">Size</span>
         <input
           id={`${id}-size`}
           type="number"
           inputMode="numeric"
-          min={KUFI_STAR_MIN_SIZE}
-          max={KUFI_STAR_MAX_SIZE}
+          min={minSize}
+          max={maxSize}
           step={1}
           value={shown}
           className="hexInput artboardNumberInput"

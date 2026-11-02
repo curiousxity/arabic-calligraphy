@@ -1,29 +1,49 @@
 /**
- * A Kufi star panel's text: each region's string packed into its region's
- * mask (`packKufiRegion`). Every region of one kind is a rotation of the
- * kind's first, with the same mask, so each distinct (kind, text) is packed
- * once and every other region of that kind takes the same result; the view
- * places it through that region's own frame, so no cells are rotated here.
+ * A Kufi star panel's text, laid out for one of its two layouts:
+ *
+ * - **`octagon`** (the 4-fold default): one text runs round the four sides
+ *   of a square, turned by rotation, and its tall strokes lengthen inward to
+ *   an open octagon at the centre (`kufiOctagon.ts`). `regions[0]` is the
+ *   side's text (with its repeats); `size` the square's side in cells.
+ * - **`wedges`**: the compass-and-ruler construction (`kufiStarGeometry.ts`),
+ *   each region's string packed into its region's mask (`packKufiRegion`).
+ *   Every region of one kind is a rotation of the kind's first, with the
+ *   same mask, so each distinct (kind, text) is packed once and every other
+ *   region of that kind takes the same result; the view places it through
+ *   that region's own frame, so no cells are rotated here.
+ *
  * Pure: no React, no Konva, no `./harfbuzz`.
  */
-import { packKufiRegion, type KufiPackResult } from "./kufiPack";
+import { kufiFormsOf, packKufiRegion, type KufiPackResult } from "./kufiPack";
+import { layoutKufiOctagon, OCTAGON_DEPTH, OCTAGON_MAX_SIZE, OCTAGON_MIN_SIZE, type KufiOctagonLayout } from "./kufiOctagon";
 import { starConstruction, type StarFold } from "./kufiStarGeometry";
+import { resolveKufiText } from "./kufiWords";
 
-export type KufiStarInputs = { fold: StarFold; k: number; size: number; regions: string[] };
+export type KufiStarLayoutKind = "wedges" | "octagon";
+
+export type KufiStarInputs = { layout: KufiStarLayoutKind; fold: StarFold; k: number; size: number; regions: string[] };
 
 export type KufiStarLayout = {
   regions: Array<{ text: string; result: KufiPackResult | null }>; // null for "" (pattern only)
   unpacked: number[]; // indices whose text did not pack
+  /** The octagon layout's square (present, null when its side's text did not pack); absent for the wedges layout. */
+  octagon?: KufiOctagonLayout | null;
 };
 
-/** The layout inputs of a star block: nothing else of the block is read. */
-export function kufiStarInputs(b: { starFold: StarFold; starK: number; starSize: number; starRegions: string[] }): KufiStarInputs {
-  return { fold: b.starFold, k: b.starK, size: b.starSize, regions: b.starRegions };
+/** The layout inputs of a star block: nothing else of the block is read. A save without `starLayout` is the wedges layout. */
+export function kufiStarInputs(b: {
+  starLayout?: KufiStarLayoutKind;
+  starFold: StarFold;
+  starK: number;
+  starSize: number;
+  starRegions: string[];
+}): KufiStarInputs {
+  return { layout: b.starLayout ?? "wedges", fold: b.starFold, k: b.starK, size: b.starSize, regions: b.starRegions };
 }
 
 /** The cache key: the layout's inputs and nothing else. */
 export function kufiStarKey(i: KufiStarInputs): string {
-  return JSON.stringify([i.fold, i.k, i.size, i.regions]);
+  return JSON.stringify([i.layout, i.fold, i.k, i.size, i.regions]);
 }
 
 /** Regions with text to pack: an upper bound on the packs one layout runs. */
@@ -31,7 +51,30 @@ export function kufiStarTextCount(i: KufiStarInputs): number {
   return i.regions.filter((t) => t.trim() !== "").length;
 }
 
+/** The side text of an octagon layout: its first region. */
+export function octagonSideText(i: Pick<KufiStarInputs, "regions">): string {
+  return i.regions[0] ?? "";
+}
+
+/**
+ * The square an octagon layout starts on for `text` along each side once:
+ * the line the text's region forms take at their authored widths, a gap
+ * between letters, plus the band's depth. An estimate for a fresh switch to
+ * the layout, within the size bounds; Find layouts measures.
+ */
+export function octagonSizeFor(text: string): number {
+  const { units } = resolveKufiText(text);
+  const line = units.reduce((n, u) => n + (kufiFormsOf(u, true)[0]?.rows[0]?.length ?? 1) + 1, 0) - 1;
+  return Math.min(OCTAGON_MAX_SIZE, Math.max(OCTAGON_MIN_SIZE, line + OCTAGON_DEPTH));
+}
+
 export function layoutKufiStar(i: KufiStarInputs): KufiStarLayout {
+  if (i.layout === "octagon") {
+    const text = octagonSideText(i);
+    if (text.trim() === "") return { regions: [{ text, result: null }], unpacked: [], octagon: null };
+    const { layout, band } = layoutKufiOctagon(i.size, text);
+    return { regions: [{ text, result: band }], unpacked: layout ? [] : [0], octagon: layout };
+  }
   const c = starConstruction(i.fold, i.k, i.size);
   const packed = new Map<string, KufiPackResult>();
   const regions = c.regions.map((r) => {
@@ -70,6 +113,10 @@ function kufiStarTextStatus(layout: KufiStarLayout | null, failed: boolean): str
   if (!layout) return "Arranging…";
   const n = layout.unpacked.length;
   if (n === 0) return null;
+  if ("octagon" in layout) {
+    const r = layout.regions[0]?.result;
+    return r && !r.ok && r.reason === "tooShort" ? "The text leaves a side open: a bigger text or a smaller size" : "The text doesn't fit a side at this size";
+  }
   return n === 1 ? "1 region doesn't fit" : `${n} regions don't fit`;
 }
 

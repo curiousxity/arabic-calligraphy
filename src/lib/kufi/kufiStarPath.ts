@@ -1,8 +1,12 @@
 import { cellRings } from "./kufiGrid";
-import type { Pt, StarConstruction } from "./kufiStarGeometry";
+import { octagonInk, type KufiOctagonLayout } from "./kufiOctagon";
+import { starConstruction, type Pt, type StarConstruction } from "./kufiStarGeometry";
+import type { KufiStarInputs, KufiStarLayout } from "./kufiStarLayout";
+
+export type StarBox = { minX: number; minY: number; width: number; height: number };
 
 /** The outline's bounding box in cells (panel units, centre at the origin). */
-export function starOutlineBox(c: StarConstruction): { minX: number; minY: number; width: number; height: number } {
+export function starOutlineBox(c: StarConstruction): StarBox {
   const xs = c.outline.map((p) => p.x), ys = c.outline.map((p) => p.y);
   const minX = Math.min(...xs), minY = Math.min(...ys);
   return { minX, minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
@@ -29,7 +33,43 @@ export function starPositionKeepingCentre(
   return { x: pos.x + dx * cos - dy * sin, y: pos.y + dx * sin + dy * cos };
 }
 
+/** The box of a star block's inputs: the octagon layout's square, else its construction's outline box. */
+export function kufiStarBox(i: Pick<KufiStarInputs, "layout" | "fold" | "k" | "size">): StarBox {
+  if (i.layout === "octagon") return { minX: -i.size / 2, minY: -i.size / 2, width: i.size, height: i.size };
+  return starOutlineBox(starConstruction(i.fold, i.k, i.size));
+}
+
 const num = (v: number) => String(Math.round(v * 100) / 100);
+
+/**
+ * One SVG path `d`, in px, origin at the square's top-left corner: the
+ * octagon layout's ink (its frame lines too when `lines` is on) traced with
+ * `cellRings`, as `kufiStarPath` traces a region's cells.
+ */
+export function kufiOctagonPath(layout: KufiOctagonLayout, lines: boolean, cellPx: number): string {
+  const N = layout.geometry.size;
+  const ink = octagonInk(layout, lines);
+  const parts: string[] = [];
+  for (const ring of cellRings(Array.from(ink, (v) => v !== 0), N, N)) {
+    parts.push(`M${ring.map(([col, row]) => `${num(col * cellPx)} ${num(row * cellPx)}`).join("L")}Z`);
+  }
+  return parts.join("");
+}
+
+/**
+ * The path of a star block's layout, whichever layout it is: the octagon's
+ * square, or every region's packed cells on its construction (an unpacked
+ * region draws nothing). Null `layout` draws the construction's lines alone.
+ */
+export function kufiStarLayoutPath(inputs: KufiStarInputs, layout: KufiStarLayout | null, lines: boolean, cellPx: number): string {
+  if (inputs.layout === "octagon") return layout?.octagon ? kufiOctagonPath(layout.octagon, lines, cellPx) : "";
+  const c = starConstruction(inputs.fold, inputs.k, inputs.size);
+  const cells = c.regions.map((r) => {
+    const res = layout?.regions[r.index]?.result;
+    return res?.ok ? res.cells : null;
+  });
+  return kufiStarPath(c, cells, lines, cellPx);
+}
 
 /**
  * One SVG path `d`, in px, with its origin at the outline's top-left corner:

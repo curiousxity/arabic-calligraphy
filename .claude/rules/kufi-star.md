@@ -1,6 +1,7 @@
 ---
 paths:
   - "src/lib/kufi/kufiStar*.ts"
+  - "src/lib/kufi/kufiOctagon*.ts"
   - "src/hooks/useKufiStarLayout.ts"
   - "src/components/KufiStarView.tsx"
   - "src/components/sidebar/KufiStarPanel.tsx"
@@ -10,13 +11,104 @@ paths:
 
 # Kufi star panel (`kufiStar` blocks)
 
-A geometric star panel in square Kufi: a centre star, a ring of 2n wedges and
-n corners, each region holding its own text on its own lattice, drawn as one
-traced outline. Built 2026-11-01 on branch `claude/kufi-star` (not merged).
-The argument for the design and the user's words are in
-`docs/superpowers/specs/2026-11-01-kufi-star-panel-design.md`; the packer it
-shares is [kufi-panel.md](kufi-panel.md), whose grammar, budgets, worker and
-clock-override rules all hold here.
+A geometric panel in square Kufi, drawn as one traced outline, in one of two
+layouts (`starLayout`; a save without the field is `wedges`):
+
+- **`octagon`**, the default since 2026-11-02: the traditional "octagon
+  inside a square". One text runs round the four sides of a square, one copy
+  per side turned by a quarter, and its tall strokes are lengthened inward
+  until their ends draw an octagon at the centre, which stays open. See "The
+  octagon layout" below.
+- **`wedges`**, built 2026-11-01: a centre star, a ring of 2n wedges and n
+  corners, each region holding its own text on its own lattice. The rest of
+  this note up to "Worker and cache" is about it.
+
+Branch `claude/kufi-star` (not merged). The argument for the wedges design
+and the user's words are in
+`docs/superpowers/specs/2026-11-01-kufi-star-panel-design.md`; the packer
+both share is [kufi-panel.md](kufi-panel.md), whose grammar, budgets, worker
+and clock-override rules all hold here.
+
+## The octagon layout (`kufiOctagon.ts`, pure)
+
+Why: the wedge star packs words into a star drawn first, and the user kept
+saying it looked wrong. In the traditional design (a 2004 article on square
+Kufi principles, its "octagon inside a square" figures; a 1444 tile mosaic
+and a 1386 tomb panel) the star is not drawn first: a short phrase repeats
+along the square's four sides and the words' tall strokes extend inward
+until their ends form an octagon and a star at the centre. Fill comes from
+lengthening strokes, never from loose filler pieces.
+
+`layoutKufiOctagon(size, text)` for a square of N = `starSize` cells
+(`OCTAGON_MIN_SIZE` 13 to 60), text = `starRegions[0]` (the side's text,
+with its repeats, as the wedge regions carry theirs):
+
+- **Four bands, a pinwheel.** One band is `BAND` (5) rows of letters with
+  their feet on the outer edge plus one seam row inside: `DEPTH` 6. The
+  bottom band's line runs from the left edge to `DEPTH` short of the right
+  edge (N - 6 cells), packed by `packKufiRegion` on a 5 x (N - 6) mask
+  with **`bars: false`** (no filler bars; the region's "no lone squares"
+  rule already holds), so a side packs only when the text repeated fills
+  its line by stretching (الله's heh box widens by up to `COL_MAX`). The
+  other three bands are the bottom one turned clockwise about the centre
+  (`octagonTurn`, cell to cell; N may be odd or even), so the text reads as
+  a panel's outer ring: upright below, upward on the left, upside down
+  above, downward on the right, never mirrored; the band on each edge stands
+  in the corner the previous one leaves, above its first letter, the seam
+  row between. The bottom band's first `DEPTH` columns lie under the left
+  band and cannot lengthen anything.
+- **Fields by the diagonals.** The interior (N - 12 square) is cut by its
+  diagonals into four fields, one per band; the diagonal cells themselves
+  (`octagonSeam`) stay paper, so two fields' stroke ends meet only at
+  corners. A stroke lengthens from the seam row straight inward through its
+  field until the next cell is a seam cell or the open centre.
+- **What lengthens** (`strokeTop`): a column whose topmost ink in the band
+  is the top of an upright (two cells or more), with paper above it and
+  beside that paper up to the band's top, so the lengthened stroke touches
+  nothing. A bar beside the top is fine: so the lam the heh of الله hangs
+  off (`allah.isolated.3`, column 2) rises above the heh's box as the
+  reference's لله does, and each الله gives three strokes, two cells apart.
+  The box's own side does not rise (its top cell has no run under it),
+  nor a bar's middle. Short letters leave the space above them open: in
+  the reference that space is the design, not a hole, so the empty-2x2
+  rule holds inside the bands (the packer's) and not above them.
+- **The open centre** (`octagonGeometry`): a stepped octagon `width` cells
+  across, `CENTRE_RATIO` (0.33) of N rounded to N's parity (centred), never
+  wider than the interior less two; its corners cut so the flat sides are
+  `flat` cells (`FLAT_RATIO`, a regular octagon's side over its width, to
+  the width's parity). At 0.27 (the mosaic's proportion) the strokes' ends
+  did not read as an octagon at 29; at 0.33 they do, with the diagonal
+  staircases from its corners to the square's.
+- **Lines on** draws each band's base row solid where its feet leave a
+  gap (`frame`, the outer ring only; a gap stays where closing it would make
+  a solid 2x2), so the frame line and the feet are one stroke, as the
+  wedges' bands are flush on their base edge. Four pinwheel segments, not a
+  closed ring: the corner cells belong to the letter standing there.
+- **Measured** (2026-11-02): الله once a side packs at 13 (its line 7; the
+  interior is the centre cell), twice at 21, three times at 29, four at 37;
+  `kufiOctagon.test.ts` pins 13 and 29. One الله a side makes a small
+  dense tile with no octagon to speak of; three makes a square with a clear
+  octagon and the diagonals drawn by stroke ends, which is why a new star is
+  `الله الله الله` at 29. A side with more words gives denser strokes, nearer the reference.
+- **Status.** The side's pack failing gives `unpacked: [0]` and
+  `octagon: null`; the view draws the dashed square and the status says
+  "doesn't fit a side at this size" (`tooLong`) or "leaves a side open"
+  (`tooShort`). `kufiStarBox` is the square for this layout, the
+  construction's outline box for the other; `kufiStarLayoutPath` draws
+  either; `starPositionKeepingCentre` keeps the centre across a switch.
+
+**Sidebar.** The panel's first row is the layout (`Octagon` / `Wedges`);
+Fold and Star show for the wedges only; Size is the square's side (13 to
+60) or the ring's apothem (12 to 60). Switching to the octagon puts the
+block's text (else الله) once along each side at `octagonSizeFor` (the
+line its region forms take at their authored widths, plus `DEPTH`); to the
+wedges, the blank classic 4-fold star at 24. Find layouts offers the octagon
+squares first (`octagonOffers`): the text once, twice, up to
+`OCTAGON_REPEATS` (6) times a side, each at the smallest square its line
+packs (scanned from `octagonSizeFor` less two, `OCTAGON_SCAN` sizes; a line
+the text leaves open ends the scan), smallest first, at most
+`OCTAGON_OFFERS` (4), then the wedge offers as below. A side pack is one
+short line, milliseconds, so this costs the budget nothing.
 
 ## The construction (`kufiStarGeometry.ts`, pure)
 

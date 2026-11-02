@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { _internal } from "./kufiPack";
 import { defaultStarK, starConstruction, type StarFold } from "./kufiStarGeometry";
-import { _resetKufiStarEvaluation, evaluateKufiStar, STAR_MAX_OFFERS, type KufiStarEvaluation, type KufiStarOffer } from "./kufiStarEvaluate";
+import { _resetKufiStarEvaluation, evaluateKufiStar, OCTAGON_OFFERS, STAR_MAX_OFFERS, type KufiStarEvaluation, type KufiStarOffer } from "./kufiStarEvaluate";
+import { octagonRows } from "./kufiOctagon";
 
 // Offers are asserted on the work cap alone (STAR_EVAL_MAX_TRIES), so machine load cannot change them.
 // The pack cache is shared by the tests below: every call of one text gives the same answer, since
@@ -88,8 +89,31 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
     for (const o of e.offers) for (const t of o.inputs.regions) expect(t).not.toContain("abc");
   });
 
-  it("offers are sorted: fitting first, denser first among them; misses after, saying so; at most STAR_MAX_OFFERS, two per fold and pattern", () => {
-    for (const e of [evalAllah(), evalTwo()]) {
+  it("the octagon squares come first: الله once to four times along a side, smallest first, each square packed and open at the centre", () => {
+    const e = evalAllah();
+    const oct = e.offers.filter((o) => o.pattern === "octagon");
+    expect(oct.length).toBe(OCTAGON_OFFERS);
+    expect(e.offers.slice(0, oct.length).every((o) => o.pattern === "octagon")).toBe(true);
+    expect(e.offers.slice(oct.length).every((o) => o.pattern !== "octagon")).toBe(true);
+    // the smallest squares: one الله at 13, two at 21, three at 29, four at 37 (their lines take 7, 15, 23, 31)
+    expect(oct.map((o) => o.inputs.size)).toEqual([13, 21, 29, 37]);
+    oct.forEach((o, i) => {
+      expect(o.fits).toBe(true);
+      expect(o.inputs).toMatchObject({ layout: "octagon", fold: 4, k: defaultStarK(4) });
+      expect(wordsOf(o.inputs.regions[0])).toEqual(Array.from({ length: i + 1 }, () => "الله"));
+      expect(o.note).toContain("along each side");
+      expect(o.layout.octagon).not.toBeNull();
+      expect(o.layout.unpacked).toEqual([]);
+      const rows = octagonRows(o.layout.octagon!);
+      const mid = Math.floor(o.inputs.size / 2);
+      expect(rows[mid][mid]).toBe(".");
+    });
+  });
+
+  it("offers are sorted: the octagon first, then fitting first, denser first among them; misses after, saying so; at most STAR_MAX_OFFERS wedge offers, two per fold and pattern", () => {
+    for (const all of [evalAllah(), evalTwo()]) {
+      const e = { ...all, offers: all.offers.filter((o) => o.pattern !== "octagon") };
+      expect(all.offers.length).toBeLessThanOrEqual(STAR_MAX_OFFERS + OCTAGON_OFFERS);
       expect(e.offers.length).toBeLessThanOrEqual(STAR_MAX_OFFERS);
       for (let i = 1; i < e.offers.length; i++) {
         const a = e.offers[i - 1], b = e.offers[i];
