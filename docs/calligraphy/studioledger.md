@@ -433,6 +433,10 @@ Times are minutes:seconds into the individual-letters lesson.
   method. The user: "Fixes and pages approved".
 - **077b and 085d (2026-11-02):** 077b's rising stroke stood past the studio's edge along its top and 085d's stroke
   start ran past on the left. Both on the whole-outline method. The user: "Your fixes are approved".
+- **085b, 085c, 078b and the medial ba (2026-11-02):** the user: "85 and 78 need work". They ran a little past the
+  studio inside the peak, at the right end and along the start. Checking all 27 medial ba shapes found the same in
+  078, 085, 081 and 084. All on the whole-outline method. The user: "All approved". With these the final review of
+  all 353 pages is done.
 
 **Every joint trimmed to the studio edge**
 
