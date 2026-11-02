@@ -402,6 +402,12 @@ Times are minutes:seconds into the individual-letters lesson.
   stroke (s1) and 742's one stroke are their own studio outline, smoothed, whole, 742's joining end then the studio's
   straight cut. 618c's tail likewise from its tip round the bowl. 732.s0 copies 732i.s1, so its outline goes in its
   own joint trims and 732i stays as approved. The user: "The fixes are approved".
+- **Edges all round (2026-11-02):** the user: "743 and 744 =", "H01 035r, 032r hedges all around", "528a, 529 a,
+  531ba, 532a, 714a ans similar. 028r. 033r, 034g, 038g". Every stroke of these 26 shapes (with the lam "a"
+  variants 493a-495a, 521a-527a, 530a, 531a) is its own studio outline, smoothed, over its whole extent and a nib
+  past it, so no pen ink is left outside. The smoothing keeps a corner turning more than 50 degrees where it is:
+  a stroke's cut end, a pair half's joining end, stays square. A stroke that copies another has its outline in its
+  own joint trims. The user: "The fixes are approved".
 
 **Every joint trimmed to the studio edge**
 
