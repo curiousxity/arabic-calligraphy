@@ -71,9 +71,10 @@ export const section: GuideSection = {
         of each wedge, and «الله» is drawn with its alef and lams standing
         two squares above the heh's box wherever the wedge has room for that,
         bare or meeting a bar across the top of the word; only in the
-        smallest wedges, or where two or three words stack in one, does it
-        stand at the line's height. Offers with the tall word come first
-        among those of the same fill. Longer words, several words in one
+        smallest wedges does it stand at the line's height. Every copy of
+        the word in a wedge is drawn the same way, tall throughout or at the
+        line's height throughout, never a mix. Offers with the tall word
+        come first among those of the same fill. Longer words, several words in one
         wedge and the corners often do not fit yet. An offer that does not
         fit can still be chosen: those parts stay as pattern, and the panel
         says how many did not fit.

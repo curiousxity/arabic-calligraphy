@@ -96,7 +96,13 @@ const LINE_PITCH = 6;
 const FILL_MAX = 16;
 /** Packs a fill search may spend on one region and text. */
 const FILL_TRIES = 5;
-/** A plan that failed at this many sizes with room for its text, before its first fit, is set aside until the rest have had their turn. */
+/**
+ * A plan that failed at this many sizes with room for its text since its last fit (or from the
+ * start) is set aside until the rest have had their turn: a classic star whose wedge never holds
+ * a second word scans every size to 60 at two failing packs each, which spent the budget before
+ * the alternative stars were tried (الله's one dense fit with every copy tall, 5-fold {10/2} ×3
+ * at 42, was never reached, 2026-11-02).
+ */
 const PATIENCE = 8;
 /** Among equally close misses the size nearest this (a new star's) is offered, so a plan nothing of which fits is not shown tiny or huge. */
 const STAR_NO_FIT_SIZE = 24;
@@ -500,7 +506,7 @@ type Task = {
  * the alternative star's, early plans before late, set-aside tasks last.
  */
 function priority(t: Task): number {
-  const aside = t.fits === 0 && t.fails.n >= PATIENCE ? 100 : 0;
+  const aside = t.fails.n >= PATIENCE ? 100 : 0;
   return aside + t.fits * 3 + FOLDS.indexOf(t.fold) + (t.k === defaultStarK(t.fold) ? 0 : 9) + (t.plan.late ? 20 : 0);
 }
 
@@ -523,6 +529,8 @@ function step(clock: Clock, t: Task): KufiStarOffer | null {
     if (better) {
       offer = o;
       t.fits++;
+      // the task's patience starts afresh at a fit: `fails` counts the failing sizes since
+      t.fails.n = 0;
       t.words = o.quality.words;
       t.cut = o.quality.cut;
       if (t.fits >= FITS_PER_PLAN) t.done = true;

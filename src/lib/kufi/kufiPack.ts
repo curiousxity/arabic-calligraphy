@@ -238,6 +238,37 @@ function stemOf(g: KufiGlyph, rows: string[], baseRow: number): number {
   }
   return stem;
 }
+/** The stem a glyph is authored with (`stemOf` unstretched): الله's tall star forms 7, its five-row form 5. */
+function authoredStem(g: KufiGlyph): number {
+  let s = authoredStems.get(g.id);
+  if (s === undefined) {
+    s = stemOf(g, g.rows, g.rows.length - 1 - g.base);
+    authoredStems.set(g.id, s);
+  }
+  return s;
+}
+const authoredStems = new Map<string, number>();
+
+/**
+ * In a region every copy of الله reads the same: a form of the authored stem
+ * the first placed copy took, the tall forms (`.5` bare, `.6` under its bar)
+ * throughout or the five-row form throughout, never both in one region (a
+ * 5-fold wedge at 40 held two five-row words under a tall one with a wide
+ * heh, 2026-11-02; in traditional square Kufi every copy of a word in a
+ * panel reads alike). Checked in `apply`, so a replay (`reapply`) that
+ * changes one copy's form holds the others to it as the search does. The
+ * heh's width is free: the word widens through its box to fill a line's end.
+ * A rectangular panel's الله is not held (its forms differ by other things).
+ */
+function sameWordForm(ctx: Ctx, st: St, letter: Letter, sh: Shape): boolean {
+  if (!ctx.region || letter.unit.skeleton !== "allah") return true;
+  for (let t = st.trail; t; t = t.prev) {
+    const p = t.p;
+    if (ctx.letters[p.letter].unit.skeleton === "allah") return authoredStem(p.shape.g) === authoredStem(sh.g);
+  }
+  return true;
+}
+
 /**
  * Orders a letter's alternatives nearest natural length first, for the moves
  * that look for one: a cell of cut outweighs this many cells of growth. The
@@ -449,7 +480,7 @@ function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins:
       dotKey: d ? dotKey(d) : null,
       pin,
       // over the glyphs allowed: a form the user chose sets its own natural length
-      natural: tall(u) && glyphs.length ? Math.max(...glyphs.map((g) => stemOf(g, g.rows, g.rows.length - 1 - g.base))) : -1,
+      natural: tall(u) && glyphs.length ? Math.max(...glyphs.map(authoredStem)) : -1,
       exempt: !!pin || !!fixed,
     };
   });
@@ -937,6 +968,7 @@ function apply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
   if (++ctx.work >= ctx.workMax || ((ctx.work & 255) === 0 && performance.now() > ctx.deadline)) ctx.out = true;
   const letter = ctx.letters[li];
   const sh = mv.shape;
+  if (!sameWordForm(ctx, st, letter, sh)) return null;
   let L: Line;
   let x0: number;
   let yb: number;

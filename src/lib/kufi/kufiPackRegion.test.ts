@@ -111,7 +111,7 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
   const rep = (n: number) => Array.from({ length: n }, () => "الله").join(" ");
   const FITS: Array<[fold: 4 | 5 | 6, size: number, region: number, text: string]> = [
     [4, 20, 1, rep(1)], [4, 23, 1, rep(1)], [4, 25, 1, rep(1)], [4, 29, 9, rep(1)],
-    [5, 24, 1, rep(1)], [5, 28, 1, rep(1)], [5, 40, 1, rep(3)],
+    [5, 24, 1, rep(1)], [5, 28, 1, rep(1)],
     [6, 30, 1, rep(1)], [6, 34, 1, rep(2)], [6, 38, 1, rep(2)],
   ];
   const packedFits = () =>
@@ -268,6 +268,20 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
     expect(r.quality?.bars).toBe(3);
     risen++;
     expect(risen).toBeGreaterThan(0);
+  });
+
+  it("every copy of الله in a region reads the same: the tall forms throughout (bare or under a bar) or the five-row form throughout, never both", () => {
+    // In traditional square Kufi every copy of a word in a panel reads alike. Before 2026-11-02 a
+    // 5-fold wedge at 40 held two five-row words under one tall word with a wide heh, and a 6-fold
+    // wedge at 40 a five-row word under a tall one: the packer takes a form of one stem for every
+    // copy (`sameWordForm`), so a region packs all tall, all five-row, or not at all. Neither of
+    // those two wedges packs any other way (measured 2026-11-02, sizes 12 to 60: no wedge of any
+    // fold holds two tall words; see "measure, then pin" above), so both are refused now.
+    const stem = (id: string) => (id === "allah.isolated.3" ? "five-row" : "tall");
+    const mixed = (r: Ok) => new Set(r.placements.map((p) => stem(p.glyphId))).size > 1;
+    for (const { fold, size, region, r } of packedFits()) expect(mixed(r), `${fold}-fold ${size} region ${region}`).toBe(false);
+    for (const [fold, size, text] of [[5, 40, rep(3)], [6, 40, rep(2)]] as const)
+      expect(packKufiRegion({ text, mask: starConstruction(fold, STAR_KS[fold][0], size).regions[1].mask }).ok, `${fold}-fold ${size}`).toBe(false);
   });
 
   it("is deterministic: the same call twice gives equal results", () => {

@@ -249,8 +249,18 @@ error; the packer reports `tooLong`.
     where its bar closes the pocket.
   - **`allah.isolated.3`, the five-row form**, `.1` at a line's height, the
     fallback where no tall form has room: the smallest wedges (4-fold 20 to
-    22) and the stacked pairs and triples (6-fold ×2, two of the three in
-    5-fold ×3). It is the octagon band's only form (five rows).
+    22) and the 6-fold wedge's stacked pairs (34 to 38). It is the octagon
+    band's only form (five rows).
+  **Every copy of الله in a region takes a form of one stem** (`sameWordForm`
+  in `kufiPack.ts`, checked in `apply`, 2026-11-02): the tall forms (`.5`
+  bare, `.6` under its bar, as each copy's place needs) throughout, or the
+  five-row form throughout, never both. In traditional square Kufi every
+  copy of a word in a panel reads alike; a 5-fold wedge at 40 held two
+  five-row words under a tall one with a wide heh, and a 6-fold wedge at
+  40 a five-row word under a tall one, and both are refused now (nothing
+  else packs them). The heh's width stays free. A rectangular panel's الله
+  is not held (its forms differ by other things than the stem), and the
+  octagon's band has the five-row form alone.
   **The packer prefers the tall forms** (`stemOf` in `kufiPack.ts`): in a
   star الله is a tall letter whose stem is its longest stroke on the line,
   7 in the tall forms, 5 in the five-row one, so the five-row form is a
@@ -317,33 +327,46 @@ error; the packer reports `tooLong`.
   wedge at 28 (on the merged form of the time) packed only with the heh's
   wall carried up: the legal packing (the barred form right, the plain form
   left, its second lam carried up) tied with the other plan and lost the hash.
-- **Measured fits of الله** (2026-11-02, classic stars, the 9-wide forms
-  above, a word's shafts carried up together or not at all): one a wedge
-  at 4-fold 20-27 (five-row at 20-22, tall at 23, tall under its bar at
-  24-27), 5-fold 24-29 (tall at 24-25, under its bar from 26), 6-fold 30
+- **Measured fits of الله** (2026-11-02, the 9-wide forms above, a word's
+  shafts carried up together or not at all, every copy on one stem): one a
+  wedge at 4-fold 20-27 (five-row at 20-22, tall at 23, tall under its bar
+  at 24-27), 5-fold 24-29 (tall at 24-25, under its bar from 26), 6-fold 30
   only (under its bar; 31-33 held the five-row form under a bar before
-  the forms changed); three a 5-fold wedge at 40 (one under its bar, two
-  five-row), two a 6-fold wedge at 34-40 (five-row pairs; at 40 one under
-  its bar); a 4-fold corner holds one at 29-31, tall, and nothing more up
-  to 60 (three packed at 46 while the five-row form grew its rows evenly);
-  5-fold corners one from 47, tall; 6-fold corners nothing up to 50; **a
-  4-fold wedge never holds two**: the pocket the slanted side leaves above
-  a heh's box has no legal filler (a lam is two cells away; the barred
-  form needs the full width at its bar's row; a word slides to its first fit
-  and no further), and two 9-wide words no longer stand on one line before
-  the sides close. The tall form fits where the wedge's sides close over the
-  pocket above the heh's box (the word's top near the mask's top: small
-  wedges, a corner's acute end); with room above the word the pocket is a
+  the forms changed), the alternative stars' wedges the same; **three a
+  5-fold {10/2} wedge at 42, every copy tall** (two under their bars on
+  the line, one bare above them, its shafts in the notch the star point
+  leaves between the wedge's prongs, which also closes over its heh's
+  pocket); two a 6-fold wedge at 34-38, five-row pairs; nothing else
+  dense: no wedge of any fold or star holds two tall copies at any size to
+  60 (measured with the five-row form taken away), and the mixed fits
+  (5-fold ×3 at 40, 6-fold ×2 at 40) are refused. Why two lines of tall
+  words do not stack: a bare tall word in the middle of a line leaves its
+  heh's pocket a hole, so a lower line is all barred words, two of which
+  need nineteen cells at their bars' row, while the upper line's word must
+  end at the notch's tip with the prongs above it too narrow for holes,
+  and no size of the classic wedges has both at once; the {10/2} wedge's
+  wider notch takes a bare word's shafts and closes its pocket. A 4-fold
+  corner holds one at 29-31, tall, and nothing more up to 60 (three packed
+  at 46 while the five-row form grew its rows evenly); 5-fold corners one
+  from 47, tall; 6-fold corners nothing up to 50; **a 4-fold wedge never
+  holds two**: the pocket the slanted side leaves above a heh's box has no
+  legal filler (a lam is two cells away; the barred form needs the full
+  width at its bar's row; a word slides to its first fit and no further),
+  and two 9-wide words no longer stand on one line before the sides close.
+  The tall form fits where the wedge's sides close over the pocket above
+  the heh's box (the word's top near the mask's top: small wedges, a
+  corner's acute end, the notch); with room above the word the pocket is a
   hole and the form under its bar takes over; where even that has no room
-  (two lines in a wedge) the five-row form stands. (The merged 7-wide form
-  held one from 18, two at 27-28 with the corners filled, three a 5-fold
-  wedge at 34, three a 6-fold at 39.)
+  (two lines in a wedge) the five-row form stands, for every copy. (The
+  merged 7-wide form held one from 18, two at 27-28 with the corners
+  filled, three a 5-fold wedge at 34, three a 6-fold at 39.)
   محمد fits a 4-fold wedge twice at 29, 32 and 35 (once never: one word
   leaves the line's end open). `kufiPackRegion.test.ts` pins the first fit,
   the 6-fold 34 and corner 29 fits, that no capped top is ever carried up,
   that every packed الله stands on four uprights, which form each measured
   fit takes (the tall one's heh wall never rising, its shafts two or more
-  above the heh's bar), and that each word's shafts rise all or none.
+  above the heh's bar), that each word's shafts rise all or none, and that
+  no fit mixes the five-row form with a tall one.
 - **Copies by rotation, never mirror.** Every region of a kind is a rotation
   of the kind's first, with the same mask, so `layoutKufiStar` packs each
   distinct (kind, text) once and every other region of that kind takes the
@@ -422,15 +445,23 @@ counts against nothing (6-fold corners never hold الله).
   tall at 23, so both are offered and 23 ranks first. A scheduler steps the task of
   lowest `priority` (every fold's first fit, 4-fold first, before any second
   one; default stars before alternatives; run and centre last; a task that
-  failed at `PATIENCE` (8) sizes with room for its text, before any fit, is
-  set aside until the rest have had their turn), round robin among equals.
+  failed at `PATIENCE` (8) sizes with room for its text since its last fit,
+  or from the start, is set aside until the rest have had their turn),
+  round robin among equals. The patience counts from the last fit
+  (2026-11-02): a classic wedge that never holds a second word scans every
+  size to 60 at two failing packs each, which spent the budget before the
+  alternative stars were tried, and الله's one dense fit with every copy
+  tall is on the 5-fold {10/2} star.
   A task that never fits is offered at its closest miss (fewest wedges
   missing, nearest size 24), its note naming what does not fit ("محمد does
   not fit a wedge"). Under the work cap "الله" gets 4-fold ×1 at 23 (tall)
-  and at 20 (five-row), 5-fold ×1 at 24 (tall) and ×3 at 40, 6-fold ×1 at
-  30 (tall under its bar) and ×2 at 40 (the merged form's 4-fold 18 and
-  28, 5-fold 21 and 34, 6-fold 24 and 39 went with it; 4-fold 34 and
-  5-fold 45 were offers while the heh's wall rose); "الله محمد" gets
+  and at 20 (five-row), 5-fold ×1 at 24 (tall) and the alternative star's
+  ×3 at 42 (every copy tall), 6-fold ×1 at 30 (tall under its bar) on both
+  stars (the mixed 5-fold ×3 at 40 and 6-fold ×2 at 40 are refused by the
+  packer; the 6-fold five-row pairs at 34-38 lie below the fill estimate's
+  jump after the fit at 30 and are not scanned; the merged form's 4-fold
+  18 and 28, 5-fold 21 and 34, 6-fold 24 and 39 went earlier; 4-fold 34
+  and 5-fold 45 were offers while the heh's wall rose); "الله محمد" gets
   the repeat fits (4-fold 30 with الله in the corners, 5-fold 36; the
   6-fold one is beyond the cap) and alternate misses (the pair in turn
   fitted the 4-fold star at 29 while الله twice a wedge packed there; now

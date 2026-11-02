@@ -46,19 +46,32 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
     expect(repeats.some((o) => kindsOf(o).some((k, i) => k === "corner" && o.inputs.regions[i] !== ""))).toBe(false);
   });
 
-  it("الله: every fold gets a dense fit on its classic star, the word three times in a 5-fold wedge, twice in a 6-fold one, once in a 4-fold one", () => {
+  it("الله: every fold's classic star holds the word once a wedge; the one dense fit is the 5-fold alternative star, three a wedge at 42, every copy tall", () => {
     // On the star's الله (five rows, or tall with its shafts two above the heh's box), with a word's
-    // shafts carried up together or not at all (2026-11-02; see kufiPackRegion.test.ts), a 4-fold
-    // wedge holds the word once (20 to 27) and never twice; a 5-fold wedge three times at 40, a
-    // 6-fold wedge twice from 34.
+    // shafts carried up together or not at all and every copy in a region on forms of one stem
+    // (2026-11-02; see kufiPackRegion.test.ts), a 4-fold wedge holds the word once (20 to 27) and
+    // never twice; the classic 5- and 6-fold wedges once (the 5-fold ×3 at 40 and 6-fold ×2 at 40
+    // mixed five-row copies with a tall one and are refused; the 6-fold five-row pairs at 34 to 38
+    // lie below the fill estimate's jump); the 5-fold {10/2} wedge three times at 42, two under
+    // their bars on the line and one bare above them, its shafts in the star point's notch.
     const e = evalAllah();
     for (const fold of [4, 5, 6] as StarFold[]) {
-      const dense = e.offers.filter((x) => x.pattern === "repeat" && x.fits && x.inputs.fold === fold && x.inputs.k === defaultStarK(fold));
-      expect(dense.length, `${fold}-fold`).toBeGreaterThan(0);
-      const most = Math.max(...dense.map((o) => wordsOf(o.inputs.regions[1]).length));
-      expect(most, `${fold}-fold`).toBe(fold === 4 ? 1 : fold === 5 ? 3 : 2);
-      for (const o of dense) expect(o.note).toMatch(/الله( ×\d+)? in every wedge/);
+      const classic = e.offers.filter((x) => x.pattern === "repeat" && x.fits && x.inputs.fold === fold && x.inputs.k === defaultStarK(fold));
+      expect(classic.length, `${fold}-fold`).toBeGreaterThan(0);
+      for (const o of classic) {
+        expect(wordsOf(o.inputs.regions[1]), `${fold}-fold ${o.inputs.size}`).toHaveLength(1);
+        expect(o.note).toMatch(/الله in every wedge/);
+      }
     }
+    const dense = e.offers.filter((x) => x.pattern === "repeat" && x.fits && wordsOf(x.inputs.regions[1]).length > 1);
+    expect(dense.map((o) => [o.inputs.fold, o.inputs.k, o.inputs.size])).toEqual([[5, 2, 42]]);
+    expect(wordsOf(dense[0].inputs.regions[1])).toHaveLength(3);
+    expect(dense[0].quality.cut).toBe(0);
+    expect(dense[0].note).toBe("الله ×3 in every wedge (5-fold, alternative star, size 42)");
+    const forms = dense[0].layout.regions.flatMap((r) => (r.result?.ok ? r.result.placements.map((p) => p.glyphId) : []));
+    expect(forms.every((id) => id === "allah.isolated.5" || id === "allah.isolated.6")).toBe(true);
+    expect(forms).toContain("allah.isolated.5");
+    expect(forms).toContain("allah.isolated.6");
   });
 
   it("الله محمد: an alternate offer puts الله in the A wedges and محمد in the B wedges, each repeated to fill", () => {
@@ -157,15 +170,19 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
 });
 
 describe("the size scan", { timeout: 600_000 }, () => {
-  it("pins الله's fits: 4-fold classic ×1 at 23 (tall) and 20, 5-fold classic ×1 at 24 and ×3 at 40, 6-fold classic ×1 at 30 and ×2 at 40", () => {
+  it("pins الله's fits: 4-fold classic ×1 at 23 (tall) and 20, 5-fold classic ×1 at 24 and alternative ×3 at 42, 6-fold classic ×1 at 30", () => {
     // Measured 2026-11-02 under the work cap, on the star's الله with a word's shafts carried up
-    // together or not at all and the tall form preferred: a 4-fold wedge holds the five-row word
-    // at 20 (a cut stem, two cells) and the tall one from 23, so the scan goes on from 20 and
-    // offers 23 too, ranked first. The merged form's fits (4-fold 18 and ×2 at 28 with the
-    // corners filled, 5-fold 21 and ×3 at 34, 6-fold 24 and ×3 at 39) are gone with it.
+    // together or not at all, the tall form preferred and every copy in a region on one stem: a
+    // 4-fold wedge holds the five-row word at 20 (a cut stem, two cells) and the tall one from 23,
+    // so the scan goes on from 20 and offers 23 too, ranked first. The dense classic fits that
+    // mixed the forms (5-fold ×3 at 40, 6-fold ×2 at 40) are gone; the 5-fold {10/2} star's ×3 at
+    // 42 is reached inside the cap because a task whose sizes keep failing after a fit is set
+    // aside (`PATIENCE`), where before the classic 5-fold scan to 60 spent the whole budget. The
+    // merged form's fits (4-fold 18 and ×2 at 28 with the corners filled, 5-fold 21 and ×3 at
+    // 34, 6-fold 24 and ×3 at 39) went earlier.
     const e = evalAllah();
-    const at = (fold: StarFold, size: number) =>
-      e.offers.find((x) => x.pattern === "repeat" && x.fits && x.inputs.fold === fold && x.inputs.k === defaultStarK(fold) && x.inputs.size === size);
+    const at = (fold: StarFold, size: number, k = defaultStarK(fold)) =>
+      e.offers.find((x) => x.pattern === "repeat" && x.fits && x.inputs.fold === fold && x.inputs.k === k && x.inputs.size === size);
     expect(wordsOf(at(4, 23)!.inputs.regions[1])).toHaveLength(1);
     expect(at(4, 23)!.quality.cut).toBe(0);
     expect(wordsOf(at(4, 20)!.inputs.regions[1])).toHaveLength(1);
@@ -174,16 +191,26 @@ describe("the size scan", { timeout: 600_000 }, () => {
     expect(e.offers.indexOf(at(4, 23)!)).toBeLessThan(e.offers.indexOf(at(4, 20)!));
     expect(wordsOf(at(5, 24)!.inputs.regions[1])).toHaveLength(1);
     expect(at(5, 24)!.quality.cut).toBe(0);
-    expect(wordsOf(at(5, 40)!.inputs.regions[1])).toHaveLength(3);
+    expect(wordsOf(at(5, 42, 2)!.inputs.regions[1])).toHaveLength(3);
+    expect(at(5, 42, 2)!.quality.cut).toBe(0);
     expect(wordsOf(at(6, 30)!.inputs.regions[1])).toHaveLength(1);
     expect(at(6, 30)!.quality.cut).toBe(0);
-    expect(wordsOf(at(6, 40)!.inputs.regions[1])).toHaveLength(2);
+    expect(at(5, 40)).toBeUndefined();
+    expect(at(6, 40)).toBeUndefined();
     // every wedge offer of الله draws the word tall where its wedge has room for a tall form: the tall forms
-    // (.5 bare, .6 under its bar) at 23, 24 and 30, the five-row one at 20 and in the stacked pairs and triples
+    // (.5 bare, .6 under its bar) at 23, 24, 30 and 42, the five-row one at 20 alone
     const forms = (o: KufiStarOffer) => new Set(o.layout.regions.flatMap((r) => (r.result?.ok ? r.result.placements.map((p) => p.glyphId) : [])));
     expect(forms(at(4, 23)!)).toEqual(new Set(["allah.isolated.5"]));
     expect(forms(at(5, 24)!)).toEqual(new Set(["allah.isolated.5"]));
     expect(forms(at(6, 30)!)).toEqual(new Set(["allah.isolated.6"]));
+    expect(forms(at(5, 42, 2)!)).toEqual(new Set(["allah.isolated.5", "allah.isolated.6"]));
     expect(forms(at(4, 20)!)).toEqual(new Set(["allah.isolated.3"]));
+    // no offer of الله mixes the five-row form with a tall one in one region
+    for (const o of e.offers)
+      for (const r of o.layout.regions) {
+        if (!r.result?.ok) continue;
+        const stems = new Set(r.result.placements.map((p) => (p.glyphId === "allah.isolated.3" ? "five-row" : "tall")));
+        expect(stems.size, `${o.note}`).toBeLessThanOrEqual(1);
+      }
   });
 });
