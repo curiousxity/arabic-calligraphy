@@ -398,6 +398,10 @@ Times are minutes:seconds into the individual-letters lesson.
   joining end then put back to the studio's straight cut, unsmoothed, which the rounding had taken off). 692's
   starting stroke copies 673.s0, fixed there. 710's left bowl (s3) and the left end of its diagonal (s1), which 713
   copies; its right foot left as it was. The user: "Approved the fixes".
+- **721, 732, 618c and 742 (2026-11-01):** the user: "721, 732, 616c, 742 need fixing" (618c meant). 721's bottom
+  stroke (s1) and 742's one stroke are their own studio outline, smoothed, whole, 742's joining end then the studio's
+  straight cut. 618c's tail likewise from its tip round the bowl. 732.s0 copies 732i.s1, so its outline goes in its
+  own joint trims and 732i stays as approved. The user: "The fixes are approved".
 
 **Every joint trimmed to the studio edge**
 
