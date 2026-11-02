@@ -61,9 +61,11 @@ test("Find layouts offers a split and approving it draws the panel", async ({ pa
   await page.getByRole("checkbox", { name: "Show construction lines" }).uncheck();
   await expect.poll(async () => ((await getBlocks(page)).find((b) => b.id === id) as { starLines?: boolean }).starLines).toBe(false);
   const before = await inkPixels(page, await blockClientBox(page, id));
-  // a 4-fold offer: a larger star's text can lie outside the viewport, where no pixels are drawn to count
+  // a 4-fold offer; the star grows (its words fill a wedge several times), so the view is reset
+  // to bring its text back into the viewport, where alone pixels are drawn to count
   await offers.filter({ hasText: /^Fits: .*4-fold/ }).first().click();
   await expect.poll(async () => (await starOf(page, id))?.starRegions?.some((t) => t !== "")).toBe(true);
+  await page.getByRole("button", { name: "Reset view" }).click();
   await expect
     .poll(async () => inkPixels(page, await blockClientBox(page, id)), { timeout: 20_000 })
     .toBeGreaterThan(before + 200);

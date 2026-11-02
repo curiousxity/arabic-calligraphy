@@ -35,9 +35,11 @@ const num = (v: number) => String(Math.round(v * 100) / 100);
  * One SVG path `d`, in px, with its origin at the outline's top-left corner:
  * every region's inked cells traced with `cellRings` (local cells, mapped
  * through the region's frame, which only rotates, so ring winding is kept) and,
- * when `lines` is on, each construction line as a band one cell wide centred
- * on it. Bands wind the same way as the cell rings' outer rings, so a
- * **nonzero** fill draws their union and a hole inside a region stays a hole.
+ * when `lines` is on, each construction line as a band one cell wide
+ * (`StarConstruction.bands`: flush inside the region whose text stands on it,
+ * so line and feet are one stroke; else centred). Bands wind the same way as
+ * the cell rings' outer rings, so a **nonzero** fill draws their union and a
+ * hole inside a region stays a hole.
  *
  * `regionCells[i]` is region i's row-major ink (1 = ink), `mask.cols *
  * mask.rows` long, or null for no ink; a missing, null or wrongly sized entry
@@ -67,20 +69,6 @@ export function kufiStarPath(
     }
   }
 
-  if (lines) {
-    for (const [a, b] of c.lines) {
-      const len = Math.hypot(b.x - a.x, b.y - a.y);
-      if (len === 0) continue;
-      // Half a cell to the left of travel (y down): the same turn as the cell rings.
-      const nx = (-(b.y - a.y) / len) * 0.5, ny = ((b.x - a.x) / len) * 0.5;
-      const quad = [
-        { x: a.x - nx, y: a.y - ny },
-        { x: b.x - nx, y: b.y - ny },
-        { x: b.x + nx, y: b.y + ny },
-        { x: a.x + nx, y: a.y + ny },
-      ];
-      parts.push(`M${quad.map(px).join("L")}Z`);
-    }
-  }
+  if (lines) for (const quad of c.bands) parts.push(`M${quad.map(px).join("L")}Z`);
   return parts.join("");
 }

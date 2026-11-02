@@ -1,12 +1,12 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`packKufiRegion > measure, then pin: الله first packs in a 4-fold classic wedge at size 20, on three uprights 1`] = `
-"   .    .   
-   .    .   
-  ..    ..  
-  .###.#.#  
- ....#.#.#. 
- #####.#.#. 
- ..#.#.#.#. 
-##########.."
+exports[`packKufiRegion > measure, then pin: الله first packs in a 4-fold classic wedge at size 18, on three uprights, its feet on the base row 1`] = `
+"  .    .  
+  .    .  
+  ..  ..  
+ ####.#.# 
+ ...#.#.# 
+.####.#.#.
+.#..#.#.#.
+.########."
 `;

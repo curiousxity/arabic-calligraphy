@@ -130,6 +130,12 @@ export type KufiMask = { cols: number; rows: number; cells: Uint8Array };
 const BAND = 5;
 /** Most cells a row slice may grow by. */
 const ROW_MAX = 6;
+/**
+ * In a region, fewer: a stem meets the slanted side by a filler bar carrying it on (`barEnds`), so
+ * a word stays near its authored height and the next line's room is not stretched into (a
+ * stem grown by six left the third الله of a 4-fold wedge nowhere to go at sizes 31 to 38).
+ */
+const REGION_ROW_MAX = 2;
 /** Most cells a column slice may grow by. */
 const COL_MAX = 4;
 /** Longest straight join run beyond the overlapped stubs. */
@@ -139,6 +145,8 @@ const CLIMB_MIN = -4;
 const CLIMB_MAX = 3;
 /** A fill square must close at least this many windows (empty 2×2, or a double break in the frame). */
 const FILL_MIN = 3;
+/** In a region, the most cells a filler bar may carry a stem on by: longer reads as an antenna, not a lengthened alef. */
+const STEM_BAR_MAX = 6;
 
 /** Time a first draft's search may take. The editor runs it off the main thread; nothing waits on it. */
 export const PACK_BUDGET_MS = 1400;
@@ -337,11 +345,11 @@ function shapeOf(g: KufiGlyph, counts: number[]): Shape {
 }
 
 /** Every count vector a glyph may take: rows from their minimum to ROW_MAX, columns 0..COL_MAX. */
-function countVectors(g: KufiGlyph): number[][] {
+function countVectors(g: KufiGlyph, rowMax = ROW_MAX): number[][] {
   let out: number[][] = [[]];
   for (const s of g.stretch) {
     const lo = -(s.min ?? 0);
-    const hi = s.axis === "row" ? ROW_MAX : COL_MAX;
+    const hi = s.axis === "row" ? rowMax : COL_MAX;
     const next: number[][] = [];
     for (const v of out) for (let n = lo; n <= hi; n++) next.push([...v, n]);
     out = next;
@@ -390,7 +398,7 @@ function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins:
       list.flatMap((g) => {
         if (pin) return [shapeOf(g, normalCounts(g, pin.counts))];
         if (fixed) return [shapeOf(g, normalCounts(g, fixed))];
-        return countVectors(g).map((c) => shapeOf(g, c));
+        return countVectors(g, whole ? REGION_ROW_MAX : ROW_MAX).map((c) => shapeOf(g, c));
       });
     // a shape without the stub it joins by would break the word silently
     const joinsBy = (sh: Shape) => (!u.joinsNext || !!sh.lStub) && (!(i > 0 && units[i - 1].joinsNext) || !!sh.rStub);
@@ -622,30 +630,44 @@ type Ctx = {
 
 /**
  * A region's mask, read by the packer: cells outside it are off-panel (no ink, `at` and the
- * line tables give -1), and only windows wholly inside it can be holes. A region has no edge
- * rule: a panel's frame is lined by a baseline on every side, but a region's lines all stand
- * on its bottom row, so only its bottom edge carries a line of text and nothing lines its
- * slanted sides or the star's notch. Holding those to the frame's rule would leave nothing
- * packable.
+ * line tables give -1), and only windows clear of its slanted sides can be holes (`win`: a
+ * window with a cell of usable margin all round; the staircase a slanted side leaves is met by
+ * the letters' stems, and its pockets a cell or two wide stay paper). The edge rule holds
+ * on the region's bottom row only (`base`): that row lies on the construction line the text
+ * stands on, so the letters' feet line it as they line a panel's frame, and the drawn line
+ * and the feet are one stroke. A region's slanted sides and the star's notch carry no line of
+ * text, so they are not held to the frame's rule and may run to paper (holding them to it
+ * left nothing packable).
  */
 type Region = {
   cells: Uint8Array;
   /** Per line, `tabOf` with the cells outside the mask taken out. */
   tabs: Map<Line, Int32Array>;
-  /** 1 at a 2×2 window's top-left cell when all four of its cells are usable. */
+  /** 1 at a 2×2 window's top-left cell when it and a cell of margin all round are usable (below the bottom row counts). */
   win: Uint8Array;
+  /** Per column c, 1 when bottom-row cells c and c + 1 are both usable: a pair the edge rule holds. */
+  base: Uint8Array;
 };
 
 function regionOf(mask: KufiMask): Region {
   const { cols, rows, cells } = mask;
   const usable = (r: number, c: number) => r >= 0 && c >= 0 && r < rows && c < cols && cells[r * cols + c] === 1;
+  // a window is a hole only away from the slanted sides: with a cell of usable margin all round
+  // (below the bottom row counts as usable: the base edge is a frame, not a side)
+  const margin = (r: number, c: number) => (r >= rows && c >= 0 && c < cols) || usable(r, c);
   const win = new Uint8Array(cols * rows);
   for (let r = 0; r + 1 < rows; r++)
-    for (let c = 0; c + 1 < cols; c++) if (usable(r, c) && usable(r, c + 1) && usable(r + 1, c) && usable(r + 1, c + 1)) win[r * cols + c] = 1;
-  return { cells, tabs: new Map(), win };
+    for (let c = 0; c + 1 < cols; c++) {
+      let ok = true;
+      for (let dr = -1; dr <= 2 && ok; dr++) for (let dc = -1; dc <= 2 && ok; dc++) if (!margin(r + dr, c + dc)) ok = false;
+      if (ok) win[r * cols + c] = 1;
+    }
+  const base = new Uint8Array(cols);
+  for (let c = 0; c + 1 < cols; c++) if (usable(rows - 1, c) && usable(rows - 1, c + 1)) base[c] = 1;
+  return { cells, tabs: new Map(), win, base };
 }
 
-/** True when the 2×2 window at top-left i can be a hole: inside the panel, or wholly inside a region's mask. */
+/** True when the 2×2 window at top-left i can be a hole: inside the panel, or clear of a region's slanted sides (`Region.win`). */
 function inWindow(ctx: Ctx, i: number): boolean {
   return !ctx.region || ctx.region.win[i] === 1;
 }
@@ -1433,8 +1455,11 @@ function partialScore(ctx: Ctx, st: St): number {
     if (adj[a] && adj[b]) edge++;
     else if (mk[a] && mk[b]) soft += 0.6;
   };
-  // a region has no edge rule (see `Region`)
-  if (!ctx.region) {
+  // a region's edge rule holds on its bottom row only (see `Region`)
+  if (ctx.region) {
+    const b = (rows - 1) * cols;
+    for (let c = 0; c + 1 < cols; c++) if (ctx.region.base[c]) pair(b + c, b + c + 1);
+  } else {
     for (let c = 0; c + 1 < cols; c++) {
       pair(c, c + 1);
       pair((rows - 1) * cols + c, (rows - 1) * cols + c + 1);
@@ -1506,11 +1531,15 @@ function count2x2(ctx: Ctx, own: Int32Array, ink: boolean): number {
   return n;
 }
 
-/** Pairs of neighbouring frame cells both empty. A region has no edge rule (see `Region`), so none. */
+/** Pairs of neighbouring frame cells both empty; in a region, on its bottom row only (see `Region`). */
 function edgeBreaks(ctx: Ctx, own: Int32Array): number {
-  if (ctx.region) return 0;
   const { cols, rows } = ctx;
   let n = 0;
+  if (ctx.region) {
+    const b = (rows - 1) * cols;
+    for (let c = 0; c + 1 < cols; c++) if (ctx.region.base[c] && !own[b + c] && !own[b + c + 1]) n++;
+    return n;
+  }
   for (let c = 0; c + 1 < cols; c++) {
     if (!own[c] && !own[c + 1]) n++;
     const b = (rows - 1) * cols + c;
@@ -1556,8 +1585,13 @@ function dotZone(ctx: Ctx, st: St): Uint8Array {
   return z;
 }
 
-/** Lone squares, each closing at least FILL_MIN windows, beside a letter, never in a dot zone, and never within two cells of another. */
+/**
+ * Lone squares, each closing at least FILL_MIN windows, beside a letter, never in a dot zone, and
+ * never within two cells of another. None in a region: between repeated short words a lone
+ * square reads as a letter's dot, and a region's stems carry on to its sides instead (`barEnds`).
+ */
 function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array, nextId: number): number {
+  if (ctx.region) return 0;
   const { cols, rows } = ctx;
   const emptyAt = (r: number, c: number) => r < 0 || c < 0 || r >= rows || c >= cols || own[r * cols + c] === 0;
   const iso = (r: number, c: number) =>
@@ -1570,7 +1604,6 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
         const i = r0 * cols + c0;
         if (!own[i] && !own[i + 1] && !own[i + cols] && !own[i + cols + 1] && inWindow(ctx, i)) n++;
       }
-    if (ctx.region) return n; // a region has no frame breaks to close
     if (r === 0 || r === rows - 1) n += (c > 0 && !own[r * cols + c - 1] ? 1 : 0) + (c < cols - 1 && !own[r * cols + c + 1] ? 1 : 0);
     if (c === 0 || c === cols - 1) n += (r > 0 && !own[(r - 1) * cols + c] ? 1 : 0) + (r < rows - 1 && !own[(r + 1) * cols + c] ? 1 : 0);
     return n;
@@ -1579,7 +1612,7 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c;
-      if (own[i] || zone[i] || (ctx.region && !ctx.region.cells[i]) || !iso(r, c)) continue;
+      if (own[i] || zone[i] || !iso(r, c)) continue;
       const n = closes(r, c);
       if (n >= FILL_MIN) cand.push([i, n]);
     }
@@ -1622,6 +1655,11 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
  * letter's stroke runs straight on through the cell, from the side it would
  * run on to. So a bar draws a baseline or a stroke on along the line, never a
  * tail off the tip of a tall stroke.
+ *
+ * In a region (upright lines only) a bar may also carry an upright stroke
+ * straight on upward, to the slanted edge: an alef or lam lengthened to meet
+ * the region's side, as square-Kufi tilework does. No bar there runs along
+ * a stroke off the baseline (the heh's bars read as arms), nor downward.
  */
 function barEnds(ctx: Ctx, st: St): Uint8Array {
   const { cols, rows } = ctx;
@@ -1644,7 +1682,8 @@ function barEnds(ctx: Ctx, st: St): Uint8Array {
     const r = (i / cols) | 0;
     const c = i - r * cols;
     const li = st.letter[i];
-    if (axis[i] === 0) out[i] |= (mine(r, c + 1, li) ? 1 : 0) | (mine(r, c - 1, li) ? 2 : 0);
+    if (ctx.region) out[i] |= mine(r + 1, c, li) && !mine(r - 1, c, li) ? 4 : 0;
+    else if (axis[i] === 0) out[i] |= (mine(r, c + 1, li) ? 1 : 0) | (mine(r, c - 1, li) ? 2 : 0);
     else out[i] |= (mine(r + 1, c, li) ? 4 : 0) | (mine(r - 1, c, li) ? 8 : 0);
   }
   return out;
@@ -1673,7 +1712,13 @@ function barPass(ctx: Ctx, own: Int32Array, ends: Uint8Array, kind: Uint8Array, 
     for (let r = Math.max(0, r0); r <= Math.min(rows - 2, r1); r++)
       for (let c = Math.max(0, c0); c <= Math.min(cols - 2, c1); c++)
         if (paper(r, c) && paper(r + 1, c) && paper(r, c + 1) && paper(r + 1, c + 1) && inWindow(ctx, r * cols + c)) n++;
-    if (ctx.region) return n; // a region has no frame breaks
+    if (ctx.region) {
+      // a region's only frame is its bottom row
+      const base = ctx.region.base;
+      if (rows - 1 >= r0 && rows - 1 <= r1)
+        for (let c = Math.max(0, c0); c <= Math.min(cols - 2, c1); c++) if (base[c] && paper(rows - 1, c) && paper(rows - 1, c + 1)) n++;
+      return n;
+    }
     for (let c = Math.max(0, c0); c <= Math.min(cols - 2, c1); c++)
       for (const r of [0, rows - 1]) if (r >= r0 && r <= r1 && paper(r, c) && paper(r, c + 1)) n++;
     for (let r = Math.max(0, r0); r <= Math.min(rows - 2, r1); r++)
@@ -1712,6 +1757,8 @@ function barPass(ctx: Ctx, own: Int32Array, ends: Uint8Array, kind: Uint8Array, 
           const t0 = beyond(s - 1);
           const t1 = beyond(e + 1);
           if (t0 >= 0 && t1 >= 0 && own[t0] === own[t1]) e--;
+          // a region's upright bar carries a stem on (its lower end on the letter, `barEnds`), by so much at most
+          if (ctx.region && dir === 1 && e - s + 1 > STEM_BAR_MAX) s = e - STEM_BAR_MAX + 1;
           b = next;
           // a bar extends a letter: one touching none would float
           if (e - s + 1 < 2 || (beyond(s - 1) < 0 && beyond(e + 1) < 0)) continue;
@@ -2993,11 +3040,12 @@ export function packKufiPanel(input: {
 /**
  * Text packed into the usable cells of a mask on upright lines stacked from the bottom row up.
  * Same result shape as packKufiPanel (cols/rows are the mask's). The panel's grammar holds
- * inside the mask: no ink outside it, no solid 2×2, no empty 2×2 wholly inside it, upright
- * lines only, no U-turns. There is no edge rule: only a region's bottom edge carries a line of
- * text, so its other edges (the slanted sides, the notch) are not held to the frame's rule and
- * may run to paper. No edits, pins or suggestions: a region's size is the star's, not the
- * user's to pick here. Pure and deterministic, on PACK_BUDGET_MS / PACK_WORK.
+ * inside the mask: no ink outside it, no solid 2×2, no empty 2×2 clear of the slanted sides,
+ * upright lines only, no U-turns. The edge rule holds on the bottom row alone (the base edge
+ * the text stands on, see `Region`); the other edges (the slanted sides, the notch) carry no
+ * line of text, are not held to the frame's rule and may run to paper. Fillers are bars only
+ * (`fillPass`, `barEnds`). No edits, pins or suggestions: a region's size is the star's, not
+ * the user's to pick here. Pure and deterministic, on PACK_BUDGET_MS / PACK_WORK.
  */
 export function packKufiRegion(input: { text: string; mask: KufiMask }): KufiPackResult {
   regionPackCount++;

@@ -560,10 +560,13 @@ export const KUFI_FORMS: KufiFormTable = {
       g("allah.isolated.0", 0, ["###.#.#.#", "#.#.#.#.#", "#.#.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }, { axis: "col", index: 3 }]),
       g("allah.isolated.1", 0, ["....#.#.#", "....#.#.#", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }, { axis: "col", index: 3 }]),
       g("allah.isolated.2", 0, ["###.#.#.#", "..#.#.#..", "###.#.#.#", "#.#.#.#.#", "#######.#"], [{ axis: "row", index: 3 }, { axis: "col", index: 3 }], undefined, { parts: 3 }),
-      // the heh hangs off the second lam, so three uprights stand (alef, lam, lam), not four
-      g("allah.isolated.3", 0, ["###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 3 }, { axis: "col", index: 3 }], undefined, { regionOnly: true }),
+      // the heh hangs off the second lam, so three uprights stand (alef, lam, lam), not four; the
+      // word widens through the heh's box (column 1: its bars grow, its counter stays one row), the
+      // one column that widens without a hole, so a word can fill the end of a wedge's line (a
+      // wide heh is how square Kufi stretches the word; without it one الله fills no wedge at 21-25)
+      g("allah.isolated.3", 0, ["###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 3 }, { axis: "col", index: 1 }], undefined, { regionOnly: true }),
       // the same under the bar of its shadda and dagger alef, one gap above the word
-      g("allah.isolated.4", 0, ["#######", ".......", "###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 5 }, { axis: "col", index: 3 }], undefined, { parts: 2, regionOnly: true }),
+      g("allah.isolated.4", 0, ["#######", ".......", "###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 5 }, { axis: "col", index: 1 }], undefined, { parts: 2, regionOnly: true }),
     ],
   },
 };

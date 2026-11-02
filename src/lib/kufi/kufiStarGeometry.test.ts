@@ -150,7 +150,7 @@ describe.each(FOLDS)("star construction, %i-fold", (fold) => {
     }
   });
 
-  it("keeps every usable cell inside its polygon by at least one cell", () => {
+  it("keeps every usable cell inside its polygon, a cell clear of every side but the base edge", () => {
     for (const r of c.regions) {
       const { cols, rows, cells } = r.mask;
       expect(cells.length).toBe(cols * rows);
@@ -159,14 +159,15 @@ describe.each(FOLDS)("star construction, %i-fold", (fold) => {
         for (let col = 0; col < cols; col++) {
           if (!cells[row * cols + col]) continue;
           usable++;
+          const at = (dc: number, dr: number) => ({
+            x: r.frame.origin.x + (col + dc) * r.frame.ux.x + (row + dr) * r.frame.uy.x,
+            y: r.frame.origin.y + (col + dc) * r.frame.ux.y + (row + dr) * r.frame.uy.y,
+          });
+          expect(pointInPolygon(at(0.5, 0.5), r.polygon)).toBe(true);
           for (const [dc, dr] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
-            const p = {
-              x: r.frame.origin.x + (col + dc) * r.frame.ux.x + (row + dr) * r.frame.uy.x,
-              y: r.frame.origin.y + (col + dc) * r.frame.ux.y + (row + dr) * r.frame.uy.y,
-            };
-            expect(pointInPolygon(p, r.polygon)).toBe(true);
-            const d = Math.min(...r.polygon.map((q, j) => distToSegment(p, q, r.polygon[(j + 1) % r.polygon.length])));
-            expect(d).toBeGreaterThanOrEqual(1 - 1e-6);
+            const p = at(dc, dr);
+            const sides = r.polygon.map((q, j) => (j === r.base ? Infinity : distToSegment(p, q, r.polygon[(j + 1) % r.polygon.length])));
+            expect(Math.min(...sides)).toBeGreaterThanOrEqual(1 - 1e-6);
           }
         }
       }
@@ -185,19 +186,35 @@ describe.each(FOLDS)("star construction, %i-fold", (fold) => {
     }
   });
 
-  it("points a wedge's down outward and a corner's down inward", () => {
+  it("points a wedge's down outward and a corner's down out through its base leg", () => {
     expect(c.regions[1].frame.uy.y).toBeCloseTo(-1, 9); // top wedge: outward is up
+    expect(c.regions[1].base).toBe(3);
     const co = c.regions[2 * n + 1];
-    const apex = co.polygon[1];
-    expect(co.frame.uy.x * apex.x + co.frame.uy.y * apex.y).toBeLessThan(0); // toward the centre
+    expect(co.base).toBe(1);
+    const [a, b] = [co.polygon[1], co.polygon[2]]; // the base leg: apex to ring corner, on the outline
+    expect(co.frame.uy.x * (b.x - a.x) + co.frame.uy.y * (b.y - a.y)).toBeCloseTo(0, 9); // across the leg
+    expect(co.frame.uy.x * a.x + co.frame.uy.y * a.y).toBeGreaterThan(0); // away from the centre
+    expect(c.regions[0].base).toBeNull();
   });
 
-  it("ends a wedge's mask one seam inside the ring edge", () => {
-    const r = c.regions[1];
-    const { origin, uy } = r.frame;
-    const vBottom = origin.x * uy.x + origin.y * uy.y + r.mask.rows;
-    expect(vBottom).toBeLessThanOrEqual(SIZE - 1 + 1e-6);
-    expect(vBottom).toBeGreaterThan(SIZE - 2);
+  it("ends a wedge's and a corner's mask on the base edge, with no seam there", () => {
+    for (const r of [c.regions[1], c.regions[2 * n + 1]]) {
+      if (r.mask.rows === 0) continue;
+      const { origin, uy } = r.frame;
+      const vBottom = origin.x * uy.x + origin.y * uy.y + r.mask.rows;
+      expect(vBottom).toBeCloseTo(SIZE, 6);
+    }
+  });
+
+  it("draws a base edge's band inside its region, one cell wide, clockwise", () => {
+    const w = c.regions[1];
+    const a = w.polygon[3], b = w.polygon[4];
+    const band = c.bands.find((q) => q.some((p) => Math.hypot(p.x - a.x, p.y - a.y) < 1e-6) && q.some((p) => Math.hypot(p.x - b.x, p.y - b.y) < 1e-6));
+    expect(band).toBeDefined();
+    const mid = { x: band!.reduce((s, p) => s + p.x, 0) / 4, y: band!.reduce((s, p) => s + p.y, 0) / 4 };
+    expect(pointInPolygon(mid, w.polygon)).toBe(true);
+    expect(area(band!)).toBeCloseTo(Math.hypot(b.x - a.x, b.y - a.y), 6);
+    for (const q of c.bands) expect(signedArea(q)).toBeGreaterThan(0);
   });
 
   it("narrows a wedge's mask inward", () => {

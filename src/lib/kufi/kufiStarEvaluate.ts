@@ -1,67 +1,83 @@
 /**
  * Evaluates a text for a Kufi star panel and offers ways to split it over
- * the regions (`.claude/rules/kufi-star.md`, "Evaluation"). Each pattern is
- * tried on every fold and each `STAR_KS` star, at every size from 12 to 60
- * (each size gives other masks, and some texts fit at one size only: الله in
- * a 5-fold wedge at 25); an offer fits at the first size where every region
- * with text packs.
+ * the regions (`.claude/rules/kufi-star.md`, "Evaluation"). A region is
+ * **filled**: its text is repeated as often as the region packs it (a wedge
+ * of a size-29 4-fold star holds الله twice, its corner once), as traditional
+ * panels repeat a short phrase to fill their fields; a corner that cannot
+ * hold its word even once stays pattern only. Each pattern is tried on every
+ * fold and each `STAR_KS` star over the sizes from `STAR_MIN_SIZE` up; an
+ * offer fits at a size where every wedge (and the centre, when it holds a
+ * word) packs, and a plan is offered at up to `FITS_PER_PLAN` growing sizes,
+ * the larger ones denser.
  *
- * Packs are slow (up to ~1.4 s each), so they are cached across calls by the
- * region's mask and the text (the mask is what fold, k, size and kind decide),
- * and the whole call is bounded: by `budgetMs` on the clock, or, under the
- * tests' clock override, by `STAR_EVAL_MAX_TRIES` packs, so a test's
- * answer never depends on machine load. The work runs likeliest first
- * (each fold's default star before its other one, repeat and alternate before run,
- * corners and centre), so a cut still leaves the best offers.
+ * Packs are slow (up to ~1.4 s each, failures slowest), so they are cached
+ * across calls by the region's mask and the text (the mask is what fold, k,
+ * size and kind decide), the repeat count is approached from an estimate
+ * (`FILL_FACTOR`) rather than from one, and the whole call is bounded: by
+ * `budgetMs` on the clock, or, under the tests' clock override, by
+ * `STAR_EVAL_MAX_TRIES` packs, so a test's answer never depends on machine
+ * load. The work runs likeliest first (`priority`: each plan's first fit on
+ * each fold's default star before second fits and the other star; repeat
+ * and alternate before run and centre; a plan whose packs keep failing is set
+ * aside), so a cut still leaves the best offers.
  * Pure: no React, no Konva, no `./harfbuzz`.
  */
-import { kufiClockOverridden, packKufiRegion, type KufiMask, type KufiPackResult } from "./kufiPack";
+import { kufiClockOverridden, kufiFormsOf, packKufiRegion, type KufiMask, type KufiPackResult } from "./kufiPack";
 import { defaultStarK, STAR_KS, starConstruction, type StarConstruction, type StarFold, type StarRegionKind } from "./kufiStarGeometry";
 import type { KufiStarInputs, KufiStarLayout } from "./kufiStarLayout";
 import { resolveKufiText } from "./kufiWords";
 
-export type KufiStarPattern = "repeat" | "alternate" | "run" | "corners" | "centre";
+export type KufiStarPattern = "repeat" | "alternate" | "run" | "centre";
 
 export type KufiStarOffer = {
-  /** What approving it sets. */
+  /** What approving it sets: the region texts carry their repeats ("الله الله"). */
   inputs: KufiStarInputs;
   pattern: KufiStarPattern;
   fits: boolean;
   /** Plain words: what goes where, and what does not fit. */
   note: string;
-  /** Summed over every region with text; size is `inputs.size`. */
-  quality: { squares: number; bars: number; size: number };
+  /** Summed over every region with text; `words` the placements drawn; size is `inputs.size`. */
+  quality: { squares: number; bars: number; words: number; size: number };
   /** The packed regions, for the preview (and the layout cache on approval). */
   layout: KufiStarLayout;
 };
 
 export type KufiStarEvaluation = {
   words: Array<{ text: string; drawable: boolean }>;
-  /** Fitting offers first, best first; then the closest that do not fit. At most `STAR_MAX_OFFERS`. */
+  /** Fitting offers first, densest first; then the closest that do not fit. At most `STAR_MAX_OFFERS`. */
   offers: KufiStarOffer[];
   /** What could not be offered, e.g. a run round a fold that needs more words. */
   notes: string[];
-  /** False when the budget ended the search before every pattern was tried. */
+  /** False when the budget ended the search before every plan was tried to the end. */
   complete: boolean;
 };
 
-export const STAR_MAX_OFFERS = 6;
+export const STAR_MAX_OFFERS = 8;
+/** Offers kept per fold and pattern, so one construction's sizes do not crowd out the other folds. */
+const OFFERS_PER_FOLD_PATTERN = 2;
 export const STAR_MIN_SIZE = 12;
 export const STAR_MAX_SIZE = 60;
-/** The size an offer takes when none of its texts fits a region at any size: a new star's. */
-const STAR_NO_FIT_SIZE = 24;
-const SIZE_STEP = 1;
-/**
- * The size scan stops after this many `tooShort` answers in a row. The
- * longest run measured before a fit is 3 (before regions took whole letters
- * only: الله, 4-fold classic wedge 21-23 then 24, 6-fold 29-31 then 32; الله
- * محمد on 6-fold alternative 37-39 then 40). The unit test pins today's fits.
- */
-const ROOMY_STOP = 5;
+/** Fits offered per plan and star: after one, the scan goes on until a size holds strictly more words (denser). */
+const FITS_PER_PLAN = 3;
 /** Under the clock override, the evaluation stops after this many packs (cache hits are free). */
-export const STAR_EVAL_MAX_TRIES = 120;
+export const STAR_EVAL_MAX_TRIES = 300;
 /** Pack results kept between calls. */
 const PACK_CACHE_LIMIT = 2000;
+/**
+ * The repeat count is first tried at `usable cells × FILL_FACTOR / the text's cells`: measured on
+ * الله in 4-fold wedges and corners (sizes 25 to 40), the slanted sides and the notch leave about
+ * that much of a region to letters. The search then steps up or down by one.
+ */
+const FILL_FACTOR = 0.6;
+/** A line of text and its gap row (`BAND` + 1). */
+const LINE_PITCH = 6;
+const FILL_MAX = 16;
+/** Packs a fill search may spend on one region and text. */
+const FILL_TRIES = 5;
+/** A plan that failed at this many sizes with room for its text, before its first fit, is set aside until the rest have had their turn. */
+const PATIENCE = 8;
+/** Among equally close misses the size nearest this (a new star's) is offered, so a plan nothing of which fits is not shown tiny or huge. */
+const STAR_NO_FIT_SIZE = 24;
 
 const FOLDS: StarFold[] = [4, 5, 6];
 const KIND_WORDS: Record<StarRegionKind, string> = {
@@ -72,6 +88,8 @@ const KIND_WORDS: Record<StarRegionKind, string> = {
 };
 
 const packCache = new Map<string, KufiPackResult>();
+const fills = new Map<string, number | null>();
+const areas = new Map<string, number>();
 const constructions = new Map<string, StarConstruction>();
 
 const maskKey = (m: KufiMask) => `${m.cols}x${m.rows}:${m.cells.join("")}`;
@@ -91,6 +109,17 @@ function letters(word: string): number {
   return resolveKufiText(word).units.reduce((n, u) => n + (u.skeleton === "allah" ? 4 : u.skeleton === "lamAlef" ? 2 : 1), 0);
 }
 
+/** The cells a text's letters take on a line, by their region forms' widths (plus a gap each) over a line's pitch. */
+function areaOf(text: string): number {
+  let a = areas.get(text);
+  if (a === undefined) {
+    const { units } = resolveKufiText(text);
+    a = Math.max(1, units.reduce((n, u) => n + ((kufiFormsOf(u, true)[0]?.rows[0]?.length ?? 1) + 1) * LINE_PITCH, 0));
+    areas.set(text, a);
+  }
+  return a;
+}
+
 /** The text split into words, each drawable when every character of it has a Kufi form. */
 export function kufiStarWords(text: string): Array<{ text: string; drawable: boolean }> {
   return text
@@ -102,15 +131,25 @@ export function kufiStarWords(text: string): Array<{ text: string; drawable: boo
     });
 }
 
-/** A pattern's region texts for one fold: index → text ("" for pattern only). */
-type Plan = { pattern: KufiStarPattern; regions: (fold: StarFold) => string[]; describe: string };
+const repeat = (text: string, n: number) => Array.from({ length: n }, () => text).join(" ");
+const times = (n: number) => (n > 1 ? ` ×${n}` : "");
 
-const blank = (fold: StarFold) => Array.from({ length: 1 + 3 * fold }, () => "");
+/**
+ * A pattern's base texts: per wedge (index 1..m), the corners' word (filled where there is
+ * room) and the centre's. `fill` repeats a wedge's text to fill it; a run never repeats.
+ */
+type Plan = {
+  pattern: KufiStarPattern;
+  late: boolean;
+  fill: boolean;
+  wedges: (fold: StarFold) => string[];
+  corner: string;
+  centre: string;
+  /** The note's opening, given the repeat count of the A wedges, the B wedges and the corners. */
+  describe: (nA: number, nB: number, nC: number) => string;
+};
+
 const isWedgeA = (i: number) => i % 2 === 1;
-
-function fillWedges(r: string[], fold: StarFold, a: string, b: string) {
-  for (let i = 1; i <= 2 * fold; i++) r[i] = isWedgeA(i) ? a : b;
-}
 
 /** Two words or more: the first half of the words in the A wedges, the rest in the B wedges, so a pair of neighbours reads in order. */
 function halves(words: string[]): [string, string] {
@@ -118,100 +157,101 @@ function halves(words: string[]): [string, string] {
   return [words.slice(0, h).join(" "), words.slice(h).join(" ")];
 }
 
-function wedgesBy(r: string[], fold: StarFold, words: string[]) {
-  if (words.length >= 2) {
-    const [a, b] = halves(words);
-    fillWedges(r, fold, a, b);
-  } else if (words.length === 1) fillWedges(r, fold, words[0], words[0]);
+function alternating(fold: StarFold, a: string, b: string): string[] {
+  const out: string[] = [""];
+  for (let i = 1; i <= 2 * fold; i++) out.push(isWedgeA(i) ? a : b);
+  return out;
 }
 
-function restOf(words: string[], pick: number): string[] {
-  return words.filter((_, i) => i !== pick);
+function corners(n: number, word: string): string {
+  return n > 0 ? `, ${word}${times(n)} in the corners` : "";
 }
 
-function plansFor(words: string[]): { early: Plan[]; late: Plan[]; runNeeds: (fold: StarFold) => number } {
+function plansFor(words: string[]): { plans: Plan[]; runNeeds: (fold: StarFold) => number } {
   const whole = words.join(" ");
-  const early: Plan[] = [
-    {
-      pattern: "repeat",
-      describe: `${whole} in every wedge`,
-      regions: (fold) => {
-        const r = blank(fold);
-        fillWedges(r, fold, whole, whole);
-        return r;
-      },
-    },
-  ];
+  let shortest = 0, longest = 0;
+  words.forEach((w, i) => {
+    if (letters(w) < letters(words[shortest])) shortest = i;
+    if (letters(w) > letters(words[longest])) longest = i;
+  });
+  const corner = words[shortest];
+  const plans: Plan[] = [];
+  // two words or more: the halves in turn is the likeliest split, so it goes first
   if (words.length >= 2) {
     const [a, b] = halves(words);
-    early.push({
+    plans.push({
       pattern: "alternate",
-      describe: `${a} and ${b} in turn round the wedges`,
-      regions: (fold) => {
-        const r = blank(fold);
-        fillWedges(r, fold, a, b);
-        return r;
-      },
+      late: false,
+      fill: true,
+      wedges: (fold) => alternating(fold, a, b),
+      corner,
+      centre: "",
+      describe: (nA, nB, nC) => `${a}${times(nA)} and ${b}${times(nB)} in turn round the wedges${corners(nC, corner)}`,
     });
   }
-  const late: Plan[] = [];
-  late.push({
+  plans.push({
+    pattern: "repeat",
+    late: false,
+    fill: true,
+    wedges: (fold) => alternating(fold, whole, whole),
+    corner,
+    centre: "",
+    describe: (nA, _nB, nC) => `${whole}${times(nA)} in every wedge${corners(nC, corner)}`,
+  });
+  plans.push({
     pattern: "run",
-    describe: "the words once round the wedges, clockwise from the top",
-    regions: (fold) => {
+    late: true,
+    fill: false,
+    wedges: (fold) => {
       const m = 2 * fold;
-      const r = blank(fold);
+      const r = [""];
       // m consecutive groups, the earlier ones a word longer when they do not divide evenly
       let at = 0;
       for (let g = 0; g < m; g++) {
         const take = Math.floor(words.length / m) + (g < words.length % m ? 1 : 0);
-        r[1 + g] = words.slice(at, at + take).join(" ");
+        r.push(words.slice(at, at + take).join(" "));
         at += take;
       }
       return r;
     },
+    corner,
+    centre: "",
+    describe: (_nA, _nB, nC) => `the words once round the wedges, clockwise from the top${corners(nC, corner)}`,
   });
   if (words.length >= 2) {
-    let shortest = 0, longest = 0;
-    words.forEach((w, i) => {
-      if (letters(w) < letters(words[shortest])) shortest = i;
-      if (letters(w) > letters(words[longest])) longest = i;
-    });
-    const cornerRest = restOf(words, shortest);
-    late.push({
-      pattern: "corners",
-      describe: `${words[shortest]} in the corners`,
-      regions: (fold) => {
-        const r = blank(fold);
-        for (let j = 1; j <= fold; j++) r[2 * fold + j] = words[shortest];
-        wedgesBy(r, fold, cornerRest);
-        return r;
-      },
-    });
-    const centreRest = restOf(words, longest);
-    late.push({
+    const rest = words.filter((_, i) => i !== longest);
+    const [a, b] = rest.length >= 2 ? halves(rest) : [rest[0], rest[0]];
+    plans.push({
       pattern: "centre",
-      describe: `${words[longest]} in the centre`,
-      regions: (fold) => {
-        const r = blank(fold);
-        r[0] = words[longest];
-        wedgesBy(r, fold, centreRest);
-        return r;
-      },
+      late: true,
+      fill: true,
+      wedges: (fold) => alternating(fold, a, b),
+      corner,
+      centre: words[longest],
+      describe: (nA, nB, nC) =>
+        `${words[longest]} in the centre, ${a === b ? `${a}${times(nA)} in every wedge` : `${a}${times(nA)} and ${b}${times(nB)} in turn round the wedges`}${corners(nC, corner)}`,
     });
   }
-  return { early, late, runNeeds: (fold) => 2 * fold - words.length };
+  return { plans, runNeeds: (fold) => 2 * fold - words.length };
 }
 
 class OutOfBudget extends Error {}
 
 type Clock = { tries: number; over: () => boolean };
 
-/** A region's pack, from the cache or packed now; only a real pack counts as a try, and none starts once the budget is spent. */
+const UNPACKED: KufiPackResult = { ok: false, reason: "tooLong", suggestions: [] };
+
+/**
+ * A region's pack, from the cache or packed now; only a real pack counts as a try, and none
+ * starts once the budget is spent. A region with fewer usable cells than half the text's area
+ * (`areaOf`, a generous measure: fits run from 0.57 to 0.9 of it) is too small without a pack,
+ * which would only fail slowly.
+ */
 function lookup(clock: Clock, mask: KufiMask, text: string): KufiPackResult {
   const key = `${maskKey(mask)}|${text}`;
   const hit = packCache.get(key);
   if (hit) return hit;
+  if (usableOf(mask) * 2 < areaOf(text)) return UNPACKED;
   if (clock.over()) throw new OutOfBudget();
   clock.tries++;
   const r = packKufiRegion({ text, mask });
@@ -220,78 +260,139 @@ function lookup(clock: Clock, mask: KufiMask, text: string): KufiPackResult {
   return r;
 }
 
-type Part = { kind: StarRegionKind; text: string };
+/** The usable cells of a mask. */
+function usableOf(mask: KufiMask): number {
+  let n = 0;
+  for (const v of mask.cells) n += v;
+  return n;
+}
 
-/** The distinct (kind, text) pairs of a region list: one pack serves every region of a kind. */
-function partsOf(c: StarConstruction, regions: string[]): Part[] {
-  const seen = new Set<string>();
-  const out: Part[] = [];
-  for (const r of c.regions) {
-    const text = regions[r.index] ?? "";
-    if (text.trim() === "") continue;
-    const id = `${r.kind}|${text}`;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push({ kind: r.kind, text });
+/** The repeat count a region is first tried at: by area, allowing for the slanted sides (`FILL_FACTOR`). */
+function estimate(mask: KufiMask, text: string): number {
+  return Math.max(1, Math.min(FILL_MAX, Math.floor((usableOf(mask) * FILL_FACTOR) / areaOf(text))));
+}
+
+/**
+ * How often `text` repeated fills `mask` (null: not even once). Starts at the
+ * estimate and steps by one, up from a `tooShort`, down from a `tooLong`,
+ * until it fits or the answer is bracketed or `FILL_TRIES` packs are spent.
+ * A miss counts against the plan (`fails`) only when the region had room:
+ * some count was too short, or the region's usable cells reach the text's
+ * area; a region too small for the text fails cheaply and says nothing.
+ */
+function fillCount(clock: Clock, mask: KufiMask, text: string, fails: { n: number }): number | null {
+  const key = `${maskKey(mask)}|${text}`;
+  if (fills.has(key)) return fills.get(key)!;
+  if (mask.cols === 0 || mask.rows === 0) {
+    fills.set(key, null);
+    return null;
   }
-  return out;
+  const seen = new Map<number, "ok" | "short" | "long">();
+  const probe = (r: number) => {
+    let s = seen.get(r);
+    if (s === undefined) {
+      const res = lookup(clock, mask, repeat(text, r));
+      s = res.ok ? "ok" : res.reason === "tooShort" ? "short" : "long";
+      seen.set(r, s);
+    }
+    return s;
+  };
+  let r = estimate(mask, text);
+  let best: number | null = null;
+  for (let i = 0; i < FILL_TRIES; i++) {
+    const s = probe(r);
+    if (s === "ok") {
+      best = r;
+      break;
+    } else if (s === "short") {
+      if (r >= FILL_MAX || seen.get(r + 1) === "long") break;
+      r++;
+    } else if (r === 1) {
+      // once is "too long" yet twice may pack (محمد in a 4-fold wedge at 29: one word leaves the
+      // line's end open, two fill it), so the room is tried once more before giving up
+      if (seen.has(2)) break;
+      r = 2;
+    } else {
+      if (seen.get(r - 1) === "short") break;
+      r--;
+    }
+  }
+  fills.set(key, best);
+  if (best === null && (usableOf(mask) >= areaOf(text) || [...seen.values()].includes("short"))) fails.n++;
+  return best;
 }
 
 function firstMask(c: StarConstruction, kind: StarRegionKind): KufiMask {
   return c.regions.find((r) => r.kind === kind)!.mask;
 }
 
-/**
- * The first size at which `text` packs a region of `kind`, or null. A region
- * that reports `tooShort` has more room than the text can fill, and larger
- * sizes mostly only add room, so `ROOMY_STOP` such answers in a row end the
- * scan. Fewer are not enough: runs of three `tooShort` before a fit have
- * been measured (see `ROOMY_STOP`).
- */
-const firstFits = new Map<string, number | null>();
-function firstFit(clock: Clock, fold: StarFold, k: number, kind: StarRegionKind, text: string): number | null {
-  const id = `${fold}/${k}|${kind}|${text}`;
-  if (firstFits.has(id)) return firstFits.get(id)!;
-  let found: number | null = null;
-  let roomy = 0;
-  for (let size = STAR_MIN_SIZE; size <= STAR_MAX_SIZE; size += SIZE_STEP) {
-    const mask = firstMask(constructionOf(fold, k, size), kind);
-    if (mask.cols === 0 || mask.rows === 0) continue;
-    const r = lookup(clock, mask, text);
-    if (r.ok) {
-      found = size;
-      break;
-    }
-    roomy = r.reason === "tooShort" ? roomy + 1 : 0;
-    if (roomy === ROOMY_STOP) break;
-  }
-  firstFits.set(id, found);
-  return found;
-}
+/** A plan laid out at one size: the region texts with their repeats, the packs, and which required regions did not pack. */
+type Attempt = { regions: string[]; layout: KufiStarLayout; missing: number; counts: { nA: number; nB: number; nC: number } };
 
-function layoutAt(clock: Clock, c: StarConstruction, regions: string[]): KufiStarLayout {
-  const out = c.regions.map((r) => {
-    const text = regions[r.index] ?? "";
-    if (text.trim() === "") return { text, result: null };
-    return { text, result: lookup(clock, firstMask(c, r.kind), text) };
-  });
-  return { regions: out, unpacked: out.flatMap((r, i) => (r.result && !r.result.ok ? [i] : [])) };
+function attempt(clock: Clock, plan: Plan, c: StarConstruction, fails: { n: number }): Attempt {
+  const wedges = plan.wedges(c.fold);
+  const regions: string[] = [];
+  const results: Array<KufiPackResult | null> = [];
+  const counts = { nA: 0, nB: 0, nC: 0 };
+  let missing = 0;
+  for (const r of c.regions) {
+    const base = r.kind === "centre" ? plan.centre : r.kind === "corner" ? plan.corner : (wedges[r.index] ?? "");
+    if (base.trim() === "") {
+      regions.push("");
+      results.push(null);
+      continue;
+    }
+    const mask = firstMask(c, r.kind);
+    if (r.kind === "corner" || (plan.fill && r.kind !== "centre")) {
+      // a corner is filled where there is room, so its misses count against no plan
+      const n = fillCount(clock, mask, base, r.kind === "corner" ? { n: 0 } : fails);
+      if (n !== null) {
+        const text = repeat(base, n);
+        regions.push(text);
+        results.push(lookup(clock, mask, text));
+        if (r.kind === "corner") counts.nC = n;
+        else if (r.kind === "wedgeA") counts.nA = n;
+        else counts.nB = n;
+      } else if (r.kind === "corner") {
+        // no room for the word: pattern only, not a failure
+        regions.push("");
+        results.push(null);
+      } else {
+        regions.push(base);
+        results.push(UNPACKED);
+        missing++;
+      }
+    } else {
+      const res = lookup(clock, mask, base);
+      regions.push(base);
+      results.push(res);
+      if (!res.ok) missing++;
+      else if (r.kind === "wedgeA") counts.nA = 1;
+      else if (r.kind === "wedgeB") counts.nB = 1;
+    }
+  }
+  const layout: KufiStarLayout = {
+    regions: regions.map((text, i) => ({ text, result: results[i] })),
+    unpacked: results.flatMap((res, i) => (res && !res.ok ? [i] : [])),
+  };
+  return { regions, layout, missing, counts };
 }
 
 function qualityOf(layout: KufiStarLayout, size: number) {
-  let squares = 0, bars = 0;
+  let squares = 0, bars = 0, words = 0;
   for (const r of layout.regions) {
     if (r.result?.ok) {
       squares += r.result.quality?.squares ?? 0;
       bars += r.result.quality?.bars ?? 0;
+      words += r.result.placements.length;
     }
   }
-  return { squares, bars, size };
+  return { squares, bars, words, size };
 }
 
 const KIND_ORDER: StarRegionKind[] = ["wedgeA", "wedgeB", "corner", "centre"];
 
-/** "محمد does not fit a wedge; الله does not fit a corner" (each text and kind once). */
+/** "محمد does not fit a wedge; الله does not fit the centre" (each text and kind once). */
 function misfits(c: StarConstruction, layout: KufiStarLayout): string {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -308,45 +409,115 @@ function misfits(c: StarConstruction, layout: KufiStarLayout): string {
   return out.join("; ");
 }
 
-/**
- * One offer for a plan on a fold and star: the first size where every part
- * packs; else, when some part never packs, the size where the parts that do
- * pack all pack (the smallest), so the preview shows them and the note names
- * the rest.
- */
-function offerFor(clock: Clock, plan: Plan, fold: StarFold, k: number): KufiStarOffer | null {
-  const regions = plan.regions(fold);
-  const parts = partsOf(constructionOf(fold, k, STAR_NO_FIT_SIZE), regions);
-  if (parts.length === 0) return null;
-  const firsts = parts.map((p) => firstFit(clock, fold, k, p.kind, p.text));
-  const known = firsts.filter((s): s is number => s !== null);
-  // When no part fits anywhere, the offer keeps a new star's size, so approving it still gives a usable panel.
-  const start = known.length ? Math.max(...known) : STAR_NO_FIT_SIZE;
-  const partsThatFit = parts.filter((_, i) => firsts[i] !== null);
-  // Every part that can fit, at one size: the first size from the latest first fit up.
-  let size = start;
-  for (let s = start; s <= STAR_MAX_SIZE; s += SIZE_STEP) {
-    const c = constructionOf(fold, k, s);
-    if (partsThatFit.every((p) => lookup(clock, firstMask(c, p.kind), p.text).ok)) {
-      size = s;
-      break;
-    }
-  }
+function offerOf(plan: Plan, fold: StarFold, k: number, size: number, a: Attempt): KufiStarOffer {
   const c = constructionOf(fold, k, size);
-  const layout = layoutAt(clock, c, regions);
-  const fits = layout.unpacked.length === 0;
+  const fits = a.missing === 0;
   const where = `${fold}-fold, ${k === STAR_KS[fold][0] ? "classic" : "alternative"} star, size ${size}`;
-  const note = fits ? `${plan.describe} (${where})` : `${plan.describe} (${where}): ${misfits(c, layout)}`;
-  return { inputs: { fold, k, size, regions }, pattern: plan.pattern, fits, note, quality: qualityOf(layout, size), layout };
+  const head = plan.describe(a.counts.nA, a.counts.nB, a.counts.nC);
+  const note = fits ? `${head} (${where})` : `${head} (${where}): ${misfits(c, a.layout)}`;
+  return { inputs: { fold, k, size, regions: a.regions }, pattern: plan.pattern, fits, note, quality: qualityOf(a.layout, size), layout: a.layout };
 }
 
-/** Fitting first; then fewer filler squares and bars; then the smaller size; the rest keep their search order. */
+/** One plan on one construction, scanning sizes upward; `best` is its closest miss so far. */
+type Task = {
+  plan: Plan;
+  fold: StarFold;
+  k: number;
+  size: number;
+  fits: number;
+  /** Words the last fit drew: the next fit must draw more. */
+  words: number;
+  fails: { n: number };
+  best: { size: number; a: Attempt } | null;
+  done: boolean;
+};
+
+/**
+ * Lower first: every fold's first fit (4-fold, then 5, then 6: a text whose packs fail slowly
+ * still gets one fold's fits inside the budget) before any second one, a default star's before
+ * the alternative star's, early plans before late, set-aside tasks last.
+ */
+function priority(t: Task): number {
+  const aside = t.fits === 0 && t.fails.n >= PATIENCE ? 100 : 0;
+  return aside + t.fits * 3 + FOLDS.indexOf(t.fold) + (t.k === defaultStarK(t.fold) ? 0 : 9) + (t.plan.late ? 20 : 0);
+}
+
+/** Advances a task by one size; returns the offer it found there, if any. */
+function step(clock: Clock, t: Task): KufiStarOffer | null {
+  if (t.size > STAR_MAX_SIZE) {
+    t.done = true;
+    return null;
+  }
+  const c = constructionOf(t.fold, t.k, t.size);
+  const fails = { n: 0 };
+  const a = attempt(clock, t.plan, c, fails);
+  if (fails.n > 0) t.fails.n++;
+  if (a.missing === 0) {
+    const offer = offerOf(t.plan, t.fold, t.k, t.size, a);
+    // a filled plan's next size worth packing is the first whose wedge estimate promises one more
+    // word (every size between would pack the same words again, slowly); a run tries each size
+    t.size++;
+    if (t.plan.fill) {
+      const base = t.plan.wedges(t.fold)[1];
+      while (t.size <= STAR_MAX_SIZE && estimate(firstMask(constructionOf(t.fold, t.k, t.size), "wedgeA"), base) <= a.counts.nA) t.size++;
+    }
+    // a fit no denser than the last is not another offer
+    if (offer.quality.words <= t.words) return null;
+    t.fits++;
+    t.words = offer.quality.words;
+    if (t.fits >= FITS_PER_PLAN) t.done = true;
+    return offer;
+  }
+  if (!t.best || a.missing < t.best.a.missing || (a.missing === t.best.a.missing && Math.abs(t.size - STAR_NO_FIT_SIZE) < Math.abs(t.best.size - STAR_NO_FIT_SIZE)))
+    t.best = { size: t.size, a };
+  t.size++;
+  return null;
+}
+
+/** Words drawn per region holding text: how densely an offer fills its panel, comparable across folds. */
+function density(o: KufiStarOffer): number {
+  const regions = o.inputs.regions.filter((t) => t !== "").length;
+  return regions ? o.quality.words / regions : 0;
+}
+
+/** Whether the offer's corners hold text (the reference panel's four filled corners). */
+function cornersFilled(o: KufiStarOffer): boolean {
+  return o.inputs.regions.slice(2 * o.inputs.fold + 1).some((t) => t !== "");
+}
+
+/**
+ * Fitting first; the classic stars before the alternative ones (the same split on the other
+ * star is nearly the same offer, and the panel can switch stars); corners filled before empty
+ * (a 4-fold star at 34 holds الله four times a wedge but nothing in its corners; at 28, twice
+ * and the corners too, which is the reference); then denser first, then fewer filler squares,
+ * then the smaller size; then the closest misses (fewer regions unpacked).
+ */
 function rank(a: KufiStarOffer, b: KufiStarOffer): number {
   if (a.fits !== b.fits) return a.fits ? -1 : 1;
   if (!a.fits) return a.layout.unpacked.length - b.layout.unpacked.length;
-  const qa = a.quality.squares + a.quality.bars, qb = b.quality.squares + b.quality.bars;
-  if (qa !== qb) return qa - qb;
+  const ca = a.inputs.k === defaultStarK(a.inputs.fold) ? 0 : 1, cb = b.inputs.k === defaultStarK(b.inputs.fold) ? 0 : 1;
+  if (ca !== cb) return ca - cb;
+  const fa = cornersFilled(a), fb = cornersFilled(b);
+  if (fa !== fb) return fa ? -1 : 1;
+  const da = density(a), db = density(b);
+  if (da !== db) return db - da;
+  if (a.quality.squares !== b.quality.squares) return a.quality.squares - b.quality.squares;
   return a.quality.size - b.quality.size;
+}
+
+/** The best `STAR_MAX_OFFERS` of the ranked offers, at most `OFFERS_PER_FOLD_PATTERN` per fold and pattern. */
+function pick(sorted: KufiStarOffer[]): KufiStarOffer[] {
+  const taken = new Map<string, number>();
+  const out: KufiStarOffer[] = [];
+  for (const o of sorted) {
+    const key = `${o.inputs.fold}|${o.pattern}`;
+    const n = taken.get(key) ?? 0;
+    if (n >= OFFERS_PER_FOLD_PATTERN) continue;
+    taken.set(key, n + 1);
+    out.push(o);
+    if (out.length >= STAR_MAX_OFFERS) break;
+  }
+  return out;
 }
 
 export function evaluateKufiStar(text: string, budgetMs: number): KufiStarEvaluation {
@@ -363,47 +534,48 @@ export function evaluateKufiStar(text: string, budgetMs: number): KufiStarEvalua
     over: () => (capped ? clock.tries >= STAR_EVAL_MAX_TRIES : performance.now() - t0 > budgetMs),
   };
 
-  const { early, late, runNeeds } = plansFor(drawn);
-  // first each fold's default star (`defaultStarK`), then its other one
-  const [first, other] = [0, 1];
-  const starOf = (fold: StarFold, ki: number) =>
-    ki === first ? defaultStarK(fold) : STAR_KS[fold].find((k) => k !== defaultStarK(fold));
-  const steps: Array<{ plans: Plan[]; ki: number }> = [
-    { plans: early, ki: first },
-    { plans: early, ki: other },
-    { plans: late, ki: first },
-    { plans: late, ki: other },
-  ];
+  const { plans, runNeeds } = plansFor(drawn);
+  const tasks: Task[] = [];
+  for (const plan of plans)
+    for (const fold of FOLDS) {
+      if (plan.pattern === "run" && runNeeds(fold) > 0) continue;
+      for (const k of STAR_KS[fold]) tasks.push({ plan, fold, k, size: STAR_MIN_SIZE, fits: 0, words: 0, fails: { n: 0 }, best: null, done: false });
+    }
   let complete = true;
   try {
-    for (const { plans, ki } of steps) {
-      for (const plan of plans) {
-        for (const fold of FOLDS) {
-          if (plan.pattern === "run" && runNeeds(fold) > 0) continue;
-          const k = starOf(fold, ki);
-          if (k === undefined) continue;
-          const offer = offerFor(clock, plan, fold, k);
-          if (offer) offers.push(offer);
-        }
-      }
+    for (;;) {
+      // the likeliest task next; among equals, round robin by the order above
+      let next: Task | null = null;
+      for (const t of tasks) if (!t.done && (!next || priority(t) < priority(next))) next = t;
+      if (!next) break;
+      const offer = step(clock, next);
+      if (offer) offers.push(offer);
+      // round robin: a stepped task goes behind its equals
+      tasks.splice(tasks.indexOf(next), 1);
+      tasks.push(next);
     }
   } catch (e) {
     if (!(e instanceof OutOfBudget)) throw e;
     complete = false;
+  }
+  // a plan that never fitted is offered at its closest miss, so the preview shows what does fit and the note the rest
+  for (const t of tasks) {
+    if (t.fits > 0) continue;
+    if (t.best) offers.push(offerOf(t.plan, t.fold, t.k, t.best.size, t.best.a));
   }
   for (const fold of FOLDS) {
     const more = runNeeds(fold);
     if (more > 0) notes.push(`Running the words round ${fold}-fold needs ${more} more word${more === 1 ? "" : "s"}`);
   }
 
-  // One offer per distinct split: the same regions on another construction is a different offer.
   const sorted = offers.map((o, i) => ({ o, i })).sort((a, b) => rank(a.o, b.o) || a.i - b.i).map((x) => x.o);
-  return { words, offers: sorted.slice(0, STAR_MAX_OFFERS), notes, complete };
+  return { words, offers: pick(sorted), notes, complete };
 }
 
 /** Tests only: forget every cached pack. */
 export function _resetKufiStarEvaluation(): void {
   packCache.clear();
-  firstFits.clear();
+  fills.clear();
+  areas.clear();
   constructions.clear();
 }

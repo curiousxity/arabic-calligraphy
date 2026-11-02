@@ -19,7 +19,13 @@ export type StarRegion = {
   polygon: Pt[];
   /** Local lattice frame: panel point = origin + col * ux + row * uy (unit vectors, local y down). */
   frame: { origin: Pt; ux: Pt; uy: Pt };
-  /** 1 = usable. The bottom row is the one along the ring edge for wedges and corners. */
+  /**
+   * The polygon edge (index i: polygon[i] to polygon[i + 1]) the text stands on: a wedge's ring
+   * edge, a corner's outer leg; null for the centre. It carries no seam, so the mask's bottom
+   * row lies on it and the letters' feet are the construction line there.
+   */
+  base: number | null;
+  /** 1 = usable. The bottom row is the one along the base edge for wedges and corners. */
   mask: { cols: number; rows: number; cells: Uint8Array };
 };
 
@@ -33,13 +39,22 @@ export type StarConstruction = {
   outline: Pt[];
   /** Every region edge, once. */
   lines: Array<[Pt, Pt]>;
+  /**
+   * The construction lines as bands one cell wide, clockwise (y down) quads: a band on a
+   * region's base edge or on the outline lies inside that region (the row the letters' feet
+   * stand on, so a line and the text standing on it are one stroke); every other band is
+   * centred on its edge, between the two seams.
+   */
+  bands: Pt[][];
 };
 
 /** Ring apothem over star-circle radius. */
 const RING_RATIO = 1.55;
-/** A usable cell lies at least this far inside its polygon: the one-cell seam. */
+/** A usable cell lies at least this far inside its polygon: the one-cell seam (none on the base edge). */
 const SEAM = 1;
 const EPS = 1e-6;
+/** A cell corner is tested a hair inside the base edge, which it lies exactly on. */
+const NUDGE = 1e-7;
 
 export const STAR_KS: Record<StarFold, number[]> = { 4: [3, 2], 5: [3, 2], 6: [4, 2] };
 
@@ -73,9 +88,10 @@ function distToSegment(p: Pt, a: Pt, b: Pt): number {
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
-function usablePoint(p: Pt, poly: Pt[]): boolean {
+function usablePoint(p: Pt, poly: Pt[], base: number | null): boolean {
   if (!pointInPolygon(p, poly)) return false;
   for (let i = 0; i < poly.length; i++) {
+    if (i === base) continue;
     if (distToSegment(p, poly[i], poly[(i + 1) % poly.length]) < SEAM - EPS) return false;
   }
   return true;
@@ -87,7 +103,7 @@ function usablePoint(p: Pt, poly: Pt[]): boolean {
  * whole-number ring edge sits on a grid line, and rotated copies get equal
  * masks), then trimmed to the rows and columns that hold a usable cell.
  */
-function buildFrameAndMask(polygon: Pt[], axes: { ux: Pt; uy: Pt }): Pick<StarRegion, "frame" | "mask"> {
+function buildFrameAndMask(polygon: Pt[], axes: { ux: Pt; uy: Pt }, base: number | null): Pick<StarRegion, "frame" | "mask"> {
   const { ux, uy } = axes;
   let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
   for (const p of polygon) {
@@ -104,16 +120,20 @@ function buildFrameAndMask(polygon: Pt[], axes: { ux: Pt; uy: Pt }): Pick<StarRe
     x: origin.x + c * ux.x + r * uy.x,
     y: origin.y + c * ux.y + r * uy.y,
   });
+  // a corner on the base edge is tested a hair up (local), inside the polygon
+  const probe = (c: number, r: number): Pt => ({
+    x: origin.x + c * ux.x + (r - NUDGE) * uy.x,
+    y: origin.y + c * ux.y + (r - NUDGE) * uy.y,
+  });
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (usablePoint(at(c, r), polygon) && usablePoint(at(c + 1, r), polygon) &&
-          usablePoint(at(c, r + 1), polygon) && usablePoint(at(c + 1, r + 1), polygon)) {
+      if (usablePoint(probe(c, r), polygon, base) && usablePoint(probe(c + 1, r), polygon, base) &&
+          usablePoint(probe(c, r + 1), polygon, base) && usablePoint(probe(c + 1, r + 1), polygon, base)) {
         cells[r * cols + c] = 1;
       }
     }
   }
-  // Trim to the usable extent: the seam leaves the outermost row (the one on the
-  // ring edge) empty, and the bottom row of the mask should be the row nearest it.
+  // Trim to the usable extent: the bottom row of the mask is the row on the base edge.
   let c0 = cols, c1 = -1, r0 = rows, r1 = -1;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -153,14 +173,15 @@ export function starConstruction(fold: StarFold, k: number, size: number): StarC
   const star: Pt[] = [];
   for (let i = 0; i < m; i++) star.push(tip(i), inner(i));
 
-  const specs: Array<{ kind: StarRegionKind; polygon: Pt[]; downDeg: number }> = [
-    { kind: "centre", polygon: star, downDeg: 90 },
+  const specs: Array<{ kind: StarRegionKind; polygon: Pt[]; downDeg: number; base: number | null }> = [
+    { kind: "centre", polygon: star, downDeg: 90, base: null },
   ];
   for (let i = 0; i < m; i++) {
     specs.push({
       kind: i % 2 === 0 ? "wedgeA" : "wedgeB",
       polygon: [inner(i - 1), tip(i), inner(i), ring(i), ring(i - 1)],
-      downDeg: tipDeg(i), // outward
+      downDeg: tipDeg(i), // outward: the text stands on the ring edge
+      base: 3,
     });
   }
   const outline: Pt[] = [];
@@ -170,7 +191,11 @@ export function starConstruction(fold: StarFold, k: number, size: number): StarC
     specs.push({
       kind: "corner",
       polygon: [ring(2 * j), apex, ring(2 * j + 1)],
-      downDeg: cornerDeg(j) + 180, // inward
+      // the text stands on the corner's outer leg ahead (clockwise), the outline side facing tip 2j + 2,
+      // so a corner's lattice is the next wedgeA's and its lines are the outline's (never the ring edge:
+      // a triangle filled from its hypotenuse holds one line and a sloped rest)
+      downDeg: cornerDeg(j) + 180 / n,
+      base: 1,
     });
   }
 
@@ -178,7 +203,8 @@ export function starConstruction(fold: StarFold, k: number, size: number): StarC
     index,
     kind: s.kind,
     polygon: s.polygon,
-    ...buildFrameAndMask(s.polygon, frameAxes(s.downDeg)),
+    base: s.base,
+    ...buildFrameAndMask(s.polygon, frameAxes(s.downDeg), s.base),
   }));
 
   const seen = new Set<string>();
@@ -195,7 +221,46 @@ export function starConstruction(fold: StarFold, k: number, size: number): StarC
     }
   }
 
-  return { fold, k, size, regions, outline, lines };
+  return { fold, k, size, regions, outline, lines, bands: lineBands(regions, outline) };
+}
+
+/** See `StarConstruction.bands`. */
+function lineBands(regions: StarRegion[], outline: Pt[]): Pt[][] {
+  const key = (p: Pt) => `${Math.round(p.x * 1e5)},${Math.round(p.y * 1e5)}`;
+  const edgeKey = (a: Pt, b: Pt) => [key(a), key(b)].sort().join("|");
+  const onOutline = (p: Pt) => outline.some((q, i) => distToSegment(p, q, outline[(i + 1) % outline.length]) < EPS);
+  const chosen = new Map<string, { quad: Pt[]; flush: boolean }>();
+  for (const r of regions) {
+    const poly = r.polygon;
+    const cx = poly.reduce((s, p) => s + p.x, 0) / poly.length, cy = poly.reduce((s, p) => s + p.y, 0) / poly.length;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len === 0) continue;
+      const id = edgeKey(a, b);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const flush = i === r.base || (onOutline(a) && onOutline(b) && onOutline(mid));
+      if (chosen.get(id)?.flush) continue;
+      // the unit normal into the region
+      let nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
+      if (nx * (cx - mid.x) + ny * (cy - mid.y) < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      const lo = flush ? 0 : -0.5, hi = flush ? 1 : 0.5;
+      const quad = [
+        { x: a.x + nx * lo, y: a.y + ny * lo },
+        { x: b.x + nx * lo, y: b.y + ny * lo },
+        { x: b.x + nx * hi, y: b.y + ny * hi },
+        { x: a.x + nx * hi, y: a.y + ny * hi },
+      ];
+      // clockwise in y down, as the cell rings' outer rings, so a nonzero fill draws the union
+      let area = 0;
+      for (let j = 0; j < 4; j++) area += quad[j].x * quad[(j + 1) % 4].y - quad[(j + 1) % 4].x * quad[j].y;
+      chosen.set(id, { quad: area < 0 ? quad.reverse() : quad, flush });
+    }
+  }
+  return Array.from(chosen.values(), (v) => v.quad);
 }
 
 /** The rotation (degrees, clockwise) taking region `from`'s frame onto region `to`'s; null if different kinds. */
