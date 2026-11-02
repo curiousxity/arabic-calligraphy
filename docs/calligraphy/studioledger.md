@@ -392,6 +392,12 @@ Times are minutes:seconds into the individual-letters lesson.
   every ha stroke of that outline (644.s3, 645.s3, 647.s3, 647r.s3, 649.s3, 653.s3, 657.s3, 658.s3, 661.s3, 661r.s3,
   662.s3, 666.s3, 667.s3, 674.s3, 675.s3, 676.s2, and the 24 strokes that copy them, 40 shapes in all) is its own
   studio outline, smoothed, whole. The user: "Approve all changes".
+- **Final ha and its like (2026-11-01):** the user: "692 starting stroke, 708, 709, 711 and 712 with all the similar
+  strokes. 710 just the ( left stroke". 708, 709, 711 and 712 are one stroke each, now its own studio outline,
+  smoothed, whole; so are the pair halves drawn with the same hump (113g, 296g, 464g, 516g, 665g; 516g's and 665g's
+  joining end then put back to the studio's straight cut, unsmoothed, which the rounding had taken off). 692's
+  starting stroke copies 673.s0, fixed there. 710's left bowl (s3) and the left end of its diagonal (s1), which 713
+  copies; its right foot left as it was. The user: "Approved the fixes".
 
 **Every joint trimmed to the studio edge**
 
