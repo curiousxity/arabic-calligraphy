@@ -418,6 +418,11 @@ Times are minutes:seconds into the individual-letters lesson.
   loop comes down into the base (and the edges near it) 12 stood past the studio: 298r, 279r, 292r, 286r, 290, 290r,
   291r, 300r, 289, 310, 293, 303. Those, with 292g, 301g (the ya's upturned left end) and 320g, are on the
   whole-outline method; shapes that copy their strokes follow. The user: "Approve the edits".
+- **380r, 391g and their like (2026-11-02):** the user: "380r, 391= need to be fixed". 380r's base end ran past the
+  studio's; 391g's tail start had loose slivers and its joining end stood past. The same faults across the variants:
+  the mim tail start (108g, 572g, 660g, 661g, 670g), the mim joining end (252g, 333g), the waw head's inner end
+  (395g, 569g, 515g, 664g, as 191g), and 448g, 452g, 462g. All on the whole-outline method. The user: "The fixes look
+  good".
 
 **Every joint trimmed to the studio edge**
 
