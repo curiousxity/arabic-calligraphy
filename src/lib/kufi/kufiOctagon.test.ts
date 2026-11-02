@@ -50,23 +50,50 @@ function solid2x2(ink: Uint8Array, N: number): Array<[number, number]> {
   return out;
 }
 
+/** The columns of a band's strokes: a word of الله's three uprights, `period` apart along the side. */
+const allahStrokes = (words: number, period = 8) => Array.from({ length: words }, (_, w) => [2, 4, 6].map((c) => c + period * w)).flat().filter((c) => c >= OCTAGON_DEPTH);
+
 describe("octagonGeometry", () => {
-  it("the line is the side less a band's depth; the centre is about a third of the square, of its parity, never wider than the interior less two", () => {
+  it("the line is the side less a band's depth; with no strokes the centre is half the square, of its parity, never wider than the interior less two", () => {
     expect(octagonGeometry(13)).toEqual({ size: 13, line: 7, width: 1, flat: 1 });
     expect(octagonGeometry(21)).toEqual({ size: 21, line: 15, width: 7, flat: 3 });
-    expect(octagonGeometry(29)).toEqual({ size: 29, line: 23, width: 9, flat: 3 });
-    expect(octagonGeometry(24)).toMatchObject({ line: 18, width: 8 });
+    expect(octagonGeometry(29)).toEqual({ size: 29, line: 23, width: 15, flat: 7 });
+    expect(octagonGeometry(24)).toEqual({ size: 24, line: 18, width: 10, flat: 4 });
     for (let n = OCTAGON_MIN_SIZE; n <= 60; n++) {
-      const g = octagonGeometry(n);
-      expect(g.width % 2).toBe(n % 2);
-      expect(g.width).toBeLessThanOrEqual(Math.max(n % 2, n - 2 * OCTAGON_DEPTH - 2));
-      expect(g.flat % 2).toBe(g.width % 2);
-      expect(g.flat).toBeLessThanOrEqual(g.width);
+      for (const strokes of [[], allahStrokes(Math.ceil(n / 8))]) {
+        const g = octagonGeometry(n, strokes);
+        expect(g.width % 2).toBe(n % 2);
+        expect(g.width).toBeLessThanOrEqual(Math.max(n % 2, n - 2 * OCTAGON_DEPTH - 2));
+        expect(g.width).toBeGreaterThanOrEqual(n % 2);
+        expect(g.flat % 2).toBe(g.width % 2);
+        expect(g.flat).toBeLessThanOrEqual(g.width);
+        expect(g.flat).toBeGreaterThanOrEqual(Math.min(1, g.width));
+      }
     }
   });
 
+  it("the strokes choose the centre: a 45-degree edge crosses the diagonal at a stroke, the octagon nearest half the square", () => {
+    // الله three times a side at 29: strokes at 6, 10, 12, 14, 18, 20, 22; column 10 (X = 8) gives flat + width = 18
+    expect(octagonGeometry(29, allahStrokes(3))).toEqual({ size: 29, line: 23, width: 13, flat: 5 });
+    // the same from either half of the band, and in any order
+    expect(octagonGeometry(29, [10])).toMatchObject({ width: 13, flat: 5 });
+    expect(octagonGeometry(29, [22, 18, 20])).toMatchObject({ width: 13, flat: 5 });
+    // column 12 alone (X = 4) names 7/3, beyond the quarter's slack from 14.5, so the ratio's own 15/7; the centre column names nothing
+    expect(octagonGeometry(29, [12])).toMatchObject({ width: 15, flat: 7 });
+    expect(octagonGeometry(29, [14])).toMatchObject({ width: 15, flat: 7 });
+    // four times a side at 37: 23/11 (column 10), 19/7 (12) and 13/5 (14) fit; 19 is nearest 18.5
+    expect(octagonGeometry(37, allahStrokes(4))).toMatchObject({ width: 19, flat: 7 });
+    // a stroke whose octagon would not fit the interior is passed over (21: column 6 names 13/5, wider than 7)
+    expect(octagonGeometry(21, allahStrokes(2))).toMatchObject({ width: 7, flat: 3 });
+    // an even square: strokes at odd X give an even sum, width and flat both even
+    expect(octagonGeometry(24, [9])).toMatchObject({ width: 8, flat: 4 });
+    // a stroke's octagon more than a quarter of the square from the aim is passed over for the ratio's own
+    // (الحمد لله at 33: strokes at 15 and 17 name 5/1; 7 and 9, 24 and 26 name octagons wider than 19)
+    expect(octagonGeometry(33, [7, 9, 15, 17, 24, 26])).toMatchObject({ width: 17, flat: 7 });
+  });
+
   it("the open centre is a stepped octagon, centred and four-fold; the diagonals are seams; a quarter turn maps the square onto itself", () => {
-    const g = octagonGeometry(29);
+    const g = { size: 29, line: 23, width: 9, flat: 3 };
     let open = 0;
     for (let y = 0; y < 29; y++)
       for (let x = 0; x < 29; x++) {
@@ -84,6 +111,11 @@ describe("octagonGeometry", () => {
     expect(octagonSeam(g, 28, 0)).toBe(true);
     expect(octagonBottomField(g, 14, 22)).toBe(true);
     expect(octagonBottomField(g, 14, 6)).toBe(false);
+    // 13 across with a flat of 5: widths 5, 7, 9, 11, 13 x 5, 11, 9, 7, 5
+    const g13 = octagonGeometry(29, allahStrokes(3));
+    let open13 = 0;
+    for (let y = 0; y < 29; y++) for (let x = 0; x < 29; x++) if (octagonOpen(g13, x, y)) open13++;
+    expect(open13).toBe(5 + 7 + 9 + 11 + 13 * 5 + 11 + 9 + 7 + 5);
     // four turns are the identity
     let p: [number, number] = [3, 7];
     for (let i = 0; i < 4; i++) p = octagonTurn(29, p[0], p[1]);
@@ -141,7 +173,7 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
       const l = packed(size, text);
       const g = l.geometry;
       const at = (x: number, y: number) => l.cells[y * size + x] === 1;
-      let lengthened = 0, onOctagon = 0;
+      let lengthened = 0, onOctagon = 0, onDiagonal = 0;
       for (let c = OCTAGON_DEPTH; c < g.line; c++) {
         // a stroke in the field above the band
         let y = size - OCTAGON_DEPTH;
@@ -152,18 +184,42 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
         const ends = octagonOpen(g, c, above) || octagonSeam(g, c, above);
         expect(ends, `${text} at ${size}, column ${c}`).toBe(true);
         if (octagonOpen(g, c, above)) onOctagon++;
+        else onDiagonal++;
         // a stroke touches nothing beside it on its way in
         for (let yy = y; yy < size - OCTAGON_BAND; yy++) {
           expect(at(c - 1, yy)).toBe(false);
           expect(at(c + 1, yy)).toBe(false);
         }
       }
-      expect(l.strokes).toEqual({ lengthened, onOctagon });
+      expect(l.strokes).toEqual({ lengthened, onOctagon, onDiagonal });
       expect(lengthened).toBeGreaterThan(0);
       for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (octagonOpen(g, x, y)) expect(at(x, y)).toBe(false);
     }
     // three الله a side: the middle word's strokes reach the octagon
     expect(packed(29, rep(ALLAH, 3)).strokes.onOctagon).toBeGreaterThan(0);
+  });
+
+  it("three الله a side at 29: the strokes' ends trace the octagon, the crossing stroke on its edge and the diagonal at once", () => {
+    const l = packed(29, rep(ALLAH, 3));
+    const g = l.geometry;
+    expect(g).toMatchObject({ width: 13, flat: 5 });
+    expect(l.strokes).toEqual({ lengthened: 7, onOctagon: 4, onDiagonal: 3 });
+    const at = (x: number, y: number) => l.cells[y * 29 + x] === 1;
+    /** The stroke in column `c` of the bottom field ends at row `y`: ink there, paper above. */
+    const endsAt = (c: number, y: number) => at(c, y) && !at(c, y - 1);
+    // under the flat side (columns 12 to 16, open to row 20) the strokes end at the same depth
+    expect(endsAt(12, 21)).toBe(true);
+    expect(endsAt(14, 21)).toBe(true);
+    // the crossing stroke, column 10: its next cell (10, 18) is open and lies on the diagonal
+    expect(endsAt(10, 19)).toBe(true);
+    expect(octagonOpen(g, 10, 18) && octagonSeam(g, 10, 18)).toBe(true);
+    // the left band's stroke at row 18 (the bottom's column 18 turned) ends at (9, 18): with (12, 21) and (10, 19)
+    // on one 45-degree line, the octagon's lower-left edge drawn by both fields' ends
+    expect(at(9, 18) && !at(10, 18) && at(5, 18)).toBe(true);
+    for (const [x, y] of [[12, 21], [10, 19], [9, 18]]) expect(x - y).toBe(-9);
+    // beyond the crossing the strokes end on the diagonal staircase: column 6 at the seam row, column 20 at row 21
+    expect(endsAt(6, 23) && octagonSeam(g, 6, 22)).toBe(true);
+    expect(endsAt(20, 21) && octagonSeam(g, 20, 20)).toBe(true);
   });
 
   it("a text that does not fill its line, or does not fit it, packs no square and says why", () => {

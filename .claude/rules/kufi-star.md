@@ -72,13 +72,31 @@ with its repeats, as the wedge regions carry theirs):
   nor a bar's middle. Short letters leave the space above them open: in
   the reference that space is the design, not a hole, so the empty-2x2
   rule holds inside the bands (the packer's) and not above them.
-- **The open centre** (`octagonGeometry`): a stepped octagon `width` cells
-  across, `CENTRE_RATIO` (0.33) of N rounded to N's parity (centred), never
-  wider than the interior less two; its corners cut so the flat sides are
-  `flat` cells (`FLAT_RATIO`, a regular octagon's side over its width, to
-  the width's parity). At 0.27 (the mosaic's proportion) the strokes' ends
-  did not read as an octagon at 29; at 0.33 they do, with the diagonal
-  staircases from its corners to the square's.
+- **The open centre** (`octagonGeometry(size, strokeCols)`): a stepped
+  octagon `width` cells across (N's parity, centred, never wider than the
+  interior less two), its corners cut so the flat sides are `flat` cells.
+  **The strokes choose it** (2026-11-02). A stroke's end on a 45° edge is at
+  Y = flat + width - |X| (doubled centred coordinates), its end on the
+  diagonal at Y = |X| + 2; where the edge crosses the diagonal *between* two
+  strokes, the strokes beyond the crossing stop at the diagonal short of the
+  edge and the next field has no strokes at those rows either, so the edge
+  is drawn by nothing and the centre reads as a plus (the 0.33 ratio at 29,
+  width 9: three strokes on each flat, the rest on the diagonals). So each
+  stroke names the octagon whose edge crosses the diagonal *at it*, flat +
+  width = 2|X| + 2 (the width nearest sum/√2 of N's parity, the flat the
+  rest, the pair nearer `FLAT_RATIO`); of those that fit and lie within
+  `CENTRE_SLACK` (a quarter of N) of `CENTRE_RATIO` (half) of N, the nearest
+  that aim is taken, the wider on a tie; with none, the ratio's own width
+  with a regular flat. The crossing stroke's end is then on the edge and the
+  diagonal at once, and the edge continues across the diagonal as the next
+  field's stroke ends: at 29 with الله ×3 (strokes 6, 10, 12, 14, 18, 20,
+  22) column 10 gives 13/5, its end (10, 19), the left band's (9, 18) and the
+  flat's corner (12, 21) on one 45° line. الله ×4 at 37 gives 19/7, the
+  Shahada at 31 15/7; الحمد لله at 33 has only far candidates and takes
+  17/7. The 45° staircase is one cell per column only where both fields
+  have strokes there; a word's gap and the heh's box leave inlets at the
+  octagon's vertices (the pinwheel's four bays), and محمد lengthens two
+  strokes a side, so its centre stays a square.
 - **Lines on** draws each band's base row solid where its feet leave a
   gap (`frame`, the outer ring only; a gap stays where closing it would make
   a solid 2x2), so the frame line and the feet are one stroke, as the
@@ -90,6 +108,8 @@ with its repeats, as the wedge regions carry theirs):
   dense tile with no octagon to speak of; three makes a square with a clear
   octagon and the diagonals drawn by stroke ends, which is why a new star is
   `الله الله الله` at 29. A side with more words gives denser strokes, nearer the reference.
+  Under the work-only clock الحمد لله packs a side at 33 (the browser's
+  clock found 37), the Shahada at 31, محمد at 25.
 - **Status.** The side's pack failing gives `unpacked: [0]` and
   `octagon: null`; the view draws the dashed square and the status says
   "doesn't fit a side at this size" (`tooLong`) or "leaves a side open"

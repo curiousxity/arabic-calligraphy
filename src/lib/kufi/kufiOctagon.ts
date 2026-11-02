@@ -21,12 +21,21 @@
  *   row, no bar at its top) runs on from the seam row straight inward through
  *   its band's field until the next cell is the open centre or a diagonal
  *   seam cell (the diagonals themselves stay paper, so the ends of two
- *   fields' strokes meet only at corners). Strokes near the middle of a side
- *   end on the octagon; the rest end on the diagonals, a staircase from the
- *   octagon's corner to the square's.
- * - **The open centre** is a stepped octagon `width` cells across (about 0.27
- *   N, the proportion of a 1444 tile-mosaic in a 2004 article on square Kufi
- *   principles), its corners cut so its flat sides are `flat` cells.
+ *   fields' strokes meet only at corners). Strokes under the octagon's flat
+ *   side all end at the same depth; the strokes beside them end one cell
+ *   deeper per column, the octagon's 45-degree edge, and the rest end on the
+ *   diagonals, a staircase from the octagon's corner to the square's.
+ * - **The open centre** is a stepped octagon `width` cells across, its
+ *   corners cut so its flat sides are `flat` cells, in the proportion of a
+ *   regular octagon. Its size is chosen from the band's strokes
+ *   (`octagonGeometry`): a 45-degree edge and a diagonal cross at one stroke
+ *   per field, the **crossing stroke**, whose end lies on both, so the
+ *   octagon's edge and the diagonal staircase are one line of stroke ends
+ *   (with the edge crossing between two strokes, the octagon read as a
+ *   cross: the strokes beyond the crossing stop at the diagonal short of the
+ *   edge, and the next field's strokes are not at those rows). Each stroke
+ *   names one such octagon; the one nearest `CENTRE_RATIO` (half) of the
+ *   square is taken, and that ratio alone decides where no stroke can.
  *
  * The lattice grammar (stroke = gap = one cell, no solid 2x2) holds over the
  * whole square; the space above a short letter and between lengthened
@@ -45,8 +54,10 @@ export const OCTAGON_DEPTH = OCTAGON_BAND + 1;
 /** The smallest square: a 7-cell line (one الله) and no interior but the centre cell. */
 export const OCTAGON_MIN_SIZE = 2 * OCTAGON_DEPTH + 1;
 export const OCTAGON_MAX_SIZE = 60;
-/** The open centre's width over the square's. */
-const CENTRE_RATIO = 0.33;
+/** The open centre's width over the square's: the aim among the strokes' octagons, the rule where there are none. */
+const CENTRE_RATIO = 0.5;
+/** How far from the aim, over the square's side, a stroke's octagon may be and still be taken. */
+const CENTRE_SLACK = 0.25;
 /** A regular octagon's side over its width. */
 const FLAT_RATIO = Math.SQRT2 - 1;
 
@@ -69,12 +80,54 @@ function nearestWithParity(v: number, like: number, min: number): number {
   return Math.max(min, pick);
 }
 
-export function octagonGeometry(size: number): KufiOctagonGeometry {
+/** A regular octagon's flat for `width`: nearest to `FLAT_RATIO` of it, of its parity, never wider. */
+function regularFlat(width: number): number {
+  return width <= 0 ? 0 : Math.min(width, nearestWithParity(FLAT_RATIO * width, width, 2 - (width % 2)));
+}
+
+/**
+ * The open centre of a square of `size` whose bottom band lengthens the
+ * strokes in columns `strokeCols` (any columns: the geometry is four-fold).
+ *
+ * In doubled centred coordinates (`centred`) a stroke's column is X, the
+ * diagonal seam it meets is at Y = |X|, so its end on the diagonal is at
+ * Y = |X| + 2, and the octagon's 45-degree edge puts the end of the stroke
+ * at Y = flat + width - |X|. The stroke is the crossing stroke of the
+ * octagon with flat + width = 2 |X| + 2: of that sum, the width is the
+ * square's parity nearest sum / sqrt 2 (the flat the rest), the pair
+ * nearest a regular octagon's proportion. Of the strokes' octagons that fit
+ * (never wider than the interior less two, so every stroke keeps a cell)
+ * and lie within `CENTRE_SLACK` of the square of `CENTRE_RATIO` of it, the
+ * one nearest that aim is taken, the wider on a tie; with none, the ratio's
+ * own width, a regular flat, capped the same way (the centre cell at 13).
+ */
+export function octagonGeometry(size: number, strokeCols: readonly number[] = []): KufiOctagonGeometry {
   const interior = size - 2 * OCTAGON_DEPTH;
-  // the centre: never wider than leaves every stroke at least one cell, never less than the centre cell
-  const width = Math.max(interior % 2 === 0 ? 0 : 1, Math.min(interior - 2, nearestWithParity(CENTRE_RATIO * size, size, 1)));
-  const flat = width <= 0 ? 0 : Math.min(width, nearestWithParity(FLAT_RATIO * width, width, 2 - (width % 2)));
-  return { size, line: size - OCTAGON_DEPTH, width, flat };
+  const maxWidth = Math.max(interior % 2 === 0 ? 0 : 1, interior - 2);
+  const aim = CENTRE_RATIO * size;
+  let best: { width: number; flat: number } | null = null;
+  for (const c of strokeCols) {
+    const X = Math.abs(2 * c - (size - 1));
+    if (X === 0) continue;
+    const sum = 2 * X + 2;
+    // the stroke's octagon: of the two widths of the square's parity about sum / sqrt 2, the pair nearer a regular octagon
+    let own: { width: number; flat: number } | null = null;
+    const lo = Math.floor(sum / Math.SQRT2);
+    for (const width of [nearestWithParity(lo, size, 0), nearestWithParity(lo + 1, size, 0)]) {
+      const flat = sum - width;
+      if (width < 1 || flat < 1 || flat > width || width > maxWidth) continue;
+      if (!own || Math.abs(flat / width - FLAT_RATIO) < Math.abs(own.flat / own.width - FLAT_RATIO)) own = { width, flat };
+    }
+    if (!own) continue;
+    const d = Math.abs(own.width - aim), dBest = best ? Math.abs(best.width - aim) : Infinity;
+    if (d > CENTRE_SLACK * size) continue;
+    if (d < dBest || (d === dBest && best && own.width > best.width)) best = own;
+  }
+  if (!best) {
+    const width = Math.max(interior % 2 === 0 ? 0 : 1, Math.min(maxWidth, nearestWithParity(aim, size, 1)));
+    best = { width, flat: regularFlat(width) };
+  }
+  return { size, line: size - OCTAGON_DEPTH, ...best };
 }
 
 /** Doubled centred coordinate of cell index `i` (odd for an even size, even for an odd one). */
@@ -118,8 +171,12 @@ export type KufiOctagonLayout = {
   frame: Uint8Array;
   /** The bottom band's packing (the other three are its turns). */
   band: Extract<KufiPackResult, { ok: true }>;
-  /** Tall strokes lengthened per side, and how many of them end on the octagon rather than a diagonal. */
-  strokes: { lengthened: number; onOctagon: number };
+  /**
+   * Tall strokes lengthened per side; how many end on the octagon (the next
+   * cell open: under a flat side or on a 45-degree edge) and how many on a
+   * diagonal beyond the crossing stroke, the staircase to the square's corner.
+   */
+  strokes: { lengthened: number; onOctagon: number; onDiagonal: number };
 };
 
 /**
@@ -148,20 +205,22 @@ export function layoutKufiOctagon(size: number, text: string): { layout: KufiOct
 
 /** The square built on one side's packing (`octagonBandMask(size)`): the four turns and the lengthened strokes. */
 export function octagonFromBand(size: number, band: Extract<KufiPackResult, { ok: true }>): KufiOctagonLayout {
-  const g = octagonGeometry(size);
-  const N = size, L = g.line;
+  const N = size, L = size - OCTAGON_DEPTH;
   const cells = new Uint8Array(N * N);
   const quarter = new Uint8Array(N * N); // the bottom band and its field
   const ink = (x: number, y: number) => band.cells[y * L + x] === 1;
   // the bottom band's letters, feet on the bottom edge
   for (let r = 0; r < OCTAGON_BAND; r++)
     for (let c = 0; c < L; c++) if (ink(c, r)) quarter[(N - OCTAGON_BAND + r) * N + c] = 1;
-  // its tall strokes, lengthened inward: a column under the interior whose top cell is an upright
-  const strokes = { lengthened: 0, onOctagon: 0 };
-  for (let c = OCTAGON_DEPTH; c < L; c++) {
-    const r0 = strokeTop(band.cells, L, c);
-    if (r0 === null) continue;
-    let y = N - OCTAGON_BAND + r0 - 1;
+  // its tall strokes: a column under the interior whose top cell is an upright on the band's top row
+  // (a shorter upright's run would start inside the band, outside its field, so it stays as drawn)
+  const strokeCols: number[] = [];
+  for (let c = OCTAGON_DEPTH; c < L; c++) if (strokeTop(band.cells, L, c) === 0) strokeCols.push(c);
+  const g = octagonGeometry(size, strokeCols);
+  // lengthened inward from the seam row until the next cell is the open centre or a diagonal seam cell
+  const strokes = { lengthened: 0, onOctagon: 0, onDiagonal: 0 };
+  for (const c of strokeCols) {
+    let y = N - OCTAGON_DEPTH;
     let n = 0;
     while (y >= 0 && octagonBottomField(g, c, y) && !octagonOpen(g, c, y)) {
       quarter[y * N + c] = 1;
@@ -171,6 +230,7 @@ export function octagonFromBand(size: number, band: Extract<KufiPackResult, { ok
     if (n > 0) {
       strokes.lengthened++;
       if (y >= 0 && octagonOpen(g, c, y)) strokes.onOctagon++;
+      else if (y >= 0 && octagonSeam(g, c, y)) strokes.onDiagonal++;
     }
   }
   // the frame: the base row's gaps, where closing one makes no solid 2x2
