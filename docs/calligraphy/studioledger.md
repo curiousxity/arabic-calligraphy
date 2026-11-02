@@ -375,6 +375,9 @@ Times are minutes:seconds into the individual-letters lesson.
   the curl and at the tip. Seven strokes hold it (481.s0, 482.s2, 483.s0, 484.s0, 486.s0, 489.s0, 490.s2); 485, 487,
   488 and the pair 445 copy one of them. Over the right 60 units of each, the ink is the stroke's own studio outline,
   smoothed. The user: "Both the redraws and pages look good".
+- **574, 577 and 578 (2026-11-01):** the user: "574 fix the dip. 577=. 578 (". 574's dip sagged past the studio's
+  and came to a point; 577's tail had a bump on its top edge; 578's head stood out on its left side with a notch
+  inside. Each is the stroke's own studio outline, smoothed, over that part. The user: "Approved 574, 577 and 578".
 
 **Every joint trimmed to the studio edge**
 
