@@ -437,6 +437,10 @@ Times are minutes:seconds into the individual-letters lesson.
   studio inside the peak, at the right end and along the start. Checking all 27 medial ba shapes found the same in
   078, 085, 081 and 084. All on the whole-outline method. The user: "All approved". With these the final review of
   all 353 pages is done.
+- **151 (2026-11-02):** found while reviewing the joins, where this dal's long stroke meets a mim. Its left edge
+  ran a little wider than the studio's from near the top to below the middle, and the extra width stopped short,
+  leaving a small step. The whole strip outside the studio's edge is trimmed, so it tapers out at both ends. The
+  user: "agree".
 
 **Every joint trimmed to the studio edge**
 
