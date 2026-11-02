@@ -26,9 +26,9 @@ clock-override rules all hold here.
 `size / RING_RATIO` (1.55). `STAR_KS` offers two stars per fold, the classic
 first (`{8/3}`, `{10/3}`, `{12/4}`) and one alternative (`k` = 2), to keep the
 evaluation inside its budget. `defaultStarK(fold)` is the star a new panel or a
-fold change starts on: the classic one, except **4-fold starts on the
-alternative**, because الله fits the 4-fold classic wedge at no size up to 60
-once the region uses whole letters only (below).
+fold change starts on: the classic one. (It started 4-fold on the
+alternative while the region's only الله forms were too tall for the classic
+wedge; the region's own الله forms, below, fit both.)
 
 **Region indexing.** 0 is the centre star; 1..m are the wedges clockwise from
 the top, **odd indices are `wedgeA`**, even `wedgeB`; m+1..m+n are the corners
@@ -60,15 +60,23 @@ it), and its bottom row is the one along the ring edge. **A mask can be
   after the frame rule left nothing packable at any size up to 60.
   Consequence: one short word sits against the outer edge and the inner part
   is sparse; محمد packs no wedge alone and no corner packs either word.
-- **Whole letters only** (`lettersOf(..., whole)`). A region drops every
-  glyph authored in more than one piece (`parts` > 1): today that is
-  `allah.isolated.2`, the five-row الله whose alef is a short stroke with a
-  square above it. A panel's frame holds that form together; in a wedge it
-  read as a broken alef (the user's call, 2026-11-01, checked against a
-  square-Kufi reference). Panels still use it. Cost: الله needs its 7-row
-  forms, so it first packs a wedge at 4-fold alternative 23, 5-fold 27,
-  6-fold classic 32 and 6-fold alternative 30, never in the 4-fold classic
-  wedge.
+- **A region's own letter forms** (`kufiFormsOf(unit, true)`). A glyph
+  marked `regionOnly` is drawn only in regions, and where a letter has such
+  forms they replace its panel forms there; a rectangular panel never takes
+  them, so its tuned layouts are unchanged. Today that is الله:
+  `allah.isolated.3` (five rows, three uprights, the heh hanging off the
+  second lam, as in square-Kufi references) and `allah.isolated.4` (the same
+  under the bar of its shadda and dagger alef, one gap above). The panel
+  forms put the heh on a stem of its own, four equal uprights that read as
+  "اللله" in a wedge (second opinion and the user, 2026-11-01). The packer
+  picks: the barred form where a wedge has room (5-fold from 27, 6-fold
+  from 28), never in a 4-fold wedge (about 8 rows deep at the sizes that
+  fit, and the form does not shorten). First fits: 4-fold 20 (both stars),
+  5-fold 22, 6-fold 26.
+- **Otherwise whole letters only** (`drawnWhole`). A letter without region
+  forms drops every glyph drawn in more than one piece, except a piece that
+  is a full-width bar over a gap row (the barred الله). The gapped-alef
+  `allah.isolated.2` read as a broken alef in a wedge.
 - **Filler bars may still end on a letter's baseline** in a region, as in a
   panel, so the word stands on a bar running the width of the wedge.
   Forbidding that was tried: nothing packed at any size, because only a
@@ -132,7 +140,7 @@ tries each **pattern** on every fold and each `STAR_KS` star:
   (`ROOMY_STOP`: the region has more room than the text fills). The longest
   run measured before a fit is three (الله: 21-23 on 4-fold, 29-31 on 6-fold),
   so fewer would cut real fits off; a unit test pins الله's first fits
-  (4-fold alternative 23, 5-fold classic 27, 6-fold classic 32).
+  (4-fold 20, 5-fold 22, 6-fold 26, all classic).
   Small sizes pack in milliseconds, so the scan up to the first fit is cheap;
   "الله" evaluates in about 0.3 s, and "الله محمد" stops on the 9 s budget
   with six offers. An offer fits

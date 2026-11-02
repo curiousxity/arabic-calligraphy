@@ -43,13 +43,9 @@ const EPS = 1e-6;
 
 export const STAR_KS: Record<StarFold, number[]> = { 4: [3, 2], 5: [3, 2], 6: [4, 2] };
 
-/**
- * The star a new panel (or a fold change) starts on: the classic one, except
- * 4-fold, whose classic wedge no size up to 60 fits الله in (its full-height
- * form; see kufi-star.md), so it starts on the alternative.
- */
+/** The star a new panel (or a fold change) starts on: the classic one. */
 export function defaultStarK(fold: StarFold): number {
-  return fold === 4 ? STAR_KS[4][1] : STAR_KS[fold][0];
+  return STAR_KS[fold][0];
 }
 
 const polar = (r: number, deg: number): Pt => {

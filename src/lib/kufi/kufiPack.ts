@@ -349,10 +349,17 @@ function countVectors(g: KufiGlyph): number[][] {
   return out;
 }
 
-/** The alternates a unit may take: its joining form's list, else the isolated one. The packer's rule, shared with the canvas. */
-export function kufiFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">): KufiGlyph[] {
+/**
+ * The alternates a unit may take: its joining form's list, else the isolated one. The packer's rule, shared with the canvas.
+ * A star region (`region`) takes a letter's region-only forms where it has them, else its forms drawn whole;
+ * a rectangular panel never takes the region-only forms.
+ */
+export function kufiFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">, region = false): KufiGlyph[] {
   const table = KUFI_FORMS as Record<string, Partial<Record<JoiningForm, KufiGlyph[]>>>;
-  return table[unit.skeleton]?.[unit.form] ?? table[unit.skeleton]?.isolated ?? [];
+  const all = table[unit.skeleton]?.[unit.form] ?? table[unit.skeleton]?.isolated ?? [];
+  if (!region) return all.filter((g) => !g.regionOnly);
+  // a letter authored for regions (الله on three uprights) replaces the panel's forms there
+  return all.some((g) => g.regionOnly) ? all.filter((g) => g.regionOnly) : all.filter(drawnWhole);
 }
 
 /** The applied counts, padded to the glyph's slices; values outside the table's limits are clamped. */
@@ -363,10 +370,16 @@ function normalCounts(g: KufiGlyph, counts: number[]): number[] {
   });
 }
 
+/** One piece, or two where the second is a full-width bar over a gap row (the shadda bar of الله). */
+function drawnWhole(g: KufiGlyph): boolean {
+  const parts = g.parts ?? 1;
+  return parts === 1 || (parts === 2 && /^#+$/.test(g.rows[0]) && /^\.+$/.test(g.rows[1]));
+}
+
 function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins: Map<number, Pin>, whole = false): Letter[] {
   return units.map((u, i) => {
     // a region has no frame to hold a letter drawn in pieces together: there الله's gapped alef reads broken
-    const all = whole ? kufiFormsOf(u).filter((g) => (g.parts ?? 1) === 1) : kufiFormsOf(u);
+    const all = kufiFormsOf(u, whole);
     const pin = pins.get(i) ?? null;
     const form = edits.forms?.[i];
     const fixed = edits.stretch?.[i];

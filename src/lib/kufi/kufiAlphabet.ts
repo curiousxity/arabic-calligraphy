@@ -68,9 +68,10 @@
  * keeps its dot inside the hook. Dots are not part of the glyph's ink: the
  * 4-connectivity and piece counts below are of the body alone.
  *
- * One glyph is drawn in more than one piece: the الله whose alef is a short
- * stroke with one square above it. It says so in `parts`; every other glyph
- * is a single 4-connected piece.
+ * Two glyphs are drawn in more than one piece: the الله whose alef is a short
+ * stroke with one square above it, and the الله under the bar of its shadda
+ * and dagger alef. They say so in `parts`; every other glyph is a single
+ * 4-connected piece.
  *
  * ## Stretching
  *
@@ -126,6 +127,8 @@ export type KufiGlyph = {
   inset?: { right?: number; left?: number };
   /** Separate 4-connected pieces the glyph is drawn in, when more than one. */
   parts?: number;
+  /** Drawn only inside a star panel's regions; a rectangular panel keeps the forms it was tuned on. */
+  regionOnly?: boolean;
   /**
    * The letter's own dot sets (iʿjām), one per dot pattern its letters need,
    * in the glyph box's coordinates; cells may lie outside the box. Letters
@@ -176,7 +179,7 @@ const g = (
   rows: string[],
   stretch: KufiStretch[],
   joins?: KufiGlyph["joins"],
-  more?: Pick<KufiGlyph, "inset" | "parts">
+  more?: Pick<KufiGlyph, "inset" | "parts" | "regionOnly">
 ): KufiGlyph => ({ id, rows, base, stretch, ...(joins ? { joins } : {}), ...more });
 
 /**
@@ -557,6 +560,10 @@ export const KUFI_FORMS: KufiFormTable = {
       g("allah.isolated.0", 0, ["###.#.#.#", "#.#.#.#.#", "#.#.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }, { axis: "col", index: 3 }]),
       g("allah.isolated.1", 0, ["....#.#.#", "....#.#.#", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }, { axis: "col", index: 3 }]),
       g("allah.isolated.2", 0, ["###.#.#.#", "..#.#.#..", "###.#.#.#", "#.#.#.#.#", "#######.#"], [{ axis: "row", index: 3 }, { axis: "col", index: 3 }], undefined, { parts: 3 }),
+      // the heh hangs off the second lam, so three uprights stand (alef, lam, lam), not four
+      g("allah.isolated.3", 0, ["###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 3 }, { axis: "col", index: 3 }], undefined, { regionOnly: true }),
+      // the same under the bar of its shadda and dagger alef, one gap above the word
+      g("allah.isolated.4", 0, ["#######", ".......", "###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 5 }, { axis: "col", index: 3 }], undefined, { parts: 2, regionOnly: true }),
     ],
   },
 };

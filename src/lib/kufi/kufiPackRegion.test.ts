@@ -41,19 +41,19 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
     expect(r).toEqual({ ok: false, reason: "tooLong", suggestions: [] });
   });
 
-  it("measure, then pin: الله first packs in a 4-fold alternative wedge at size 23, in its full-height form", () => {
-    // Measured 2026-11-01 (sizes 12..60) with the region's whole-letter forms only: الله first packs a
-    // wedge at 4-fold alternative 23, 5-fold 27 (both stars), 6-fold classic 32, 6-fold alternative 30;
-    // never in the 4-fold classic wedge. No corner and no محمد wedge or corner packs.
-    const wedge = (size: number) => starConstruction(4, STAR_KS[4][1], size).regions[1].mask;
-    for (let size = 12; size < 23; size++) expect(packKufiRegion({ text: "الله", mask: wedge(size) }).ok).toBe(false);
-    const mask = wedge(23);
+  it("measure, then pin: الله first packs in a 4-fold classic wedge at size 20, on three uprights", () => {
+    // Measured 2026-11-01 (sizes 12..40) with the region's own الله forms: it first packs a wedge at
+    // 4-fold 20 (both stars), 5-fold 22 (both stars), 6-fold 26 (both stars); the form under its bar
+    // takes over where a wedge has room (5-fold from 27, 6-fold from 28). No corner packs.
+    const wedge = (size: number) => starConstruction(4, STAR_KS[4][0], size).regions[1].mask;
+    for (let size = 12; size < 20; size++) expect(packKufiRegion({ text: "الله", mask: wedge(size) }).ok).toBe(false);
+    const mask = wedge(20);
     const r = packKufiRegion({ text: "الله", mask });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expectRegionGrammar(r, mask);
-    // never the الله whose alef is drawn in two pieces
-    expect(r.placements.map((p) => p.glyphId)).not.toContain("allah.isolated.2");
+    // the heh on the second lam, never on a stem of its own (allah.isolated.0, .1) nor the gapped alef (.2)
+    expect(r.placements.map((p) => p.glyphId)).toEqual(["allah.isolated.3"]);
     // "#" ink, "." paper inside the mask, " " outside it
     const art: string[] = [];
     for (let y = 0; y < mask.rows; y++) {

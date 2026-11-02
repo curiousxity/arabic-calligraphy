@@ -422,8 +422,16 @@ describe("KUFI_FORMS: pieces read off the reference panel", () => {
     expect(g.parts).toBe(3);
   });
 
-  it("only the gapped الله is drawn in more than one piece", () => {
-    expect(ENTRIES.filter((e) => (e.g.parts ?? 1) !== 1).map(label)).toEqual(["allah.isolated.2"]);
+  it("only the gapped الله and the الله under its bar are drawn in more than one piece", () => {
+    expect(ENTRIES.filter((e) => (e.g.parts ?? 1) !== 1).map(label)).toEqual(["allah.isolated.2", "allah.isolated.4"]);
+  });
+
+  it("has a الله of three uprights, the heh on the second lam, and the same under its bar", () => {
+    const g = glyphById("allah.isolated.3");
+    expect(g.rows).toEqual(["###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"]);
+    expect(g.parts).toBeUndefined();
+    expect(glyphById("allah.isolated.4").rows).toEqual(["#######", ".......", ...g.rows]);
+    expect(glyphById("allah.isolated.4").parts).toBe(2);
   });
 
   it("joinCol defaults to the outermost column", () => {

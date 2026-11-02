@@ -14,7 +14,7 @@ test("Add Kufi star draws the 4-fold construction and the lines toggle hides it"
     .poll(async () => (await getBlocks(page)).some((b) => b.type === "kufiStar" && !before.has(b.id)))
     .toBe(true);
   const star = (await getBlocks(page)).find((b) => b.type === "kufiStar" && !before.has(b.id))!;
-  expect(star).toMatchObject({ type: "kufiStar", starFold: 4, starK: 2, starSize: 24, starLines: true });
+  expect(star).toMatchObject({ type: "kufiStar", starFold: 4, starK: 3, starSize: 24, starLines: true });
 
   // The starter text may sit under the star, so the lines are judged by how much ink they add.
   const box = await blockClientBox(page, star.id);

@@ -12,7 +12,7 @@ beforeEach(() => _internal.resetRegionPacks());
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
-/** 4-fold alternative at size 23, where الله packs a wedge (see kufiPackRegion.test.ts). */
+/** 4-fold alternative at size 23, where الله packs a wedge. */
 const c = starConstruction(4, STAR_KS[4][1], 23);
 const wedgeA = c.regions.filter((r) => r.kind === "wedgeA");
 const withText = (fill: (i: number) => string): KufiStarInputs => ({
