@@ -413,6 +413,11 @@ Times are minutes:seconds into the individual-letters lesson.
 - **187g and 191g (2026-11-02):** the user: "187 and 191g are still not right". The mim's tail tip stood past the
   studio's and the waw's inner head stroke ran past its end; both on the whole-outline method. The user: "Your fixes I
   approve".
+- **The ta joint, all variants (2026-11-02):** the user: "279r 292g need fixing", "301 and 320 need work", and "you
+  have to look at the ^ for all letter variations as well". Every ta shape was measured against the studio; where the
+  loop comes down into the base (and the edges near it) 12 stood past the studio: 298r, 279r, 292r, 286r, 290, 290r,
+  291r, 300r, 289, 310, 293, 303. Those, with 292g, 301g (the ya's upturned left end) and 320g, are on the
+  whole-outline method; shapes that copy their strokes follow. The user: "Approve the edits".
 
 **Every joint trimmed to the studio edge**
 
