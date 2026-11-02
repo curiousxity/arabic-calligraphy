@@ -423,6 +423,10 @@ Times are minutes:seconds into the individual-letters lesson.
   the mim tail start (108g, 572g, 660g, 661g, 670g), the mim joining end (252g, 333g), the waw head's inner end
   (395g, 569g, 515g, 664g, as 191g), and 448g, 452g, 462g. All on the whole-outline method. The user: "The fixes look
   good".
+- **454g and the fa, qaf and waw ends (2026-11-02):** the user: "454 needs attention". 454g's qaf head ran past the
+  studio at its inner end, as the waw heads did; 508g had the same. Checking every fa, qaf and waw found the fa's
+  joining end standing past in 288g and 456g, the pair's tail start in 391 (that one stroke redone) and the fa tail
+  in 374. All on the whole-outline method. The user: "Fixes approved".
 
 **Every joint trimmed to the studio edge**
 
