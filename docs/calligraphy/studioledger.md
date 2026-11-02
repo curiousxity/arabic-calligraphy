@@ -386,6 +386,12 @@ Times are minutes:seconds into the individual-letters lesson.
   tail, from its tip to where it leaves the bowl, is the stroke's own studio outline, smoothed (the studio's faceted
   bowls rounded). 726's tail copies 630's and changed with it. The user: "Add them to the library". How a tail meets
   the next letter inside a word (above or below it) is the join step, still open.
+- **Ha tails and the head's right curve (2026-11-01):** the user: "661, 664, 665, 667, 669, 670 =. 674 and 675 right (
+  strokes and all the strokes like it". The tails (661.s6, 664.s5, 665.s5, 667.s6, 669.s4, 670.s4) are their own
+  studio outline, smoothed, from the tip round the bowl. The head's right curve stood past the studio on its outside;
+  every ha stroke of that outline (644.s3, 645.s3, 647.s3, 647r.s3, 649.s3, 653.s3, 657.s3, 658.s3, 661.s3, 661r.s3,
+  662.s3, 666.s3, 667.s3, 674.s3, 675.s3, 676.s2, and the 24 strokes that copy them, 40 shapes in all) is its own
+  studio outline, smoothed, whole. The user: "Approve all changes".
 
 **Every joint trimmed to the studio edge**
 
