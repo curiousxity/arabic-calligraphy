@@ -378,6 +378,14 @@ Times are minutes:seconds into the individual-letters lesson.
 - **574, 577 and 578 (2026-11-01):** the user: "574 fix the dip. 577=. 578 (". 574's dip sagged past the studio's
   and came to a point; 577's tail had a bump on its top edge; 578's head stood out on its left side with a notch
   inside. Each is the stroke's own studio outline, smoothed, over that part. The user: "Approved 574, 577 and 578".
+- **The mim heads of 583, 585, 587 and 589 (2026-11-01):** the user: "585 587 and 589 have the same strokes that you
+  have to fix" (with 583). Each head's left side stood out past the studio with a notch inside, as 578's did. The
+  whole head is its own studio outline, smoothed: 561.s1 (583 copies it), 572.s1 (589 copies it), 585.s1, 587.s1.
+- **Mim, nun and waw tails (2026-11-01):** the user: "The tails of these letters are not identical to those of the
+  studio", of 612, 616, 617, 618, 620, 621, 627b, 628, 630, 630b, and then "634, 635, 638 and 639 = on all". Each
+  tail, from its tip to where it leaves the bowl, is the stroke's own studio outline, smoothed (the studio's faceted
+  bowls rounded). 726's tail copies 630's and changed with it. The user: "Add them to the library". How a tail meets
+  the next letter inside a word (above or below it) is the join step, still open.
 
 **Every joint trimmed to the studio edge**
 
