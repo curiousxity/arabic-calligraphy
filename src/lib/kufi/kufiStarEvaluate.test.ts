@@ -47,12 +47,14 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
     expect(corners!.note).toContain("in the corners");
   });
 
-  it("الله: every fold gets a dense fit on its classic star, the word at least three times in a wedge", () => {
+  it("الله: every fold gets a dense fit on its classic star, the word three times in a 5- or 6-fold wedge, twice in a 4-fold one", () => {
+    // A 4-fold wedge holds الله four times only with the heh's wall carried up, which no bar does
+    // any more (2026-11-02; see kufiPackRegion.test.ts): its densest fit is two a wedge, at 28.
     const e = evalAllah();
     for (const fold of [4, 5, 6] as StarFold[]) {
       const dense = e.offers.filter((x) => x.pattern === "repeat" && x.fits && x.inputs.fold === fold && x.inputs.k === defaultStarK(fold));
       expect(dense.length, `${fold}-fold`).toBeGreaterThan(0);
-      expect(dense.some((o) => wordsOf(o.inputs.regions[1]).length >= 3), `${fold}-fold`).toBe(true);
+      expect(dense.some((o) => wordsOf(o.inputs.regions[1]).length >= (fold === 4 ? 2 : 3)), `${fold}-fold`).toBe(true);
       for (const o of dense) expect(o.note).toMatch(/الله( ×\d+)? in every wedge/);
     }
   });
@@ -69,9 +71,14 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
     });
     if (!alt!.fits) expect(alt!.note).toContain("محمد does not fit");
     expect(alt!.note).not.toContain("الله does not fit");
-    // the 4-fold classic star holds the pair: محمد twice in a wedge from size 29
-    const four = e.offers.find((o) => o.pattern === "alternate" && o.fits && o.inputs.fold === 4);
+    // the 4-fold classic star holds the pair as a repeat at 29, الله محمد in every wedge. In turn
+    // (alternate) it no longer fits anywhere: محمد fits a wedge twice from 29, الله twice at 27
+    // and 28 only, once up to 25, now that no bar carries the heh's wall up (2026-11-02)
+    const four = e.offers.find((o) => o.pattern === "repeat" && o.fits && o.inputs.fold === 4 && o.inputs.k === defaultStarK(4));
     expect(four).toBeDefined();
+    expect(four!.inputs.size).toBe(29);
+    expect(wordsOf(four!.inputs.regions[1])).toEqual(["الله", "محمد"]);
+    expect(e.offers.some((o) => o.pattern === "alternate" && o.fits)).toBe(false);
   });
 
   it("empty or blank text gives no offers", () => {
@@ -146,13 +153,16 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
 });
 
 describe("the size scan", { timeout: 600_000 }, () => {
-  it("pins الله's dense fits: 4-fold classic ×4 at 34, 5-fold classic ×3 at 34", () => {
-    // Measured 2026-11-02 under the work cap; the smallest fits (4-fold 18, 5-fold 21, 6-fold 24,
-    // one word a wedge) are found first and give way to the denser ones in the offers kept.
+  it("pins الله's dense fits: 4-fold classic ×2 at 28 with the corners filled, 5-fold classic ×3 at 34, 6-fold classic ×3 at 39", () => {
+    // Measured 2026-11-02 under the work cap, with only shafts carried up by bars; the smallest
+    // fits (4-fold 18, 5-fold 21, 6-fold 24, one word a wedge) are found first and give way to
+    // the denser ones in the offers kept. 4-fold ×4 at 34 was an offer while the heh's wall rose.
     const e = evalAllah();
     const at = (fold: StarFold, size: number) =>
       e.offers.find((x) => x.pattern === "repeat" && x.fits && x.inputs.fold === fold && x.inputs.k === defaultStarK(fold) && x.inputs.size === size);
-    expect(wordsOf(at(4, 34)!.inputs.regions[1])).toHaveLength(4);
+    expect(wordsOf(at(4, 28)!.inputs.regions[1])).toHaveLength(2);
+    expect(at(4, 28)!.inputs.regions[9]).toBe("الله");
     expect(wordsOf(at(5, 34)!.inputs.regions[1])).toHaveLength(3);
+    expect(wordsOf(at(6, 39)!.inputs.regions[1])).toHaveLength(3);
   });
 });

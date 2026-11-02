@@ -52,6 +52,7 @@ import {
   dotsOf,
   joinCol,
   joinRow,
+  kufiShaftTops,
   stretchGlyph,
   stretchedBase,
   type KufiDotKey,
@@ -1300,10 +1301,27 @@ function pinX0(L: Line, sh: Shape, pin: Pin): number | null {
   return dc / ac;
 }
 
+/**
+ * Whether letter li is a region's last: nothing after it opens a line, so the space above its
+ * line is settled with it, and `partialScore` counts every window there. A region's lines
+ * stack upward and the beam marks the space above the top line as unsettled (a later line may
+ * fill it); with no letter to come it never will, and the finals a width-B beam keeps were
+ * being picked among tied scores by hash while what they left open above decided whether the
+ * region packed (two الله in a 4-fold wedge at 28 packed only with the heh's wall carried up,
+ * 2026-11-02). A panel's rings run to the core, so its last letter settles nothing new. The
+ * score still cannot see the bars; a region therefore searches with its bars on from the start
+ * (`searchInner`), so the finals a beam keeps are finished with them and the plan whose shafts
+ * the bars carry to the sides wins over its tied twin.
+ */
+function lastInRegion(ctx: Ctx, li: number): boolean {
+  return !!ctx.region && li === ctx.letters.length - 1;
+}
+
 /** Enumerates every move for letter li from state st, scoring each in place (`cheap`: only round the new ink). */
 function expand(ctx: Ctx, st: St, pi: number, li: number, out: Cand[], cheap = false) {
+  const last = lastInRegion(ctx, li);
   forMoves(ctx, st, li, (mv, rec) => {
-    const score = cheap ? localScore(ctx, st, rec) : partialScore(ctx, st);
+    const score = cheap ? localScore(ctx, st, rec) : partialScore(ctx, st, last);
     out.push({ parent: pi, li, mv, score, hash: cheap ? st.hash : lastFrontier });
     return false;
   });
@@ -1391,7 +1409,7 @@ let lastFrontier = 0;
  * in full; open windows in band areas the reading order has passed count as
  * likely holes, the band's top row at half weight.
  */
-function partialScore(ctx: Ctx, st: St): number {
+function partialScore(ctx: Ctx, st: St, last = false): number {
   const { cols, rows, n } = ctx;
   if (stamp.mask.length !== n) {
     stamp.mask = new Uint8Array(n);
@@ -1400,10 +1418,13 @@ function partialScore(ctx: Ctx, st: St): number {
   }
   // settled band cells: closed lines (cached), the current line behind its cursor
   const mk = stamp.mask;
-  mk.set(st.settled);
-  for (let k = st.settledUpTo; k < st.lines.length; k++) markBand(ctx, st.lines[k], k === st.cur ? st.cursor[k] + 2 : 0, mk);
+  if (last) mk.fill(2);
+  else {
+    mk.set(st.settled);
+    for (let k = st.settledUpTo; k < st.lines.length; k++) markBand(ctx, st.lines[k], k === st.cur ? st.cursor[k] + 2 : 0, mk);
+  }
   // what the current line can still reach (ahead of its cursor, to a stroke's height) is never settled
-  if (st.cur >= 0) {
+  if (st.cur >= 0 && !last) {
     const L = st.lines[st.cur];
     const tab = tabIn(ctx, L);
     const xe = Math.min(L.len - 1, st.cursor[st.cur] + 1);
@@ -1659,16 +1680,24 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
  * run on to. So a bar draws a baseline or a stroke on along the line, never a
  * tail off the tip of a tall stroke.
  *
- * In a region (upright lines only) a bar may also carry an upright stroke
- * straight on upward, to the slanted edge: an alef or lam lengthened to meet
- * the region's side, as square-Kufi tilework does. No bar there runs along
- * a stroke off the baseline (the heh's bars read as arms), nor downward.
+ * In a region (upright lines only) a bar may also carry a **shaft** straight
+ * on upward, to the slanted edge: an alef or lam lengthened to meet the
+ * region's side, as square-Kufi tilework does. Which uprights are shafts is
+ * `kufiShaftTops`, the notion the octagon's lengthened strokes use: a shaft
+ * letter's column with a bare top, never a heh's wall under its bar, a box's
+ * or bowl's side or a stretched tooth (the heh of الله was carried up out of
+ * its box by five or six cells, 2026-11-02). No bar there runs along a
+ * stroke off the baseline (the heh's bars read as arms), nor downward.
  */
 function barEnds(ctx: Ctx, st: St): Uint8Array {
   const { cols, rows } = ctx;
   const out = new Uint8Array(ctx.n);
   const axis = new Int8Array(ctx.n).fill(-1);
   const mine = (r: number, c: number, li: number) => r >= 0 && c >= 0 && r < rows && c < cols && st.kind[r * cols + c] === K_GLYPH && st.letter[r * cols + c] === li;
+  const paperAt = (L: Line, x: number, y: number) => {
+    const i = at(ctx, L, x, y);
+    return i < 0 || st.owner[i] === 0;
+  };
   for (const p of placedList(st)) {
     const L = st.lines[p.line];
     const a = L.rot % 180 === 0 ? 0 : 1;
@@ -1679,14 +1708,25 @@ function barEnds(ctx: Ctx, st: St): Uint8Array {
       axis[i] = a;
       if (ink[k + 1] === 0) out[i] = a === 0 ? 3 : 12;
     }
+    if (!ctx.region) continue;
+    // a region's upright bar carries a shaft on upward from its top (`kufiShaftTops`, the notion the
+    // octagon's strokes share): never a heh's wall, a box's side or a tooth, whatever its height, and
+    // only with paper beside the top (a region's lines are upright, so the glyph's rows are the cells')
+    const tops = kufiShaftTops(ctx.letters[p.letter].unit.skeleton, stretchGlyph(p.shape.g, p.shape.counts));
+    for (let j = 0; j < tops.length; j++) {
+      if (tops[j] < 0) continue;
+      const y = p.shape.baseRow - tops[j];
+      const i = at(ctx, L, p.x0 + j, p.yb + y);
+      if (i >= 0 && st.kind[i] === K_GLYPH && paperAt(L, p.x0 + j - 1, p.yb + y) && paperAt(L, p.x0 + j + 1, p.yb + y)) out[i] |= 4;
+    }
   }
+  if (ctx.region) return out;
   for (let i = 0; i < ctx.n; i++) {
     if (axis[i] < 0) continue;
     const r = (i / cols) | 0;
     const c = i - r * cols;
     const li = st.letter[i];
-    if (ctx.region) out[i] |= mine(r + 1, c, li) && !mine(r - 1, c, li) ? 4 : 0;
-    else if (axis[i] === 0) out[i] |= (mine(r, c + 1, li) ? 1 : 0) | (mine(r, c - 1, li) ? 2 : 0);
+    if (axis[i] === 0) out[i] |= (mine(r, c + 1, li) ? 1 : 0) | (mine(r, c - 1, li) ? 2 : 0);
     else out[i] |= (mine(r + 1, c, li) ? 4 : 0) | (mine(r - 1, c, li) ? 8 : 0);
   }
   return out;
@@ -2238,8 +2278,9 @@ const LOOK_FACTOR = 4;
 /** The best partial score any move of letter li reaches from `st`; a failure when none fits. */
 function lookahead(ctx: Ctx, st: St, li: number): number {
   let best = Infinity;
+  const last = lastInRegion(ctx, li);
   forMoves(ctx, st, li, () => {
-    const v = partialScore(ctx, st);
+    const v = partialScore(ctx, st, last);
     if (v < best) best = v;
     return false;
   });
@@ -2314,8 +2355,10 @@ function search(ctx: Ctx): Final | null {
 }
 
 function searchInner(ctx: Ctx): Final | null {
-  // a greedy pass first, so there is always an answer within the budget
-  ctx.bars = false;
+  // a greedy pass first, so there is always an answer within the budget. A region searches
+  // with its bars from the start (see `barEnds`: the base row is closed by bars in nearly every
+  // packing, and which plan the bars can close is what decides it), a panel without them.
+  ctx.bars = !!ctx.region && !barsOff;
   ctx.noClock = true;
   let best: Final | null = beamPass(ctx, 1, initState(ctx), 0, true);
   ctx.noClock = false;
@@ -2323,7 +2366,7 @@ function searchInner(ctx: Ctx): Final | null {
   // a panel the text nearly fills: filler bars may close what its letters leave open. Never
   // tried where it packs without them, so a panel that packs bar-free keeps every cell; the
   // bar phase has work of its own (BAR_WORK), beyond the cap the bar-free search spent
-  if (best && !best.packed && !barsOff) {
+  if (best && !best.packed && !barsOff && !ctx.bars) {
     ctx.bars = true;
     ctx.workMax += Math.floor(ctx.workMax * BAR_WORK);
     ctx.out = ctx.work >= ctx.workMax || performance.now() > ctx.deadline;
@@ -3048,9 +3091,11 @@ export function packKufiPanel(input: {
  * upright lines only, no U-turns. The edge rule holds on the bottom row alone (the base edge
  * the text stands on, see `Region`); the other edges (the slanted sides, the notch) carry no
  * line of text, are not held to the frame's rule and may run to paper. Fillers are bars only
- * (`fillPass`, `barEnds`). No edits, pins or suggestions: a region's size is the star's, not
- * the user's to pick here. `place` (a wedge unless said) chooses the letters' forms, see
- * `kufiFormsOf`. Pure and deterministic, on PACK_BUDGET_MS / PACK_WORK.
+ * (`fillPass`, `barEnds`), searched with from the start: a region's base row is closed by bars
+ * in nearly every packing, so there is no bar-free phase to keep (`searchInner`). No edits,
+ * pins or suggestions: a region's size is the star's, not the user's to pick here. `place` (a
+ * wedge unless said) chooses the letters' forms, see `kufiFormsOf`. Pure and deterministic,
+ * on PACK_BUDGET_MS / PACK_WORK.
  */
 export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boolean; place?: Exclude<KufiPlace, "panel"> }): KufiPackResult {
   regionPackCount++;

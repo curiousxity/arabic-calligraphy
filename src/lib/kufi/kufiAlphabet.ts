@@ -654,6 +654,34 @@ export function skeletonOf(cp: number): SkeletonName | null {
  */
 export const KUFI_SHAFT_LETTERS: ReadonlySet<SkeletonName | LigatureName> = new Set<SkeletonName | LigatureName>(["alef", "lam", "kaf", "tah", "lamAlef", "allah"]);
 
+/**
+ * Where a drawn glyph's shafts end: per column of `rows` (the glyph at its
+ * stretch, `stretchGlyph`), the row of that column's top ink cell when it is
+ * a **shaft's top**, else -1. A shaft's top is a cell of a shaft letter's
+ * glyph (`KUFI_SHAFT_LETTERS`) with the column's ink running down from it
+ * two cells or more and no ink of the glyph beside it. A capped top is none:
+ * a heh's wall under its bar, a box's or bowl's side, a lam's hook, an
+ * alef's head, the bar of a barred الله; nor is any column of another
+ * letter, however tall it stands (a tooth stretched to a line's top). Only a
+ * shaft's top may be carried on upward, by the octagon's lengthened strokes
+ * (`octagonShafts`) and a region's filler bars (`barEnds`): lengthening
+ * anything else stretches the letter or turns it into another (a heh's wall
+ * shot up out of its box; a tooth became a lam). Ink of other letters beside
+ * the top is the caller's to check.
+ */
+export function kufiShaftTops(skeleton: SkeletonName | LigatureName, rows: string[]): number[] {
+  const w = rows[0]?.length ?? 0;
+  const out = new Array<number>(w).fill(-1);
+  if (!KUFI_SHAFT_LETTERS.has(skeleton)) return out;
+  const ink = (i: number, j: number) => rows[i]?.[j] === "#";
+  for (let j = 0; j < w; j++) {
+    let i = 0;
+    while (i < rows.length && !ink(i, j)) i++;
+    if (i < rows.length && ink(i + 1, j) && !ink(i, j - 1) && !ink(i, j + 1)) out[j] = i;
+  }
+  return out;
+}
+
 /** The glyph with this id (`<skeleton>.<form>.<n>`) and its letter, or null. */
 export function kufiGlyphById(id: string): { skeleton: SkeletonName | LigatureName; glyph: KufiGlyph } | null {
   const [skeleton, form] = id.split(".") as [SkeletonName | LigatureName, JoiningForm];

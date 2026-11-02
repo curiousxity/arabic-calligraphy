@@ -67,7 +67,8 @@ with its repeats, as the wedge regions carry theirs):
 - **What lengthens** (`octagonShafts`): a column whose top-row cell is a
   **shaft**, the upright of a tall letter (`KUFI_SHAFT_LETTERS`: alef, lam,
   kaf, tah, lamAlef, allah) reaching the band's top row, two cells or more,
-  with paper beside its top. Which letter owns the cell is read from the
+  with paper beside its top (`kufiShaftTops` in `kufiAlphabet.ts`, the one
+  predicate the wedges' filler bars use too). Which letter owns the cell is read from the
   band's placements (the glyph drawn at its stretch), never from the ink
   alone: a heh's wall is as tall as a lam and capped by the heh's bar, a
   box's or bowl's side likewise, and a tooth stretched to the band's top has
@@ -232,19 +233,44 @@ error; the packer reports `tooLong`.
   `allah.isolated.2` read as a broken alef in a wedge.
 - **Fillers in a region: bars only, and only two kinds.** A bar may end on a
   letter's baseline (the feet row, so the line runs the width of the region;
-  forbidding that left nothing packable) or **carry an upright stroke
-  straight on upward**, by at most `STEM_BAR_MAX` (6) cells, to meet the
-  slanted side as square-Kufi tilework lengthens an alef or lam (`barEnds`,
-  region branch). Never along a stroke off the baseline (the heh's bars grew
-  arms) and never downward. **No lone filler squares in a region**
-  (`fillPass`): between repeated short words a square reads as a letter's
-  dot, and a region packs without them or not at all.
-- **Measured fits of الله** (2026-11-02, classic stars): one a wedge at
-  4-fold 18-25, 5-fold 21-29, 6-fold 24-30; two a 4-fold wedge at 28-29,
-  four at 34-36; a 4-fold corner holds one from 25, two from 35; 5-fold
-  corners hold one from 43; 6-fold corners nothing up to 50. محمد fits a
-  4-fold wedge twice at 29, 32 and 35 (once never: one word leaves the
-  line's end open). `kufiPackRegion.test.ts` pins the first and the 28 fits.
+  forbidding that left nothing packable) or **carry a shaft straight on
+  upward**, by at most `STEM_BAR_MAX` (6) cells, to meet the slanted side as
+  square-Kufi tilework lengthens an alef or lam (`barEnds`, region branch).
+  A shaft is what the octagon lengthens too, one predicate for both
+  (`kufiShaftTops` in `kufiAlphabet.ts`): a column of a `KUFI_SHAFT_LETTERS`
+  glyph whose top cell has nothing beside it. **Never a heh's wall, a box's
+  or bowl's side or a stretched tooth**, however tall (2026-11-02, the user:
+  the heh of الله was carried up out of its box by five or six cells in the
+  4-fold wedges at 28 and 34), never along a stroke off the baseline (the
+  heh's bars grew arms) and never downward. **No lone filler squares in a
+  region** (`fillPass`): between repeated short words a square reads as a
+  letter's dot, and a region packs without them or not at all.
+- **A region's search sees what its bars can close.** The beam's partial
+  score never counts the space above a region's top line (a later line may
+  fill it) and never sees bars (they are drawn in `finish`), so the finals
+  it kept were picked among tied scores by hash while what they left open
+  above decided whether the region packed. Two things, both regions only:
+  at the **last letter every cell is settled** (`lastInRegion`, nothing
+  after it opens a line), and the search runs **with its bars from the
+  start** (`searchInner`; a panel keeps its bar-free phase, since nearly
+  every region packing closes its base row with bars anyway, and a region
+  that packs bar-free still draws none). Without both, two الله in a 4-fold
+  wedge at 28 pack only with the heh's wall carried up: the legal packing
+  (the barred form right, the plain form left, its second lam carried up)
+  tied with the other plan and lost the hash.
+- **Measured fits of الله** (2026-11-02, classic stars, shafts only carried):
+  one a wedge at 4-fold 18-25, 5-fold 21-29, 6-fold 24-30; two a 4-fold
+  wedge at 27-28, three a 5-fold wedge at 34-35, two a 6-fold wedge at 34
+  and three at 39-42; a 4-fold corner holds one at 25-28 and three at 39-41;
+  5-fold corners hold one from 43; 6-fold corners nothing up to 50. **Four
+  الله in a 4-fold wedge (34-36 before) no longer pack, nor two at 29, nor
+  one in a 4-fold corner from 29**: each packed only by carrying the heh's
+  wall up, and the pocket the slanted side leaves above a heh's box has no
+  legal filler (a lam is two cells away; the barred form needs the full
+  width at its bar's row; a word slides to its first fit and no further).
+  محمد fits a 4-fold wedge twice at 29, 32 and 35 (once never: one word
+  leaves the line's end open). `kufiPackRegion.test.ts` pins the first and
+  the 28 fits, and that no capped top is ever carried up.
 - **Copies by rotation, never mirror.** Every region of a kind is a rotation
   of the kind's first, with the same mask, so `layoutKufiStar` packs each
   distinct (kind, text) once and every other region of that kind takes the
@@ -322,10 +348,13 @@ counts against nothing (6-fold corners never hold الله).
   set aside until the rest have had their turn), round robin among equals.
   A task that never fits is offered at its closest miss (fewest wedges
   missing, nearest size 24), its note naming what does not fit ("محمد does
-  not fit a wedge"). On the 9 s budget "الله" gets three fits a fold
-  (4-fold 18, 28, 34; 5-fold 21, 34, 45; 6-fold 24, 39); "الله محمد" gets
-  the 4-fold fits (repeat at 29, alternate at 29) and misses for the rest,
-  with `complete: false`; a second Find layouts goes on from the cache.
+  not fit a wedge"). On the 9 s budget "الله" gets two fits a fold
+  (4-fold 18, 28; 5-fold 21, 34; 6-fold 24, 39, under the work cap; 4-fold
+  34 and 5-fold 45 were offers while the heh's wall rose); "الله محمد" gets
+  the repeat fits (4-fold 29, 5-fold 33, 6-fold 39) and alternate misses
+  (the pair in turn fitted the 4-fold star at 29 while الله twice a wedge
+  packed there; now nothing holds both), with `complete: false`; a second
+  Find layouts goes on from the cache.
 - **Cache.** Packs are cached between calls by the region's mask and the text
   (the mask is what fold, k, size and kind decide, so wedgeA and wedgeB share
   packs), up to 2000 entries; fill counts and text areas likewise.
@@ -338,7 +367,8 @@ counts against nothing (6-fold corners never hold الله).
 - **Ranking.** Fitting first; the classic stars before the alternative ones
   (the same split on the other star is nearly the same offer); corners
   filled before empty (the reference's four filled corners: 4-fold 28 holds
-  الله twice a wedge and once a corner, 34 four times a wedge and no corner);
+  الله twice a wedge and once a corner; 34 held four a wedge and no corner
+  while the heh's wall rose);
   then denser first (words drawn per region holding text), then fewer filler squares,
   then the smaller size; non-fitting after, fewer unpacked regions first.
   `pick` keeps at most `OFFERS_PER_FOLD_PATTERN` (2) per fold and pattern,
@@ -368,7 +398,8 @@ drawing its approved regions. The block's `text` is edited in Content
   sides as a staircase, their stems carried on to it by bars.
 - **A corner's acute end stays paper**: the triangle's point beyond its last
   line is too thin for a line of text, and no filler is drawn there.
-- **"الله محمد" needs two Find layouts** for the 5- and 6-fold fits: محمد's
-  failing packs spend the 9 s on the 4-fold scan (see Sizes and tasks).
+- **"الله محمد" may need two Find layouts** for the 5- and 6-fold fits on
+  the 9 s clock: محمد's failing packs spend it on the 4-fold scan (see Sizes
+  and tasks); under the work cap all three repeat fits come at once.
 - One star layout is one long worker job (up to about 27 s for a 6-fold star
   with 19 different texts); panel jobs wait behind it.

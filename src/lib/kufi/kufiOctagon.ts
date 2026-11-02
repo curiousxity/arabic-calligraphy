@@ -46,7 +46,7 @@
  * a gap, the frame line and the feet one stroke (a gap stays where filling
  * it would make a solid 2x2). Pure: no React, no Konva, no `./harfbuzz`.
  */
-import { KUFI_SHAFT_LETTERS, kufiGlyphById, stretchGlyph } from "./kufiAlphabet";
+import { kufiGlyphById, kufiShaftTops, stretchGlyph } from "./kufiAlphabet";
 import { packKufiRegion, type KufiMask, type KufiPackResult } from "./kufiPack";
 
 /** Letter height: a band is one 5-row line. */
@@ -200,17 +200,18 @@ export type KufiOctagonLayout = {
 export function octagonShafts(band: Extract<KufiPackResult, { ok: true }>): number[] {
   const { cols: L, rows: R, cells, placements } = band;
   const ink = (x: number, y: number) => x >= 0 && x < L && y >= 0 && y < R && cells[y * L + x] === 1;
-  // per column, whether the ink on the band's top row is a shaft letter's
+  // per column, whether the ink on the band's top row is a shaft's top (`kufiShaftTops`, the notion a region's bars share)
   const tall = new Uint8Array(L);
   for (const p of placements) {
     if (p.turn !== 0 || p.row !== 0) continue; // a region's lines are upright; a letter below the top row reaches nothing
     const found = kufiGlyphById(p.glyphId);
-    if (!found || !KUFI_SHAFT_LETTERS.has(found.skeleton)) continue;
-    const top = stretchGlyph(found.glyph, p.stretch)[0] ?? "";
-    for (let j = 0; j < top.length; j++) if (top[j] === "#") tall[p.col + j] = 1;
+    if (!found) continue;
+    const tops = kufiShaftTops(found.skeleton, stretchGlyph(found.glyph, p.stretch));
+    for (let j = 0; j < tops.length; j++) if (tops[j] === 0) tall[p.col + j] = 1;
   }
+  // and nothing of any letter beside it
   const out: number[] = [];
-  for (let c = 0; c < L; c++) if (tall[c] && ink(c, 0) && ink(c, 1) && !ink(c - 1, 0) && !ink(c + 1, 0)) out.push(c);
+  for (let c = 0; c < L; c++) if (tall[c] && !ink(c - 1, 0) && !ink(c + 1, 0)) out.push(c);
   return out;
 }
 

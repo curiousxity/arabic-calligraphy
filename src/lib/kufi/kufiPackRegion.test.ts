@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { packKufiRegion, _internal, type KufiMask, type KufiPackResult } from "./kufiPack";
 import { STAR_KS, starConstruction } from "./kufiStarGeometry";
+import { kufiGlyphById, kufiShaftTops, stretchGlyph } from "./kufiAlphabet";
 
 // Layouts are asserted on the work budget alone, so machine load cannot change them.
 beforeAll(() => _internal.setClockOverride(Infinity));
@@ -49,9 +50,11 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
   });
 
   it("measure, then pin: الله first packs in a 4-fold classic wedge at size 18, on three uprights, its feet on the base row", () => {
-    // Measured 2026-11-01 (sizes 12..44) with the region's own الله forms, the base row on the ring
-    // edge and the heh free to widen: one الله packs a 4-fold wedge at 18 to 25, two at 28 and 29,
-    // four at 34 to 36; a 4-fold corner holds one from 25. 5-fold wedges from 21, 6-fold from 24.
+    // Measured 2026-11-02 (sizes 12..46) with the region's own الله forms, the base row on the ring
+    // edge, the heh free to widen and only shafts carried up by bars: one الله packs a 4-fold
+    // wedge at 18 to 25, two at 27 and 28, never three or four (the pocket above a heh's box has
+    // no legal filler once its wall stays); a 4-fold corner holds one at 25 to 28, three at 39 to 41.
+    // 5-fold wedges hold one from 21, three at 34 and 35; 6-fold one from 24, two at 34, three from 39.
     const wedge = (size: number) => starConstruction(4, STAR_KS[4][0], size).regions[1].mask;
     for (let size = 12; size < 18; size++) expect(packKufiRegion({ text: "الله", mask: wedge(size) }).ok).toBe(false);
     const mask = wedge(18);
@@ -91,6 +94,43 @@ describe("packKufiRegion", { timeout: 120_000 }, () => {
     const corner = packKufiRegion({ text: "الله", mask: c.regions[9].mask });
     expect(corner.ok).toBe(true);
     if (corner.ok) expectRegionGrammar(corner, c.regions[9].mask);
+  });
+
+  it("carries only a shaft up to the side: no heh wall, box side or capped top is ever extended above its glyph", () => {
+    // The user, 2026-11-02: a heh (or any box or bowl wall) is never carried up, only the shaft of a
+    // tall letter. Every glyph's columns are checked: a column whose top is not a shaft's
+    // (`kufiShaftTops`: a capped top such as the heh's wall under its bar, the barred form's bar,
+    // or any column of a letter outside KUFI_SHAFT_LETTERS) has paper right above it.
+    const rep = (n: number) => Array.from({ length: n }, () => "الله").join(" ");
+    const cases: Array<[fold: 4 | 5 | 6, size: number, region: number, text: string]> = [
+      [4, 18, 1, rep(1)], [4, 28, 1, rep(2)], [4, 25, 9, rep(1)], [4, 28, 9, rep(1)],
+      [5, 21, 1, rep(1)], [5, 28, 1, rep(1)], [5, 34, 1, rep(3)],
+      [6, 24, 1, rep(1)], [6, 28, 1, rep(1)], [6, 34, 1, rep(2)],
+    ];
+    let hehWalls = 0;
+    for (const [fold, size, region, text] of cases) {
+      const mask = starConstruction(fold, STAR_KS[fold][0], size).regions[region].mask;
+      const r = packKufiRegion({ text, mask });
+      expect(r.ok, `${fold}-fold ${size} region ${region} ${text}`).toBe(true);
+      if (!r.ok) continue;
+      expectRegionGrammar(r, mask);
+      const ink = (x: number, y: number) => x >= 0 && y >= 0 && x < r.cols && y < r.rows && r.cells[y * r.cols + x] === 1;
+      for (const p of r.placements) {
+        const found = kufiGlyphById(p.glyphId)!;
+        const rows = stretchGlyph(found.glyph, p.stretch);
+        const tops = kufiShaftTops(found.skeleton, rows);
+        for (let j = 0; j < rows[0].length; j++) {
+          let i = 0;
+          while (i < rows.length && rows[i][j] !== "#") i++;
+          if (i >= rows.length || tops[j] >= 0) continue;
+          if (rows[i][j - 1] === "#" || rows[i][j + 1] === "#") hehWalls++;
+          expect(ink(p.col + j, p.row + i - 1), `${fold}-fold ${size} region ${region}: ${p.glyphId} at ${p.col},${p.row} column ${j} carried up`).toBe(false);
+        }
+      }
+    }
+    expect(hehWalls).toBeGreaterThan(20); // every الله has capped tops, so the rule was exercised
+    // four الله in a 4-fold wedge at 34 packed only by carrying the heh's wall up (2026-11-02): no longer
+    expect(packKufiRegion({ text: rep(4), mask: starConstruction(4, STAR_KS[4][0], 34).regions[1].mask }).ok).toBe(false);
   });
 
   it("is deterministic: the same call twice gives equal results", () => {
