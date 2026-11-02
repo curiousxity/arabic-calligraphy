@@ -431,6 +431,8 @@ Times are minutes:seconds into the individual-letters lesson.
   at the top of its window, leaving a notch; 569r, 570r and 574r fell short along the left of theirs. 569r's base
   also ran past the studio at its start, and 652g, 655g and 658r had ends standing past. All on the whole-outline
   method. The user: "Fixes and pages approved".
+- **077b and 085d (2026-11-02):** 077b's rising stroke stood past the studio's edge along its top and 085d's stroke
+  start ran past on the left. Both on the whole-outline method. The user: "Your fixes are approved".
 
 **Every joint trimmed to the studio edge**
 
