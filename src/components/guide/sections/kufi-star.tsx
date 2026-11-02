@@ -64,11 +64,15 @@ export const section: GuideSection = {
         it is repeated, as the traditional panels do: one «الله» a side makes
         a small tile, three make a square with a clear octagon, four a
         denser one. Only the tall letters reach into the centre, the alef and
-        the lam; a heh keeps its box, as in the old panels. In the wedges
-        layout the letters stand only on the outer edge of each wedge, so a
-        short word such as «الله» fits well, while longer words and the
-        corners often do not fit yet. An offer that does not fit can still be chosen:
-        those parts stay as pattern, and the panel says how many did not fit.
+        the lam, and a word's tall letters rise together, all of them or none,
+        so no single stroke stands up alone beside the rest of its word; a heh
+        keeps its box, as in the old panels, and «الله» always reads alef, lam,
+        lam and heh. In the wedges layout the letters stand on the outer edge
+        of each wedge and their tall strokes are carried up to the slanted
+        sides the same way, so a short word such as «الله» fits well, while
+        longer words, several words in one wedge and the corners often do not
+        fit yet. An offer that does not fit can still be chosen: those parts
+        stay as pattern, and the panel says how many did not fit.
       </p>
     </>
   ),

@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { kufiGlyphById, stretchGlyph } from "./kufiAlphabet";
-import { _internal, packKufiRegion } from "./kufiPack";
+import { kufiGlyphById, kufiShaftTops, stretchGlyph } from "./kufiAlphabet";
+import { _internal } from "./kufiPack";
+import { resolveKufiText } from "./kufiWords";
 import {
   layoutKufiOctagon,
   OCTAGON_BAND,
   OCTAGON_DEPTH,
   OCTAGON_MIN_SIZE,
-  octagonBandMask,
   octagonBottomField,
   octagonGeometry,
   octagonInk,
@@ -59,8 +59,11 @@ function solid2x2(ink: Uint8Array, N: number): Array<[number, number]> {
   return out;
 }
 
-/** The columns of a band's strokes: a word of الله's shafts (the second lam, the first lam, the alef; never the heh's wall), `period` apart along the side. */
-const allahStrokes = (words: number, period = 10) => Array.from({ length: words }, (_, w) => [4, 6, 8].map((c) => c + period * w)).flat().filter((c) => c >= OCTAGON_DEPTH);
+/**
+ * The columns of a band's strokes: a word of الله's shafts (the second lam, the first lam, the alef;
+ * never the heh's wall), `period` apart along the side; the first word's, under the corner in part, none.
+ */
+const allahStrokes = (words: number, period = 10) => Array.from({ length: words }, (_, w) => [4, 6, 8].map((c) => c + period * w)).flat().filter((c) => c >= period);
 
 describe("octagonGeometry", () => {
   it("the line is the side less a band's depth; with no strokes the centre is half the square, of its parity, never wider than the interior less two", () => {
@@ -202,7 +205,9 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
         }
       }
       expect(l.strokes).toEqual({ lengthened, onOctagon, onDiagonal });
-      expect(lengthened).toBeGreaterThan(0);
+      // one الله a side is a side's first word, its heh and first lam under the corner, so nothing of it rises
+      if (size === 15) expect(lengthened).toBe(0);
+      else expect(lengthened).toBeGreaterThan(0);
       for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (octagonOpen(g, x, y)) expect(at(x, y)).toBe(false);
     }
     // three الله a side: the middle word's strokes reach the octagon
@@ -213,7 +218,7 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
     const l = packed(35, rep(ALLAH, 3));
     const g = l.geometry;
     expect(g).toMatchObject({ width: 21, flat: 9 });
-    expect(l.strokes).toEqual({ lengthened: 8, onOctagon: 4, onDiagonal: 4 });
+    expect(l.strokes).toEqual({ lengthened: 6, onOctagon: 4, onDiagonal: 2 });
     const at = (x: number, y: number) => l.cells[y * 35 + x] === 1;
     /** The stroke in column `c` of the bottom field ends at row `y`: ink there, paper above. */
     const endsAt = (c: number, y: number) => at(c, y) && !at(c, y - 1);
@@ -228,8 +233,9 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
     // beyond the crossing the strokes end on the diagonal staircase, one cell deeper per column toward the square's corner
     expect(endsAt(26, 27) && octagonSeam(g, 26, 26)).toBe(true);
     expect(endsAt(28, 29) && octagonSeam(g, 28, 28)).toBe(true);
-    expect(endsAt(8, 27) && octagonSeam(g, 8, 26)).toBe(true);
-    expect(endsAt(6, 29) && octagonSeam(g, 6, 28)).toBe(true);
+    // the first word (columns 0 to 8) has its heh and first lam under the left band's corner, so none of its shafts
+    // rise: its second lam (6) and alef (8) stay at the band's height rather than rise without the lam at 4
+    for (const c of [4, 6, 8]) expect(at(c, 29), `column ${c}`).toBe(false);
     // the heh's box keeps its own wall under its bar, in the band: nothing rises out of it (words at 10 and 20; columns 10 to 12, 20 to 22)
     for (const c of [10, 11, 12, 20, 21, 22]) expect(at(c, 29), `column ${c}`).toBe(false);
     expect(at(12, 30) && at(12, 31) && at(10, 30) && !at(10, 31)).toBe(true);
@@ -253,16 +259,17 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
           if (ch === "#") owner.set(p.col + j, p.glyphId);
         });
       }
-      const shafts = octagonShafts(b);
+      const shafts = octagonShafts(b, text);
       for (const c of shafts) {
         const id = owner.get(c);
         expect(id && TALL.some((t) => id.startsWith(t)), `${text} at ${size}: column ${c} is ${id ?? "no letter's"}`).toBe(true);
         expect(ink(c, 0) && ink(c, 1) && !ink(c - 1, 0) && !ink(c + 1, 0), `${text} at ${size}: column ${c} is not a bare upright`).toBe(true);
       }
-      // what rises out of the band is exactly the shafts under the interior
+      // what rises out of the band is exactly the shafts, all under the interior
       const lengthened: number[] = [];
       for (let c = 0; c < L; c++) if (l.cells[(size - OCTAGON_DEPTH) * size + c]) lengthened.push(c);
-      expect(lengthened).toEqual(shafts.filter((c) => c >= OCTAGON_DEPTH));
+      expect(lengthened).toEqual(shafts);
+      expect(shafts.every((c) => c >= OCTAGON_DEPTH)).toBe(true);
       // a heh's columns are never among them, nor the heh of الله (its box: the glyph's first three columns, widened by its column stretch)
       for (const p of b.placements) {
         let box: number[] = [];
@@ -273,14 +280,46 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
     }
     // محمد has no tall letter, so nothing is lengthened, however tall its boxes are drawn
     expect(packed(21, "محمد").strokes).toEqual({ lengthened: 0, onOctagon: 0, onDiagonal: 0 });
-    // the band takes الله with the heh's own wall (`allah.isolated.5`), so every word gives three shafts: both lams and the alef
+    // the band takes الله on four uprights with the heh's own wall (`allah.isolated.3`), so a word gives three shafts,
+    // both lams and the alef; the first word's lie under the corner in part (its lam at 4), so it gives none
     const b35 = packed(35, rep(ALLAH, 3)).band;
-    expect(b35.placements.map((p) => p.glyphId)).toEqual(["allah.isolated.5", "allah.isolated.5", "allah.isolated.5"]);
-    expect(octagonShafts(b35)).toEqual([4, 6, 8, 14, 16, 18, 24, 26, 28]);
-    // the wedges' merged form (the heh hanging off the second lam) would give two: that lam is the heh's wall, capped by its bar
-    const merged = packKufiRegion({ text: rep(ALLAH, 3), mask: octagonBandMask(29), bars: false, place: "wedge" });
-    expect(merged.ok && merged.placements.map((p) => p.glyphId)).toEqual(["allah.isolated.3", "allah.isolated.3", "allah.isolated.3"]);
-    expect(merged.ok && octagonShafts(merged)).toEqual([4, 6, 12, 14, 20, 22]);
+    expect(b35.placements.map((p) => p.glyphId)).toEqual(["allah.isolated.3", "allah.isolated.3", "allah.isolated.3"]);
+    expect(octagonShafts(b35, rep(ALLAH, 3))).toEqual([14, 16, 18, 24, 26, 28]);
+  });
+
+  it("a word's shafts rise together or not at all: never a lone lengthened shaft beside its unlengthened siblings", () => {
+    // The user, 2026-11-02: a lone lengthened shaft beside its word's other uprights read as another
+    // letter's stem. Per word of the band, every shaft (`kufiShaftTops`) lengthens or none does; a
+    // word with a shaft under the corner (a side's first word) is one that cannot rise.
+    let risen = 0, still = 0;
+    for (const [size, text] of [...CASES, ...PHRASES]) {
+      const l = packed(size, text);
+      const b = l.band;
+      const { units } = resolveKufiText(text);
+      const rises = new Map<number, number[]>();
+      for (const p of b.placements) {
+        const found = kufiGlyphById(p.glyphId)!;
+        const rows = stretchGlyph(found.glyph, p.stretch);
+        const tops = kufiShaftTops(found.skeleton, rows);
+        const word = units[p.unitIndex].wordIndex;
+        for (let j = 0; j < tops.length; j++) {
+          if (tops[j] < 0) continue;
+          const list = rises.get(word) ?? [];
+          rises.set(word, list);
+          let n = 0;
+          while (size - OCTAGON_DEPTH - n >= 0 && l.cells[(size - OCTAGON_DEPTH - n) * size + p.col + j]) n++;
+          list.push(n);
+        }
+      }
+      for (const [word, list] of rises) {
+        const up = list.filter((n) => n > 0).length;
+        expect(up === 0 || up === list.length, `${text} at ${size}: word ${word} rises ${list.join(",")}`).toBe(true);
+        if (up > 0) risen++;
+        else still++;
+      }
+    }
+    expect(risen).toBeGreaterThan(0);
+    expect(still).toBeGreaterThan(0);
   });
 
   it("a text that does not fill its line, or does not fit it, packs no square and says why", () => {

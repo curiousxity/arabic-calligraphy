@@ -124,7 +124,7 @@ function areaOf(text: string): number {
   let a = areas.get(text);
   if (a === undefined) {
     const { units } = resolveKufiText(text);
-    a = Math.max(1, units.reduce((n, u) => n + ((kufiFormsOf(u, "wedge")[0]?.rows[0]?.length ?? 1) + 1) * LINE_PITCH, 0));
+    a = Math.max(1, units.reduce((n, u) => n + ((kufiFormsOf(u, "star")[0]?.rows[0]?.length ?? 1) + 1) * LINE_PITCH, 0));
     areas.set(text, a);
   }
   return a;
@@ -265,7 +265,7 @@ function lookup(clock: Clock, mask: KufiMask, text: string, octagon = false): Ku
   if (clock.over()) throw new OutOfBudget();
   clock.tries++;
   // the octagon's band packs as `layoutKufiOctagon` packs it (its forms, no bars), since an approved offer is drawn as packed here
-  const r = octagon ? packKufiRegion({ text, mask, bars: false, place: "octagon" }) : packKufiRegion({ text, mask });
+  const r = octagon ? packKufiRegion({ text, mask, bars: false }) : packKufiRegion({ text, mask });
   packCache.set(key, r);
   if (packCache.size > PACK_CACHE_LIMIT) packCache.delete(packCache.keys().next().value!);
   return r;
@@ -448,7 +448,7 @@ function octagonOffers(clock: Clock, text: string, offers: KufiStarOffer[]): voi
         if (band.reason === "tooShort") break;
         continue;
       }
-      const octagon = octagonFromBand(size, band);
+      const octagon = octagonFromBand(size, band, side);
       offers.push({
         inputs: { layout: "octagon", fold: 4, k: defaultStarK(4), size, regions: [side] },
         pattern: "octagon",

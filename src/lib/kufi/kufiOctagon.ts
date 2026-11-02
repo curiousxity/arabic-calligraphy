@@ -19,7 +19,8 @@
  * - **The interior** (N - 2 DEPTH square) is cut by its diagonals into four
  *   fields, one per band. A tall stroke (a shaft: a tall letter's upright
  *   reaching the band's top row, nothing beside its top, `octagonShafts`;
- *   never a heh's wall or a bowl's side) runs on from the seam row straight inward through
+ *   never a heh's wall or a bowl's side; a word's shafts all together or
+ *   none) runs on from the seam row straight inward through
  *   its band's field until the next cell is the open centre or a diagonal
  *   seam cell (the diagonals themselves stay paper, so the ends of two
  *   fields' strokes meet only at corners). Strokes under the octagon's flat
@@ -48,6 +49,7 @@
  */
 import { kufiGlyphById, kufiShaftTops, stretchGlyph } from "./kufiAlphabet";
 import { packKufiRegion, type KufiMask, type KufiPackResult } from "./kufiPack";
+import { resolveKufiText } from "./kufiWords";
 
 /** Letter height: a band is one 5-row line. */
 export const OCTAGON_BAND = 5;
@@ -182,9 +184,9 @@ export type KufiOctagonLayout = {
 };
 
 /**
- * The columns of a packed band that may lengthen inward: each holds a
- * **shaft**, the upright of a tall letter (`KUFI_SHAFT_LETTERS`: an alef, a
- * lam, a kaf's or tah's stem, the ligatures' own), reaching the band's top
+ * The columns of a packed band (of `text`) that lengthen inward: each holds
+ * a **shaft**, the upright of a tall letter (`KUFI_SHAFT_LETTERS`: an alef,
+ * a lam, a kaf's or tah's stem, the ligatures' own), reaching the band's top
  * row, two cells or more, with paper beside its top. Which letter the top
  * cell belongs to is read from the band's placements (the glyph drawn at
  * its stretch), not from the ink alone: a heh's wall rises as high as a lam
@@ -196,34 +198,50 @@ export type KufiOctagonLayout = {
  * the lams rise above the heh, whose wall ends at its bar. A capped top
  * (a lam's hook, an alef's head) is not lengthened either: the stroke would
  * rise past its own head.
+ *
+ * **A word's shafts rise together or not at all** (the user, 2026-11-02: a
+ * lone lengthened shaft beside its unlengthened siblings read as another
+ * letter's stem). A shaft under the next band's corner (the band's first
+ * `DEPTH` columns) or with ink beside its top cannot rise, so a word with
+ * one such gives no stroke at all: the first word of a side, whose heh and
+ * first lam lie under the corner, stays at the band's height.
  */
-export function octagonShafts(band: Extract<KufiPackResult, { ok: true }>): number[] {
+export function octagonShafts(band: Extract<KufiPackResult, { ok: true }>, text: string): number[] {
   const { cols: L, rows: R, cells, placements } = band;
   const ink = (x: number, y: number) => x >= 0 && x < L && y >= 0 && y < R && cells[y * L + x] === 1;
-  // per column, whether the ink on the band's top row is a shaft's top (`kufiShaftTops`, the notion a region's bars share)
-  const tall = new Uint8Array(L);
+  const { units } = resolveKufiText(text);
+  // per word, its shafts' columns: the band's top-row cells that are a shaft's top (`kufiShaftTops`, the
+  // notion a region's bars share), or -1 for a shaft that cannot rise
+  const words = new Map<number, number[]>();
   for (const p of placements) {
-    if (p.turn !== 0 || p.row !== 0) continue; // a region's lines are upright; a letter below the top row reaches nothing
     const found = kufiGlyphById(p.glyphId);
-    if (!found) continue;
+    const word = units[p.unitIndex]?.wordIndex;
+    if (!found || word === undefined) continue;
+    const list = words.get(word) ?? [];
+    words.set(word, list);
     const tops = kufiShaftTops(found.skeleton, stretchGlyph(found.glyph, p.stretch));
-    for (let j = 0; j < tops.length; j++) if (tops[j] === 0) tall[p.col + j] = 1;
+    for (let j = 0; j < tops.length; j++) {
+      if (tops[j] < 0) continue;
+      // a region's lines are upright; a shaft below the band's top row, under the corner or with ink beside its top reaches nothing
+      const c = p.col + j;
+      const free = p.turn === 0 && p.row + tops[j] === 0 && c >= OCTAGON_DEPTH && !ink(c - 1, 0) && !ink(c + 1, 0);
+      list.push(free ? c : -1);
+    }
   }
-  // and nothing of any letter beside it
   const out: number[] = [];
-  for (let c = 0; c < L; c++) if (tall[c] && !ink(c - 1, 0) && !ink(c + 1, 0)) out.push(c);
-  return out;
+  for (const list of words.values()) if (list.length > 0 && list.every((c) => c >= 0)) out.push(...list);
+  return out.sort((a, b) => a - b);
 }
 
 /** Packs `text` along one side; null when it does not pack a line of this size (the reason is in `band`). */
 export function layoutKufiOctagon(size: number, text: string): { layout: KufiOctagonLayout | null; band: KufiPackResult } {
-  const band = packKufiRegion({ text, mask: octagonBandMask(size), bars: false, place: "octagon" });
+  const band = packKufiRegion({ text, mask: octagonBandMask(size), bars: false });
   if (!band.ok) return { layout: null, band };
-  return { layout: octagonFromBand(size, band), band };
+  return { layout: octagonFromBand(size, band, text), band };
 }
 
-/** The square built on one side's packing (`octagonBandMask(size)`): the four turns and the lengthened strokes. */
-export function octagonFromBand(size: number, band: Extract<KufiPackResult, { ok: true }>): KufiOctagonLayout {
+/** The square built on one side's packing of `text` (`octagonBandMask(size)`): the four turns and the lengthened strokes. */
+export function octagonFromBand(size: number, band: Extract<KufiPackResult, { ok: true }>, text: string): KufiOctagonLayout {
   const N = size, L = size - OCTAGON_DEPTH;
   const cells = new Uint8Array(N * N);
   const quarter = new Uint8Array(N * N); // the bottom band and its field
@@ -231,8 +249,8 @@ export function octagonFromBand(size: number, band: Extract<KufiPackResult, { ok
   // the bottom band's letters, feet on the bottom edge
   for (let r = 0; r < OCTAGON_BAND; r++)
     for (let c = 0; c < L; c++) if (ink(c, r)) quarter[(N - OCTAGON_BAND + r) * N + c] = 1;
-  // its tall strokes: the shafts under the interior (a shaft under the next band's corner lengthens nothing)
-  const strokeCols = octagonShafts(band).filter((c) => c >= OCTAGON_DEPTH);
+  // its tall strokes: each word's shafts under the interior, all of them or none
+  const strokeCols = octagonShafts(band, text);
   const g = octagonGeometry(size, strokeCols);
   // lengthened inward from the seam row until the next cell is the open centre or a diagonal seam cell
   const strokes = { lengthened: 0, onOctagon: 0, onDiagonal: 0 };

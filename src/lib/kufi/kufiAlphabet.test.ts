@@ -426,12 +426,26 @@ describe("KUFI_FORMS: pieces read off the reference panel", () => {
     expect(ENTRIES.filter((e) => (e.g.parts ?? 1) !== 1).map(label)).toEqual(["allah.isolated.2", "allah.isolated.4"]);
   });
 
-  it("has a الله of three uprights, the heh on the second lam, and the same under its bar", () => {
+  it("has a star الله of four uprights at a line's height, the heh with its own wall, and the same under its bar", () => {
     const g = glyphById("allah.isolated.3");
-    expect(g.rows).toEqual(["###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"]);
+    expect(g.rows).toEqual(["###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"]);
     expect(g.parts).toBeUndefined();
-    expect(glyphById("allah.isolated.4").rows).toEqual(["#######", ".......", ...g.rows]);
-    expect(glyphById("allah.isolated.4").parts).toBe(2);
+    expect(g.only).toBe("star");
+    expect(glyphById("allah.isolated.4").rows).toEqual(["#########", ".........", ...g.rows]);
+    expect(glyphById("allah.isolated.4")).toMatchObject({ parts: 2, only: "star" });
+  });
+
+  it("every الله form shows alef, lam, lam and the heh's own wall: four uprights the height of its body, never a heh hanging off a lam", () => {
+    // A merged form of three uprights (the heh's right wall doubling as the second lam) read as the heh's
+    // stem rising whenever the lam beside it was lengthened (2026-11-02), so no form has one in any place.
+    for (const g of KUFI_FORMS.allah.isolated ?? []) {
+      const body = g.rows.slice(-5); // the five rows standing on the line: the heh's box and the uprights
+      // the runs of ink along the body's top row: the heh's box (its bar, or its two walls in the panel's
+      // tall form) and then three bare uprights, a paper column between each
+      const runs = body[0].match(/#+/g) ?? [];
+      expect(runs.length, g.id).toBeGreaterThanOrEqual(4);
+      expect(runs.slice(-3), g.id).toEqual(["#", "#", "#"]);
+    }
   });
 
   it("joinCol defaults to the outermost column", () => {

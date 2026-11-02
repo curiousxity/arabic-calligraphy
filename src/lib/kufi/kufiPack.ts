@@ -361,9 +361,9 @@ function countVectors(g: KufiGlyph, rowMax = ROW_MAX): number[][] {
 
 /**
  * The alternates a unit may take: its joining form's list, else the isolated one. The packer's rule, shared with the canvas.
- * A star's wedge or the octagon's band (`place`) takes the forms a letter has for that place where it has any
- * (`KufiGlyph.only`: الله on three uprights in a wedge, on four with the heh's own wall in the octagon's band),
- * else its forms drawn whole; a rectangular panel takes the forms authored for no place.
+ * A star (`place`: a wedge or the octagon's band) takes the forms a letter has for a star where it has any
+ * (`KufiGlyph.only`: الله on four uprights at a line's height, the heh with its own wall), else its forms
+ * drawn whole; a rectangular panel takes the forms authored for no place.
  */
 export function kufiFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">, place: KufiPlace = "panel"): KufiGlyph[] {
   const table = KUFI_FORMS as Record<string, Partial<Record<JoiningForm, KufiGlyph[]>>>;
@@ -1680,18 +1680,22 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
  * run on to. So a bar draws a baseline or a stroke on along the line, never a
  * tail off the tip of a tall stroke.
  *
- * In a region (upright lines only) a bar may also carry a **shaft** straight
- * on upward, to the slanted edge: an alef or lam lengthened to meet the
- * region's side, as square-Kufi tilework does. Which uprights are shafts is
- * `kufiShaftTops`, the notion the octagon's lengthened strokes use: a shaft
- * letter's column with a bare top, never a heh's wall under its bar, a box's
- * or bowl's side or a stretched tooth (the heh of الله was carried up out of
- * its box by five or six cells, 2026-11-02). No bar there runs along a
- * stroke off the baseline (the heh's bars read as arms), nor downward.
+ * In a region (upright lines only) bars may also carry a word's **shafts**
+ * straight on upward, to the slanted edge: its alef and lams lengthened to
+ * meet the region's side, as square-Kufi tilework does. Which uprights are
+ * shafts is `kufiShaftTops`, the notion the octagon's lengthened strokes
+ * use: a shaft letter's column with a bare top, never a heh's wall under its
+ * bar, a box's or bowl's side or a stretched tooth (the heh of الله was
+ * carried up out of its box by five or six cells, 2026-11-02). The shafts are
+ * returned per word (`shafts[word]`, the cells of their tops), since a word's
+ * shafts rise together or not at all (`shaftGroup`); no bit of `ends` marks
+ * them. No bar there runs along a stroke off the baseline (the heh's bars
+ * read as arms), nor downward.
  */
-function barEnds(ctx: Ctx, st: St): Uint8Array {
+function barEnds(ctx: Ctx, st: St): BarEnds {
   const { cols, rows } = ctx;
   const out = new Uint8Array(ctx.n);
+  const shafts: number[][] = [];
   const axis = new Int8Array(ctx.n).fill(-1);
   const mine = (r: number, c: number, li: number) => r >= 0 && c >= 0 && r < rows && c < cols && st.kind[r * cols + c] === K_GLYPH && st.letter[r * cols + c] === li;
   const paperAt = (L: Line, x: number, y: number) => {
@@ -1709,18 +1713,22 @@ function barEnds(ctx: Ctx, st: St): Uint8Array {
       if (ink[k + 1] === 0) out[i] = a === 0 ? 3 : 12;
     }
     if (!ctx.region) continue;
-    // a region's upright bar carries a shaft on upward from its top (`kufiShaftTops`, the notion the
-    // octagon's strokes share): never a heh's wall, a box's side or a tooth, whatever its height, and
-    // only with paper beside the top (a region's lines are upright, so the glyph's rows are the cells')
-    const tops = kufiShaftTops(ctx.letters[p.letter].unit.skeleton, stretchGlyph(p.shape.g, p.shape.counts));
+    // a region's upright bars carry a word's shafts on upward from their tops (`kufiShaftTops`, the
+    // notion the octagon's strokes share): never a heh's wall, a box's side or a tooth, whatever its
+    // height (a region's lines are upright, so the glyph's rows are the cells'); a top with ink beside
+    // it is a shaft that cannot rise, kept (-1) so its word's others do not rise without it
+    const letter = ctx.letters[p.letter];
+    const tops = kufiShaftTops(letter.unit.skeleton, stretchGlyph(p.shape.g, p.shape.counts));
     for (let j = 0; j < tops.length; j++) {
       if (tops[j] < 0) continue;
       const y = p.shape.baseRow - tops[j];
       const i = at(ctx, L, p.x0 + j, p.yb + y);
-      if (i >= 0 && st.kind[i] === K_GLYPH && paperAt(L, p.x0 + j - 1, p.yb + y) && paperAt(L, p.x0 + j + 1, p.yb + y)) out[i] |= 4;
+      if (i < 0 || st.kind[i] !== K_GLYPH) continue;
+      const free = paperAt(L, p.x0 + j - 1, p.yb + y) && paperAt(L, p.x0 + j + 1, p.yb + y);
+      (shafts[letter.word] ??= []).push(free ? i : -1);
     }
   }
-  if (ctx.region) return out;
+  if (ctx.region) return { ends: out, shafts };
   for (let i = 0; i < ctx.n; i++) {
     if (axis[i] < 0) continue;
     const r = (i / cols) | 0;
@@ -1729,7 +1737,42 @@ function barEnds(ctx: Ctx, st: St): Uint8Array {
     if (axis[i] === 0) out[i] |= (mine(r, c + 1, li) ? 1 : 0) | (mine(r, c - 1, li) ? 2 : 0);
     else out[i] |= (mine(r + 1, c, li) ? 4 : 0) | (mine(r - 1, c, li) ? 8 : 0);
   }
-  return out;
+  return { ends: out, shafts };
+}
+
+/** `barEnds`' answer: the end bits per cell, and in a region each word's shaft tops (sparse by word index). */
+type BarEnds = { ends: Uint8Array; shafts: number[][] };
+
+/**
+ * A region's upward bars for one word, taken together or not at all: from
+ * each of the word's shaft tops (`barEnds`, `shafts[word]`) a run of paper
+ * straight up, at least two cells and at most `STEM_BAR_MAX`, with paper
+ * beside it and never ending against ink above (a region's bar meets a
+ * letter at its lower end alone). The runs may differ in length where the
+ * slanted side stops them, but every shaft of the word must have one: a
+ * lone lengthened shaft beside its unlengthened siblings reads as another
+ * letter's (the user, 2026-11-02: the one tall stroke beside the heh's box
+ * of الله read as the heh's stem). So a shaft that cannot rise (ink beside
+ * its top, -1, or no room above it) means none of the word's rise, and null
+ * is returned. `ok(r, c)` says whether a cell may hold a bar along its column.
+ */
+function shaftGroup(ctx: Ctx, own: Int32Array, tops: number[], ok: (r: number, c: number) => boolean): number[] | null {
+  const { cols } = ctx;
+  const cells: number[] = [];
+  for (const t of tops) {
+    if (t < 0) return null;
+    const r = (t / cols) | 0;
+    const c = t - r * cols;
+    const e = r - 1;
+    let s = e;
+    if (e < 0 || !ok(e, c)) return null;
+    while (s - 1 >= 0 && ok(s - 1, c)) s--;
+    if (s - 1 >= 0 && own[(s - 1) * cols + c]) s++;
+    if (e - s + 1 > STEM_BAR_MAX) s = e - STEM_BAR_MAX + 1;
+    if (e - s + 1 < 2) return null;
+    for (let k = s; k <= e; k++) cells.push(k * cols + c);
+  }
+  return cells.length > 0 ? cells.sort((a, b) => a - b) : null;
 }
 
 /**
@@ -1743,12 +1786,38 @@ function barEnds(ctx: Ctx, st: St): Uint8Array {
  * of them is drawn. Candidates are the maximal runs of paper that pass,
  * trimmed by a cell at an end that touches the wrong ink; they are taken
  * greedily by the empty windows and frame breaks they close (most first, ties
- * by first cell, rows before columns), the rule re-checked after each. Each
- * bar gets its own owner id. Returns the count.
+ * by first cell, rows before columns), the rule re-checked after each. In a
+ * region the candidates along a column are a word's shafts carried up
+ * together (`shaftGroup`), one candidate per word, taken or left as one.
+ * Each bar gets its own owner id (a group's, one per shaft). Returns the
+ * count of bars drawn.
  */
-function barPass(ctx: Ctx, own: Int32Array, ends: Uint8Array, kind: Uint8Array, zone: Uint8Array, nextId: number): number {
+function barPass(ctx: Ctx, own: Int32Array, { ends, shafts }: BarEnds, kind: Uint8Array, zone: Uint8Array, nextId: number): number {
   const { cols, rows } = ctx;
   const paper = (r: number, c: number) => r < 0 || c < 0 || r >= rows || c >= cols || own[r * cols + c] === 0;
+  // a cell may hold a bar along `dir` (0 a row, 1 a column): paper, in no dot zone, inside the region, nothing beside it
+  const okAt = (r: number, c: number, dir: number) => {
+    const i = r * cols + c;
+    if (own[i] || zone[i] || (ctx.region && !ctx.region.cells[i])) return false;
+    return dir === 0 ? paper(r - 1, c) && paper(r + 1, c) : paper(r, c - 1) && paper(r, c + 1);
+  };
+  const okUp = (r: number, c: number) => okAt(r, c, 1);
+  /** The windows and breaks a candidate closes: `cells` (sorted) taken, against the same box left open. */
+  const closedBy = (cells: number[]) => {
+    let r0 = rows, r1 = -1, c0 = cols, c1 = -1;
+    for (const i of cells) {
+      const r = (i / cols) | 0, c = i - r * cols;
+      r0 = Math.min(r0, r);
+      r1 = Math.max(r1, r);
+      c0 = Math.min(c0, c);
+      c1 = Math.max(c1, c);
+    }
+    const before = gaps(r0 - 1, r1, c0 - 1, c1);
+    for (const i of cells) own[i] = -1;
+    const closes = before - gaps(r0 - 1, r1, c0 - 1, c1);
+    for (const i of cells) own[i] = 0;
+    return closes;
+  };
   // empty windows by their top-left cell, and frame breaks by their first cell, in rows r0..r1 and cols c0..c1
   const gaps = (r0: number, r1: number, c0: number, c1: number) => {
     let n = 0;
@@ -1770,18 +1839,25 @@ function barPass(ctx: Ctx, own: Int32Array, ends: Uint8Array, kind: Uint8Array, 
   };
   let bars = 0;
   for (;;) {
-    let best: { cells: number[]; closes: number } | null = null;
+    let best: { cells: number[]; closes: number; count: number } | null = null;
+    const offer = (cells: number[], closes: number, count: number) => {
+      if (closes >= 1 && (!best || closes > best.closes || (closes === best.closes && cells[0] < best.cells[0]))) best = { cells, closes, count };
+    };
     // dir 0: along a row; 1: along a column
     for (const dir of [0, 1]) {
+      if (ctx.region && dir === 1) {
+        // a region's column bars: each word's shafts carried up together, or none of them
+        for (const tops of shafts) {
+          const cells = tops && shaftGroup(ctx, own, tops, okUp);
+          if (cells) offer(cells, closedBy(cells), tops.length);
+        }
+        continue;
+      }
       const across = dir === 0 ? rows : cols;
       const len = dir === 0 ? cols : rows;
       for (let a = 0; a < across; a++) {
         const idx = (b: number) => (dir === 0 ? a * cols + b : b * cols + a);
-        const ok = (b: number) => {
-          const i = idx(b);
-          if (own[i] || zone[i] || (ctx.region && !ctx.region.cells[i])) return false;
-          return dir === 0 ? paper(a - 1, b) && paper(a + 1, b) : paper(b, a - 1) && paper(b, a + 1);
-        };
+        const ok = (b: number) => (dir === 0 ? okAt(a, b, 0) : okAt(b, a, 1));
         // the ink beyond an end, or -1 for paper or the panel's edge
         const beyond = (b: number) => (b < 0 || b >= len || !own[idx(b)] ? -1 : idx(b));
         // the ink at the near end has the bar after it, at the far end before it (see `barEnds`)
@@ -1800,32 +1876,27 @@ function barPass(ctx: Ctx, own: Int32Array, ends: Uint8Array, kind: Uint8Array, 
           const t0 = beyond(s - 1);
           const t1 = beyond(e + 1);
           if (t0 >= 0 && t1 >= 0 && own[t0] === own[t1]) e--;
-          // a region's upright bar carries a stem on (its lower end on the letter, `barEnds`), by so much at most
-          if (ctx.region && dir === 1 && e - s + 1 > STEM_BAR_MAX) s = e - STEM_BAR_MAX + 1;
           b = next;
           // a bar extends a letter: one touching none would float
           if (e - s + 1 < 2 || (beyond(s - 1) < 0 && beyond(e + 1) < 0)) continue;
           const cells: number[] = [];
           for (let k = s; k <= e; k++) cells.push(idx(k));
-          const r0 = (cells[0] / cols) | 0;
-          const c0 = cells[0] - r0 * cols;
-          const r1 = (cells[cells.length - 1] / cols) | 0;
-          const c1 = cells[cells.length - 1] - r1 * cols;
-          const before = gaps(r0 - 1, r1, c0 - 1, c1);
-          for (const i of cells) own[i] = -1;
-          const closes = before - gaps(r0 - 1, r1, c0 - 1, c1);
-          for (const i of cells) own[i] = 0;
-          if (closes >= 1 && (!best || closes > best.closes || (closes === best.closes && cells[0] < best.cells[0]))) best = { cells, closes };
+          offer(cells, closedBy(cells), 1);
         }
       }
     }
     if (!best) return bars;
-    const id = nextId++;
-    for (const i of best.cells) {
+    const taken: { cells: number[]; count: number } = best;
+    // a group's shafts stand in different columns: one id per column, so each bar is its own run
+    const ids = new Map<number, number>();
+    for (const i of taken.cells) {
+      const c = taken.count > 1 ? i % cols : 0;
+      let id = ids.get(c);
+      if (id === undefined) ids.set(c, (id = nextId++));
       own[i] = id;
       kind[i] = K_BAR;
     }
-    bars++;
+    bars += taken.count;
   }
 }
 
@@ -2468,9 +2539,9 @@ function makeCtx(
   pins: Map<number, Pin>,
   budgetMs: number,
   strictClock = false,
-  mask: KufiMask | null = null,
-  place: KufiPlace = mask ? "wedge" : "panel"
+  mask: KufiMask | null = null
 ): Ctx {
+  const place: KufiPlace = mask ? "star" : "panel";
   const { units } = resolveKufiText(text);
   const rings = Math.max(1, Math.floor((Math.min(cols, rows) - 1) / (2 * (BAND + 1))) + 1);
   const letters = lettersOf(text, units, edits, pins, place);
@@ -3093,13 +3164,13 @@ export function packKufiPanel(input: {
  * line of text, are not held to the frame's rule and may run to paper. Fillers are bars only
  * (`fillPass`, `barEnds`), searched with from the start: a region's base row is closed by bars
  * in nearly every packing, so there is no bar-free phase to keep (`searchInner`). No edits,
- * pins or suggestions: a region's size is the star's, not the user's to pick here. `place` (a
- * wedge unless said) chooses the letters' forms, see `kufiFormsOf`. Pure and deterministic,
- * on PACK_BUDGET_MS / PACK_WORK.
+ * pins or suggestions: a region's size is the star's, not the user's to pick here. The letters
+ * take their star forms (`kufiFormsOf` for the `star` place). Pure and deterministic, on
+ * PACK_BUDGET_MS / PACK_WORK.
  */
-export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boolean; place?: Exclude<KufiPlace, "panel"> }): KufiPackResult {
+export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boolean }): KufiPackResult {
   regionPackCount++;
-  const { text, mask, place = "wedge" } = input;
+  const { text, mask } = input;
   const { cols, rows } = mask;
   const { units } = resolveKufiText(text);
   if (letterCount(units) < 2) return { ok: false, reason: "tooShort", suggestions: [] };
@@ -3109,7 +3180,7 @@ export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boo
   if (input.bars === false) barsOff = true;
   let f: Final | null;
   try {
-    f = search(makeCtx(text, cols, rows, {}, new Map(), PACK_BUDGET_MS, false, mask, place));
+    f = search(makeCtx(text, cols, rows, {}, new Map(), PACK_BUDGET_MS, false, mask));
   } finally {
     barsOff = wereOff;
   }

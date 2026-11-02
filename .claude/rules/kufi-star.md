@@ -78,12 +78,20 @@ with its repeats, as the wedge regions carry theirs):
   verticals, the heh's own short wall ending at its bar and the lams rising
   far above it, and a 2004 article's لله keeps the heh a closed box). A
   capped top (a lam's hook, an alef's head) is not lengthened either: the
-  stroke would rise past its own head. So الله gives three shafts a word
-  (the second lam, the first lam, the alef) and never the heh's wall; محمد
-  gives none; الحمد لله only its alef and lams (its meem's walls used to
-  rise). Short letters leave the space above them open: in the reference
-  that space is the design, not a hole, so the empty-2x2 rule holds inside
-  the bands (the packer's) and not above them.
+  stroke would rise past its own head. **A word's shafts rise together or
+  not at all** (2026-11-02, the user: one tall stroke beside the heh's box
+  read as the heh's stem, and a lone lengthened shaft beside its word's
+  unlengthened siblings is that fault wherever it occurs): a shaft under
+  the next band's corner (the band's first `DEPTH` columns) or with ink
+  beside its top cannot rise, so a word with one such gives no stroke at
+  all. So الله gives three shafts a word (the second lam, the first lam,
+  the alef) and never the heh's wall, except a side's first word, whose heh
+  and first lam lie under the corner and which stays at the band's height;
+  محمد gives none; الحمد لله only لله's two lams (الحمد's alef sits
+  under the corner; its meem's walls used to rise). Short letters leave the
+  space above them open: in the reference that space is the design, not a
+  hole, so the empty-2x2 rule holds inside the bands (the packer's) and not
+  above them.
 - **The open centre** (`octagonGeometry(size, strokeCols)`): a stepped
   octagon `width` cells across (N's parity, centred, never wider than the
   interior less two), its corners cut so the flat sides are `flat` cells.
@@ -101,15 +109,15 @@ with its repeats, as the wedge regions carry theirs):
   that aim is taken, the wider on a tie; with none, the ratio's own width
   with a regular flat. The crossing stroke's end is then on the edge and the
   diagonal at once, and the edge continues across the diagonal as the next
-  field's stroke ends: at 35 with الله ×3 (shafts 6, 8, 14, 16, 18, 24, 26,
-  28) column 24 gives 21/9: its end (24, 25) under the open seam cell
-  (24, 24), the left band's copy ending at (9, 24) beside (10, 24), the
-  middle word's three shafts ending together under the flat, and beyond the
-  crossing the ends stepping down the diagonal, (26, 27), (28, 29). الله ×2
-  at 25 gives 11/7, ×4 at 45 25/9 (the clearest octagon of the four: longer
-  shafts round a centre nearer half the square), the Shahada at 33 19/7;
-  الحمد لله at 31 has three shafts a side, all ending on the diagonals, and
-  takes 15/7. The 45° staircase is one cell per column only where both
+  field's stroke ends: at 35 with الله ×3 (shafts 14, 16, 18, 24, 26, 28;
+  the first word's none) column 24 gives 21/9: its end (24, 25) under the
+  open seam cell (24, 24), the left band's copy ending at (9, 24) beside
+  (10, 24), the middle word's three shafts ending together under the flat,
+  and beyond the crossing the ends stepping down the diagonal, (26, 27),
+  (28, 29). الله ×2 at 25 gives 11/7, ×4 at 45 25/9 (the clearest octagon
+  of the four: longer shafts round a centre nearer half the square), the
+  Shahada at 33 19/7; الحمد لله at 31 has two shafts a side, both ending
+  on a diagonal, and takes 15/7. The 45° staircase is one cell per column only where both
   fields have strokes there; a word's gap and the heh's box leave inlets at
   the octagon's vertices (the pinwheel's four bays), and محمد has no shaft
   at all, so its centre is the ratio's own 7/3 at 21, an open square drawn
@@ -119,10 +127,10 @@ with its repeats, as the wedge regions carry theirs):
   a solid 2x2), so the frame line and the feet are one stroke, as the
   wedges' bands are flush on their base edge. Four pinwheel segments, not a
   closed ring: the corner cells belong to the letter standing there.
-- **Measured** (2026-11-02, the band's 9-wide الله): الله once a side
-  packs at 15 (its line 9; the interior is a 3x3 with the centre cell open),
-  twice at 25, three times at 35, four at 45; `kufiOctagon.test.ts` pins 15
-  and 35. One الله a side makes a small dense tile with no octagon to speak
+- **Measured** (2026-11-02, the star's 9-wide الله): الله once a side
+  packs at 15 (its line 9; the interior is a 3x3 with the centre cell open,
+  and nothing rises: the one word is the first), twice at 25, three times
+  at 35, four at 45; `kufiOctagon.test.ts` pins 15 and 35. One الله a side makes a small dense tile with no octagon to speak
   of; three makes a square whose centre reads as an octagon with the
   diagonals drawn by stroke ends, which is why a new star is
   `الله الله الله` at 35 (it was 29 on the merged form). A side with more
@@ -206,25 +214,25 @@ error; the packer reports `tooLong`.
   counts as usable). Letters meet the sides as a staircase; the pockets that
   staircase leaves, a cell or two wide, stay paper.
 - **A letter's forms by place** (`kufiFormsOf(unit, place)`, `KufiPlace`:
-  `panel`, `wedge` or `octagon`; `packKufiRegion`'s `place`, a wedge unless
-  said). A glyph marked `only` is drawn in that place of a star alone, and
-  where a letter has such forms they replace its other forms there; a
+  `panel` or `star`; `packKufiRegion` packs for the star). A glyph marked
+  `only: "star"` is drawn in a star alone (a wedge or the octagon's band),
+  and where a letter has such forms they replace its other forms there; a
   rectangular panel takes the forms marked for no place, so its tuned
-  layouts are unchanged; a wedge or the octagon's band otherwise takes the
-  unmarked forms drawn whole. Today that is الله. In a wedge
-  `allah.isolated.3` (five rows, three uprights, the heh hanging off the
-  second lam, as in square-Kufi references) and `allah.isolated.4` (the same
-  under the bar of its shadda and dagger alef, one gap above): the panel
-  forms put the heh on a stem of its own, four equal uprights that read as
-  "اللله" in a wedge (second opinion and the user, 2026-11-01), where nothing
-  rises above the heh. In the octagon's band `allah.isolated.5` (five rows,
-  four uprights, the heh's own wall under its bar: the panel's
-  `allah.isolated.1` at the band's height), since there the lams are
-  lengthened out of the band and the heh's wall must stay (2026-11-02; on
-  the merged form the heh's wall was the lam and rose). **The word
-  widens through the heh's box** (column stretch at index 1, up to
-  `COL_MAX`): the one column that widens without a hole, and how a word fills
-  the end of a wedge's line; without it one الله fills no wedge at 21-25.
+  layouts are unchanged; a star otherwise takes the unmarked forms drawn
+  whole. Today that is الله: `allah.isolated.3` (five rows, 9 wide, four
+  uprights with the heh's own wall under its bar: the panel's
+  `allah.isolated.1` at a line's height) and `allah.isolated.4` (the same
+  under the bar of its shadda and dagger alef, one gap above), so every
+  الله in every layout reads alef, lam, lam and a heh, as the Topkapi
+  Scroll's does, with the three shafts lengthened together above the heh's
+  short wall. The wedges had merged forms of three uprights (the heh
+  hanging off the second lam, 7 wide) until 2026-11-02: the merged lam was
+  the heh's wall, and once only shafts were carried up a word showed the
+  heh's box with one tall stroke beside it, which the user read as the heh's
+  stem; four *equal* uprights had read as "اللله" (2026-11-01), which the
+  lengthening now answers. **The word widens through the heh's box**
+  (column stretch at index 1, up to `COL_MAX`): the one column that widens
+  without a hole, and how a word fills the end of a wedge's line.
   **Row stretch is capped at `REGION_ROW_MAX` (2)** in regions: a stem grown
   by six stretched into the next line's room and left the third word nowhere.
 - **Otherwise whole letters only** (`drawnWhole`). A letter without region
@@ -242,9 +250,16 @@ error; the packer reports `tooLong`.
   or bowl's side or a stretched tooth**, however tall (2026-11-02, the user:
   the heh of الله was carried up out of its box by five or six cells in the
   4-fold wedges at 28 and 34), never along a stroke off the baseline (the
-  heh's bars grew arms) and never downward. **No lone filler squares in a
-  region** (`fillPass`): between repeated short words a square reads as a
-  letter's dot, and a region packs without them or not at all.
+  heh's bars grew arms) and never downward. **A word's shafts rise together
+  or not at all** (`shaftGroup`, 2026-11-02): the bar pass's column
+  candidates are one per word, every shaft of the word carried up (by two
+  cells at least, by lengths the slanted side may vary), taken or left as
+  one; a shaft with ink beside its top or no room above it means none of
+  the word's rise. One lengthened shaft beside its unlengthened siblings
+  read as another letter's stem (the lam beside the heh's box as the heh's).
+  **No lone filler squares in a region** (`fillPass`): between repeated
+  short words a square reads as a letter's dot, and a region packs without
+  them or not at all.
 - **A region's search sees what its bars can close.** The beam's partial
   score never counts the space above a region's top line (a later line may
   fill it) and never sees bars (they are drawn in `finish`), so the finals
@@ -255,22 +270,25 @@ error; the packer reports `tooLong`.
   start** (`searchInner`; a panel keeps its bar-free phase, since nearly
   every region packing closes its base row with bars anyway, and a region
   that packs bar-free still draws none). Without both, two الله in a 4-fold
-  wedge at 28 pack only with the heh's wall carried up: the legal packing
-  (the barred form right, the plain form left, its second lam carried up)
-  tied with the other plan and lost the hash.
-- **Measured fits of الله** (2026-11-02, classic stars, shafts only carried):
-  one a wedge at 4-fold 18-25, 5-fold 21-29, 6-fold 24-30; two a 4-fold
-  wedge at 27-28, three a 5-fold wedge at 34-35, two a 6-fold wedge at 34
-  and three at 39-42; a 4-fold corner holds one at 25-28 and three at 39-41;
-  5-fold corners hold one from 43; 6-fold corners nothing up to 50. **Four
-  الله in a 4-fold wedge (34-36 before) no longer pack, nor two at 29, nor
-  one in a 4-fold corner from 29**: each packed only by carrying the heh's
-  wall up, and the pocket the slanted side leaves above a heh's box has no
-  legal filler (a lam is two cells away; the barred form needs the full
-  width at its bar's row; a word slides to its first fit and no further).
+  wedge at 28 (on the merged form of the time) packed only with the heh's
+  wall carried up: the legal packing (the barred form right, the plain form
+  left, its second lam carried up) tied with the other plan and lost the hash.
+- **Measured fits of الله** (2026-11-02, classic stars, the four-upright
+  9-wide form, a word's shafts carried up together or not at all): one a
+  wedge at 4-fold 20-27, 5-fold 24-29, 6-fold 30-33; three a 5-fold wedge
+  at 40, two a 6-fold wedge at 34-40; a 4-fold corner holds one at 29-31
+  and three at 46; 5-fold corners one from 47; 6-fold corners nothing up to
+  50; **a 4-fold wedge never holds two**: the pocket the slanted side leaves
+  above a heh's box has no legal filler (a lam is two cells away; the barred
+  form needs the full width at its bar's row; a word slides to its first fit
+  and no further), and two 9-wide words no longer stand on one line before
+  the sides close. (The merged 7-wide form held one from 18, two at 27-28
+  with the corners filled, three a 5-fold wedge at 34, three a 6-fold at 39.)
   محمد fits a 4-fold wedge twice at 29, 32 and 35 (once never: one word
-  leaves the line's end open). `kufiPackRegion.test.ts` pins the first and
-  the 28 fits, and that no capped top is ever carried up.
+  leaves the line's end open). `kufiPackRegion.test.ts` pins the first fit,
+  the 6-fold 34 and corner 29 fits, that no capped top is ever carried up,
+  that every packed الله stands on four uprights, and that each word's
+  shafts rise all or none.
 - **Copies by rotation, never mirror.** Every region of a kind is a rotation
   of the kind's first, with the same mask, so `layoutKufiStar` packs each
   distinct (kind, text) once and every other region of that kind takes the
@@ -348,13 +366,15 @@ counts against nothing (6-fold corners never hold الله).
   set aside until the rest have had their turn), round robin among equals.
   A task that never fits is offered at its closest miss (fewest wedges
   missing, nearest size 24), its note naming what does not fit ("محمد does
-  not fit a wedge"). On the 9 s budget "الله" gets two fits a fold
-  (4-fold 18, 28; 5-fold 21, 34; 6-fold 24, 39, under the work cap; 4-fold
+  not fit a wedge"). Under the work cap "الله" gets 4-fold ×1 at 20, 5-fold
+  ×1 at 24 and ×3 at 40, 6-fold ×1 at 30 and ×2 at 40 (the merged form's
+  4-fold 18 and 28, 5-fold 21 and 34, 6-fold 24 and 39 went with it; 4-fold
   34 and 5-fold 45 were offers while the heh's wall rose); "الله محمد" gets
-  the repeat fits (4-fold 29, 5-fold 33, 6-fold 39) and alternate misses
-  (the pair in turn fitted the 4-fold star at 29 while الله twice a wedge
-  packed there; now nothing holds both), with `complete: false`; a second
-  Find layouts goes on from the cache.
+  the repeat fits (4-fold 30 with الله in the corners, 5-fold 36; the
+  6-fold one is beyond the cap) and alternate misses (the pair in turn
+  fitted the 4-fold star at 29 while الله twice a wedge packed there; now
+  nothing holds both), with `complete: false`; a second Find layouts goes
+  on from the cache.
 - **Cache.** Packs are cached between calls by the region's mask and the text
   (the mask is what fold, k, size and kind decide, so wedgeA and wedgeB share
   packs), up to 2000 entries; fill counts and text areas likewise.
@@ -366,8 +386,10 @@ counts against nothing (6-fold corners never hold الله).
   `complete: false` says the budget ended it.
 - **Ranking.** Fitting first; the classic stars before the alternative ones
   (the same split on the other star is nearly the same offer); corners
-  filled before empty (the reference's four filled corners: 4-fold 28 holds
-  الله twice a wedge and once a corner; 34 held four a wedge and no corner
+  filled before empty (the reference's four filled corners: "الله محمد" at
+  4-fold 30 holds the pair a wedge and الله a corner; الله alone fills no
+  corner, a 4-fold wedge holding it to 27 and the corner from 29; 28 held
+  it twice a wedge and once a corner on the merged form, 34 four a wedge
   while the heh's wall rose);
   then denser first (words drawn per region holding text), then fewer filler squares,
   then the smaller size; non-fitting after, fewer unpacked regions first.

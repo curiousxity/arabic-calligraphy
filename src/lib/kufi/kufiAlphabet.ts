@@ -128,9 +128,9 @@ export type KufiGlyph = {
   /** Separate 4-connected pieces the glyph is drawn in, when more than one. */
   parts?: number;
   /**
-   * Drawn only in that place of a star panel (a wedge, or the octagon's band); a rectangular
-   * panel keeps the forms it was tuned on, and where a letter has forms for a place they
-   * replace its other forms there. See `KufiPlace` and `kufiFormsOf`.
+   * Drawn in a star panel alone (a wedge, or the octagon's band); a rectangular panel keeps
+   * the forms it was tuned on, and where a letter has star forms they replace its other
+   * forms there. See `KufiPlace` and `kufiFormsOf`.
    */
   only?: Exclude<KufiPlace, "panel">;
   /**
@@ -153,10 +153,11 @@ export type KufiDots = { count: 1 | 2 | 3; side: KufiDotSide };
 export type KufiDotKey = `${KufiDotSide}${1 | 2 | 3}`;
 
 /**
- * Where a letter is drawn: a rectangular panel, a wedge of a star, or the
- * band of the octagon layout, whose tall strokes are lengthened inward.
+ * Where a letter is drawn: a rectangular panel, or a star panel (a wedge of
+ * the wedges layout, or a band of the octagon layout), where tall strokes
+ * are lengthened out of the line.
  */
-export type KufiPlace = "panel" | "wedge" | "octagon";
+export type KufiPlace = "panel" | "star";
 
 export type SkeletonName =
   | "alef"
@@ -570,19 +571,20 @@ export const KUFI_FORMS: KufiFormTable = {
       g("allah.isolated.0", 0, ["###.#.#.#", "#.#.#.#.#", "#.#.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }, { axis: "col", index: 3 }]),
       g("allah.isolated.1", 0, ["....#.#.#", "....#.#.#", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }, { axis: "col", index: 3 }]),
       g("allah.isolated.2", 0, ["###.#.#.#", "..#.#.#..", "###.#.#.#", "#.#.#.#.#", "#######.#"], [{ axis: "row", index: 3 }, { axis: "col", index: 3 }], undefined, { parts: 3 }),
-      // in a wedge the heh hangs off the second lam, so three uprights stand (alef, lam, lam), not
-      // four equal ones (which read as اللله where nothing rises above the heh); the word widens
-      // through the heh's box (column 1: its bars grow, its counter stays one row), the one column
-      // that widens without a hole, so a word can fill the end of a wedge's line (a wide heh is how
-      // square Kufi stretches the word; without it one الله fills no wedge at 21-25)
-      g("allah.isolated.3", 0, ["###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 3 }, { axis: "col", index: 1 }], undefined, { only: "wedge" }),
-      // the same under the bar of its shadda and dagger alef, one gap above the word
-      g("allah.isolated.4", 0, ["#######", ".......", "###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 5 }, { axis: "col", index: 1 }], undefined, { parts: 2, only: "wedge" }),
-      // in the octagon's band the heh keeps a wall of its own under its bar: the four uprights of
-      // `allah.isolated.1` at the band's height. The layout lengthens the alef and both lams out of
-      // the band and never the heh's wall, so the lams rise above the heh as in the references
-      // (the Topkapi Scroll's الله, where the heh's wall ends at its bar); widens through the heh as above
-      g("allah.isolated.5", 0, ["###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 3 }, { axis: "col", index: 1 }], undefined, { only: "octagon" }),
+      // in a star (a wedge or the octagon's band) the word stands on four uprights at a line's
+      // height, the heh with a wall of its own under its bar: `allah.isolated.1` at five rows. The
+      // layouts lengthen the alef and both lams together, by bars to a wedge's slanted side or
+      // inward to the octagon, and never the heh's wall, so the lams rise above the heh as in the
+      // references (the Topkapi Scroll's الله: alef, lam, lam tall together, the heh's short wall
+      // ending at its bar). A merged form with the heh hanging off the second lam (three uprights)
+      // read as the heh's stem rising whenever a lam beside it was carried up (2026-11-02). **The
+      // word widens through the heh's box** (column 1: its bars grow, its counter stays one row),
+      // the one column that widens without a hole, so a word can fill the end of a wedge's line
+      // (a wide heh is how square Kufi stretches the word; without it one الله fills no wedge)
+      g("allah.isolated.3", 0, ["###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 3 }, { axis: "col", index: 1 }], undefined, { only: "star" }),
+      // the same under the bar of its shadda and dagger alef, one gap above the word: its tops are
+      // capped, so nothing of it is lengthened
+      g("allah.isolated.4", 0, ["#########", ".........", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 5 }, { axis: "col", index: 1 }], undefined, { parts: 2, only: "star" }),
     ],
   },
 };
