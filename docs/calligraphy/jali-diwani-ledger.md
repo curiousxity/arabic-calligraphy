@@ -819,6 +819,34 @@ the wrong way.
 | 084.s0 | 0.960 | 0.047 / 0.013 (most of it the tail's blunt lip) |
 | 108.s0 | 0.953 | 0.020 / 0.015 |
 
+**Blue on 095 and 731, and the tails of all four (the user, 2026-11-02; approved on 075, 086, 095 and 731).**
+Blue is re-run from its kept fit (`PEN_POLISH`), not fitted afresh:
+- **The neck (`meet`, 095 and 731):** blue's first node is green's last (place, angle and width), which cleared the
+  red spike at 095's neck. Its first segments are split, and widths are free there (`PEN_MEET_WIDTHS`), then capped at
+  the nib and settled again, which removed the wedge. 731's seam is not closed by an overlap: "no you cannot close
+  731".
+- **The tail (`PEN_TAIL_FIT`):** the studio ends each tail in a small blunt knob, and ours ran to a needle. Whole-
+  stroke scoring can't see a miss that small, though the grid (200 px a nuqta) can. So only the last 0.6 nuqta is refit,
+  scored on the studio's ink within 0.6 nuqta of the tip (`tail_piece`), and kept only if the worst miss at the tip
+  falls. With widths free, 086 got its knob but also a waist (0.90 → 0.71 → 0.94 nib), which showed as a step. Evening
+  the widths out afterwards spilled 0.1–0.17 nuqta. **Kept: widths held at the nib (`PEN_TAIL_WFREE=0`)**, with 095's
+  tip started blunt at the studio's far end (`PEN_TAIL_SEED`).
+
+| stroke | tip gap (nuqta) | overlap |
+|---|---|---|
+| 095.s0 (n095h1) | 0.031 → 0.010 | 0.962 → 0.966 |
+| 086.s0 (n086h1) | 0.048 → 0.010 | 0.983 → 0.986 |
+| 731.s0 (n731e, end patch) | 0.023 → 0 | 0.970 → 0.975 |
+| 075.s0 | unchanged; its square end already matched | 0.985 |
+
+**731's tail is the studio's outline (the user allowed it, 2026-11-02).** No refit reached the knob: widths free,
+evened out, or held, each left a needle or a spill. The Thuluth session had the same result and patches its ends
+with the studio's outline instead. `jdendcap.py` does the same here. Within 0.3 nuqta of the tail's last node, ours
+past the studio edge is erased and the studio's ink, rounded by two rounds of corner cutting, is filled in. The
+patch is stored as the record's `endcap` (erase and fill rings, in nuqta). 0.3 nuqta is where ours and the studio
+already agree to within 0.003, so the patch's edge leaves a jog of about 0.004, invisible at normal size. Tail ends
+only, and only once the pen fit has failed.
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |
