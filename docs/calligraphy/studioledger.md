@@ -427,6 +427,10 @@ Times are minutes:seconds into the individual-letters lesson.
   studio at its inner end, as the waw heads did; 508g had the same. Checking every fa, qaf and waw found the fa's
   joining end standing past in 288g and 456g, the pair's tail start in 391 (that one stroke redone) and the fa tail
   in 374. All on the whole-outline method. The user: "Fixes approved".
+- **557r's window and its like (2026-11-02):** the user: "557 %". 557r's head stroke fell short of the studio's edge
+  at the top of its window, leaving a notch; 569r, 570r and 574r fell short along the left of theirs. 569r's base
+  also ran past the studio at its start, and 652g, 655g and 658r had ends standing past. All on the whole-outline
+  method. The user: "Fixes and pages approved".
 
 **Every joint trimmed to the studio edge**
 
