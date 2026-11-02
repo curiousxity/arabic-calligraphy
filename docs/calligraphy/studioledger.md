@@ -410,6 +410,9 @@ Times are minutes:seconds into the individual-letters lesson.
   own joint trims. The user: "The fixes are approved".
 - **Edges, second set (2026-11-02):** the user: "096r and 106r ( jagged edge. 105g. 184g, 112,113". The same
   whole-outline method on every stroke of 096r, 106r, 105g, 184g, 112r and 113r. The user: "I approve the rest".
+- **187g and 191g (2026-11-02):** the user: "187 and 191g are still not right". The mim's tail tip stood past the
+  studio's and the waw's inner head stroke ran past its end; both on the whole-outline method. The user: "Your fixes I
+  approve".
 
 **Every joint trimmed to the studio edge**
 
