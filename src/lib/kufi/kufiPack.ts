@@ -56,6 +56,7 @@ import {
   stretchedBase,
   type KufiDotKey,
   type KufiGlyph,
+  type KufiPlace,
 } from "./kufiAlphabet";
 import { applyCellEdits, packedCells, type Turn } from "./kufiGrid";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
@@ -359,15 +360,16 @@ function countVectors(g: KufiGlyph, rowMax = ROW_MAX): number[][] {
 
 /**
  * The alternates a unit may take: its joining form's list, else the isolated one. The packer's rule, shared with the canvas.
- * A star region (`region`) takes a letter's region-only forms where it has them, else its forms drawn whole;
- * a rectangular panel never takes the region-only forms.
+ * A star's wedge or the octagon's band (`place`) takes the forms a letter has for that place where it has any
+ * (`KufiGlyph.only`: الله on three uprights in a wedge, on four with the heh's own wall in the octagon's band),
+ * else its forms drawn whole; a rectangular panel takes the forms authored for no place.
  */
-export function kufiFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">, region = false): KufiGlyph[] {
+export function kufiFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">, place: KufiPlace = "panel"): KufiGlyph[] {
   const table = KUFI_FORMS as Record<string, Partial<Record<JoiningForm, KufiGlyph[]>>>;
   const all = table[unit.skeleton]?.[unit.form] ?? table[unit.skeleton]?.isolated ?? [];
-  if (!region) return all.filter((g) => !g.regionOnly);
-  // a letter authored for regions (الله on three uprights) replaces the panel's forms there
-  return all.some((g) => g.regionOnly) ? all.filter((g) => g.regionOnly) : all.filter(drawnWhole);
+  if (place === "panel") return all.filter((g) => !g.only);
+  const own = all.filter((g) => g.only === place);
+  return own.length > 0 ? own : all.filter((g) => !g.only && drawnWhole(g));
 }
 
 /** The applied counts, padded to the glyph's slices; values outside the table's limits are clamped. */
@@ -384,10 +386,11 @@ function drawnWhole(g: KufiGlyph): boolean {
   return parts === 1 || (parts === 2 && /^#+$/.test(g.rows[0]) && /^\.+$/.test(g.rows[1]));
 }
 
-function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins: Map<number, Pin>, whole = false): Letter[] {
+function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins: Map<number, Pin>, place: KufiPlace = "panel"): Letter[] {
+  const whole = place !== "panel";
   return units.map((u, i) => {
     // a region has no frame to hold a letter drawn in pieces together: there الله's gapped alef reads broken
-    const all = kufiFormsOf(u, whole);
+    const all = kufiFormsOf(u, place);
     const pin = pins.get(i) ?? null;
     const form = edits.forms?.[i];
     const fixed = edits.stretch?.[i];
@@ -2422,11 +2425,12 @@ function makeCtx(
   pins: Map<number, Pin>,
   budgetMs: number,
   strictClock = false,
-  mask: KufiMask | null = null
+  mask: KufiMask | null = null,
+  place: KufiPlace = mask ? "wedge" : "panel"
 ): Ctx {
   const { units } = resolveKufiText(text);
   const rings = Math.max(1, Math.floor((Math.min(cols, rows) - 1) / (2 * (BAND + 1))) + 1);
-  const letters = lettersOf(text, units, edits, pins, !!mask);
+  const letters = lettersOf(text, units, edits, pins, place);
   // a region stacks upright lines from its bottom row up, one ring per band
   const regionLines = Math.floor((rows - 1) / (BAND + 1)) + 1;
   return {
@@ -3045,11 +3049,12 @@ export function packKufiPanel(input: {
  * the text stands on, see `Region`); the other edges (the slanted sides, the notch) carry no
  * line of text, are not held to the frame's rule and may run to paper. Fillers are bars only
  * (`fillPass`, `barEnds`). No edits, pins or suggestions: a region's size is the star's, not
- * the user's to pick here. Pure and deterministic, on PACK_BUDGET_MS / PACK_WORK.
+ * the user's to pick here. `place` (a wedge unless said) chooses the letters' forms, see
+ * `kufiFormsOf`. Pure and deterministic, on PACK_BUDGET_MS / PACK_WORK.
  */
-export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boolean }): KufiPackResult {
+export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boolean; place?: Exclude<KufiPlace, "panel"> }): KufiPackResult {
   regionPackCount++;
-  const { text, mask } = input;
+  const { text, mask, place = "wedge" } = input;
   const { cols, rows } = mask;
   const { units } = resolveKufiText(text);
   if (letterCount(units) < 2) return { ok: false, reason: "tooShort", suggestions: [] };
@@ -3059,7 +3064,7 @@ export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boo
   if (input.bars === false) barsOff = true;
   let f: Final | null;
   try {
-    f = search(makeCtx(text, cols, rows, {}, new Map(), PACK_BUDGET_MS, false, mask));
+    f = search(makeCtx(text, cols, rows, {}, new Map(), PACK_BUDGET_MS, false, mask, place));
   } finally {
     barsOff = wereOff;
   }

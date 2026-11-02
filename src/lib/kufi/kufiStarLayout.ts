@@ -64,7 +64,7 @@ export function octagonSideText(i: Pick<KufiStarInputs, "regions">): string {
  */
 export function octagonSizeFor(text: string): number {
   const { units } = resolveKufiText(text);
-  const line = units.reduce((n, u) => n + (kufiFormsOf(u, true)[0]?.rows[0]?.length ?? 1) + 1, 0) - 1;
+  const line = units.reduce((n, u) => n + (kufiFormsOf(u, "octagon")[0]?.rows[0]?.length ?? 1) + 1, 0) - 1;
   return Math.min(OCTAGON_MAX_SIZE, Math.max(OCTAGON_MIN_SIZE, line + OCTAGON_DEPTH));
 }
 

@@ -124,7 +124,7 @@ function areaOf(text: string): number {
   let a = areas.get(text);
   if (a === undefined) {
     const { units } = resolveKufiText(text);
-    a = Math.max(1, units.reduce((n, u) => n + ((kufiFormsOf(u, true)[0]?.rows[0]?.length ?? 1) + 1) * LINE_PITCH, 0));
+    a = Math.max(1, units.reduce((n, u) => n + ((kufiFormsOf(u, "wedge")[0]?.rows[0]?.length ?? 1) + 1) * LINE_PITCH, 0));
     areas.set(text, a);
   }
   return a;
@@ -257,14 +257,15 @@ const UNPACKED: KufiPackResult = { ok: false, reason: "tooLong", suggestions: []
  * (`areaOf`, a generous measure: fits run from 0.57 to 0.9 of it) is too small without a pack,
  * which would only fail slowly.
  */
-function lookup(clock: Clock, mask: KufiMask, text: string): KufiPackResult {
-  const key = `${maskKey(mask)}|${text}`;
+function lookup(clock: Clock, mask: KufiMask, text: string, octagon = false): KufiPackResult {
+  const key = `${octagon ? "octagon|" : ""}${maskKey(mask)}|${text}`;
   const hit = packCache.get(key);
   if (hit) return hit;
   if (usableOf(mask) * 2 < areaOf(text)) return UNPACKED;
   if (clock.over()) throw new OutOfBudget();
   clock.tries++;
-  const r = packKufiRegion({ text, mask });
+  // the octagon's band packs as `layoutKufiOctagon` packs it (its forms, no bars), since an approved offer is drawn as packed here
+  const r = octagon ? packKufiRegion({ text, mask, bars: false, place: "octagon" }) : packKufiRegion({ text, mask });
   packCache.set(key, r);
   if (packCache.size > PACK_CACHE_LIMIT) packCache.delete(packCache.keys().next().value!);
   return r;
@@ -442,7 +443,7 @@ function octagonOffers(clock: Clock, text: string, offers: KufiStarOffer[]): voi
     const from = Math.max(OCTAGON_MIN_SIZE, octagonSizeFor(side) - 2);
     if (from > OCTAGON_MAX_SIZE) break;
     for (let size = from; size <= Math.min(OCTAGON_MAX_SIZE, from + OCTAGON_SCAN); size++) {
-      const band = lookup(clock, octagonBandMask(size), side);
+      const band = lookup(clock, octagonBandMask(size), side, true);
       if (!band.ok) {
         if (band.reason === "tooShort") break;
         continue;

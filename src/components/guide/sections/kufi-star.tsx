@@ -62,7 +62,9 @@ export const section: GuideSection = {
         wedge, never mirrored, and the whole panel is one solid shape, ready
         to cut. In the octagon layout a short phrase fills a side best when
         it is repeated, as the traditional panels do: one «الله» a side makes
-        a small tile, three make a square with a clear octagon. In the wedges
+        a small tile, three make a square with a clear octagon, four a
+        denser one. Only the tall letters reach into the centre, the alef and
+        the lam; a heh keeps its box, as in the old panels. In the wedges
         layout the letters stand only on the outer edge of each wedge, so a
         short word such as «الله» fits well, while longer words and the
         corners often do not fit yet. An offer that does not fit can still be chosen:

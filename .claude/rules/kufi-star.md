@@ -48,8 +48,10 @@ with its repeats, as the wedge regions carry theirs):
   bottom band's line runs from the left edge to `DEPTH` short of the right
   edge (N - 6 cells), packed by `packKufiRegion` on a 5 x (N - 6) mask
   with **`bars: false`** (no filler bars; the region's "no lone squares"
-  rule already holds), so a side packs only when the text repeated fills
-  its line by stretching (الله's heh box widens by up to `COL_MAX`). The
+  rule already holds) and **`place: "octagon"`** (the band's own letter
+  forms, see "A letter's forms by place"), so a side packs only when the
+  text repeated fills its line by stretching (الله's heh box widens by up
+  to `COL_MAX`). The
   other three bands are the bottom one turned clockwise about the centre
   (`octagonTurn`, cell to cell; N may be odd or even), so the text reads as
   a panel's outer ring: upright below, upward on the left, upside down
@@ -62,16 +64,25 @@ with its repeats, as the wedge regions carry theirs):
   (`octagonSeam`) stay paper, so two fields' stroke ends meet only at
   corners. A stroke lengthens from the seam row straight inward through its
   field until the next cell is a seam cell or the open centre.
-- **What lengthens** (`strokeTop`): a column whose topmost ink in the band
-  is the top of an upright (two cells or more), with paper above it and
-  beside that paper up to the band's top, so the lengthened stroke touches
-  nothing. A bar beside the top is fine: so the lam the heh of الله hangs
-  off (`allah.isolated.3`, column 2) rises above the heh's box as the
-  reference's لله does, and each الله gives three strokes, two cells apart.
-  The box's own side does not rise (its top cell has no run under it),
-  nor a bar's middle. Short letters leave the space above them open: in
-  the reference that space is the design, not a hole, so the empty-2x2
-  rule holds inside the bands (the packer's) and not above them.
+- **What lengthens** (`octagonShafts`): a column whose top-row cell is a
+  **shaft**, the upright of a tall letter (`KUFI_SHAFT_LETTERS`: alef, lam,
+  kaf, tah, lamAlef, allah) reaching the band's top row, two cells or more,
+  with paper beside its top. Which letter owns the cell is read from the
+  band's placements (the glyph drawn at its stretch), never from the ink
+  alone: a heh's wall is as tall as a lam and capped by the heh's bar, a
+  box's or bowl's side likewise, and a tooth stretched to the band's top has
+  nothing beside it, yet lengthening any of them stretches the letter or
+  turns it into another (2026-11-02, the user: with the wedges' merged form
+  the heh of الله shot up out of its box; the Topkapi Scroll's الله has four
+  verticals, the heh's own short wall ending at its bar and the lams rising
+  far above it, and a 2004 article's لله keeps the heh a closed box). A
+  capped top (a lam's hook, an alef's head) is not lengthened either: the
+  stroke would rise past its own head. So الله gives three shafts a word
+  (the second lam, the first lam, the alef) and never the heh's wall; محمد
+  gives none; الحمد لله only its alef and lams (its meem's walls used to
+  rise). Short letters leave the space above them open: in the reference
+  that space is the design, not a hole, so the empty-2x2 rule holds inside
+  the bands (the packer's) and not above them.
 - **The open centre** (`octagonGeometry(size, strokeCols)`): a stepped
   octagon `width` cells across (N's parity, centred, never wider than the
   interior less two), its corners cut so the flat sides are `flat` cells.
@@ -89,27 +100,34 @@ with its repeats, as the wedge regions carry theirs):
   that aim is taken, the wider on a tie; with none, the ratio's own width
   with a regular flat. The crossing stroke's end is then on the edge and the
   diagonal at once, and the edge continues across the diagonal as the next
-  field's stroke ends: at 29 with الله ×3 (strokes 6, 10, 12, 14, 18, 20,
-  22) column 10 gives 13/5, its end (10, 19), the left band's (9, 18) and the
-  flat's corner (12, 21) on one 45° line. الله ×4 at 37 gives 19/7, the
-  Shahada at 31 15/7; الحمد لله at 33 has only far candidates and takes
-  17/7. The 45° staircase is one cell per column only where both fields
-  have strokes there; a word's gap and the heh's box leave inlets at the
-  octagon's vertices (the pinwheel's four bays), and محمد lengthens two
-  strokes a side, so its centre stays a square.
+  field's stroke ends: at 35 with الله ×3 (shafts 6, 8, 14, 16, 18, 24, 26,
+  28) column 24 gives 21/9: its end (24, 25) under the open seam cell
+  (24, 24), the left band's copy ending at (9, 24) beside (10, 24), the
+  middle word's three shafts ending together under the flat, and beyond the
+  crossing the ends stepping down the diagonal, (26, 27), (28, 29). الله ×2
+  at 25 gives 11/7, ×4 at 45 25/9 (the clearest octagon of the four: longer
+  shafts round a centre nearer half the square), the Shahada at 33 19/7;
+  الحمد لله at 31 has three shafts a side, all ending on the diagonals, and
+  takes 15/7. The 45° staircase is one cell per column only where both
+  fields have strokes there; a word's gap and the heh's box leave inlets at
+  the octagon's vertices (the pinwheel's four bays), and محمد has no shaft
+  at all, so its centre is the ratio's own 7/3 at 21, an open square drawn
+  by nothing.
 - **Lines on** draws each band's base row solid where its feet leave a
   gap (`frame`, the outer ring only; a gap stays where closing it would make
   a solid 2x2), so the frame line and the feet are one stroke, as the
   wedges' bands are flush on their base edge. Four pinwheel segments, not a
   closed ring: the corner cells belong to the letter standing there.
-- **Measured** (2026-11-02): الله once a side packs at 13 (its line 7; the
-  interior is the centre cell), twice at 21, three times at 29, four at 37;
-  `kufiOctagon.test.ts` pins 13 and 29. One الله a side makes a small
-  dense tile with no octagon to speak of; three makes a square with a clear
-  octagon and the diagonals drawn by stroke ends, which is why a new star is
-  `الله الله الله` at 29. A side with more words gives denser strokes, nearer the reference.
-  Under the work-only clock الحمد لله packs a side at 33 (the browser's
-  clock found 37), the Shahada at 31, محمد at 25.
+- **Measured** (2026-11-02, the band's 9-wide الله): الله once a side
+  packs at 15 (its line 9; the interior is a 3x3 with the centre cell open),
+  twice at 25, three times at 35, four at 45; `kufiOctagon.test.ts` pins 15
+  and 35. One الله a side makes a small dense tile with no octagon to speak
+  of; three makes a square whose centre reads as an octagon with the
+  diagonals drawn by stroke ends, which is why a new star is
+  `الله الله الله` at 35 (it was 29 on the merged form). A side with more
+  words gives longer, denser strokes, nearer the reference. Under the
+  work-only clock الحمد لله packs a side at 31, the Shahada at 33, محمد at
+  21.
 - **Status.** The side's pack failing gives `unpacked: [0]` and
   `octagon: null`; the view draws the dashed square and the status says
   "doesn't fit a side at this size" (`tooLong`) or "leaves a side open"
@@ -121,7 +139,7 @@ with its repeats, as the wedge regions carry theirs):
 Fold and Star show for the wedges only; Size is the square's side (13 to
 60) or the ring's apothem (12 to 60). Switching to the octagon puts the
 block's text (else الله) once along each side at `octagonSizeFor` (the
-line its region forms take at their authored widths, plus `DEPTH`); to the
+line its octagon forms take at their authored widths, plus `DEPTH`); to the
 wedges, the blank classic 4-fold star at 24. Find layouts offers the octagon
 squares first (`octagonOffers`): the text once, twice, up to
 `OCTAGON_REPEATS` (6) times a side, each at the smallest square its line
@@ -186,15 +204,23 @@ error; the packer reports `tooLong`.
   counts only with a cell of usable margin all round; below the base row
   counts as usable). Letters meet the sides as a staircase; the pockets that
   staircase leaves, a cell or two wide, stay paper.
-- **A region's own letter forms** (`kufiFormsOf(unit, true)`). A glyph
-  marked `regionOnly` is drawn only in regions, and where a letter has such
-  forms they replace its panel forms there; a rectangular panel never takes
-  them, so its tuned layouts are unchanged. Today that is الله:
+- **A letter's forms by place** (`kufiFormsOf(unit, place)`, `KufiPlace`:
+  `panel`, `wedge` or `octagon`; `packKufiRegion`'s `place`, a wedge unless
+  said). A glyph marked `only` is drawn in that place of a star alone, and
+  where a letter has such forms they replace its other forms there; a
+  rectangular panel takes the forms marked for no place, so its tuned
+  layouts are unchanged; a wedge or the octagon's band otherwise takes the
+  unmarked forms drawn whole. Today that is الله. In a wedge
   `allah.isolated.3` (five rows, three uprights, the heh hanging off the
   second lam, as in square-Kufi references) and `allah.isolated.4` (the same
-  under the bar of its shadda and dagger alef, one gap above). The panel
+  under the bar of its shadda and dagger alef, one gap above): the panel
   forms put the heh on a stem of its own, four equal uprights that read as
-  "اللله" in a wedge (second opinion and the user, 2026-11-01). **The word
+  "اللله" in a wedge (second opinion and the user, 2026-11-01), where nothing
+  rises above the heh. In the octagon's band `allah.isolated.5` (five rows,
+  four uprights, the heh's own wall under its bar: the panel's
+  `allah.isolated.1` at the band's height), since there the lams are
+  lengthened out of the band and the heh's wall must stay (2026-11-02; on
+  the merged form the heh's wall was the lam and rose). **The word
   widens through the heh's box** (column stretch at index 1, up to
   `COL_MAX`): the one column that widens without a hole, and how a word fills
   the end of a wedge's line; without it one الله fills no wedge at 21-25.

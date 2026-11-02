@@ -127,8 +127,12 @@ export type KufiGlyph = {
   inset?: { right?: number; left?: number };
   /** Separate 4-connected pieces the glyph is drawn in, when more than one. */
   parts?: number;
-  /** Drawn only inside a star panel's regions; a rectangular panel keeps the forms it was tuned on. */
-  regionOnly?: boolean;
+  /**
+   * Drawn only in that place of a star panel (a wedge, or the octagon's band); a rectangular
+   * panel keeps the forms it was tuned on, and where a letter has forms for a place they
+   * replace its other forms there. See `KufiPlace` and `kufiFormsOf`.
+   */
+  only?: Exclude<KufiPlace, "panel">;
   /**
    * The letter's own dot sets (iʿjām), one per dot pattern its letters need,
    * in the glyph box's coordinates; cells may lie outside the box. Letters
@@ -147,6 +151,12 @@ export type KufiDots = { count: 1 | 2 | 3; side: KufiDotSide };
 
 /** The name of a dot set in `KufiGlyph.dots`: side then count, e.g. `above2`. */
 export type KufiDotKey = `${KufiDotSide}${1 | 2 | 3}`;
+
+/**
+ * Where a letter is drawn: a rectangular panel, a wedge of a star, or the
+ * band of the octagon layout, whose tall strokes are lengthened inward.
+ */
+export type KufiPlace = "panel" | "wedge" | "octagon";
 
 export type SkeletonName =
   | "alef"
@@ -179,7 +189,7 @@ const g = (
   rows: string[],
   stretch: KufiStretch[],
   joins?: KufiGlyph["joins"],
-  more?: Pick<KufiGlyph, "inset" | "parts" | "regionOnly">
+  more?: Pick<KufiGlyph, "inset" | "parts" | "only">
 ): KufiGlyph => ({ id, rows, base, stretch, ...(joins ? { joins } : {}), ...more });
 
 /**
@@ -560,13 +570,19 @@ export const KUFI_FORMS: KufiFormTable = {
       g("allah.isolated.0", 0, ["###.#.#.#", "#.#.#.#.#", "#.#.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }, { axis: "col", index: 3 }]),
       g("allah.isolated.1", 0, ["....#.#.#", "....#.#.#", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1, min: 1 }, { axis: "col", index: 3 }]),
       g("allah.isolated.2", 0, ["###.#.#.#", "..#.#.#..", "###.#.#.#", "#.#.#.#.#", "#######.#"], [{ axis: "row", index: 3 }, { axis: "col", index: 3 }], undefined, { parts: 3 }),
-      // the heh hangs off the second lam, so three uprights stand (alef, lam, lam), not four; the
-      // word widens through the heh's box (column 1: its bars grow, its counter stays one row), the
-      // one column that widens without a hole, so a word can fill the end of a wedge's line (a
-      // wide heh is how square Kufi stretches the word; without it one الله fills no wedge at 21-25)
-      g("allah.isolated.3", 0, ["###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 3 }, { axis: "col", index: 1 }], undefined, { regionOnly: true }),
+      // in a wedge the heh hangs off the second lam, so three uprights stand (alef, lam, lam), not
+      // four equal ones (which read as اللله where nothing rises above the heh); the word widens
+      // through the heh's box (column 1: its bars grow, its counter stays one row), the one column
+      // that widens without a hole, so a word can fill the end of a wedge's line (a wide heh is how
+      // square Kufi stretches the word; without it one الله fills no wedge at 21-25)
+      g("allah.isolated.3", 0, ["###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 3 }, { axis: "col", index: 1 }], undefined, { only: "wedge" }),
       // the same under the bar of its shadda and dagger alef, one gap above the word
-      g("allah.isolated.4", 0, ["#######", ".......", "###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 5 }, { axis: "col", index: 1 }], undefined, { parts: 2, regionOnly: true }),
+      g("allah.isolated.4", 0, ["#######", ".......", "###.#.#", "..#.#.#", "###.#.#", "#.#.#.#", "#######"], [{ axis: "row", index: 5 }, { axis: "col", index: 1 }], undefined, { parts: 2, only: "wedge" }),
+      // in the octagon's band the heh keeps a wall of its own under its bar: the four uprights of
+      // `allah.isolated.1` at the band's height. The layout lengthens the alef and both lams out of
+      // the band and never the heh's wall, so the lams rise above the heh as in the references
+      // (the Topkapi Scroll's الله, where the heh's wall ends at its bar); widens through the heh as above
+      g("allah.isolated.5", 0, ["###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 3 }, { axis: "col", index: 1 }], undefined, { only: "octagon" }),
     ],
   },
 };
@@ -628,6 +644,21 @@ const SKELETON_OF: Record<number, SkeletonName> = {
 
 export function skeletonOf(cp: number): SkeletonName | null {
   return SKELETON_OF[cp] ?? null;
+}
+
+/**
+ * The letters whose uprights are shafts: the tall strokes square Kufi
+ * lengthens to fill a field (an alef, a lam, the stem of a kaf or a tah,
+ * and the ligatures' own). A heh's wall, a bowl's side or a tooth letter's
+ * tooth is never one, however tall it is drawn.
+ */
+export const KUFI_SHAFT_LETTERS: ReadonlySet<SkeletonName | LigatureName> = new Set<SkeletonName | LigatureName>(["alef", "lam", "kaf", "tah", "lamAlef", "allah"]);
+
+/** The glyph with this id (`<skeleton>.<form>.<n>`) and its letter, or null. */
+export function kufiGlyphById(id: string): { skeleton: SkeletonName | LigatureName; glyph: KufiGlyph } | null {
+  const [skeleton, form] = id.split(".") as [SkeletonName | LigatureName, JoiningForm];
+  const glyph = KUFI_FORMS[skeleton]?.[form]?.find((g) => g.id === id);
+  return glyph ? { skeleton, glyph } : null;
 }
 
 /** The row (top = 0) a glyph joins on at one side: its own `joins` entry, else its baseline row. */

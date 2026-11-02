@@ -17,8 +17,9 @@
  *   as a square-Kufi panel's outer ring does: upright along the bottom,
  *   upward on the left, upside down along the top, downward on the right.
  * - **The interior** (N - 2 DEPTH square) is cut by its diagonals into four
- *   fields, one per band. A tall stroke (an upright reaching the band's top
- *   row, no bar at its top) runs on from the seam row straight inward through
+ *   fields, one per band. A tall stroke (a shaft: a tall letter's upright
+ *   reaching the band's top row, nothing beside its top, `octagonShafts`;
+ *   never a heh's wall or a bowl's side) runs on from the seam row straight inward through
  *   its band's field until the next cell is the open centre or a diagonal
  *   seam cell (the diagonals themselves stay paper, so the ends of two
  *   fields' strokes meet only at corners). Strokes under the octagon's flat
@@ -45,13 +46,14 @@
  * a gap, the frame line and the feet one stroke (a gap stays where filling
  * it would make a solid 2x2). Pure: no React, no Konva, no `./harfbuzz`.
  */
+import { KUFI_SHAFT_LETTERS, kufiGlyphById, stretchGlyph } from "./kufiAlphabet";
 import { packKufiRegion, type KufiMask, type KufiPackResult } from "./kufiPack";
 
 /** Letter height: a band is one 5-row line. */
 export const OCTAGON_BAND = 5;
 /** A band's depth: its letters and the seam row inside them. */
 export const OCTAGON_DEPTH = OCTAGON_BAND + 1;
-/** The smallest square: a 7-cell line (one الله) and no interior but the centre cell. */
+/** The smallest square: a 7-cell line and no interior but the centre cell (one الله needs 15: its band form is 9 wide). */
 export const OCTAGON_MIN_SIZE = 2 * OCTAGON_DEPTH + 1;
 export const OCTAGON_MAX_SIZE = 60;
 /** The open centre's width over the square's: the aim among the strokes' octagons, the rule where there are none. */
@@ -180,25 +182,41 @@ export type KufiOctagonLayout = {
 };
 
 /**
- * The row of the upright that column `c` of a packed band may lengthen
- * inward, or null: its topmost ink must be the top of an upright (two cells
- * or more; a bar beside its top is fine, so the lam the heh of الله hangs
- * off rises above the heh's box as the traditional form does), with paper
- * above it and beside that paper up to the band's top, so the lengthened
- * stroke touches nothing.
+ * The columns of a packed band that may lengthen inward: each holds a
+ * **shaft**, the upright of a tall letter (`KUFI_SHAFT_LETTERS`: an alef, a
+ * lam, a kaf's or tah's stem, the ligatures' own), reaching the band's top
+ * row, two cells or more, with paper beside its top. Which letter the top
+ * cell belongs to is read from the band's placements (the glyph drawn at
+ * its stretch), not from the ink alone: a heh's wall rises as high as a lam
+ * and is capped by the heh's bar, a box's or bowl's side likewise, and a
+ * tooth letter's tooth may be stretched to the band's top with nothing
+ * beside it, yet none of them is a shaft, and lengthening one stretches the
+ * letter or turns it into another (a tooth into a lam). So الله lengthens
+ * its alef and both lams and never the heh's wall, as the references do:
+ * the lams rise above the heh, whose wall ends at its bar. A capped top
+ * (a lam's hook, an alef's head) is not lengthened either: the stroke would
+ * rise past its own head.
  */
-function strokeTop(cells: Uint8Array, cols: number, c: number): number | null {
-  const ink = (x: number, y: number) => x >= 0 && x < cols && cells[y * cols + x] === 1;
-  let r0 = 0;
-  while (r0 < OCTAGON_BAND && !ink(c, r0)) r0++;
-  if (r0 + 1 >= OCTAGON_BAND || !ink(c, r0 + 1)) return null;
-  for (let r = 0; r < r0; r++) if (ink(c - 1, r) || ink(c + 1, r)) return null;
-  return r0;
+export function octagonShafts(band: Extract<KufiPackResult, { ok: true }>): number[] {
+  const { cols: L, rows: R, cells, placements } = band;
+  const ink = (x: number, y: number) => x >= 0 && x < L && y >= 0 && y < R && cells[y * L + x] === 1;
+  // per column, whether the ink on the band's top row is a shaft letter's
+  const tall = new Uint8Array(L);
+  for (const p of placements) {
+    if (p.turn !== 0 || p.row !== 0) continue; // a region's lines are upright; a letter below the top row reaches nothing
+    const found = kufiGlyphById(p.glyphId);
+    if (!found || !KUFI_SHAFT_LETTERS.has(found.skeleton)) continue;
+    const top = stretchGlyph(found.glyph, p.stretch)[0] ?? "";
+    for (let j = 0; j < top.length; j++) if (top[j] === "#") tall[p.col + j] = 1;
+  }
+  const out: number[] = [];
+  for (let c = 0; c < L; c++) if (tall[c] && ink(c, 0) && ink(c, 1) && !ink(c - 1, 0) && !ink(c + 1, 0)) out.push(c);
+  return out;
 }
 
 /** Packs `text` along one side; null when it does not pack a line of this size (the reason is in `band`). */
 export function layoutKufiOctagon(size: number, text: string): { layout: KufiOctagonLayout | null; band: KufiPackResult } {
-  const band = packKufiRegion({ text, mask: octagonBandMask(size), bars: false });
+  const band = packKufiRegion({ text, mask: octagonBandMask(size), bars: false, place: "octagon" });
   if (!band.ok) return { layout: null, band };
   return { layout: octagonFromBand(size, band), band };
 }
@@ -212,10 +230,8 @@ export function octagonFromBand(size: number, band: Extract<KufiPackResult, { ok
   // the bottom band's letters, feet on the bottom edge
   for (let r = 0; r < OCTAGON_BAND; r++)
     for (let c = 0; c < L; c++) if (ink(c, r)) quarter[(N - OCTAGON_BAND + r) * N + c] = 1;
-  // its tall strokes: a column under the interior whose top cell is an upright on the band's top row
-  // (a shorter upright's run would start inside the band, outside its field, so it stays as drawn)
-  const strokeCols: number[] = [];
-  for (let c = OCTAGON_DEPTH; c < L; c++) if (strokeTop(band.cells, L, c) === 0) strokeCols.push(c);
+  // its tall strokes: the shafts under the interior (a shaft under the next band's corner lengthens nothing)
+  const strokeCols = octagonShafts(band).filter((c) => c >= OCTAGON_DEPTH);
   const g = octagonGeometry(size, strokeCols);
   // lengthened inward from the seam row until the next cell is the open centre or a diagonal seam cell
   const strokes = { lengthened: 0, onOctagon: 0, onDiagonal: 0 };

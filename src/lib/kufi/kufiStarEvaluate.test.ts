@@ -95,8 +95,8 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
     expect(oct.length).toBe(OCTAGON_OFFERS);
     expect(e.offers.slice(0, oct.length).every((o) => o.pattern === "octagon")).toBe(true);
     expect(e.offers.slice(oct.length).every((o) => o.pattern !== "octagon")).toBe(true);
-    // the smallest squares: one الله at 13, two at 21, three at 29, four at 37 (their lines take 7, 15, 23, 31)
-    expect(oct.map((o) => o.inputs.size)).toEqual([13, 21, 29, 37]);
+    // the smallest squares: one الله at 15, two at 25, three at 35, four at 45 (their lines take 9, 19, 29, 39: the band's form is 9 wide)
+    expect(oct.map((o) => o.inputs.size)).toEqual([15, 25, 35, 45]);
     oct.forEach((o, i) => {
       expect(o.fits).toBe(true);
       expect(o.inputs).toMatchObject({ layout: "octagon", fold: 4, k: defaultStarK(4) });

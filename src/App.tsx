@@ -2133,7 +2133,7 @@ const App: React.FC = () => {
       starLayout: "octagon",
       starFold: 4,
       starK: defaultStarK(4),
-      starSize: 29,
+      starSize: 35,
       starRegions: ["الله الله الله"],
       starLines: true,
       x: 0,
