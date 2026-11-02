@@ -408,6 +408,8 @@ Times are minutes:seconds into the individual-letters lesson.
   past it, so no pen ink is left outside. The smoothing keeps a corner turning more than 50 degrees where it is:
   a stroke's cut end, a pair half's joining end, stays square. A stroke that copies another has its outline in its
   own joint trims. The user: "The fixes are approved".
+- **Edges, second set (2026-11-02):** the user: "096r and 106r ( jagged edge. 105g. 184g, 112,113". The same
+  whole-outline method on every stroke of 096r, 106r, 105g, 184g, 112r and 113r. The user: "I approve the rest".
 
 **Every joint trimmed to the studio edge**
 
