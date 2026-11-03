@@ -869,6 +869,23 @@ match ("you can use the studio outlines for anything not limited to the tails").
 | 485.s0 | 0.914 | 0.96 |
 | 732.s0 | 0.889 | 0.97 |
 
+**076, 077 and 087 (the earlier catalogue fixes, the user, 2026-11-03; approved).** They were fitted with the
+turn-back as a second move before the flag head had three. Now they are three moves: red and green from the sheet as
+one nib gesture (076 and 077 share the head), then blue fitted with them kept. 076's tilted flag and the strip 087
+missed along its head are gone. Patches, each blended in:
+- the tails: 076's and 077's square ends had corners past the studio's, and 087's needle is now the studio's knob;
+- each head's peak: a small spike past the studio's.
+
+The first peak patch erased part of blue beside green, because the patch counted only its own stroke's ink as ours.
+Now every stroke of the shape near the patch counts. The earlier patches (731, 484, 485, 732) each sit where only one
+stroke has ink.
+
+| shape | before | now |
+|---|---|---|
+| 076.s0 | 0.981 | 0.991 |
+| 077.s0 | 0.984 | 0.990 |
+| 087.s0 | 0.966 | 0.989 |
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |

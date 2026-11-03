@@ -33,7 +33,7 @@ def rings_of(g):
 RAMP, BLEND_PX = 0.15, 1500  # nuqta over which ours eases into the studio's edge; raster px a nuqta for the blend
 
 
-def blended(stroke, rec, studio, c, r):
+def blended(stroke, rec, studio, c, r, others=()):
     """The ink inside the disc of r + RAMP round c: ours eased into the studio's by their signed distances, all
     studio inside r, all ours at r + RAMP. A hard switch at r left a jog where the two edges differ (0.005 nuqta at
     484's, 485's and 732's tips, the user, 2026-11-03: the "=" tips)."""
@@ -41,7 +41,7 @@ def blended(stroke, rec, studio, c, r):
     from shapely.geometry import box as Box
     R2 = r + RAMP; x1, y1 = c[0] - R2 - 0.05, c[1] - R2 - 0.05; n = int((2 * R2 + 0.1) * BLEND_PX) + 1
     piece, _, O = J.job_of(stroke)
-    A, _ = J.ink([rec["nodes"]], [], O, x1 * J.PPN + O[0], y1 * J.PPN + O[1], BLEND_PX / J.PPN, n, n)
+    A, _ = J.ink([rec["nodes"]] + [o for o in others], [], O, x1 * J.PPN + O[0], y1 * J.PPN + O[1], BLEND_PX / J.PPN, n, n)
     Sm = np.zeros((n, n), np.uint8)
     loc = studio.intersection(Box(x1, y1, x1 + n / BLEND_PX, y1 + n / BLEND_PX))
     for g in ([loc] if loc.geom_type == "Polygon" else list(getattr(loc, "geoms", []))):
@@ -56,12 +56,14 @@ def blended(stroke, rec, studio, c, r):
     return unary_union([Polygon(q[:, 0] / BLEND_PX + [x1, y1]).buffer(0) for q in cs if len(q) > 2]).simplify(0.0005), R2
 
 
-def endcap(stroke, rec, r=R, at=None):
+def endcap(stroke, rec, r=R, at=None, others=()):
+    """others: the node lists of the shape's other strokes, so their ink counts as ours (a patch at 076's peak, on
+    green, erased blue beside it)."""
     piece, _, O = J.job_of(stroke.split("~")[0])  # the letter's outline: the disc holds only the tail
     from shapely.validation import make_valid
     studio = make_valid(Polygon(chaikin((J.ref_ring(piece) - O) / J.PPN, CUT)))  # a loop's crossing: both lobes kept
     c = list(at) if at is not None else rec["nodes"][-1]["p"]  # anywhere (the user, 2026-11-03), the tail's end by default
-    ink, R2 = blended(stroke, rec, studio, c, r)
+    ink, R2 = blended(stroke, rec, studio, c, r, others)
     disc = Point(c).buffer(R2, 128)
     return {"c": c, "r": R2, "erase": rings_of(disc.difference(ink)), "fill": rings_of(disc.intersection(ink))}
 
@@ -86,7 +88,10 @@ if __name__ == "__main__":
     src, dst, st = sys.argv[1:4]
     p = json.load(open(src))
     at = [float(v) for v in sys.argv[5].split(",")] if len(sys.argv) > 5 else None
-    cap = endcap(st, p[st], float(sys.argv[4]) if len(sys.argv) > 4 else R, at)
+    c_ = at if at is not None else p[st]["nodes"][-1]["p"]  # strokes nowhere near the patch are left out (_ink)
+    others = [v["nodes"] for k, v in p.items() if k != st and k.split("~")[0] == st.split("~")[0]
+              and min(np.hypot(q["p"][0] - c_[0], q["p"][1] - c_[1]) for q in v["nodes"]) < 1.5]
+    cap = endcap(st, p[st], float(sys.argv[4]) if len(sys.argv) > 4 else R, at, others)
     had = p[st].get("endcap")  # a stroke patched in more than one place keeps a list
     p[st]["endcap"] = cap if not had else (had if isinstance(had, list) else [had]) + [cap]
     os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
