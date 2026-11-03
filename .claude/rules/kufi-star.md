@@ -77,17 +77,20 @@ with its repeats, as the wedge regions carry theirs):
   wider by what the first shaft needs to stand at `DEPTH` (two cells for
   الله; the slice must lie left of every shaft of the word, `COL_MAX` at
   most; the placed form keeps its other counts, else the unit's first band
-  form with such a slice is taken, through `packKufiRegion`'s `edits`); the
-  second packing is kept when it leaves fewer words at the band's height,
-  or as many with the corner letter in the corner. So the corner word's
+  form with such a slice is taken, through `packKufiRegion`'s `edits`); a
+  packing is kept when it leaves fewer words at the band's height, or as
+  many with the corner letter nearer the corner, and the widening repeats
+  while that holds (`COL_MAX` passes at most: a line's slack may stand the
+  widened letter a cell short of the corner, which the next pass fills,
+  as الحمد لله's heh at 32 takes three). So the corner word's
   three shafts rise into the corner bay, 1, 3, 5, the mirror of the other
   end word's 5, 3, 1, and the side reads alike from either corner. Where
   the line has no room for the widening (الله ×4 at 45: a line of 39 for
   four words of 9) the plain packing stands and the corner word stays at
   the band's height, as it did before, so a saved panel at the old squares
   still draws; `KufiOctagonLayout.words` counts the band's words with a
-  shaft as `risen` or `still`. A corner heh with no column slice (لله's
-  `heh.final` forms) cannot widen, and its word stays.
+  shaft as `risen` or `still`. A corner letter with no column slice left
+  of its word's shafts cannot widen, and its word stays.
 - **Fields by the diagonals.** The interior (N - 12 square) is cut by its
   diagonals into four fields, one per band; the diagonal cells themselves
   (`octagonSeam`) stay paper, so two fields' stroke ends meet only at
@@ -115,8 +118,10 @@ with its repeats, as the wedge regions carry theirs):
   beside its top cannot rise, so a word with one such gives no stroke at
   all. So الله gives three shafts a word (the second lam, the first lam,
   the alef) and never the heh's wall, the corner word's with its heh
-  widened (above); محمد gives none; الحمد لله gives الحمد's lam and alef,
-  and لله's two lams only where its heh can widen. Short letters leave the
+  widened (above); محمد gives none; الحمد لله gives الحمد's lam and alef
+  and لله's two lams, its heh (`heh.final.3`, which widens through its box
+  as الله's does since 2026-11-03; a line's odd cell widens it once more,
+  so the letter stands in the corner itself) two wider in the corner. Short letters leave the
   space above them open: in the reference that space is the design, not a
   hole, so the empty-2x2 rule holds inside the bands (the packer's) and not
   above them.
@@ -169,8 +174,15 @@ with its repeats, as the wedge regions carry theirs):
   why a new star is `الله الله الله الله` at 47 (2026-11-03; 45 for a day
   with the corner word short, ×3 at 35 the day before, 29 on the merged
   form). A side with more words gives longer, denser strokes, nearer the
-  reference. Under the work-only clock الحمد لله packs a side from 29 (its
-  لله's heh cannot widen, so لله stays), the Shahada at 35, محمد at 21.
+  reference. Under the work-only clock الحمد لله packs a side from 29, and
+  with لله's heh widened from 31 (الحمد on its 5-wide medial ح; two words
+  a side, both at the line's ends, so all four shafts step into the corner
+  bays, 1, 3 and 3, 1, and the centre is the ratio's own 15/7; Find
+  layouts offers 31 and ×2 at 55, four words a side, the inner two's four
+  shafts reaching a 15/7 octagon and the end words stepping into the bays:
+  the first square where every word rises, and the one that reads as a
+  star, since only four of the phrase's sixteen letters are tall); the
+  Shahada at 35, محمد at 21.
 - **Status.** The side's pack failing gives `unpacked: [0]` and
   `octagon: null`; the view draws the dashed square and the status says
   "doesn't fit a side at this size" (`tooLong`) or "leaves a side open"
@@ -193,8 +205,13 @@ squares first (`octagonOffers`): the text once, twice, up to
 packs **with every word rising** (`words.still` 0; scanned from
 `octagonSizeFor` less two, `OCTAGON_SCAN` sizes; a line the text leaves
 open ends the scan), else the smallest that packs at all, smallest first,
-at most `OCTAGON_OFFERS` (4), then the wedge offers as below. A side pack
-is one short line, milliseconds, so this costs the budget nothing.
+at most `OCTAGON_OFFERS` (4), then the wedge offers as below. A text with
+no tall letter (محمد) is offered once a side alone, its note saying that
+nothing lengthens and the centre stays an open square: more copies only
+widen the hole (×2 at 37 is a ring round a 25-cell hole), and at the old
+estimate's 25 the word stood stretched by four, so 21 is the offer, the
+word at its authored widths with the tall medial ح. A side pack is one
+short line, milliseconds, so this costs the budget nothing.
 
 ## The construction (`kufiStarGeometry.ts`, pure)
 

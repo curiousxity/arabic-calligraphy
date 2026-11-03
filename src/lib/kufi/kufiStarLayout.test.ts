@@ -3,7 +3,7 @@ import { _internal, type KufiPackResult } from "./kufiPack";
 import { cellRings } from "./kufiGrid";
 import { STAR_KS, starConstruction } from "./kufiStarGeometry";
 import { kufiStarPath } from "./kufiStarPath";
-import { kufiStarKey, kufiStarStatus, layoutKufiStar, type KufiStarInputs } from "./kufiStarLayout";
+import { kufiStarKey, kufiStarStatus, layoutKufiStar, octagonSizeFor, type KufiStarInputs } from "./kufiStarLayout";
 
 // Layouts are asserted on the work budget alone, so machine load cannot change them.
 beforeAll(() => _internal.setClockOverride(Infinity));
@@ -78,6 +78,19 @@ describe("layoutKufiStar", { timeout: 120_000 }, () => {
     expect(rings).toBeGreaterThan(0);
     expect(d.split("M").length - 1).toBe(rings * wedgeA.length);
     expect(d).not.toContain("NaN");
+  });
+});
+
+describe("octagonSizeFor", () => {
+  it("is the line the band forms take at their authored widths (joined letters sharing a column), the corner word's widening, and the band's depth", () => {
+    // الله: 9 wide, its corner heh two wider; محمد: 4 + 5 + 5 + 4 less three joins, no tall letter to clear the corner;
+    // الحمد لله: 15 + 1 + 7 (the first medial ح form, 5 wide), and لله's heh two wider (the old estimate counted a gap at
+    // every join: 27 and 36); the scan from two below finds 32, where the line has room
+    expect(octagonSizeFor("الله")).toBe(17);
+    expect(octagonSizeFor("محمد")).toBe(21);
+    expect(octagonSizeFor("الحمد لله")).toBe(31);
+    expect(octagonSizeFor("الله الله الله الله")).toBe(47);
+    expect(octagonSizeFor("")).toBe(13);
   });
 });
 

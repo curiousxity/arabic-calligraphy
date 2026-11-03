@@ -549,7 +549,10 @@ export const KUFI_FORMS: KufiFormTable = {
       g("heh.final.0", 0, ["###.", "#.#.", "####"], [{ axis: "row", index: 1 }]),
       g("heh.final.1", 0, ["..#.", "..#.", "###.", "#.#.", "####"], [{ axis: "row", index: 3 }]),
       g("heh.final.2", 2, ["###.", "#.#.", "###.", "..#.", "..##"], [{ axis: "row", index: 3 }], { right: 4 }),
-      g("heh.final.3", 0, ["###.", "..#.", "###.", "#.#.", "####"], [{ axis: "row", index: 3 }]),
+      // the heh of الله's star forms drawn alone (لله, إله): its box widens through its middle column as the
+      // ligature's does, the one column that widens without a hole, so the octagon's corner word لله can
+      // widen its heh for its lams to clear the next band (2026-11-03)
+      g("heh.final.3", 0, ["###.", "..#.", "###.", "#.#.", "####"], [{ axis: "row", index: 3 }, { axis: "col", index: 1 }]),
       g("heh.final.4", 0, ["###.", "#.#.", "#.#.", "..#.", "###.", "#.#.", "####"], [{ axis: "row", index: 3 }]),
     ],
   },

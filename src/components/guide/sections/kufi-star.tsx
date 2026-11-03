@@ -71,7 +71,9 @@ export const section: GuideSection = {
         lam and heh. The word in each corner stands under the next side, so
         its heh is drawn two squares wider to bring its tall letters clear of
         it, and the two words at a side's ends step into the corners alike;
-        Find layouts offers the squares where every word rises. In the wedges layout the letters stand on the outer edge
+        Find layouts offers the squares where every word rises. A word with no
+        tall letter, such as «محمد», lengthens nothing: it is offered once a
+        side, as a ring round an open square. In the wedges layout the letters stand on the outer edge
         of each wedge, and «الله» is drawn with its alef and lams standing
         two squares above the heh's box wherever the wedge has room for that,
         bare or meeting a bar across the top of the word; only in the

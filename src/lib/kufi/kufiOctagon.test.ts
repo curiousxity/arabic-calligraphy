@@ -377,9 +377,36 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
       }
     }
     expect(risen).toBeGreaterThan(0);
-    // محمد has no shaft, and every الله rises at these squares, the corner words with their heh widened; only
-    // الحمد لله's لله stays, its heh having no column to widen by
-    expect(still).toBe(1);
+    // محمد has no shaft; every other word rises at these squares, the corner words with their heh widened
+    expect(still).toBe(0);
+  });
+
+  it("الحمد لله at 31: the corner word لله widens its heh (`heh.final.3`) by two and both its lams rise, mirroring الحمد's lam and alef", () => {
+    const text = "الحمد لله";
+    const l = packed(31, text);
+    const b = l.band;
+    const corner = b.placements.reduce((a, p) => (p.col < a.col ? p : a));
+    expect(`${corner.glyphId}@${corner.col}+${corner.stretch.join()}`).toBe("heh.final.3@0+0,2");
+    expect(octagonShafts(b, text)).toEqual([6, 8, 22, 24]);
+    expect(l.words).toEqual({ risen: 2, still: 0 });
+    const rise = (c: number) => {
+      let n = 0;
+      while (l.cells[(31 - OCTAGON_DEPTH - n) * 31 + c]) n++;
+      return n;
+    };
+    // two words a side, both at the line's ends: all four shafts step into the corner bays, and the centre is the ratio's own
+    expect([6, 8, 22, 24].map(rise)).toEqual([1, 3, 3, 1]);
+    expect(l.geometry).toMatchObject({ width: 15, flat: 7 });
+    // twice a side at 55 (Find layouts' second offer): every word rises, and the inner two words' four shafts reach the octagon
+    const two = packed(55, rep(text, 2));
+    expect(two.words).toEqual({ risen: 4, still: 0 });
+    expect(octagonShafts(two.band, rep(text, 2))).toEqual([6, 8, 22, 24, 30, 32, 46, 48]);
+    expect(two.strokes).toEqual({ lengthened: 8, onOctagon: 4, onDiagonal: 4 });
+    expect(two.geometry).toMatchObject({ width: 15, flat: 7 });
+    // at 29 the line has no room for the widening (its 23 cells are the words' own) and لله stays, as before
+    expect(packed(29, text).words).toEqual({ risen: 1, still: 1 });
+    // محمد, with no tall letter, lengthens nothing at any square
+    expect(packed(21, "محمد").words).toEqual({ risen: 0, still: 0 });
   });
 
   it("a text that does not fill its line, or does not fit it, packs no square and says why", () => {

@@ -26,6 +26,7 @@
  * Pure: no React, no Konva, no `./harfbuzz`.
  */
 import { kufiClockOverridden, kufiFormsOf, packKufiRegion, type KufiMask, type KufiPackResult } from "./kufiPack";
+import { KUFI_SHAFT_LETTERS } from "./kufiAlphabet";
 import { octagonFromBand, OCTAGON_MAX_SIZE, OCTAGON_MIN_SIZE, packOctagonBand } from "./kufiOctagon";
 import { defaultStarK, STAR_KS, starConstruction, type StarConstruction, type StarFold, type StarRegionKind } from "./kufiStarGeometry";
 import { octagonSizeFor, type KufiStarInputs, type KufiStarLayout } from "./kufiStarLayout";
@@ -466,10 +467,13 @@ function offerOf(plan: Plan, fold: StarFold, k: number, size: number, a: Attempt
  * text leaves open ends the scan, since a bigger one is worse), else the
  * smallest that packs at all, its corner word short. Each pack is one short
  * line, so this costs little; the packs share the cache. Smallest first; at
- * most `OCTAGON_OFFERS`.
+ * most `OCTAGON_OFFERS`. A text with no tall letter at all (محمد) lengthens
+ * nothing, so a bigger square only widens the open centre: it is offered
+ * once a side alone, and the note says why.
  */
 function octagonOffers(clock: Clock, text: string, offers: KufiStarOffer[]): void {
-  for (let n = 1; n <= OCTAGON_REPEATS && offers.length < OCTAGON_OFFERS; n++) {
+  const tall = resolveKufiText(text).units.some((u) => KUFI_SHAFT_LETTERS.has(u.skeleton));
+  for (let n = 1; n <= (tall ? OCTAGON_REPEATS : 1) && offers.length < OCTAGON_OFFERS; n++) {
     const side = repeat(text, n);
     const from = Math.max(OCTAGON_MIN_SIZE, octagonSizeFor(side) - 2);
     if (from > OCTAGON_MAX_SIZE) break;
@@ -485,7 +489,9 @@ function octagonOffers(clock: Clock, text: string, offers: KufiStarOffer[]): voi
         inputs: { layout: "octagon", fold: 4, k: defaultStarK(4), size, regions: [side] },
         pattern: "octagon",
         fits: true,
-        note: `${text}${times(n)} along each side, the tall strokes lengthened to an octagon in a square of ${size}`,
+        note: tall
+          ? `${text}${times(n)} along each side, the tall strokes lengthened to an octagon in a square of ${size}`
+          : `${text} along each side in a square of ${size}; none of its letters is tall, so nothing lengthens and the centre stays an open square`,
         quality: { squares: 0, bars: 0, cut: band.quality?.cut ?? 0, words: band.placements.length, size },
         layout: { regions: [{ text: side, result: band }], unpacked: [], octagon },
       };

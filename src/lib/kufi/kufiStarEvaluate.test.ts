@@ -21,6 +21,8 @@ let allah: KufiStarEvaluation;
 let two: KufiStarEvaluation;
 const evalAllah = () => (allah ??= evaluateKufiStar("الله", 0));
 const evalTwo = () => (two ??= evaluateKufiStar("الله محمد", 0));
+let muhammad: KufiStarEvaluation;
+const evalMuhammad = () => (muhammad ??= evaluateKufiStar("محمد", 0));
 
 describe("evaluateKufiStar", { timeout: 600_000 }, () => {
   it("الله: the repeat offers fill every wedge with الله repeated, the corners where there is room, and nothing else", () => {
@@ -134,6 +136,19 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
       const mid = Math.floor(o.inputs.size / 2);
       expect(rows[mid][mid]).toBe(".");
     });
+  });
+
+  it("محمد, with no tall letter, gets one octagon square, once a side at its natural line (21), and the note says nothing lengthens", () => {
+    // The user, 2026-11-03: محمد read weakly in the octagon. It has no shaft, so no square lengthens anything
+    // and a bigger one (×2 at 37, ×3 at 53) only widens the open centre; and the scan began at 25 (the old
+    // estimate counted a gap at every join), where the word stood stretched by four. Once a side at 21 it is a
+    // dense ring round a nine-cell square, the word at its authored widths with the tall medial ح.
+    const oct = evalMuhammad().offers.filter((o) => o.pattern === "octagon");
+    expect(oct.map((o) => o.inputs.size)).toEqual([21]);
+    expect(oct[0].inputs.regions).toEqual(["محمد"]);
+    expect(oct[0].note).toContain("none of its letters is tall");
+    expect(oct[0].layout.octagon!.strokes.lengthened).toBe(0);
+    expect(oct[0].layout.octagon!.band.placements.map((p) => p.glyphId)).toEqual(["meem.initial.0", "jeem.medial.0", "meem.medial.0", "dal.final.0"]);
   });
 
   it("offers are sorted: the octagon first, then fitting first, denser first among them; misses after, saying so; at most STAR_MAX_OFFERS wedge offers, two per fold and pattern", () => {

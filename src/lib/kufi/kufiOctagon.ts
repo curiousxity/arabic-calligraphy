@@ -312,17 +312,23 @@ function cornerWidening(band: Extract<KufiPackResult, { ok: true }>, units: Kufi
  */
 export function packOctagonBand(size: number, text: string): KufiPackResult {
   const mask = octagonBandMask(size);
-  const first = packKufiRegion({ text, mask, bars: false });
-  if (!first.ok) return first;
+  let best = packKufiRegion({ text, mask, bars: false });
+  if (!best.ok) return best;
   const { units } = resolveKufiText(text);
-  const edits = cornerWidening(first, units);
-  if (!edits) return first;
-  const second = packKufiRegion({ text, mask, bars: false, edits });
-  if (!second.ok) return first;
-  // the better band: fewer words left at the band's height, then its corner letter in the corner itself
+  // the better band: fewer words left at the band's height, then its corner letter nearer the corner itself
   const rank = (b: Extract<KufiPackResult, { ok: true }>) => [octagonWords(b, text).still, Math.min(...b.placements.map((p) => p.col))];
-  const [a, b] = [rank(second), rank(first)];
-  return a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]) ? second : first;
+  // packed again while the corner letter can widen and each packing betters the last (a line's slack may
+  // put the widened letter a cell short of the corner, which the next widening fills)
+  for (let pass = 0; pass <= COL_MAX; pass++) {
+    const edits = cornerWidening(best, units);
+    if (!edits) break;
+    const next = packKufiRegion({ text, mask, bars: false, edits });
+    if (!next.ok) break;
+    const [a, b] = [rank(next), rank(best)];
+    if (!(a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]))) break;
+    best = next;
+  }
+  return best;
 }
 
 /**
