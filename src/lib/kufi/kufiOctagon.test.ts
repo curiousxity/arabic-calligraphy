@@ -335,8 +335,9 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
     expect(long.band).toMatchObject({ ok: false, reason: "tooLong" });
   });
 
-  it("pins الله once a side at 15 and three times at 35, with the lines", () => {
+  it("pins الله once a side at 15, three times at 35 and four times at 45 (a new star's square), with the lines", () => {
     expect(octagonRows(packed(15, ALLAH), true)).toMatchSnapshot();
     expect(octagonRows(packed(35, rep(ALLAH, 3)), true)).toMatchSnapshot();
+    expect(octagonRows(packed(45, rep(ALLAH, 4)), true)).toMatchSnapshot();
   });
 });

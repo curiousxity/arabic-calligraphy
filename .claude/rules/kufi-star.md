@@ -138,10 +138,13 @@ with its repeats, as the wedge regions carry theirs):
 - **Measured** (2026-11-02, the star's 9-wide الله): الله once a side
   packs at 15 (its line 9; the interior is a 3x3 with the centre cell open,
   and nothing rises: the one word is the first), twice at 25, three times
-  at 35, four at 45; `kufiOctagon.test.ts` pins 15 and 35. One الله a side makes a small dense tile with no octagon to speak
+  at 35, four at 45; `kufiOctagon.test.ts` pins 15, 35 and 45. One الله a side makes a small dense tile with no octagon to speak
   of; three makes a square whose centre reads as an octagon with the
-  diagonals drawn by stroke ends, which is why a new star is
-  `الله الله الله` at 35 (it was 29 on the merged form). A side with more
+  diagonals drawn by stroke ends; four makes the clearest octagon of the
+  four squares (longer shafts round a centre nearer half the square, see
+  "The open centre"), which is why a new star is `الله الله الله الله` at
+  45 (2026-11-02; it was ×3 at 35 for a day, and 29 on the merged form).
+  A side with more
   words gives longer, denser strokes, nearer the reference. Under the
   work-only clock الحمد لله packs a side at 31, the Shahada at 33, محمد at
   21.

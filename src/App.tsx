@@ -2114,9 +2114,10 @@ const App: React.FC = () => {
 
   // A new Kufi star panel is the construction alone, every region blank: its
   // text goes in through Content and the sidebar's Find layouts (see
-  // kufi-star.md). A new star is the octagon layout with الله three times
-  // along each side, so it draws at once. The block's x,y is the outline's
-  // top-left corner, and the click that places it is the star's centre.
+  // kufi-star.md). A new star is the octagon layout with الله four times
+  // along each side, the clearest octagon of its measured squares, so it
+  // draws at once. The block's x,y is the outline's top-left corner, and
+  // the click that places it is the star's centre.
   const addKufiStar = () => {
     const id = createNextId();
     const fontSize = 112;
@@ -2133,8 +2134,8 @@ const App: React.FC = () => {
       starLayout: "octagon",
       starFold: 4,
       starK: defaultStarK(4),
-      starSize: 35,
-      starRegions: ["الله الله الله"],
+      starSize: 45,
+      starRegions: ["الله الله الله الله"],
       starLines: true,
       x: 0,
       y: 0,

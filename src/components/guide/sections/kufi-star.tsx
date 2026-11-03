@@ -62,8 +62,9 @@ export const section: GuideSection = {
         wedge, never mirrored, and the whole panel is one solid shape, ready
         to cut. In the octagon layout a short phrase fills a side best when
         it is repeated, as the traditional panels do: one «الله» a side makes
-        a small tile, three make a square with a clear octagon, four a
-        denser one. Only the tall letters reach into the centre, the alef and
+        a small tile, three make a square with a clear octagon, four the
+        clearest, which is what a new star starts as. Only the tall letters
+        reach into the centre, the alef and
         the lam, and a word's tall letters rise together, all of them or none,
         so no single stroke stands up alone beside the rest of its word; a heh
         keeps its box, as in the old panels, and «الله» always reads alef, lam,

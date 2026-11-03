@@ -19,15 +19,15 @@ test("Add Kufi star draws the octagon square with الله along each side, and 
     starLayout: "octagon",
     starFold: 4,
     starK: 3,
-    starSize: 35,
-    starRegions: ["الله الله الله"],
+    starSize: 45,
+    starRegions: ["الله الله الله الله"],
     starLines: true,
     text: "الله",
   });
 
   // The starter text may sit under the star, so the lines are judged by how much ink they add:
   // the frame closes the gaps in each side's feet row, a few cells of ink on the square's edges.
-  // At the default zoom a 35-cell square overflows the canvas, so the view is reset to bring its
+  // At the default zoom a 45-cell square overflows the canvas, so the view is reset to bring its
   // edges on screen, where alone pixels are drawn to count.
   await page.getByRole("button", { name: "Reset view" }).click();
   const box = await blockClientBox(page, star.id);
