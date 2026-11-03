@@ -917,10 +917,13 @@ it as a separate speck below the hook. The patch now drops any island of our ink
 | 474.s0 | first | 1.05 | 0.948 | 0.992 |
 | 476.s0 | first | 1.15 | 0.942 | 0.992 |
 
-**On trial: the spill group (`PEN_SETTLE`).** On long S strokes and alif stems the fit runs 0.02 to 0.05 nuqta past
-the studio's edge along one side, with the nib held near full width. `PEN_SETTLE` takes the fitted stroke as it is,
-splits its segments, settles it with the widths free (never wider than the nib), and settles it again on those
-widths. Nothing from it is approved yet.
+**Tried and dropped: settling the spill group (`PEN_SETTLE`, 2026-11-03).** On long S strokes and alif stems the fit
+runs 0.02 to 0.05 nuqta past the studio's edge along one side, with the nib held near full width. `PEN_SETTLE` took the
+fitted stroke as it was, split its segments, and settled it with the widths free (never wider than the nib), then again
+on those widths. It raised the overlap on all five tried (162.s1 0.982 to 0.993, 181.s1 0.976 to 0.991, 620.s1 0.982
+to 0.993, 459.s1 0.987 to 0.995, 023.s2 0.969 to 0.982), but the freed widths left lumps and facets along every one,
+and strokes are smooth. It was taken out of the pen job. The spill group is to be patched from the studio's outline
+along the side that spills instead.
 
 **Peaked bends follow the studio on both sides (the user, 2026-11-03; the eight sent back, approved).** Six of the
 eight are the same shape: up to a peak, then down and out to the right. The studio's peak comes to a point, with a
@@ -966,6 +969,26 @@ head is rounded with a small barb, and ours ended square.
 | 221.s0 | 0.956 | 0.997 |
 | 222.s0 | 0.955 | 0.997 |
 | 473.s0 | 0.962 | 0.997 |
+
+**Bowls and shapes: a refit, then patches where it still misses (the user, 2026-11-03; approved).** Four strokes whose
+fit missed the studio in the body, not just at a tip, were refitted on the queue two ways: with a turning nib, and with
+the fit started from a walk along the shape's centre line (`PEN_WALK`).
+- **092.s0:** the walk won outright (0.922 to 0.979, the turning nib 0.881). A 0.6 patch at each tip finished it.
+- **187.s2 and 207.s2:** the turning nib was better (0.908 to 0.935, 0.904 to 0.938) but left the bowl's left end wrong.
+  `jdautopatch.py` laid one 0.5 patch on the largest miss, then a 0.3 patch at the first tip and a 0.5 at the last.
+- **072.s1:** neither refit was clean (0.931 turning, 0.972 walk, both with a kink). The original fit kept, with two 0.5
+  patches on its worst misses and a 0.5 on the foot.
+
+`jdautopatch.py` finds the largest blob of ours-only or studio-only ink, after a 5 px opening so a hairline sliver
+along an edge doesn't count, and patches its centroid. It repeats until the largest blob is under 400 px at 400 px a
+nuqta.
+
+| shape | before | now |
+|---|---|---|
+| 072.s1 | 0.915 | 0.995 |
+| 092.s0 | 0.913 | 0.996 |
+| 187.s2 | 0.868 | 0.992 |
+| 207.s2 | 0.885 | 0.991 |
 
 The pick before the review, each pair against the sheet's whole outline:
 

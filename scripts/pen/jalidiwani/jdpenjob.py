@@ -1178,36 +1178,6 @@ def tail_fit(nodes, piece, ignore, O, P):
     return (t, before, after) if max(after) < max(before) - 1e-4 else (nodes, before, before)
 
 
-# PEN_SETTLE (JSON, {"162.s1": its pen.json record}): a whole fitted stroke taken as it is, its segments split
-# SETTLE_SPLIT times, then settled with the widths free (no wider than the nib) and again on those widths: the
-# catalogue's long S strokes and alif stems ran 0.02-0.05 nuqta past the studio's edge along one side, with the nib
-# held near full width by the fit (the user, 2026-11-03: the spill group).
-SETTLE = json.loads(os.environ.get("PEN_SETTLE", "{}"))
-SETTLE_SPLIT = int(os.environ.get("PEN_SETTLE_SPLIT", 1))
-
-
-def settle(stroke, rec, log):
-    piece, ignore, O = job_of(stroke)
-    ps = rec.get("pen_scale", 1.0); P = PEN * ps
-    n = [{**q, "width": q.get("width", 1) / ps} for q in rec["nodes"]]
-    for _ in range(SETTLE_SPLIT):
-        m = [n[0]]
-        for q, r_ in zip(n, n[1:]):
-            m += [{"p": [round((q["p"][k] + r_["p"][k]) / 2, 4) for k in (0, 1)], "angle": (q["angle"] + r_["angle"]) / 2,
-                   "width": (q.get("width", 1) + r_.get("width", 1)) / 2}, r_]
-        n = m
-    windows = end_windows(n, P, stroke)
-    n, s = nrefine(n, [piece], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ignore, windows=windows, widths_free=True, judge="gpu")
-    n = [{**q, "width": min(q.get("width", 1), 1.0)} for q in n]
-    n, s = nrefine(n, [piece], O, PPN, P, rough=ROUGH, edge=EDGE, ignore=ignore, windows=windows, judge="gpu")
-    n, moved = trim_ends(stroke, n, piece, ignore, O, P)
-    s = nscore([n], [piece], O, PPN, P, ignore)
-    s["window_worst"] = round(nworst(n, [piece], O, PPN, P, (), windows, ignore), 4)
-    log(stroke, "settle", rec["score"]["iou"], rec["score"]["gap95"], "->", s["iou"], s["gap95"])
-    p = [{**q, "width": round(q.get("width", 1) * ps, 4)} for q in n]
-    return {**rec, "nodes": p, "score": s, "lifts": lifts(p), "trim": moved or None, "settle": {"before": rec["score"]}}
-
-
 def polish(stroke, rec, prev, log):
     """PEN_POLISH: rec's nodes, their free end run back out by the nuqta its trim took, then met (meet)."""
     piece, ignore, O = job_of(stroke)
@@ -1517,11 +1487,6 @@ if __name__ == "__main__":
     for st in [p for s in names for p in ([s] + [f"{s}~h{i}" for i in range(1, hairs(s) + 1)] if s in SPLIT
                                           else [s] if "~" in s else three(s) if s in THREE else bigger_first(s) if s in CUT else [s])]:
         if st in KEEP:
-            continue
-        if st in SETTLE:  # PEN_SETTLE: taken as fitted, its widths settled
-            res[st] = settle(st, SETTLE[st], log)
-            json.dump(res, open(os.path.join(od, "pen.json"), "w"))
-            json.dump(pics, open(os.path.join(od, "pics.json"), "w"))
             continue
         if st in POLISH:  # PEN_POLISH: taken as fitted, its start met to the move before's end
             res[st] = polish(st, POLISH[st], res[st[:-1] + str(int(st[-1]) - 1)], log)
