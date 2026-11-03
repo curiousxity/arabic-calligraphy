@@ -1,5 +1,6 @@
 """Pen-held fits of Jali Diwani strokes on the Geekmini (jdpenjob.py through the queue's "scan" mode, scanjob.py).
   python jdpensubmit.py submit QUEUE TAG [--env K=V ...] stroke ...   one job per stroke, "shape.sN" or a bare shape
+  python jdpensubmit.py submit QUEUE TAG --patch IN/pen.json N R stroke ...   jdautopatch.py on IN's records instead
   python jdpensubmit.py collect QUEUE TAG OUTDIR                    OUTDIR/pen.json merged, each stroke's picture a png
 The bundle (QUEUE/bundles/jd-TAG.zip) holds this folder's jdcatalog.py and jdpenjob.py beside a copy of the queue's
 own code/ (so the fit runs the code the workers run), and the data jdcatalog reads: JD_STUDIO_DATA, JD_COMPOSED and
@@ -14,12 +15,15 @@ if cmd == "submit":
            "JD_EXACT": "{bundle}/stamps.exact.json", "JD_WORK": "{bundle}/work"}
     while rest and rest[0] == "--env":
         k, v = rest[1].split("=", 1); env[k] = v; rest = rest[2:]
+    patch = None  # the user, 2026-11-03: studio-outline patches go to the queue too, at neutral priority (no A-/T- prefix)
+    if rest and rest[0] == "--patch":
+        patch, rest = rest[1:4], rest[4:]
     names = [s for x in rest for s in ([x] if "." in x else [f"{x}.{sid}" for sid, _ in strokes(x)])]
     z = os.path.join(q, "bundles", f"jd-{tag}.zip"); tmp = z + f".{socket.gethostname()}.tmp"
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in glob.glob(os.path.join(q, "code", "*.py")):
             zf.write(f, "jd/" + os.path.basename(f))
-        for f in ("jdcatalog.py", "jdpenjob.py"):
+        for f in ("jdcatalog.py", "jdpenjob.py") + (("jdendcap.py", "jdautopatch.py") if patch else ()):
             zf.write(os.path.join(HERE, f), "jd/" + f)
         # this branch's gpufit over the queue's, until the queue's has window_worst's runaway check (2026-10-26: a
         # runaway on the mark T21.s0 drew a 15 GB raster) and _ink_b's guard for a batch wholly out of frame (2026-10-27,
@@ -33,11 +37,16 @@ if cmd == "submit":
         zf.write(os.environ["JD_COMPOSED"], "composed.json")
         zf.write(os.environ["JD_EXACT"], "stamps.exact.json")
         zf.writestr("work/.keep", "")
+        if patch:  # each stroke's record and its shape's other strokes (a patch counts their ink as ours)
+            p_ = json.load(open(patch[0]))
+            zf.writestr("in/pen.json", json.dumps({k: v for k, v in p_.items()
+                                                   if k.split("~")[0].split(".")[0] in {n.split(".")[0] for n in names}}))
     os.replace(tmp, z)
     jobs = []
     for st in names:
-        name = f"jdpen-{tag}-{st}"
-        job = {"name": name, "mode": "scan", "bundle": os.path.basename(z), "argv": ["jd/jdpenjob.py", "{out}", st], "env": env}
+        name = f"jd{'patch' if patch else 'pen'}-{tag}-{st}"
+        argv = (["jd/jdautopatch.py", "in/pen.json", "{out}/pen.json", st] + patch[1:]) if patch else ["jd/jdpenjob.py", "{out}", st]
+        job = {"name": name, "mode": "scan", "bundle": os.path.basename(z), "argv": argv, "env": env}
         dst = os.path.join(q, "todo", name + ".json"); t = dst + f".{socket.gethostname()}.tmp"
         open(t, "w").write(json.dumps(job)); os.replace(t, dst); jobs.append(name)
     json.dump({"names": jobs, "strokes": names}, open(info_f, "w"))
