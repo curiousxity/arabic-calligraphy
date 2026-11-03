@@ -139,7 +139,7 @@ const ROW_MAX = 6;
  */
 const REGION_ROW_MAX = 2;
 /** Most cells a column slice may grow by. */
-const COL_MAX = 4;
+export const COL_MAX = 4;
 /** Longest straight join run beyond the overlapped stubs. */
 const JEXT_MAX = 2;
 /** The U-turn's climb, relative to its authored 6. */
@@ -3240,9 +3240,11 @@ export function packKufiPanel(input: {
  * take their star forms (`kufiFormsOf` for the `star` place). Pure and deterministic, on
  * PACK_BUDGET_MS / PACK_WORK.
  */
-export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boolean }): KufiPackResult {
+export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boolean; edits?: KufiPanelEdits }): KufiPackResult {
   regionPackCount++;
   const { text, mask } = input;
+  // `edits`: a form or stretch fixed per unit (the octagon widens its corner word's heh); never pins or painted cells
+  const edits: KufiPanelEdits = { forms: input.edits?.forms, stretch: input.edits?.stretch };
   const { cols, rows } = mask;
   const { units } = resolveKufiText(text);
   if (letterCount(units) < 2) return { ok: false, reason: "tooShort", suggestions: [] };
@@ -3252,7 +3254,7 @@ export function packKufiRegion(input: { text: string; mask: KufiMask; bars?: boo
   if (input.bars === false) barsOff = true;
   let f: Final | null;
   try {
-    f = search(makeCtx(text, cols, rows, {}, new Map(), PACK_BUDGET_MS, false, mask));
+    f = search(makeCtx(text, cols, rows, edits, new Map(), PACK_BUDGET_MS, false, mask));
   } finally {
     barsOff = wereOff;
   }

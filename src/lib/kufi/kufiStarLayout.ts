@@ -14,10 +14,9 @@
  *
  * Pure: no React, no Konva, no `./harfbuzz`.
  */
-import { kufiFormsOf, packKufiRegion, type KufiPackResult } from "./kufiPack";
-import { layoutKufiOctagon, OCTAGON_DEPTH, OCTAGON_MAX_SIZE, OCTAGON_MIN_SIZE, type KufiOctagonLayout } from "./kufiOctagon";
+import { packKufiRegion, type KufiPackResult } from "./kufiPack";
+import { layoutKufiOctagon, OCTAGON_DEPTH, OCTAGON_MAX_SIZE, OCTAGON_MIN_SIZE, octagonLineFor, type KufiOctagonLayout } from "./kufiOctagon";
 import { starConstruction, type StarFold } from "./kufiStarGeometry";
-import { resolveKufiText } from "./kufiWords";
 
 export type KufiStarLayoutKind = "wedges" | "octagon";
 
@@ -58,14 +57,15 @@ export function octagonSideText(i: Pick<KufiStarInputs, "regions">): string {
 
 /**
  * The square an octagon layout starts on for `text` along each side once:
- * the line the text's region forms take at their authored widths, a gap
- * between letters, plus the band's depth. An estimate for a fresh switch to
- * the layout, within the size bounds; Find layouts measures.
+ * the line the text's band forms take at their authored widths (joined
+ * letters sharing a column, a gap between the rest), the widening its corner
+ * word's heh needs for its shafts to clear the next band, plus the band's
+ * depth (`octagonLineFor`). An estimate for a fresh switch to the layout,
+ * within the size bounds; Find layouts measures.
  */
 export function octagonSizeFor(text: string): number {
-  const { units } = resolveKufiText(text);
-  const line = units.reduce((n, u) => n + (kufiFormsOf(u, "star")[0]?.rows[0]?.length ?? 1) + 1, 0) - 1;
-  return Math.min(OCTAGON_MAX_SIZE, Math.max(OCTAGON_MIN_SIZE, line + OCTAGON_DEPTH));
+  const { line, widen } = octagonLineFor(text);
+  return Math.min(OCTAGON_MAX_SIZE, Math.max(OCTAGON_MIN_SIZE, line + widen + OCTAGON_DEPTH));
 }
 
 export function layoutKufiStar(i: KufiStarInputs): KufiStarLayout {

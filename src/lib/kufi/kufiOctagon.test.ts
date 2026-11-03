@@ -38,16 +38,19 @@ function packed(size: number, text: string): KufiOctagonLayout {
 
 const ALLAH = "الله";
 const rep = (t: string, n: number) => Array.from({ length: n }, () => t).join(" ");
-/** الله once, twice and three times along a side, at the smallest square each packs (its band form is 9 wide). */
+/**
+ * الله once, twice and three times along a side, at the smallest square each packs with every word rising
+ * (its band form is 9 wide; the corner word's heh is widened by two so its first lam clears the next band).
+ */
 const CASES: Array<[size: number, text: string]> = [
-  [15, ALLAH],
-  [25, rep(ALLAH, 2)],
-  [35, rep(ALLAH, 3)],
+  [17, ALLAH],
+  [27, rep(ALLAH, 2)],
+  [37, rep(ALLAH, 3)],
 ];
 /** Other phrases at a square they pack: a heh in إله, a لله, no tall letter at all. */
 const PHRASES: Array<[size: number, text: string]> = [
-  [33, "لا إله إلا الله"],
-  [31, "الحمد لله"],
+  [35, "لا إله إلا الله"],
+  [32, "الحمد لله"],
   [21, "محمد"],
 ];
 
@@ -61,9 +64,10 @@ function solid2x2(ink: Uint8Array, N: number): Array<[number, number]> {
 
 /**
  * The columns of a band's strokes: a word of الله's shafts (the second lam, the first lam, the alef;
- * never the heh's wall), `period` apart along the side; the first word's, under the corner in part, none.
+ * never the heh's wall), `period` apart along the side, the corner word's heh two cells wider so its
+ * first lam stands at `OCTAGON_DEPTH`, clear of the next band.
  */
-const allahStrokes = (words: number, period = 10) => Array.from({ length: words }, (_, w) => [4, 6, 8].map((c) => c + period * w)).flat().filter((c) => c >= period);
+const allahStrokes = (words: number, period = 10) => Array.from({ length: words }, (_, w) => [6, 8, 10].map((c) => c + period * w)).flat();
 
 describe("octagonGeometry", () => {
   it("the line is the side less a band's depth; with no strokes the centre is half the square, of its parity, never wider than the interior less two", () => {
@@ -85,8 +89,8 @@ describe("octagonGeometry", () => {
   });
 
   it("the strokes choose the centre: a 45-degree edge crosses the diagonal at a stroke, the octagon nearest half the square", () => {
-    // الله three times a side at 35: strokes at 6, 8, 14, 16, 18, 24, 26, 28; column 24 (X = 14) gives flat + width = 30
-    expect(octagonGeometry(35, allahStrokes(3))).toEqual({ size: 35, line: 29, width: 21, flat: 9 });
+    // الله three times a side at 35 with the corner word short: strokes at 14, 16, 18, 24, 26, 28; column 24 (X = 14) gives flat + width = 30
+    expect(octagonGeometry(35, [14, 16, 18, 24, 26, 28])).toEqual({ size: 35, line: 29, width: 21, flat: 9 });
     // the same alone, and in any order
     expect(octagonGeometry(35, [24])).toMatchObject({ width: 21, flat: 9 });
     expect(octagonGeometry(35, [28, 26, 24])).toMatchObject({ width: 21, flat: 9 });
@@ -94,10 +98,12 @@ describe("octagonGeometry", () => {
     // beyond it, so the ratio's own 17/7
     expect(octagonGeometry(35, [14])).toMatchObject({ width: 9, flat: 5 });
     expect(octagonGeometry(35, [16])).toMatchObject({ width: 17, flat: 7 });
-    // four times a side at 45: 25/9 (column 14) is nearest 22.5
-    expect(octagonGeometry(45, allahStrokes(4))).toMatchObject({ width: 25, flat: 9 });
-    // a stroke whose octagon would not fit the interior is passed over (25: column 6 names 17/9, wider than 11; column 8 names 11/7)
-    expect(octagonGeometry(25, allahStrokes(2))).toMatchObject({ width: 11, flat: 7 });
+    // four times a side at 45 with the corner word short: 25/9 (column 14) is nearest 22.5
+    expect(octagonGeometry(45, [14, 16, 18, 24, 26, 28, 34, 36, 38])).toMatchObject({ width: 25, flat: 9 });
+    // four times a side at 47, every word rising (strokes at 6, 8, 10, 16, ... 40): 21/9, column 16 (X = 14), nearest 23.5
+    expect(octagonGeometry(47, allahStrokes(4))).toMatchObject({ width: 21, flat: 9 });
+    // a stroke whose octagon would not fit the interior is passed over (27: columns 8 and 18 name 15/7, wider than 13; 10 and 16 name 9/5)
+    expect(octagonGeometry(27, allahStrokes(2))).toMatchObject({ width: 9, flat: 5 });
     // an even square: strokes at odd X give an even sum, width and flat both even
     expect(octagonGeometry(24, [9])).toMatchObject({ width: 8, flat: 4 });
     // a stroke's octagon more than a quarter of the square from the aim is passed over for the ratio's own
@@ -125,7 +131,7 @@ describe("octagonGeometry", () => {
     expect(octagonBottomField(g, 14, 22)).toBe(true);
     expect(octagonBottomField(g, 14, 6)).toBe(false);
     // 21 across with a flat of 9: widths 9, 11, ..., 19, 21 x 9, 19, ..., 9
-    const g21 = octagonGeometry(35, allahStrokes(3));
+    const g21 = octagonGeometry(35, [14, 16, 18, 24, 26, 28]);
     let open21 = 0;
     for (let y = 0; y < 35; y++) for (let x = 0; x < 35; x++) if (octagonOpen(g21, x, y)) open21++;
     expect(open21).toBe(2 * (9 + 11 + 13 + 15 + 17 + 19) + 21 * 9);
@@ -205,16 +211,61 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
         }
       }
       expect(l.strokes).toEqual({ lengthened, onOctagon, onDiagonal });
-      // one الله a side is a side's first word, its heh and first lam under the corner, so nothing of it rises
-      if (size === 15) expect(lengthened).toBe(0);
-      else expect(lengthened).toBeGreaterThan(0);
+      expect(lengthened).toBeGreaterThan(0);
       for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (octagonOpen(g, x, y)) expect(at(x, y)).toBe(false);
     }
     // three الله a side: the middle word's strokes reach the octagon
-    expect(packed(35, rep(ALLAH, 3)).strokes.onOctagon).toBeGreaterThan(0);
+    expect(packed(37, rep(ALLAH, 3)).strokes.onOctagon).toBeGreaterThan(0);
   });
 
-  it("three الله a side at 35: the strokes' ends trace the octagon, the crossing stroke on its edge and the diagonal at once", () => {
+  it("the corner word rises too: its heh is widened so its first lam clears the next band, and the side's two end words mirror each other", () => {
+    // The user, 2026-11-03: a side's first word (the band's corner word, its heh in the corner under the
+    // next band) stayed at the band's height while every other word rose, so each side began stubby.
+    // Its first lam stood under the corner (column 4 of 0 to 5), and a word's shafts rise together or
+    // not at all. Widening its heh by two puts the lam at `OCTAGON_DEPTH`, clear of the band above, so
+    // the word's three shafts rise into the corner bay as the side's other end word's do, mirrored.
+    const text = rep(ALLAH, 4);
+    const l = packed(47, text);
+    const b = l.band;
+    expect(b.placements.map((p) => `${p.glyphId}@${p.col}+${p.stretch.join()}`)).toEqual([
+      "allah.isolated.3@32+0",
+      "allah.isolated.3@22+0",
+      "allah.isolated.3@12+0",
+      "allah.isolated.3@0+2",
+    ]);
+    expect(octagonShafts(b, text)).toEqual([6, 8, 10, 16, 18, 20, 26, 28, 30, 36, 38, 40]);
+    expect(l.words).toEqual({ risen: 4, still: 0 });
+    const rise = (c: number) => {
+      let n = 0;
+      while (l.cells[(47 - OCTAGON_DEPTH - n) * 47 + c]) n++;
+      return n;
+    };
+    // the corner word's strokes step up to the diagonal, 1, 3, 5; the other end word's step down, 5, 3, 1
+    expect([6, 8, 10].map(rise)).toEqual([1, 3, 5]);
+    expect([36, 38, 40].map(rise)).toEqual([5, 3, 1]);
+    // the middle words reach the octagon, its flat side and its 45-degree edges, mirrored about the line's middle
+    expect([16, 18, 20].map(rise)).toEqual([30, 28, 26].map(rise));
+    expect(rise(16)).toBeGreaterThan(rise(10));
+    expect(l.strokes).toEqual({ lengthened: 12, onOctagon: 6, onDiagonal: 6 });
+    // every stroke's rise is mirrored about the line's middle: the side reads alike from either corner
+    for (let c = OCTAGON_DEPTH; c < b.cols; c++) expect(rise(c), `column ${c}`).toBe(rise(b.cols - 1 - c + OCTAGON_DEPTH));
+    // one الله a side at 17: its heh fills the corner and its shafts rise, 1, 2, 1, round the centre cell
+    const one = packed(17, ALLAH);
+    expect(one.band.placements.map((p) => `${p.glyphId}@${p.col}+${p.stretch.join()}`)).toEqual(["allah.isolated.3@0+2"]);
+    expect(one.words).toEqual({ risen: 1, still: 0 });
+    expect(one.strokes.lengthened).toBe(3);
+  });
+
+  it("where the line leaves no room to widen the corner heh, the corner word stays at the band's height, as before (45: a line of 39 for four words of 9)", () => {
+    const text = rep(ALLAH, 4);
+    const l = packed(45, text);
+    expect(l.band.placements.map((p) => p.col)).toEqual([30, 20, 10, 0]);
+    expect(octagonShafts(l.band, text)).toEqual([14, 16, 18, 24, 26, 28, 34, 36, 38]);
+    expect(l.words).toEqual({ risen: 3, still: 1 });
+    expect(l.geometry).toMatchObject({ width: 25, flat: 9 });
+  });
+
+  it("three الله a side at 35, the corner word short: the strokes' ends trace the octagon, the crossing stroke on its edge and the diagonal at once", () => {
     const l = packed(35, rep(ALLAH, 3));
     const g = l.geometry;
     expect(g).toMatchObject({ width: 21, flat: 9 });
@@ -233,8 +284,9 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
     // beyond the crossing the strokes end on the diagonal staircase, one cell deeper per column toward the square's corner
     expect(endsAt(26, 27) && octagonSeam(g, 26, 26)).toBe(true);
     expect(endsAt(28, 29) && octagonSeam(g, 28, 28)).toBe(true);
-    // the first word (columns 0 to 8) has its heh and first lam under the left band's corner, so none of its shafts
-    // rise: its second lam (6) and alef (8) stay at the band's height rather than rise without the lam at 4
+    // the corner word (columns 0 to 8) has its heh and first lam under the left band's corner and the line no room
+    // to widen its heh, so none of its shafts rise: its second lam (6) and alef (8) stay at the band's height
+    // rather than rise without the lam at 4
     for (const c of [4, 6, 8]) expect(at(c, 29), `column ${c}`).toBe(false);
     // the heh's box keeps its own wall under its bar, in the band: nothing rises out of it (words at 10 and 20; columns 10 to 12, 20 to 22)
     for (const c of [10, 11, 12, 20, 21, 22]) expect(at(c, 29), `column ${c}`).toBe(false);
@@ -285,10 +337,12 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
     // محمد has no tall letter, so nothing is lengthened, however tall its boxes are drawn
     expect(packed(21, "محمد").strokes).toEqual({ lengthened: 0, onOctagon: 0, onDiagonal: 0 });
     // the band takes الله on four uprights with the heh's own wall (`allah.isolated.3`), so a word gives three shafts,
-    // both lams and the alef; the first word's lie under the corner in part (its lam at 4), so it gives none
-    const b35 = packed(35, rep(ALLAH, 3)).band;
-    expect(b35.placements.map((p) => p.glyphId)).toEqual(["allah.isolated.3", "allah.isolated.3", "allah.isolated.3"]);
-    expect(octagonShafts(b35, rep(ALLAH, 3))).toEqual([14, 16, 18, 24, 26, 28]);
+    // both lams and the alef; the corner word's heh is two wider, so its first lam stands clear of the corner
+    const b37 = packed(37, rep(ALLAH, 3)).band;
+    expect(b37.placements.map((p) => p.glyphId)).toEqual(["allah.isolated.3", "allah.isolated.3", "allah.isolated.3"]);
+    expect(octagonShafts(b37, rep(ALLAH, 3))).toEqual([6, 8, 10, 16, 18, 20, 26, 28, 30]);
+    // at 35 the line has no room for that, and the corner word's lam at 4 lies under the corner: it gives none
+    expect(octagonShafts(packed(35, rep(ALLAH, 3)).band, rep(ALLAH, 3))).toEqual([14, 16, 18, 24, 26, 28]);
   });
 
   it("a word's shafts rise together or not at all: never a lone lengthened shaft beside its unlengthened siblings", () => {
@@ -323,11 +377,13 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
       }
     }
     expect(risen).toBeGreaterThan(0);
-    expect(still).toBeGreaterThan(0);
+    // محمد has no shaft, and every الله rises at these squares, the corner words with their heh widened; only
+    // الحمد لله's لله stays, its heh having no column to widen by
+    expect(still).toBe(1);
   });
 
   it("a text that does not fill its line, or does not fit it, packs no square and says why", () => {
-    const short = layoutKufiOctagon(25, ALLAH);
+    const short = layoutKufiOctagon(27, ALLAH);
     expect(short.layout).toBeNull();
     expect(short.band).toMatchObject({ ok: false, reason: "tooShort" });
     const long = layoutKufiOctagon(15, rep(ALLAH, 2));
@@ -335,9 +391,9 @@ describe("layoutKufiOctagon", { timeout: 120_000 }, () => {
     expect(long.band).toMatchObject({ ok: false, reason: "tooLong" });
   });
 
-  it("pins الله once a side at 15, three times at 35 and four times at 45 (a new star's square), with the lines", () => {
-    expect(octagonRows(packed(15, ALLAH), true)).toMatchSnapshot();
-    expect(octagonRows(packed(35, rep(ALLAH, 3)), true)).toMatchSnapshot();
-    expect(octagonRows(packed(45, rep(ALLAH, 4)), true)).toMatchSnapshot();
+  it("pins الله once a side at 17, three times at 37 and four times at 47 (a new star's square), with the lines", () => {
+    expect(octagonRows(packed(17, ALLAH), true)).toMatchSnapshot();
+    expect(octagonRows(packed(37, rep(ALLAH, 3)), true)).toMatchSnapshot();
+    expect(octagonRows(packed(47, rep(ALLAH, 4)), true)).toMatchSnapshot();
   });
 });

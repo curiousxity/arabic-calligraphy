@@ -119,8 +119,10 @@ describe("evaluateKufiStar", { timeout: 600_000 }, () => {
     expect(oct.length).toBe(OCTAGON_OFFERS);
     expect(e.offers.slice(0, oct.length).every((o) => o.pattern === "octagon")).toBe(true);
     expect(e.offers.slice(oct.length).every((o) => o.pattern !== "octagon")).toBe(true);
-    // the smallest squares: one الله at 15, two at 25, three at 35, four at 45 (their lines take 9, 19, 29, 39: the band's form is 9 wide)
-    expect(oct.map((o) => o.inputs.size)).toEqual([15, 25, 35, 45]);
+    // the smallest squares with every word rising: one الله at 17, two at 27, three at 37, four at 47 (their lines take
+    // 11, 21, 31, 41: the band's form is 9 wide, and the corner word's heh two wider so its first lam clears the next band)
+    expect(oct.map((o) => o.inputs.size)).toEqual([17, 27, 37, 47]);
+    for (const o of oct) expect(o.layout.octagon!.words).toEqual({ risen: wordsOf(o.inputs.regions[0]).length, still: 0 });
     oct.forEach((o, i) => {
       expect(o.fits).toBe(true);
       expect(o.inputs).toMatchObject({ layout: "octagon", fold: 4, k: defaultStarK(4) });

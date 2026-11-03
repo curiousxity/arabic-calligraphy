@@ -19,7 +19,7 @@ test("Add Kufi star draws the octagon square with الله along each side, and 
     starLayout: "octagon",
     starFold: 4,
     starK: 3,
-    starSize: 45,
+    starSize: 47,
     starRegions: ["الله الله الله الله"],
     starLines: true,
     text: "الله",
@@ -27,7 +27,7 @@ test("Add Kufi star draws the octagon square with الله along each side, and 
 
   // The starter text may sit under the star, so the lines are judged by how much ink they add:
   // the frame closes the gaps in each side's feet row, a few cells of ink on the square's edges.
-  // At the default zoom a 45-cell square overflows the canvas, so the view is reset to bring its
+  // At the default zoom a 47-cell square overflows the canvas, so the view is reset to bring its
   // edges on screen, where alone pixels are drawn to count.
   await page.getByRole("button", { name: "Reset view" }).click();
   const box = await blockClientBox(page, star.id);
@@ -60,7 +60,7 @@ test("the Wedges layout is still there: switching to it draws the 4-fold constru
   await panel.getByRole("button", { name: "Octagon" }).click();
   await expect
     .poll(async () => (await getBlocks(page)).find((b) => b.id === id) as { starLayout?: string; starSize?: number; starRegions?: string[] } | undefined)
-    .toMatchObject({ starLayout: "octagon", starSize: 15, starRegions: ["الله"] });
+    .toMatchObject({ starLayout: "octagon", starSize: 17, starRegions: ["الله"] });
   await expect(panel.getByRole("group", { name: "Fold" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });

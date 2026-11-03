@@ -26,7 +26,7 @@
  * Pure: no React, no Konva, no `./harfbuzz`.
  */
 import { kufiClockOverridden, kufiFormsOf, packKufiRegion, type KufiMask, type KufiPackResult } from "./kufiPack";
-import { octagonBandMask, octagonFromBand, OCTAGON_MAX_SIZE, OCTAGON_MIN_SIZE } from "./kufiOctagon";
+import { octagonFromBand, OCTAGON_MAX_SIZE, OCTAGON_MIN_SIZE, packOctagonBand } from "./kufiOctagon";
 import { defaultStarK, STAR_KS, starConstruction, type StarConstruction, type StarFold, type StarRegionKind } from "./kufiStarGeometry";
 import { octagonSizeFor, type KufiStarInputs, type KufiStarLayout } from "./kufiStarLayout";
 import { resolveKufiText } from "./kufiWords";
@@ -275,15 +275,25 @@ const UNPACKED: KufiPackResult = { ok: false, reason: "tooLong", suggestions: []
  * (`areaOf`, a generous measure: fits run from 0.57 to 0.9 of it) is too small without a pack,
  * which would only fail slowly.
  */
-function lookup(clock: Clock, mask: KufiMask, text: string, octagon = false): KufiPackResult {
-  const key = `${octagon ? "octagon|" : ""}${maskKey(mask)}|${text}`;
+function lookup(clock: Clock, mask: KufiMask, text: string): KufiPackResult {
+  const key = `${maskKey(mask)}|${text}`;
   const hit = packCache.get(key);
   if (hit) return hit;
   if (usableOf(mask) * 2 < areaOf(text)) return UNPACKED;
+  return tried(clock, key, () => packKufiRegion({ text, mask }));
+}
+
+/** The octagon's band of `size` for `text`, from the cache or packed now, as `layoutKufiOctagon` packs it (an approved offer is drawn as packed here). */
+function lookupOctagon(clock: Clock, size: number, text: string): KufiPackResult {
+  const key = `octagon|${size}|${text}`;
+  return packCache.get(key) ?? tried(clock, key, () => packOctagonBand(size, text));
+}
+
+/** One real pack, counted as a try and cached under `key`; none starts once the budget is spent. */
+function tried(clock: Clock, key: string, pack: () => KufiPackResult): KufiPackResult {
   if (clock.over()) throw new OutOfBudget();
   clock.tries++;
-  // the octagon's band packs as `layoutKufiOctagon` packs it (its forms, no bars), since an approved offer is drawn as packed here
-  const r = octagon ? packKufiRegion({ text, mask, bars: false }) : packKufiRegion({ text, mask });
+  const r = pack();
   packCache.set(key, r);
   if (packCache.size > PACK_CACHE_LIMIT) packCache.delete(packCache.keys().next().value!);
   return r;
@@ -450,34 +460,43 @@ function offerOf(plan: Plan, fold: StarFold, k: number, size: number, a: Attempt
 
 /**
  * The octagon squares: `text` once, twice, ... (`OCTAGON_REPEATS`) along each
- * side, each at the smallest square whose line its repeats pack (scanned up
- * from the line their authored widths take, less two, `OCTAGON_SCAN` sizes;
- * a line the text leaves open ends the scan, since a bigger one is worse).
- * Each pack is one short line, so this costs little; the packs share the
- * cache. Smallest first; at most `OCTAGON_OFFERS`.
+ * side, each at the smallest square whose line its repeats pack **with every
+ * word rising** (scanned up from the line their authored widths take with
+ * the corner word's widening, less two, `OCTAGON_SCAN` sizes; a line the
+ * text leaves open ends the scan, since a bigger one is worse), else the
+ * smallest that packs at all, its corner word short. Each pack is one short
+ * line, so this costs little; the packs share the cache. Smallest first; at
+ * most `OCTAGON_OFFERS`.
  */
 function octagonOffers(clock: Clock, text: string, offers: KufiStarOffer[]): void {
   for (let n = 1; n <= OCTAGON_REPEATS && offers.length < OCTAGON_OFFERS; n++) {
     const side = repeat(text, n);
     const from = Math.max(OCTAGON_MIN_SIZE, octagonSizeFor(side) - 2);
     if (from > OCTAGON_MAX_SIZE) break;
+    let short: KufiStarOffer | null = null;
     for (let size = from; size <= Math.min(OCTAGON_MAX_SIZE, from + OCTAGON_SCAN); size++) {
-      const band = lookup(clock, octagonBandMask(size), side, true);
+      const band = lookupOctagon(clock, size, side);
       if (!band.ok) {
         if (band.reason === "tooShort") break;
         continue;
       }
       const octagon = octagonFromBand(size, band, side);
-      offers.push({
+      const offer: KufiStarOffer = {
         inputs: { layout: "octagon", fold: 4, k: defaultStarK(4), size, regions: [side] },
         pattern: "octagon",
         fits: true,
         note: `${text}${times(n)} along each side, the tall strokes lengthened to an octagon in a square of ${size}`,
         quality: { squares: 0, bars: 0, cut: band.quality?.cut ?? 0, words: band.placements.length, size },
         layout: { regions: [{ text: side, result: band }], unpacked: [], octagon },
-      });
-      break;
+      };
+      if (octagon.words.still === 0) {
+        offers.push(offer);
+        short = null;
+        break;
+      }
+      short ??= offer;
     }
+    if (short) offers.push(short);
   }
 }
 

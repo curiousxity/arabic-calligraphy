@@ -17,7 +17,8 @@ layouts (`starLayout`; a save without the field is `wedges`):
 - **`octagon`**, the default since 2026-11-02: the traditional "octagon
   inside a square". One text runs round the four sides of a square, one copy
   per side turned by a quarter, and its tall strokes are lengthened inward
-  until their ends draw an octagon at the centre, which stays open. See "The
+  until their ends draw an octagon at the centre, which stays open. A new
+  star is الله ×4 a side at 47 (2026-11-03; 45 for a day). See "The
   octagon layout" below.
 - **`wedges`**, built 2026-11-01: a centre star, a ring of 2n wedges and n
   corners, each region holding its own text on its own lattice. The rest of
@@ -55,18 +56,38 @@ with its repeats, as the wedge regions carry theirs):
   its line by stretching (الله's heh box widens by up to `COL_MAX`). **The
   band keeps five rows** (2026-11-02): the tall الله forms would need a
   seven-row band, pushing the interior in by four cells, moving every
-  measured square (15, 25, 35, 45) and the pinned geometry, and gaining
-  nothing: the octagon already lengthens every word's shafts far above the
-  heh's box, and the one word that stays squat, a side's first, does so
-  because its heh and first lam lie under the next band's corner, not for
-  want of a form. The
+  measured square and the pinned geometry, and gaining nothing: the octagon
+  already lengthens every word's shafts far above the heh's box. The
   other three bands are the bottom one turned clockwise about the centre
   (`octagonTurn`, cell to cell; N may be odd or even), so the text reads as
   a panel's outer ring: upright below, upward on the left, upside down
   above, downward on the right, never mirrored; the band on each edge stands
   in the corner the previous one leaves, above its first letter, the seam
   row between. The bottom band's first `DEPTH` columns lie under the left
-  band and cannot lengthen anything.
+  band and cannot lengthen anything, which is why the **corner word's heh
+  is widened** (`packOctagonBand`, `cornerWidening`, 2026-11-03; the user:
+  each side began with a stubby word and the octagon's outline broke
+  there). The band's corner word (the text's last, its heh in the corner)
+  had its first lam at column 4, under the next band, and since a word's
+  shafts rise together or not at all, none of it rose while every other
+  word did. The band is packed, and where the corner word has a shaft under
+  the corner, or its corner letter stands short of the corner (the packer
+  leaves a line's odd cell empty at the band's start rather than widen a
+  heh by one), it is packed again with that letter's column slice fixed
+  wider by what the first shaft needs to stand at `DEPTH` (two cells for
+  الله; the slice must lie left of every shaft of the word, `COL_MAX` at
+  most; the placed form keeps its other counts, else the unit's first band
+  form with such a slice is taken, through `packKufiRegion`'s `edits`); the
+  second packing is kept when it leaves fewer words at the band's height,
+  or as many with the corner letter in the corner. So the corner word's
+  three shafts rise into the corner bay, 1, 3, 5, the mirror of the other
+  end word's 5, 3, 1, and the side reads alike from either corner. Where
+  the line has no room for the widening (الله ×4 at 45: a line of 39 for
+  four words of 9) the plain packing stands and the corner word stays at
+  the band's height, as it did before, so a saved panel at the old squares
+  still draws; `KufiOctagonLayout.words` counts the band's words with a
+  shaft as `risen` or `still`. A corner heh with no column slice (لله's
+  `heh.final` forms) cannot widen, and its word stays.
 - **Fields by the diagonals.** The interior (N - 12 square) is cut by its
   diagonals into four fields, one per band; the diagonal cells themselves
   (`octagonSeam`) stay paper, so two fields' stroke ends meet only at
@@ -93,10 +114,9 @@ with its repeats, as the wedge regions carry theirs):
   the next band's corner (the band's first `DEPTH` columns) or with ink
   beside its top cannot rise, so a word with one such gives no stroke at
   all. So الله gives three shafts a word (the second lam, the first lam,
-  the alef) and never the heh's wall, except a side's first word, whose heh
-  and first lam lie under the corner and which stays at the band's height;
-  محمد gives none; الحمد لله only لله's two lams (الحمد's alef sits
-  under the corner; its meem's walls used to rise). Short letters leave the
+  the alef) and never the heh's wall, the corner word's with its heh
+  widened (above); محمد gives none; الحمد لله gives الحمد's lam and alef,
+  and لله's two lams only where its heh can widen. Short letters leave the
   space above them open: in the reference that space is the design, not a
   hole, so the empty-2x2 rule holds inside the bands (the packer's) and not
   above them.
@@ -117,15 +137,17 @@ with its repeats, as the wedge regions carry theirs):
   that aim is taken, the wider on a tie; with none, the ratio's own width
   with a regular flat. The crossing stroke's end is then on the edge and the
   diagonal at once, and the edge continues across the diagonal as the next
-  field's stroke ends: at 35 with الله ×3 (shafts 14, 16, 18, 24, 26, 28;
-  the first word's none) column 24 gives 21/9: its end (24, 25) under the
-  open seam cell (24, 24), the left band's copy ending at (9, 24) beside
-  (10, 24), the middle word's three shafts ending together under the flat,
-  and beyond the crossing the ends stepping down the diagonal, (26, 27),
-  (28, 29). الله ×2 at 25 gives 11/7, ×4 at 45 25/9 (the clearest octagon
-  of the four: longer shafts round a centre nearer half the square), the
-  Shahada at 33 19/7; الحمد لله at 31 has two shafts a side, both ending
-  on a diagonal, and takes 15/7. The 45° staircase is one cell per column only where both
+  field's stroke ends: at 47 with الله ×4 (shafts 6, 8, 10, 16, 18, 20,
+  26, 28, 30, 36, 38, 40) column 16 gives 21/9: its end (16, 31) under the
+  open seam cell (16, 30), the middle words' shafts ending on the flat and
+  its 45° edges (20 and 26 at 34, 18 and 28 at 33, 16 and 30 at 31), and
+  beyond the crossing the two end words stepping down the diagonals into
+  the corner bays, (10, 37), (8, 39), (6, 41) and their mirror. ×3 at 37
+  gives 23/11 (the interior less two: the middle word rises two cells under
+  the flat, the end words 1, 2, 4), ×2 at 27 9/5 (a plus between four
+  staircases), one at 17 3/1; at the old squares (35 with ×3, 45 with ×4,
+  the corner word short) column 24 gives 21/9 and column 14 25/9, as
+  `kufiOctagon.test.ts` still pins. The 45° staircase is one cell per column only where both
   fields have strokes there; a word's gap and the heh's box leave inlets at
   the octagon's vertices (the pinwheel's four bays), and محمد has no shaft
   at all, so its centre is the ratio's own 7/3 at 21, an open square drawn
@@ -135,19 +157,20 @@ with its repeats, as the wedge regions carry theirs):
   a solid 2x2), so the frame line and the feet are one stroke, as the
   wedges' bands are flush on their base edge. Four pinwheel segments, not a
   closed ring: the corner cells belong to the letter standing there.
-- **Measured** (2026-11-02, the star's 9-wide الله): الله once a side
-  packs at 15 (its line 9; the interior is a 3x3 with the centre cell open,
-  and nothing rises: the one word is the first), twice at 25, three times
-  at 35, four at 45; `kufiOctagon.test.ts` pins 15, 35 and 45. One الله a side makes a small dense tile with no octagon to speak
-  of; three makes a square whose centre reads as an octagon with the
-  diagonals drawn by stroke ends; four makes the clearest octagon of the
-  four squares (longer shafts round a centre nearer half the square, see
-  "The open centre"), which is why a new star is `الله الله الله الله` at
-  45 (2026-11-02; it was ×3 at 35 for a day, and 29 on the merged form).
-  A side with more
-  words gives longer, denser strokes, nearer the reference. Under the
-  work-only clock الحمد لله packs a side at 31, the Shahada at 33, محمد at
-  21.
+- **Measured** (2026-11-03, the star's 9-wide الله, its corner heh two
+  wider): الله once a side packs with its word rising at 17 (its line 11;
+  the interior a 5x5 round the centre cell, the shafts rising 1, 2, 1),
+  twice at 27, three times at 37, four at 47; `kufiOctagon.test.ts` pins
+  17, 37 and 47, and 35 and 45 with the corner word short. One الله a side
+  makes a small dense tile; two a tile with a plus at the centre; three a
+  square whose centre reads as an octagon with the diagonals drawn by
+  stroke ends; four the clearest octagon of the four squares (longer shafts
+  round a centre nearer half the square, see "The open centre"), which is
+  why a new star is `الله الله الله الله` at 47 (2026-11-03; 45 for a day
+  with the corner word short, ×3 at 35 the day before, 29 on the merged
+  form). A side with more words gives longer, denser strokes, nearer the
+  reference. Under the work-only clock الحمد لله packs a side from 29 (its
+  لله's heh cannot widen, so لله stays), the Shahada at 35, محمد at 21.
 - **Status.** The side's pack failing gives `unpacked: [0]` and
   `octagon: null`; the view draws the dashed square and the status says
   "doesn't fit a side at this size" (`tooLong`) or "leaves a side open"
@@ -158,15 +181,20 @@ with its repeats, as the wedge regions carry theirs):
 **Sidebar.** The panel's first row is the layout (`Octagon` / `Wedges`);
 Fold and Star show for the wedges only; Size is the square's side (13 to
 60) or the ring's apothem (12 to 60). Switching to the octagon puts the
-block's text (else الله) once along each side at `octagonSizeFor` (the
-line its octagon forms take at their authored widths, plus `DEPTH`); to the
+block's text (else الله) once along each side at `octagonSizeFor`
+(`octagonLineFor`: the line its band forms take at their authored widths,
+joined letters sharing a column and a gap between the rest, plus the corner
+word's widening, plus `DEPTH`; the old estimate counted a gap at every
+join, so محمد's scan began at 25 and الحمد لله's above every square it
+packs, 2026-11-03); to the
 wedges, the blank classic 4-fold star at 24. Find layouts offers the octagon
 squares first (`octagonOffers`): the text once, twice, up to
 `OCTAGON_REPEATS` (6) times a side, each at the smallest square its line
-packs (scanned from `octagonSizeFor` less two, `OCTAGON_SCAN` sizes; a line
-the text leaves open ends the scan), smallest first, at most
-`OCTAGON_OFFERS` (4), then the wedge offers as below. A side pack is one
-short line, milliseconds, so this costs the budget nothing.
+packs **with every word rising** (`words.still` 0; scanned from
+`octagonSizeFor` less two, `OCTAGON_SCAN` sizes; a line the text leaves
+open ends the scan), else the smallest that packs at all, smallest first,
+at most `OCTAGON_OFFERS` (4), then the wedge offers as below. A side pack
+is one short line, milliseconds, so this costs the budget nothing.
 
 ## The construction (`kufiStarGeometry.ts`, pure)
 
@@ -516,6 +544,17 @@ drawing its approved regions. The block's `text` is edited in Content
   sides as a staircase, their stems carried on to it by bars.
 - **A corner's acute end stays paper**: the triangle's point beyond its last
   line is too thin for a line of text, and no filler is drawn there.
+- **The octagon's corner word is widened, not turned** (2026-11-03). In the
+  historical four-way pinwheels each side is one motif turned, and a word's
+  tail crosses into the next sector, its final letter turning at the corner,
+  so the four sides come out equal and the corners interlock; the loops
+  (meem, heh, waw, ain) keep a fixed 3x3 ring, and the leftover space is
+  filled by stretching the alef and lam shafts first, raising or lowering a
+  loop next, and a stub filler last. The band's grammar lets no word bend
+  round a corner (a side is one line), so the corner word's shafts are
+  freed by widening its heh's box instead, the one column of الله that
+  widens without a hole; a corner that turns the final letter into the next
+  band would keep the heh a 3x3 ring and is deferred.
 - **"الله محمد" may need two Find layouts** for the 5- and 6-fold fits on
   the 9 s clock: محمد's failing packs spend it on the 4-fold scan (see Sizes
   and tasks); under the work cap all three repeat fits come at once.

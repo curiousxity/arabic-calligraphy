@@ -47,9 +47,9 @@
  * a gap, the frame line and the feet one stroke (a gap stays where filling
  * it would make a solid 2x2). Pure: no React, no Konva, no `./harfbuzz`.
  */
-import { kufiGlyphById, kufiShaftTops, stretchGlyph } from "./kufiAlphabet";
-import { packKufiRegion, type KufiMask, type KufiPackResult } from "./kufiPack";
-import { resolveKufiText } from "./kufiWords";
+import { kufiGlyphById, kufiShaftTops, stretchGlyph, type KufiGlyph } from "./kufiAlphabet";
+import { COL_MAX, kufiFormsOf, packKufiRegion, type KufiMask, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
+import { resolveKufiText, type KufiUnit } from "./kufiWords";
 
 /** Letter height: a band is one 5-row line. */
 export const OCTAGON_BAND = 5;
@@ -181,7 +181,51 @@ export type KufiOctagonLayout = {
    * diagonal beyond the crossing stroke, the staircase to the square's corner.
    */
   strokes: { lengthened: number; onOctagon: number; onDiagonal: number };
+  /** The band's words with a shaft: those whose shafts rise, and those left at the band's height. */
+  words: { risen: number; still: number };
 };
+
+/** A shaft of the band: its column, and whether it can rise (false under the next band's corner or with ink beside its top). */
+type Shaft = { col: number; free: boolean; corner: boolean };
+
+/**
+ * The band's shafts by word: per placement, the band's top-row cells that
+ * are a shaft's top (`kufiShaftTops`, the notion a region's bars share),
+ * each marked free to rise or not, and under the corner or not.
+ */
+function wordShafts(band: Extract<KufiPackResult, { ok: true }>, units: KufiUnit[]): Map<number, Shaft[]> {
+  const { cols: L, rows: R, cells, placements } = band;
+  const ink = (x: number, y: number) => x >= 0 && x < L && y >= 0 && y < R && cells[y * L + x] === 1;
+  const words = new Map<number, Shaft[]>();
+  for (const p of placements) {
+    const found = kufiGlyphById(p.glyphId);
+    const word = units[p.unitIndex]?.wordIndex;
+    if (!found || word === undefined) continue;
+    const list = words.get(word) ?? [];
+    words.set(word, list);
+    const tops = kufiShaftTops(found.skeleton, stretchGlyph(found.glyph, p.stretch));
+    for (let j = 0; j < tops.length; j++) {
+      if (tops[j] < 0) continue;
+      // a region's lines are upright; a shaft below the band's top row, under the corner or with ink beside its top reaches nothing
+      const c = p.col + j;
+      const top = p.turn === 0 && p.row + tops[j] === 0;
+      const corner = top && c < OCTAGON_DEPTH;
+      list.push({ col: c, free: top && !corner && !ink(c - 1, 0) && !ink(c + 1, 0), corner });
+    }
+  }
+  return words;
+}
+
+/** The band's words with a shaft: risen (every shaft free) or still. */
+function octagonWords(band: Extract<KufiPackResult, { ok: true }>, text: string): { risen: number; still: number } {
+  const out = { risen: 0, still: 0 };
+  for (const list of wordShafts(band, resolveKufiText(text).units).values()) {
+    if (list.length === 0) continue;
+    if (list.every((s) => s.free)) out.risen++;
+    else out.still++;
+  }
+  return out;
+}
 
 /**
  * The columns of a packed band (of `text`) that lengthen inward: each holds
@@ -203,39 +247,121 @@ export type KufiOctagonLayout = {
  * lone lengthened shaft beside its unlengthened siblings read as another
  * letter's stem). A shaft under the next band's corner (the band's first
  * `DEPTH` columns) or with ink beside its top cannot rise, so a word with
- * one such gives no stroke at all: the first word of a side, whose heh and
- * first lam lie under the corner, stays at the band's height.
+ * one such gives no stroke at all. The corner word, whose heh fills the
+ * corner, is packed with its heh wide enough for its first lam to stand
+ * clear of the corner (`packOctagonBand`); only where the line has no room
+ * for that does it stay at the band's height.
  */
 export function octagonShafts(band: Extract<KufiPackResult, { ok: true }>, text: string): number[] {
-  const { cols: L, rows: R, cells, placements } = band;
-  const ink = (x: number, y: number) => x >= 0 && x < L && y >= 0 && y < R && cells[y * L + x] === 1;
-  const { units } = resolveKufiText(text);
-  // per word, its shafts' columns: the band's top-row cells that are a shaft's top (`kufiShaftTops`, the
-  // notion a region's bars share), or -1 for a shaft that cannot rise
-  const words = new Map<number, number[]>();
-  for (const p of placements) {
-    const found = kufiGlyphById(p.glyphId);
-    const word = units[p.unitIndex]?.wordIndex;
-    if (!found || word === undefined) continue;
-    const list = words.get(word) ?? [];
-    words.set(word, list);
-    const tops = kufiShaftTops(found.skeleton, stretchGlyph(found.glyph, p.stretch));
-    for (let j = 0; j < tops.length; j++) {
-      if (tops[j] < 0) continue;
-      // a region's lines are upright; a shaft below the band's top row, under the corner or with ink beside its top reaches nothing
-      const c = p.col + j;
-      const free = p.turn === 0 && p.row + tops[j] === 0 && c >= OCTAGON_DEPTH && !ink(c - 1, 0) && !ink(c + 1, 0);
-      list.push(free ? c : -1);
-    }
-  }
   const out: number[] = [];
-  for (const list of words.values()) if (list.length > 0 && list.every((c) => c >= 0)) out.push(...list);
+  for (const list of wordShafts(band, resolveKufiText(text).units).values())
+    if (list.length > 0 && list.every((s) => s.free)) out.push(...list.map((s) => s.col));
   return out.sort((a, b) => a - b);
+}
+
+/**
+ * The corner word's widening: the edits that pack it with its corner letter
+ * (the band's leftmost, its heh) wide enough for the word's first shaft to
+ * stand at `DEPTH`, clear of the next band, or null where no shaft of the
+ * corner word lies under the corner, or nothing can widen it.
+ *
+ * The user, 2026-11-03: each side began with a stubby word. The band's
+ * corner word has its heh in the corner and its first lam under the next
+ * band (column 4 of the corner's 0 to 5), and since a word's shafts rise
+ * together or not at all, none of it rose while every other word did. A
+ * heh's box is the one column of الله that widens without a hole, and the
+ * traditional way the word is stretched, so the corner heh is widened by
+ * what the lam needs (two cells for الله) and the word's shafts then rise
+ * into the corner bay as the side's other end word's do, mirrored. The
+ * widening is the glyph's column slice (`COL_MAX` at most) left of every
+ * shaft of the word; the placed form keeps its other counts, else the
+ * unit's first band form with such a slice is taken.
+ */
+function cornerWidening(band: Extract<KufiPackResult, { ok: true }>, units: KufiUnit[]): KufiPanelEdits | null {
+  if (band.placements.length === 0) return null;
+  // the corner letter: the band's leftmost placement; the corner word is its word
+  const p = band.placements.reduce((a, b) => (b.col < a.col ? b : a));
+  const unit = units[p.unitIndex];
+  if (!unit) return null;
+  const shafts = wordShafts(band, units).get(unit.wordIndex) ?? [];
+  const under = shafts.filter((s) => s.corner).map((s) => s.col);
+  // what the first shaft needs to stand at the corner's edge, and what the letter needs to stand in the corner itself
+  // (the packer leaves a line's odd cell empty at the band's start rather than widen a heh by one)
+  const d = (under.length > 0 ? OCTAGON_DEPTH - Math.min(...under) : 0) + p.col;
+  if (d <= 0) return null;
+  const placed = kufiGlyphById(p.glyphId)?.glyph ?? null;
+  // a column slice of the corner letter's glyph that lies left of every shaft of the word
+  const slice = (g: KufiGlyph) => g.stretch.findIndex((s) => s.axis === "col" && shafts.every((sh) => sh.col > p.col + s.index));
+  const forms = [placed, ...kufiFormsOf(unit, "star")].filter((g): g is KufiGlyph => !!g && slice(g) >= 0);
+  for (const g of forms) {
+    const k = slice(g);
+    const counts = g.stretch.map((_, i) => (g === placed ? (p.stretch[i] ?? 0) : 0));
+    counts[k] += d;
+    if (counts[k] > COL_MAX) continue;
+    return { forms: { [p.unitIndex]: g.id }, stretch: { [p.unitIndex]: counts } };
+  }
+  return null;
+}
+
+/**
+ * Packs `text` along one side of a square of `size`: the band's mask, no
+ * bars, and the corner word's heh widened so its shafts clear the next
+ * band (`cornerWidening`) wherever the line has room for that, else the
+ * plain packing (the corner word then stays at the band's height, and the
+ * layout's `words.still` says so).
+ */
+export function packOctagonBand(size: number, text: string): KufiPackResult {
+  const mask = octagonBandMask(size);
+  const first = packKufiRegion({ text, mask, bars: false });
+  if (!first.ok) return first;
+  const { units } = resolveKufiText(text);
+  const edits = cornerWidening(first, units);
+  if (!edits) return first;
+  const second = packKufiRegion({ text, mask, bars: false, edits });
+  if (!second.ok) return first;
+  // the better band: fewer words left at the band's height, then its corner letter in the corner itself
+  const rank = (b: Extract<KufiPackResult, { ok: true }>) => [octagonWords(b, text).still, Math.min(...b.placements.map((p) => p.col))];
+  const [a, b] = [rank(second), rank(first)];
+  return a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]) ? second : first;
+}
+
+/**
+ * The line `text` takes along a side at its band forms' authored widths
+ * (joined letters share a column, a gap stands between the rest), and the
+ * widening its corner word needs (`cornerWidening`, from the forms alone):
+ * the estimate a fresh switch to the layout and the offers' scan start from.
+ */
+export function octagonLineFor(text: string): { line: number; widen: number } {
+  const { units } = resolveKufiText(text);
+  const formOf = (u: KufiUnit) => kufiFormsOf(u, "star")[0] ?? null;
+  const widthOf = (g: KufiGlyph | null) => g?.rows[0]?.length ?? 1;
+  let line = 0;
+  units.forEach((u, i) => {
+    line += widthOf(formOf(u)) + (i === 0 ? 0 : units[i - 1].joinsNext ? -1 : 1);
+  });
+  // the corner word, laid from the band's corner: its last unit leftmost
+  const last = units.length > 0 ? units[units.length - 1].wordIndex : -1;
+  const corner = units.filter((u) => u.wordIndex === last).reverse();
+  let col = 0;
+  const shafts: number[] = [];
+  corner.forEach((u, i) => {
+    const g = formOf(u);
+    if (i > 0) col += widthOf(formOf(corner[i - 1])) + (u.joinsNext ? -1 : 1);
+    if (!g) return;
+    kufiShaftTops(u.skeleton, g.rows).forEach((top, j) => {
+      if (top === 0) shafts.push(col + j);
+    });
+  });
+  const under = shafts.filter((c) => c < OCTAGON_DEPTH);
+  if (under.length === 0 || corner.length === 0) return { line, widen: 0 };
+  const d = OCTAGON_DEPTH - Math.min(...under);
+  const slice = (g: KufiGlyph) => g.stretch.some((s) => s.axis === "col" && shafts.every((c) => c > s.index));
+  return { line, widen: d <= COL_MAX && kufiFormsOf(corner[0], "star").some(slice) ? d : 0 };
 }
 
 /** Packs `text` along one side; null when it does not pack a line of this size (the reason is in `band`). */
 export function layoutKufiOctagon(size: number, text: string): { layout: KufiOctagonLayout | null; band: KufiPackResult } {
-  const band = packKufiRegion({ text, mask: octagonBandMask(size), bars: false });
+  const band = packOctagonBand(size, text);
   if (!band.ok) return { layout: null, band };
   return { layout: octagonFromBand(size, band, text), band };
 }
@@ -290,7 +416,7 @@ export function octagonFromBand(size: number, band: Extract<KufiPackResult, { ok
         [tx, ty] = octagonTurn(N, tx, ty);
       }
     }
-  return { geometry: g, cells, frame, band, strokes };
+  return { geometry: g, cells, frame, band, strokes, words: octagonWords(band, text) };
 }
 
 /** The ink drawn: the layout's cells, plus its frame when `lines` is on. */

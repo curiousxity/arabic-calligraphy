@@ -68,7 +68,10 @@ export const section: GuideSection = {
         the lam, and a word's tall letters rise together, all of them or none,
         so no single stroke stands up alone beside the rest of its word; a heh
         keeps its box, as in the old panels, and «الله» always reads alef, lam,
-        lam and heh. In the wedges layout the letters stand on the outer edge
+        lam and heh. The word in each corner stands under the next side, so
+        its heh is drawn two squares wider to bring its tall letters clear of
+        it, and the two words at a side's ends step into the corners alike;
+        Find layouts offers the squares where every word rises. In the wedges layout the letters stand on the outer edge
         of each wedge, and «الله» is drawn with its alef and lams standing
         two squares above the heh's box wherever the wedge has room for that,
         bare or meeting a bar across the top of the word; only in the
