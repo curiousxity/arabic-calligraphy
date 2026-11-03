@@ -143,6 +143,8 @@ TRIM_HAIR = 0.35  # pens: an end whose ink is narrower than this is a hairline t
 # hook missed). The course's jim head is one small-pen move that sweeps, turns down, curls under and back, and ends in a
 # short thick foot (lesson 2, 05:29-05:36), so these strokes also start from the walk round the skeleton, finely spaced.
 WALK = {x for x in os.environ.get("PEN_WALK", "").split(",") if x}
+GIVEN = json.loads(os.environ.get("PEN_START", "{}"))  # {stroke: nodes}: one more start for the fit
+WALK_STRAIGHT = os.environ.get("PEN_WALK_STRAIGHT", "0") == "1"  # the walk goes straight on at a crossing
 HAIR_W, HAIR_L = 0.2, 0.5  # nuqta: a hairline is thinner than HAIR_W and reaches HAIR_L; shorter bits are where the body thins
 HAIR_SPACING = 0.12  # nuqta between a hairline's start nodes: a loop half a nuqta across needs a dozen to go round
 TIP_ANGLE = 110  # degrees: an outline point sharper than this is a tooth's tip
@@ -408,13 +410,26 @@ def walk_samples(piece, pen, sub=8):
     adj = defaultdict(list)
     for i, (a, b, _) in enumerate(segs):
         adj[a].append(i); adj[b].append(i)
+    def oriented(i, frm):
+        return segs[i][2] if segs[i][0] == frm else segs[i][2][::-1]
+    k_ = max(4, int(1.5 * width * sub))  # sub px: how far along a branch its direction is read
+
+    def straightest(v, came, cand):
+        """at a crossing the pen goes straight on (484's and 485's loops, 2026-11-03: an arbitrary branch turned the
+        walk back on its own side, and the two sides kissed instead of crossing)"""
+        p = np.array(oriented(*came), float); d0 = p[-1] - p[max(0, len(p) - k_)]
+        def cos(j):
+            q = np.array(oriented(j, v), float); d1 = q[min(len(q) - 1, k_)] - q[0]
+            return float(d0 @ d1) / (np.linalg.norm(d0) * np.linalg.norm(d1) + 1e-9)
+        return max((j for j in cand if j not in used), key=cos)
     used, stack, walk = set(), [(odd[0] if odd else segs[0][0], None)], []
     while stack:  # Hierholzer
         v, _ = stack[-1]
         while adj[v] and adj[v][-1] in used:
             adj[v].pop()
         if adj[v]:
-            i = adj[v].pop(); used.add(i)
+            i = adj[v].pop() if not (WALK_STRAIGHT and stack[-1][1]) else straightest(v, stack[-1][1], adj[v])
+            adj[v].remove(i) if i in adj[v] else None; used.add(i)
             a, b, _ = segs[i]
             stack.append((b if a == v else a, (i, v)))
         else:
@@ -1237,6 +1252,8 @@ def fit(stroke, log, size=None, lead=None, follow=None):
         starts.append(("tooth", tooth))
     if stroke in WALK and not hair:  # a curl the band's path stops short of: the walk goes on round it
         starts.append(("walk", orient(stroke, band_start(piece, O, ignore, P, hair=True), O, piece)))
+    if stroke in GIVEN:  # PEN_START: a path put together by hand (484: one walk's loop, another's curl)
+        starts.append(("given", [{"p": n["p"], "angle": n["angle"]} for n in GIVEN[stroke]]))
     if r_old:
         starts.append(("free", [{"p": n["p"], "angle": n["angle"]} for n in r_old["nodes"]]))
     held = ()

@@ -847,6 +847,28 @@ patch is stored as the record's `endcap` (erase and fill rings, in nuqta). 0.3 n
 already agree to within 0.003, so the patch's edge leaves a jog of about 0.004, invisible at normal size. Tail ends
 only, and only once the pen fit has failed.
 
+**484, 485 and 732 (the user, 2026-11-03; approved).** The studio's outline may now patch any part a pen fit can't
+match ("you can use the studio outlines for anything not limited to the tails"). The pen fit still comes first.
+- **Crossings go straight on (`PEN_WALK_STRAIGHT`).** At a junction, the skeleton walk took whichever branch came
+  first, so 485's loop turned back on its own side and its two sides touched instead of crossing. The walk now takes
+  the branch that carries on straightest. On 484 that fixed the loop but broke the small curl, which has a crossing of
+  its own. So the old fit's curl was joined to the new fit's loop, with the nib angle made continuous across the join,
+  and refit from there (`PEN_START`, a start given by hand): 0.917 → 0.947.
+- **732 is a flag head (731's kind).** Red and green come from the sheet as one nib gesture, then blue is fitted with
+  them kept, then the neck and tail pass (meet, held-width tail).
+- **Patches (`jdendcap.py`, a list where a stroke has more than one).** 484's and 485's loop bottoms (the studio
+  comes to a point, ours was round), 732's bowl bottom (a lump and a nick), and the five tail tips (needles 0.15
+  nuqta past the studio's end, or short of it). A hard switch at the patch's circle left a 0.005 jog, so inside the
+  last 0.15 nuqta our edge eases into the studio's, blended by signed distance. Every tip is now within 0.005 nuqta.
+- At a crossing, the studio's outline has a small hole where the two lines overlap (even-odd fill). Ours is solid
+  ink there, as a pen leaves it.
+
+| shape | before | now |
+|---|---|---|
+| 484.s0 | 0.898 | 0.965 |
+| 485.s0 | 0.914 | 0.96 |
+| 732.s0 | 0.889 | 0.97 |
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |

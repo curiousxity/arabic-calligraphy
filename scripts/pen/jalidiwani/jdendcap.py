@@ -5,8 +5,9 @@ studio's: ours past the studio edge erased, the studio's ink filled. The studio 
 corner cutting), as a stroke is smooth (no facets even where the studio outline has them). R is picked where ours and
 the studio already agree (731: under 0.003 nuqta from 0.2 nuqta back), so the disc's edge leaves no step.
 
-The record gains "endcap": {"c": tip, "r": R, "erase": rings, "fill": rings}, all in node (nuqta) coordinates.
-  python jdendcap.py IN/pen.json OUT/pen.json STROKE~cN [R]       (JD_* env as jdpenjob)"""
+The record gains "endcap": {"c": tip, "r": R, "erase": rings, "fill": rings}, all in node (nuqta) coordinates; a second
+patch on the same stroke makes it a list.
+  python jdendcap.py IN/pen.json OUT/pen.json STROKE [R [X,Y]]       (JD_* env as jdpenjob; X,Y in nuqta)"""
 import json, os, sys
 import numpy as np
 from shapely.geometry import Point, Polygon
@@ -29,17 +30,50 @@ def rings_of(g):
             if p.geom_type == "Polygon" and p.area > 1e-6]
 
 
-def endcap(stroke, rec, r=R):
+RAMP, BLEND_PX = 0.15, 1500  # nuqta over which ours eases into the studio's edge; raster px a nuqta for the blend
+
+
+def blended(stroke, rec, studio, c, r):
+    """The ink inside the disc of r + RAMP round c: ours eased into the studio's by their signed distances, all
+    studio inside r, all ours at r + RAMP. A hard switch at r left a jog where the two edges differ (0.005 nuqta at
+    484's, 485's and 732's tips, the user, 2026-11-03: the "=" tips)."""
+    import cv2
+    from shapely.geometry import box as Box
+    R2 = r + RAMP; x1, y1 = c[0] - R2 - 0.05, c[1] - R2 - 0.05; n = int((2 * R2 + 0.1) * BLEND_PX) + 1
+    piece, _, O = J.job_of(stroke)
+    A, _ = J.ink([rec["nodes"]], [], O, x1 * J.PPN + O[0], y1 * J.PPN + O[1], BLEND_PX / J.PPN, n, n)
+    Sm = np.zeros((n, n), np.uint8)
+    loc = studio.intersection(Box(x1, y1, x1 + n / BLEND_PX, y1 + n / BLEND_PX))
+    for g in ([loc] if loc.geom_type == "Polygon" else list(getattr(loc, "geoms", []))):
+        if g.geom_type == "Polygon" and not g.is_empty:
+            cv2.fillPoly(Sm, [np.round((np.array(g.exterior.coords) - [x1, y1]) * BLEND_PX * 16).astype(np.int32)], 1, cv2.LINE_8, 4)
+    sdf = lambda M: cv2.distanceTransform((1 - M).astype(np.uint8), cv2.DIST_L2, 5) - cv2.distanceTransform(M.astype(np.uint8), cv2.DIST_L2, 5)  # noqa: E731
+    yy, xx = np.mgrid[0:n, 0:n]; d = np.hypot(xx / BLEND_PX + x1 - c[0], yy / BLEND_PX + y1 - c[1])
+    t = np.clip((R2 - d) / RAMP, 0, 1); t = t * t * (3 - 2 * t)
+    M = ((1 - t) * sdf(A.astype(np.uint8)) + t * sdf(Sm) < 0).astype(np.uint8)
+    cs, _ = cv2.findContours(M, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    from shapely.ops import unary_union
+    return unary_union([Polygon(q[:, 0] / BLEND_PX + [x1, y1]).buffer(0) for q in cs if len(q) > 2]).simplify(0.0005), R2
+
+
+def endcap(stroke, rec, r=R, at=None):
     piece, _, O = J.job_of(stroke.split("~")[0])  # the letter's outline: the disc holds only the tail
-    studio = Polygon(chaikin((J.ref_ring(piece) - O) / J.PPN, CUT)).buffer(0)
-    c = rec["nodes"][-1]["p"]
-    disc = Point(c).buffer(r, 64)
-    return {"c": c, "r": r, "erase": rings_of(disc.difference(studio)), "fill": rings_of(disc.intersection(studio))}
+    from shapely.validation import make_valid
+    studio = make_valid(Polygon(chaikin((J.ref_ring(piece) - O) / J.PPN, CUT)))  # a loop's crossing: both lobes kept
+    c = list(at) if at is not None else rec["nodes"][-1]["p"]  # anywhere (the user, 2026-11-03), the tail's end by default
+    ink, R2 = blended(stroke, rec, studio, c, r)
+    disc = Point(c).buffer(R2, 128)
+    return {"c": c, "r": R2, "erase": rings_of(disc.difference(ink)), "fill": rings_of(disc.intersection(ink))}
 
 
 def apply(A, cap, O, x1, y1, scale):
-    """A (bool raster of our ink, px = (screen - [x1, y1]) * scale) with the cap's erase and fill drawn in."""
+    """A (bool raster of our ink, px = (screen - [x1, y1]) * scale) with the cap's erase and fill drawn in; a list of
+    caps in turn."""
     import cv2
+    if isinstance(cap, list):
+        for c in cap:
+            A = apply(A, c, O, x1, y1, scale)
+        return A
     to = lambda ring: np.round(((np.array(ring) * J.PPN + O) - [x1, y1]) * scale * 16).astype(np.int32)  # noqa: E731
     E, F = (np.zeros(A.shape, np.uint8) for _ in range(2))
     for M, rs in ((E, cap["erase"]), (F, cap["fill"])):
@@ -51,7 +85,10 @@ def apply(A, cap, O, x1, y1, scale):
 if __name__ == "__main__":
     src, dst, st = sys.argv[1:4]
     p = json.load(open(src))
-    p[st]["endcap"] = endcap(st, p[st], float(sys.argv[4]) if len(sys.argv) > 4 else R)
+    at = [float(v) for v in sys.argv[5].split(",")] if len(sys.argv) > 5 else None
+    cap = endcap(st, p[st], float(sys.argv[4]) if len(sys.argv) > 4 else R, at)
+    had = p[st].get("endcap")  # a stroke patched in more than one place keeps a list
+    p[st]["endcap"] = cap if not had else (had if isinstance(had, list) else [had]) + [cap]
     os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
     json.dump(p, open(dst, "w"))
-    print(st, "erase", len(p[st]["endcap"]["erase"]), "fill", len(p[st]["endcap"]["fill"]))
+    print(st, "erase", len(cap["erase"]), "fill", len(cap["fill"]), "patches", len(p[st]["endcap"]) if isinstance(p[st]["endcap"], list) else 1)
