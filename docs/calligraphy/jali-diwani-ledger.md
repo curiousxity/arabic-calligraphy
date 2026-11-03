@@ -948,6 +948,25 @@ stroke with its earlier patches already applied.
 | 107.s0 | 0.945 | 0.966 |
 | 109.s0 | 0.969 | 0.983 |
 
+**Head barbs are patched from the studio's outline (the user, 2026-11-03; approved).** The pen fit leaves out the small
+barb at a head. On the long alifs (019-022) it is a hairline hanging off the top to the left. On 221, 222 and 473 the
+head is rounded with a small barb, and ours ended square.
+- **Alifs:** a 0.6 patch at the head's top, then a 0.2 patch at the barb's tip. The first left the hairline's tip a
+  little short, because the blend is still part ours there.
+- **221, 222, 473:** a 1.0-1.15 patch at the head (0.75 left a step at the disc's edge). A 0.4-0.8 patch on the tail
+  tip removes a needle past the studio's end. A 0.5 patch on the outer curve fixes a flat spot. It was aimed at where
+  the studio's ink lies past ours.
+
+| shape | before | now |
+|---|---|---|
+| 019.s0 | 0.964 | 0.985 |
+| 020.s0 | 0.964 | 0.981 |
+| 021.s0 | 0.973 | 0.987 |
+| 022.s0 | 0.973 | 0.987 |
+| 221.s0 | 0.956 | 0.997 |
+| 222.s0 | 0.955 | 0.997 |
+| 473.s0 | 0.962 | 0.997 |
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |
