@@ -922,6 +922,32 @@ the studio's edge along one side, with the nib held near full width. `PEN_SETTLE
 splits its segments, settles it with the widths free (never wider than the nib), and settles it again on those
 widths. Nothing from it is approved yet.
 
+**Peaked bends follow the studio on both sides (the user, 2026-11-03; the eight sent back, approved).** Six of the
+eight are the same shape: up to a peak, then down and out to the right. The studio's peak comes to a point, with a
+corner in the arch under it. Our pen rounds both, and the overlap scores (0.965-0.973) don't show it. The Thuluth
+session had the same fault on its humped joins, and the user ruled there "Fix the humps on both sides". The same
+holds here, so the corner under the peak is kept although strokes are otherwise smooth. Patches, each blended in:
+- the top of each peak (radius 0.35, at the studio's highest point);
+- the corner under it (radius 0.35, aimed at where our ink lies past the studio's: aiming at the arch's highest
+  point missed the corner, which sits to one side);
+- 104's kinked leg and 078's foot and shoulder (0.95 and 0.9; a smaller disc left a step at its edge);
+- 023.s2's lumpy edge (one 0.9 disc in the middle) and both tips, and 023.s0's top tip.
+
+Two patches on one stroke used to blend each against the bare fit. Where their discs overlapped, the second erased
+part of the first (104's peak under its leg patch) or left a step (023.s2's tip). Each patch now blends against the
+stroke with its earlier patches already applied.
+
+| shape | before | now |
+|---|---|---|
+| 023.s0 | 0.972 | 0.976 |
+| 023.s2 | 0.965 | 0.992 |
+| 078.s0 | 0.966 | 0.990 |
+| 081.s0 | 0.965 | 0.980 |
+| 104.s0 | 0.967 | 0.990 |
+| 106.s0 | 0.973 | 0.983 |
+| 107.s0 | 0.945 | 0.966 |
+| 109.s0 | 0.969 | 0.983 |
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |

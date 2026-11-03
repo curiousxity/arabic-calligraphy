@@ -42,6 +42,9 @@ def blended(stroke, rec, studio, c, r, others=()):
     R2 = r + RAMP; x1, y1 = c[0] - R2 - 0.05, c[1] - R2 - 0.05; n = int((2 * R2 + 0.1) * BLEND_PX) + 1
     piece, _, O = J.job_of(stroke)
     A, _ = J.ink([rec["nodes"]] + [o for o in others], [], O, x1 * J.PPN + O[0], y1 * J.PPN + O[1], BLEND_PX / J.PPN, n, n)
+    if rec.get("endcap"):  # the stroke's earlier patches are ours too: blending against the bare fit left a step where
+        # two discs overlapped and erased the first patch's ink (104's peak under its leg patch, 023.s2's tip)
+        A = apply(A.astype(bool), rec["endcap"], O, x1 * J.PPN + O[0], y1 * J.PPN + O[1], BLEND_PX / J.PPN)
     Sm = np.zeros((n, n), np.uint8)
     loc = studio.intersection(Box(x1, y1, x1 + n / BLEND_PX, y1 + n / BLEND_PX))
     for g in ([loc] if loc.geom_type == "Polygon" else list(getattr(loc, "geoms", []))):
