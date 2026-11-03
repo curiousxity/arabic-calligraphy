@@ -886,6 +886,42 @@ stroke has ink.
 | 077.s0 | 0.984 | 0.990 |
 | 087.s0 | 0.966 | 0.989 |
 
+**The rest of the catalogue, reviewed in sheets of eight (the user, 2026-11-03).** The 238 strokes not yet reviewed
+were sorted by eye into groups: clean, hooked ends, barbed heads, spills past the studio's edge along one side,
+bowls, and wrong shapes. Of the first 32 marked clean, the user approved 24 and sent back eight: 023.s0, 023.s2,
+078.s0, 081.s0, 104.s0, 106.s0, 107.s0 and 109.s0. Their overlap scores look like the approved ones, so the scores
+alone don't catch what is wrong with them.
+
+Approved as fitted: 013.s0, 014.s0, 016.s0, 017.s0, 083.s0, 090.s1, 091.s0, 093.s0, 162.s0, 164.s0, 165.s0, 165.s1,
+166.s0, 167.s0, 170.s0, 171.s0, 172.s0, 172.s1, 173.s0, 173.s1, 176.s0, 177.s0, 178.s0, 179.s0.
+
+**Hooked ends are patched from the studio's outline (approved).** On twelve strokes the pen fit stopped short of a
+small hook at one end, or ran past it, by up to a third of a nuqta. The user expects this to be common ("you can start
+on the end hooks because that is going to be a common issue"). Each hook is patched as 731's tail was. The patch is a
+disc round the end node, of radius 0.6 to 1.2 nuqta depending on the hook's size, and our edge eases into the studio's
+over the disc's last 0.15 nuqta. On 164.s1, 474.s0 and 476.s0 our pen's tip ran past the studio's, and the blend left
+it as a separate speck below the hook. The patch now drops any island of our ink that has no studio ink under it.
+
+| shape | end | radius (nuqta) | before | now |
+|---|---|---|---|---|
+| 088.s0 | last | 1.2 | 0.940 | 0.985 |
+| 096.s0 | first | 1.1 | 0.950 | 0.988 |
+| 097.s0 | first | 1.2 | 0.955 | 0.978 |
+| 099.s0 | last | 1.1 | 0.963 | 0.985 |
+| 100.s0 | first | 1.1 | 0.962 | 0.985 |
+| 110.s0 | first | 1.1 | 0.950 | 0.983 |
+| 111.s0 | first | 1.0 | 0.946 | 0.990 |
+| 112.s0 | last | 0.9 | 0.943 | 0.977 |
+| 164.s1 | last | 0.75 | 0.965 | 0.988 |
+| 200.s0 | first | 0.6 | 0.952 | 0.987 |
+| 474.s0 | first | 1.05 | 0.948 | 0.992 |
+| 476.s0 | first | 1.15 | 0.942 | 0.992 |
+
+**On trial: the spill group (`PEN_SETTLE`).** On long S strokes and alif stems the fit runs 0.02 to 0.05 nuqta past
+the studio's edge along one side, with the nib held near full width. `PEN_SETTLE` takes the fitted stroke as it is,
+splits its segments, settles it with the widths free (never wider than the nib), and settles it again on those
+widths. Nothing from it is approved yet.
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |

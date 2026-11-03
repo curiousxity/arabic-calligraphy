@@ -53,7 +53,9 @@ def blended(stroke, rec, studio, c, r, others=()):
     M = ((1 - t) * sdf(A.astype(np.uint8)) + t * sdf(Sm) < 0).astype(np.uint8)
     cs, _ = cv2.findContours(M, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     from shapely.ops import unary_union
-    return unary_union([Polygon(q[:, 0] / BLEND_PX + [x1, y1]).buffer(0) for q in cs if len(q) > 2]).simplify(0.0005), R2
+    # an island of ours alone (our pen's tip past the studio's, cut loose by the blend: 164.s1, 474, 476) is dropped
+    gs = [g for g in (Polygon(q[:, 0] / BLEND_PX + [x1, y1]).buffer(0) for q in cs if len(q) > 2) if g.intersects(studio)]
+    return unary_union(gs).simplify(0.0005), R2
 
 
 def endcap(stroke, rec, r=R, at=None, others=()):
