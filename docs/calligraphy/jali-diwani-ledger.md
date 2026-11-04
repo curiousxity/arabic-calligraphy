@@ -1231,6 +1231,8 @@ Spill group:
 
 **168.s2 (approved).** The default fit had the wrong shape. Refitted with the small pen (`PEN_SMALL`) and patched: 0.851 to 0.990. The free-fill mode (`PEN_FILL`) scored 0.969 before patching but left lumps and a spur, so it was dropped.
 
+**235.s0 (approved).** A thin curl that the default fit drew far too wide (0.506), and its stored alternative missed the curl (0.724). Refitted with the small pen and patched, then the upstroke patched again: 0.985. Its tip and knob stay slightly rounder than the studio's facets, as strokes are smooth.
+
 | stroke | before | now |
 |---|---|---|
 | 013.s0 | 0.979 | 0.990 |
