@@ -1032,11 +1032,13 @@ k10 is `PEN_CUTWIN=free`. 299.s1, 312.s1 and 356.s0 keep their earlier fits:
 
 The free-end spins are open.
 
-**The shape and spill groups, patched on the queue (the user, 2026-11-04; approved, four spill strokes still open).** All 41 shape strokes and 50 of the 54 spill strokes, patched from the studio's outline after the pen fit. Shape mean 0.946 to 0.993; spill mean 0.972 to 0.993. 459.s1, 462.s1, 465.s2 and 469.s1 are not approved yet.
+**The shape and spill groups, patched on the queue (the user, 2026-11-04; approved).** All 41 shape strokes and 50 of the 54 spill strokes, patched from the studio's outline after the pen fit. Shape mean 0.946 to 0.993; spill mean 0.972 to 0.993. 459.s1, 462.s1, 465.s2 and 469.s1 needed another round, below.
 
 - **Scores don't find small faults, so edges were measured.** Our outline against the studio's, at 300 px a nuqta. A bar of 0.015 nuqta still let visible kinks through, so these were taken below 0.009. Needle tips, kinks and a seam inside 098.s0's ink had all passed by eye on sheets.
 - **A patch can hold the neighbouring stroke's ink.** Every stroke of the shape near a patch counts as ours (the 076 entry above), so a patch's fill can carry a piece of the neighbour. One stroke drawn alone then looks wrong, and its score drops, while the whole letter is right. Near a neighbour, judge the whole letter. Spill strokes 226.s2 and others approved here may hold such ink.
 - **Patch from a set that holds the whole shape.** Three spill rounds ran from a set of spill strokes alone, so neighbours didn't count, and were replaced by a replay from a complete set.
+
+- **Stray ink in patches, removed from the last four spill strokes (approved).** The neighbour's ink in 459.s1, 462.s1 and 465.s2 is gone: fills are clipped to the stroke's own outline, and the small nicks that leaves are patched again from a set holding only that stroke, so nothing neighbouring counts. Now 0.997, 0.998 and 0.998 (were 0.961, 0.916 and 0.976 with the neighbour's ink). 469.s1's edge slivers were cleared: 0.995. A spur on 465.s1 and a spike on 459.s2, left by patches, went the same way; both approved.
 
 Shape group:
 
