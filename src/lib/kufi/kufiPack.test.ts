@@ -29,6 +29,8 @@ const layoutOf = (r: KufiPackResult) => {
 const ALLAH = "الله";
 const SHAHADA = "لا إله إلا الله محمد رسول الله";
 const NASR = "نصر من الله";
+/** The first half of the Shahada twice: every band word on tall strokes, so it packs round a centre (measured 2026-11-04). */
+const TAWHID2 = "لا إله إلا الله لا إله إلا الله";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
 
@@ -1204,7 +1206,6 @@ describe("a word in the centre", () => {
    * the core; one with a short word does not, since nothing interlocks a fixed core with a band whose
    * letters stop short of its depth (the next ring does that in a plain panel).
    */
-  const TAWHID2 = "لا إله إلا الله لا إله إلا الله";
   const TAWHID2_SIZE = { cols: 21, rows: 17 };
   const centreUnit = (text: string) => {
     const units = resolveKufiText(text).units;
@@ -1278,6 +1279,25 @@ describe("a word in the centre", () => {
       expect(pinned.centre).toEqual(a.centre);
     }
   }, 30000);
+});
+
+describe("Fit's centre pass", () => {
+  it("a text that packs today gets today's size and no centre, whatever the clock", () => {
+    expect(fitKufiPanel("الله أكبر")).toEqual({ cols: 9, rows: 13 });
+    expect(fitKufiPanel("الله الله الله الله الله")).toEqual({ cols: 17, rows: 22 });
+  }, 60000);
+
+  it("falls back to the centre, begun at the top right, for لا إله إلا الله twice, and says so", () => {
+    const r = fitKufiPanel(TAWHID2);
+    expect(r).toEqual({ cols: 17, rows: 24, centre: true, start: "topRight" });
+    expect(packKufiPanel({ text: TAWHID2, cols: r.cols, rows: r.rows, centre: true, start: "topRight" }).ok).toBe(true);
+  }, 120000);
+
+  it("with the centre already on, Fit runs the centre pass alone and keeps the block's start", () => {
+    const r = fitKufiPanel(TAWHID2, {}, { centre: true, start: "bottomRight" });
+    expect(r).toMatchObject({ centre: true, start: "bottomRight" });
+    expect(packKufiPanel({ text: TAWHID2, cols: r.cols, rows: r.rows, centre: true, start: "bottomRight" }).ok).toBe(true);
+  }, 60000);
 });
 
 describe("the clock override (tests only)", () => {

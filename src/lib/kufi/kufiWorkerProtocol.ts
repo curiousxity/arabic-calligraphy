@@ -4,7 +4,15 @@
  * imports the client (which names the worker's URL).
  */
 import { kufiChangesOf, tryKufiChange, type KufiTry } from "./kufiExplore";
-import { FIT_BUDGET_MS, fitKufiPanel, packKufiPanel, type KufiPackResult, type KufiPanelEdits, type KufiPanelStart } from "./kufiPack";
+import {
+  FIT_BUDGET_MS,
+  fitKufiPanel,
+  packKufiPanel,
+  type KufiFitResult,
+  type KufiPackResult,
+  type KufiPanelEdits,
+  type KufiPanelStart,
+} from "./kufiPack";
 import { evaluateKufiStar, type KufiStarEvaluation } from "./kufiStarEvaluate";
 import { layoutKufiStar, type KufiStarInputs, type KufiStarLayout } from "./kufiStarLayout";
 
@@ -13,13 +21,13 @@ export type KufiLayoutInputs = { text: string; cols: number; rows: number; edits
 
 export type KufiWorkerRequest =
   | { id: number; kind: "pack"; input: KufiLayoutInputs & { previous?: KufiPackResult }; text?: undefined }
-  | { id: number; kind: "fit"; text: string; edits?: KufiPanelEdits; input?: undefined }
+  | { id: number; kind: "fit"; text: string; edits?: KufiPanelEdits; centre?: boolean; start?: KufiPanelStart; input?: undefined }
   | { id: number; kind: "star"; star: KufiStarInputs; input?: undefined; text?: undefined }
   | { id: number; kind: "starEvaluate"; text: string; input?: undefined };
 
 export type KufiWorkerResponse =
   | { id: number; kind: "pack"; result: KufiPackResult }
-  | { id: number; kind: "fit"; size: { cols: number; rows: number } }
+  | { id: number; kind: "fit"; size: KufiFitResult }
   | { id: number; kind: "star"; layout: KufiStarLayout }
   | { id: number; kind: "starEvaluate"; evaluation: KufiStarEvaluation };
 
@@ -33,7 +41,7 @@ export type KufiWorkerLike = {
 
 /** Runs a request on the calling thread: the worker's own body, and the fallback when there is no `Worker`. */
 export function runKufiRequest(req: KufiWorkerRequest): KufiWorkerResponse {
-  if (req.kind === "fit") return { id: req.id, kind: "fit", size: fitKufiPanel(req.text, req.edits) };
+  if (req.kind === "fit") return { id: req.id, kind: "fit", size: fitKufiPanel(req.text, req.edits, { centre: req.centre, start: req.start }) };
   if (req.kind === "star") return { id: req.id, kind: "star", layout: layoutKufiStar(req.star) };
   if (req.kind === "starEvaluate") return { id: req.id, kind: "starEvaluate", evaluation: evaluateKufiStar(req.text, FIT_BUDGET_MS) };
   return { id: req.id, kind: "pack", result: packKufiPanel(req.input) };

@@ -170,7 +170,7 @@ import { defaultStarK } from "./lib/kufi/kufiStarGeometry";
 import { kufiStarBox, starPositionKeepingCentre } from "./lib/kufi/kufiStarPath";
 import { kufiStarInputs } from "./lib/kufi/kufiStarLayout";
 import { kufiLayoutKey, requestKufiFit, seedKufiLayout } from "./lib/kufi/kufiLayoutClient";
-import type { KufiPackResult, KufiPanelEdits } from "./lib/kufi/kufiPack";
+import type { KufiFitResult, KufiPackResult, KufiPanelEdits } from "./lib/kufi/kufiPack";
 import {
   buildComposition,
   describeComposition,
@@ -2191,16 +2191,16 @@ const App: React.FC = () => {
    */
   const fitKufiPanelSize = async () => {
     if (!selectedBlock || !isKufiPanel(selectedBlock)) return;
-    const { id, text, panelEdits, panelCols, panelRows } = selectedBlock;
+    const { id, text, panelEdits, panelCols, panelRows, panelCentre, panelStart } = selectedBlock;
     const editsKey = JSON.stringify(panelEdits ?? null);
     const pending = { blockId: id, key: kufiLayoutKey(kufiPanelInputs(selectedBlock)) };
     const running = kufiFitPendingRef.current;
     if (running && running.blockId === pending.blockId && running.key === pending.key) return;
     kufiFitPendingRef.current = pending;
     setKufiFitPending(pending);
-    let size: { cols: number; rows: number };
+    let size: KufiFitResult;
     try {
-      size = await requestKufiFit(text, panelEdits);
+      size = await requestKufiFit(text, panelEdits, { centre: panelCentre, start: panelStart });
     } finally {
       if (kufiFitPendingRef.current === pending) {
         kufiFitPendingRef.current = null;
@@ -2210,12 +2210,17 @@ const App: React.FC = () => {
     const now = blocksRef.current.find((b) => b.id === id);
     if (!now || !isKufiPanel(now) || now.text !== text) return;
     if (now.panelCols !== panelCols || now.panelRows !== panelRows) return;
+    if (now.panelCentre !== panelCentre || now.panelStart !== panelStart) return;
     if (JSON.stringify(now.panelEdits ?? null) !== editsKey) return;
-    if (now.panelCols === size.cols && now.panelRows === size.rows) return;
+    // the centre pass's answer brings the centre and its start with the size (see `fitKufiPanel`)
+    const patch: Partial<KufiPanelBlock> = { panelCols: size.cols, panelRows: size.rows };
+    if (size.centre) {
+      patch.panelCentre = true;
+      patch.panelStart = size.start === "topRight" ? "topRight" : undefined;
+    }
+    if (Object.entries(patch).every(([k, v]) => now[k as keyof KufiPanelBlock] === v)) return;
     pushHistoryRef.current();
-    setBlocks((prev) =>
-      prev.map((b) => (b.id === id && isKufiPanel(b) ? { ...b, panelCols: size.cols, panelRows: size.rows } : b))
-    );
+    setBlocks((prev) => prev.map((b) => (b.id === id && isKufiPanel(b) ? ({ ...b, ...patch } as Block) : b)));
   };
 
   /**

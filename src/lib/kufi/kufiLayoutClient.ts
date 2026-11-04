@@ -42,7 +42,7 @@
  * Pure apart from the worker: no React, no Konva, no `./harfbuzz`.
  */
 
-import { packKufiPanel, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
+import { packKufiPanel, type KufiFitResult, type KufiPackResult, type KufiPanelEdits, type KufiPanelStart } from "./kufiPack";
 
 import type { KufiStarEvaluation } from "./kufiStarEvaluate";
 import { kufiStarKey, kufiStarTextCount, layoutKufiStar, type KufiStarInputs, type KufiStarLayout } from "./kufiStarLayout";
@@ -96,7 +96,7 @@ const wanted = new Map<string, { key: string; seq: number }>();
 const latest = new Map<string, { result: KufiPackResult; inputs: KufiLayoutInputs }>();
 /** Inputs the packer threw on, even on the main thread: never retried. */
 const failed = new Set<string>();
-type FitWaiter = { resolve: (s: { cols: number; rows: number }) => void; reject: (e: Error) => void };
+type FitWaiter = { resolve: (s: KufiFitResult) => void; reject: (e: Error) => void };
 const fits: Array<{ req: KufiWorkerRequest } & FitWaiter> = [];
 const fitWaiters = new Map<number, FitWaiter>();
 type EvalWaiter = { resolve: (e: KufiStarEvaluation) => void; reject: (e: Error) => void };
@@ -490,13 +490,16 @@ export function ensureKufiLayouts(all: KufiLayoutInputs[]): boolean {
 }
 
 /**
- * A square size that packs `text` (`fitKufiPanel`), computed in the worker.
- * Rejects with an Error whose message starts "Fit failed" if the worker dies
- * while fitting; it never resolves a made-up size.
+ * A size that packs `text` (`fitKufiPanel`), computed in the worker; with
+ * `centre: true` when only the centre pass found one (and the start it used),
+ * which the block takes on with the size. `opts` are the block's own centre
+ * and start, so Fit on a panel with its centre on keeps it. Rejects with an
+ * Error whose message starts "Fit failed" if the worker dies while fitting;
+ * it never resolves a made-up size.
  */
-export function requestKufiFit(text: string, edits?: KufiPanelEdits): Promise<{ cols: number; rows: number }> {
+export function requestKufiFit(text: string, edits?: KufiPanelEdits, opts: { centre?: boolean; start?: KufiPanelStart } = {}): Promise<KufiFitResult> {
   return new Promise((resolve, reject) => {
-    fits.push({ req: { id: nextId++, kind: "fit", text, edits }, resolve, reject });
+    fits.push({ req: { id: nextId++, kind: "fit", text, edits, centre: opts.centre, start: opts.start }, resolve, reject });
     pump();
   });
 }

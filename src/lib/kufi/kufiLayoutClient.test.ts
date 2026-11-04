@@ -266,6 +266,14 @@ describe("kufi layout client", () => {
     await expect(p).resolves.toEqual({ cols: 9, rows: 9 });
   });
 
+  it("Fit carries the block's centre and start to the worker, and the centre pass's answer back unchanged", async () => {
+    const p = requestKufiFit("محمد رسول الله", undefined, { centre: true, start: "topRight" });
+    const job = worker.last();
+    expect(job).toMatchObject({ kind: "fit", text: "محمد رسول الله", centre: true, start: "topRight" });
+    worker.reply({ id: job.id, kind: "fit", size: { cols: 21, rows: 17, centre: true, start: "topRight" } });
+    await expect(p).resolves.toEqual({ cols: 21, rows: 17, centre: true, start: "topRight" });
+  });
+
   it("never evicts a layout a mounted slot still wants, so it is not packed again", () => {
     wantKufiLayout("kept", A);
     worker.reply({ id: worker.last().id, kind: "pack", result: fail(9) });

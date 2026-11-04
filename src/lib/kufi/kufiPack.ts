@@ -3182,6 +3182,19 @@ const FIT_TRIES = 9;
 /** `fitKufiPanel` stops trying sizes after this. */
 export const FIT_BUDGET_MS = 9000;
 /**
+ * Fit's centre pass (`fitCentre`) has a clock of its own, after the first pass spent its `FIT_BUDGET_MS`,
+ * so a text that packs today is found as before and the Shahada's pass costs it nothing. Under the tests'
+ * clock override it stops after `FIT_CENTRE_MAX_SIZES` sizes instead.
+ */
+export const FIT_CENTRE_BUDGET_MS = 9000;
+const FIT_CENTRE_MAX_SIZES = 12;
+
+/**
+ * Fit's answer: a size, and, when the centre pass found it, `centre: true` with the start the pass ran
+ * with, for the block to take on with the size. A first-pass answer carries neither.
+ */
+export type KufiFitResult = { cols: number; rows: number; centre?: true; start?: KufiPanelStart };
+/**
  * Under the tests' clock override, Fit stops after this many sizes instead of
  * on FIT_BUDGET_MS, so its answer never depends on machine load. The clock
  * reaches 25 to 46 sizes on the development machine (a failing text); the
@@ -3664,12 +3677,19 @@ const MIN_SEARCH_MS = 250;
  */
 export const CALL_BUDGET_MS = 1750;
 
-/** A box that packs `text`, trying sizes of any proportion round an estimate; the closest attempt when none does. */
-export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}): { cols: number; rows: number } {
+/**
+ * A box that packs `text`, trying sizes of any proportion round an estimate; the closest attempt when none
+ * does. Two passes: today's, unchanged, then, only when it finds nothing and the text has two words or
+ * more, the centre pass (`fitCentre`) with the last word in the core and the words begun at the top
+ * right, the Cairo way. A block whose centre is already on (`opts.centre`) gets the centre pass alone,
+ * with its own start, so Fit never switches its centre off.
+ */
+export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}, opts: { centre?: boolean; start?: KufiPanelStart } = {}): KufiFitResult {
   const { units } = resolveKufiText(text);
   const est = estimateSide(units);
   if (letterCount(units) < 2) return { cols: est, rows: est };
   const pins = explicitPins(units, edits) ?? new Map<number, Pin>();
+  if (opts.centre && centreFrom(units) > 0) return fitCentre(text, units, edits, opts.start ?? "bottomRight") ?? { cols: est, rows: est };
   let best: { size: Size; score: number } | null = null;
   const t0 = performance.now();
   let tried = 0;
@@ -3686,7 +3706,37 @@ export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}): { cols: 
     if (f?.packed) return { cols, rows };
     if (f && (!best || f.score < best.score)) best = { size, score: f.score };
   }
+  if (centreFrom(units) > 0) {
+    const c = fitCentre(text, units, edits, "topRight");
+    if (c?.centre) return c;
+  }
   return best?.size ?? { cols: est, rows: est };
+}
+
+/**
+ * Fit's centre pass: the centre sizes (`centreSizes`) ranked by the greedy pass with the core reserved,
+ * each packed as a pack would pack it (the centre word's edits dropped, the rest's pins held), on
+ * `FIT_CENTRE_BUDGET_MS` / `FIT_CENTRE_MAX_SIZES`. The first that packs, with `centre: true` and the
+ * start; else the closest attempt with the same flags (a block with the centre on keeps it), or null
+ * when no size could even be tried.
+ */
+function fitCentre(text: string, units: KufiUnit[], edits: KufiPanelEdits, start: KufiPanelStart): KufiFitResult | null {
+  const popts: PackOpts = { start, centre: true };
+  const stripped = stripCentreEdits(edits, units, centreFrom(units));
+  const pins = explicitPins(units, stripped) ?? new Map<number, Pin>();
+  let best: { size: Size; score: number } | null = null;
+  const t0 = performance.now();
+  let tried = 0;
+  for (const size of rankByGreedy(text, centreSizes(units), stripped, pins, popts)) {
+    if (clockOverride !== null ? tried >= FIT_CENTRE_MAX_SIZES : performance.now() - t0 > FIT_CENTRE_BUDGET_MS) break;
+    tried++;
+    stats.fitSizes++;
+    const { cols, rows } = size;
+    const f = pins.size > 0 ? packPinned(text, units, cols, rows, stripped, pins, popts) : freshFinal(text, cols, rows, stripped, pins, PACK_BUDGET_MS, false, popts);
+    if (f?.packed) return { cols, rows, centre: true, start };
+    if (f && (!best || f.score < best.score)) best = { size, score: f.score };
+  }
+  return best ? { ...best.size, centre: true, start } : null;
 }
 
 /**
@@ -3813,6 +3863,7 @@ export const _internal = {
   PINNED_CALL_MS,
   FIT_BUDGET_MS,
   FIT_MAX_SIZES,
+  FIT_CENTRE_MAX_SIZES,
   rectangleSizes,
   rankByGreedy,
   better,
