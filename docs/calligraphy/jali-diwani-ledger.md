@@ -1032,6 +1032,114 @@ k10 is `PEN_CUTWIN=free`. 299.s1, 312.s1 and 356.s0 keep their earlier fits:
 
 The free-end spins are open.
 
+**The shape and spill groups, patched on the queue (the user, 2026-11-04; approved, four spill strokes still open).** All 41 shape strokes and 50 of the 54 spill strokes, patched from the studio's outline after the pen fit. Shape mean 0.946 to 0.993; spill mean 0.972 to 0.993. 459.s1, 462.s1, 465.s2 and 469.s1 are not approved yet.
+
+- **Scores don't find small faults, so edges were measured.** Our outline against the studio's, at 300 px a nuqta. A bar of 0.015 nuqta still let visible kinks through, so these were taken below 0.009. Needle tips, kinks and a seam inside 098.s0's ink had all passed by eye on sheets.
+- **A patch can hold the neighbouring stroke's ink.** Every stroke of the shape near a patch counts as ours (the 076 entry above), so a patch's fill can carry a piece of the neighbour. One stroke drawn alone then looks wrong, and its score drops, while the whole letter is right. Near a neighbour, judge the whole letter. Spill strokes 226.s2 and others approved here may hold such ink.
+- **Patch from a set that holds the whole shape.** Three spill rounds ran from a set of spill strokes alone, so neighbours didn't count, and were replaced by a replay from a complete set.
+
+Shape group:
+
+| stroke | before | now |
+|---|---|---|
+| 080.s0 | 0.913 | 0.992 |
+| 085.s0 | 0.914 | 0.995 |
+| 090.s0 | 0.937 | 0.995 |
+| 098.s0 | 0.918 | 0.995 |
+| 102.s0 | 0.886 | 0.996 |
+| 103.s0 | 0.910 | 0.995 |
+| 182.s0 | 0.961 | 0.994 |
+| 219.s0 | 0.978 | 0.995 |
+| 223.s0 | 0.943 | 0.995 |
+| 224.s1 | 0.967 | 0.991 |
+| 225.s0 | 0.982 | 0.996 |
+| 226.s0 | 0.981 | 0.997 |
+| 232.s0 | 0.942 | 0.986 |
+| 235.s1 | 0.959 | 0.986 |
+| 241.s0 | 0.950 | 0.995 |
+| 251.s0 | 0.937 | 0.993 |
+| 471.s0 | 0.968 | 0.995 |
+| 478.s0 | 0.964 | 0.997 |
+| 480.s1 | 0.981 | 0.997 |
+| 483.s0 | 0.936 | 0.978 |
+| 485.s2 | 0.966 | 0.991 |
+| 537.s1 | 0.971 | 0.995 |
+| 538.s1 | 0.956 | 0.994 |
+| 540.s1 | 0.956 | 0.995 |
+| 541.s1 | 0.960 | 0.994 |
+| 543.s1 | 0.950 | 0.992 |
+| 544.s1 | 0.953 | 0.993 |
+| 545.s1 | 0.946 | 0.993 |
+| 547.s1 | 0.941 | 0.991 |
+| 548.s1 | 0.961 | 0.992 |
+| 623.s2 | 0.877 | 0.980 |
+| 624.s2 | 0.951 | 0.995 |
+| 627.s2 | 0.936 | 0.992 |
+| 628.s2 | 0.944 | 0.992 |
+| 630.s2 | 0.963 | 0.994 |
+| 631.s2 | 0.949 | 0.996 |
+| 632.s2 | 0.925 | 0.993 |
+| 638.s1 | 0.960 | 0.990 |
+| 639.s1 | 0.945 | 0.990 |
+| 641.s1 | 0.960 | 0.990 |
+| 737.s1 | 0.894 | 0.996 |
+
+Spill group:
+
+| stroke | before | now |
+|---|---|---|
+| 162.s1 | 0.986 | 0.993 |
+| 163.s1 | 0.975 | 0.996 |
+| 166.s1 | 0.970 | 0.993 |
+| 167.s1 | 0.968 | 0.992 |
+| 168.s1 | 0.979 | 0.992 |
+| 177.s1 | 0.971 | 0.993 |
+| 181.s1 | 0.976 | 0.991 |
+| 188.s1 | 0.973 | 0.992 |
+| 202.s1 | 0.960 | 0.992 |
+| 203.s1 | 0.981 | 0.992 |
+| 207.s1 | 0.967 | 0.996 |
+| 211.s2 | 0.961 | 0.994 |
+| 215.s2 | 0.963 | 0.993 |
+| 217.s2 | 0.972 | 0.992 |
+| 220.s2 | 0.974 | 0.996 |
+| 222.s2 | 0.963 | 0.994 |
+| 223.s2 | 0.970 | 0.993 |
+| 224.s2 | 0.970 | 0.996 |
+| 226.s2 | 0.976 | 0.992 |
+| 228.s2 | 0.965 | 0.992 |
+| 229.s2 | 0.973 | 0.994 |
+| 460.s0 | 0.987 | 0.997 |
+| 460.s2 | 0.969 | 0.993 |
+| 462.s2 | 0.981 | 0.995 |
+| 464.s0 | 0.989 | 0.997 |
+| 468.s1 | 0.973 | 0.995 |
+| 472.s1 | 0.979 | 0.992 |
+| 473.s1 | 0.959 | 0.989 |
+| 474.s1 | 0.973 | 0.991 |
+| 475.s1 | 0.970 | 0.991 |
+| 476.s1 | 0.967 | 0.990 |
+| 478.s1 | 0.971 | 0.989 |
+| 482.s1 | 0.965 | 0.991 |
+| 483.s3 | 0.955 | 0.988 |
+| 484.s2 | 0.967 | 0.989 |
+| 532.s1 | 0.938 | 0.995 |
+| 619.s1 | 0.959 | 0.992 |
+| 620.s1 | 0.978 | 0.992 |
+| 621.s1 | 0.960 | 0.991 |
+| 624.s1 | 0.971 | 0.993 |
+| 627.s1 | 0.969 | 0.992 |
+| 628.s1 | 0.977 | 0.993 |
+| 630.s1 | 0.975 | 0.993 |
+| 632.s1 | 0.976 | 0.992 |
+| 634.s1 | 0.978 | 0.993 |
+| 636.s1 | 0.983 | 0.993 |
+| 639.s2 | 0.979 | 0.993 |
+| 640.s2 | 0.979 | 0.992 |
+| 640B.s2 | 0.991 | 0.992 |
+| 641.s2 | 0.986 | 0.990 |
+
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
