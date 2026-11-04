@@ -75,6 +75,11 @@ def blended(stroke, rec, studio, c, r, others=()):
     R2 = r + RAMP; x1, y1 = c[0] - R2 - 0.05, c[1] - R2 - 0.05; n = int((2 * R2 + 0.1) * BLEND_PX) + 1
     piece, _, O = J.job_of(stroke)
     near = [run for nodes in [rec["nodes"]] + list(others) for run in runs_near(nodes, c, R2)]
+    # a run whose nib never reaches the frame is left out: gpufit._ink sizes its windows by the blocks in the frame,
+    # and with none there it asked torch for a negative range (251.s0's third patch, a neighbour's run beside the disc)
+    fx1, fy1 = x1 * J.PPN + O[0], y1 * J.PPN + O[1]; fx2, fy2 = fx1 + n / BLEND_PX * J.PPN, fy1 + n / BLEND_PX * J.PPN
+    near = [q for q in near if (lambda e: (e[:, 0].max() > fx1) & (e[:, 0].min() < fx2) & (e[:, 1].max() > fy1)
+                                & (e[:, 1].min() < fy2))(J.gpufit._reach([q], O, J.PPN, J.PEN))]
     A, _ = J.ink(near, [], O, x1 * J.PPN + O[0], y1 * J.PPN + O[1], BLEND_PX / J.PPN, n, n)
     release()
     if rec.get("endcap"):  # the stroke's earlier patches are ours too: blending against the bare fit left a step where
