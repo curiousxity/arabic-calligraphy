@@ -630,8 +630,11 @@ Times are minutes:seconds into the individual-letters lesson.
 - **Pair halves made wholly of copies (2026-11-04):** a pair half none of whose strokes had a fit of its own was never
   listed, though every stroke repeats an accepted outline, so 262 halves and the joins using them were missing.
   `studiolib.py` now lists such a half. Judged as a whole letter against the studio's (a stroke may run under its
-  neighbour, so stroke by stroke reads low), 233 match at 0.95 or better and went in; the user: "you check". The 29
-  below 0.95 (worst 023r 0.78, 037r 0.81) wait in `me/halfhold.txt` for the user.
+  neighbour, so stroke by stroke reads low), 233 matched at 0.95 or better and went in; the user: "you check". The
+  copies ran on past the half's cut end into the other half (the parent letter's whole stroke), so every half's ink
+  past its own studio letter, a piece over 0.15 nib square, is erased in its joint trims (170 strokes). After that
+  28 of the 29 held halves matched at 0.95 or better and went in too: 261 halves, the least 0.952, median 0.978.
+  444g (0.941) waits in `me/halfhold.txt` for the user.
 
 ### Ya
 
