@@ -1144,6 +1144,89 @@ Spill group:
 
 **Neighbour ink taken out of the patches (the user, 2026-11-04).** 69 strokes held another stroke's ink in their fills, 47 of them already settled. It could bring back a fault if the neighbour was patched later. Fills are now clipped to the stroke's own outline plus 0.004 nuqta, and any nick that leaves is patched again from a set holding one stroke per shape, so nothing neighbouring counts. No stroke or letter got worse; 22 of 46 letters improved. Checked with each stroke's patches applied to that stroke alone and the strokes then combined. Whether the app draws letters the same way is not yet checked: if a patch were applied to a whole letter, its erase could cut a neighbour, as at 076. The 076 rule has not been changed.
 
+**The rest of the clean group, re-checked against the stricter bar (the user, 2026-11-04; approved).** The 78 strokes marked clean by eye and not reviewed before, plus 465.s1 and 459.s2 approved above. Nearly all had small faults once measured: needles, kinks, slivers along an edge. Patched from the studio's outline on sets holding one stroke per shape, so no neighbour's ink came in. Mean 0.971 to 0.991; every edge within 0.012 nuqta of the studio. 199.s0, 457.s1 and 458.s1 had no patches before this.
+
+| stroke | before | now |
+|---|---|---|
+| 180.s1 | 0.986 | 0.989 |
+| 183.s0 | 0.952 | 0.993 |
+| 184.s0 | 0.952 | 0.994 |
+| 185.s0 | 0.959 | 0.987 |
+| 194.s0 | 0.968 | 0.989 |
+| 195.s0 | 0.976 | 0.990 |
+| 196.s0 | 0.982 | 0.991 |
+| 197.s0 | 0.983 | 0.991 |
+| 199.s0 | 0.985 | 0.991 |
+| 202.s0 | 0.969 | 0.991 |
+| 206.s0 | 0.982 | 0.992 |
+| 207.s0 | 0.982 | 0.991 |
+| 208.s0 | 0.924 | 0.983 |
+| 209.s0 | 0.959 | 0.988 |
+| 210.s0 | 0.961 | 0.988 |
+| 211.s1 | 0.974 | 0.990 |
+| 212.s1 | 0.967 | 0.990 |
+| 213.s1 | 0.956 | 0.992 |
+| 214.s1 | 0.965 | 0.991 |
+| 215.s1 | 0.967 | 0.990 |
+| 216.s1 | 0.962 | 0.990 |
+| 217.s1 | 0.941 | 0.990 |
+| 218.s1 | 0.959 | 0.991 |
+| 219.s1 | 0.958 | 0.990 |
+| 220.s1 | 0.966 | 0.989 |
+| 221.s1 | 0.958 | 0.991 |
+| 222.s1 | 0.958 | 0.991 |
+| 223.s1 | 0.984 | 0.989 |
+| 225.s1 | 0.967 | 0.989 |
+| 226.s1 | 0.972 | 0.990 |
+| 227.s1 | 0.984 | 0.990 |
+| 228.s1 | 0.959 | 0.991 |
+| 233.s1 | 0.965 | 0.990 |
+| 239.s0 | 0.967 | 0.994 |
+| 252.s0 | 0.943 | 0.987 |
+| 457.s1 | 0.987 | 0.994 |
+| 458.s1 | 0.994 | 0.994 |
+| 461.s1 | 0.978 | 0.995 |
+| 464.s1 | 0.986 | 0.992 |
+| 466.s1 | 0.985 | 0.991 |
+| 467.s1 | 0.979 | 0.994 |
+| 470.s1 | 0.980 | 0.994 |
+| 475.s0 | 0.988 | 0.996 |
+| 477.s0 | 0.985 | 0.994 |
+| 479.s1 | 0.960 | 0.988 |
+| 481.s0 | 0.977 | 0.996 |
+| 482.s0 | 0.973 | 0.992 |
+| 528.s1 | 0.981 | 0.994 |
+| 529.s1 | 0.932 | 0.992 |
+| 530.s1 | 0.943 | 0.992 |
+| 531.s1 | 0.932 | 0.992 |
+| 534.s1 | 0.960 | 0.993 |
+| 535.s1 | 0.975 | 0.989 |
+| 536.s1 | 0.958 | 0.995 |
+| 539.s1 | 0.974 | 0.993 |
+| 546.s1 | 0.981 | 0.993 |
+| 619.s0 | 0.980 | 0.994 |
+| 620.s0 | 0.984 | 0.992 |
+| 620.s2 | 0.958 | 0.994 |
+| 621.s0 | 0.985 | 0.993 |
+| 624.s0 | 0.980 | 0.992 |
+| 626.s0 | 0.980 | 0.993 |
+| 626.s2 | 0.963 | 0.989 |
+| 627.s0 | 0.980 | 0.991 |
+| 629.s2 | 0.974 | 0.989 |
+| 630.s0 | 0.983 | 0.993 |
+| 631.s0 | 0.985 | 0.993 |
+| 631.s1 | 0.978 | 0.992 |
+| 632.s0 | 0.983 | 0.993 |
+| 634.s0 | 0.984 | 0.993 |
+| 636.s0 | 0.983 | 0.992 |
+| 636.s2 | 0.970 | 0.988 |
+| 638.s0 | 0.985 | 0.993 |
+| 639.s0 | 0.984 | 0.993 |
+| 640.s0 | 0.983 | 0.991 |
+| 640.s1 | 0.960 | 0.988 |
+| 640B.s0 | 0.987 | 0.991 |
+| 641.s0 | 0.984 | 0.992 |
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
