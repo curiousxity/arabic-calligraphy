@@ -634,7 +634,7 @@ Times are minutes:seconds into the individual-letters lesson.
   copies ran on past the half's cut end into the other half (the parent letter's whole stroke), so every half's ink
   past its own studio letter, a piece over 0.15 nib square, is erased in its joint trims (170 strokes). After that
   28 of the 29 held halves matched at 0.95 or better and went in too: 261 halves, the least 0.952, median 0.978.
-  444g (0.941) waits in `me/halfhold.txt` for the user.
+  444g (0.941) waited for the user: "444g approve".
 
 ### Ya
 
