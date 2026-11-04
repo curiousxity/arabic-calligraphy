@@ -1,6 +1,7 @@
 """Pen-held fits of Jali Diwani strokes on the Geekmini (jdpenjob.py through the queue's "scan" mode, scanjob.py).
   python jdpensubmit.py submit QUEUE TAG [--env K=V ...] stroke ...   one job per stroke, "shape.sN" or a bare shape
-  python jdpensubmit.py submit QUEUE TAG --patch IN/pen.json N R stroke ...   jdautopatch.py on IN's records instead
+  python jdpensubmit.py submit QUEUE TAG --patch IN/pen.json N R stroke[+AT...] ...   jdautopatch.py on IN's records
+    instead; AT as jdautopatch's ("192.s2+last:0.5+-2.247,1.821:0.4")
   python jdpensubmit.py collect QUEUE TAG OUTDIR                    OUTDIR/pen.json merged, each stroke's picture a png
 The bundle (QUEUE/bundles/jd-TAG.zip) holds this folder's jdcatalog.py and jdpenjob.py beside a copy of the queue's
 own code/ (so the fit runs the code the workers run), and the data jdcatalog reads: JD_STUDIO_DATA, JD_COMPOSED and
@@ -18,6 +19,8 @@ if cmd == "submit":
     patch = None  # the user, 2026-11-03: studio-outline patches go to the queue too, at neutral priority (no A-/T- prefix)
     if rest and rest[0] == "--patch":
         patch, rest = rest[1:4], rest[4:]
+    ats = {x.split("+")[0]: x.split("+")[1:] for x in rest}
+    rest = [x.split("+")[0] for x in rest]
     names = [s for x in rest for s in ([x] if "." in x else [f"{x}.{sid}" for sid, _ in strokes(x)])]
     z = os.path.join(q, "bundles", f"jd-{tag}.zip"); tmp = z + f".{socket.gethostname()}.tmp"
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -45,7 +48,7 @@ if cmd == "submit":
     jobs = []
     for st in names:
         name = f"jd{'patch' if patch else 'pen'}-{tag}-{st}"
-        argv = (["jd/jdautopatch.py", "in/pen.json", "{out}/pen.json", st] + patch[1:]) if patch else ["jd/jdpenjob.py", "{out}", st]
+        argv = (["jd/jdautopatch.py", "in/pen.json", "{out}/pen.json", st] + patch[1:] + ats.get(st, [])) if patch else ["jd/jdpenjob.py", "{out}", st]
         job = {"name": name, "mode": "scan", "bundle": os.path.basename(z), "argv": argv, "env": env}
         dst = os.path.join(q, "todo", name + ".json"); t = dst + f".{socket.gethostname()}.tmp"
         open(t, "w").write(json.dumps(job)); os.replace(t, dst); jobs.append(name)
@@ -56,12 +59,14 @@ else:
     info = json.load(open(info_f))
     pf = os.path.join(out, "pen.json")
     res, left = (json.load(open(pf)) if os.path.exists(pf) else {}), []
-    for name in info["names"]:
+    for name, st in zip(info["names"], info["strokes"]):
         f = os.path.join(q, "done", name + ".json")
         if not os.path.exists(f):
             left.append(name + (" (failed)" if os.path.exists(os.path.join(q, "failed", name + ".json")) else "")); continue
         files = json.load(open(f, encoding="utf-8"))["files"]
-        res.update(json.loads(files.get("pen.json", "{}")))
+        got = json.loads(files.get("pen.json", "{}"))
+        # a patch job hands back its shape's other strokes as they went in: only its own is taken
+        res.update({st: got[st]} if name.startswith("jdpatch") else got)
         for st, b64 in json.loads(files.get("pics.json", "{}")).items():
             open(os.path.join(out, st + ".png"), "wb").write(base64.b64decode(b64))
     json.dump(res, open(pf, "w"), indent=1)
