@@ -1142,6 +1142,8 @@ Spill group:
 | 641.s2 | 0.986 | 0.990 |
 
 
+**Neighbour ink taken out of the patches (the user, 2026-11-04).** 69 strokes held another stroke's ink in their fills, 47 of them already settled. It could bring back a fault if the neighbour was patched later. Fills are now clipped to the stroke's own outline plus 0.004 nuqta, and any nick that leaves is patched again from a set holding one stroke per shape, so nothing neighbouring counts. No stroke or letter got worse; 22 of 46 letters improved. This replaces the 076 rule for new patches: strokes are drawn separately, so a patch needs no neighbour's ink.
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
