@@ -113,6 +113,19 @@ def main(sp, out):
             continue
         if "~" not in k and s not in ids:
             ids[s] = [sid for sid, _d in stamp_strokes(s)]
+    # a pair half none of whose strokes has a fit of its own, every one repeating an outline fitted elsewhere, was
+    # never listed above, so joins using it had no letter (2026-11-04: 262 halves). It goes in when every stroke copies
+    # an accepted fit, unless me/halfhold.txt holds it back: the user checks the halves whose ink as a whole matches
+    # the studio's letter under 0.95 ("you check", 2026-11-04)
+    hold = set(open(os.path.join(sp, "me", "halfhold.txt")).read().split()) if os.path.exists(os.path.join(sp, "me", "halfhold.txt")) else set()
+    for s, e in db.items():
+        if s in ids or s in hold or not e.get("pair_of"):
+            continue
+        sts = stamp_strokes(s)
+        src = lambda d: (twins[reg["fits"][key(d)]["job"]]["from"] if reg["fits"][key(d)]["job"] in twins  # noqa: E731
+                         else reg["fits"][key(d)]["job"])
+        if sts and all(key(d) in reg["fits"] and src(d) in rev for _sid, d in sts):
+            ids[s] = [sid for sid, _d in sts]
     shapes, missing = {}, []
     for s, sids in sorted(ids.items()):
         strokes = []

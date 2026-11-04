@@ -627,6 +627,11 @@ Times are minutes:seconds into the individual-letters lesson.
 - **Decision 56's five strokes (added 2026-11-04):** 031r.s0, 031g.s1, 289r.s0, 657r.s0 and 657g.s1, approved
   2026-11-02 for three joins but never entered in the review, so 031r, 031g, 289r, 657r and 657g were out of the
   library. Their other strokes are copies (0.92-0.99 of the studio).
+- **Pair halves made wholly of copies (2026-11-04):** a pair half none of whose strokes had a fit of its own was never
+  listed, though every stroke repeats an accepted outline, so 262 halves and the joins using them were missing.
+  `studiolib.py` now lists such a half. Judged as a whole letter against the studio's (a stroke may run under its
+  neighbour, so stroke by stroke reads low), 233 match at 0.95 or better and went in; the user: "you check". The 29
+  below 0.95 (worst 023r 0.78, 037r 0.81) wait in `me/halfhold.txt` for the user.
 
 ### Ya
 
