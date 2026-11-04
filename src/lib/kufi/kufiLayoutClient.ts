@@ -128,9 +128,16 @@ const listeners = new Set<() => void>();
 
 const hasEdits = (e: KufiPanelEdits | undefined) => !!e && Object.values(e).some((v) => v !== undefined);
 
-/** The cache key: the layout's inputs and nothing else. */
+/**
+ * The cache key: the layout's inputs and nothing else. The centre and start
+ * fields are appended only when set (off and bottom right are the defaults),
+ * so every key of a block without them is the key it had before they existed.
+ */
 export function kufiLayoutKey(i: KufiLayoutInputs): string {
-  return JSON.stringify([i.text, i.cols, i.rows, hasEdits(i.edits) ? i.edits : null]);
+  const base: unknown[] = [i.text, i.cols, i.rows, hasEdits(i.edits) ? i.edits : null];
+  const start = i.start && i.start !== "bottomRight" ? i.start : null;
+  if (i.centre || start) base.push(i.centre ? 1 : 0, start);
+  return JSON.stringify(base);
 }
 
 function notify() {

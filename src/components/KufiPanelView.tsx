@@ -82,8 +82,8 @@ export const KufiPanelView: React.FC<KufiPanelViewProps> = (p) => {
   const shown = preview ?? result;
   const inputs = useMemo(
     () => kufiPanelInputs(p),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the four layout fields, not the props object
-    [p.text, p.panelCols, p.panelRows, p.panelEdits]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the layout fields, not the props object
+    [p.text, p.panelCols, p.panelRows, p.panelEdits, p.panelCentre, p.panelStart]
   );
 
   const rings = useMemo(() => {

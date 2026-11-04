@@ -52,7 +52,7 @@ import type { DetachedMarkOverride } from "./lib/detachedMarks";
 import type { BlockFill } from "./lib/blockFill";
 import type { SvgCmd } from "./lib/svgPath";
 import type { Pt } from "./lib/strokeCuts";
-import type { KufiPanelEdits } from "./lib/kufi/kufiPack";
+import type { KufiPanelEdits, KufiPanelStart } from "./lib/kufi/kufiPack";
 import type { KufiStarLayoutKind } from "./lib/kufi/kufiStarLayout";
 // ---- /STREAM-F ----
 
@@ -376,6 +376,10 @@ export type KufiPanelBlock = BlockCommon & {
   panelRows: number;
   /** The user's form, stretch, route, pin and cell edits. Absent means none. */
   panelEdits?: KufiPanelEdits;
+  /** The text's last word alone in the panel's core (see kufi-panel.md, "A word in the centre"). Absent means off. */
+  panelCentre?: boolean;
+  /** Which corner the words start from. Absent means `"bottomRight"`, so old saves redraw unchanged. */
+  panelStart?: KufiPanelStart;
 };
 
 /**

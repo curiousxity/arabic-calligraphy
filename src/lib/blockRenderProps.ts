@@ -119,6 +119,8 @@ export const kufiPanelProps = (b: Extract<Block, { type: "kufiPanel" }>) => ({
   panelCols: b.panelCols,
   panelRows: b.panelRows,
   panelEdits: b.panelEdits,
+  panelCentre: b.panelCentre,
+  panelStart: b.panelStart,
 });
 
 /** A Kufi star panel, for `KufiStarView`. */

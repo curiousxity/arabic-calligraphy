@@ -4,11 +4,12 @@
  * imports the client (which names the worker's URL).
  */
 import { kufiChangesOf, tryKufiChange, type KufiTry } from "./kufiExplore";
-import { FIT_BUDGET_MS, fitKufiPanel, packKufiPanel, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
+import { FIT_BUDGET_MS, fitKufiPanel, packKufiPanel, type KufiPackResult, type KufiPanelEdits, type KufiPanelStart } from "./kufiPack";
 import { evaluateKufiStar, type KufiStarEvaluation } from "./kufiStarEvaluate";
 import { layoutKufiStar, type KufiStarInputs, type KufiStarLayout } from "./kufiStarLayout";
 
-export type KufiLayoutInputs = { text: string; cols: number; rows: number; edits?: KufiPanelEdits };
+/** The packer's inputs for one panel. `centre` and `start` are left undefined when off / bottom right, so an old block's inputs are unchanged. */
+export type KufiLayoutInputs = { text: string; cols: number; rows: number; edits?: KufiPanelEdits; centre?: boolean; start?: KufiPanelStart };
 
 export type KufiWorkerRequest =
   | { id: number; kind: "pack"; input: KufiLayoutInputs & { previous?: KufiPackResult }; text?: undefined }

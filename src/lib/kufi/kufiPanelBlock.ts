@@ -4,7 +4,7 @@
  * edits a canvas gesture makes. Pure: no React, no Konva, no `./harfbuzz`.
  */
 import { firstUnitOfWord, kufiFormsOf, kufiReadingStep, placedBox, placementOf } from "./kufiHit";
-import { reconcileEdits, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
+import { reconcileEdits, type KufiPackResult, type KufiPanelEdits, type KufiPanelStart } from "./kufiPack";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
 import type { KufiLayoutInputs } from "./kufiWorkerProtocol";
 
@@ -19,14 +19,23 @@ export type KufiTool = "select" | "stretch" | "move" | "paint";
 
 export const kufiCellSize = (fontSize: number) => fontSize / KUFI_CELLS_PER_EM;
 
-type PanelFields = { text: string; panelCols: number; panelRows: number; panelEdits?: KufiPanelEdits };
+type PanelFields = {
+  text: string;
+  panelCols: number;
+  panelRows: number;
+  panelEdits?: KufiPanelEdits;
+  panelCentre?: boolean;
+  panelStart?: KufiPanelStart;
+};
 
-/** What the packer is asked for a block: these four fields and nothing else. */
+/** What the packer is asked for a block: these six fields and nothing else. */
 export const kufiPanelInputs = (b: PanelFields): KufiLayoutInputs => ({
   text: b.text,
   cols: b.panelCols,
   rows: b.panelRows,
   edits: b.panelEdits,
+  centre: b.panelCentre,
+  start: b.panelStart,
 });
 
 /**

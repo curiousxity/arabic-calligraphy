@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useSyncExternalStore } from "react";
-import type { KufiPackResult, KufiPanelEdits } from "../lib/kufi/kufiPack";
+import type { KufiPackResult, KufiPanelEdits, KufiPanelStart } from "../lib/kufi/kufiPack";
 import {
   kufiLayoutKey,
   kufiLayoutSnapshot,
@@ -15,6 +15,8 @@ export type KufiPanelLayoutSource = {
   panelCols: number;
   panelRows: number;
   panelEdits?: KufiPanelEdits;
+  panelCentre?: boolean;
+  panelStart?: KufiPanelStart;
 };
 
 /**
@@ -22,15 +24,16 @@ export type KufiPanelLayoutSource = {
  *
  * Null only before the first result arrives; while a newer one is pending it
  * keeps returning the last result this renderer was shown. Memoised on the
- * layout inputs (`text`, `panelCols`, `panelRows`, `panelEdits`), never on
- * the block object, which is replaced on every drag frame.
+ * layout inputs (`text`, `panelCols`, `panelRows`, `panelEdits`,
+ * `panelCentre`, `panelStart`), never on the block object, which is replaced
+ * on every drag frame.
  */
 export function useKufiPanelLayout(block: KufiPanelLayoutSource): KufiPackResult | null {
   const slot = useId();
-  const { text, panelCols, panelRows, panelEdits } = block;
+  const { text, panelCols, panelRows, panelEdits, panelCentre, panelStart } = block;
   const inputs = useMemo(
-    () => kufiPanelInputs({ text, panelCols, panelRows, panelEdits }),
-    [text, panelCols, panelRows, panelEdits]
+    () => kufiPanelInputs({ text, panelCols, panelRows, panelEdits, panelCentre, panelStart }),
+    [text, panelCols, panelRows, panelEdits, panelCentre, panelStart]
   );
   // An equal-but-new edits object (an undo, a reload) must not re-request.
   const key = kufiLayoutKey(inputs);

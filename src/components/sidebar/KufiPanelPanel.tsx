@@ -116,8 +116,8 @@ export const KufiPanelPanel: React.FC<{
   useKufiPanelLayout(block);
   const inputs = useMemo(
     () => kufiPanelInputs(block),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the four layout fields, not the block object
-    [block.text, block.panelCols, block.panelRows, block.panelEdits]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the layout fields, not the block object
+    [block.text, block.panelCols, block.panelRows, block.panelEdits, block.panelCentre, block.panelStart]
   );
   const getResult = useCallback(() => cachedKufiLayout(inputs), [inputs]);
   const getFailed = useCallback(() => kufiLayoutFailed(inputs), [inputs]);

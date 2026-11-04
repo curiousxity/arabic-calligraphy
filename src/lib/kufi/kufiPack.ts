@@ -103,6 +103,13 @@ export type KufiPanelEdits = {
   cells?: KufiCellEdit[];
 };
 
+/**
+ * Where the words start: the bottom right (the default, the ring read bottom,
+ * left, top, right) or the top right (the same clockwise order begun one side
+ * later: right, read downward, then bottom, left, top).
+ */
+export type KufiPanelStart = "bottomRight" | "topRight";
+
 export type KufiPackResult =
   | {
       ok: true;

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { KufiPackResult } from "./kufiPack";
 import {
+  kufiLayoutKey,
   KUFI_CACHE_LIMIT,
   KUFI_FIT_WATCHDOG_MS,
   KUFI_PACK_WATCHDOG_MS,
@@ -560,5 +561,16 @@ describe("kufi star layouts", () => {
     expect(ensureKufiStarLayouts([S1])).toBe(true);
     expect(cachedKufiStarLayout(S1)?.regions.length).toBe(13);
     expect(ensureKufiStarLayouts([S1])).toBe(false);
+  });
+});
+
+describe("kufiLayoutKey", () => {
+  it("is unchanged for inputs without centre or start, and differs with them", () => {
+    const base = { text: "الله", cols: 9, rows: 9 };
+    expect(kufiLayoutKey(base)).toBe(JSON.stringify(["الله", 9, 9, null]));
+    expect(kufiLayoutKey({ ...base, centre: false, start: "bottomRight" })).toBe(kufiLayoutKey(base));
+    expect(kufiLayoutKey({ ...base, centre: true })).not.toBe(kufiLayoutKey(base));
+    expect(kufiLayoutKey({ ...base, start: "topRight" })).not.toBe(kufiLayoutKey(base));
+    expect(kufiLayoutKey({ ...base, start: "topRight" })).not.toBe(kufiLayoutKey({ ...base, centre: true }));
   });
 });

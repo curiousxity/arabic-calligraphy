@@ -51,6 +51,21 @@ describe("kufiPanelBlock", () => {
     });
   });
 
+  it("inputs carry the centre and start fields, undefined when absent", () => {
+    expect(kufiPanelInputs({ text: "الله", panelCols: 9, panelRows: 9 })).toEqual({
+      text: "الله",
+      cols: 9,
+      rows: 9,
+      edits: undefined,
+      centre: undefined,
+      start: undefined,
+    });
+    expect(kufiPanelInputs({ text: "الله", panelCols: 9, panelRows: 9, panelCentre: true, panelStart: "topRight" })).toMatchObject({
+      centre: true,
+      start: "topRight",
+    });
+  });
+
   it("a text change carries the edits to their letter's new index", () => {
     const before = "الله";
     const after = "و الله";
