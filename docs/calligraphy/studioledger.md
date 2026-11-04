@@ -624,6 +624,9 @@ Times are minutes:seconds into the individual-letters lesson.
   smoothed, from a cut where ours and the studio already agree (`partboxes.py` then `endcap.py`). 576r.s2 is its
   whole studio outline, smoothed: a part patch left a step on the lower edge. The user: "all of your fixes are
   approved". The 13 shapes' other strokes repeat outlines already fitted and are copied from them.
+- **Decision 56's five strokes (added 2026-11-04):** 031r.s0, 031g.s1, 289r.s0, 657r.s0 and 657g.s1, approved
+  2026-11-02 for three joins but never entered in the review, so 031r, 031g, 289r, 657r and 657g were out of the
+  library. Their other strokes are copies (0.92-0.99 of the studio).
 
 ### Ya
 
