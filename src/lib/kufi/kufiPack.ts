@@ -110,6 +110,12 @@ export type KufiPanelEdits = {
  */
 export type KufiPanelStart = "bottomRight" | "topRight";
 
+/** The pack-wide choices a block makes: where the words start, and whether the last word takes the centre. */
+type PackOpts = { start: KufiPanelStart; centre: boolean };
+const DEFAULT_OPTS: PackOpts = { start: "bottomRight", centre: false };
+/** `Ctx.start` for a `KufiPanelStart`. */
+const startSide = (start: KufiPanelStart): number => (start === "topRight" ? 3 : 0);
+
 export type KufiPackResult =
   | {
       ok: true;
@@ -586,12 +592,14 @@ const RING0_OFF = [0, 1, 2];
 const RINGK_OFF = [-2, -1, 0, 1, 2];
 
 /**
- * Template line t: ring t / sides, side t % sides (bottom, left, top, right), at the given offset
- * from its ring. A panel has 4 sides; a region (`packKufiRegion`) 1, its upright bottom lines.
+ * Template line t: ring t / sides, side (t + start) % sides (bottom, left, top, right), at the given
+ * offset from its ring. A panel has 4 sides; a region (`packKufiRegion`) 1, its upright bottom lines.
+ * `start` is the side the first line lies on: 0 for a ring begun at the bottom right, 3 for one
+ * begun at the top right (`KufiPanelStart`), the same clockwise order one side later.
  */
-function templateLine(cols: number, rows: number, t: number, off: number, sides = 4): Line | null {
+function templateLine(cols: number, rows: number, t: number, off: number, sides = 4, start = 0): Line | null {
   const ring = Math.floor(t / sides);
-  const side = t % sides;
+  const side = (t + start) % sides;
   const dist = ring * (BAND + 1) + off;
   if (dist < 0) return null;
   const rot = SIDE_ROT[side];
@@ -694,6 +702,8 @@ type Ctx = {
   bars: boolean;
   /** Template lines per ring: 4 round a panel's frame, 1 (upright, from the bottom up) in a region. */
   sides: number;
+  /** The side template line 0 lies on (`templateLine`): 0 bottom (the default), 3 right (`"topRight"`). */
+  start: number;
   /** Packing into a region's mask (`packKufiRegion`); null for a whole panel, whose every path is unchanged. */
   region: Region | null;
 };
@@ -992,8 +1002,8 @@ function apply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
     else {
       const t =
         mv.base !== null
-          ? lineOf(ctx.cols, ctx.rows, SIDE_ROT[mv.t % ctx.sides], mv.base)
-          : templateLine(ctx.cols, ctx.rows, mv.t, mv.off, ctx.sides);
+          ? lineOf(ctx.cols, ctx.rows, SIDE_ROT[(mv.t + ctx.start) % ctx.sides], mv.base)
+          : templateLine(ctx.cols, ctx.rows, mv.t, mv.off, ctx.sides, ctx.start);
       if (!t) return null;
       L = t;
       newLine = t;
@@ -1289,7 +1299,7 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
     if (t >= ctx.nTpl || (inc === 2 && t - 1 < ctx.sides)) continue; // never skip a side of the frame (a region's bottom line)
     if (pin) {
       // a pinned letter opens its line where the pin says, whatever the template offset
-      if (SIDE_ROT[t % ctx.sides] / 90 !== pin.turn) continue;
+      if (SIDE_ROT[(t + ctx.start) % ctx.sides] / 90 !== pin.turn) continue;
       lineOpts.push({ mode: 1, t, off: 0, base: null });
       continue;
     }
@@ -1304,8 +1314,8 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
       if (lo.mode === 0) L = st.lines[st.cur];
       else if (pin) {
         base = pinBase(sh, pin);
-        L = lineOf(ctx.cols, ctx.rows, SIDE_ROT[lo.t % ctx.sides], base);
-      } else L = templateLine(ctx.cols, ctx.rows, lo.t, lo.off, ctx.sides);
+        L = lineOf(ctx.cols, ctx.rows, SIDE_ROT[(lo.t + ctx.start) % ctx.sides], base);
+      } else L = templateLine(ctx.cols, ctx.rows, lo.t, lo.off, ctx.sides, ctx.start);
       if (!L) continue;
       const start = lo.mode === 0 ? st.cursor[st.cur] : L.len - 1;
       if (pin) {
@@ -1328,7 +1338,7 @@ function forMoves(ctx: Ctx, st: St, li: number, visit: (mv: Move, rec: Applied) 
   if (pin && !placed && !stop) {
     const tried = new Set(lineOpts.filter((lo) => lo.mode === 1).map((lo) => lo.t));
     for (let t = st.tpl; t < ctx.nTpl; t++)
-      if (SIDE_ROT[t % ctx.sides] / 90 === pin.turn) {
+      if (SIDE_ROT[(t + ctx.start) % ctx.sides] / 90 === pin.turn) {
         if (!tried.has(t)) tryLine({ mode: 1, t, off: 0, base: null });
         break;
       }
@@ -2096,7 +2106,7 @@ function reapply(ctx: Ctx, st: St, li: number, mv: Move): Applied | null {
     start = st.cursor[st.cur];
   } else {
     if (mv.t < st.tpl) return null;
-    len = ((mv.t % ctx.sides) & 1) === 0 ? ctx.cols : ctx.rows;
+    len = (((mv.t + ctx.start) % ctx.sides) & 1) === 0 ? ctx.cols : ctx.rows;
     start = len - 1;
   }
   const sh = mv.shape;
@@ -2618,7 +2628,8 @@ function makeCtx(
   pins: Map<number, Pin>,
   budgetMs: number,
   strictClock = false,
-  mask: KufiMask | null = null
+  mask: KufiMask | null = null,
+  opts: PackOpts = DEFAULT_OPTS
 ): Ctx {
   const place: KufiPlace = mask ? "star" : "panel";
   const { units } = resolveKufiText(text);
@@ -2633,6 +2644,7 @@ function makeCtx(
     letters,
     nTpl: mask ? regionLines : rings * 4,
     sides: mask ? 1 : 4,
+    start: mask ? 0 : startSide(opts.start),
     region: mask ? regionOf(mask) : null,
     zob: zobrist(cols * rows),
     // the work budget makes a search give the same panel on a busy machine as on a quiet
@@ -2771,14 +2783,15 @@ function freshFinal(
   edits: KufiPanelEdits,
   pins: Map<number, Pin>,
   budgetMs: number,
-  strictClock = false
+  strictClock = false,
+  opts: PackOpts = DEFAULT_OPTS
 ): Final | null {
-  const key = JSON.stringify([text, cols, rows, edits.forms ?? {}, edits.stretch ?? {}, edits.pinned ?? {}]);
+  const key = JSON.stringify([text, cols, rows, edits.forms ?? {}, edits.stretch ?? {}, edits.pinned ?? {}, opts.start, opts.centre]);
   const hit = finals.get(key);
   if (hit && (hit.f?.packed || hit.budget >= budgetMs)) return hit.f;
   if (outOfRoom(text, cols, rows)) return null;
   if (budgetMs <= 0) return hit?.f ?? null;
-  const f = search(makeCtx(text, cols, rows, edits, pins, budgetMs, strictClock));
+  const f = search(makeCtx(text, cols, rows, edits, pins, budgetMs, strictClock, null, opts));
   if (finals.size >= FINALS_MAX) finals.delete(finals.keys().next().value as string);
   finals.set(key, { f, budget: budgetMs });
   return f;
@@ -2876,11 +2889,11 @@ function rectangleSizes(units: KufiUnit[]): Size[] {
  * order given. About 8 ms a size on the Al-Baqarah and Shahada texts, so only
  * the first `RANK_MAX_SIZES` are scored; the rest keep the order given, after them.
  */
-function rankByGreedy(text: string, sizes: Size[], edits: KufiPanelEdits, pins: Map<number, Pin>): Size[] {
+function rankByGreedy(text: string, sizes: Size[], edits: KufiPanelEdits, pins: Map<number, Pin>, opts: PackOpts = DEFAULT_OPTS): Size[] {
   const scored = sizes.slice(0, RANK_MAX_SIZES).map((s, k) => {
     let f: Final | null = null;
     if (!outOfRoom(text, s.cols, s.rows)) {
-      const ctx = makeCtx(text, s.cols, s.rows, edits, pins, PACK_BUDGET_MS, true);
+      const ctx = makeCtx(text, s.cols, s.rows, edits, pins, PACK_BUDGET_MS, true, null, opts);
       ctx.noClock = true;
       f = beamPass(ctx, 1, initState(ctx), 0, true);
     }
@@ -2943,7 +2956,8 @@ function suggestions(
   rows: number,
   edits: KufiPanelEdits,
   dir: 1 | -1,
-  deadline: number
+  deadline: number,
+  opts: PackOpts
 ): Size[] {
   const out: Size[] = [];
   const pins = explicitPins(units, edits) ?? new Map<number, Pin>();
@@ -2953,12 +2967,12 @@ function suggestions(
   const squares = sizesFrom(from, dir).map((n) => ({ cols: n, rows: n }));
   const rects = rectangleSizes(units).filter((s) => (dir > 0 ? s.cols * s.rows > area : s.cols * s.rows < area));
   let tried = 0;
-  for (const s of squaresThenRanked(squares, () => rankByGreedy(text, rects, edits, pins))) {
+  for (const s of squaresThenRanked(squares, () => rankByGreedy(text, rects, edits, pins, opts))) {
     if (++tried > squares.length + SUGGEST_TRIES * 3) break;
     const left = Math.min(PACK_BUDGET_MS, deadline - performance.now());
     // a search shorter than this cannot finish even its first passes
     // what is left of the call's time, on the clock: suggestions never run the call over
-    const f = freshFinal(text, s.cols, s.rows, edits, pins, left < MIN_SEARCH_MS ? 0 : left, true);
+    const f = freshFinal(text, s.cols, s.rows, edits, pins, left < MIN_SEARCH_MS ? 0 : left, true, opts);
     if (f?.packed) out.push(s);
     if (out.length >= 2 || left < MIN_SEARCH_MS) break;
   }
@@ -2972,14 +2986,15 @@ function failure(
   cols: number,
   rows: number,
   edits: KufiPanelEdits,
-  deadline: number
+  deadline: number,
+  opts: PackOpts
 ): KufiPackResult {
   if (f && f.st.failedPins > 0) return { ok: false, reason: "pinConflict", suggestions: [] };
   const tooLong = !f || f.st.failed > 0;
   return {
     ok: false,
     reason: tooLong ? "tooLong" : "tooShort",
-    suggestions: suggestions(text, units, cols, rows, edits, tooLong ? 1 : -1, deadline),
+    suggestions: suggestions(text, units, cols, rows, edits, tooLong ? 1 : -1, deadline, opts),
   };
 }
 
@@ -3063,6 +3078,7 @@ function repack(
   prev: KufiPlacement[],
   cells: Uint8Array,
   explicit: Map<number, Pin>,
+  opts: PackOpts,
   rearrange = false
 ): Final | null {
   const t0 = performance.now();
@@ -3122,7 +3138,7 @@ function repack(
       if (pins.has(k) || !free || free.has(keys[k])) return;
       pins.set(k, pinOf(prev[k], dotsDrawn(text, u, prev[k], cells, glyph, cols, rows), false));
     });
-    const ctx = makeCtx(text, cols, rows, edits, pins, left, true);
+    const ctx = makeCtx(text, cols, rows, edits, pins, left, true, null, opts);
     ctx.workMax = Math.min(ctx.workMax, workLeft);
     const f = search(ctx);
     workLeft -= ctx.work;
@@ -3134,7 +3150,7 @@ function repack(
   if (rearrange && complete && first.size > 0 && !best?.packed) {
     stats.rearranges++;
     // work-bounded like a first draft, cached by its inputs: a refused cell asked again costs nothing
-    const f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS, true);
+    const f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS, true, opts);
     if (f?.packed) return f;
   }
   return best;
@@ -3160,7 +3176,8 @@ function packPinned(
   cols: number,
   rows: number,
   edits: KufiPanelEdits,
-  explicit: Map<number, Pin>
+  explicit: Map<number, Pin>,
+  opts: PackOpts
 ): Final | null {
   const deadline = clockOverride !== null ? Infinity : performance.now() + PINNED_CALL_MS;
   const left = () => Math.min(PACK_BUDGET_MS, deadline - performance.now());
@@ -3171,15 +3188,15 @@ function packPinned(
     if (tried.has(key)) continue;
     tried.add(key);
     if (left() < MIN_SEARCH_MS) return null;
-    const base = freshFinal(text, cols, rows, baseEdits, new Map(), left());
+    const base = freshFinal(text, cols, rows, baseEdits, new Map(), left(), false, opts);
     if (!base?.packed) continue;
     const prev = okResult(units, base, cols, rows, baseEdits);
     if (!prev.ok) continue;
-    const f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit);
+    const f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit, opts);
     if (f?.packed) return f;
   }
   if (left() < MIN_SEARCH_MS) return null;
-  return freshFinal(text, cols, rows, edits, explicit, left());
+  return freshFinal(text, cols, rows, edits, explicit, left(), false, opts);
 }
 
 /**
@@ -3204,9 +3221,14 @@ export function packKufiPanel(input: {
   rows: number;
   edits?: KufiPanelEdits;
   previous?: KufiPackResult;
+  /** The last word alone in the core (see `centreOf`); off by default. */
+  centre?: boolean;
+  /** The corner the words start from; bottom right by default. */
+  start?: KufiPanelStart;
 }): KufiPackResult {
   let t0 = performance.now();
   const { text, cols, rows } = input;
+  const opts: PackOpts = { start: input.start ?? "bottomRight", centre: !!input.centre };
   const edits = input.edits ?? {};
   const { units } = resolveKufiText(text);
   if (letterCount(units) < 2) return { ok: false, reason: "tooShort", suggestions: [] };
@@ -3222,16 +3244,16 @@ export function packKufiPanel(input: {
     prev.placements.length === units.length &&
     prev.placements.every((p, k) => p.unitIndex === k && p.key === units[k].key)
   ) {
-    f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit, true);
+    f = repack(text, units, cols, rows, edits, prev.placements, prev.cells, explicit, opts, true);
     repacked = true;
   } else if (explicit.size > 0) {
-    f = packPinned(text, units, cols, rows, edits, explicit);
+    f = packPinned(text, units, cols, rows, edits, explicit, opts);
     // the pinned path spends its own bound; suggestions get a call's budget of their own
     t0 = performance.now();
-  } else f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS);
+  } else f = freshFinal(text, cols, rows, edits, explicit, PACK_BUDGET_MS, false, opts);
   if (f?.packed) return okResult(units, f, cols, rows, edits);
   // after an edit the box is the user's: say why, but do not spend a first draft's time on other sizes
-  return failure(text, units, f, cols, rows, edits, repacked ? 0 : t0 + CALL_BUDGET_MS);
+  return failure(text, units, f, cols, rows, edits, repacked ? 0 : t0 + CALL_BUDGET_MS, opts);
 }
 
 /**
@@ -3300,7 +3322,7 @@ export function fitKufiPanel(text: string, edits: KufiPanelEdits = {}): { cols: 
     stats.fitSizes++;
     const { cols, rows } = size;
     // the same path a pack takes, so a size fit calls packable is one a pack packs
-    const f = pins.size > 0 ? packPinned(text, units, cols, rows, edits, pins) : freshFinal(text, cols, rows, edits, pins, PACK_BUDGET_MS);
+    const f = pins.size > 0 ? packPinned(text, units, cols, rows, edits, pins, DEFAULT_OPTS) : freshFinal(text, cols, rows, edits, pins, PACK_BUDGET_MS);
     if (f?.packed) return { cols, rows };
     if (f && (!best || f.score < best.score)) best = { size, score: f.score };
   }

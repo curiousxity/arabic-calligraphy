@@ -173,7 +173,8 @@ function dotZoneOf(r: Ok): Set<number> {
         for (let dr = -1; dr <= 1; dr++)
           for (let dc = -1; dc <= 1; dc++) {
             const [rr, cc] = boxCell(p.turn, rows.length, rows[0].length, p.row, p.col, c.row + dr, c.col + dc);
-            zone.add(rr * r.cols + cc);
+            // a cell past an edge is no zone (an index past the right edge would wrap onto the next row)
+            if (rr >= 0 && cc >= 0 && rr < r.rows && cc < r.cols) zone.add(rr * r.cols + cc);
           }
     }
   }
@@ -347,6 +348,31 @@ describe("packKufiPanel", () => {
 });
 
 // Timing: the work budget decides results, so these tests assert the work each call did, plus a
+describe("panelStart", () => {
+  it("bottom right is the default: the same cells as a pack without the field", () => {
+    for (const [text, n] of [
+      [ALLAH, 9],
+      [BAQARAH, 21],
+    ] as const)
+      expect(layoutOf(packKufiPanel({ text, cols: n, rows: n, start: "bottomRight" }))).toEqual(layoutOf(packKufiPanel({ text, cols: n, rows: n })));
+  }, 20000);
+
+  it("top right starts the first word on the right side, read downward: سبحان الله at 15x13 is its 13x15 panel turned a quarter anticlockwise", () => {
+    const text = "سبحان الله";
+    const r = expectPacked(packKufiPanel({ text, cols: 15, rows: 13, start: "topRight" }), text);
+    expect(r.placements[0].turn).toBe(3);
+    // the same clockwise order one side later: right, bottom, left, top
+    const turns = [...new Set(r.placements.map((p) => p.turn))];
+    expect(turns).toEqual([3, 0, 1, 2].slice(0, turns.length));
+    const a = expectPacked(packKufiPanel({ text, cols: 13, rows: 15 }), text);
+    const turned = new Uint8Array(15 * 13);
+    for (let row = 0; row < 15; row++) for (let col = 0; col < 13; col++) turned[(13 - 1 - col) * 15 + row] = a.cells[row * 13 + col];
+    expect(Array.from(r.cells)).toEqual(Array.from(turned));
+    // a square is its own turn, yet a tight one (Al-Baqarah at 21x21) need not pack from the other corner within the work cap: the beam's ties fall differently
+    expect(packKufiPanel({ text: ALLAH, cols: 9, rows: 9, start: "topRight" }).ok).toBe(true);
+  }, 20000);
+});
+
 // wall-clock bound three times the target: loose enough that the parallel suite cannot flake it.
 // The targets themselves (2000 ms, 200 ms) are what a call takes alone; the code also stops on the
 // clock, at FIRST_DRAFT_CLOCK_MS for a first draft and at the repack budget for a repack.
