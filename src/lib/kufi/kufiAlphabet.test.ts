@@ -422,8 +422,15 @@ describe("KUFI_FORMS: pieces read off the reference panel", () => {
     expect(g.parts).toBe(3);
   });
 
-  it("only the gapped الله is drawn in more than one piece", () => {
-    expect(ENTRIES.filter((e) => (e.g.parts ?? 1) !== 1).map(label)).toEqual(["allah.isolated.2"]);
+  it("only the gapped الله and the centre's dotted one are drawn in more than one piece", () => {
+    expect(ENTRIES.filter((e) => (e.g.parts ?? 1) !== 1).map(label)).toEqual(["allah.isolated.2", "allah.isolated.7"]);
+  });
+
+  it("has the centre's 9x5 الله: a closed heh box on its stem, the corner dot, no stretch, drawn in a centre alone", () => {
+    const g = glyphById("allah.isolated.7");
+    expect(g.rows).toEqual(["###.#.#.#", "#.#.#.#.#", "###.#.#.#", "..#.#.#.#", "#.#######"]);
+    expect(g.stretch).toEqual([]);
+    expect(g).toMatchObject({ only: "centre", parts: 2 });
   });
 
   it("has three star forms of الله: five rows on four uprights, the tall one with its shafts two above the heh's box, and the tall one under its bar", () => {
@@ -454,7 +461,7 @@ describe("KUFI_FORMS: pieces read off the reference panel", () => {
     expect(barred.parts).toBeUndefined();
     expect(components(barred.rows)).toBe(1);
     // there is no allah.isolated.4 any more (the five-row form under a bar: four equal uprights)
-    expect(KUFI_FORMS.allah.isolated!.map((g) => g.id)).toEqual(["allah.isolated.0", "allah.isolated.1", "allah.isolated.2", "allah.isolated.3", "allah.isolated.5", "allah.isolated.6"]);
+    expect(KUFI_FORMS.allah.isolated!.map((g) => g.id)).toEqual(["allah.isolated.0", "allah.isolated.1", "allah.isolated.2", "allah.isolated.3", "allah.isolated.5", "allah.isolated.6", "allah.isolated.7"]);
     // in every star form the heh's walls never grow: a row slice, where there is one, lies in the shafts alone
     for (const g of KUFI_FORMS.allah.isolated!.filter((x) => x.only === "star"))
       for (const s of g.stretch) if (s.axis === "row") expect(g.rows[s.index], g.id).toBe("....#.#.#");
@@ -767,8 +774,9 @@ describe("KufiGlyph.dots", () => {
 });
 
 describe("the packer's alternates", () => {
-  it("every الله form widens sideways at a column slice", () => {
-    for (const g of KUFI_FORMS.allah.isolated ?? []) {
+  it("every الله form widens sideways at a column slice, but the centre's fixed 9x5", () => {
+    // the Cairo form has no slice at all: widening its box opens a hole between the dot and the stem
+    for (const g of (KUFI_FORMS.allah.isolated ?? []).filter((x) => x.only !== "centre")) {
       expect(g.stretch.some((s) => s.axis === "col"), g.id).toBe(true);
       const i = g.stretch.findIndex((s) => s.axis === "col");
       const counts = g.stretch.map((_, j) => (j === i ? 3 : 0));

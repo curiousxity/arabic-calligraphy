@@ -1078,6 +1078,16 @@ describe("the form rule", () => {
     // a form a skeleton lacks falls back to its isolated list
     expect(kufiFormsOf({ skeleton: "alef", form: "medial" }).every((g) => g.id.startsWith("alef.isolated."))).toBe(true);
   });
+
+  it("the centre place takes the star forms and the centre-only ones (الله: the forms whose heh never grows, and the Cairo 9x5); panel and star lists are unchanged", () => {
+    const u = resolveKufiText("الله").units[0];
+    expect(kufiFormsOf(u).map((g) => g.id)).toEqual(["allah.isolated.0", "allah.isolated.1", "allah.isolated.2"]);
+    expect(kufiFormsOf(u, "star").map((g) => g.id)).toEqual(["allah.isolated.3", "allah.isolated.5", "allah.isolated.6"]);
+    expect(kufiFormsOf(u, "centre").map((g) => g.id)).toEqual(["allah.isolated.3", "allah.isolated.5", "allah.isolated.6", "allah.isolated.7"]);
+    // a letter with no star or centre forms takes the panel's in the centre
+    const m = resolveKufiText("محمد").units[0];
+    expect(kufiFormsOf(m, "centre")).toEqual(kufiFormsOf(m));
+  });
 });
 
 describe("the clock override (tests only)", () => {

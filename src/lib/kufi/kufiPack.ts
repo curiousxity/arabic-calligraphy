@@ -429,12 +429,18 @@ function countVectors(g: KufiGlyph, rowMax = ROW_MAX): number[][] {
  * The alternates a unit may take: its joining form's list, else the isolated one. The packer's rule, shared with the canvas.
  * A star (`place`: a wedge or the octagon's band) takes the forms a letter has for a star where it has any
  * (`KufiGlyph.only`: الله on four uprights at a line's height, the heh with its own wall), else its forms
- * drawn whole; a rectangular panel takes the forms authored for no place.
+ * drawn whole; a rectangular panel takes the forms authored for no place. A panel's centre (the last word
+ * alone in the core, `centreOf`) takes the star forms and the centre-only ones where a letter has either
+ * (الله: the forms whose heh never grows taller, and the Cairo 9x5), else the panel's forms.
  */
 export function kufiFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">, place: KufiPlace = "panel"): KufiGlyph[] {
   const table = KUFI_FORMS as Record<string, Partial<Record<JoiningForm, KufiGlyph[]>>>;
   const all = table[unit.skeleton]?.[unit.form] ?? table[unit.skeleton]?.isolated ?? [];
   if (place === "panel") return all.filter((g) => !g.only);
+  if (place === "centre") {
+    const own = all.filter((g) => g.only === "star" || g.only === "centre");
+    return own.length > 0 ? own : all.filter((g) => !g.only);
+  }
   const own = all.filter((g) => g.only === place);
   return own.length > 0 ? own : all.filter((g) => !g.only && drawnWhole(g));
 }
@@ -454,7 +460,8 @@ function drawnWhole(g: KufiGlyph): boolean {
 }
 
 function lettersOf(text: string, units: KufiUnit[], edits: KufiPanelEdits, pins: Map<number, Pin>, place: KufiPlace = "panel", rows = Infinity): Letter[] {
-  const whole = place !== "panel";
+  // a region's rules (letters drawn whole, الله a tall letter, the row cap): a star's alone; the centre's box is its own bound
+  const whole = place === "star";
   // in a star, الله is a tall letter too: its natural length is its tall form's shafts (`stemOf`), so the
   // packer takes that form wherever it fits and the five-row one where it does not
   const tall = (u: KufiUnit) => TALL.has(u.skeleton) || (whole && u.skeleton === "allah");

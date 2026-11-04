@@ -163,7 +163,7 @@ export type KufiDotKey = `${KufiDotSide}${1 | 2 | 3}`;
  * the wedges layout, or a band of the octagon layout), where tall strokes
  * are lengthened out of the line.
  */
-export type KufiPlace = "panel" | "star";
+export type KufiPlace = "panel" | "star" | "centre";
 
 export type SkeletonName =
   | "alef"
@@ -613,6 +613,12 @@ export const KUFI_FORMS: KufiFormTable = {
       // packs and this one only where the bar is needed; its tops are all capped, so nothing of
       // it is lengthened. A bar a gap row above the shafts would leave a hole over the heh's box
       g("allah.isolated.6", 0, ["#########", "....#.#.#", "###.#.#.#", "..#.#.#.#", "###.#.#.#", "#.#.#.#.#", "#########"], [{ axis: "row", index: 1 }, { axis: "col", index: 1 }], undefined, { only: "star", bars: 1 }),
+      // The 9x5 الله of the Cairo Shahada's centre (2026-11-04): a closed three-row heh box standing on
+      // its stem, the three shafts beside it the height of the box, and the dot in the bottom-left corner
+      // that stops the empty 2x2 under the box (the panel's gap ring round the core would make it a hole).
+      // Drawn in a panel's centre alone (`only: "centre"`, see `kufiFormsOf`). No stretch: widening the
+      // box opens a hole between the dot and the stem, and a row slice would grow the heh's box.
+      g("allah.isolated.7", 0, ["###.#.#.#", "#.#.#.#.#", "###.#.#.#", "..#.#.#.#", "#.#######"], [], undefined, { only: "centre", parts: 2 }),
     ],
   },
 };
