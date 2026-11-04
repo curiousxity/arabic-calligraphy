@@ -1167,8 +1167,15 @@ describe("centre off is today's panel", () => {
     ["قل هو الله أحد", 17, 19],
   ] as const)("%s %dx%d", (text, cols, rows) => {
     const a = packKufiPanel({ text, cols, rows });
-    expect(layoutOf(packKufiPanel({ text, cols, rows, centre: false, start: "bottomRight" }))).toEqual(layoutOf(a));
-    if (a.ok) expect(a.centre).toBeUndefined();
+    const b = packKufiPanel({ text, cols, rows, centre: false, start: "bottomRight" });
+    if (a.ok) {
+      expect(layoutOf(b)).toEqual(layoutOf(a));
+      expect(a.centre).toBeUndefined();
+    } else {
+      // a failing size's suggestions are searched on the clock, so only the answer itself is compared
+      expect(b.ok).toBe(false);
+      if (!b.ok) expect(b.reason).toBe(a.reason);
+    }
   }, 30000);
 });
 
