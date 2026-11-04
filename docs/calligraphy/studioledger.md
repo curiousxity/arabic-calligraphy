@@ -635,6 +635,9 @@ Times are minutes:seconds into the individual-letters lesson.
   past its own studio letter, a piece over 0.15 nib square, is erased in its joint trims (170 strokes). After that
   28 of the 29 held halves matched at 0.95 or better and went in too: 261 halves, the least 0.952, median 0.978.
   444g (0.941) waited for the user: "444g approve".
+- **107r.s1 (Jim Ha Kha Initial 15, 2026-11-04):** the last stroke with no fit anywhere. Turning pen, half lift,
+  smoother body (0.992); the user: "I don't like the left edge. Keep it matching the studio's", so its left end is
+  the studio's outline, smoothed, from a cut where ours and the studio agree. Approved; 107r goes in.
 
 ### Ya
 
