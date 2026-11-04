@@ -617,6 +617,13 @@ Times are minutes:seconds into the individual-letters lesson.
   turning, both flicks, and the nib-tip fill (91%, which notched the left side). The user: "go with A. The top right
   corner square is part of the other stroke." So the one-angle fit stays, and the corner is left to the neighbouring
   stroke.
+- **Decisions 58-60 (pair-half strokes never fitted, 2026-11-04):** 020r.s0, 670r.s0, 286g.s1, 258r.s0, 646r.s0,
+  573g.s0, 576r.s2, 512r.s0, 453g.s1, 577r.s2, 446r.s3, 392r.s2 and 453r.s0 had no fit, so 13 pair halves were out
+  of the library. Each was fitted with the end lift on and off, turning and at one angle, and the best kept. Where
+  the user named a part (a hook, a tail, an end, "the right part"), that part is the stroke's own studio outline,
+  smoothed, from a cut where ours and the studio already agree (`partboxes.py` then `endcap.py`). 576r.s2 is its
+  whole studio outline, smoothed: a part patch left a step on the lower edge. The user: "all of your fixes are
+  approved". The 13 shapes' other strokes repeat outlines already fitted and are copied from them.
 
 ### Ya
 
