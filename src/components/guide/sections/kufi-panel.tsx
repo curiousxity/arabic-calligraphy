@@ -26,6 +26,10 @@ export const section: GuideSection = {
     "tools",
     "move word",
     "paint",
+    "centre",
+    "centre word",
+    "spiral",
+    "start",
     "كوفي",
     "كوفي مربع",
     "إعجام",
@@ -101,6 +105,33 @@ export const section: GuideSection = {
         and short single words such as «محمد» usually show "Too long" or "Too
         short" at every size for now.
       </p>
+
+      <h4>A word in the centre</h4>
+      <p>
+        The old spiral panels run their words round the frame and end with
+        the last word alone in the middle. <strong>Centre word</strong> in the
+        Kufi panel section does that: set it to <em>Last word</em> and the
+        text's last word takes the core, upright or turned on its side,
+        whichever fills it better, with the other words packed round it. Fit
+        tries this by itself when nothing else fits, and then also starts the
+        words at the top right, running down the right side first, as the
+        Cairo panels do; <strong>Start</strong> lets you choose the corner
+        either way. Switching the centre on or off lets every letter find a
+        new place, so hand-placed letters are released (their shapes and
+        stroke lengths are kept). The letters in the middle are the panel's
+        own: they take no stretching, moving or painting. It suits a longer
+        text whose words stand on tall strokes, such as «لا إله إلا الله»
+        written twice, shown here at 21×17 with «الله» in the middle; a text
+        with short words, the Shahada among them, does not fill the ring yet.
+      </p>
+      <svg
+        viewBox="0 0 21 17"
+        role="img"
+        aria-label="A 21 by 17 square-Kufi panel: لا إله إلا الله twice round the frame, with الله alone in the middle"
+        style={{ display: "block", width: "100%", maxWidth: 252, margin: "8px auto 12px" }}
+      >
+        <path fill="currentColor" d="M0 0h3v1h-3zM4 0h3v1h-3zM8 0h1v1h-1zM10 0h5v1h-5zM16 0h1v1h-1zM18 0h3v1h-3zM0 1h1v1h-1zM2 1h3v1h-3zM8 1h1v1h-1zM10 1h1v1h-1zM12 1h1v1h-1zM14 1h1v1h-1zM16 1h1v1h-1zM18 1h1v1h-1zM20 1h1v1h-1zM0 2h3v1h-3zM4 2h3v1h-3zM8 2h1v1h-1zM10 2h1v1h-1zM12 2h3v1h-3zM16 2h1v1h-1zM18 2h3v1h-3zM8 3h1v1h-1zM10 3h1v1h-1zM12 3h1v1h-1zM16 3h1v1h-1zM19 3h1v1h-1zM0 4h3v1h-3zM4 4h1v1h-1zM6 4h3v1h-3zM10 4h1v1h-1zM12 4h3v1h-3zM16 4h1v1h-1zM18 4h3v1h-3zM0 5h1v1h-1zM2 5h1v1h-1zM4 5h1v1h-1zM16 5h1v1h-1zM18 5h1v1h-1zM20 5h1v1h-1zM0 6h5v1h-5zM6 6h3v1h-3zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM0 7h1v1h-1zM6 7h1v1h-1zM8 7h1v1h-1zM10 7h1v1h-1zM12 7h1v1h-1zM14 7h1v1h-1zM18 7h1v1h-1zM20 7h1v1h-1zM0 8h5v1h-5zM6 8h3v1h-3zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM0 9h1v1h-1zM8 9h1v1h-1zM10 9h1v1h-1zM12 9h1v1h-1zM14 9h1v1h-1zM16 9h1v1h-1zM18 9h1v1h-1zM20 9h1v1h-1zM0 10h5v1h-5zM6 10h1v1h-1zM8 10h7v1h-7zM16 10h1v1h-1zM18 10h1v1h-1zM20 10h1v1h-1zM16 11h1v1h-1zM18 11h1v1h-1zM20 11h1v1h-1zM0 12h3v1h-3zM4 12h1v1h-1zM6 12h3v1h-3zM10 12h3v1h-3zM14 12h1v1h-1zM16 12h1v1h-1zM18 12h3v1h-3zM8 13h1v1h-1zM12 13h1v1h-1zM14 13h1v1h-1zM16 13h1v1h-1zM19 13h1v1h-1zM0 14h3v1h-3zM4 14h3v1h-3zM8 14h1v1h-1zM10 14h3v1h-3zM14 14h1v1h-1zM16 14h1v1h-1zM18 14h3v1h-3zM0 15h1v1h-1zM2 15h3v1h-3zM8 15h1v1h-1zM10 15h1v1h-1zM12 15h1v1h-1zM14 15h1v1h-1zM16 15h1v1h-1zM18 15h1v1h-1zM20 15h1v1h-1zM0 16h3v1h-3zM4 16h3v1h-3zM8 16h1v1h-1zM10 16h5v1h-5zM16 16h1v1h-1zM18 16h3v1h-3z" />
+      </svg>
 
       <h4>Editing on the canvas</h4>
       <p>

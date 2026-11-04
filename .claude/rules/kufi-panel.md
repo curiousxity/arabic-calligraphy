@@ -451,6 +451,99 @@ inputs change the pending Fit no longer applies (its answer is dropped) and
 the buttons return. The zoom is read as `Math.abs(getAbsoluteScale().x)`,
 so a mirrored parent cannot flip the text.
 
+## A word in the centre (`panelCentre`, `panelStart`)
+
+Built 2026-11-04 on branch `claude/kufi-star` from
+`docs/superpowers/specs/2026-11-03-kufi-spiral-centre-design.md`: the
+historical spiral, where the text runs clockwise round the frame and ends
+with its **last word alone in the core**. Two block fields, both absent on an
+old save, so it redraws unchanged: `panelCentre` (`true`: the last word in
+the centre; off by default) and `panelStart` (`"bottomRight"`, the default,
+or `"topRight"`: the same clockwise order begun one side later, the right
+side read downward, then bottom, left, top; `Ctx.start`, `templateLine`).
+They travel in `KufiLayoutInputs` as `centre` and `start` and in the layout
+key only when set, so every key and every input of a block without them is
+what it was. With the centre off the packer takes exactly today's path:
+`kufiPack.test.ts` pins الله 9x9, Al-Baqarah 21x21, سبحان الله 13x15,
+الله أكبر 9x13 and قل هو الله أحد 17x19 against a pack without the fields.
+
+- **The core is reserved first** (`centreOf`). The last word is packed alone
+  into its box by `coreFinal`: the search itself on a context of one line
+  (`Ctx.core`: template line 0 alone, the box's frame rule on every side and,
+  since the panel's gap ring round the core would make an empty corner a
+  hole, at the four corners too, in `edgeBreaks`, `partialScore`, the fill
+  squares' `closes` and the bars' `gaps`), on `CORE_BUDGET_MS` (300)
+  work-bounded, cached by the word and its box. The core of k rings is
+  `k * (BAND + 1)` cells in from each side (`coreBox`, `CORE_RING` = 12 per
+  ring): the most rings, one at least, whose core still holds the word's
+  smallest box (`wordExtent`), upright or turned; both orientations are
+  packed where both fit and the `better` kept (`Final.centre`, the
+  result's `centre: { unitFrom, col, row, cols, rows, turn }`; turn 1 is
+  the word read upward, a quarter turn, never a mirror). `carryCentre`
+  stamps its cells, owners and kinds into every starting state
+  (`initState`, `stampCentre`), appends its placements to the result and
+  gives `barEnds` and `dotZone` its letters' lines (`allPlaced`), so a band
+  bar may end on the centre word's baseline and no square may read as its
+  dot. The band letters (the units before `unitFrom`) then pack as today on
+  `4k` template lines, meeting the core as they meet any placed ink. A size
+  whose core is smaller than the word is `tooLong`; one the word cannot fill
+  within the grammar is `tooShort`, never padded; the suggestions and Fit's
+  centre pass draw from `centreSizes` (a ring or two round every box of the
+  word's extent, `CENTRE_RINGS_MAX` = 2), ranked by the greedy pass with
+  the core reserved.
+- **The centre place** (`KufiPlace` `"centre"`, `kufiFormsOf`): a word in
+  the core takes its star forms and its centre-only forms where it has
+  either, else the panel's. For الله that is the three star forms, whose
+  heh never grows taller (a row slice lies in the shafts alone), and
+  `allah.isolated.7`, the 9x5 of the Cairo Shahada's centre: a closed
+  three-row heh box on its stem, the shafts the height of the box, and the
+  dot in the bottom-left corner that closes the empty 2x2 under the box
+  (`parts: 2`, no stretch: widening the box opens a hole between the dot and
+  the stem). It is drawn in a centre alone, so no panel or star layout
+  changes. A heh widens sideways and never taller: a wide core is filled by
+  the heh's column slice and then by bars along the heh's bars (الله fills
+  25x5 with three), a tall one by the star forms' shafts.
+- **Centre letters are fixed.** The packer places, stretches and swaps them;
+  they take no pins, forms, stretch, routes or painted cells
+  (`stripCentreEdits` drops those before anything else reads the edits, so a
+  pin on one is never a `pinConflict`), and the UI never offers them:
+  `kufiIsCentreUnit` (`kufiHit.ts`) is false on a result without a centre,
+  and `hitKufiUnit`, `stretchEnds`, `routeHandleOf`, `nearestKufiUnit` (a
+  painted cell is keyed to the nearest band letter) and `kufiChangesOf` skip
+  them. **Switching the centre on or off releases the pins and routes**
+  (`kufiCentrePatch`, the sidebar's `Centre word` select: Off / Last word),
+  since every letter moves; forms, stretch counts and painted cells are
+  kept. `Start` (Bottom right / Top right) is a plain patch: pins hold and
+  may conflict, as after a size change, with Release hand edits beside it.
+- **Fit's second pass** (`fitCentre`). Pass one is today's, unchanged, so a
+  text that packs today gets the size it got (الله ×5 and الله أكبر ×2 الله
+  both pack at 17x22 without a centre). Only when it finds nothing, and the
+  text has two words or more, the centre pass runs on
+  `FIT_CENTRE_BUDGET_MS` (9000; `FIT_CENTRE_MAX_SIZES` = 12 under the clock
+  override) over `centreSizes` ranked by the greedy pass, with the centre
+  on and the start at the top right, the Cairo way; a success returns
+  `{ cols, rows, centre: true, start: "topRight" }` (`KufiFitResult`,
+  carried by the worker protocol and `requestKufiFit`), and `App` writes
+  `panelCentre` and `panelStart` with the size in one undo step. A block
+  whose centre is already on gets the centre pass alone, with its own
+  start, so Fit never switches a centre off. A failing text can now cost a
+  Fit 18 s on the clock (two passes), under the 30 s watchdog.
+- **Measured 2026-11-04** (work-bounded; `kufiPack.test.ts` pins the
+  fixtures): **the Shahada does not pack round a centre at any of its 130
+  centre sizes from either corner**, nor does محمد رسول الله (two band words
+  cannot fill a ring), nor محمد أبو بكر عمر عثمان علي (علي fills no core up
+  to 17x9: its letters stand at different heights). The reason is not the
+  search: محمد and رسول have no tall letter, and a band whose letters stop
+  short of its depth is closed in a plain panel by the next ring's letters
+  interlocking into it, while a fixed core interlocks with nothing. At
+  23x19 the Shahada's best attempt places every letter but رسول's lam, with
+  six holes above محمد's meems. What packs is a text whose band words all
+  stand on tall strokes: **لا إله إلا الله twice at 21x17 from either
+  corner** (Fit finds 17x24, top right), الله ×5 at 21x17 (الله on four
+  sides round a centre الله), الله أكبر ×2 الله at 21x17 and 23x17, and the
+  single لا إله إلا الله at 17x21, 17x22, 19x21 and 23x17 (with many bars).
+  الله fills cores of 9 to 13 wide by 5 to 13 tall; محمد a 15x5 or 17x5 core.
+
 ## Tests
 
 `e2e/kufi-panel.spec.ts` is **load-sensitive under parallel workers**: it
@@ -463,12 +556,27 @@ check a layout use the clock override; do not add wall-clock assertions.
 
 - **Some texts still do not pack.** Fit now packs الله أكبر, سبحان الله
   (13x15), قل هو الله أحد and Bismillah (17x19), by rectangles and bars, as
-  well as the Al-Baqarah-like texts. **The Shahada does not pack** at any
-  size, nor do short single words such as محمد: a band holds one word's
-  pieces, and there are few corner / turn options. The Shahada stays a known
-  limit for a later layout with a word in the centre. The planned next
-  layouts (radial star panels, other shapes, flowing angular Kufi) are listed
-  in [deferred-features.md](deferred-features.md).
+  well as the Al-Baqarah-like texts. **The Shahada does not pack**, with the
+  centre off (a band holds one word's pieces, and there are few corner /
+  turn options) or on (see "A word in the centre", Measured: محمد and رسول
+  have no tall letter, and a band that stops short of its depth is closed by
+  the next ring in a plain panel and by nothing round a fixed core). Short
+  single words such as محمد do not pack either. What would let the Shahada
+  round a centre pack is a set of tall alternates for the short letters (a
+  meem on a stem, tall teeth for س, a reh that rises), for the band letters
+  of a centre panel alone, so that no plain panel changes; that and the
+  shallower laps are in [deferred-features.md](deferred-features.md) with
+  the other layouts.
+- **A centre panel needs a long text of tall letters.** The core's smallest
+  ring is 21x17 round a 9x5 الله, about 56 cells of baseline, and every band
+  letter must reach the band's depth or be stretched to it; a text of two
+  band words (محمد رسول الله) is `tooShort` at every size. A core must be
+  filled exactly by its word: علي fills none (its letters stand at
+  different heights), الله and محمد do.
+- **The centre's Fit can be slow.** A text that fails both passes costs
+  up to 18 s on the clock (`FIT_BUDGET_MS` + `FIT_CENTRE_BUDGET_MS`), under
+  the 30 s watchdog but ahead of every other job. Even core widths (a 10- or
+  12-wide core for الله) fail at once in the core and rank last.
 - **Bismillah's Fit is close to the clock in the product.** It reaches its
   size (the 17th size tried) at about 6 s of the 9 s wall-clock
   `FIT_BUDGET_MS`, so a slow machine may stop before it. Under the tests'

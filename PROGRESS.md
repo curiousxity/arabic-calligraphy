@@ -101,6 +101,17 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-11-04 — Kufi panel: a word in the centre — on `claude/kufi-star`, not merged
+
+- **Centre word** and **Start** in the Kufi panel section (`panelCentre`,
+  `panelStart`): the text's last word alone in the core, the other words
+  round it, begun at the bottom right or the top right; Fit tries the centre
+  when nothing else packs. لا إله إلا الله twice packs at 21×17; **the
+  Shahada still does not** (its short words), measured and recorded in
+  [kufi-panel.md](.claude/rules/kufi-panel.md) ("A word in the centre");
+  what it would take is in
+  [deferred-features.md](.claude/rules/deferred-features.md).
+
 ### 2026-11-01 — Kufi star panel — on `claude/kufi-star`, not merged
 
 - **Kufi star** block: a 4-, 5- or 6-fold star construction (centre, wedges,

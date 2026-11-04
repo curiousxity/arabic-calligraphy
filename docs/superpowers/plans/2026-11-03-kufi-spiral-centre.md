@@ -315,3 +315,30 @@ Only if Task 8 leaves the Shahada unpacked at every lap depth 5 within the work 
 - [ ] **Step 1: Write the sections.** No teacher, calligrapher, channel, studio or product named.
 - [ ] **Step 2: Run the full unit suite, tsc, lint, e2e (`npm run e2e`; rerun kufi-panel failures alone).**
 - [ ] **Step 3: Commit** `docs(kufi): a word in the centre: how it works, what packs, what is deferred`.
+
+---
+
+## Outcome (2026-11-04)
+
+Built as planned through Task 7 and Task 10, with these departures:
+
+- **Task 3:** the centre place takes the **star forms and the centre-only
+  ones** (الله: `.3`, `.5`, `.6` and the 9x5 `.7`), not the panel forms:
+  the panel forms' row slice runs through the heh's walls, and a heh may
+  widen only. `.7` has no stretch (widening its box opens a hole between the
+  dot and the stem).
+- **Task 4:** علي fills no core up to 17x9 (letters of different heights);
+  محمد fills 15x5. Pinned as measured.
+- **Task 5 / 8:** the fixture is `لا إله إلا الله لا إله إلا الله` at 21x17
+  (both starts); محمد رسول الله is `tooShort` at every size (two band words
+  cannot fill a ring). **The Shahada does not pack at any of its 130 centre
+  sizes from either corner**: محمد and رسول have no tall letter, and a band
+  that stops short of its depth is closed by the next ring in a plain panel
+  and by nothing round a fixed core (see kufi-panel.md, "A word in the
+  centre", Measured).
+- **Task 9:** skipped. A shallower lap would not close the Shahada's bands
+  either (its sides mix tall and short letters); what would is tall
+  alternates for the short letters, recorded in deferred-features.md.
+- **Task 6:** Fit's centre pass has `FIT_CENTRE_BUDGET_MS` = 9000 of its
+  own and `FIT_CENTRE_MAX_SIZES` = 12 under the override; لا إله إلا الله
+  twice fits at 17x24, top right.

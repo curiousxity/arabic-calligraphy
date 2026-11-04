@@ -84,6 +84,24 @@ lays every panel as one ring of bands around a square or rectangle (see
      (see [kufi-star.md](kufi-star.md)) was repeating the text to fill each
      region, letters standing on the construction line itself, stems carried
      on to the slanted sides by bars, and corners lined along an outer leg.
+   - **A word in the centre: built 2026-11-04** (`panelCentre`,
+     `panelStart`; see [kufi-panel.md](kufi-panel.md), "A word in the
+     centre"). Left for later from that design, each recorded with its
+     reason there:
+     - **Tall alternates for the short letters in a centre panel's bands**
+       (a meem on a stem, tall teeth for س, a reh that rises), in a place of
+       their own so no plain panel changes. This is what the Shahada needs:
+       its محمد and رسول stop short of the band's depth, and a fixed core
+       interlocks with nothing. Measured 2026-11-04: 0 of 130 sizes.
+     - **Laps of different depth** (the design's riskiest part): deferred
+       untried, since a shallower lap would not close the Shahada's bands
+       either (its sides mix tall and short letters), and the spec's own
+       gate was to drop it if the Shahada packed at five.
+     - **"Last two words" in the centre**, and a centre word that bends
+       (محمد folded on itself); v1 is the last word on one line.
+     - **A word turning round a corner mid-word**, and the four-way
+       pinwheel (محمد ×4, علي ×4), the next layout after this one.
+
 2. **Panels in other shapes.** Square Kufi filling a triangle, trapezoid,
    diamond or small square, as in mosaic tilework where several such panels
    tile one wall.
