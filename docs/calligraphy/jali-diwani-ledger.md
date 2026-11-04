@@ -990,6 +990,24 @@ nuqta.
 | 187.s2 | 0.868 | 0.992 |
 | 207.s2 | 0.885 | 0.991 |
 
+**The rest of the bowls, and two shapes, patched on the queue (the user, 2026-11-04; approved).** No refit this time:
+`jdautopatch.py` on the catalogue's fits, four rounds of 0.5, run as queue jobs (a laptop run of the eight was stopped
+for low memory; patches go to the queue from now on, `jdpensubmit.py --patch`). Three wanted a second job, with patches
+aimed by eye after a look: 192.s2 at both tips (0.5 last, 0.3 first) and a lump on the inner edge (0.4); 235.s5 at its
+squared tip (0.5) and the inner edge beside it (0.4); 072.s0 at a kink on the inner curve (0.5) and the foot (0.4).
+The small notch just inside the top of each bowl's left tip is the studio's own and is kept.
+
+| shape | before | now |
+|---|---|---|
+| 181.s2 | 0.902 | 0.995 |
+| 192.s2 | 0.874 | 0.994 |
+| 203.s2 | 0.893 | 0.995 |
+| 220.s3 | 0.878 | 0.995 |
+| 226.s3 | 0.902 | 0.995 |
+| 235.s5 | 0.879 | 0.995 |
+| 023.s1 | 0.969 | 0.989 |
+| 072.s0 | 0.947 | 0.996 |
+
 The pick before the review, each pair against the sheet's whole outline:
 
 | stroke | run | overlap |
