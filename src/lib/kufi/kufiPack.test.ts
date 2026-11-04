@@ -1090,6 +1090,196 @@ describe("the form rule", () => {
   });
 });
 
+/** A core search's cells as rows of `#` and `.`. */
+function rowsOf(f: { owner: Int32Array }, cols: number, rows: number): string[] {
+  const out: string[] = [];
+  for (let r = 0; r < rows; r++) {
+    let s = "";
+    for (let c = 0; c < cols; c++) s += f.owner[r * cols + c] ? "#" : ".";
+    out.push(s);
+  }
+  return out;
+}
+
+describe("coreFinal: one word packed into a box of its own", () => {
+  const units = resolveKufiText(ALLAH).units;
+
+  it("fills the Cairo 9x5 with the centre form, dot and all", () => {
+    const f = _internal.coreFinal(ALLAH, units, 9, 5);
+    expect(f?.packed).toBe(true);
+    expect(rowsOf(f!, 9, 5)).toEqual(["###.#.#.#", "#.#.#.#.#", "###.#.#.#", "..#.#.#.#", "#.#######"]);
+  });
+
+  it("widens through the heh's box to fill 11x5 and 13x5, and fills 9x7 with the tall form", () => {
+    for (const [w, h] of [
+      [11, 5],
+      [13, 5],
+      [9, 7],
+    ]) {
+      const f = _internal.coreFinal(ALLAH, units, w, h);
+      expect(f?.packed, `${w}x${h}`).toBe(true);
+      // every corner is inked: in the panel the gap ring round the core would make an empty corner a hole
+      const art = rowsOf(f!, w, h);
+      for (const [r, c] of [
+        [0, 0],
+        [0, w - 1],
+        [h - 1, 0],
+        [h - 1, w - 1],
+      ])
+        expect(art[r][c], `${w}x${h} corner ${r},${c}`).toBe("#");
+    }
+  });
+
+  it("refuses a box the word cannot fill or does not fit; a wide one it fills by bars along the heh's bars (a heh widens sideways)", () => {
+    expect(_internal.coreFinal(ALLAH, units, 9, 4)?.packed ?? false).toBe(false);
+    expect(_internal.coreFinal(ALLAH, units, 7, 5)?.packed ?? false).toBe(false);
+    const wide = _internal.coreFinal(ALLAH, units, 25, 5);
+    expect(wide?.packed).toBe(true);
+    expect(wide!.bars).toBe(3);
+  });
+
+  it("محمد fills a 15x5 core, every corner inked; علي fills no box up to 17x9 (measured 2026-11-04)", () => {
+    // a word whose letters stand at different heights has nothing to fill the box's top with; in a band
+    // the next ring interlocks there, in a core nothing does. The Shahada's الله stands on four uprights.
+    const m = resolveKufiText("محمد").units;
+    const f = _internal.coreFinal("محمد", m, 15, 5);
+    expect(f?.packed).toBe(true);
+    const art = rowsOf(f!, 15, 5);
+    expect([art[0][0], art[0][14], art[4][0], art[4][14]]).toEqual(["#", "#", "#", "#"]);
+    const ali = resolveKufiText("علي").units;
+    for (const [w, h] of [
+      [11, 5],
+      [13, 7],
+      [15, 9],
+    ])
+      expect(_internal.coreFinal("علي", ali, w, h)?.packed ?? false, `${w}x${h}`).toBe(false);
+  });
+});
+
+describe("centre off is today's panel", () => {
+  it.each([
+    [ALLAH, 9, 9],
+    [BAQARAH, 21, 21],
+    ["سبحان الله", 13, 15],
+    ["الله أكبر", 9, 13],
+    ["قل هو الله أحد", 17, 19],
+  ] as const)("%s %dx%d", (text, cols, rows) => {
+    const a = packKufiPanel({ text, cols, rows });
+    expect(layoutOf(packKufiPanel({ text, cols, rows, centre: false, start: "bottomRight" }))).toEqual(layoutOf(a));
+    if (a.ok) expect(a.centre).toBeUndefined();
+  }, 30000);
+});
+
+describe("a word in the centre", () => {
+  const RASUL = "محمد رسول الله";
+
+  it("one word with centre on packs as with it off", () => {
+    expect(layoutOf(packKufiPanel({ text: ALLAH, cols: 9, rows: 9, centre: true }))).toEqual(layoutOf(packKufiPanel({ text: ALLAH, cols: 9, rows: 9 })));
+  });
+
+  it("a core smaller than the word is tooLong", () => {
+    const r = packKufiPanel({ text: "محمد الله", cols: 15, rows: 15, centre: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("tooLong");
+  });
+
+  it("the centre's sizes are the word's boxes with a ring or two round them, smallest first", () => {
+    const sizes = _internal.centreSizes(resolveKufiText(RASUL).units);
+    expect(sizes[0]).toEqual({ cols: 21, rows: 17 });
+    expect(sizes).toContainEqual({ cols: 17, rows: 21 });
+    expect(sizes.every((s) => s.cols >= 17 && s.rows >= 17)).toBe(true);
+    expect(new Set(sizes.map((s) => `${s.cols}x${s.rows}`)).size).toBe(sizes.length);
+  });
+
+  it("edits aimed at the centre word are dropped, the rest kept", () => {
+    const units = resolveKufiText(RASUL).units;
+    const pin: KufiPlacement = { unitIndex: 8, key: units[8].key, glyphId: "allah.isolated.7", col: 6, row: 6, turn: 0, stretch: [] };
+    const edits = { pinned: { 0: { ...pin, unitIndex: 0 }, 8: pin }, forms: { 8: "allah.isolated.3", 1: "x" }, stretch: { 8: [1] }, routes: { 0: 2, 2: 2 }, cells: [{ unitIndex: 8, key: units[8].key, dx: 0, dy: 0, on: true }] };
+    expect(_internal.stripCentreEdits(edits, units, 8)).toEqual({ pinned: { 0: { ...pin, unitIndex: 0 } }, forms: { 1: "x" }, routes: { 0: 2 } });
+    expect(_internal.stripCentreEdits({}, units, 8)).toEqual({});
+  });
+
+  /**
+   * Measured 2026-11-04 (the plan's Task 8): a text whose band words all stand on tall strokes packs round
+   * the core; one with a short word does not, since nothing interlocks a fixed core with a band whose
+   * letters stop short of its depth (the next ring does that in a plain panel).
+   */
+  const TAWHID2 = "لا إله إلا الله لا إله إلا الله";
+  const TAWHID2_SIZE = { cols: 21, rows: 17 };
+  const centreUnit = (text: string) => {
+    const units = resolveKufiText(text).units;
+    return units.findIndex((u) => u.wordIndex === units[units.length - 1].wordIndex);
+  };
+
+  it.each(["bottomRight", "topRight"] as const)("لا إله إلا الله twice packs at 21x17 with الله alone in the core, from the %s", (start) => {
+    const r = packKufiPanel({ text: TAWHID2, ...TAWHID2_SIZE, centre: true, start });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const from = centreUnit(TAWHID2);
+    expect(r.centre).toMatchObject({ unitFrom: from, col: 6, row: 6, cols: 9, rows: 5 });
+    expect([0, 1]).toContain(r.centre!.turn);
+    expect(r.placements.map((p) => p.unitIndex)).toEqual(resolveKufiText(TAWHID2).units.map((u) => u.index));
+    expect(inkBlocks2x2(grid(r))).toEqual([]);
+    expect(emptyBlocks2x2(grid(r))).toEqual([]);
+    // the centre word's ink lies inside its core, drawn where its placement says; no band letter reaches in
+    const c = r.centre!;
+    const inside = (i: number) => {
+      const row = (i / r.cols) | 0;
+      const col = i % r.cols;
+      return row >= c.row && row < c.row + c.rows && col >= c.col && col < c.col + c.cols;
+    };
+    for (const i of glyphInk(r, r.placements[from])) {
+      expect(r.cells[i]).toBe(1);
+      expect(inside(i)).toBe(true);
+    }
+    for (const p of r.placements.slice(0, from)) for (const i of glyphInk(r, p)) expect(inside(i)).toBe(false);
+    // the centre's own forms: never a panel form whose heh could grow taller
+    expect(["allah.isolated.3", "allah.isolated.5", "allah.isolated.6", "allah.isolated.7"]).toContain(r.placements[from].glyphId);
+    expect(r.placements[from].turn).toBe(c.turn);
+    // the first word starts on the side the start names
+    expect(r.placements[0].turn).toBe(start === "topRight" ? 3 : 0);
+  }, 20000);
+
+  it("the Shahada does not pack round a centre at 23x19 from either corner, nor محمد رسول الله at 21x17: their short words leave their band open", () => {
+    for (const start of ["bottomRight", "topRight"] as const) expect(packKufiPanel({ text: SHAHADA, cols: 23, rows: 19, centre: true, start }).ok).toBe(false);
+    const r = packKufiPanel({ text: "محمد رسول الله", cols: 21, rows: 17, centre: true, start: "topRight" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("tooShort");
+  }, 30000);
+
+  it("pins, forms and painted cells on a centre letter are ignored, never a pinConflict", () => {
+    const units = resolveKufiText(TAWHID2).units;
+    const from = centreUnit(TAWHID2);
+    const r = packKufiPanel({
+      text: TAWHID2,
+      ...TAWHID2_SIZE,
+      centre: true,
+      edits: {
+        pinned: { [from]: { unitIndex: from, key: units[from].key, glyphId: "allah.isolated.0", col: 0, row: 0, turn: 0, stretch: [0, 0] } },
+        forms: { [from]: "allah.isolated.2" },
+        cells: [{ unitIndex: from, key: units[from].key, dx: 0, dy: 0, on: false }],
+      },
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(layoutOf(r)).toEqual(layoutOf(packKufiPanel({ text: TAWHID2, ...TAWHID2_SIZE, centre: true })));
+  }, 20000);
+
+  it("a repack from the previous panel keeps the centre, and a pin on a band letter holds", () => {
+    const a = packKufiPanel({ text: TAWHID2, ...TAWHID2_SIZE, centre: true });
+    expect(a.ok).toBe(true);
+    if (!a.ok) return;
+    const same = packKufiPanel({ text: TAWHID2, ...TAWHID2_SIZE, centre: true, previous: a });
+    expect(layoutOf(same)).toEqual(layoutOf(a));
+    const units = resolveKufiText(TAWHID2).units;
+    const pinned = packKufiPanel({ text: TAWHID2, ...TAWHID2_SIZE, centre: true, edits: { pinned: { 0: { ...a.placements[0], key: units[0].key } } } });
+    expect(pinned.ok).toBe(true);
+    if (pinned.ok) {
+      expect(pinned.placements[0]).toEqual({ ...a.placements[0], key: units[0].key });
+      expect(pinned.centre).toEqual(a.centre);
+    }
+  }, 30000);
+});
+
 describe("the clock override (tests only)", () => {
   it("lets a layout test run on its work budget alone, and leaves the product's clock alone", () => {
     _internal.setClockOverride(null);

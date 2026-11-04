@@ -116,6 +116,14 @@ const DEFAULT_OPTS: PackOpts = { start: "bottomRight", centre: false };
 /** `Ctx.start` for a `KufiPanelStart`. */
 const startSide = (start: KufiPanelStart): number => (start === "topRight" ? 3 : 0);
 
+/**
+ * The core a centre word was placed in (`centreOf`): the box in panel cells,
+ * the turn its line was given (0 upright, 1 read upward), and the first unit
+ * of the word, so the units from `unitFrom` on are the centre's and take no
+ * edits. Absent on a panel packed without a centre.
+ */
+export type KufiCentre = { unitFrom: number; col: number; row: number; cols: number; rows: number; turn: Turn };
+
 export type KufiPackResult =
   | {
       ok: true;
@@ -123,6 +131,8 @@ export type KufiPackResult =
       rows: number;
       cells: Uint8Array;
       placements: KufiPlacement[];
+      /** The last word's core, when it was placed in the centre. */
+      centre?: KufiCentre;
       /** True when the painted or erased cells of `edits.cells` leave a hole, a solid 2×2 or a frame break: the packing itself was sound. */
       editsBreakPacking: boolean;
       /**
@@ -165,6 +175,12 @@ const STEM_BAR_MAX = 6;
 
 /** Time a first draft's search may take. The editor runs it off the main thread; nothing waits on it. */
 export const PACK_BUDGET_MS = 1400;
+/** Time the centre word's own search may take (`coreFinal`): one word in a small box, packed once per box and cached. */
+const CORE_BUDGET_MS = 300;
+/** A ring of bands is this deep: a band and its gap row on each side. The core of k rings starts k of these in. */
+const CORE_RING = 2 * (BAND + 1);
+/** Most rings a centre panel is offered with (`centreSizes`). */
+const CENTRE_RINGS_MAX = 2;
 /** Time a repack from `previous` may take. */
 export const REPACK_BUDGET_MS = 150;
 /** Beam widths tried in turn until one packs or the budget runs out. */
@@ -713,6 +729,33 @@ type Ctx = {
   start: number;
   /** Packing into a region's mask (`packKufiRegion`); null for a whole panel, whose every path is unchanged. */
   region: Region | null;
+  /**
+   * One word packed into a box of its own (`coreFinal`): the bottom line alone, and the frame's rule holds
+   * at the box's four corners too, since in the panel the gap ring round the core makes an empty corner a hole.
+   */
+  core: boolean;
+  /** The core reserved before the bands pack, stamped into every starting state (`initState`); null without one. */
+  centre: Centre | null;
+};
+
+/** A centre letter as placed in the panel: its line, place and shape, for the bars' ends and the dot zone. */
+type PlacedAt = { L: Line; x0: number; yb: number; shape: Shape; letter: number };
+
+/**
+ * The core, reserved first (`centreOf`): the last word packed alone into its box (`coreFinal`) and carried
+ * into panel coordinates. Its cells are pre-inked in every starting state, so the band letters meet it as
+ * they meet any placed ink, and its placements are appended to the panel's.
+ */
+type Centre = {
+  /** The first unit of the centre word; the band letters are the units before it. */
+  unitFrom: number;
+  /** The pre-inked cells: panel index, kind, letter (unit index, or -1 for a join, dot or filler) and owner id. */
+  cells: Array<{ i: number; kind: number; letter: number; owner: number }>;
+  /** Owner ids the core uses; `St.ids` starts here. */
+  ids: number;
+  placements: KufiPlacement[];
+  placed: PlacedAt[];
+  box: KufiCentre;
 };
 
 /**
@@ -760,6 +803,30 @@ function inWindow(ctx: Ctx, i: number): boolean {
 }
 
 function initState(ctx: Ctx): St {
+  const st = emptyState(ctx);
+  if (ctx.centre) stampCentre(ctx, st, ctx.centre);
+  return st;
+}
+
+/** Writes the core's cells into a fresh state: owners, kinds, letters, the neighbours' counts and the hash. */
+function stampCentre(ctx: Ctx, st: St, centre: Centre) {
+  const { cols, rows } = ctx;
+  for (const c of centre.cells) {
+    st.owner[c.i] = c.owner;
+    st.kind[c.i] = c.kind;
+    st.letter[c.i] = c.letter;
+    st.hash ^= ctx.zob[c.i];
+    const r = (c.i / cols) | 0;
+    const cc = c.i - r * cols;
+    if (r > 0) st.adj[c.i - cols]++;
+    if (r + 1 < rows) st.adj[c.i + cols]++;
+    if (cc > 0) st.adj[c.i - 1]++;
+    if (cc + 1 < cols) st.adj[c.i + 1]++;
+  }
+  st.ids = centre.ids;
+}
+
+function emptyState(ctx: Ctx): St {
   return {
     owner: new Int32Array(ctx.n),
     kind: new Uint8Array(ctx.n),
@@ -1576,6 +1643,13 @@ function partialScore(ctx: Ctx, st: St, last = false): number {
       pair(r * cols, (r + 1) * cols);
       pair(r * cols + cols - 1, (r + 1) * cols + cols - 1);
     }
+    // a core's empty corner is a hole in the panel (the gap ring round it): certain once dead, likely when settled
+    if (ctx.core)
+      for (const i of cornersOf(ctx)) {
+        if (own[i] || virt[i] === vg) continue;
+        if (adj[i]) edge++;
+        else if (mk[i]) soft += 0.6;
+      }
   }
   return (
     W.fail * st.failed +
@@ -1605,6 +1679,8 @@ type Final = {
   grow: number;
   /** Packed into a region's mask, where the least shortening ranks before the fewest bars (`better`). */
   region: boolean;
+  /** The core this panel was packed round, whose placements the result appends (`placementsOf`). */
+  centre: Centre | null;
 };
 
 /**
@@ -1667,7 +1743,14 @@ function edgeBreaks(ctx: Ctx, own: Int32Array): number {
     if (!own[r * cols] && !own[(r + 1) * cols]) n++;
     if (!own[r * cols + cols - 1] && !own[(r + 1) * cols + cols - 1]) n++;
   }
+  if (ctx.core) for (const i of cornersOf(ctx)) if (!own[i]) n++;
   return n;
+}
+
+/** The panel indices of the four corner cells. */
+function cornersOf(ctx: Ctx): number[] {
+  const { cols, rows } = ctx;
+  return [0, cols - 1, (rows - 1) * cols, rows * cols - 1];
 }
 
 /** Placed letters in reading order. */
@@ -1675,6 +1758,12 @@ function placedList(st: St): Placed[] {
   const out: Placed[] = [];
   for (let t = st.trail; t; t = t.prev) out.push(t.p);
   return out.reverse();
+}
+
+/** Every letter inked in the panel, the centre word's first: what a filler may end against or read as a dot of. */
+function allPlaced(ctx: Ctx, st: St): PlacedAt[] {
+  const own = placedList(st).map((p) => ({ L: st.lines[p.line], x0: p.x0, yb: p.yb, shape: p.shape, letter: p.letter }));
+  return ctx.centre ? [...ctx.centre.placed, ...own] : own;
 }
 
 /**
@@ -1685,8 +1774,8 @@ function placedList(st: St): Placed[] {
  */
 function dotZone(ctx: Ctx, st: St): Uint8Array {
   const z = new Uint8Array(ctx.n);
-  for (const p of placedList(st)) {
-    const L = st.lines[p.line];
+  for (const p of allPlaced(ctx, st)) {
+    const L = p.L;
     for (const [k, d] of Object.entries(p.shape.dots)) {
       if (!d || k.endsWith("3")) continue;
       for (let k = 0; k < d.length; k += 2) {
@@ -1724,6 +1813,8 @@ function fillPass(ctx: Ctx, own: Int32Array, kind: Uint8Array, zone: Uint8Array,
       }
     if (r === 0 || r === rows - 1) n += (c > 0 && !own[r * cols + c - 1] ? 1 : 0) + (c < cols - 1 && !own[r * cols + c + 1] ? 1 : 0);
     if (c === 0 || c === cols - 1) n += (r > 0 && !own[(r - 1) * cols + c] ? 1 : 0) + (r < rows - 1 && !own[(r + 1) * cols + c] ? 1 : 0);
+    // a core's corner: the window the panel's gap ring makes there (the dot of the Cairo الله)
+    if (ctx.core && (r === 0 || r === rows - 1) && (c === 0 || c === cols - 1)) n++;
     return n;
   };
   const cand: Array<[number, number]> = [];
@@ -1796,8 +1887,8 @@ function barEnds(ctx: Ctx, st: St): BarEnds {
     const i = at(ctx, L, x, y);
     return i < 0 || st.owner[i] === 0;
   };
-  for (const p of placedList(st)) {
-    const L = st.lines[p.line];
+  for (const p of allPlaced(ctx, st)) {
+    const L = p.L;
     const a = L.rot % 180 === 0 ? 0 : 1;
     const ink = p.shape.ink;
     for (let k = 0; k < ink.length; k += 2) {
@@ -1929,6 +2020,7 @@ function barPass(ctx: Ctx, own: Int32Array, { ends, shafts }: BarEnds, kind: Uin
       for (const r of [0, rows - 1]) if (r >= r0 && r <= r1 && paper(r, c) && paper(r, c + 1)) n++;
     for (let r = Math.max(0, r0); r <= Math.min(rows - 2, r1); r++)
       for (const c of [0, cols - 1]) if (c >= c0 && c <= c1 && paper(r, c) && paper(r + 1, c)) n++;
+    if (ctx.core) for (const r of [0, rows - 1]) for (const c of [0, cols - 1]) if (r >= r0 && r <= r1 && c >= c0 && c <= c1 && paper(r, c)) n++;
     return n;
   };
   let bars = 0;
@@ -2061,7 +2153,23 @@ function finish(ctx: Ctx, st0: St): Final {
     W.uturn * st.uturns +
     W.stretch * st.stretch +
     W.dotsOff * st.dotsOff;
-  return { st, owner, kind, holes, edge, ink2, squares, bars, score, packed: !holes && !edge && !ink2 && !st.failed, dev: st.dev, cut: st.cut, grow: st.grow, region: !!ctx.region };
+  return {
+    st,
+    owner,
+    kind,
+    holes,
+    edge,
+    ink2,
+    squares,
+    bars,
+    score,
+    packed: !holes && !edge && !ink2 && !st.failed,
+    dev: st.dev,
+    cut: st.cut,
+    grow: st.grow,
+    region: !!ctx.region,
+    centre: ctx.centre,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -2636,23 +2744,28 @@ function makeCtx(
   budgetMs: number,
   strictClock = false,
   mask: KufiMask | null = null,
-  opts: PackOpts = DEFAULT_OPTS
+  opts: PackOpts = DEFAULT_OPTS,
+  extra: CtxExtra = {}
 ): Ctx {
-  const place: KufiPlace = mask ? "star" : "panel";
-  const { units } = resolveKufiText(text);
+  const place: KufiPlace = extra.place ?? (mask ? "star" : "panel");
+  const units = extra.units ?? resolveKufiText(text).units;
   const rings = Math.max(1, Math.floor((Math.min(cols, rows) - 1) / (2 * (BAND + 1))) + 1);
   const letters = lettersOf(text, units, edits, pins, place, rows);
   // a region stacks upright lines from its bottom row up, one ring per band
   const regionLines = Math.floor((rows - 1) / (BAND + 1)) + 1;
+  const centre = extra.centre ?? null;
   return {
     cols,
     rows,
     n: cols * rows,
     letters,
-    nTpl: mask ? regionLines : rings * 4,
+    // a core is one line; a panel with a centre has only the rings outside its core
+    nTpl: extra.core ? 1 : mask ? regionLines : centre ? 4 * (centre.box.col / (BAND + 1)) : rings * 4,
     sides: mask ? 1 : 4,
     start: mask ? 0 : startSide(opts.start),
     region: mask ? regionOf(mask) : null,
+    core: !!extra.core,
+    centre,
     zob: zobrist(cols * rows),
     // the work budget makes a search give the same panel on a busy machine as on a quiet
     // one; the clock is a safety net, loose for panels the size of a real one and tight
@@ -2667,6 +2780,230 @@ function makeCtx(
     mend: false,
     bars: false,
   };
+}
+
+/**
+ * What a context is built for beyond a whole panel: `units` the letters it places (the band letters, or
+ * the centre word's), `place` their forms' place, `core` a word in a box of its own (`coreFinal`),
+ * `centre` the core already reserved (`centreOf`).
+ */
+type CtxExtra = { units?: KufiUnit[]; place?: KufiPlace; core?: boolean; centre?: Centre | null };
+
+// ---------------------------------------------------------------------------
+// The centre word
+// ---------------------------------------------------------------------------
+
+/** The first unit of the text's last word, or -1 when the text has fewer than two words. */
+function centreFrom(units: KufiUnit[]): number {
+  if (units.length === 0) return -1;
+  const last = units[units.length - 1].wordIndex;
+  const from = units.findIndex((u) => u.wordIndex === last);
+  return from > 0 ? from : -1;
+}
+
+/**
+ * The boxes one word may take on a line of its own, in cells, over its centre forms: the narrowest and
+ * widest line (joins share a stub and may run `JEXT_MAX` on; a gap between pieces) and the shortest
+ * and tallest letter (row slices to `ROW_MAX`). A guide for the sizes to try, not a promise: `coreFinal` decides.
+ */
+function wordExtent(units: KufiUnit[]): { wMin: number; wMax: number; hMin: number; hMax: number } {
+  let wMin = 0;
+  let wMax = 0;
+  let hMin = 0;
+  let hMax = 0;
+  units.forEach((u, k) => {
+    let lo = Infinity;
+    let hi = 0;
+    let shortest = Infinity;
+    let tallest = 0;
+    for (const g of kufiFormsOf(u, "centre")) {
+      const w = (g.rows[0]?.length ?? 1) - (g.inset?.right ?? 0) - (g.inset?.left ?? 0);
+      const colSlices = g.stretch.filter((x) => x.axis === "col").length;
+      const rowSlices = g.stretch.filter((x) => x.axis === "row").length;
+      const rowMins = g.stretch.reduce((n, x) => n + (x.axis === "row" ? (x.min ?? 0) : 0), 0);
+      lo = Math.min(lo, w);
+      hi = Math.max(hi, w + COL_MAX * colSlices);
+      shortest = Math.min(shortest, g.rows.length - rowMins);
+      tallest = Math.max(tallest, g.rows.length + ROW_MAX * rowSlices);
+    }
+    if (!Number.isFinite(lo)) lo = hi = 1;
+    if (!Number.isFinite(shortest)) shortest = tallest = 1;
+    const joined = k > 0 && units[k - 1].joinsNext;
+    const gap = k === 0 ? 0 : joined ? -1 : 1;
+    wMin += lo + gap;
+    wMax += hi + gap + (joined ? JEXT_MAX : 0);
+    hMin = Math.max(hMin, shortest);
+    hMax = Math.max(hMax, tallest);
+  });
+  return { wMin, wMax, hMin, hMax };
+}
+
+/** Fresh core searches by the word and its box, so a size tried again, or in both orientations, costs nothing. */
+const cores = new Map<string, Final | null>();
+const CORES_MAX = 256;
+
+/**
+ * One word packed alone into a box of `cols` x `rows` cells: on the box's bottom line (a template of one
+ * line), its centre forms (`kufiFormsOf` for the `centre` place), the frame's rule on every side and at the
+ * corners (`Ctx.core`), the search's own fill order (stretch, then bars, then squares). `units` are the
+ * word's units, a suffix of `text`'s. Work-bounded on `CORE_BUDGET_MS`; cached. Null when the word cannot
+ * lie on the line at all, else the best panel found, packed or not.
+ */
+function coreFinal(text: string, units: KufiUnit[], cols: number, rows: number): Final | null {
+  const key = `${units.map((u) => `${u.key}:${text[u.textOffset] ?? ""}`).join(" ")}|${cols}x${rows}`;
+  const hit = cores.get(key);
+  if (hit !== undefined) return hit;
+  let f: Final | null = null;
+  if (wordExtent(units).wMin <= cols) f = search(makeCtx(text, cols, rows, {}, new Map(), CORE_BUDGET_MS, true, null, DEFAULT_OPTS, { units, place: "centre", core: true }));
+  if (cores.size >= CORES_MAX) cores.delete(cores.keys().next().value as string);
+  cores.set(key, f);
+  return f;
+}
+
+/** The core's box for k rings: `CORE_RING` cells in from each side per ring. */
+function coreBox(cols: number, rows: number, k: number): { col: number; row: number; cols: number; rows: number } {
+  return { col: k * (BAND + 1), row: k * (BAND + 1), cols: cols - k * CORE_RING, rows: rows - k * CORE_RING };
+}
+
+type CentreAnswer = { centre: Centre } | { reason: "tooLong" | "tooShort" };
+
+/**
+ * The core reserved for the text's last word in a panel of `cols` x `rows`: the most rings (one at least)
+ * whose core still holds the word's smallest box, upright or turned; the word packed into that core
+ * (`coreFinal`) both ways where both fit, the `better` kept; and its cells, placements and lines carried
+ * into panel coordinates (turned: mini (r, c) -> panel (row + c, col + H - 1 - r), a quarter turn, never a
+ * mirror; the turn of every placement one more). `tooLong` when even one ring leaves the word no room,
+ * `tooShort` when the word cannot fill its core within the grammar (never padded with filler).
+ */
+function centreOf(text: string, units: KufiUnit[], cols: number, rows: number): CentreAnswer {
+  const from = centreFrom(units);
+  const word = units.slice(from);
+  const e = wordExtent(word);
+  const fits = (box: { cols: number; rows: number }, turn: 0 | 1) => (turn === 0 ? box.cols >= e.wMin && box.rows >= e.hMin : box.rows >= e.wMin && box.cols >= e.hMin);
+  let k = 0;
+  for (let n = 1; ; n++) {
+    const box = coreBox(cols, rows, n);
+    if (box.cols < 1 || box.rows < 1 || (!fits(box, 0) && !fits(box, 1))) break;
+    k = n;
+  }
+  if (k === 0) return { reason: "tooLong" };
+  const box = coreBox(cols, rows, k);
+  let best: { f: Final; turn: 0 | 1 } | null = null;
+  for (const turn of [0, 1] as const) {
+    if (!fits(box, turn)) continue;
+    const f = coreFinal(text, word, turn === 0 ? box.cols : box.rows, turn === 0 ? box.rows : box.cols);
+    if (f?.packed && (!best || better(f, best.f))) best = { f, turn };
+  }
+  if (!best) return { reason: "tooShort" };
+  return { centre: carryCentre(units, from, best.f, best.turn, box, cols, rows) };
+}
+
+/** A core's packed word carried into the panel (see `centreOf`). */
+function carryCentre(
+  units: KufiUnit[],
+  from: number,
+  f: Final,
+  turn: 0 | 1,
+  box: { col: number; row: number; cols: number; rows: number },
+  cols: number,
+  rows: number
+): Centre {
+  // the mini box's own size: turned, its width lies along the panel's rows
+  const mw = turn === 0 ? box.cols : box.rows;
+  const mh = turn === 0 ? box.rows : box.cols;
+  const toPanel = (r: number, c: number): [number, number] => (turn === 0 ? [box.row + r, box.col + c] : [box.row + c, box.col + mh - 1 - r]);
+  const cells: Centre["cells"] = [];
+  let ids = 0;
+  for (let i = 0; i < mw * mh; i++) {
+    if (f.owner[i] === 0) continue;
+    const r = (i / mw) | 0;
+    const c = i - r * mw;
+    const [R, C] = toPanel(r, c);
+    const letter = f.st.letter[i];
+    cells.push({ i: R * cols + C, kind: f.kind[i], letter: letter >= 0 ? letter + from : -1, owner: f.owner[i] });
+    ids = Math.max(ids, f.owner[i]);
+  }
+  const placements = placementsOf(f).map((p) => {
+    const u = units[p.unitIndex + from];
+    const g = kufiFormsOf(u, "centre").find((x) => x.id === p.glyphId);
+    const sh = g ? shapeOf(g, normalCounts(g, p.stretch)) : null;
+    const tall = p.turn === 0 || p.turn === 2;
+    const hb = sh ? (tall ? sh.h : sh.w) : 1;
+    if (turn === 0) return { ...p, unitIndex: p.unitIndex + from, col: box.col + p.col, row: box.row + p.row };
+    return { ...p, unitIndex: p.unitIndex + from, row: box.row + p.col, col: box.col + mh - p.row - hb, turn: ((p.turn + 1) & 3) as Turn };
+  });
+  const placed: PlacedAt[] = [];
+  for (const p of placements) {
+    const g = kufiFormsOf(units[p.unitIndex], "centre").find((x) => x.id === p.glyphId);
+    if (!g) continue;
+    const sh = shapeOf(g, normalCounts(g, p.stretch));
+    const pin = pinOf(p, null, false);
+    const L = lineOf(cols, rows, SIDE_ROT[p.turn], pinBase(sh, pin));
+    const x0 = pinX0(L, sh, pin);
+    if (x0 !== null) placed.push({ L, x0, yb: 0, shape: sh, letter: p.unitIndex });
+  }
+  return { unitFrom: from, cells, ids, placements, placed, box: { unitFrom: from, ...box, turn } };
+}
+
+/**
+ * The panel sizes a centre word may take: for one or two rings and either orientation, every box of the
+ * word's extent (`wordExtent`) with the rings round it, smallest area first, then nearer a square.
+ * The suggestions and Fit's centre pass rank them further by the greedy pass (`rankByGreedy`).
+ */
+function centreSizes(units: KufiUnit[]): Size[] {
+  const from = centreFrom(units);
+  if (from < 0) return [];
+  const e = wordExtent(units.slice(from));
+  const out = new Map<number, Size>();
+  for (let k = 1; k <= CENTRE_RINGS_MAX; k++)
+    for (let w = e.wMin; w <= e.wMax; w++)
+      for (let h = e.hMin; h <= e.hMax; h++)
+        for (const s of [
+          { cols: w + k * CORE_RING, rows: h + k * CORE_RING },
+          { cols: h + k * CORE_RING, rows: w + k * CORE_RING },
+        ])
+          out.set(s.cols * 1024 + s.rows, s);
+  const elong = (s: Size) => Math.max(s.cols, s.rows) / Math.min(s.cols, s.rows);
+  return [...out.values()].sort((a, b) => a.cols * a.rows - b.cols * b.rows || elong(a) - elong(b) || a.rows - b.rows);
+}
+
+/**
+ * The edits with those aimed at the centre word dropped: its letters take no pins, forms, stretch or
+ * painted cells (the packer places them), and the word has no route.
+ */
+function stripCentreEdits(edits: KufiPanelEdits, units: KufiUnit[], from: number): KufiPanelEdits {
+  const keep = <T,>(m: Record<number, T> | undefined) => {
+    if (!m) return undefined;
+    const out: Record<number, T> = {};
+    for (const [k, v] of Object.entries(m)) if (Number(k) < from) out[Number(k)] = v;
+    return Object.keys(out).length ? out : undefined;
+  };
+  const lastWord = units[from].wordIndex;
+  const routes = edits.routes ? Object.fromEntries(Object.entries(edits.routes).filter(([w]) => Number(w) !== lastWord)) : undefined;
+  const cells = edits.cells?.filter((c) => c.unitIndex < from);
+  const out: KufiPanelEdits = {};
+  const forms = keep(edits.forms);
+  const stretch = keep(edits.stretch);
+  const pinned = keep(edits.pinned);
+  if (forms) out.forms = forms;
+  if (stretch) out.stretch = stretch;
+  if (pinned) out.pinned = pinned;
+  if (routes && Object.keys(routes).length) out.routes = routes;
+  if (cells && cells.length) out.cells = cells;
+  return out;
+}
+
+/**
+ * The context a fresh search or the greedy pass runs in: a whole panel, or, with the centre on, the band
+ * letters round the core `centreOf` reserves for this size. Null when the core cannot be made at this size
+ * (the word has no room, or cannot fill it), which the caller reports as it reports a hopeless box.
+ */
+function ctxFor(text: string, cols: number, rows: number, edits: KufiPanelEdits, pins: Map<number, Pin>, budgetMs: number, strictClock: boolean, opts: PackOpts): Ctx | null {
+  if (!opts.centre) return makeCtx(text, cols, rows, edits, pins, budgetMs, strictClock, null, opts);
+  const { units } = resolveKufiText(text);
+  const a = centreOf(text, units, cols, rows);
+  if ("reason" in a) return null;
+  return makeCtx(text, cols, rows, edits, pins, budgetMs, strictClock, null, opts, { units: units.slice(0, a.centre.unitFrom), centre: a.centre });
 }
 
 // ---------------------------------------------------------------------------
@@ -2691,6 +3028,7 @@ function placementsOf(f: Final): KufiPlacement[] {
       stretch: p.shape.counts.slice(),
     };
   });
+  if (f.centre) out.push(...f.centre.placements.map((p) => ({ ...p, stretch: p.stretch.slice() })));
   return out.sort((a, b) => a.unitIndex - b.unitIndex);
 }
 
@@ -2773,7 +3111,9 @@ function okResult(units: KufiUnit[], f: Final, cols: number, rows: number, edits
   // the user's painted cells go over the packed lattice (`kufiGrid`, shared with the canvas paint tool)
   applyCellEdits(cells, cols, rows, (k) => placements[k] ?? null, edits);
   const editsBreakPacking = (edits.cells?.length ?? 0) > 0 && !packedCells(cells, cols, rows);
-  return { ok: true, cols, rows, cells, placements, editsBreakPacking, quality: { squares: f.squares, bars: f.bars, cut: f.cut, grow: f.grow } };
+  const out: KufiPackResult = { ok: true, cols, rows, cells, placements, editsBreakPacking, quality: { squares: f.squares, bars: f.bars, cut: f.cut, grow: f.grow } };
+  if (f.centre) out.centre = f.centre.box;
+  return out;
 }
 
 /**
@@ -2796,9 +3136,10 @@ function freshFinal(
   const key = JSON.stringify([text, cols, rows, edits.forms ?? {}, edits.stretch ?? {}, edits.pinned ?? {}, opts.start, opts.centre]);
   const hit = finals.get(key);
   if (hit && (hit.f?.packed || hit.budget >= budgetMs)) return hit.f;
-  if (outOfRoom(text, cols, rows)) return null;
+  if (outOfRoom(text, cols, rows, opts)) return null;
   if (budgetMs <= 0) return hit?.f ?? null;
-  const f = search(makeCtx(text, cols, rows, edits, pins, budgetMs, strictClock, null, opts));
+  const ctx = ctxFor(text, cols, rows, edits, pins, budgetMs, strictClock, opts);
+  const f = ctx ? search(ctx) : null;
   if (finals.size >= FINALS_MAX) finals.delete(finals.keys().next().value as string);
   finals.set(key, { f, budget: budgetMs });
   return f;
@@ -2809,15 +3150,18 @@ function freshFinal(
  * narrowest, end to end, are longer than every line of every ring together
  * (with a quarter more for U-turned lines). Saves searching a hopeless box.
  */
-function outOfRoom(text: string, cols: number, rows: number): boolean {
-  const { units } = resolveKufiText(text);
+function outOfRoom(text: string, cols: number, rows: number, opts: PackOpts = DEFAULT_OPTS): boolean {
+  const all = resolveKufiText(text).units;
+  // with a centre, the band letters alone, on the rings outside the core (the core needs one ring at least)
+  const from = opts.centre ? centreFrom(all) : -1;
+  const units = from > 0 ? all.slice(0, from) : all;
   let need = 0;
   units.forEach((u, k) => {
     let w = Infinity;
     for (const g of kufiFormsOf(u)) w = Math.min(w, (g.rows[0]?.length ?? 1) - (g.inset?.right ?? 0) - (g.inset?.left ?? 0));
     need += (Number.isFinite(w) ? w : 1) + (k > 0 && units[k - 1].joinsNext ? -1 : 1);
   });
-  const rings = Math.max(1, Math.floor((Math.min(cols, rows) - 1) / (2 * (BAND + 1))) + 1);
+  const rings = from > 0 ? Math.max(1, Math.floor((Math.min(cols, rows) - wordExtent(all.slice(from)).hMin) / CORE_RING)) : Math.max(1, Math.floor((Math.min(cols, rows) - 1) / (2 * (BAND + 1))) + 1);
   let room = 0;
   for (let t = 0; t < rings * 4; t++) room += Math.max(0, ((t & 1) === 0 ? cols : rows) - 2 * (t >> 2) * (BAND + 1));
   return need > room * 1.25;
@@ -2899,8 +3243,8 @@ function rectangleSizes(units: KufiUnit[]): Size[] {
 function rankByGreedy(text: string, sizes: Size[], edits: KufiPanelEdits, pins: Map<number, Pin>, opts: PackOpts = DEFAULT_OPTS): Size[] {
   const scored = sizes.slice(0, RANK_MAX_SIZES).map((s, k) => {
     let f: Final | null = null;
-    if (!outOfRoom(text, s.cols, s.rows)) {
-      const ctx = makeCtx(text, s.cols, s.rows, edits, pins, PACK_BUDGET_MS, true, null, opts);
+    const ctx = outOfRoom(text, s.cols, s.rows, opts) ? null : ctxFor(text, s.cols, s.rows, edits, pins, PACK_BUDGET_MS, true, opts);
+    if (ctx) {
       ctx.noClock = true;
       f = beamPass(ctx, 1, initState(ctx), 0, true);
     }
@@ -2971,8 +3315,9 @@ function suggestions(
   const area = cols * rows;
   const est = estimateSide(units);
   const from = dir > 0 ? Math.max(Math.max(cols, rows) + 1, est) : Math.min(Math.min(cols, rows) - 1, est);
-  const squares = sizesFrom(from, dir).map((n) => ({ cols: n, rows: n }));
-  const rects = rectangleSizes(units).filter((s) => (dir > 0 ? s.cols * s.rows > area : s.cols * s.rows < area));
+  // with a centre the sizes are the core's own (`centreSizes`): a ring or two round the word's boxes
+  const squares = opts.centre ? [] : sizesFrom(from, dir).map((n) => ({ cols: n, rows: n }));
+  const rects = (opts.centre ? centreSizes(units) : rectangleSizes(units)).filter((s) => (dir > 0 ? s.cols * s.rows > area : s.cols * s.rows < area));
   let tried = 0;
   for (const s of squaresThenRanked(squares, () => rankByGreedy(text, rects, edits, pins, opts))) {
     if (++tried > squares.length + SUGGEST_TRIES * 3) break;
@@ -3145,7 +3490,8 @@ function repack(
       if (pins.has(k) || !free || free.has(keys[k])) return;
       pins.set(k, pinOf(prev[k], dotsDrawn(text, u, prev[k], cells, glyph, cols, rows), false));
     });
-    const ctx = makeCtx(text, cols, rows, edits, pins, left, true, null, opts);
+    const ctx = ctxFor(text, cols, rows, edits, pins, left, true, opts);
+    if (!ctx) break;
     ctx.workMax = Math.min(ctx.workMax, workLeft);
     const f = search(ctx);
     workLeft -= ctx.work;
@@ -3235,10 +3581,17 @@ export function packKufiPanel(input: {
 }): KufiPackResult {
   let t0 = performance.now();
   const { text, cols, rows } = input;
-  const opts: PackOpts = { start: input.start ?? "bottomRight", centre: !!input.centre };
-  const edits = input.edits ?? {};
   const { units } = resolveKufiText(text);
+  // a text of one word has nothing to put round a centre: it packs as with the centre off
+  const from = input.centre ? centreFrom(units) : -1;
+  const opts: PackOpts = { start: input.start ?? "bottomRight", centre: from > 0 };
+  // the centre word's letters take no edits: those aimed at them are dropped (the sanitizer of the design)
+  const edits = from > 0 ? stripCentreEdits(input.edits ?? {}, units, from) : (input.edits ?? {});
   if (letterCount(units) < 2) return { ok: false, reason: "tooShort", suggestions: [] };
+  if (from > 0) {
+    const a = centreOf(text, units, cols, rows);
+    if ("reason" in a) return { ok: false, reason: a.reason, suggestions: suggestions(text, units, cols, rows, edits, a.reason === "tooLong" ? 1 : -1, t0 + CALL_BUDGET_MS, opts) };
+  }
   const explicit = explicitPins(units, edits);
   if (!explicit) return { ok: false, reason: "pinConflict", suggestions: [] };
   const prev = input.previous;
@@ -3475,6 +3828,11 @@ export const _internal = {
   PACK_WORK,
   REPACK_WORK,
   FIRST_DRAFT_CLOCK_MS,
+  coreFinal,
+  centreOf,
+  ctxFor,
+  centreSizes,
+  stripCentreEdits,
   regionPacks: () => regionPackCount,
   resetRegionPacks: () => {
     regionPackCount = 0;
@@ -3484,6 +3842,7 @@ export const _internal = {
 /** Every cache, so a timing is cold. */
 function clearCaches() {
   finals.clear();
+  cores.clear();
   shapeCache.clear();
   lineCache.clear();
 }
