@@ -8,7 +8,7 @@ the studio already agree (731: under 0.003 nuqta from 0.2 nuqta back), so the di
 The record gains "endcap": {"c": tip, "r": R, "erase": rings, "fill": rings}, all in node (nuqta) coordinates; a second
 patch on the same stroke makes it a list.
   python jdendcap.py IN/pen.json OUT/pen.json STROKE [R [X,Y]]       (JD_* env as jdpenjob; X,Y in nuqta)"""
-import json, os, sys
+import json, math, os, sys
 import numpy as np
 from shapely.geometry import Point, Polygon
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -33,6 +33,39 @@ def rings_of(g):
 RAMP, BLEND_PX = 0.15, 1500  # nuqta over which ours eases into the studio's edge; raster px a nuqta for the blend
 
 
+REACH, SPARE = 1.0, 2  # nuqta a node's nib can ink from it; nodes kept past the last one in reach, for the curve
+
+
+def runs_near(nodes, c, R2):
+    """The runs of nodes that can ink the disc of R2 round c, each with SPARE nodes more either side. The ink is
+    placed every few raster px, so a whole stroke drawn at BLEND_PX built several GB of tensors per patch for the
+    pixels' windows, nearly all of it off the disc's frame (the Geekmini's memory, 2026-11-04)."""
+    d = [math.hypot(q["p"][0] - c[0], q["p"][1] - c[1]) for q in nodes]
+    keep = [False] * len(nodes)
+    for i, v in enumerate(d):
+        if v < R2 + REACH:
+            for j in range(max(0, i - SPARE), min(len(nodes), i + SPARE + 1)):
+                keep[j] = True
+    out, cur = [], []
+    for q, k in zip(nodes, keep):
+        if k:
+            cur.append(q)
+        elif cur:
+            out.append(cur); cur = []
+    if cur:
+        out.append(cur)
+    return [r for r in out if len(r) > 1]
+
+
+def release():
+    """torch keeps the GPU memory of a patch's draw cached for the next; four patch jobs at once each held their
+    biggest draw (gpufit._release does the same between a fit's stages)."""
+    import gpufit
+    if gpufit.available():
+        import torch
+        torch.cuda.empty_cache()
+
+
 def blended(stroke, rec, studio, c, r, others=()):
     """The ink inside the disc of r + RAMP round c: ours eased into the studio's by their signed distances, all
     studio inside r, all ours at r + RAMP. A hard switch at r left a jog where the two edges differ (0.005 nuqta at
@@ -41,7 +74,9 @@ def blended(stroke, rec, studio, c, r, others=()):
     from shapely.geometry import box as Box
     R2 = r + RAMP; x1, y1 = c[0] - R2 - 0.05, c[1] - R2 - 0.05; n = int((2 * R2 + 0.1) * BLEND_PX) + 1
     piece, _, O = J.job_of(stroke)
-    A, _ = J.ink([rec["nodes"]] + [o for o in others], [], O, x1 * J.PPN + O[0], y1 * J.PPN + O[1], BLEND_PX / J.PPN, n, n)
+    near = [run for nodes in [rec["nodes"]] + list(others) for run in runs_near(nodes, c, R2)]
+    A, _ = J.ink(near, [], O, x1 * J.PPN + O[0], y1 * J.PPN + O[1], BLEND_PX / J.PPN, n, n)
+    release()
     if rec.get("endcap"):  # the stroke's earlier patches are ours too: blending against the bare fit left a step where
         # two discs overlapped and erased the first patch's ink (104's peak under its leg patch, 023.s2's tip)
         A = apply(A.astype(bool), rec["endcap"], O, x1 * J.PPN + O[0], y1 * J.PPN + O[1], BLEND_PX / J.PPN)
