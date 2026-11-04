@@ -177,3 +177,17 @@ describe("kufiLetterOptions", () => {
     expect(kufiStretchTry({ key: "k", tries, done: false, failed: false }, unit, si, 2)?.result).not.toBeNull();
   }, 60000);
 });
+
+describe("a centre word", () => {
+  const TAWHID2 = "لا إله إلا الله لا إله إلا الله";
+  it("gets no change to try, and its letter's options are its drawn form alone", () => {
+    const r = packKufiPanel({ text: TAWHID2, cols: 21, rows: 17, centre: true });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const from = r.centre!.unitFrom;
+    const changes = kufiChangesOf(TAWHID2, r);
+    expect(changes.length).toBeGreaterThan(0);
+    expect(changes.some((c) => c.unitIndex >= from)).toBe(false);
+    expect(kufiLetterOptions(TAWHID2, r, null, from)).toEqual({ forms: [{ glyphId: r.placements[from].glyphId, fits: true, try: null }], stretch: new Map() });
+  });
+});

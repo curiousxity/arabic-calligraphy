@@ -3,7 +3,8 @@ import type { KufiPanelBlock } from "../../types";
 import { kufiPanelStatus, kufiSizeLabel } from "../../lib/kufi/kufiPanelStatus";
 import { useKufiPanelLayout } from "../../hooks/useKufiPanelLayout";
 import { cachedKufiLayout, kufiLayoutFailed, kufiLayoutKey, subscribeKufiLayouts } from "../../lib/kufi/kufiLayoutClient";
-import { kufiPanelInputs, type KufiTool } from "../../lib/kufi/kufiPanelBlock";
+import { kufiCentrePatch, kufiPanelInputs, type KufiTool } from "../../lib/kufi/kufiPanelBlock";
+import { SelectRow } from "./FormControls";
 import { resolveKufiText } from "../../lib/kufi/kufiWords";
 import type { KufiPackResult, KufiPanelEdits } from "../../lib/kufi/kufiPack";
 import { useKufiExplore } from "../../hooks/useKufiExplore";
@@ -110,7 +111,9 @@ export const KufiPanelPanel: React.FC<{
   letter?: number | null;
   /** A Fit of this panel is running, whoever pressed it (the canvas has a Fit button too): shown as busy here. */
   fitPending?: boolean;
-}> = ({ block, onSetSize, onFit, onReleasePins, onApplyEdits, tool = "select", onSetTool, letter = null, fitPending = false }) => {
+  /** Sets the centre word and the start corner (one undo step each); the two rows are left out without it. */
+  onPatch?: (patch: Partial<KufiPanelBlock>) => void;
+}> = ({ block, onSetSize, onFit, onReleasePins, onApplyEdits, tool = "select", onSetTool, letter = null, fitPending = false, onPatch }) => {
   // Registers this panel as a reader, so the layout is packed even if the
   // canvas has not asked yet; the status reads the exact inputs below.
   useKufiPanelLayout(block);
@@ -192,6 +195,37 @@ export const KufiPanelPanel: React.FC<{
           Fit
         </button>
       </div>
+
+      {onPatch && (
+        <>
+          <SelectRow
+            id={`${idBase}-centre`}
+            name="kufiPanelCentre"
+            label="Centre word"
+            value={block.panelCentre ? "last" : "off"}
+            onChange={(v) => {
+              const patch = kufiCentrePatch(block, v === "last");
+              if (Object.keys(patch).length) onPatch(patch);
+            }}
+          >
+            <option value="off">Off</option>
+            <option value="last">Last word</option>
+          </SelectRow>
+          <SelectRow
+            id={`${idBase}-start`}
+            name="kufiPanelStart"
+            label="Start"
+            value={block.panelStart ?? "bottomRight"}
+            onChange={(v) => {
+              const start = v === "topRight" ? "topRight" : undefined;
+              if (start !== block.panelStart) onPatch({ panelStart: start });
+            }}
+          >
+            <option value="bottomRight">Bottom right</option>
+            <option value="topRight">Top right</option>
+          </SelectRow>
+        </>
+      )}
 
       <div className="kufiPanelStatus" role="status">
         {fit === "busy" ? (

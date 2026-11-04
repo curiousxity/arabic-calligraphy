@@ -306,3 +306,19 @@ describe("paintKufiCell against the packer", () => {
     expect(dotAgain.result.cells[dr * 21 + dc]).toBe(1);
   }, 30000);
 });
+
+describe("a centre word", () => {
+  it("is never the unit a painted cell is keyed to", () => {
+    const text = "لا إله إلا الله لا إله إلا الله";
+    const r = packKufiPanel({ text, cols: 21, rows: 17, centre: true });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const c = r.centre!;
+    for (let row = c.row; row < c.row + c.rows; row++)
+      for (let col = c.col; col < c.col + c.cols; col++) {
+        const u = nearestKufiUnit(r, col, row);
+        expect(u).not.toBeNull();
+        expect(u!).toBeLessThan(c.unitFrom);
+      }
+  });
+});

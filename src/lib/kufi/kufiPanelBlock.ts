@@ -129,6 +129,21 @@ export function kufiReleasePins(edits: KufiPanelEdits | undefined): KufiPanelEdi
 }
 
 /**
+ * The patch that switches the centre word on or off: `panelCentre` (absent
+ * when off, so a save without it is unchanged) and, since every letter moves
+ * when the core is reserved or given up, the pins and routes released
+ * (`kufiReleasePins`), as the design settles. Forms, stretch counts and
+ * painted cells are kept. Empty when nothing changes.
+ */
+export function kufiCentrePatch(
+  b: { panelCentre?: boolean; panelEdits?: KufiPanelEdits },
+  centre: boolean
+): { panelCentre?: boolean; panelEdits?: KufiPanelEdits } {
+  if (!!b.panelCentre === centre) return {};
+  return { panelCentre: centre ? true : undefined, panelEdits: kufiReleasePins(b.panelEdits) };
+}
+
+/**
  * The edits to preview a word dragged to `route` cells along its path. The
  * route counts from where the word stood before it was ever dragged, through
  * the chain of its drags: the committed `edits.routes` entry is where it

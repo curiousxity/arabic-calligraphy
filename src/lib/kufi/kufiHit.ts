@@ -77,9 +77,22 @@ function ownerMap(result: Ok): Int16Array {
   let m = owners.get(result);
   if (m) return m;
   m = new Int16Array(result.cols * result.rows);
-  for (const p of result.placements) for (const i of placementInk(result, p)) if (m[i] === 0) m[i] = p.unitIndex + 1;
+  for (const p of result.placements) {
+    if (kufiIsCentreUnit(result, p.unitIndex)) continue;
+    for (const i of placementInk(result, p)) if (m[i] === 0) m[i] = p.unitIndex + 1;
+  }
   owners.set(result, m);
   return m;
+}
+
+/**
+ * Whether the unit is one of the centre word's (`result.centre`, the units from
+ * `unitFrom` on). Centre letters are fixed: the packer places and stretches
+ * them, and they take no pins, no Move word, no paint and no pick, so no hit,
+ * handle or option is ever offered on one. False on a result without a centre.
+ */
+export function kufiIsCentreUnit(result: Ok, unitIndex: number): boolean {
+  return !!result.centre && unitIndex >= result.centre.unitFrom;
 }
 
 /** The unit whose letter covers the cell, or null on paper, a dot or a filler square. */
@@ -139,7 +152,7 @@ export function stretchEnds(result: Ok, unitIndex: number): KufiStretchEnd[] {
   if (!perUnit) endsCache.set(result, (perUnit = new Map()));
   const hit = perUnit.get(unitIndex);
   if (hit) return hit;
-  const p = placementOf(result, unitIndex);
+  const p = kufiIsCentreUnit(result, unitIndex) ? null : placementOf(result, unitIndex);
   const g = p ? kufiGlyphById(p.glyphId) : null;
   const out: KufiStretchEnd[] = [];
   if (p && g) {
@@ -338,7 +351,7 @@ export function hitWordStart(result: Ok, units: KufiUnit[], col: number, row: nu
  */
 export function routeHandleOf(result: Ok, units: KufiUnit[], wordIndex: number): KufiRouteHandle | null {
   const unitIndex = firstUnitOfWord(units, wordIndex);
-  const p = unitIndex === null ? null : placementOf(result, unitIndex);
+  const p = unitIndex === null || kufiIsCentreUnit(result, unitIndex) ? null : placementOf(result, unitIndex);
   if (unitIndex === null || !p) return null;
   const [dc, dr] = kufiReadingStep(p.turn);
   const { h, w } = placedBox(p);

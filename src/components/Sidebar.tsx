@@ -5,7 +5,7 @@ import {
   URDU,
   PRESETS,
 } from "../lib/presets";
-import type { Block, KufiStarBlock } from "../types";
+import type { Block, KufiPanelBlock, KufiStarBlock } from "../types";
 import type { NamedProjectMeta } from "../App";
 import { STARTER_TEMPLATES } from "../lib/templates";
 import type { StarterTemplate } from "../lib/templates";
@@ -212,6 +212,8 @@ export type SidebarProps = {
   onFitKufiPanel?: () => Promise<void>;
   /** Releases the selected Kufi panel's pins (its letters may move again); one undo step. */
   onReleaseKufiPanelPins?: () => void;
+  /** Sets the selected Kufi panel's centre word or start corner; one undo step. */
+  onSetKufiPanel?: (patch: Partial<KufiPanelBlock>) => void;
   /** Applies one of the Kufi panel's other arrangements to block `id`; one undo step, dropped if its inputs moved on from `fromKey`. */
   onApplyKufiEdits?: (id: number, fromKey: string, edits: KufiPanelEdits, result: KufiPackResult) => void;
   /** Why the last canvas edit of a Kufi panel changed nothing, keyed to the panel and its inputs. */
@@ -424,6 +426,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddKufiStar,
   onSetKufiStar,
   onSetKufiPanelSize,
+  onSetKufiPanel,
   onFitKufiPanel,
   onReleaseKufiPanelPins,
   onApplyKufiEdits,
@@ -1460,6 +1463,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onSetSize={onSetKufiPanelSize}
                 onFit={onFitKufiPanel}
                 onReleasePins={onReleaseKufiPanelPins}
+                onPatch={onSetKufiPanel}
                 onApplyEdits={onApplyKufiEdits && ((fromKey, edits, result) => onApplyKufiEdits(selectedBlock.id, fromKey, edits, result))}
                 tool={kufiTool}
                 onSetTool={onSetKufiTool}

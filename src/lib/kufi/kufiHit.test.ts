@@ -6,6 +6,7 @@ import {
   hitStretchEnd,
   hitWordStart,
   kufiFormsOf,
+  kufiIsCentreUnit,
   kufiGlyphById,
   kufiReadingStep,
   nearestHandle,
@@ -17,7 +18,7 @@ import {
   stretchEnds,
   unitRings,
 } from "./kufiHit";
-import type { KufiPackResult, KufiPlacement } from "./kufiPack";
+import { _internal, packKufiPanel, type KufiPackResult, type KufiPlacement } from "./kufiPack";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
@@ -400,5 +401,48 @@ describe("routeHandleOf / hitRouteHandle", () => {
       placements: [...r.placements, { unitIndex: 3, key: "beh:medial", glyphId: "beh.medial.0", col: 2, row: 5, turn: 0, stretch: [] }],
     };
     expect(hitRouteHandle(withLetter, [...units, { ...units[2], index: 3, wordIndex: 2 }], 2, 7)).toBeNull();
+  });
+});
+
+describe("the centre word's letters", () => {
+  const TAWHID2 = "لا إله إلا الله لا إله إلا الله";
+  const packed = () => {
+    _internal.setClockOverride(Infinity);
+    try {
+      const r = packKufiPanel({ text: TAWHID2, cols: 21, rows: 17, centre: true });
+      if (!r.ok) throw new Error("the fixture did not pack");
+      return r;
+    } finally {
+      _internal.setClockOverride(null);
+    }
+  };
+
+  it("are known from the result's centre; a result without one has none", () => {
+    const r = packed();
+    const from = r.centre!.unitFrom;
+    expect(kufiIsCentreUnit(r, from)).toBe(true);
+    expect(kufiIsCentreUnit(r, from - 1)).toBe(false);
+    const plain = { ...r, centre: undefined };
+    expect(kufiIsCentreUnit(plain, from)).toBe(false);
+  });
+
+  it("take no hit, no stretch end and no route handle, while the band letters keep theirs", () => {
+    const r = packed();
+    const from = r.centre!.unitFrom;
+    const units = resolveKufiText(TAWHID2).units;
+    for (const i of placementInk(r, r.placements[from])) expect(hitKufiUnit(r, i % r.cols, Math.floor(i / r.cols))).toBeNull();
+    expect(stretchEnds(r, from)).toEqual([]);
+    expect(routeHandleOf(r, units, units[from].wordIndex)).toBeNull();
+    // a band letter's ink hits a band letter (its own, or at a shared join stub the one joined before it)
+    for (const p of r.placements.slice(0, from))
+      for (const i of placementInk(r, p)) {
+        const hit = hitKufiUnit(r, i % r.cols, Math.floor(i / r.cols));
+        expect(hit).not.toBeNull();
+        expect(hit!).toBeLessThan(from);
+      }
+    expect(routeHandleOf(r, units, 0)).not.toBeNull();
+    const plain = { ...r, centre: undefined };
+    const i = placementInk(r, r.placements[from])[0];
+    expect(hitKufiUnit(plain, i % r.cols, Math.floor(i / r.cols))).toBe(from);
   });
 });

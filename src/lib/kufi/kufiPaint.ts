@@ -9,7 +9,7 @@
  * Pure: no React, no Konva, no `./harfbuzz`.
  */
 import { applyCellEdits, packedCells } from "./kufiGrid";
-import { placedBox, placementInk, placementOf } from "./kufiHit";
+import { kufiIsCentreUnit, placedBox, placementInk, placementOf } from "./kufiHit";
 import type { KufiCellEdit, KufiPackResult, KufiPanelEdits } from "./kufiPack";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
@@ -63,6 +63,8 @@ export function nearestKufiUnit(result: Ok, col: number, row: number): number | 
   let best: number | null = null;
   let bestD = Infinity;
   for (const p of result.placements) {
+    // a centre letter takes no paint edits: the cell is keyed to the nearest band letter instead
+    if (kufiIsCentreUnit(result, p.unitIndex)) continue;
     const { h, w } = placedBox(p);
     const dc = col < p.col ? p.col - col : col >= p.col + w ? col - (p.col + w - 1) : 0;
     const dr = row < p.row ? p.row - row : row >= p.row + h ? row - (p.row + h - 1) : 0;

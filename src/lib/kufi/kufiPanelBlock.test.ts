@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   kufiCellSize,
+  kufiCentrePatch,
   kufiFormCycle,
   kufiFormEdits,
   kufiPanelInputs,
@@ -12,7 +13,7 @@ import {
   kufiRouteEdits,
   kufiStretchEdits,
 } from "./kufiPanelBlock";
-import type { KufiPackResult, KufiPlacement } from "./kufiPack";
+import type { KufiPackResult, KufiPanelEdits, KufiPlacement } from "./kufiPack";
 import { resolveKufiText } from "./kufiWords";
 
 type Ok = Extract<KufiPackResult, { ok: true }>;
@@ -38,6 +39,23 @@ describe("kufiPanelBlock", () => {
       const edits = { forms: { 4: "feh.final.1" } };
       expect(kufiReleasePins(edits)).toBe(edits);
       expect(kufiReleasePins(undefined)).toBeUndefined();
+    });
+  });
+
+  describe("switching the centre word", () => {
+    const pin: KufiPlacement = { unitIndex: 0, key: "lamAlef:isolated", glyphId: "lamAlef.isolated.0", col: 3, row: 4, turn: 0, stretch: [1] };
+    const cell = { unitIndex: 2, key: "kaf:medial", dx: 1, dy: 1, on: true };
+    const edits: KufiPanelEdits = { pinned: { 0: pin }, routes: { 0: 2 }, forms: { 1: "x" }, stretch: { 2: [1] }, cells: [cell] };
+
+    it("releases the pins and routes, keeping forms, stretch and painted cells", () => {
+      expect(kufiCentrePatch({ panelEdits: edits }, true)).toEqual({ panelCentre: true, panelEdits: { forms: { 1: "x" }, stretch: { 2: [1] }, cells: [cell] } });
+      expect(kufiCentrePatch({ panelCentre: true, panelEdits: edits }, false)).toEqual({ panelCentre: undefined, panelEdits: { forms: { 1: "x" }, stretch: { 2: [1] }, cells: [cell] } });
+    });
+
+    it("is empty when nothing changes, and leaves no edits where there were none", () => {
+      expect(kufiCentrePatch({ panelCentre: true, panelEdits: edits }, true)).toEqual({});
+      expect(kufiCentrePatch({}, false)).toEqual({});
+      expect(kufiCentrePatch({ panelCentre: true }, false)).toEqual({ panelCentre: undefined, panelEdits: undefined });
     });
   });
 

@@ -2173,6 +2173,12 @@ const App: React.FC = () => {
     updateSelectedBlock({ panelEdits: kufiReleasePins(selectedBlock.panelEdits) });
   };
 
+  /** The Kufi panel's centre word or start corner (the sidebar's two selects); one undo step. */
+  const setKufiPanel = (patch: Partial<KufiPanelBlock>) => {
+    if (!selectedBlock || !isKufiPanel(selectedBlock)) return;
+    updateSelectedBlock(patch);
+  };
+
   /**
    * Fit: the selected panel's text in the smallest square box it fills. The
    * history step is pushed when the answer is applied, not when Fit is
@@ -3596,6 +3602,7 @@ const App: React.FC = () => {
         onAddKufiStar={addKufiStar}
         onSetKufiStar={setKufiStar}
         onSetKufiPanelSize={setKufiPanelSize}
+        onSetKufiPanel={setKufiPanel}
         onFitKufiPanel={fitKufiPanelSize}
         onReleaseKufiPanelPins={releaseKufiPanelPins}
         onApplyKufiEdits={editKufiPanel}

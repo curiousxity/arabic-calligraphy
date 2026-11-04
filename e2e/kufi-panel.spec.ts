@@ -243,6 +243,51 @@ test("Fit packs «سبحان الله» and draws it", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+const centreOf = async (page: Page, id: number) =>
+  ((await getBlocks(page)).find((b) => b.id === id) ?? {}) as { panelCentre?: boolean; panelStart?: string };
+
+test("Centre word: Last word packs «لا إله إلا الله» twice at 21×17 with الله in the middle, Start: Top right keeps it drawn, one undo step each", async ({ page }) => {
+  const errors = collectConsoleErrors(page);
+  await gotoApp(page);
+  const id = await addKufiPanel(page);
+  await setBlockText(page, "لا إله إلا الله لا إله إلا الله", id);
+  for (const [which, n] of [
+    ["Width", "21"],
+    ["Height", "17"],
+  ] as const) {
+    const field = sizeField(page, which);
+    await field.click();
+    await field.press("ControlOrMeta+a");
+    await field.pressSequentially(n);
+    await field.press("Enter");
+  }
+  await expect.poll(async () => (await panelOf(page, id))?.panelRows).toBe(17);
+  // without a centre the box does not pack
+  await expect(kufiPanel(page)).toContainText(/Too (long|short)/, { timeout: 60_000 });
+
+  await page.waitForTimeout(400);
+  await kufiPanel(page).getByLabel("Centre word").selectOption("last");
+  await expect.poll(async () => (await centreOf(page, id)).panelCentre).toBe(true);
+  await expect(kufiPanel(page)).not.toContainText(/Too (long|short)/, { timeout: 60_000 });
+  await expect.poll(() => namedNodeCount(page, "kufi-unfit-frame"), { timeout: 60_000 }).toBe(0);
+  const box = await blockClientBox(page, id);
+  await expect
+    .poll(async () => inkPixels(page, await blockClientBox(page, id)), { timeout: 60_000 })
+    .toBeGreaterThan(box.width * box.height * 0.15);
+
+  await page.waitForTimeout(400);
+  await kufiPanel(page).getByLabel("Start").selectOption("topRight");
+  await expect.poll(async () => (await centreOf(page, id)).panelStart).toBe("topRight");
+  await expect(kufiPanel(page)).not.toContainText(/Too (long|short)/, { timeout: 60_000 });
+  await expect.poll(() => namedNodeCount(page, "kufi-unfit-frame"), { timeout: 60_000 }).toBe(0);
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(async () => (await centreOf(page, id)).panelStart).toBeUndefined();
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(async () => (await centreOf(page, id)).panelCentre).toBeUndefined();
+  expect(errors).toEqual([]);
+});
+
 test("a box too small for the text offers sizes that fit", async ({ page }) => {
   await gotoApp(page);
   const id = await addKufiPanel(page);

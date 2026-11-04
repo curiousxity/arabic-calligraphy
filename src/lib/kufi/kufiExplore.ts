@@ -4,7 +4,7 @@
  * change through the packer, and the picks that make distinct alternative
  * arrangements. No React, no worker: callers decide where it runs.
  */
-import { kufiGlyphById, kufiFormsOf, placementOf } from "./kufiHit";
+import { kufiGlyphById, kufiFormsOf, kufiIsCentreUnit, placementOf } from "./kufiHit";
 import { packKufiPanel, type KufiPackResult, type KufiPanelEdits } from "./kufiPack";
 import { kufiFormEdits, kufiPinEdits, kufiStretchEdits } from "./kufiPanelBlock";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
@@ -44,7 +44,8 @@ export function kufiChangesOf(text: string, current: Ok): KufiChange[] {
 function unitChanges(unit: KufiUnit, current: Ok): { forms: KufiChange[]; stretches: KufiChange[] } {
   const forms: KufiChange[] = [];
   const stretches: KufiChange[] = [];
-  const p = placementOf(current, unit.index);
+  // the centre word's letters are the packer's own: no form or stretch of theirs is offered
+  const p = kufiIsCentreUnit(current, unit.index) ? null : placementOf(current, unit.index);
   if (!p) return { forms, stretches };
   for (const g of kufiFormsOf(unit)) {
     if (g.id !== p.glyphId) forms.push({ kind: "form", unitIndex: unit.index, glyphId: g.id });
@@ -85,6 +86,7 @@ export function kufiLetterOptions(text: string, current: Ok, state: KufiExploreS
   const p = placementOf(current, unitIndex);
   const stretch = new Map<number, number[]>();
   if (!unit || !p) return { forms: [], stretch };
+  if (kufiIsCentreUnit(current, unitIndex)) return { forms: [{ glyphId: p.glyphId, fits: true, try: null }], stretch };
   const tries = state ? state.tries.filter((t) => t.change.unitIndex === unitIndex) : [];
   const forms = kufiFormsOf(unit).map((g) => {
     if (g.id === p.glyphId) return { glyphId: g.id, fits: true, try: null };

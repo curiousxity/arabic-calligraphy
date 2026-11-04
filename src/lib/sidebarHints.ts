@@ -10,6 +10,9 @@
  * how it is built. Renaming a label means moving its entry here too.
  */
 export const SIDEBAR_HINTS: Record<string, string> = {
+  // ---- Kufi panel ----
+  "Centre word": "Put the text's last word alone in the middle of the panel, with the other words running round it.",
+  Start: "Which corner the words start from: the bottom right, or the top right running down the right side first.",
   // ---- Panel headers ----
   "Start from a Template": "Begin from a ready-made layout, then type your own words into it.",
   "Artboard & Grid":
