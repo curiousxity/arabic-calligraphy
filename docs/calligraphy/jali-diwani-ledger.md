@@ -1227,6 +1227,58 @@ Spill group:
 | 640B.s0 | 0.987 | 0.991 |
 | 641.s0 | 0.984 | 0.992 |
 
+**Peaks and edges on strokes approved earlier (the user, 2026-11-04; approved).** 45 strokes, 22 approved as fitted and 23 patched before the stricter bar, had gaps at their peaks and corners. Patching only those left steps beside other faults, so each had a full edge pass, from sets holding one stroke per shape. Mean 0.978 to 0.992; every edge within 0.014 nuqta of the studio.
+
+**168.s2 (approved).** The default fit had the wrong shape. Refitted with the small pen (`PEN_SMALL`) and patched: 0.851 to 0.990. The free-fill mode (`PEN_FILL`) scored 0.969 before patching but left lumps and a spur, so it was dropped.
+
+| stroke | before | now |
+|---|---|---|
+| 013.s0 | 0.979 | 0.990 |
+| 014.s0 | 0.983 | 0.990 |
+| 016.s0 | 0.981 | 0.991 |
+| 017.s0 | 0.979 | 0.991 |
+| 019.s0 | 0.985 | 0.991 |
+| 020.s0 | 0.981 | 0.987 |
+| 021.s0 | 0.987 | 0.989 |
+| 022.s0 | 0.987 | 0.988 |
+| 023.s0 | 0.976 | 0.989 |
+| 078.s0 | 0.990 | 0.996 |
+| 081.s0 | 0.980 | 0.991 |
+| 083.s0 | 0.967 | 0.991 |
+| 088.s0 | 0.985 | 0.991 |
+| 090.s1 | 0.926 | 0.994 |
+| 091.s0 | 0.978 | 0.993 |
+| 093.s0 | 0.981 | 0.996 |
+| 096.s0 | 0.988 | 0.994 |
+| 097.s0 | 0.978 | 0.992 |
+| 099.s0 | 0.985 | 0.992 |
+| 100.s0 | 0.985 | 0.991 |
+| 104.s0 | 0.990 | 0.995 |
+| 106.s0 | 0.983 | 0.993 |
+| 107.s0 | 0.966 | 0.993 |
+| 109.s0 | 0.983 | 0.994 |
+| 110.s0 | 0.983 | 0.993 |
+| 111.s0 | 0.990 | 0.992 |
+| 112.s0 | 0.977 | 0.991 |
+| 162.s0 | 0.980 | 0.993 |
+| 164.s0 | 0.941 | 0.995 |
+| 164.s1 | 0.988 | 0.996 |
+| 165.s0 | 0.969 | 0.996 |
+| 165.s1 | 0.934 | 0.991 |
+| 166.s0 | 0.989 | 0.993 |
+| 167.s0 | 0.992 | 0.993 |
+| 170.s0 | 0.978 | 0.994 |
+| 172.s0 | 0.976 | 0.993 |
+| 172.s1 | 0.971 | 0.996 |
+| 173.s0 | 0.986 | 0.994 |
+| 173.s1 | 0.972 | 0.996 |
+| 176.s0 | 0.937 | 0.991 |
+| 177.s0 | 0.979 | 0.990 |
+| 178.s0 | 0.979 | 0.990 |
+| 200.s0 | 0.987 | 0.990 |
+| 474.s0 | 0.992 | 0.995 |
+| 476.s0 | 0.992 | 0.996 |
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
