@@ -1281,6 +1281,24 @@ Spill group:
 | 474.s0 | 0.992 | 0.995 |
 | 476.s0 | 0.992 | 0.996 |
 
+**The older flag heads and 484, 485, 731, 732, given the edge pass (the user, 2026-11-04; accepted).** Patches are laid on a stroke's last move, with its other moves counted as ink, since they are one stroke. A patch keeps only the outer edge of the ink in its disc, so a disc covering a small loop fills it in (484's first try, 0.913): patches stay clear of 484's small loop, where gaps of up to 0.063 nuqta remain, and 0.084 at its crossing, where our ink is solid.
+
+| stroke | before | now |
+|---|---|---|
+| 074.s0 | 0.965 | 0.994 |
+| 075.s0 | 0.988 | 0.995 |
+| 076.s0 | 0.992 | 0.996 |
+| 077.s0 | 0.993 | 0.996 |
+| 084.s0 | 0.949 | 0.989 |
+| 086.s0 | 0.989 | 0.994 |
+| 087.s0 | 0.991 | 0.995 |
+| 095.s0 | 0.968 | 0.993 |
+| 108.s0 | 0.933 | 0.994 |
+| 484.s0 | 0.963 | 0.969 |
+| 485.s0 | 0.959 | 0.977 |
+| 731.s0 | 0.975 | 0.992 |
+| 732.s0 | 0.974 | 0.987 |
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
