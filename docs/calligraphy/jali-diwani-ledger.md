@@ -774,7 +774,7 @@ sin's second tooth came out a sliver: 314.s0 and 314.s1 both took a 0.7 nib (the
   step under the join went; the ha->mim's nub stayed. The user approved the ha->ya (2026-10-31) with the seam closed:
   meeting at one node, the halves drawn apart left a hairline, so the exit now runs one node on under the entry's ink.
 - 314.s1 at the full nib (sq3): the sin's second tooth is solid again, a little shorter than the studio's.
-- The ha->mim (151.s0 -> 672.s0) stays one movement (the user, 2026-10-31: "One movement"). Its nub is still open:
+- The ha->mim (151.s0 -> 672.s0) stays one movement (the user, 2026-10-31: "One movement"). Its nub, closed 2026-11-04 (see "Join 4" below):
   it is in the studio's own outline, and fitting the ha on into the mim's stem (672.s1) matched only 0.464.
 - The sin's teeth (2026-11-01): 314.s1 at the full nib with its start full (`PEN_FULLSTART`, sq4) and 314.s0 cut in
   two at the full nib (`PEN_CUT`, `PEN_CUTWIN=free`, `PEN_CUT_MARGIN=0.15`, `PEN_FULLEND`, sc1), finished where the
@@ -1300,6 +1300,8 @@ Spill group:
 | 732.s0 | 0.974 | 0.987 |
 
 **Dots in 226's bowl (2026-11-04).** Single-pixel holes in a line in 226.s1, at under 180 px a nuqta only. They come from drawing ink to a small raster, between the pen's placements: about 30 strokes' bare pen ink has them, and patches paint them out. No patch made one. 226.s1 was the one left showing; one disc over the line cleared it. The app draws by joining vector hulls, not this raster, and has not been tested for this.
+
+**Join 4, the ha into the mim, and its barb (the user, 2026-11-04; approved).** The "nub" above is a small sharp barb in the studio's outline, beside a notch. The one-movement fit had rounded it into a shoulder. Patches from the studio's outline brought it back: the end of the ha's tail (151.s0) is the barb. The crown's fold is gone too (151.s1, and its eye, 151.s2), and the mim's head and stem are patched (672.s0, 672.s1). The join scores 0.990 at the studio's placement. The barb is a one-off exception to strokes being smooth (the user: "it is an exception to the rule basically because i like it"), not a new rule. The pen paths stay one movement, but this shape depends on the patches, which the app does not yet draw.
 
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
