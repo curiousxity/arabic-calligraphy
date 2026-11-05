@@ -1332,6 +1332,17 @@ Spill group:
 | 136.s1 | 0.862 | 0.987 |
 | 136.s2 | 0.733 | 0.984 |
 
+**The Allah module T02 (the user, 2026-11-05; approved).** The Bismillah's Allah. T02.s1 and T02.s4 had come out far too wide, so they were refitted with the small pen (`PEN_SMALL`) and patched; the other four kept their fits and were patched. Every edge is within 0.01 nuqta of the studio. The whole Bismillah scores 0.989 at the studio's placements. T01, the studio's other Allah module, has not been patched. Its data is in the `allah1` run's bundle, not `bundle-r1`.
+
+| stroke | before | now |
+|---|---|---|
+| T02.s0 | 0.929 | 0.985 |
+| T02.s1 | 0.621 | 0.992 |
+| T02.s2 | 0.953 | 0.992 |
+| T02.s3 | 0.934 | 0.989 |
+| T02.s4 | 0.799 | 0.992 |
+| T02.s5 | 0.975 | 0.986 |
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
