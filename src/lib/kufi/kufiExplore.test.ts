@@ -190,4 +190,19 @@ describe("a centre word", () => {
     expect(changes.some((c) => c.unitIndex >= from)).toBe(false);
     expect(kufiLetterOptions(TAWHID2, r, null, from)).toEqual({ forms: [{ glyphId: r.placements[from].glyphId, fits: true, try: null }], stretch: new Map() });
   });
+
+  it("a band letter's forms are its spiral forms: the ح of محمد lists its five embracing lengths, the initial meem its one tall form", () => {
+    const SHAHADA = "لا إله إلا الله محمد رسول الله";
+    const r = packKufiPanel({ text: SHAHADA, cols: 24, rows: 19, centre: true, start: "topRight" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // units 7..10 are محمد: meem, ha, meem, dal
+    expect(kufiLetterOptions(SHAHADA, r, null, 8).forms.map((f) => f.glyphId)).toEqual(["jeem.medial.2", "jeem.medial.3", "jeem.medial.4", "jeem.medial.5", "jeem.medial.6"]);
+    expect(kufiLetterOptions(SHAHADA, r, null, 7).forms).toEqual([{ glyphId: "meem.initial.2", fits: true, try: null }]);
+    const changes = kufiChangesOf(SHAHADA, r);
+    expect(changes.filter((c) => c.kind === "form" && c.unitIndex === 7)).toEqual([]);
+    expect(changes.filter((c) => c.kind === "form" && c.unitIndex === 8).length).toBe(4);
+    // the dal keeps the panel's forms
+    expect(changes.filter((c) => c.kind === "form" && c.unitIndex === 10).map((c) => (c as { glyphId: string }).glyphId)).toContain("dal.final.1");
+  }, 30000);
 });

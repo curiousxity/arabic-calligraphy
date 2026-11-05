@@ -1,11 +1,13 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { KUFI_FORMS, dotCells, dotsOf, stretchGlyph, stretchedBase, type KufiGlyph } from "./kufiAlphabet";
+import { KUFI_FORMS, dotCells, dotsOf, kufiGlyphById, stretchGlyph, stretchedBase, type KufiGlyph, type KufiPlace } from "./kufiAlphabet";
 import { emptyBlocks2x2, inkBlocks2x2, rotateRows, type Turn } from "./kufiGrid";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
 import { kufiMovedUnits, kufiPinWordEdits, kufiRouteEdits } from "./kufiPanelBlock";
 import {
   fitKufiPanel,
   kufiFormsOf,
+  kufiGlyphOf,
+  kufiPlaceOf,
   packKufiPanel,
   reconcileEdits,
   _internal,
@@ -77,16 +79,21 @@ function lineKeys(r: Ok, units: KufiUnit[]): string[] {
   return keys;
 }
 
-/** How far along its line, in reading order, a placement's far end is. */
+/**
+ * How far along its line, in reading order, a placement's far end is: its box's far edge, less the
+ * columns a glyph's box reaches past its left stub over the letters after it (`inset.left`, the
+ * embracing ح of the spiral), which stand inside that box.
+ */
 function along(p: KufiPlacement): number {
   const g = glyphOf(p.glyphId);
   const rows = rotateRows(stretchGlyph(g, p.stretch), p.turn);
   const h = rows.length;
   const w = rows[0].length;
-  if (p.turn === 0) return -p.col; // right to left
-  if (p.turn === 2) return p.col + w - 1; // upside down: left to right
-  if (p.turn === 1) return -p.row; // upwards
-  return p.row + h - 1; // downwards
+  const n = g.inset?.left ?? 0;
+  if (p.turn === 0) return -(p.col + n); // right to left
+  if (p.turn === 2) return p.col + w - 1 - n; // upside down: left to right
+  if (p.turn === 1) return -(p.row + n); // upwards
+  return p.row + h - 1 - n; // downwards
 }
 
 /** Placements in unit order walk the structure forwards: a line is never returned to, and on a line each goes further. */
@@ -1090,6 +1097,35 @@ describe("the form rule", () => {
     const m = resolveKufiText("محمد").units[0];
     expect(kufiFormsOf(m, "centre")).toEqual(kufiFormsOf(m));
   });
+
+  it("the spiral place (a centre panel's bands) takes a letter's spiral forms alone where it has any, else the panel's; no other place sees them", () => {
+    const units = resolveKufiText("محمد رسول").units;
+    const ids = (u: KufiUnit, place?: KufiPlace) => kufiFormsOf(u, place).map((g) => g.id);
+    expect(ids(units[0], "spiral")).toEqual(["meem.initial.2"]);
+    expect(ids(units[1], "spiral")).toEqual(["jeem.medial.2", "jeem.medial.3", "jeem.medial.4", "jeem.medial.5", "jeem.medial.6"]);
+    expect(ids(units[2], "spiral")).toEqual(["meem.medial.2"]);
+    // the dal, and every letter of رسول, keeps the panel's forms: رسول closes its band by the panel's
+    // own means (the و on its foot, a bar drawn on from its head), see kufi-panel.md
+    for (const u of [units[3], ...units.slice(4), ...resolveKufiText(TAWHID2).units]) expect(ids(u, "spiral")).toEqual(ids(u));
+    for (const u of units) {
+      for (const place of [undefined, "star", "centre"] as const) expect(ids(u, place).some((id) => kufiGlyphById(id)?.glyph.only === "spiral"), `${u.key} ${place}`).toBe(false);
+      // every form a unit was ever drawn with is recognised, whatever the place it was drawn in
+      for (const id of ids(u, "spiral")) expect(kufiGlyphOf(u, id)?.id).toBe(id);
+    }
+    expect(kufiGlyphOf(units[0], "meem.initial.9")).toBeUndefined();
+  });
+
+  it("kufiPlaceOf: the centre word's letters are in the centre, the band's in the spiral, a plain panel's in the panel", () => {
+    const r = packKufiPanel({ text: TAWHID2, cols: 21, rows: 17, centre: true });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(kufiPlaceOf(r, 0)).toBe("spiral");
+    expect(kufiPlaceOf(r, r.centre!.unitFrom - 1)).toBe("spiral");
+    expect(kufiPlaceOf(r, r.centre!.unitFrom)).toBe("centre");
+    const plain = packKufiPanel({ text: ALLAH, cols: 9, rows: 9 });
+    expect(plain.ok).toBe(true);
+    if (plain.ok) expect(kufiPlaceOf(plain, 0)).toBe("panel");
+  }, 20000);
 });
 
 /** A core search's cells as rows of `#` and `.`. */
@@ -1248,7 +1284,34 @@ describe("a word in the centre", () => {
     expect(r.placements[0].turn).toBe(start === "topRight" ? 3 : 0);
   }, 20000);
 
-  it("the Shahada does not pack round a centre at 23x19 from either corner, nor محمد رسول الله at 21x17: their short words leave their band open", () => {
+  /**
+   * Measured 2026-11-05, every size packed on a cold cache (a neighbour's suggestions had packed 19x24
+   * too, which a fresh pack does not): with محمد in the spiral place's tall forms (the embracing ح of the
+   * Cairo plates) the Shahada packs at 2 of its 130 centre sizes (0 before): 24x19 from the top right and
+   * 19x25 from the bottom right. رسول keeps the panel's forms, its band closed by a bar drawn on from the و's head.
+   */
+  it.each([
+    ["topRight", 24, 19],
+    ["bottomRight", 19, 25],
+  ] as const)("the Shahada packs round الله from the %s at %dx%d, محمد in its tall forms, رسول in the panel's", (start, cols, rows) => {
+    const r = packKufiPanel({ text: SHAHADA, cols, rows, centre: true, start });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expectPacked(r, SHAHADA);
+    expect(r.centre).toMatchObject({ unitFrom: 15, col: 6, row: 6 });
+    expect(r.placements[0].turn).toBe(start === "topRight" ? 3 : 0);
+    const ids = r.placements.map((p) => p.glyphId);
+    // محمد: units 7..10
+    expect(ids[7]).toBe("meem.initial.2");
+    expect(ids[8]).toMatch(/^jeem\.medial\.[2-6]$/);
+    expect(ids[9]).toBe("meem.medial.2");
+    expect(ids[10]).toMatch(/^dal\.final\./);
+    // رسول: units 11..14, the panel's own forms
+    for (const k of [11, 12, 13, 14]) expect(kufiGlyphById(ids[k])?.glyph.only, ids[k]).toBeUndefined();
+    expect(kufiPlaceOf(r, 7)).toBe("spiral");
+  }, 30000);
+
+  it("the Shahada does not pack round a centre at 23x19 from either corner, nor محمد رسول الله at 21x17: two band words cannot fill a ring", () => {
     for (const start of ["bottomRight", "topRight"] as const) expect(packKufiPanel({ text: SHAHADA, cols: 23, rows: 19, centre: true, start }).ok).toBe(false);
     const r = packKufiPanel({ text: "محمد رسول الله", cols: 21, rows: 17, centre: true, start: "topRight" });
     expect(r.ok).toBe(false);
@@ -1299,6 +1362,11 @@ describe("Fit's centre pass", () => {
     expect(r).toEqual({ cols: 17, rows: 24, centre: true, start: "topRight" });
     expect(packKufiPanel({ text: TAWHID2, cols: r.cols, rows: r.rows, centre: true, start: "topRight" }).ok).toBe(true);
   }, 120000);
+
+  it("finds the Shahada's 24x19 round a centre, from the top right, the tenth size of the centre pass", () => {
+    const r = fitKufiPanel(SHAHADA);
+    expect(r).toEqual({ cols: 24, rows: 19, centre: true, start: "topRight" });
+  }, 180000);
 
   it("with the centre already on, Fit runs the centre pass alone and keeps the block's start", () => {
     const r = fitKufiPanel(TAWHID2, {}, { centre: true, start: "bottomRight" });

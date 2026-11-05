@@ -487,6 +487,39 @@ describe("KUFI_FORMS: pieces read off the reference panel", () => {
   });
 });
 
+describe("KUFI_FORMS: the spiral's band forms (a centre panel's bands alone)", () => {
+  const spiral = ENTRIES.filter((e) => e.g.only === "spiral").map(label);
+
+  it("are the tall forms of محمد, drawn in a centre panel's bands alone", () => {
+    expect(spiral).toEqual(["jeem.medial.2", "jeem.medial.3", "jeem.medial.4", "jeem.medial.5", "jeem.medial.6", "meem.initial.2", "meem.medial.2"]);
+    for (const id of spiral) expect(glyphById(id).base, id).toBe(0);
+  });
+
+  it("the initial meem is a hollow square on a short upright at the middle of its base; the medial one a hollow square on the line", () => {
+    expect(glyphById("meem.initial.2").rows).toEqual(["###", "#.#", "###", ".#.", "###"]);
+    expect(glyphById("meem.initial.2").stretch).toEqual([]);
+    expect(glyphById("meem.medial.2").rows).toEqual(["###", "#.#", "###"]);
+    expect(joinRow(glyphById("meem.medial.2"), "right")).toBe(2);
+  });
+
+  it("the ح of محمد is a hook embracing the letters after it: its bar reaches past its left stub by a fixed length, one form per length", () => {
+    const lengths = [2, 3, 4, 5, 6].map((n) => {
+      const g = glyphById(`jeem.medial.${n}`);
+      const w = g.rows[0].length;
+      const e = g.inset!.left! + 2; // the upright's column: the bar's columns left of it
+      expect(g.rows, g.id).toEqual(["#".repeat(e + 1) + "..", ...Array(3).fill(".".repeat(e) + "#.."), ".".repeat(e - 2) + "#####"]);
+      expect(w, g.id).toBe(e + 3);
+      expect(joinCol(g, "left"), g.id).toBe(e - 2);
+      expect(joinCol(g, "right"), g.id).toBe(w - 1);
+      // no stretch: a column slice beyond the stub would move it (see "slice inside the left inset" above)
+      expect(g.stretch, g.id).toEqual([]);
+      return e;
+    });
+    expect(lengths).toEqual([9, 10, 11, 12, 13]);
+  });
+
+});
+
 describe("KUFI_FILLS", () => {
   it("has only the lone square: dots are iʿjām, never filler", () => {
     expect(KUFI_FILLS.map((f) => f.id)).toEqual(["fill.square"]);

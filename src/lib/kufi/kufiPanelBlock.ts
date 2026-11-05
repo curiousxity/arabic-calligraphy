@@ -3,6 +3,7 @@
  * inputs, carrying the user's edits across a text change, and planning the
  * edits a canvas gesture makes. Pure: no React, no Konva, no `./harfbuzz`.
  */
+import type { KufiPlace } from "./kufiAlphabet";
 import { firstUnitOfWord, kufiFormsOf, kufiReadingStep, placedBox, placementOf } from "./kufiHit";
 import { reconcileEdits, type KufiPackResult, type KufiPanelEdits, type KufiPanelStart } from "./kufiPack";
 import { resolveKufiText, type KufiUnit } from "./kufiWords";
@@ -215,12 +216,13 @@ export function kufiMovedUnits(before: Ok, result: Ok, units: KufiUnit[], wordIn
  * The alternates to try on a click, in table order starting after the unit's
  * current glyph and wrapping round, without the current one. A glyph the
  * unit cannot take (a stale save) starts from the table's first. Empty when
- * the letter has a single form.
+ * the letter has a single form. `place` is the letter's (`kufiPlaceOf`): a
+ * centre panel's band letters cycle through the spiral's tall forms too.
  */
-export function kufiFormCycle(text: string, unitIndex: number, currentGlyphId: string): string[] {
+export function kufiFormCycle(text: string, unitIndex: number, currentGlyphId: string, place: KufiPlace = "panel"): string[] {
   const unit = resolveKufiText(text).units[unitIndex];
   if (!unit) return [];
-  const ids = kufiFormsOf(unit).map((g) => g.id);
+  const ids = kufiFormsOf(unit, place).map((g) => g.id);
   if (ids.length < 2) return [];
   const at = ids.indexOf(currentGlyphId);
   if (at < 0) return ids;

@@ -159,11 +159,14 @@ export type KufiDots = { count: 1 | 2 | 3; side: KufiDotSide };
 export type KufiDotKey = `${KufiDotSide}${1 | 2 | 3}`;
 
 /**
- * Where a letter is drawn: a rectangular panel, or a star panel (a wedge of
+ * Where a letter is drawn: a rectangular panel; a star panel (a wedge of
  * the wedges layout, or a band of the octagon layout), where tall strokes
- * are lengthened out of the line.
+ * are lengthened out of the line; a panel's centre (the last word alone in
+ * the core); or the spiral, the bands of a centre panel, whose short words
+ * must reach the band's depth on their own since no next ring interlocks
+ * with a fixed core (the tall محمد read off the Cairo Shahada plates).
  */
-export type KufiPlace = "panel" | "star" | "centre";
+export type KufiPlace = "panel" | "star" | "centre" | "spiral";
 
 export type SkeletonName =
   | "alef"
@@ -198,6 +201,25 @@ const g = (
   joins?: KufiGlyph["joins"],
   more?: Pick<KufiGlyph, "inset" | "parts" | "only" | "bars">
 ): KufiGlyph => ({ id, rows, base, stretch, ...(joins ? { joins } : {}), ...more });
+
+/**
+ * The ح of محمد in the Cairo Shahada spirals (the 1340 mosque panel, the
+ * 21x21 plate, and the compact محمد of the plates): a hook of two parallels
+ * joined on the right by an upright the band's depth, embracing the medial
+ * meem and the dal after it, which stand three rows high under its bar. The
+ * bar runs `e` columns left of the upright, over the next letters: a gap
+ * column, the meem's box, a gap column and the dal. Those columns lie beyond
+ * the left stub (`inset`), so the bar cannot stretch (a slice beyond a stub
+ * would move it) and there is one form per length. On the right the box
+ * carries its own gap column and run to the stub, so the initial meem's box
+ * stands one gap clear of the upright, as in the plates. Drawn in a centre
+ * panel's bands alone (`only: "spiral"`).
+ */
+const embracingHa = (n: number, e: number): KufiGlyph =>
+  g(`jeem.medial.${n}`, 0, ["#".repeat(e + 1) + "..", ...Array<string>(3).fill(".".repeat(e) + "#.."), ".".repeat(e - 2) + "#####"], [], undefined, {
+    only: "spiral",
+    inset: { left: e - 2 },
+  });
 
 /**
  * Every glyph. The tooth letters (ب ن ي) share their initial and medial
@@ -313,6 +335,12 @@ export const KUFI_FORMS: KufiFormTable = {
     medial: [
       g("jeem.medial.0", 0, [".###.", ".#.#.", ".#.#.", "...#.", "#####"], [{ axis: "col", index: 2 }]),
       g("jeem.medial.1", 0, [".####.", "....#.", "######"], [{ axis: "col", index: 3 }]),
+      // the embracing ح of the spiral's محمد, its bar 9 to 13 columns long (see `embracingHa`)
+      embracingHa(2, 9),
+      embracingHa(3, 10),
+      embracingHa(4, 11),
+      embracingHa(5, 12),
+      embracingHa(6, 13),
     ],
     final: [
       g("jeem.final.0", 2, ["#####.", "....#.", "######", "#.....", "#####."], [{ axis: "col", index: 2 }]),
@@ -521,10 +549,16 @@ export const KUFI_FORMS: KufiFormTable = {
     initial: [
       g("meem.initial.0", 0, [".###", ".#.#", "####"], []),
       g("meem.initial.1", 0, [".###", ".#.#", "####", "#...", "#..."], [{ axis: "row", index: 3, min: 1 }]),
+      // the spiral's initial meem of محمد (the Cairo Shahada plates and the compact محمد of the
+      // plates): a hollow square on a short upright at the middle of its base, the band's depth
+      g("meem.initial.2", 0, ["###", "#.#", "###", ".#.", "###"], [], undefined, { only: "spiral" }),
     ],
     medial: [
       g("meem.medial.0", 0, [".###.", ".#.#.", "#####"], []),
       g("meem.medial.1", 0, [".###.", ".#.#.", ".###.", ".#.#.", "##.##"], []),
+      // the spiral's medial meem of محمد: a hollow square whose base is the line, under the
+      // embracing ح's bar (the plates)
+      g("meem.medial.2", 0, ["###", "#.#", "###"], [], undefined, { only: "spiral" }),
     ],
     final: [
       g("meem.final.0", 2, ["..###.", "..#.#.", "######", "#.....", "#....."], []),
@@ -1061,6 +1095,16 @@ const DOT_CELLS: DotTable = {
   "jeem.initial.2": { above1: [[-2, 1]], below1: [[4, 2]], below3: [[6, 1], [6, 3], [8, 2]] },
   "jeem.medial.0": { above1: [[-2, 2]], below1: [[6, 2]], below3: [[6, 1], [6, 3], [8, 2]] },
   "jeem.medial.1": { above1: [[-2, 3]], below1: [[4, 3]], below3: [[4, 2], [4, 4], [6, 3]] },
+  // the embracing ح's dots sit over and under its upright (`embracingHa`: the upright is column e)
+  ...Object.fromEntries(
+    [
+      [2, 9],
+      [3, 10],
+      [4, 11],
+      [5, 12],
+      [6, 13],
+    ].map(([n, e]) => [`jeem.medial.${n}`, { above1: [[-2, e]], below1: [[6, e]], below3: [[6, e - 1], [6, e + 1], [8, e]] }])
+  ),
   "jeem.final.0": { above1: [[-2, 2]], below1: [[6, 2]], below3: [[6, 1], [6, 3], [8, 2]] },
   "dal.isolated.0": { above1: [[-2, 1]] },
   "dal.isolated.1": { above1: [[0, 2]] },

@@ -12,6 +12,7 @@ import {
   hitStretchEnd,
   kufiFormsOf,
   kufiGlyphById,
+  kufiPlaceOf,
   nearestHandle,
   nearestHandleAt,
   placedBox,
@@ -447,7 +448,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
       onSelectLetter?.(unitIndex);
       const p = placementOf(committed, unitIndex);
       if (!p) return;
-      const ids = kufiFormCycle(inputs.text, unitIndex, p.glyphId);
+      const ids = kufiFormCycle(inputs.text, unitIndex, p.glyphId, kufiPlaceOf(committed, unitIndex));
       if (ids.length === 0) {
         onNotice(fromKey, { text: SINGLE_FORM, unitIndex });
         return;
@@ -844,7 +845,7 @@ export const KufiPanelEditOverlay: React.FC<Props> = ({
       return {
         unit: p.unitIndex,
         glyphId: p.glyphId,
-        forms: unit ? kufiFormsOf(unit).length : 1,
+        forms: unit ? kufiFormsOf(unit, kufiPlaceOf(result, p.unitIndex)).length : 1,
         x: ((at % result.cols) + 0.5) * cell,
         y: (Math.floor(at / result.cols) + 0.5) * cell,
       };

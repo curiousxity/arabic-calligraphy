@@ -172,7 +172,6 @@ const CLIMB_MAX = 3;
 const FILL_MIN = 3;
 /** In a region, the most cells a filler bar may carry a stem on by: longer reads as an antenna, not a lengthened alef. */
 const STEM_BAR_MAX = 6;
-
 /** Time a first draft's search may take. The editor runs it off the main thread; nothing waits on it. */
 export const PACK_BUDGET_MS = 1400;
 /** Time the centre word's own search may take (`coreFinal`): one word in a small box, packed once per box and cached. */
@@ -441,24 +440,52 @@ function countVectors(g: KufiGlyph, rowMax = ROW_MAX): number[][] {
   return out;
 }
 
+/** Every glyph authored for the unit's joining form (else its isolated one), whatever place each is for. */
+function allFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">): KufiGlyph[] {
+  const table = KUFI_FORMS as Record<string, Partial<Record<JoiningForm, KufiGlyph[]>>>;
+  return table[unit.skeleton]?.[unit.form] ?? table[unit.skeleton]?.isolated ?? [];
+}
+
 /**
  * The alternates a unit may take: its joining form's list, else the isolated one. The packer's rule, shared with the canvas.
  * A star (`place`: a wedge or the octagon's band) takes the forms a letter has for a star where it has any
  * (`KufiGlyph.only`: الله on four uprights at a line's height, the heh with its own wall), else its forms
  * drawn whole; a rectangular panel takes the forms authored for no place. A panel's centre (the last word
  * alone in the core, `centreOf`) takes the star forms and the centre-only ones where a letter has either
- * (الله: the forms whose heh never grows taller, and the Cairo 9x5), else the panel's forms.
+ * (الله: the forms whose heh never grows taller, and the Cairo 9x5), else the panel's forms. The spiral
+ * (the bands of a centre panel) takes the spiral forms where a letter has any, as a star takes its
+ * star forms, else the panel's: the tall محمد, which a plain panel never sees, and whose forms
+ * replace the short ones there so the word rises as a whole (offered beside the short forms, the
+ * search kept the short ones and their holes, 2026-11-05).
  */
 export function kufiFormsOf(unit: Pick<KufiUnit, "skeleton" | "form">, place: KufiPlace = "panel"): KufiGlyph[] {
-  const table = KUFI_FORMS as Record<string, Partial<Record<JoiningForm, KufiGlyph[]>>>;
-  const all = table[unit.skeleton]?.[unit.form] ?? table[unit.skeleton]?.isolated ?? [];
+  const all = allFormsOf(unit);
   if (place === "panel") return all.filter((g) => !g.only);
+  if (place === "spiral") {
+    const own = all.filter((g) => g.only === "spiral");
+    return own.length > 0 ? own : all.filter((g) => !g.only);
+  }
   if (place === "centre") {
     const own = all.filter((g) => g.only === "star" || g.only === "centre");
     return own.length > 0 ? own : all.filter((g) => !g.only);
   }
   const own = all.filter((g) => g.only === place);
   return own.length > 0 ? own : all.filter((g) => !g.only && drawnWhole(g));
+}
+
+/**
+ * The glyph a unit was drawn with, by id, whatever place it was drawn in: for reading a placement, a pin
+ * or a saved form back (a band letter of a centre panel may stand in a spiral form, the centre word in a
+ * centre one). Which forms a letter may *take* is `kufiFormsOf` for its place.
+ */
+export function kufiGlyphOf(unit: Pick<KufiUnit, "skeleton" | "form">, glyphId: string): KufiGlyph | undefined {
+  return allFormsOf(unit).find((g) => g.id === glyphId);
+}
+
+/** The place a packed panel's unit is drawn in: the centre word's letters in the centre, the rest of a centre panel's in the spiral, a plain panel's in the panel. */
+export function kufiPlaceOf(result: { centre?: KufiCentre }, unitIndex: number): KufiPlace {
+  if (!result.centre) return "panel";
+  return unitIndex >= result.centre.unitFrom ? "centre" : "spiral";
 }
 
 /** The applied counts, padded to the glyph's slices; values outside the table's limits are clamped. */
@@ -3003,7 +3030,8 @@ function ctxFor(text: string, cols: number, rows: number, edits: KufiPanelEdits,
   const { units } = resolveKufiText(text);
   const a = centreOf(text, units, cols, rows);
   if ("reason" in a) return null;
-  return makeCtx(text, cols, rows, edits, pins, budgetMs, strictClock, null, opts, { units: units.slice(0, a.centre.unitFrom), centre: a.centre });
+  // the band letters take the spiral's forms: the tall محمد in place of the panel's short one
+  return makeCtx(text, cols, rows, edits, pins, budgetMs, strictClock, null, opts, { units: units.slice(0, a.centre.unitFrom), centre: a.centre, place: "spiral" });
 }
 
 // ---------------------------------------------------------------------------
@@ -3050,7 +3078,7 @@ function boxCell(turn: Turn, h: number, w: number, row: number, col: number, i: 
 function glyphCells(units: KufiUnit[], placements: KufiPlacement[], cols: number, rows: number): Uint8Array {
   const out = new Uint8Array(cols * rows);
   for (const p of placements) {
-    const g = kufiFormsOf(units[p.unitIndex]).find((x) => x.id === p.glyphId);
+    const g = kufiGlyphOf(units[p.unitIndex], p.glyphId);
     if (!g) continue;
     const sh = shapeOf(g, normalCounts(g, p.stretch));
     for (let k = 0; k < sh.ink.length; k += 2) {
@@ -3066,7 +3094,7 @@ function glyphCells(units: KufiUnit[], placements: KufiPlacement[], cols: number
  * of a glyph (`glyph`: الله has one) is that letter's own, never a dot.
  */
 function dotsDrawn(text: string, unit: KufiUnit, p: KufiPlacement, cells: Uint8Array, glyph: Uint8Array, cols: number, rows: number): number {
-  const g = kufiFormsOf(unit).find((x) => x.id === p.glyphId);
+  const g = kufiGlyphOf(unit, p.glyphId);
   if (!g) return 0;
   const d = unit.skeleton === "allah" || unit.skeleton === "lamAlef" ? null : dotsOf(text[unit.textOffset] ?? "", unit.form);
   if (!d) return 0;
@@ -3096,7 +3124,7 @@ function explicitPins(units: KufiUnit[], edits: KufiPanelEdits): Map<number, Pin
   for (const [k, p] of Object.entries(edits.pinned ?? {})) {
     const i = Number(k);
     const u = units[i];
-    const g = u && p.key === u.key ? kufiFormsOf(u).find((x) => x.id === p.glyphId) : undefined;
+    const g = u && p.key === u.key ? kufiGlyphOf(u, p.glyphId) : undefined;
     // a stretch the glyph cannot take would be quietly corrected: a moved pin
     if (!g || !sameCounts(normalCounts(g, p.stretch), p.stretch)) return null;
     pins.set(i, pinOf(p, null, true));
@@ -3368,7 +3396,7 @@ function lineKeys(units: KufiUnit[], prev: KufiPlacement[]): string[] {
   const keys: string[] = [];
   prev.forEach((p, k) => {
     const u = units[k];
-    const g = kufiFormsOf(u).find((x) => x.id === p.glyphId);
+    const g = kufiGlyphOf(u, p.glyphId);
     const startsLine = k === 0 || !units[k - 1].joinsNext || prev[k - 1].turn !== p.turn;
     if (!g || !startsLine) {
       keys.push(keys[k - 1] ?? "?");
@@ -3385,7 +3413,7 @@ function sameCounts(a: number[], b: number[]): boolean {
 
 /** Cells (row-major indices) a placement's glyph box covers. */
 function boxIndices(p: KufiPlacement, units: KufiUnit[], cols: number, rows: number): number[] {
-  const g = kufiFormsOf(units[p.unitIndex]).find((x) => x.id === p.glyphId);
+  const g = kufiGlyphOf(units[p.unitIndex], p.glyphId);
   if (!g) return [];
   const sh = shapeOf(g, normalCounts(g, p.stretch));
   const tall = p.turn === 0 || p.turn === 2;
@@ -3450,7 +3478,7 @@ function repack(
   const dirty = new Set<number>();
   units.forEach((u, k) => {
     const p = prev[k];
-    const g = kufiFormsOf(u).find((x) => x.id === p.glyphId);
+    const g = kufiGlyphOf(u, p.glyphId);
     if (edits.forms?.[k] !== undefined && edits.forms[k] !== p.glyphId) dirty.add(k);
     if (edits.stretch?.[k] && g && !sameCounts(normalCounts(g, edits.stretch[k]), p.stretch)) dirty.add(k);
     const pin = edits.pinned?.[k];
@@ -3797,7 +3825,8 @@ function alignUnits(oldUnits: KufiUnit[], newUnits: KufiUnit[]): Map<number, num
 export function reconcileEdits(edits: KufiPanelEdits, oldUnits: KufiUnit[], newUnits: KufiUnit[]): KufiPanelEdits {
   const to = alignUnits(oldUnits, newUnits);
   const stale = new Set<number>();
-  const fits = (k: number, glyphId: string) => !!newUnits[k] && kufiFormsOf(newUnits[k]).some((g) => g.id === glyphId);
+  // a form of any place: a centre panel's band letters stand in spiral forms, its centre word in centre ones
+  const fits = (k: number, glyphId: string) => !!newUnits[k] && !!kufiGlyphOf(newUnits[k], glyphId);
   for (const [k, p] of Object.entries(edits.pinned ?? {})) {
     const j = to.get(+k);
     if (j === undefined || p.key !== newUnits[j].key || !fits(j, p.glyphId)) stale.add(+k);
@@ -3810,7 +3839,7 @@ export function reconcileEdits(edits: KufiPanelEdits, oldUnits: KufiUnit[], newU
     const j = to.get(+k);
     if (j === undefined || !fits(j, id)) stale.add(+k);
   }
-  const maxSlices = (j: number) => Math.max(0, ...kufiFormsOf(newUnits[j]).map((g) => g.stretch.length));
+  const maxSlices = (j: number) => Math.max(0, ...allFormsOf(newUnits[j]).map((g) => g.stretch.length));
   const carry = <T,>(m: Record<number, T> | undefined, ok: (j: number, v: T) => boolean): Record<number, T> | undefined => {
     if (!m) return undefined;
     const out: Record<number, T> = {};
