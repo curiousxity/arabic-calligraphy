@@ -288,6 +288,37 @@ test("Centre word: Last word packs «لا إله إلا الله» twice at 21×
   expect(errors).toEqual([]);
 });
 
+test("Centre word: the Shahada packs at 24×19 from the top right, محمد in its tall forms round الله in the middle", async ({ page }) => {
+  const errors = collectConsoleErrors(page);
+  await gotoApp(page);
+  const id = await addKufiPanel(page);
+  await setBlockText(page, "لا إله إلا الله محمد رسول الله", id);
+  for (const [which, n] of [
+    ["Width", "24"],
+    ["Height", "19"],
+  ] as const) {
+    const field = sizeField(page, which);
+    await field.click();
+    await field.press("ControlOrMeta+a");
+    await field.pressSequentially(n);
+    await field.press("Enter");
+  }
+  await expect.poll(async () => (await panelOf(page, id))?.panelRows).toBe(19);
+  await page.waitForTimeout(400);
+  await kufiPanel(page).getByLabel("Centre word").selectOption("last");
+  await expect.poll(async () => (await centreOf(page, id)).panelCentre).toBe(true);
+  await page.waitForTimeout(400);
+  await kufiPanel(page).getByLabel("Start").selectOption("topRight");
+  await expect.poll(async () => (await centreOf(page, id)).panelStart).toBe("topRight");
+  await expect(kufiPanel(page)).not.toContainText(/Too (long|short)/, { timeout: 60_000 });
+  await expect.poll(() => namedNodeCount(page, "kufi-unfit-frame"), { timeout: 60_000 }).toBe(0);
+  const box = await blockClientBox(page, id);
+  await expect
+    .poll(async () => inkPixels(page, await blockClientBox(page, id)), { timeout: 60_000 })
+    .toBeGreaterThan(box.width * box.height * 0.15);
+  expect(errors).toEqual([]);
+});
+
 test("a box too small for the text offers sizes that fit", async ({ page }) => {
   await gotoApp(page);
   const id = await addKufiPanel(page);

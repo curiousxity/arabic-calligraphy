@@ -101,16 +101,26 @@ interpolated steps; the mechanics are in `CLAUDE.md`'s "End-to-end tests".
 
 ## Shipped
 
+### 2026-11-05 — Kufi panel: the tall محمد of the Cairo plates — on `claude/kufi-star`, not merged
+
+- A centre panel's bands pack in a place of their own (`"spiral"`), where
+  محمد takes the forms of the Cairo Shahada spirals: a meem on a short
+  upright, the ح as a hook embracing the meem and the dal. **The Shahada
+  now packs with الله in the centre** (24×19 from the top right, which Fit
+  finds), from 0 of 130 sizes to the few recorded in
+  [kufi-panel.md](.claude/rules/kufi-panel.md) ("The spiral place",
+  Measured); رسول keeps the panel's forms, its band closed by a bar from the
+  و's head. The tall ر, س and و that were tried and dropped are in
+  [deferred-features.md](.claude/rules/deferred-features.md).
+
 ### 2026-11-04 — Kufi panel: a word in the centre — on `claude/kufi-star`, not merged
 
 - **Centre word** and **Start** in the Kufi panel section (`panelCentre`,
   `panelStart`): the text's last word alone in the core, the other words
   round it, begun at the bottom right or the top right; Fit tries the centre
-  when nothing else packs. لا إله إلا الله twice packs at 21×17; **the
-  Shahada still does not** (its short words), measured and recorded in
-  [kufi-panel.md](.claude/rules/kufi-panel.md) ("A word in the centre");
-  what it would take is in
-  [deferred-features.md](.claude/rules/deferred-features.md).
+  when nothing else packs. لا إله إلا الله twice packs at 21×17; the
+  Shahada did not yet (its short words), measured and recorded in
+  [kufi-panel.md](.claude/rules/kufi-panel.md) ("A word in the centre").
 
 ### 2026-11-01 — Kufi star panel — on `claude/kufi-star`, not merged
 

@@ -102,8 +102,9 @@ export const section: GuideSection = {
       <p>
         Several short words work well, such as «سبحان الله», «الله أكبر» and
         «قل هو الله أحد», and so does «لا يكلف الله نفسا إلا وسعها». The Shahada
-        and short single words such as «محمد» usually show "Too long" or "Too
-        short" at every size for now.
+        fills a box only with «الله» in the centre (below); short single words
+        such as «محمد» usually show "Too long" or "Too short" at every size
+        for now.
       </p>
 
       <h4>A word in the centre</h4>
@@ -119,18 +120,20 @@ export const section: GuideSection = {
         either way. Switching the centre on or off lets every letter find a
         new place, so hand-placed letters are released (their shapes and
         stroke lengths are kept). The letters in the middle are the panel's
-        own: they take no stretching, moving or painting. It suits a longer
-        text whose words stand on tall strokes, such as «لا إله إلا الله»
-        written twice, shown here at 21×17 with «الله» in the middle; a text
-        with short words, the Shahada among them, does not fill the ring yet.
+        own: they take no stretching, moving or painting. In these bands the
+        word «محمد» takes the tall forms of the old Cairo panels, with the ح
+        drawn as a hook embracing the letters after it, so the Shahada fills a
+        box this way: shown here at 24×19, started at the top right, with
+        «الله» in the middle. A longer text whose words all stand on tall
+        strokes, such as «لا إله إلا الله» written twice, fills one too.
       </p>
       <svg
-        viewBox="0 0 21 17"
+        viewBox="0 0 24 19"
         role="img"
-        aria-label="A 21 by 17 square-Kufi panel: لا إله إلا الله twice round the frame, with الله alone in the middle"
-        style={{ display: "block", width: "100%", maxWidth: 252, margin: "8px auto 12px" }}
+        aria-label="A 24 by 19 square-Kufi panel: the Shahada round the frame, begun at the top right, with الله alone in the middle"
+        style={{ display: "block", width: "100%", maxWidth: 288, margin: "8px auto 12px" }}
       >
-        <path fill="currentColor" d="M0 0h3v1h-3zM4 0h3v1h-3zM8 0h1v1h-1zM10 0h5v1h-5zM16 0h1v1h-1zM18 0h3v1h-3zM0 1h1v1h-1zM2 1h3v1h-3zM8 1h1v1h-1zM10 1h1v1h-1zM12 1h1v1h-1zM14 1h1v1h-1zM16 1h1v1h-1zM18 1h1v1h-1zM20 1h1v1h-1zM0 2h3v1h-3zM4 2h3v1h-3zM8 2h1v1h-1zM10 2h1v1h-1zM12 2h3v1h-3zM16 2h1v1h-1zM18 2h3v1h-3zM8 3h1v1h-1zM10 3h1v1h-1zM12 3h1v1h-1zM16 3h1v1h-1zM19 3h1v1h-1zM0 4h3v1h-3zM4 4h1v1h-1zM6 4h3v1h-3zM10 4h1v1h-1zM12 4h3v1h-3zM16 4h1v1h-1zM18 4h3v1h-3zM0 5h1v1h-1zM2 5h1v1h-1zM4 5h1v1h-1zM16 5h1v1h-1zM18 5h1v1h-1zM20 5h1v1h-1zM0 6h5v1h-5zM6 6h3v1h-3zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM0 7h1v1h-1zM6 7h1v1h-1zM8 7h1v1h-1zM10 7h1v1h-1zM12 7h1v1h-1zM14 7h1v1h-1zM18 7h1v1h-1zM20 7h1v1h-1zM0 8h5v1h-5zM6 8h3v1h-3zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM0 9h1v1h-1zM8 9h1v1h-1zM10 9h1v1h-1zM12 9h1v1h-1zM14 9h1v1h-1zM16 9h1v1h-1zM18 9h1v1h-1zM20 9h1v1h-1zM0 10h5v1h-5zM6 10h1v1h-1zM8 10h7v1h-7zM16 10h1v1h-1zM18 10h1v1h-1zM20 10h1v1h-1zM16 11h1v1h-1zM18 11h1v1h-1zM20 11h1v1h-1zM0 12h3v1h-3zM4 12h1v1h-1zM6 12h3v1h-3zM10 12h3v1h-3zM14 12h1v1h-1zM16 12h1v1h-1zM18 12h3v1h-3zM8 13h1v1h-1zM12 13h1v1h-1zM14 13h1v1h-1zM16 13h1v1h-1zM19 13h1v1h-1zM0 14h3v1h-3zM4 14h3v1h-3zM8 14h1v1h-1zM10 14h3v1h-3zM14 14h1v1h-1zM16 14h1v1h-1zM18 14h3v1h-3zM0 15h1v1h-1zM2 15h3v1h-3zM8 15h1v1h-1zM10 15h1v1h-1zM12 15h1v1h-1zM14 15h1v1h-1zM16 15h1v1h-1zM18 15h1v1h-1zM20 15h1v1h-1zM0 16h3v1h-3zM4 16h3v1h-3zM8 16h1v1h-1zM10 16h5v1h-5zM16 16h1v1h-1zM18 16h3v1h-3z" />
+        <path fill="currentColor" d="M0 0h3v1h-3zM4 0h9v1h-9zM14 0h3v1h-3zM18 0h6v1h-6zM0 1h1v1h-1zM4 1h1v1h-1zM6 1h1v1h-1zM8 1h1v1h-1zM10 1h1v1h-1zM14 1h1v1h-1zM21 1h1v1h-1zM23 1h1v1h-1zM0 2h1v1h-1zM2 2h1v1h-1zM4 2h1v1h-1zM6 2h1v1h-1zM8 2h1v1h-1zM10 2h3v1h-3zM14 2h1v1h-1zM16 2h1v1h-1zM18 2h6v1h-6zM10 3h1v1h-1zM12 3h1v1h-1zM14 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM4 4h1v1h-1zM6 4h7v1h-7zM14 4h1v1h-1zM16 4h8v1h-8zM0 5h1v1h-1zM2 5h1v1h-1zM4 5h1v1h-1zM0 6h3v1h-3zM4 6h1v1h-1zM6 6h12v1h-12zM19 6h5v1h-5zM0 7h1v1h-1zM4 7h1v1h-1zM13 7h1v1h-1zM15 7h1v1h-1zM17 7h1v1h-1zM23 7h1v1h-1zM0 8h3v1h-3zM4 8h1v1h-1zM6 8h6v1h-6zM13 8h1v1h-1zM15 8h1v1h-1zM17 8h1v1h-1zM19 8h5v1h-5zM0 9h1v1h-1zM2 9h1v1h-1zM4 9h1v1h-1zM11 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM17 9h1v1h-1zM19 9h1v1h-1zM21 9h1v1h-1zM23 9h1v1h-1zM0 10h3v1h-3zM4 10h1v1h-1zM6 10h6v1h-6zM13 10h1v1h-1zM15 10h1v1h-1zM17 10h1v1h-1zM19 10h1v1h-1zM21 10h1v1h-1zM23 10h1v1h-1zM0 11h1v1h-1zM2 11h1v1h-1zM4 11h1v1h-1zM6 11h1v1h-1zM11 11h1v1h-1zM13 11h1v1h-1zM15 11h1v1h-1zM17 11h1v1h-1zM19 11h1v1h-1zM21 11h1v1h-1zM23 11h1v1h-1zM0 12h1v1h-1zM2 12h1v1h-1zM4 12h1v1h-1zM6 12h12v1h-12zM19 12h1v1h-1zM21 12h3v1h-3zM0 13h1v1h-1zM4 13h1v1h-1zM0 14h5v1h-5zM6 14h3v1h-3zM10 14h1v1h-1zM12 14h1v1h-1zM14 14h1v1h-1zM16 14h8v1h-8zM0 15h1v1h-1zM8 15h1v1h-1zM10 15h1v1h-1zM12 15h1v1h-1zM0 16h1v1h-1zM2 16h3v1h-3zM6 16h3v1h-3zM10 16h1v1h-1zM12 16h1v1h-1zM14 16h1v1h-1zM16 16h4v1h-4zM21 16h3v1h-3zM0 17h3v1h-3zM4 17h1v1h-1zM6 17h1v1h-1zM8 17h1v1h-1zM10 17h1v1h-1zM12 17h1v1h-1zM14 17h1v1h-1zM19 17h3v1h-3zM23 17h1v1h-1zM0 18h1v1h-1zM2 18h3v1h-3zM6 18h7v1h-7zM14 18h1v1h-1zM16 18h4v1h-4zM21 18h3v1h-3z" />
       </svg>
 
       <h4>Editing on the canvas</h4>

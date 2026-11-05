@@ -528,21 +528,79 @@ what it was. With the centre off the packer takes exactly today's path:
   whose centre is already on gets the centre pass alone, with its own
   start, so Fit never switches a centre off. A failing text can now cost a
   Fit 18 s on the clock (two passes), under the 30 s watchdog.
-- **Measured 2026-11-04** (work-bounded; `kufiPack.test.ts` pins the
-  fixtures): **the Shahada does not pack round a centre at any of its 130
-  centre sizes from either corner**, nor does محمد رسول الله (two band words
-  cannot fill a ring), nor محمد أبو بكر عمر عثمان علي (علي fills no core up
-  to 17x9: its letters stand at different heights). The reason is not the
-  search: محمد and رسول have no tall letter, and a band whose letters stop
-  short of its depth is closed in a plain panel by the next ring's letters
-  interlocking into it, while a fixed core interlocks with nothing. At
-  23x19 the Shahada's best attempt places every letter but رسول's lam, with
-  six holes above محمد's meems. What packs is a text whose band words all
-  stand on tall strokes: **لا إله إلا الله twice at 21x17 from either
-  corner** (Fit finds 17x24, top right), الله ×5 at 21x17 (الله on four
-  sides round a centre الله), الله أكبر ×2 الله at 21x17 and 23x17, and the
-  single لا إله إلا الله at 17x21, 17x22, 19x21 and 23x17 (with many bars).
-  الله fills cores of 9 to 13 wide by 5 to 13 tall; محمد a 15x5 or 17x5 core.
+- **The spiral place: the tall محمد** (2026-11-05). A band whose letters
+  stop short of its depth is closed in a plain panel by the next ring's
+  letters interlocking into it; round a fixed core nothing does, so a short
+  word must reach the band's depth by itself. The band letters of a centre
+  panel are therefore packed in a place of their own, `KufiPlace`
+  `"spiral"` (`ctxFor` passes it to `makeCtx` for `lettersOf`), which takes a
+  letter's `only: "spiral"` forms **in place of** its panel forms where it
+  has any, as a star takes its star forms, and the panel's forms otherwise
+  (`kufiFormsOf`). Offered beside the short forms instead, the search kept
+  the short ones and their holes. No plain panel, star or octagon sees them.
+  The forms are محمد's, read off the Cairo Shahada spirals (the 1340 mosque
+  panel, the 21x21 plate, and the plates' compact محمد), the word of the
+  Shahada that the plain forms left open: `meem.initial.2`, a hollow square
+  on a short upright at the middle of its base, five rows; `jeem.medial.2`
+  to `.6`, the ح as a hook of two parallels joined on the right by an
+  upright the band's depth, whose bar reaches **past its left stub**
+  (`inset.left`) over the medial meem and the dal, which stand three rows
+  high under it, one gap row below the bar, a gap column before the
+  upright; and `meem.medial.2`, a hollow square whose base is the line. The
+  embrace is a fixed length, 9 to 13 columns (a column slice beyond a stub
+  would move the stub, which the alphabet test forbids), so there is one
+  form per length and the search picks; the dal keeps the panel's forms
+  (`dal.final.0` widened by one to meet the bar's end). The word's rise is
+  structural: every letter of محمد that has a spiral form stands in it, so
+  the word rises as a whole, never one tall stroke beside short siblings. A
+  heh never grows taller: no spiral form has a row slice. Which uprights
+  count as shafts is unchanged (`KUFI_SHAFT_LETTERS`): none of these is one,
+  so no bar lengthens them.
+  **رسول keeps the panel's forms.** Its ر, س and و were given tall forms
+  too (a five-row ر standing on its bar as the corner ر of the plates, a
+  raised س on three teeth with its first tooth carried down to the line,
+  the و's head on its wall with a foot) and dropped: the ر's bar leaves a
+  two-column shadow beside its upright that only the next piece can fill,
+  and in the plates the س sits inside the ر's embrace, which the packer's
+  pieces cannot do (a piece starts past the one before it, `st.cursor`;
+  letting the raised س start back over the ر's bar packed رسول alone in a
+  box but cost لا إله إلا الله twice its 21x17 packing when done for every
+  piece, and found nothing when done for the س alone, since the rigid
+  ر-س-و-ل of 15 cells fits no side of the sizes the text fills). What
+  closes رسول's band is the panel's own means: the و on its foot with its
+  head at the band's top (`waw.final.1`, five rows) and a **filler bar
+  drawn on from the head's top bar over the س** (the panel's `barEnds`
+  rule, a stroke drawn on along the line), with محمد's dal interlocking at
+  the corner under the three-row ر.
+- **Recognising a drawn form** is place-agnostic: `kufiGlyphOf(unit, id)`
+  finds a glyph of any place, so a pin, a saved form, a previous panel's
+  placement or an explored try on a band letter in a spiral form (or the
+  centre word in a centre form) is read back (`glyphCells`, `dotsDrawn`,
+  `explicitPins`, `lineKeys`, `boxIndices`, `repack`, `reconcileEdits`).
+  Which forms a letter may *take* stays `kufiFormsOf` for its place, and the
+  UI asks for the letter's place with `kufiPlaceOf(result, unitIndex)`
+  (centre, spiral or panel): the exploration's changes and options
+  (`kufiExplore`), the click cycle (`kufiFormCycle`'s `place`) and the
+  overlay's e2e targets, so a band letter's forms list is the one it was
+  drawn from.
+- **Measured 2026-11-05** (work-bounded, every size on a cold cache;
+  `kufiPack.test.ts` pins the fixtures): **the Shahada packs round a centre
+  at 24x19 from the top right and at 19x25 from the bottom right**, 2 of
+  its 130 centre sizes from either corner (0 of 130 on 2026-11-04, before
+  the tall محمد), with two filler squares and two or three bars each; Fit
+  finds 24x19, top right, the tenth size of its centre pass. (A scan on a
+  warm cache counts 19x24 too: a failing neighbour's suggestions pack it,
+  a fresh pack on its own budget does not, so it is not pinned.) In the
+  packed panels لا إله and إلا الله take the first two sides, محمد the
+  third in its tall forms and رسول the fourth in the panel's, with الله
+  upright in the core at 24x19 and turned at 19x25. محمد رسول الله is still `tooShort` at every
+  size (two band words cannot fill a ring) and محمد أبو بكر عمر عثمان علي
+  still fills no core with علي. What else packs: **لا إله إلا الله twice at
+  21x17 from either corner** (Fit finds 17x24, top right), الله ×5 at 21x17
+  (الله on four sides round a centre الله), الله أكبر ×2 الله at 21x17 and
+  23x17, and the single لا إله إلا الله at 17x21, 17x22, 19x21 and 23x17
+  (with many bars). الله fills cores of 9 to 13 wide by 5 to 13 tall; محمد
+  a 15x5 or 17x5 core.
 
 ## Tests
 
@@ -556,17 +614,23 @@ check a layout use the clock override; do not add wall-clock assertions.
 
 - **Some texts still do not pack.** Fit now packs الله أكبر, سبحان الله
   (13x15), قل هو الله أحد and Bismillah (17x19), by rectangles and bars, as
-  well as the Al-Baqarah-like texts. **The Shahada does not pack**, with the
-  centre off (a band holds one word's pieces, and there are few corner /
-  turn options) or on (see "A word in the centre", Measured: محمد and رسول
-  have no tall letter, and a band that stops short of its depth is closed by
-  the next ring in a plain panel and by nothing round a fixed core). Short
-  single words such as محمد do not pack either. What would let the Shahada
-  round a centre pack is a set of tall alternates for the short letters (a
-  meem on a stem, tall teeth for س, a reh that rises), for the band letters
-  of a centre panel alone, so that no plain panel changes; that and the
-  shallower laps are in [deferred-features.md](deferred-features.md) with
-  the other layouts.
+  well as the Al-Baqarah-like texts. **The Shahada packs only with the
+  centre on** (24x19 from the top right, 19x25 from the bottom right; see
+  "A word in the centre", Measured): with it off a band holds
+  one word's pieces and there are few corner / turn options. Short single
+  words such as محمد do not pack either. Round a centre, رسول's band is
+  closed by a filler bar drawn on from the و's head over the س, not by a
+  tall form of its own: its ر has none that packs (see "The spiral place").
+  The spiral forms are محمد's alone; another short word in a centre
+  panel's bands (a ب, a ن, a د without a tall neighbour) still leaves its
+  band open. Shallower laps are in
+  [deferred-features.md](deferred-features.md) with the other layouts.
+- **The embracing ح is taken wherever محمد stands in a centre panel's
+  bands**, since the spiral place replaces the panel forms: a text with a
+  ح followed by a letter taller than three rows, or by more than a dal's
+  width of letters, has no ح form that fits there and does not pack with
+  the centre on. Only محمد's letters have spiral forms, so any other word
+  packs as before.
 - **A centre panel needs a long text of tall letters.** The core's smallest
   ring is 21x17 round a 9x5 الله, about 56 cells of baseline, and every band
   letter must reach the band's depth or be stretched to it; a text of two

@@ -88,11 +88,17 @@ lays every panel as one ring of bands around a square or rectangle (see
      `panelStart`; see [kufi-panel.md](kufi-panel.md), "A word in the
      centre"). Left for later from that design, each recorded with its
      reason there:
-     - **Tall alternates for the short letters in a centre panel's bands**
-       (a meem on a stem, tall teeth for س, a reh that rises), in a place of
-       their own so no plain panel changes. This is what the Shahada needs:
-       its محمد and رسول stop short of the band's depth, and a fixed core
-       interlocks with nothing. Measured 2026-11-04: 0 of 130 sizes.
+     - **Tall alternates for the short letters in a centre panel's bands:
+       built 2026-11-05 for محمد** (the `"spiral"` place: a meem on a stem,
+       the ح as a hook embracing the meem and the dal, read off the Cairo
+       Shahada plates; see [kufi-panel.md](kufi-panel.md), "The spiral
+       place"). The Shahada packs at 2 of its 130 centre sizes (0 before).
+       Left for later: a tall ر, س and و for رسول (authored and dropped: a
+       ر's bar shadows its upright, and the plates close it by nesting the
+       س inside the ر's embrace, which unjoined pieces cannot do in the
+       packer; رسول's band closes by a filler bar from the و's head
+       instead), and tall forms for other short words (ب ن ت د alone in a
+       band), which still leave a centre panel's band open.
      - **Laps of different depth** (the design's riskiest part): deferred
        untried, since a shallower lap would not close the Shahada's bands
        either (its sides mix tall and short letters), and the spec's own
