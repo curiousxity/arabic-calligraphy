@@ -1299,6 +1299,8 @@ Spill group:
 | 731.s0 | 0.975 | 0.992 |
 | 732.s0 | 0.974 | 0.987 |
 
+**Dots in 226's bowl (2026-11-04).** Single-pixel holes in a line in 226.s1, at under 180 px a nuqta only. They come from drawing ink to a small raster, between the pen's placements: about 30 strokes' bare pen ink has them, and patches paint them out. No patch made one. 226.s1 was the one left showing; one disc over the line cleared it. The app draws by joining vector hulls, not this raster, and has not been tested for this.
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
