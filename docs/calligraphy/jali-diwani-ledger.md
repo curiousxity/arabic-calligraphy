@@ -1303,6 +1303,35 @@ Spill group:
 
 **Join 4, the ha into the mim, and its barb (the user, 2026-11-04; approved).** The "nub" above is a small sharp barb in the studio's outline, beside a notch. The one-movement fit had rounded it into a shoulder. Patches from the studio's outline brought it back: the end of the ha's tail (151.s0) is the barb. The crown's fold is gone too (151.s1, and its eye, 151.s2), and the mim's head and stem are patched (672.s0, 672.s1). The join scores 0.990 at the studio's placement. The barb is a one-off exception to strokes being smooth (the user: "it is an exception to the rule basically because i like it"), not a new rule. The pen paths stay one movement, but this shape depends on the patches, which the app does not yet draw.
 
+**The Bismillah, whole (the user, 2026-11-04; approved).** Every stroke but the Allah module, from the best fit of each, patched from the studio's outline on sets holding one stroke per shape: 0.989 at the studio's placements. It includes 059.s2 (open since 2026-10-31, its join to the sin now clean) and seven strokes approved in October: 003.s0, 059.s0, 059.s1, 136.s0, 136.s1, 136.s2, 105.s0. These versions replace the October ones. The sin's points now follow the studio, without the small caps of 2026-11-01 (the 2026-11-04 approval covers this). The word's shape depends on patches the app does not yet draw. Scores: fit as found, then patched.
+
+| stroke | before | now |
+|---|---|---|
+| T20.s0 | 0.979 | 0.995 |
+| 059.s0 | 0.896 | 0.989 |
+| 059.s1 | 0.961 | 0.992 |
+| 059.s2 | 0.957 | 0.986 |
+| 314.s0 | 0.769 | 0.993 |
+| 314.s1 | 0.805 | 0.993 |
+| 647.s0 | 0.962 | 0.987 |
+| 647.s1 | 0.906 | 0.972 |
+| 647.s2 | 0.897 | 0.991 |
+| 647.s3 | 0.909 | 0.995 |
+| T06.s0 | 0.766 | 0.985 |
+| T06.s1 | 0.908 | 0.971 |
+| 003.s0 | 0.986 | 0.990 |
+| 599.s0 | 0.924 | 0.993 |
+| 599.s1 | 0.984 | 0.993 |
+| 249.s0 | 0.923 | 0.991 |
+| 249.s1 | 0.979 | 0.990 |
+| 685.s0 | 0.749 | 0.993 |
+| 685.s1 | 0.931 | 0.995 |
+| 136.s0 | 0.940 | 0.992 |
+| 105.s0 | 0.780 | 0.992 |
+| T22.s1 | 0.962 | 0.995 |
+| 136.s1 | 0.862 | 0.987 |
+| 136.s2 | 0.733 | 0.984 |
+
 **Hairlines drawn with the pen's tip are fitted apart from the body.**
 T18.s0 is one outline on the sheet: a thick body with a hairline loop off
 the tail's end and another hanging under the head. The course draws such
